@@ -1,0 +1,22 @@
+#########################################################################################
+# [ WARNING ]
+# patroni service unit file maintained by the postgres-operator
+# local changes may be overwritten.
+#########################################################################################
+[Unit]
+Description=Runners to orchestrate a high-availability PostgreSQL
+After=syslog.target network.target
+
+[Service]
+Type=simple
+
+User=postgres
+Group=postgres
+
+ExecStart=/usr/local/bin/patroni /var/lib/postgresql/data/patroni.yml
+KillMode=process
+TimeoutSec=30
+Restart=no
+
+[Install]
+WantedBy=multi-user.targ
