@@ -17,6 +17,7 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
     WaitingStatus,
 )
@@ -53,8 +54,19 @@ class PostgresqlOperatorCharm(CharmBase):
         # Prevent the default cluster creation.
         self._cluster.inhibit_default_cluster_creation()
 
-        # Install the PostgreSQL packages.
-        self._install_apt_packages(event, ["postgresql"])
+        # Install the PostgreSQL and Patroni requirements packages.
+        self._install_apt_packages(event, ["postgresql", "python3-pip", "python3-psycopg2"])
+
+        try:
+            resource_path = self.model.resources.fetch("patroni")
+        except ModelError as e:
+            logger.error(f"missing patroni resource {str(e)}")
+            self.unit.status = BlockedStatus("Missing 'patroni' resource")
+            return
+
+        # Build Patroni package path with raft dependency and install it.
+        patroni_package_path = f"{str(resource_path)}[raft]"
+        self._install_pip_packages([patroni_package_path])
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
@@ -123,6 +135,20 @@ class PostgresqlOperatorCharm(CharmBase):
         except apt.PackageNotFoundError:
             logger.error("a specified package not found in package cache or on system")
             self.unit.status = BlockedStatus("failed to install packages")
+
+    def _install_pip_packages(self, packages: List[str]) -> None:
+        """Simple wrapper around pip install."""
+        try:
+            command = [
+                "pip3",
+                "install",
+                " ".join(packages),
+            ]
+            logger.debug(f"installing python packages: {', '.join(packages)}")
+            subprocess.check_call(command)
+        except subprocess.SubprocessError:
+            logger.error("could not install pip packages")
+            self.unit.status = BlockedStatus("failed to install pip packages")
 
     def _new_password(self) -> str:
         """Generate a random password string.

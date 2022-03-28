@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import re
+import subprocess
 import unittest
 from unittest.mock import Mock, patch
 
@@ -29,17 +30,29 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.charm = self.harness.charm
 
+    @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
     @patch("charm.PostgresqlCluster.inhibit_default_cluster_creation")
     def test_on_install(
-        self,
-        _inhibit_default_cluster_creation,
-        _install_apt_packages,
+        self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
+        # Test without adding Patroni resource.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
         _inhibit_default_cluster_creation.assert_called_once()
         _install_apt_packages.assert_called_once()
+        # Assert that the needed calls were made.
+        _install_pip_packages.assert_not_called()
+        # Assert the status set by the event handler.
+        self.assertEqual(
+            self.harness.model.unit.status,
+            BlockedStatus("Missing 'patroni' resource"),
+        )
+
+        # Add an empty file as Patroni resource just to check that the correct calls were made.
+        self.harness.add_resource("patroni", "")
+        self.charm.on.install.emit()
+        _install_pip_packages.assert_called_once()
         # Assert the status set by the event handler.
         self.assertEqual(
             self.harness.model.unit.status,
@@ -141,10 +154,25 @@ class TestCharm(unittest.TestCase):
     def test_install_apt_packages(self, _update, _add_package):
         mock_event = Mock()
 
+        # Mock the returns of apt-get update calls.
+        _update.side_effect = [
+            subprocess.CalledProcessError(returncode=1, cmd="apt-get update"),
+            None,
+            None,
+        ]
+
+        # Test for problem with apt update.
+        self.charm._install_apt_packages(mock_event, "postgresql")
+        _update.assert_called_once()
+        self.assertEqual(
+            self.harness.model.unit.status,
+            BlockedStatus("failed to update apt cache"),
+        )
+
         # Test with a not found package.
         _add_package.side_effect = apt.PackageNotFoundError
         self.charm._install_apt_packages(mock_event, "postgresql")
-        _update.assert_called_once()
+        _update.assert_called()
         _add_package.assert_called_once_with("postgresql")
         self.assertEqual(
             self.harness.model.unit.status,
@@ -158,6 +186,37 @@ class TestCharm(unittest.TestCase):
         self.charm._install_apt_packages(mock_event, "postgresql-12")
         _update.assert_called_once()
         _add_package.assert_called_once_with("postgresql-12")
+
+    @patch("subprocess.call")
+    def test_install_pip_packages(self, _call):
+        # Fake pip packages.
+        packages = ["package1", "package2"]
+
+        _call.side_effect = [None, subprocess.SubprocessError]
+
+        # Then test for a succesful install.
+        self.charm._install_pip_packages(packages)
+        # Check that check_call was invoked with the correct arguments.
+        _call.assert_called_once_with(
+            [
+                "pip3",
+                "install",
+                "package1 package2",
+            ]
+        )
+        # Assert the status set by the event handler.
+        self.assertNotEqual(
+            self.harness.model.unit.status,
+            BlockedStatus("failed to install pip packages"),
+        )
+
+        # Then, test for an error.
+        self.charm._install_pip_packages(packages)
+        # Assert the status set by the event handler.
+        self.assertEqual(
+            self.harness.model.unit.status,
+            BlockedStatus("failed to install pip packages"),
+        )
 
     def test_new_password(self):
         # Test the password generation twice in order to check if we get different passwords and
