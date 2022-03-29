@@ -3,6 +3,10 @@
 # patroni configuration file maintained by the postgres-operator
 # local changes may be overwritten.
 #########################################################################################
+# For a complete reference of all the options for this configuration file,
+# please refer to https://patroni.readthedocs.io/en/latest/SETTINGS.html.
+
+# Name of the cluster.
 scope: {{ scope }}
 namespace: /db/
 name: {{ member_name }}
@@ -17,6 +21,8 @@ raft:
 
 bootstrap:
   dcs:
+    # Settings related to the time without communication
+    # to the leader before triggering a failover.
     ttl: 30
     loop_wait: 10
     retry_timeout: 10
@@ -34,6 +40,7 @@ bootstrap:
 postgresql:
   listen: '{{ self_ip }}:5432'
   connect_address: '{{ self_ip }}:5432'
+  # Path to PostgreSQL binaries used in the database bootstrap process.
   bin_dir: /usr/lib/postgresql/{{ version }}/bin/
   data_dir: {{ conf_path }}/pgdata
   pgpass: /tmp/pgpass
