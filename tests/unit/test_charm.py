@@ -59,6 +59,41 @@ class TestCharm(unittest.TestCase):
             WaitingStatus("waiting to start PostgreSQL"),
         )
 
+    @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
+    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
+    @patch("charm.PostgresqlCluster.inhibit_default_cluster_creation")
+    def test_on_install_apt_failure(
+        self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
+    ):
+        # Mock the result of the call.
+        _install_apt_packages.side_effect = apt.PackageNotFoundError
+        # Trigger the hook.
+        self.charm.on.install.emit()
+        # Assert that the needed calls were made.
+        _inhibit_default_cluster_creation.assert_called_once()
+        _install_apt_packages.assert_called_once()
+        _install_pip_packages.assert_not_called()
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+
+    @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
+    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
+    @patch("charm.PostgresqlCluster.inhibit_default_cluster_creation")
+    def test_on_install_pip_failure(
+        self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
+    ):
+        # Mock the result of the call.
+        _install_pip_packages.side_effect = subprocess.CalledProcessError(
+            cmd="pip3 install patroni", returncode=1
+        )
+        # Add an empty file as Patroni resource just to check that the correct calls were made.
+        self.harness.add_resource("patroni", "")
+        self.charm.on.install.emit()
+        # Assert that the needed calls were made.
+        _inhibit_default_cluster_creation.assert_called_once()
+        _install_apt_packages.assert_called_once()
+        _install_pip_packages.assert_called_once()
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+
     def test_on_leader_elected(self):
         # Assert that there is no password in the peer relation.
         self.harness.add_relation(self._peer_relation, self.charm.app.name)
@@ -162,30 +197,24 @@ class TestCharm(unittest.TestCase):
         ]
 
         # Test for problem with apt update.
-        self.charm._install_apt_packages(mock_event, "postgresql")
-        _update.assert_called_once()
-        self.assertEqual(
-            self.harness.model.unit.status,
-            BlockedStatus("failed to update apt cache"),
-        )
+        with self.assertRaises(subprocess.CalledProcessError):
+            self.charm._install_apt_packages(mock_event, ["postgresql"])
+            _update.assert_called_once()
 
         # Test with a not found package.
         _add_package.side_effect = apt.PackageNotFoundError
-        self.charm._install_apt_packages(mock_event, "postgresql")
-        _update.assert_called()
-        _add_package.assert_called_once_with("postgresql")
-        self.assertEqual(
-            self.harness.model.unit.status,
-            BlockedStatus("failed to install packages"),
-        )
+        with self.assertRaises(apt.PackageNotFoundError):
+            self.charm._install_apt_packages(mock_event, ["postgresql"])
+            _update.assert_called()
+            _add_package.assert_called_with("postgresql")
 
         # Then test a valid one.
         _update.reset_mock()
         _add_package.reset_mock()
         _add_package.side_effect = None
-        self.charm._install_apt_packages(mock_event, "postgresql-12")
+        self.charm._install_apt_packages(mock_event, ["postgresql"])
         _update.assert_called_once()
-        _add_package.assert_called_once_with("postgresql-12")
+        _add_package.assert_called_with("postgresql")
 
     @patch("subprocess.call")
     def test_install_pip_packages(self, _call):
@@ -211,12 +240,8 @@ class TestCharm(unittest.TestCase):
         )
 
         # Then, test for an error.
-        self.charm._install_pip_packages(packages)
-        # Assert the status set by the event handler.
-        self.assertEqual(
-            self.harness.model.unit.status,
-            BlockedStatus("failed to install pip packages"),
-        )
+        with self.assertRaises(subprocess.SubprocessError):
+            self.charm._install_pip_packages(packages)
 
     def test_new_password(self):
         # Test the password generation twice in order to check if we get different passwords and

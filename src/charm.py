@@ -55,7 +55,11 @@ class PostgresqlOperatorCharm(CharmBase):
         self._cluster.inhibit_default_cluster_creation()
 
         # Install the PostgreSQL and Patroni requirements packages.
-        self._install_apt_packages(event, ["postgresql", "python3-pip", "python3-psycopg2"])
+        try:
+            self._install_apt_packages(event, ["postgresql", "python3-pip", "python3-psycopg2"])
+        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
+            self.unit.status = BlockedStatus("failed to install apt packages")
+            return
 
         try:
             resource_path = self.model.resources.fetch("patroni")
@@ -65,8 +69,12 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Build Patroni package path with raft dependency and install it.
-        patroni_package_path = f"{str(resource_path)}[raft]"
-        self._install_pip_packages([patroni_package_path])
+        try:
+            patroni_package_path = f"{str(resource_path)}[raft]"
+            self._install_pip_packages([patroni_package_path])
+        except subprocess.SubprocessError:
+            self.unit.status = BlockedStatus("failed to install Patroni python package")
+            return
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
@@ -120,24 +128,37 @@ class PostgresqlOperatorCharm(CharmBase):
         return data.get("postgres-password", None)
 
     def _install_apt_packages(self, _, packages: List[str]) -> None:
-        """Simple wrapper around 'apt-get install -y."""
+        """Simple wrapper around 'apt-get install -y.
+
+        Raises:
+            CalledProcessError if it fails to update the apt cache.
+            PackageNotFoundError if the package is not in the cache.
+            PackageError if the packages could not be installed.
+        """
         try:
             logger.debug("updating apt cache")
             apt.update()
         except subprocess.CalledProcessError as e:
             logger.exception("failed to update apt cache, CalledProcessError", exc_info=e)
-            self.unit.status = BlockedStatus("failed to update apt cache")
-            return
+            raise
 
-        try:
-            logger.debug(f"installing apt packages: {', '.join(packages)}")
-            apt.add_package(packages)
-        except apt.PackageNotFoundError:
-            logger.error("a specified package not found in package cache or on system")
-            self.unit.status = BlockedStatus("failed to install packages")
+        for package in packages:
+            try:
+                apt.add_package(package)
+                logger.debug(f"installed package: {package}")
+            except apt.PackageNotFoundError:
+                logger.error(f"package not found: {package}")
+                raise
+            except apt.PackageError:
+                logger.error(f"package error: {package}")
+                raise
 
     def _install_pip_packages(self, packages: List[str]) -> None:
-        """Simple wrapper around pip install."""
+        """Simple wrapper around pip install.
+
+        Raises:
+            SubprocessError if the packages could not be installed.
+        """
         try:
             command = [
                 "pip3",
@@ -148,7 +169,7 @@ class PostgresqlOperatorCharm(CharmBase):
             subprocess.check_call(command)
         except subprocess.SubprocessError:
             logger.error("could not install pip packages")
-            self.unit.status = BlockedStatus("failed to install pip packages")
+            raise
 
     def _new_password(self) -> str:
         """Generate a random password string.
