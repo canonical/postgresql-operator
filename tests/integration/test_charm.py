@@ -38,10 +38,13 @@ async def test_deploy(ops_test: OpsTest, charm: str, series: str):
     # Set a composite application name in order to test in more than one series at the same time.
     application_name = f"{APP_NAME}-{series}"
 
-    # Deploy two units in order to test later the sharing of password through peer relation data.
+    # Deploy the charm with Patroni resource.
+    resources = {"patroni": "patroni.tar.gz"}
     await ops_test.model.deploy(
-        charm, application_name=application_name, num_units=2, series=series
+        charm, resources=resources, application_name=application_name, num_units=2, series=series
     )
+    # Attach the resource to the controller.
+    await ops_test.juju("attach-resource", application_name, "patroni=patroni.tar.gz")
 
     # Issuing dummy update_status just to trigger an event.
     await ops_test.model.set_config({"update-status-hook-interval": "10s"})
