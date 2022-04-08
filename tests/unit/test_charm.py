@@ -17,9 +17,11 @@ from cluster import (
     ClusterNotRunningError,
     ClusterStartError,
 )
+from tests.helpers import patch_network_get
 
 
 class TestCharm(unittest.TestCase):
+    @patch_network_get(private_address="1.1.1.1")
     def setUp(self):
         self._peer_relation = "postgresql-replicas"
         self._postgresql_container = "postgresql"

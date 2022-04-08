@@ -32,6 +32,8 @@ from cluster import (
 
 logger = logging.getLogger(__name__)
 
+PEER = "postgresql-replicas"
+
 
 class PostgresqlOperatorCharm(CharmBase):
     """Charmed Operator for the PostgreSQL database."""
@@ -45,7 +47,12 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
-        self._cluster = PostgresqlCluster()
+        self._cluster = PostgresqlCluster(self._unit_ip)
+
+    @property
+    def _unit_ip(self) -> str:
+        """Current unit ip."""
+        return self.model.get_binding(PEER).network.bind_address
 
     def _on_install(self, event) -> None:
         """Install prerequisites for the application."""
@@ -82,9 +89,13 @@ class PostgresqlOperatorCharm(CharmBase):
         """Handle the leader-elected event."""
         data = self._peers.data[self.app]
         postgres_password = data.get("postgres-password", None)
+        replication_password = data.get("replication-password", None)
 
         if postgres_password is None:
             self._peers.data[self.app]["postgres-password"] = self._new_password()
+
+        if replication_password is None:
+            self._peers.data[self.app]["replication-password"] = self._new_password()
 
     def _on_start(self, event) -> None:
         password = self._get_postgres_password()
@@ -126,6 +137,17 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         data = self._peers.data[self.app]
         return data.get("postgres-password", None)
+
+    @property
+    def _replication_password(self) -> str:
+        """Get replication user password.
+
+        Returns:
+            The password from the peer relation or None if the
+            password has not yet been set by the leader.
+        """
+        data = self._peers.data[self.app]
+        return data.get("replication-password", None)
 
     def _install_apt_packages(self, _, packages: List[str]) -> None:
         """Simple wrapper around 'apt-get install -y.
@@ -189,7 +211,7 @@ class PostgresqlOperatorCharm(CharmBase):
              A:class:`ops.model.Relation` object representing
              the peer relation.
         """
-        return self.model.get_relation("postgresql-replicas")
+        return self.model.get_relation(PEER)
 
 
 if __name__ == "__main__":

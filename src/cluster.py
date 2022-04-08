@@ -12,12 +12,17 @@ import subprocess
 import tempfile
 from pathlib import Path
 
+import yaml
 from charms.operator_libs_linux.v0.apt import DebianPackage
+from charms.operator_libs_linux.v1.systemd import service_running, service_start
 from jinja2 import Template
 
 logger = logging.getLogger(__name__)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
+METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
+STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
+PATRONI_SERVICE = "patroni"
 
 
 class ClusterAlreadyRunningError(Exception):
@@ -51,9 +56,10 @@ class PostgresqlCluster:
     running database server.
     """
 
-    def __init__(self):
+    def __init__(self, unit_ip: str):
         self.version = self._get_postgresql_version()
         self.conf_path = Path(f"/etc/postgresql/{self.version}/main")
+        self.unit_ip = unit_ip
 
     def bootstrap_cluster(self, password: str) -> None:
         """Bootstrap a PostgreSQL cluster with the given superuser password."""
@@ -70,6 +76,30 @@ class PostgresqlCluster:
             # Check that the cluster is up and running.
             if not self._is_cluster_running():
                 raise ClusterNotRunningError()
+
+    def _change_owner(self, path: str) -> None:
+        """Change the ownership of a file or a directory to the postgres user.
+
+        Args:
+            path: path to a file or directory.
+        """
+        # Get the uid/gid for the postgres user.
+        u = pwd.getpwnam("postgres")
+        # Set the correct ownership for the file or directory.
+        os.chown(path, uid=u.pw_uid, gid=u.pw_gid)
+
+    def _create_directory(self, path: str, mode: int) -> None:
+        """Creates a directory.
+
+        Args:
+            path: the path of the directory that should be created.
+            mode: access permission mask applied to the
+              directory using chmod (e.g. 0o640).
+        """
+        os.makedirs(path, mode=mode, exist_ok=True)
+        # Ensure correct permissions are set on the directory.
+        os.chmod(path, mode)
+        self._change_owner(path)
 
     def inhibit_default_cluster_creation(self) -> None:
         """Stop the PostgreSQL packages from creating the default cluster."""
@@ -143,10 +173,46 @@ class PostgresqlCluster:
             file.write(content)
         # Ensure correct permissions are set on the file.
         os.chmod(path, mode)
-        # Get the uid/gid for the postgres user.
-        u = pwd.getpwnam("postgres")
-        # Set the correct ownership for the file.
-        os.chown(path, uid=u.pw_uid, gid=u.pw_gid)
+        self._change_owner(path)
+
+    def _render_patroni_service_file(self) -> None:
+        """Render the Patroni configuration file."""
+        # Open the template patroni systemd unit file.
+        with open("templates/patroni.service.j2", "r") as file:
+            template = Template(file.read())
+        # Render the template file with the correct values.
+        rendered = template.render(conf_path=STORAGE_PATH)
+        self._render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
+
+    def _render_patroni_yml_file(
+        self,
+        cluster_name: str,
+        member_name: str,
+        superuser_password: str,
+        replication_password: str,
+    ) -> None:
+        """Render the Patroni configuration file.
+
+        Args:
+            cluster_name: name of the cluster
+            member_name: name of the member inside the cluster
+            superuser_password: password for the postgres user
+            replication_password: password for the user used in the replication
+        """
+        # Open the template patroni.yml file.
+        with open("templates/patroni.yml.j2", "r") as file:
+            template = Template(file.read())
+        # Render the template file with the correct values.
+        rendered = template.render(
+            conf_path=STORAGE_PATH,
+            member_name=member_name,
+            scope=cluster_name,
+            self_ip=self.unit_ip,
+            superuser_password=superuser_password,
+            replication_password=replication_password,
+            version=self._get_postgresql_version(),
+        )
+        self._render_file(f"{STORAGE_PATH}/patroni.yml", rendered, 0o644)
 
     def _render_postgresql_conf_file(self) -> None:
         """Render the PostgreSQL configuration file."""
@@ -171,3 +237,12 @@ class PostgresqlCluster:
             subprocess.check_call(command)
         except subprocess.CalledProcessError as e:
             raise ClusterStartError(e.stdout)
+
+    def _start_patroni(self) -> bool:
+        """Start Patroni service using systemd.
+
+        Returns:
+            Whether the service started successfully.
+        """
+        service_start(PATRONI_SERVICE)
+        return service_running(PATRONI_SERVICE)
