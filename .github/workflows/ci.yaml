@@ -37,6 +37,10 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
+          # Edge channel enables the use of "craftctl default" on charmcraft parts.
+          charmcraft-channel: latest/edge
           provider: lxd
+      - name: Create lib directory (to make downloaded charm libraries available on charmcraft part)
+        run: mkdir lib
       - name: Run integration tests
         run: tox -e integration

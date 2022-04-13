@@ -13,3 +13,17 @@ parts:
   charm:
     # pip==21.3.1 needed to install Patroni with raft support on bionic.
     charm-python-packages: [pip==21.3.1]
+    override-pull: |
+      # Install wget to download charm libraries later.
+      apt install -y wget
+      
+      # Create library directories.
+      mkdir -p /root/project/lib/charms/operator_libs_linux/v0
+      mkdir -p /root/project/lib/charms/operator_libs_linux/v1
+      
+      # Download needed libraries to the right directories.
+      wget https://raw.githubusercontent.com/canonical/operator-libs-linux/main/lib/charms/operator_libs_linux/v0/apt.py -O /root/project/lib/charms/operator_libs_linux/v0/apt.py -o /dev/null
+      wget https://raw.githubusercontent.com/canonical/operator-libs-linux/main/lib/charms/operator_libs_linux/v1/systemd.py -O /root/project/lib/charms/operator_libs_linux/v1/systemd.py -o /dev/null
+      
+      # Run the default pull step from charmcraft.
+      craftctl default
