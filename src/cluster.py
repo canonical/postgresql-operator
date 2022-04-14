@@ -84,9 +84,9 @@ class PostgresqlCluster:
             path: path to a file or directory.
         """
         # Get the uid/gid for the postgres user.
-        u = pwd.getpwnam("postgres")
+        user_database = pwd.getpwnam("postgres")
         # Set the correct ownership for the file or directory.
-        os.chown(path, uid=u.pw_uid, gid=u.pw_gid)
+        os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
