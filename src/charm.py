@@ -88,14 +88,9 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_leader_elected(self, _) -> None:
         """Handle the leader-elected event."""
         data = self._peers.data[self.app]
-        postgres_password = data.get("postgres-password")
-        replication_password = data.get("replication-password")
-
-        if postgres_password is None:
-            self._peers.data[self.app]["postgres-password"] = self._new_password()
-
-        if replication_password is None:
-            self._peers.data[self.app]["replication-password"] = self._new_password()
+        # The leader sets the needed password on peer relation databag if they weren't set before.
+        data.setdefault("postgres-password", self._new_password())
+        data.setdefault("replication-password", self._new_password())
 
     def _on_start(self, event) -> None:
         password = self._get_postgres_password()
