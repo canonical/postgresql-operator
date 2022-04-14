@@ -88,8 +88,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_leader_elected(self, _) -> None:
         """Handle the leader-elected event."""
         data = self._peers.data[self.app]
-        postgres_password = data.get("postgres-password", None)
-        replication_password = data.get("replication-password", None)
+        postgres_password = data.get("postgres-password")
+        replication_password = data.get("replication-password")
 
         if postgres_password is None:
             self._peers.data[self.app]["postgres-password"] = self._new_password()
@@ -136,7 +136,7 @@ class PostgresqlOperatorCharm(CharmBase):
             password has not yet been set by the leader.
         """
         data = self._peers.data[self.app]
-        return data.get("postgres-password", None)
+        return data.get("postgres-password")
 
     @property
     def _replication_password(self) -> str:
@@ -147,7 +147,7 @@ class PostgresqlOperatorCharm(CharmBase):
             password has not yet been set by the leader.
         """
         data = self._peers.data[self.app]
-        return data.get("replication-password", None)
+        return data.get("replication-password")
 
     def _install_apt_packages(self, _, packages: List[str]) -> None:
         """Simple wrapper around 'apt-get install -y.
