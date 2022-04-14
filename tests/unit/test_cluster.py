@@ -5,20 +5,24 @@ import os
 import unittest
 from unittest.mock import call, mock_open, patch
 
+from jinja2 import Template
+
 from cluster import (
     ClusterAlreadyRunningError,
     ClusterNotRunningError,
     PostgresqlCluster,
 )
 from lib.charms.operator_libs_linux.v0.apt import DebianPackage, PackageState
+from tests.helpers import STORAGE_PATH
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
+PATRONI_SERVICE = "patroni"
 
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
         # Setup a cluster.
-        self.cluster = PostgresqlCluster()
+        self.cluster = PostgresqlCluster("1.1.1.1")
 
     @patch("charm.PostgresqlCluster._start_cluster")
     @patch("charm.PostgresqlCluster._render_postgresql_conf_file")
@@ -184,7 +188,79 @@ class TestCharm(unittest.TestCase):
         _chown.assert_called_with(filename, uid=35, gid=35)
 
     @patch("charm.PostgresqlCluster._render_file")
-    def test_render_postgresql_conf_file(self, _render_file):
+    @patch("charm.PostgresqlCluster._create_directory")
+    def test_render_patroni_service_file(self, _, _render_file):
+        # Get the expected content from a file.
+        with open("templates/patroni.service.j2") as file:
+            template = Template(file.read())
+        expected_content = template.render(conf_path=STORAGE_PATH)
+
+        # Setup a mock for the `open` method, set returned data to patroni.service template.
+        with open("templates/patroni.service.j2", "r") as f:
+            mock = mock_open(read_data=f.read())
+
+        # Patch the `open` method with our mock.
+        with patch("builtins.open", mock, create=True):
+            # Call the method
+            self.cluster._render_patroni_service_file()
+
+        # Check the template is opened read-only in the call to open.
+        self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.service.j2", "r"))
+        # Ensure the correct rendered template is sent to _render_file method.
+        _render_file.assert_called_once_with(
+            "/etc/systemd/system/patroni.service",
+            expected_content,
+            0o644,
+        )
+
+    @patch("charm.PostgresqlCluster._render_file")
+    @patch("charm.PostgresqlCluster._create_directory")
+    def test_render_patroni_yml_file(self, _, _render_file):
+        # Define variables to render in the template.
+        member_name = "postgresql-0"
+        scope = "postgresql"
+        superuser_password = "fake-superuser-password"
+        replication_password = "fake-replication-password"
+
+        # Get the expected content from a file.
+        with open("templates/patroni.yml.j2") as file:
+            template = Template(file.read())
+        expected_content = template.render(
+            conf_path=STORAGE_PATH,
+            member_name=member_name,
+            scope=scope,
+            self_ip=self.cluster.unit_ip,
+            superuser_password=superuser_password,
+            replication_password=replication_password,
+            version=self.cluster._get_postgresql_version(),
+        )
+
+        # Setup a mock for the `open` method, set returned data to patroni.yml template.
+        with open("templates/patroni.yml.j2", "r") as f:
+            mock = mock_open(read_data=f.read())
+
+        # Patch the `open` method with our mock.
+        with patch("builtins.open", mock, create=True):
+            # Call the method.
+            self.cluster._render_patroni_yml_file(
+                scope,
+                member_name,
+                superuser_password,
+                replication_password,
+            )
+
+        # Check the template is opened read-only in the call to open.
+        self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
+        # Ensure the correct rendered template is sent to _render_file method.
+        _render_file.assert_called_once_with(
+            f"{STORAGE_PATH}/patroni.yml",
+            expected_content,
+            0o644,
+        )
+
+    @patch("charm.PostgresqlCluster._render_file")
+    @patch("charm.PostgresqlCluster._create_directory")
+    def test_render_postgresql_conf_file(self, _, _render_file):
         # Get the expected content from a file.
         with open("tests/data/postgresql.conf") as file:
             expected_content = file.read()
@@ -215,3 +291,19 @@ class TestCharm(unittest.TestCase):
         self.cluster._start_cluster()
         # Check that check_call was invoked with the correct arguments.
         _call.assert_called_once_with(["pg_ctlcluster", self.cluster.version, "main", "start"])
+
+    @patch("cluster.service_start")
+    @patch("cluster.service_running")
+    @patch("charm.PostgresqlCluster._create_directory")
+    def test_start_patroni(self, _create_directory, _service_running, _service_start):
+        _service_running.side_effect = [True, False]
+
+        # Test a success scenario.
+        success = self.cluster._start_patroni()
+        _service_start.assert_called_with(PATRONI_SERVICE)
+        _service_running.assert_called_with(PATRONI_SERVICE)
+        assert success
+
+        # Test a fail scenario.
+        success = self.cluster._start_patroni()
+        assert not success
