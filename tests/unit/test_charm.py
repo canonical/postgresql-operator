@@ -11,12 +11,6 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
-from cluster import (
-    ClusterAlreadyRunningError,
-    ClusterCreateError,
-    ClusterNotRunningError,
-    ClusterStartError,
-)
 from tests.helpers import patch_network_get
 
 
@@ -34,7 +28,7 @@ class TestCharm(unittest.TestCase):
 
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlCluster.inhibit_default_cluster_creation")
+    @patch("charm.Patroni.inhibit_default_cluster_creation")
     def test_on_install(
         self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
@@ -46,24 +40,18 @@ class TestCharm(unittest.TestCase):
         # Assert that the needed calls were made.
         _install_pip_packages.assert_not_called()
         # Assert the status set by the event handler.
-        self.assertEqual(
-            self.harness.model.unit.status,
-            BlockedStatus("Missing 'patroni' resource"),
-        )
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
         # Add an empty file as Patroni resource just to check that the correct calls were made.
         self.harness.add_resource("patroni", "")
         self.charm.on.install.emit()
         _install_pip_packages.assert_called_once()
         # Assert the status set by the event handler.
-        self.assertEqual(
-            self.harness.model.unit.status,
-            WaitingStatus("waiting to start PostgreSQL"),
-        )
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlCluster.inhibit_default_cluster_creation")
+    @patch("charm.Patroni.inhibit_default_cluster_creation")
     def test_on_install_apt_failure(
         self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
@@ -79,7 +67,7 @@ class TestCharm(unittest.TestCase):
 
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlCluster.inhibit_default_cluster_creation")
+    @patch("charm.Patroni.inhibit_default_cluster_creation")
     def test_on_install_pip_failure(
         self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
@@ -113,59 +101,55 @@ class TestCharm(unittest.TestCase):
             self.charm._peers.data[self.charm.app].get("postgres-password", None), password
         )
 
-    @patch("charm.PostgresqlCluster.bootstrap_cluster")
+    @patch("charm.Patroni.bootstrap_cluster")
+    @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_postgres_password")
-    def test_on_start(self, _get_postgres_password, _bootstrap_cluster):
-        # Test before the superuser password is generated.
+    def test_on_start(self, _get_postgres_password, _replication_password, _bootstrap_cluster):
+        # Test before the passwords are generated.
         _get_postgres_password.return_value = None
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
-        self.assertEqual(
-            self.harness.model.unit.status, WaitingStatus("waiting superuser password generation")
-        )
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
-        # Mock the superuser password.
-        _get_postgres_password.return_value = "random-password"
+        # Mock the passwords.
+        _get_postgres_password.return_value = "fake-postgres-password"
+        _replication_password.return_value = "fake-replication-password"
 
-        # Test the possible errors.
-        errors = [
-            {
-                "error": ClusterAlreadyRunningError,
-                "message": "there is already a running cluster",
-            },
-            {
-                "error": ClusterCreateError("test"),
-                "message": "failed to create cluster with error test",
-            },
-            {
-                "error": ClusterNotRunningError("test"),
-                "message": "failed to start cluster with error test",
-            },
-            {
-                "error": ClusterStartError("test"),
-                "message": "failed to start cluster with error test",
-            },
-        ]
-        for error in errors:
-            _bootstrap_cluster.side_effect = error["error"]
-            self.charm.on.start.emit()
-            _bootstrap_cluster.assert_called_once()
-            # Check the correct error message on unit status.
-            self.assertEqual(
-                self.harness.model.unit.status,
-                BlockedStatus(error["message"]),
-            )
-            # Reset the mock call count.
-            _bootstrap_cluster.reset_mock()
+        # Mock cluster start success values.
+        _bootstrap_cluster.side_effect = [False, True]
 
-        # Then test the event of a correct cluster bootstrapping.
-        _bootstrap_cluster.side_effect = None
+        # Test for a failed cluster bootstrapping.
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+
+        # Set an initial waiting status (like after the install hook was triggered).
+        self.harness.model.unit.status = WaitingStatus("fake message")
+
+        # Then test the event of a correct cluster bootstrapping.
+        self.charm.on.start.emit()
         self.assertEqual(
             self.harness.model.unit.status,
             ActiveStatus(),
         )
+
+    @patch("charm.Patroni.bootstrap_cluster")
+    @patch("charm.PostgresqlOperatorCharm._replication_password")
+    @patch("charm.PostgresqlOperatorCharm._get_postgres_password")
+    def test_on_start_after_blocked_state(
+        self, _get_postgres_password, _replication_password, _bootstrap_cluster
+    ):
+        # Set an initial blocked status (like after the install hook was triggered).
+        initial_status = BlockedStatus("fake message")
+        self.harness.model.unit.status = initial_status
+
+        # Test for a failed cluster bootstrapping.
+        self.charm.on.start.emit()
+        _get_postgres_password.assert_not_called()
+        _replication_password.assert_not_called()
+        _bootstrap_cluster.assert_not_called()
+        # Assert the status didn't change.
+        self.assertEqual(self.harness.model.unit.status, initial_status)
 
     @patch("charm.PostgresqlOperatorCharm._get_postgres_password")
     def test_on_get_postgres_password(self, _get_postgres_password):
@@ -236,10 +220,7 @@ class TestCharm(unittest.TestCase):
             ]
         )
         # Assert the status set by the event handler.
-        self.assertNotEqual(
-            self.harness.model.unit.status,
-            BlockedStatus("failed to install pip packages"),
-        )
+        self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
 
         # Then, test for an error.
         with self.assertRaises(subprocess.SubprocessError):

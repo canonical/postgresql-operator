@@ -22,13 +22,7 @@ from ops.model import (
     WaitingStatus,
 )
 
-from cluster import (
-    ClusterAlreadyRunningError,
-    ClusterCreateError,
-    ClusterNotRunningError,
-    ClusterStartError,
-    PostgresqlCluster,
-)
+from cluster import Patroni
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +41,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
-        self._cluster = PostgresqlCluster(self._unit_ip)
+        self._cluster = Patroni(self._unit_ip)
 
     @property
     def _unit_ip(self) -> str:
@@ -93,35 +87,41 @@ class PostgresqlOperatorCharm(CharmBase):
         data.setdefault("replication-password", self._new_password())
 
     def _on_start(self, event) -> None:
-        password = self._get_postgres_password()
-        # If the leader was elected and it generated a superuser password for the all the units,
-        # the cluster can be bootstrapped in each unit.
-        if password is not None:
-            try:
-                self._cluster.bootstrap_cluster(password)
-            except ClusterAlreadyRunningError:
-                logging.error("there is already a running cluster")
-                self.unit.status = BlockedStatus("there is already a running cluster")
-            except ClusterCreateError as e:
-                logging.error("failed to create cluster")
-                self.unit.status = BlockedStatus(f"failed to create cluster with error {e}")
-            except (ClusterNotRunningError, ClusterStartError) as e:
-                logging.error("failed to start cluster")
-                self.unit.status = BlockedStatus(f"failed to start cluster with error {e}")
-            except subprocess.CalledProcessError as e:
-                logging.error("failed to bootstrap cluster")
-                self.unit.status = BlockedStatus(f"failed to bootstrap cluster with error {e}")
-            else:
+        """Handle the start event."""
+        # Doesn't try to bootstrap the cluster if it's in a blocked state
+        # caused, for example, because a failed installation of packages.
+        if self._has_blocked_status:
+            return
+
+        postgres_password = self._get_postgres_password()
+        replication_password = self._get_postgres_password()
+        # If the leader was elected and it generated the needed passwords,
+        # the cluster can be bootstrapped.
+        if postgres_password is not None and replication_password is not None:
+            # Set some information needed by Patroni to bootstrap the cluster.
+            cluster_name = self.app.name
+            member_name = self.unit.name.replace("/", "-")
+            success = self._cluster.bootstrap_cluster(
+                cluster_name, member_name, postgres_password, replication_password
+            )
+            if success:
                 # The cluster is up and running.
                 self.unit.status = ActiveStatus()
+            else:
+                self.unit.status = BlockedStatus("failed to start Patroni")
         else:
             logger.info("leader not elected and/or superuser password not yet generated")
-            self.unit.status = WaitingStatus("waiting superuser password generation")
+            self.unit.status = WaitingStatus("waiting passwords generation")
             event.defer()
 
     def _on_get_initial_password(self, event: ActionEvent) -> None:
         """Returns the password for the postgres user as an action response."""
         event.set_results({"postgres-password": self._get_postgres_password()})
+
+    @property
+    def _has_blocked_status(self) -> bool:
+        """Returns whether the unit is in a blocked state."""
+        return isinstance(self.unit.status, BlockedStatus)
 
     def _get_postgres_password(self) -> str:
         """Get postgres user password.
