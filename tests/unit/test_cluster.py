@@ -67,18 +67,6 @@ class TestCharm(unittest.TestCase):
         _render_postgresql_conf_file.assert_called_once()
         _start_cluster.assert_called_once()
 
-    @patch("charm.PostgresqlCluster._change_owner")
-    @patch("os.chmod")
-    @patch("os.makedirs")
-    def test_create_directory(self, _makedirs, _chmod, _change_owner):
-        path = "/tmp/fakedir"
-        mode = 0o755
-
-        self.cluster._create_directory(path, mode)
-        _makedirs.assert_called_once_with(path, mode=mode, exist_ok=True)
-        _chmod.assert_called_once_with(path, mode)
-        _change_owner.assert_called_once_with(path)
-
     @patch("os.makedirs")
     def test_inhibit_default_cluster_creation(self, _makedirs):
         # Setup a mock for the `open` method.
