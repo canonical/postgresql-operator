@@ -85,14 +85,13 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str):
     logger.info("connecting to the database host: %s", host)
     with psycopg2.connect(
         f"dbname='postgres' user='postgres' host='{host}' password='{password}' connect_timeout=1"
-    ) as connection:
+    ) as connection, connection.cursor() as cursor:
         assert connection.status == psycopg2.extensions.STATUS_READY
 
         # Retrieve settings from PostgreSQL pg_settings table.
         # Here the SQL query gets a key-value pair composed by the name of the setting
         # and its value, filtering the retrieved data to return only the settings
         # that were set by Patroni.
-        cursor = connection.cursor()
         cursor.execute(
             """SELECT name,setting
                 FROM pg_settings

@@ -102,18 +102,18 @@ class TestCharm(unittest.TestCase):
         )
 
     @patch("charm.Patroni.bootstrap_cluster")
-    @patch("charm.PostgresqlOperatorCharm._replication_password")
-    @patch("charm.PostgresqlOperatorCharm._get_postgres_password")
+    @patch(
+        "charm.PostgresqlOperatorCharm._replication_password", return_value="fake-replication-pw"
+    )
+    @patch("charm.PostgresqlOperatorCharm._get_postgres_password", return_value=None)
     def test_on_start(self, _get_postgres_password, _replication_password, _bootstrap_cluster):
         # Test before the passwords are generated.
-        _get_postgres_password.return_value = None
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
-        # Mock the passwords.
+        # Mock the generated superuser password.
         _get_postgres_password.return_value = "fake-postgres-password"
-        _replication_password.return_value = "fake-replication-password"
 
         # Mock cluster start success values.
         _bootstrap_cluster.side_effect = [False, True]
@@ -128,10 +128,7 @@ class TestCharm(unittest.TestCase):
 
         # Then test the event of a correct cluster bootstrapping.
         self.charm.on.start.emit()
-        self.assertEqual(
-            self.harness.model.unit.status,
-            ActiveStatus(),
-        )
+        self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")

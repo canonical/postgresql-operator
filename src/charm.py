@@ -95,24 +95,26 @@ class PostgresqlOperatorCharm(CharmBase):
 
         postgres_password = self._get_postgres_password()
         replication_password = self._get_postgres_password()
-        # If the leader was elected and it generated the needed passwords,
-        # the cluster can be bootstrapped.
-        if postgres_password is not None and replication_password is not None:
-            # Set some information needed by Patroni to bootstrap the cluster.
-            cluster_name = self.app.name
-            member_name = self.unit.name.replace("/", "-")
-            success = self._cluster.bootstrap_cluster(
-                cluster_name, member_name, postgres_password, replication_password
-            )
-            if success:
-                # The cluster is up and running.
-                self.unit.status = ActiveStatus()
-            else:
-                self.unit.status = BlockedStatus("failed to start Patroni")
-        else:
-            logger.info("leader not elected and/or superuser password not yet generated")
-            self.unit.status = WaitingStatus("waiting passwords generation")
+
+        # If the leader was not elected (and the needed passwords were not generated yet),
+        # the cluster cannot be bootstrapped yet.
+        if not postgres_password or not replication_password:
+            logger.info("leader not elected and/or passwords not yet generated")
+            self.unit.status = WaitingStatus("awaiting passwords generation")
             event.defer()
+            return
+
+        # Set some information needed by Patroni to bootstrap the cluster.
+        cluster_name = self.app.name
+        member_name = self.unit.name.replace("/", "-")
+        success = self._cluster.bootstrap_cluster(
+            cluster_name, member_name, postgres_password, replication_password
+        )
+        if success:
+            # The cluster is up and running.
+            self.unit.status = ActiveStatus()
+        else:
+            self.unit.status = BlockedStatus("failed to start Patroni")
 
     def _on_get_initial_password(self, event: ActionEvent) -> None:
         """Returns the password for the postgres user as an action response."""

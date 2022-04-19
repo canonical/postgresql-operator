@@ -29,8 +29,6 @@ PATRONI_SERVICE = "patroni"
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
-    pass
-
     def __init__(self, unit_ip: str):
         self.unit_ip = unit_ip
 
