@@ -7,9 +7,9 @@
 import logging
 import os
 import pwd
-from pathlib import Path
+from typing import List
 
-import yaml
+import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
@@ -17,13 +17,27 @@ from charms.operator_libs_linux.v1.systemd import (
     service_start,
 )
 from jinja2 import Template
+from requests.exceptions import ConnectionError
+from tenacity import (
+    RetryError,
+    retry,
+    retry_if_exception_type,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 logger = logging.getLogger(__name__)
 
-CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 PATRONI_SERVICE = "patroni"
+
+
+class NotReadyError(Exception):
+    """Raised when not all cluster members healthy or finished initial sync."""
+
+
+class SwitchoverFailedError(Exception):
+    """Raised when a switchover failed for some reason."""
 
 
 class Patroni:
@@ -31,34 +45,49 @@ class Patroni:
 
     pass
 
-    def __init__(self, unit_ip: str):
-        self.unit_ip = unit_ip
-
-    def bootstrap_cluster(
+    def __init__(
         self,
+        unit_ip: str,
+        storage_path: str,
         cluster_name: str,
         member_name: str,
+        peers_ips: List[str],
         superuser_password: str,
         replication_password: str,
-    ) -> bool:
-        """Bootstrap a PostgreSQL cluster using Patroni.
+    ):
+        """Initialize the Patroni class.
 
         Args:
+            unit_ip: IP address of the current unit
+            storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
+            peers_ips: IP addresses of the peer units
             superuser_password: password for the postgres user
             replication_password: password for the user used in the replication
         """
+        self.unit_ip = unit_ip
+        self.storage_path = storage_path
+        self.cluster_name = cluster_name
+        self.member_name = member_name
+        self.peers_ips = peers_ips
+        self.superuser_password = superuser_password
+        self.replication_password = replication_password
+
+    def bootstrap_cluster(self, replica: bool = False) -> bool:
+        """Bootstrap a PostgreSQL cluster using Patroni."""
         # Render the configuration files and start the cluster.
-        self._change_owner(STORAGE_PATH)
-        self._render_patroni_yml_file(
-            cluster_name, member_name, superuser_password, replication_password
-        )
+        self.configure_patroni_on_unit(replica)
+        return self.start_patroni()
+
+    def configure_patroni_on_unit(self, replica: bool = False):
+        """Configure Patroni (configuration files and service) on the unit."""
+        self._change_owner(self.storage_path)
+        self._render_patroni_yml_file(replica)
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
         self._render_postgresql_conf_file()
-        return self._start_patroni()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -70,6 +99,13 @@ class Patroni:
         user_database = pwd.getpwnam("postgres")
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def cluster_members(self) -> set:
+        """Returns the list of the current cluster members."""
+        # Request info from health endpoint (which returns all members of the cluster).
+        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        return set([member["name"] for member in r.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
@@ -84,18 +120,44 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("create_main_cluster = false\n")
-            file.write(f"include '{STORAGE_PATH}/conf.d/postgresql-operator.conf'")
-
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
         package = DebianPackage.from_system("postgresql")
         # Remove the Ubuntu revision from the version.
         return str(package.version).split("+")[0]
+
+    def get_primary(self, unit_name_pattern=False) -> str:
+        """Get primary instance.
+
+        Args:
+            unit_name_pattern: whether or not to convert pod name to unit name
+
+        Returns:
+            primary pod or unit name.
+        """
+        primary = None
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        for member in r.json()["members"]:
+            if member["role"] == "leader":
+                primary = member["name"]
+                if unit_name_pattern:
+                    # Change the last dash to / in order to match unit name pattern.
+                    primary = "/".join(primary.rsplit("-", 1))
+                break
+        return primary
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def is_all_members_ready(
+        self,
+    ) -> bool:
+        """Check if all cluster members are ready/running."""
+        # Request info from health endpoint (which returns all members of the cluster).
+        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        return all(
+            member["state"] == "running" or member["state"] == "stopped"
+            for member in r.json()["members"]
+        )
 
     def _render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
@@ -121,38 +183,27 @@ class Patroni:
         with open("templates/patroni.service.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
-        rendered = template.render(conf_path=STORAGE_PATH)
+        rendered = template.render(conf_path=self.storage_path)
         self._render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def _render_patroni_yml_file(
-        self,
-        cluster_name: str,
-        member_name: str,
-        superuser_password: str,
-        replication_password: str,
-    ) -> None:
-        """Render the Patroni configuration file.
-
-        Args:
-            cluster_name: name of the cluster
-            member_name: name of the member inside the cluster
-            superuser_password: password for the postgres user
-            replication_password: password for the user used in the replication
-        """
+    def _render_patroni_yml_file(self, replica: bool = False) -> None:
+        """Render the Patroni configuration file."""
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            conf_path=STORAGE_PATH,
-            member_name=member_name,
-            scope=cluster_name,
+            conf_path=self.storage_path,
+            member_name=self.member_name,
+            peers_ips=self.peers_ips,
+            scope=self.cluster_name,
             self_ip=self.unit_ip,
-            superuser_password=superuser_password,
-            replication_password=replication_password,
+            replica=replica,
+            superuser_password=self.superuser_password,
+            replication_password=self.replication_password,
             version=self._get_postgresql_version(),
         )
-        self._render_file(f"{STORAGE_PATH}/patroni.yml", rendered, 0o644)
+        self._render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
     def _render_postgresql_conf_file(self) -> None:
         """Render the PostgreSQL configuration file."""
@@ -162,10 +213,10 @@ class Patroni:
         # Render the template file with the correct values.
         # TODO: add extra configurations here later.
         rendered = template.render(listen_addresses="*")
-        self._create_directory(f"{STORAGE_PATH}/conf.d", mode=0o644)
-        self._render_file(f"{STORAGE_PATH}/conf.d/postgresql-operator.conf", rendered, 0o644)
+        self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
+        self._render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
-    def _start_patroni(self) -> bool:
+    def start_patroni(self) -> bool:
         """Start Patroni service using systemd.
 
         Returns:
@@ -173,3 +224,53 @@ class Patroni:
         """
         service_start(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
+
+    def switchover(self, candidate: str = None) -> None:
+        """Schedule a switchover to a given candidate member????."""
+        current_primary = self.get_primary()
+        r = requests.post(
+            f"http://{self.unit_ip}:8008/switchover",
+            json={"leader": current_primary, "candidate": candidate},
+        )
+        if r.status_code != 200:
+            raise SwitchoverFailedError(f"received {r.status_code}")
+
+        try:
+            self.primary_changed(current_primary)
+        except RetryError:
+            raise SwitchoverFailedError("primary hasn't changed")
+
+    @retry(
+        retry=retry_if_result(lambda x: not x),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+    )
+    def primary_changed(self, old_primary: str) -> bool:
+        """Checks whether the primary unit has changed."""
+        primary = self.get_primary()
+        return primary != old_primary
+
+    @retry(
+        retry=(retry_if_exception_type(ConnectionError) | retry_if_result(lambda x: not x)),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+    )
+    def cluster_started(self):
+        """???"""
+        r = requests.get(f"http://{self.unit_ip}:8008/health")
+        started = r.json()["state"] == "running"
+        return started
+
+    def update_cluster_members(self) -> None:
+        """Update the list of members of the cluster."""
+        # Update the members in the Patroni configuration.
+        self._render_patroni_yml_file()
+
+        if service_running(PATRONI_SERVICE):
+            # Make Patroni use the updated configuration.
+            self._reload_patroni_configuration()
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def _reload_patroni_configuration(self):
+        """Reload Patroni configuration after it was changed."""
+        requests.post(f"http://{self.unit_ip}:8008/reload")

@@ -1,0 +1,29 @@
+#########################################################################################
+# [ WARNING ]
+# postgresql client authentication configuration file maintained by the postgres-operator
+# local changes may be overwritten.
+#########################################################################################
+# Database administrative login by Unix domain socket
+local    all            postgres               peer
+
+# "local" is for Unix domain socket connections only
+local    all            all                    peer
+
+# IPv4 local connections:
+host     all            all    127.0.0.1/32    md5
+
+# IPv6 local connections:
+host     all            all    ::1/128         md5
+
+# Allow replication connections from localhost, by a user with the replication privilege.
+local    replication    all        peer
+host     replication    all    127.0.0.1/32    md5
+host     replication    all    ::1/128         md5
+
+# Allow replications connections from other cluster members.
+{%- for peer_ip in peers_ips %}
+host     replication    replication    {{ peer_ip }}/0    md5
+{% endfor %}
+
+# Allow access from outside the database machine by using a password.
+host     all            all    all             md5
