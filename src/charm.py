@@ -11,7 +11,13 @@ import subprocess
 from typing import List
 
 from charms.operator_libs_linux.v0 import apt
-from ops.charm import ActionEvent, CharmBase
+from ops.charm import (
+    ActionEvent,
+    CharmBase,
+    LeaderElectedEvent,
+    RelationChangedEvent,
+    RelationDepartedEvent,
+)
 from ops.main import main
 from ops.model import (
     ActiveStatus,
