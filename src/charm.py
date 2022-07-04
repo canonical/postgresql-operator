@@ -23,6 +23,7 @@ from ops.model import (
 )
 
 from cluster import Patroni
+from relations.db import LegacyRelation
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,9 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
+        self.framework.observe(self.on.install_package_action, self._on_install_package)
         self._cluster = Patroni(self._unit_ip)
+        self.legacy_relation = LegacyRelation(self)
 
     @property
     def _unit_ip(self) -> str:
@@ -119,6 +122,14 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_get_initial_password(self, event: ActionEvent) -> None:
         """Returns the password for the postgres user as an action response."""
         event.set_results({"postgres-password": self._get_postgres_password()})
+
+    def _on_install_package(self, event: ActionEvent) -> None:
+        """Install an additional package through APT."""
+        try:
+            self._install_apt_packages(event, [event.params["package"]])
+        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
+            logger.warning("failed to install apt package")
+            event.set_results({"error": "failed to install apt package"})
 
     @property
     def _has_blocked_status(self) -> bool:
