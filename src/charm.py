@@ -11,7 +11,7 @@ import subprocess
 from typing import List
 
 from charms.operator_libs_linux.v0 import apt
-from ops.charm import ActionEvent, CharmBase
+from ops.charm import ActionEvent, CharmBase, ConfigChangedEvent
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -23,6 +23,7 @@ from ops.model import (
 )
 
 from cluster import Patroni
+from relations.db import LegacyRelation
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
         self._cluster = Patroni(self._unit_ip)
+        self.legacy_relation = LegacyRelation(self)
 
     @property
     def _unit_ip(self) -> str:
@@ -85,6 +88,15 @@ class PostgresqlOperatorCharm(CharmBase):
         # The leader sets the needed password on peer relation databag if they weren't set before.
         data.setdefault("postgres-password", self._new_password())
         data.setdefault("replication-password", self._new_password())
+
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
+        """Install additional packages through APT."""
+        try:
+            extra_packages = self.config.get("extra-packages")
+            if extra_packages:
+                self._install_apt_packages(event, extra_packages.split(" "))
+        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
+            logger.warning("failed to install apts packages")
 
     def _on_start(self, event) -> None:
         """Handle the start event."""
