@@ -11,7 +11,7 @@ import subprocess
 from typing import List
 
 from charms.operator_libs_linux.v0 import apt
-from ops.charm import ActionEvent, CharmBase
+from ops.charm import ActionEvent, CharmBase, ConfigChangedEvent
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -40,9 +40,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
-        self.framework.observe(self.on.install_package_action, self._on_install_package)
         self._cluster = Patroni(self._unit_ip)
         self.legacy_relation = LegacyRelation(self)
 
@@ -89,6 +89,15 @@ class PostgresqlOperatorCharm(CharmBase):
         data.setdefault("postgres-password", self._new_password())
         data.setdefault("replication-password", self._new_password())
 
+    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
+        """Install additional packages through APT."""
+        try:
+            extra_packages = self.config.get("extra-packages")
+            if extra_packages:
+                self._install_apt_packages(event, extra_packages.split(" "))
+        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
+            logger.warning("failed to install apts packages")
+
     def _on_start(self, event) -> None:
         """Handle the start event."""
         # Doesn't try to bootstrap the cluster if it's in a blocked state
@@ -122,14 +131,6 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_get_initial_password(self, event: ActionEvent) -> None:
         """Returns the password for the postgres user as an action response."""
         event.set_results({"postgres-password": self._get_postgres_password()})
-
-    def _on_install_package(self, event: ActionEvent) -> None:
-        """Install an additional package through APT."""
-        try:
-            self._install_apt_packages(event, [event.params["package"]])
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            logger.warning("failed to install apt package")
-            event.set_results({"error": "failed to install apt package"})
 
     @property
     def _has_blocked_status(self) -> bool:
