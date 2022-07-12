@@ -5,6 +5,7 @@ from pathlib import Path
 from typing import List
 
 import psycopg2
+import requests
 import yaml
 from pytest_operator.plugin import OpsTest
 
@@ -41,6 +42,34 @@ def db_connect(host: str, password: str):
     )
 
 
+def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]:
+    """List the unit names of an application.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+
+    Returns:
+        list of current unit names of the application
+    """
+    return [
+        unit.name.replace("/", "-") for unit in ops_test.model.applications[application_name].units
+    ]
+
+
+def get_cluster_members(endpoint: str) -> List[str]:
+    """List of current Patroni cluster members.
+
+    Args:
+        endpoint: endpoint of the Patroni API
+
+    Returns:
+        list of Patroni cluster members
+    """
+    r = requests.get(f"http://{endpoint}:8008/cluster")
+    return [member["name"] for member in r.json()["members"]]
+
+
 async def get_postgres_password(ops_test: OpsTest, unit_name: str) -> str:
     """Retrieve the postgres user password using the action."""
     unit = ops_test.model.units.get(unit_name)
@@ -62,3 +91,39 @@ async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
     action = await ops_test.model.units.get(unit_name).run_action("get-primary")
     action = await action.wait()
     return action.results["primary"]
+
+
+async def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
+    """Get unit IP address.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit
+
+    Returns:
+        IP address of the unit
+    """
+    return ops_test.model.units.get(unit_name).public_address
+
+
+async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
+    """Scale a given application to a specific unit count.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+        count: The desired number of units to scale to
+    """
+    change = count - len(ops_test.model.applications[application_name].units)
+    if change > 0:
+        await ops_test.model.applications[application_name].add_units(change)
+    elif change < 0:
+        units = [
+            unit.name for unit in ops_test.model.applications[application_name].units[0:-change]
+        ]
+        print(units)
+        print(type(units[0]))
+        await ops_test.model.applications[application_name].destroy_units(*units)
+    await ops_test.model.wait_for_idle(
+        apps=[application_name], status="active", timeout=1000, wait_for_exact_units=count
+    )

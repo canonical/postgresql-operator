@@ -317,16 +317,31 @@ class PostgresqlOperatorCharm(CharmBase):
         data.setdefault("postgres-password", self._new_password())
         data.setdefault("replication-password", self._new_password())
 
-        # Update the list of the current PostgreSQL hosts when a new leader is elected.
-        self._update_members_ips(ip_to_add=self._unit_ip)
-
-        # Remove departing members.
+        # # Update the list of the current PostgreSQL hosts when a new leader is elected.
+        # self._update_members_ips(ip_to_add=self._unit_ip)
+        #
+        # # Remove departing members.
+        # if self._unit_ip not in json.loads(self.members_ips):
+        #     try:
+        #         self._remove_members(event)
+        #     except RetryError:
+        #         # Ignore RetryError on first leader election.
+        #         pass
+        # Add this unit to the list of cluster members
+        # (the cluster should start with only this member).
         if self._unit_ip not in json.loads(self.members_ips):
-            try:
-                self._remove_members(event)
-            except RetryError:
-                # Ignore RetryError on first leader election.
-                pass
+            self._update_members_ips(ip_to_add=self._unit_ip)
+
+        # Remove departing units when the leader changes.
+        for ip in self._get_endpoints_to_remove():
+            self._update_members_ips(ip_to_remove=ip)
+
+    def _get_endpoints_to_remove(self) -> List[str]:
+        """List the endpoints that were part of the cluster but departed."""
+        old = json.loads(self.members_ips)
+        current = self._units_ips
+        endpoints_to_remove = list(set(old) - set(current))
+        return endpoints_to_remove
 
     def _on_start(self, event) -> None:
         """Handle the start event."""
