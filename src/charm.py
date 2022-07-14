@@ -75,11 +75,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self.unit.is_leader() or event.departing_unit == self.unit:
             return
 
-        # Remove departing members.
-        self._remove_members(event)
-
-    def _remove_members(self, event):
-        """Remove cluster members one at a time."""
+        # Remove cluster members one at a time.
         try:
             logger.error(self.members_ips)
             logger.error(self._units_ips)
@@ -99,7 +95,15 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
         if self.unit.name == self._patroni.get_primary(unit_name_pattern=True):
+            logger.error(f"members_ips: {self.members_ips}")
+            logger.error(f"cluster members: {self._patroni.cluster_members}")
+            self._patroni.update_cluster_members(True)
+            logger.error(f"cluster members: {self._patroni.cluster_members}")
             self._change_primary()
+            logger.error(f"cluster members: {self._patroni.cluster_members}")
+            self._patroni.update_cluster_members(True)
+            logger.error(f"cluster members: {self._patroni.cluster_members}")
+            self._patroni.stop_patroni()
 
     @retry(
         stop=stop_after_delay(60),
@@ -208,6 +212,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._storage_path,
             self._cluster_name,
             self._member_name,
+            self.app.planned_units(),
             self._peers_ips,
             self._get_postgres_password(),
             self._replication_password,
@@ -323,14 +328,15 @@ class PostgresqlOperatorCharm(CharmBase):
         #         pass
         # Add this unit to the list of cluster members
         # (the cluster should start with only this member).
-        restart = True
+        # restart = True
+        restart = False
         if self._unit_ip not in json.loads(self.members_ips):
             self._update_members_ips(ip_to_add=self._unit_ip)
-            restart = False
 
         # Remove departing units when the leader changes.
         for ip in self._get_endpoints_to_remove():
             self._update_members_ips(ip_to_remove=ip)
+            # restart = True
 
         self._patroni.update_cluster_members(restart)
 

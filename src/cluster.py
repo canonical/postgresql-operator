@@ -16,6 +16,7 @@ from charms.operator_libs_linux.v1.systemd import (
     service_restart,
     service_running,
     service_start,
+    service_stop,
 )
 from jinja2 import Template
 from requests.exceptions import ConnectionError
@@ -55,6 +56,7 @@ class Patroni:
         storage_path: str,
         cluster_name: str,
         member_name: str,
+        planned_units: int,
         peers_ips: List[str],
         superuser_password: str,
         replication_password: str,
@@ -67,6 +69,7 @@ class Patroni:
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
             peers_ips: IP addresses of the peer units
+            planned_units: number of units planned for the cluster
             superuser_password: password for the postgres user
             replication_password: password for the user used in the replication
         """
@@ -74,6 +77,7 @@ class Patroni:
         self.storage_path = storage_path
         self.cluster_name = cluster_name
         self.member_name = member_name
+        self.planned_units = planned_units
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
@@ -105,7 +109,7 @@ class Patroni:
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
     @property
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
@@ -240,7 +244,11 @@ class Patroni:
             template = Template(file.read())
         # Render the template file with the correct values.
         # TODO: add extra configurations here later.
-        rendered = template.render(listen_addresses="*")
+        rendered = template.render(
+            listen_addresses="*",
+            synchronous_commit="on" if self.planned_units > 1 else "off",
+            synchronous_standby_names="*",
+        )
         self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
         self._render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
@@ -251,6 +259,15 @@ class Patroni:
             Whether the service started successfully.
         """
         service_start(PATRONI_SERVICE)
+        return service_running(PATRONI_SERVICE)
+
+    def stop_patroni(self) -> bool:
+        """Start Patroni service using systemd.
+
+        Returns:
+            Whether the service started successfully.
+        """
+        service_stop(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
 
     def switchover(self, candidate: str = None) -> None:
@@ -299,7 +316,7 @@ class Patroni:
             # Make Patroni use the updated configuration.
             logger.error("running")
             if restart:
-                logger.error(f'restart: {service_restart(PATRONI_SERVICE)}')
+                logger.error(f"restart: {service_restart(PATRONI_SERVICE)}")
                 logger.error(service_running(PATRONI_SERVICE))
             else:
                 self._reload_patroni_configuration()

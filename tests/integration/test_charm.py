@@ -17,7 +17,6 @@ from tests.integration.helpers import (
     check_cluster_members,
     convert_records_to_dict,
     db_connect,
-    get_application_units,
     get_postgres_password,
     get_primary,
     get_unit_address,
@@ -129,42 +128,28 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     assert settings["maximum_lag_on_failover"] == 1048576
 
 
-# @pytest.mark.parametrize("series", SERIES)
-# async def test_scale_down_and_up(ops_test: OpsTest, series: str):
-#     """Test data is replicated to new units after a scale up."""
-#     # Set a composite application name in order to test in more than one series at the same time.
-#     application_name = build_application_name(series)
-#
-#     # Ensure the initial number of units in the application.
-#     initial_scale = len(UNIT_IDS)
-#     await scale_application(ops_test, application_name, initial_scale)
-#
-#     # Scale down the application.
-#     await scale_application(ops_test, application_name, initial_scale - 1)
-#
-#     # Ensure the member was correctly removed from the cluster
-#     # (by comparing the cluster members and the current units).
-#     any_unit_name = ops_test.model.applications[application_name].units[0].name
-#     primary = await get_primary(ops_test, any_unit_name)
-#     address = await get_unit_address(ops_test, primary)
-#
-#     # Assert the correct members are part of the cluster.
-#     expected_cluster_members = get_application_units(ops_test, application_name)
-#     check_cluster_members(address, expected_cluster_members)
-#
-#     # Scale up the application (2 more units than the current scale).
-#     await scale_application(ops_test, application_name, initial_scale + 1)
-#
-#     # Assert the correct members are part of the cluster.
-#     expected_cluster_members = get_application_units(ops_test, application_name)
-#     check_cluster_members(address, expected_cluster_members)
-#
-#     # Scale the application to the initial scale.
-#     await scale_application(ops_test, application_name, initial_scale)
-#
-#     # Assert the correct members are part of the cluster.
-#     expected_cluster_members = get_application_units(ops_test, application_name)
-#     check_cluster_members(address, expected_cluster_members)
+@pytest.mark.parametrize("series", SERIES)
+async def test_scale_down_and_up(ops_test: OpsTest, series: str):
+    """Test data is replicated to new units after a scale up."""
+    # Set a composite application name in order to test in more than one series at the same time.
+    application_name = build_application_name(series)
+
+    # Ensure the initial number of units in the application.
+    initial_scale = len(UNIT_IDS)
+    await scale_application(ops_test, application_name, initial_scale)
+
+    # Scale down the application.
+    await scale_application(ops_test, application_name, initial_scale - 1)
+
+    # Ensure the member was correctly removed from the cluster
+    # (by comparing the cluster members and the current units).
+    await check_cluster_members(ops_test, application_name)
+
+    # Scale up the application (2 more units than the current scale).
+    await scale_application(ops_test, application_name, initial_scale + 1)
+
+    # Assert the correct members are part of the cluster.
+    await check_cluster_members(ops_test, application_name)
 
 
 @pytest.mark.parametrize("series", SERIES)

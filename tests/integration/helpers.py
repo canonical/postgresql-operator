@@ -19,19 +19,25 @@ def build_application_name(series: str) -> str:
     return f"{APP_NAME}-{series}"
 
 
-def check_cluster_members(endpoint: str, members: List[str]):
+async def check_cluster_members(ops_test: OpsTest, application_name: str):
     """Check that the correct members are part of the cluster.
 
     Args:
-        endpoint: endpoint of the Patroni API
-        members: members that should be part of the cluster
+        ops_test: The ops test framework instance
+        application_name: The name of the application
     """
     for attempt in Retrying(
         stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
     ):
         with attempt:
-            r = requests.get(f"http://{endpoint}:8008/cluster")
-            assert members == [member["name"] for member in r.json()["members"]]
+            any_unit_name = ops_test.model.applications[application_name].units[0].name
+            primary = await get_primary(ops_test, any_unit_name)
+            address = await get_unit_address(ops_test, primary)
+
+            expected_members = get_application_units(ops_test, application_name)
+
+            r = requests.get(f"http://{address}:8008/cluster")
+            assert [member["name"] for member in r.json()["members"]] == expected_members
 
 
 def convert_records_to_dict(records: List[tuple]) -> dict:
