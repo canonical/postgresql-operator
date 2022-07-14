@@ -13,6 +13,7 @@ import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
+    service_restart,
     service_running,
     service_start,
 )
@@ -20,11 +21,14 @@ from jinja2 import Template
 from requests.exceptions import ConnectionError
 from tenacity import (
     RetryError,
+    Retrying,
     retry,
     retry_if_exception_type,
     retry_if_result,
     stop_after_attempt,
+    stop_after_delay,
     wait_exponential,
+    wait_fixed,
 )
 
 logger = logging.getLogger(__name__)
@@ -100,10 +104,11 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
+    @property
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def cluster_members(self) -> set:
-        """Returns the list of the current cluster members."""
-        # Request info from health endpoint (which returns all members of the cluster).
+        """Get the current cluster members."""
+        # Request info from cluster endpoint (which returns all members of the cluster).
         r = requests.get(f"http://{self.unit_ip}:8008/cluster")
         return set([member["name"] for member in r.json()["members"]])
 
@@ -147,17 +152,40 @@ class Patroni:
                 break
         return primary
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def is_all_members_ready(
-        self,
-    ) -> bool:
-        """Check if all cluster members are ready/running."""
-        # Request info from health endpoint (which returns all members of the cluster).
-        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
-        return all(
-            member["state"] == "running" or member["state"] == "stopped"
-            for member in r.json()["members"]
-        )
+    def are_all_members_ready(self) -> bool:
+        """Check if all members are correctly running Patroni and PostgreSQL.
+
+        Returns:
+            True if all members are ready False otherwise. Retries over a period of 10 seconds
+            3 times to allow server time to start up.
+        """
+        # Request info from cluster endpoint
+        # (which returns all members of the cluster and their states).
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        except RetryError:
+            return False
+
+        return all(member["state"] == "running" for member in r.json()["members"])
+
+    @property
+    def member_started(self) -> bool:
+        """Has the member started Patroni and PostgreSQL.
+
+        Returns:
+            True if services is ready False otherwise. Retries over a period of 60 seconds times to
+            allow server time to start up.
+        """
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(f"http://{self.unit_ip}:8008/health")
+        except RetryError:
+            return False
+
+        return r.json()["state"] == "running"
 
     def _render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
@@ -261,16 +289,24 @@ class Patroni:
         started = r.json()["state"] == "running"
         return started
 
-    def update_cluster_members(self) -> None:
+    def update_cluster_members(self, restart: bool = False) -> None:
         """Update the list of members of the cluster."""
         # Update the members in the Patroni configuration.
+        logger.error(self.peers_ips)
         self._render_patroni_yml_file()
 
         if service_running(PATRONI_SERVICE):
             # Make Patroni use the updated configuration.
-            self._reload_patroni_configuration()
+            logger.error("running")
+            if restart:
+                logger.error(f'restart: {service_restart(PATRONI_SERVICE)}')
+                logger.error(service_running(PATRONI_SERVICE))
+            else:
+                self._reload_patroni_configuration()
+        else:
+            logger.error("not running")
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def _reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(f"http://{self.unit_ip}:8008/reload")
+        logger.error(requests.post(f"http://{self.unit_ip}:8008/reload"))

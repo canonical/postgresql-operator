@@ -8,6 +8,7 @@ import psycopg2
 import requests
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_attempt, wait_exponential
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 APP_NAME = METADATA["name"]
@@ -16,6 +17,21 @@ APP_NAME = METADATA["name"]
 def build_application_name(series: str) -> str:
     """Return a composite application name combining application name and series."""
     return f"{APP_NAME}-{series}"
+
+
+def check_cluster_members(endpoint: str, members: List[str]):
+    """Check that the correct members are part of the cluster.
+
+    Args:
+        endpoint: endpoint of the Patroni API
+        members: members that should be part of the cluster
+    """
+    for attempt in Retrying(
+        stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+    ):
+        with attempt:
+            r = requests.get(f"http://{endpoint}:8008/cluster")
+            assert members == [member["name"] for member in r.json()["members"]]
 
 
 def convert_records_to_dict(records: List[tuple]) -> dict:
@@ -55,19 +71,6 @@ def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]
     return [
         unit.name.replace("/", "-") for unit in ops_test.model.applications[application_name].units
     ]
-
-
-def get_cluster_members(endpoint: str) -> List[str]:
-    """List of current Patroni cluster members.
-
-    Args:
-        endpoint: endpoint of the Patroni API
-
-    Returns:
-        list of Patroni cluster members
-    """
-    r = requests.get(f"http://{endpoint}:8008/cluster")
-    return [member["name"] for member in r.json()["members"]]
 
 
 async def get_postgres_password(ops_test: OpsTest, unit_name: str) -> str:
