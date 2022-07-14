@@ -23,10 +23,29 @@ class TestCharm(unittest.TestCase):
             STORAGE_PATH,
             "postgresql",
             "postgresql-0",
+            1,
             peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
         )
+
+    # @patch("os.makedirs")
+    # def test_inhibit_default_cluster_creation(self, _makedirs):
+    #     # Setup a mock for the `open` method.
+    #     mock = mock_open()
+    #     # Patch the `open` method with our mock.
+    #     with patch("builtins.open", mock, create=True):
+    #         self.inhibit_default_cluster_creation()
+    #         _makedirs.assert_called_once_with(
+    #             os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
+    #         )
+    #         # Check the write calls made to the file.
+    #         handle = mock()
+    #         calls = [
+    #             call("create_main_cluster = false\n"),
+    #             call(f"include '{STORAGE_PATH}/conf.d/postgresql-operator.conf'"),
+    #         ]
+    #         handle.write.assert_has_calls(calls)
 
     @patch("charms.operator_libs_linux.v0.apt.DebianPackage.from_system")
     def test_get_postgresql_version(self, _from_system):
@@ -137,8 +156,14 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Patroni._create_directory")
     def test_render_postgresql_conf_file(self, _, _render_file):
         # Get the expected content from a file.
-        with open("tests/data/postgresql.conf") as file:
-            expected_content = file.read()
+        with open("templates/postgresql.conf.j2") as file:
+            template = Template(file.read())
+        expected_content = template.render(
+            listen_addresses="*",
+            logging_collector="on",
+            synchronous_commit="off",
+            synchronous_standby_names="*",
+        )
 
         # Setup a mock for the `open` method, set returned data to postgresql.conf template.
         with open("templates/postgresql.conf.j2", "r") as f:
@@ -147,7 +172,7 @@ class TestCharm(unittest.TestCase):
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):
             # Call the method
-            self.patroni._render_postgresql_conf_file()
+            self.patroni.render_postgresql_conf_file()
 
         # Check the template is opened read-only in the call to open.
         self.assertEqual(mock.call_args_list[0][0], ("templates/postgresql.conf.j2", "r"))

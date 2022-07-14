@@ -33,9 +33,6 @@ from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
 from cluster import NotReadyError, Patroni, SwitchoverFailedError
 
-# from requests import HTTPError
-
-
 logger = logging.getLogger(__name__)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -356,11 +353,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
         postgres_password = self._get_postgres_password()
         replication_password = self._get_postgres_password()
-        # If the leader was elected and it generated the needed passwords,
-        # the cluster can be bootstrapped.
+        # If the leader was not elected (and the needed passwords were not generated yet),
+        # the cluster cannot be bootstrapped yet.
         if not postgres_password or not replication_password:
-            logger.info("leader not elected and/or superuser password not yet generated")
-            self.unit.status = WaitingStatus("waiting passwords generation")
+            logger.info("leader not elected and/or passwords not yet generated")
+            self.unit.status = WaitingStatus("awaiting passwords generation")
             event.defer()
             return
 
