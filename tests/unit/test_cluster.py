@@ -29,24 +29,6 @@ class TestCharm(unittest.TestCase):
             "fake-replication-password",
         )
 
-    # @patch("os.makedirs")
-    # def test_inhibit_default_cluster_creation(self, _makedirs):
-    #     # Setup a mock for the `open` method.
-    #     mock = mock_open()
-    #     # Patch the `open` method with our mock.
-    #     with patch("builtins.open", mock, create=True):
-    #         self.inhibit_default_cluster_creation()
-    #         _makedirs.assert_called_once_with(
-    #             os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
-    #         )
-    #         # Check the write calls made to the file.
-    #         handle = mock()
-    #         calls = [
-    #             call("create_main_cluster = false\n"),
-    #             call(f"include '{STORAGE_PATH}/conf.d/postgresql-operator.conf'"),
-    #         ]
-    #         handle.write.assert_has_calls(calls)
-
     @patch("charms.operator_libs_linux.v0.apt.DebianPackage.from_system")
     def test_get_postgresql_version(self, _from_system):
         # Mock the package returned by from_system call.

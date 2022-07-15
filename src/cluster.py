@@ -19,12 +19,10 @@ from charms.operator_libs_linux.v1.systemd import (
     service_stop,
 )
 from jinja2 import Template
-from requests.exceptions import ConnectionError
 from tenacity import (
     RetryError,
     Retrying,
     retry,
-    retry_if_exception_type,
     retry_if_result,
     stop_after_attempt,
     stop_after_delay,
@@ -294,17 +292,6 @@ class Patroni:
         """Checks whether the primary unit has changed."""
         primary = self.get_primary()
         return primary != old_primary
-
-    @retry(
-        retry=(retry_if_exception_type(ConnectionError) | retry_if_result(lambda x: not x)),
-        stop=stop_after_attempt(10),
-        wait=wait_exponential(multiplier=1, min=2, max=30),
-    )
-    def cluster_started(self):
-        """???"""
-        r = requests.get(f"http://{self.unit_ip}:8008/health")
-        started = r.json()["state"] == "running"
-        return started
 
     def update_cluster_members(self, restart: bool = False) -> None:
         """Update the list of members of the cluster."""

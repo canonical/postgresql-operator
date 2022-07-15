@@ -128,7 +128,7 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.update_cluster_members")
-    @patch("charm.Patroni.cluster_started")
+    @patch("charm.Patroni.member_started")
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_postgres_password")
@@ -137,7 +137,7 @@ class TestCharm(unittest.TestCase):
         _get_postgres_password,
         _replication_password,
         _bootstrap_cluster,
-        _cluster_started,
+        _member_started,
         _,
     ):
         # Test before the passwords are generated.
