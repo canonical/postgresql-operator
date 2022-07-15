@@ -13,10 +13,8 @@ import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
-    service_restart,
     service_running,
     service_start,
-    service_stop,
 )
 from jinja2 import Template
 from tenacity import (
@@ -259,15 +257,6 @@ class Patroni:
         service_start(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
 
-    def stop_patroni(self) -> bool:
-        """Start Patroni service using systemd.
-
-        Returns:
-            Whether the service started successfully.
-        """
-        service_stop(PATRONI_SERVICE)
-        return service_running(PATRONI_SERVICE)
-
     def switchover(self, candidate: str = None) -> None:
         """Schedule a switchover to a given candidate member????."""
         current_primary = self.get_primary()
@@ -293,24 +282,15 @@ class Patroni:
         primary = self.get_primary()
         return primary != old_primary
 
-    def update_cluster_members(self, restart: bool = False) -> None:
+    def update_cluster_members(self) -> None:
         """Update the list of members of the cluster."""
         # Update the members in the Patroni configuration.
-        logger.error(self.peers_ips)
         self._render_patroni_yml_file()
 
         if service_running(PATRONI_SERVICE):
-            # Make Patroni use the updated configuration.
-            logger.error("running")
-            if restart:
-                logger.error(f"restart: {service_restart(PATRONI_SERVICE)}")
-                logger.error(service_running(PATRONI_SERVICE))
-            else:
-                self._reload_patroni_configuration()
-        else:
-            logger.error("not running")
+            self._reload_patroni_configuration()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def _reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        logger.error(requests.post(f"http://{self.unit_ip}:8008/reload"))
+        requests.post(f"http://{self.unit_ip}:8008/reload")

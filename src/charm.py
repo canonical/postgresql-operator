@@ -95,18 +95,10 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
         if self.unit.name == self._patroni.get_primary(unit_name_pattern=True):
-            # logger.error(f"members_ips: {self.members_ips}")
-            # logger.error(f"cluster members: {self._patroni.cluster_members}")
-            # self._patroni.update_cluster_members(True)
-            # logger.error(f"cluster members: {self._patroni.cluster_members}")
             try:
                 self._change_primary()
             except RetryError:
                 logger.error("failed to change primary")
-            # logger.error(f"cluster members: {self._patroni.cluster_members}")
-            # self._patroni.update_cluster_members(True)
-            # logger.error(f"cluster members: {self._patroni.cluster_members}")
-            # self._patroni.stop_patroni()
 
     @retry(
         stop=stop_after_delay(60),
