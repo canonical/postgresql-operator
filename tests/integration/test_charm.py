@@ -153,8 +153,8 @@ async def test_scale_down_and_up(ops_test: OpsTest, series: str):
 
 
 @pytest.mark.parametrize("series", SERIES)
-async def test_persist_data_through_graceful_restart(ops_test: OpsTest, series: str):
-    """Test data persists through a graceful restart."""
+async def test_persist_data_through_leader_deletion(ops_test: OpsTest, series: str):
+    """Test data persists through a leader deletion."""
     # Set a composite application name in order to test in more than one series at the same time.
     application_name = build_application_name(series)
     any_unit_name = ops_test.model.applications[application_name].units[0].name
@@ -166,7 +166,7 @@ async def test_persist_data_through_graceful_restart(ops_test: OpsTest, series: 
     logger.info(f"connecting to primary {primary} on {host}")
     with db_connect(host=host, password=password) as connection:
         connection.autocommit = True
-        connection.cursor().execute("CREATE TABLE gracetest (testcol INT );")
+        connection.cursor().execute("CREATE TABLE leaderdeletiontest (testcol INT );")
 
     # Remove one unit.
     await ops_test.model.destroy_units(
@@ -183,5 +183,5 @@ async def test_persist_data_through_graceful_restart(ops_test: OpsTest, series: 
         host = unit.public_address
         logger.info("connecting to the database host: %s", host)
         with db_connect(host=host, password=password) as connection:
-            # Ensure we can read from "gracetest" table
-            connection.cursor().execute("SELECT * FROM gracetest;")
+            # Ensure we can read from "leaderdeletiontest" table
+            connection.cursor().execute("SELECT * FROM leaderdeletiontest;")

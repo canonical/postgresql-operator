@@ -19,7 +19,7 @@ def build_application_name(series: str) -> str:
     return f"{APP_NAME}-{series}"
 
 
-async def check_cluster_members(ops_test: OpsTest, application_name: str):
+async def check_cluster_members(ops_test: OpsTest, application_name: str) -> None:
     """Check that the correct members are part of the cluster.
 
     Args:
@@ -49,7 +49,7 @@ def convert_records_to_dict(records: List[tuple]) -> dict:
     return dict
 
 
-def db_connect(host: str, password: str):
+def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
     Args:
@@ -80,7 +80,15 @@ def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]
 
 
 async def get_postgres_password(ops_test: OpsTest, unit_name: str) -> str:
-    """Retrieve the postgres user password using the action."""
+    """Retrieve the postgres user password using the action.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: the name of the unit.
+
+    Returns:
+        the postgres user password.
+    """
     unit = ops_test.model.units.get(unit_name)
     action = await unit.run_action("get-initial-password")
     result = await action.wait()
@@ -130,8 +138,6 @@ async def scale_application(ops_test: OpsTest, application_name: str, count: int
         units = [
             unit.name for unit in ops_test.model.applications[application_name].units[0:-change]
         ]
-        print(units)
-        print(type(units[0]))
         await ops_test.model.applications[application_name].destroy_units(*units)
     await ops_test.model.wait_for_idle(
         apps=[application_name], status="active", timeout=1000, wait_for_exact_units=count

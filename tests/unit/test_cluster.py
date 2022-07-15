@@ -114,7 +114,6 @@ class TestCharm(unittest.TestCase):
             replication_password=replication_password,
             version=self.patroni._get_postgresql_version(),
         )
-        print(expected_content)
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
         with open("templates/patroni.yml.j2", "r") as f:
