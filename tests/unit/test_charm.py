@@ -1,7 +1,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 import os
-import re
 import subprocess
 import unittest
 from unittest.mock import Mock, call, mock_open, patch
@@ -260,14 +259,3 @@ class TestCharm(unittest.TestCase):
         # Then, test for an error.
         with self.assertRaises(subprocess.SubprocessError):
             self.charm._install_pip_packages(packages)
-
-    def test_new_password(self):
-        # Test the password generation twice in order to check if we get different passwords and
-        # that they meet the required criteria.
-        first_password = self.charm._new_password()
-        self.assertEqual(len(first_password), 16)
-        self.assertIsNotNone(re.fullmatch("[a-zA-Z0-9\b]{16}$", first_password))
-
-        second_password = self.charm._new_password()
-        self.assertIsNotNone(re.fullmatch("[a-zA-Z0-9\b]{16}$", second_password))
-        self.assertNotEqual(second_password, first_password)

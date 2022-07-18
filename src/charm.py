@@ -6,8 +6,6 @@
 import json
 import logging
 import os
-import secrets
-import string
 import subprocess
 from typing import List
 
@@ -32,6 +30,8 @@ from ops.model import (
 from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
 from cluster import NotReadyError, Patroni, SwitchoverFailedError
+from relations.postgresql_provider import PostgreSQLProvider
+from utils import new_password
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +59,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
 
+        self.postgresql_client_relation = PostgreSQLProvider(self)
+
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
         try:
@@ -84,6 +86,8 @@ class PostgresqlOperatorCharm(CharmBase):
                 # Check that all members are ready before removing unit from the cluster.
                 if not self._patroni.are_all_members_ready():
                     raise NotReadyError("not all members are ready")
+
+                self.postgresql_client_relation.update_read_only_endpoint()
 
                 # Update the list of the current members.
                 self._remove_from_members_ips(member_ip)
@@ -133,7 +137,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._add_members(event)
 
         # Don't update this member before it's part of the members list.
-        if self._unit_ip not in self.members_ips:
+        if self.unit_ip not in self.members_ips:
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
@@ -155,6 +159,7 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.postgresql_client_relation.update_read_only_endpoint()
         self.unit.status = ActiveStatus()
 
     def _add_members(self, event):
@@ -226,18 +231,18 @@ class PostgresqlOperatorCharm(CharmBase):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
-            self._unit_ip,
+            self.unit_ip,
             self._storage_path,
             self._cluster_name,
             self._member_name,
             self.app.planned_units(),
-            self._peers_ips,
+            self.peers_ips,
             self._get_postgres_password(),
             self._replication_password,
         )
 
     @property
-    def _peers_ips(self) -> List[str]:
+    def peers_ips(self) -> List[str]:
         """Fetch current list of peers IPs.
 
         Returns:
@@ -245,7 +250,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         # Get all members IPs and remove the current unit IP from the list.
         addresses = self.members_ips
-        current_unit_ip = self._unit_ip
+        current_unit_ip = self.unit_ip
         if current_unit_ip in addresses:
             addresses.remove(current_unit_ip)
         return addresses
@@ -259,7 +264,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         # Get all members IPs and remove the current unit IP from the list.
         addresses = [self._get_ip_by_unit(unit) for unit in self._peers.units]
-        addresses.append(self._unit_ip)
+        addresses.append(self.unit_ip)
         return addresses
 
     @property
@@ -289,7 +294,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
 
     @property
-    def _unit_ip(self) -> str:
+    def unit_ip(self) -> str:
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
@@ -335,14 +340,14 @@ class PostgresqlOperatorCharm(CharmBase):
         """Handle the leader-elected event."""
         data = self._peers.data[self.app]
         # The leader sets the needed password on peer relation databag if they weren't set before.
-        data.setdefault("postgres-password", self._new_password())
-        data.setdefault("replication-password", self._new_password())
+        data.setdefault("postgres-password", new_password())
+        data.setdefault("replication-password", new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
         # (the cluster should start with only this member).
-        if self._unit_ip not in self.members_ips:
-            self._add_to_members_ips(self._unit_ip)
+        if self.unit_ip not in self.members_ips:
+            self._add_to_members_ips(self.unit_ip)
 
         # Remove departing units when the leader changes.
         for ip in self._get_ips_to_remove():
@@ -473,16 +478,6 @@ class PostgresqlOperatorCharm(CharmBase):
         except subprocess.SubprocessError:
             logger.error("could not install pip packages")
             raise
-
-    def _new_password(self) -> str:
-        """Generate a random password string.
-
-        Returns:
-           A random password string.
-        """
-        choices = string.ascii_letters + string.digits
-        password = "".join([secrets.choice(choices) for i in range(16)])
-        return password
 
     @property
     def _peers(self) -> Relation:
