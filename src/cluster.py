@@ -9,6 +9,7 @@ import os
 import pwd
 from pathlib import Path
 
+import requests
 import yaml
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
@@ -17,6 +18,16 @@ from charms.operator_libs_linux.v1.systemd import (
     service_start,
 )
 from jinja2 import Template
+from tenacity import (
+    RetryError,
+    Retrying,
+    retry,
+    retry_if_result,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_exponential,
+    wait_fixed,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +35,14 @@ CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 PATRONI_SERVICE = "patroni"
+
+
+class NotReadyError(Exception):
+    """Raised when not all cluster members healthy or finished initial sync."""
+
+
+class SwitchoverFailedError(Exception):
+    """Raised when a switchover failed for some reason."""
 
 
 class Patroni:
@@ -69,6 +88,14 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
+    @property
+    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def cluster_members(self) -> set:
+        """Get the current cluster members."""
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        return set([member["name"] for member in r.json()["members"]])
+
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
 
@@ -94,6 +121,62 @@ class Patroni:
         package = DebianPackage.from_system("postgresql")
         # Remove the Ubuntu revision from the version.
         return str(package.version).split("+")[0]
+
+    def get_primary(self, unit_name_pattern=False) -> str:
+        """Get primary instance.
+
+        Args:
+            unit_name_pattern: whether to convert pod name to unit name
+
+        Returns:
+            primary pod or unit name.
+        """
+        primary = None
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        for member in r.json()["members"]:
+            if member["role"] == "leader":
+                primary = member["name"]
+                if unit_name_pattern:
+                    # Change the last dash to / in order to match unit name pattern.
+                    primary = "/".join(primary.rsplit("-", 1))
+                break
+        return primary
+
+    def are_all_members_ready(self) -> bool:
+        """Check if all members are correctly running Patroni and PostgreSQL.
+
+        Returns:
+            True if all members are ready False otherwise. Retries over a period of 10 seconds
+            3 times to allow server time to start up.
+        """
+        # Request info from cluster endpoint
+        # (which returns all members of the cluster and their states).
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        except RetryError:
+            return False
+
+        return all(member["state"] == "running" for member in r.json()["members"])
+
+    @property
+    def member_started(self) -> bool:
+        """Has the member started Patroni and PostgreSQL.
+
+        Returns:
+            True if services is ready False otherwise. Retries over a period of 60 seconds times to
+            allow server time to start up.
+        """
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(f"http://{self.unit_ip}:8008/health")
+        except RetryError:
+            return False
+
+        return r.json()["state"] == "running"
 
     def _render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
@@ -171,3 +254,41 @@ class Patroni:
         """
         service_start(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
+
+    def switchover(self, candidate: str = None) -> None:
+        """Schedule a switchover to a given candidate member????."""
+        current_primary = self.get_primary()
+        r = requests.post(
+            f"http://{self.unit_ip}:8008/switchover",
+            json={"leader": current_primary, "candidate": candidate},
+        )
+        if r.status_code != 200:
+            raise SwitchoverFailedError(f"received {r.status_code}")
+
+        try:
+            self.primary_changed(current_primary)
+        except RetryError:
+            raise SwitchoverFailedError("primary hasn't changed")
+
+    @retry(
+        retry=retry_if_result(lambda x: not x),
+        stop=stop_after_attempt(10),
+        wait=wait_exponential(multiplier=1, min=2, max=30),
+    )
+    def primary_changed(self, old_primary: str) -> bool:
+        """Checks whether the primary unit has changed."""
+        primary = self.get_primary()
+        return primary != old_primary
+
+    def update_cluster_members(self) -> None:
+        """Update the list of members of the cluster."""
+        # Update the members in the Patroni configuration.
+        self._render_patroni_yml_file()
+
+        if service_running(PATRONI_SERVICE):
+            self._reload_patroni_configuration()
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def _reload_patroni_configuration(self):
+        """Reload Patroni configuration after it was changed."""
+        requests.post(f"http://{self.unit_ip}:8008/reload")
