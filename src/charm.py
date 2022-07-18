@@ -338,7 +338,7 @@ class PostgresqlOperatorCharm(CharmBase):
         data.setdefault("postgres-password", self._new_password())
         data.setdefault("replication-password", self._new_password())
 
-        # # Update the list of the current PostgreSQL hosts when a new leader is elected.
+        # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
         # (the cluster should start with only this member).
         if self._unit_ip not in self.members_ips:

@@ -24,8 +24,7 @@ def patch_network_get(private_address="1.1.1.1") -> Callable:
                 {
                     "addresses": [{"value": private_address}],
                 }
-            ],
-            "bind-address": private_address,
+            ]
         }
 
     return patch("ops.testing._TestingModelBackend.network_get", network_get)

@@ -135,7 +135,7 @@ class Patroni:
         """Get primary instance.
 
         Args:
-            unit_name_pattern: whether or not to convert pod name to unit name
+            unit_name_pattern: whether to convert pod name to unit name
 
         Returns:
             primary pod or unit name.
