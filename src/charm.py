@@ -8,7 +8,7 @@ import logging
 import secrets
 import string
 import subprocess
-from typing import List
+from typing import List, Set
 
 from charms.operator_libs_linux.v0 import apt
 from ops.charm import ActionEvent, CharmBase
@@ -108,7 +108,7 @@ class PostgresqlOperatorCharm(CharmBase):
         )
 
     @property
-    def _peers_ips(self) -> List[str]:
+    def _peers_ips(self) -> Set[str]:
         """Fetch current list of peers IPs.
 
         Returns:
@@ -122,21 +122,21 @@ class PostgresqlOperatorCharm(CharmBase):
         return addresses
 
     @property
-    def _units_ips(self) -> List[str]:
+    def _units_ips(self) -> Set[str]:
         """Fetch current list of peers IPs.
 
         Returns:
             A list of peers addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
-        addresses = [self._get_ip_by_unit(unit) for unit in self._peers.units]
-        addresses.append(self._unit_ip)
+        addresses = {self._get_ip_by_unit(unit) for unit in self._peers.units}
+        addresses.add(self._unit_ip)
         return addresses
 
     @property
-    def members_ips(self) -> List[str]:
+    def members_ips(self) -> Set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
-        return json.loads(self._peers.data[self.app].get("members_ips", "[]"))
+        return set(json.loads(self._peers.data[self.app].get("members_ips", "[]")))
 
     def _add_to_members_ips(self, ip: str) -> None:
         """Add one IP to the members list."""
@@ -202,12 +202,11 @@ class PostgresqlOperatorCharm(CharmBase):
         data.setdefault("postgres-password", self._new_password())
         data.setdefault("replication-password", self._new_password())
 
-    def _get_ips_to_remove(self) -> List[str]:
+    def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
         current = self._units_ips
-        endpoints_to_remove = list(set(old) - set(current))
-        return endpoints_to_remove
+        return old - current
 
     def _on_start(self, event) -> None:
         """Handle the start event."""
