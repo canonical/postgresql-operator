@@ -7,7 +7,7 @@
 import logging
 import os
 import pwd
-from typing import List
+from typing import Set
 
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
@@ -53,7 +53,7 @@ class Patroni:
         cluster_name: str,
         member_name: str,
         planned_units: int,
-        peers_ips: List[str],
+        peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
     ):
