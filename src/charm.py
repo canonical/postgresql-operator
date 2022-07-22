@@ -85,7 +85,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
         Returns:
             a set containing the current Juju hosts
-                with the names in the k8s pod name format
+                with the names using - instead of /
+                to match Patroni members names
         """
         peers = self.model.get_relation(PEER)
         hosts = [self.unit.name.replace("/", "-")] + [
