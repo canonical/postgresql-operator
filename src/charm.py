@@ -175,7 +175,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
             logger.info("Reconfiguring cluster")
             self.unit.status = MaintenanceStatus("reconfiguring cluster")
-            self.unit.status = MaintenanceStatus("reconfiguring cluster")
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
