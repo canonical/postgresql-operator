@@ -94,11 +94,22 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
-        if self.unit.name == self._patroni.get_primary(unit_name_pattern=True):
-            try:
-                self._change_primary()
-            except RetryError:
-                logger.error("failed to change primary")
+        if self.unit.name != self._patroni.get_primary(unit_name_pattern=True):
+            return
+
+        if not self._patroni.are_all_members_ready():
+            logger.warning(
+                "could not switchover because not all members are ready"
+                " - an automatic failover will be triggered"
+            )
+            return
+
+        try:
+            self._change_primary()
+        except RetryError:
+            logger.warning(
+                "failed to change primary;" " - an automatic failover will be triggered"
+            )
 
     @retry(
         stop=stop_after_delay(60),
@@ -107,19 +118,15 @@ class PostgresqlOperatorCharm(CharmBase):
     )
     def _change_primary(self) -> None:
         """Change the primary member of the cluster."""
-        # Inform the first of the remaining available members to not incur the risk
-        # of triggering a switchover to a member that is also being removed.
-        if not self._patroni.are_all_members_ready():
-            logger.info("could not switchover because not all members are ready")
-            return
-
         # Try switchover and raise and exception if it doesn't succeed.
         # If it doesn't happen on time, Patroni will automatically run a fail-over.
         try:
             self._patroni.switchover()
             logger.info("successful switchover")
         except SwitchoverFailedError as e:
-            logger.error(f"switchover failed with reason: {e}")
+            logger.warning(
+                f"switchover failed with reason: {e}" " - an automatic failover will be triggered"
+            )
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
