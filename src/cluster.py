@@ -7,10 +7,9 @@
 import logging
 import os
 import pwd
-from pathlib import Path
+from typing import Set
 
 import requests
-import yaml
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
@@ -31,9 +30,6 @@ from tenacity import (
 
 logger = logging.getLogger(__name__)
 
-CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
-METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 PATRONI_SERVICE = "patroni"
 
 
@@ -48,34 +44,59 @@ class SwitchoverFailedError(Exception):
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
-    def __init__(self, unit_ip: str):
-        self.unit_ip = unit_ip
+    pass
 
-    def bootstrap_cluster(
+    def __init__(
         self,
+        unit_ip: str,
+        storage_path: str,
         cluster_name: str,
         member_name: str,
+        planned_units: int,
+        peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
-    ) -> bool:
-        """Bootstrap a PostgreSQL cluster using Patroni.
+    ):
+        """Initialize the Patroni class.
 
         Args:
+            unit_ip: IP address of the current unit
+            storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
+            peers_ips: IP addresses of the peer units
+            planned_units: number of units planned for the cluster
             superuser_password: password for the postgres user
             replication_password: password for the user used in the replication
         """
+        self.unit_ip = unit_ip
+        self.storage_path = storage_path
+        self.cluster_name = cluster_name
+        self.member_name = member_name
+        self.planned_units = planned_units
+        self.peers_ips = peers_ips
+        self.superuser_password = superuser_password
+        self.replication_password = replication_password
+
+    def bootstrap_cluster(self, replica: bool = False) -> bool:
+        """Bootstrap a PostgreSQL cluster using Patroni."""
         # Render the configuration files and start the cluster.
-        self._change_owner(STORAGE_PATH)
-        self._render_patroni_yml_file(
-            cluster_name, member_name, superuser_password, replication_password
-        )
+        self.configure_patroni_on_unit(replica)
+        return self.start_patroni()
+
+    def configure_patroni_on_unit(self, replica: bool = False):
+        """Configure Patroni (configuration files and service) on the unit.
+
+        Args:
+            replica: whether the unit should be configured as a replica
+            (defaults to False, which configures the unit as a leader)
+        """
+        self._change_owner(self.storage_path)
+        self._render_patroni_yml_file(replica)
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
-        self._render_postgresql_conf_file()
-        return self._start_patroni()
+        self.render_postgresql_conf_file()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -108,13 +129,6 @@ class Patroni:
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
-
-    def inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("create_main_cluster = false\n")
-            file.write(f"include '{STORAGE_PATH}/conf.d/postgresql-operator.conf'")
 
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
@@ -202,51 +216,44 @@ class Patroni:
         with open("templates/patroni.service.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
-        rendered = template.render(conf_path=STORAGE_PATH)
+        rendered = template.render(conf_path=self.storage_path)
         self._render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def _render_patroni_yml_file(
-        self,
-        cluster_name: str,
-        member_name: str,
-        superuser_password: str,
-        replication_password: str,
-    ) -> None:
-        """Render the Patroni configuration file.
-
-        Args:
-            cluster_name: name of the cluster
-            member_name: name of the member inside the cluster
-            superuser_password: password for the postgres user
-            replication_password: password for the user used in the replication
-        """
+    def _render_patroni_yml_file(self, replica: bool = False) -> None:
+        """Render the Patroni configuration file."""
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            conf_path=STORAGE_PATH,
-            member_name=member_name,
-            scope=cluster_name,
+            conf_path=self.storage_path,
+            member_name=self.member_name,
+            peers_ips=self.peers_ips,
+            scope=self.cluster_name,
             self_ip=self.unit_ip,
-            superuser_password=superuser_password,
-            replication_password=replication_password,
+            replica=replica,
+            superuser_password=self.superuser_password,
+            replication_password=self.replication_password,
             version=self._get_postgresql_version(),
         )
-        self._render_file(f"{STORAGE_PATH}/patroni.yml", rendered, 0o644)
+        self._render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
-    def _render_postgresql_conf_file(self) -> None:
+    def render_postgresql_conf_file(self) -> None:
         """Render the PostgreSQL configuration file."""
         # Open the template postgresql.conf file.
         with open("templates/postgresql.conf.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         # TODO: add extra configurations here later.
-        rendered = template.render(listen_addresses="*")
-        self._create_directory(f"{STORAGE_PATH}/conf.d", mode=0o644)
-        self._render_file(f"{STORAGE_PATH}/conf.d/postgresql-operator.conf", rendered, 0o644)
+        rendered = template.render(
+            listen_addresses="*",
+            synchronous_commit="on" if self.planned_units > 1 else "off",
+            synchronous_standby_names="*",
+        )
+        self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
+        self._render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
-    def _start_patroni(self) -> bool:
+    def start_patroni(self) -> bool:
         """Start Patroni service using systemd.
 
         Returns:

@@ -1,10 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import os
 import re
 import subprocess
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, mock_open, patch
 
 from charms.operator_libs_linux.v0 import apt
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
@@ -13,9 +13,10 @@ from ops.testing import Harness
 from charm import PostgresqlOperatorCharm
 from tests.helpers import patch_network_get
 
+CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
+
 
 class TestCharm(unittest.TestCase):
-    @patch_network_get(private_address="1.1.1.1")
     def setUp(self):
         self._peer_relation = "postgresql-replicas"
         self._postgresql_container = "postgresql"
@@ -25,10 +26,12 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
         self.charm = self.harness.charm
+        self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
+    @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.Patroni.inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     def test_on_install(
         self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
@@ -49,9 +52,10 @@ class TestCharm(unittest.TestCase):
         # Assert the status set by the event handler.
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
+    @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.Patroni.inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     def test_on_install_apt_failure(
         self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
@@ -65,9 +69,10 @@ class TestCharm(unittest.TestCase):
         _install_pip_packages.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.Patroni.inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     def test_on_install_pip_failure(
         self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
     ):
@@ -84,14 +89,34 @@ class TestCharm(unittest.TestCase):
         _install_pip_packages.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
-    def test_on_leader_elected(self):
+    @patch("os.makedirs")
+    def test_inhibit_default_cluster_creation(self, _makedirs):
+        # Setup a mock for the `open` method.
+        mock = mock_open()
+        # Patch the `open` method with our mock.
+        with patch("builtins.open", mock, create=True):
+            self.charm._inhibit_default_cluster_creation()
+            _makedirs.assert_called_once_with(
+                os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
+            )
+            # Check the write calls made to the file.
+            handle = mock()
+            calls = [
+                call("create_main_cluster = false\n"),
+                call(f"include '{self.charm._storage_path}/conf.d/postgresql-operator.conf'"),
+            ]
+            handle.write.assert_has_calls(calls)
+
+    @patch("charm.Patroni.update_cluster_members")
+    @patch_network_get(private_address="1.1.1.1")
+    def test_on_leader_elected(self, _update_cluster_members):
         # Assert that there is no password in the peer relation.
-        self.harness.add_relation(self._peer_relation, self.charm.app.name)
         self.assertIsNone(self.charm._peers.data[self.charm.app].get("postgres-password", None))
 
         # Check that a new password was generated on leader election.
         self.harness.set_leader()
         password = self.charm._peers.data[self.charm.app].get("postgres-password", None)
+        _update_cluster_members.assert_called_once()
         self.assertIsNotNone(password)
 
         # Trigger a new leader election and check that the password is still the same.
@@ -101,24 +126,36 @@ class TestCharm(unittest.TestCase):
             self.charm._peers.data[self.charm.app].get("postgres-password", None), password
         )
 
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.Patroni.update_cluster_members")
+    @patch("charm.Patroni.member_started")
     @patch("charm.Patroni.bootstrap_cluster")
-    @patch(
-        "charm.PostgresqlOperatorCharm._replication_password", return_value="fake-replication-pw"
-    )
-    @patch("charm.PostgresqlOperatorCharm._get_postgres_password", return_value=None)
-    def test_on_start(self, _get_postgres_password, _replication_password, _bootstrap_cluster):
+    @patch("charm.PostgresqlOperatorCharm._replication_password")
+    @patch("charm.PostgresqlOperatorCharm._get_postgres_password")
+    def test_on_start(
+        self,
+        _get_postgres_password,
+        _replication_password,
+        _bootstrap_cluster,
+        _member_started,
+        _,
+    ):
         # Test before the passwords are generated.
+        _get_postgres_password.return_value = None
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
-        # Mock the generated superuser password.
+        # Mock the passwords.
         _get_postgres_password.return_value = "fake-postgres-password"
+        _replication_password.return_value = "fake-replication-password"
 
         # Mock cluster start success values.
         _bootstrap_cluster.side_effect = [False, True]
 
         # Test for a failed cluster bootstrapping.
+        # TODO: test replicas start (DPE-494).
+        self.harness.set_leader()
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
@@ -156,9 +193,10 @@ class TestCharm(unittest.TestCase):
         _get_postgres_password.assert_called_once()
         mock_event.set_results.assert_called_once_with({"postgres-password": "test-password"})
 
-    def test_get_postgres_password(self):
+    @patch("charm.Patroni.update_cluster_members")
+    @patch_network_get(private_address="1.1.1.1")
+    def test_get_postgres_password(self, _):
         # Test for a None password.
-        self.harness.add_relation(self._peer_relation, self.charm.app.name)
         self.assertIsNone(self.charm._get_postgres_password())
 
         # Then test for a non empty password after leader election and peer data set.
