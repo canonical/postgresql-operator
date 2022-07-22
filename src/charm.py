@@ -3,12 +3,12 @@
 # See LICENSE file for licensing details.
 
 """Charmed Machine Operator for the PostgreSQL database."""
-
+import json
 import logging
 import secrets
 import string
 import subprocess
-from typing import List
+from typing import List, Set
 
 from charms.operator_libs_linux.v0 import apt
 from ops.charm import ActionEvent, CharmBase
@@ -19,10 +19,12 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
+    Unit,
     WaitingStatus,
 )
+from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
-from cluster import Patroni
+from cluster import Patroni, SwitchoverFailedError
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +41,135 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
+        self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
         self._cluster = Patroni(self._unit_ip)
+
+    def _on_get_primary(self, event: ActionEvent) -> None:
+        """Get primary instance."""
+        try:
+            primary = self._patroni.get_primary(unit_name_pattern=True)
+            event.set_results({"primary": primary})
+        except RetryError as e:
+            logger.error(f"failed to get primary with error {e}")
+
+    @retry(
+        stop=stop_after_delay(60),
+        wait=wait_fixed(5),
+        reraise=True,
+    )
+    def _change_primary(self) -> None:
+        """Change the primary member of the cluster."""
+        # Try to switchover to another member and raise an exception if it doesn't succeed.
+        # If it doesn't happen on time, Patroni will automatically run a fail-over.
+        try:
+            # Get the current primary to check if it has changed later.
+            current_primary = self._patroni.get_primary()
+
+            # Trigger the switchover.
+            self._patroni.switchover()
+
+            # Wait for the switchover to complete.
+            self._patroni.primary_changed(current_primary)
+
+            logger.info("successful switchover")
+        except (RetryError, SwitchoverFailedError) as e:
+            logger.warning(
+                f"switchover failed with reason: {e} - an automatic failover will be triggered"
+            )
+
+    def _get_peer_unit_ip(self, unit: Unit) -> str:
+        """Get the IP address of a specific peer unit."""
+        return self._peers.data[unit].get("private-address")
+
+    @property
+    def _hosts(self) -> set:
+        """List of the current Juju hosts.
+
+        Returns:
+            a set containing the current Juju hosts
+                with the names using - instead of /
+                to match Patroni members names
+        """
+        peers = self.model.get_relation(PEER)
+        hosts = [self.unit.name.replace("/", "-")] + [
+            unit.name.replace("/", "-") for unit in peers.units
+        ]
+        return set(hosts)
+
+    @property
+    def _patroni(self) -> Patroni:
+        """Returns an instance of the Patroni object."""
+        return Patroni(
+            self._unit_ip,
+            self._storage_path,
+            self._cluster_name,
+            self._member_name,
+            self.app.planned_units(),
+            self._peer_members_ips,
+            self._get_postgres_password(),
+            self._replication_password,
+        )
+
+    @property
+    def _peer_members_ips(self) -> Set[str]:
+        """Fetch current list of peer members IPs.
+
+        Returns:
+            A list of peer members addresses (strings).
+        """
+        # Get all members IPs and remove the current unit IP from the list.
+        addresses = self.members_ips
+        current_unit_ip = self._unit_ip
+        if current_unit_ip in addresses:
+            addresses.remove(current_unit_ip)
+        return addresses
+
+    @property
+    def _units_ips(self) -> Set[str]:
+        """Fetch current list of peers IPs.
+
+        Returns:
+            A list of peers addresses (strings).
+        """
+        # Get all members IPs and remove the current unit IP from the list.
+        addresses = {self._get_peer_unit_ip(unit) for unit in self._peers.units}
+        addresses.add(self._unit_ip)
+        return addresses
+
+    @property
+    def members_ips(self) -> Set[str]:
+        """Returns the list of IPs addresses of the current members of the cluster."""
+        return set(json.loads(self._peers.data[self.app].get("members_ips", "[]")))
+
+    def _add_to_members_ips(self, ip: str) -> None:
+        """Add one IP to the members list."""
+        self._update_members_ips(ip_to_add=ip)
+
+    def _remove_from_members_ips(self, ip: str) -> None:
+        """Remove IPs from the members list."""
+        self._update_members_ips(ip_to_remove=ip)
+
+    def _update_members_ips(self, ip_to_add: str = None, ip_to_remove: str = None) -> None:
+        """Update cluster member IPs on application data.
+
+        Member IPs on application data are used to determine when a unit of PostgreSQL
+        should be added or removed from the PostgreSQL cluster.
+
+        NOTE: this function does not update the IPs on the PostgreSQL cluster
+        in the Patroni configuration.
+        """
+        # Allow leader to reset which members are part of the cluster.
+        if not self.unit.is_leader():
+            return
+
+        ips = json.loads(self._peers.data[self.app].get("members_ips", "[]"))
+        if ip_to_add and ip_to_add not in ips:
+            ips.append(ip_to_add)
+        elif ip_to_remove:
+            ips.remove(ip_to_remove)
+        self._peers.data[self.app]["members_ips"] = json.dumps(ips)
 
     @property
     def _unit_ip(self) -> str:
@@ -85,6 +213,12 @@ class PostgresqlOperatorCharm(CharmBase):
         # The leader sets the needed password on peer relation databag if they weren't set before.
         data.setdefault("postgres-password", self._new_password())
         data.setdefault("replication-password", self._new_password())
+
+    def _get_ips_to_remove(self) -> Set[str]:
+        """List the IPs that were part of the cluster but departed."""
+        old = self.members_ips
+        current = self._units_ips
+        return old - current
 
     def _on_start(self, event) -> None:
         """Handle the start event."""
