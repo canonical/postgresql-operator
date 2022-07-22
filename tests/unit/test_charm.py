@@ -154,7 +154,7 @@ class TestCharm(unittest.TestCase):
         _bootstrap_cluster.side_effect = [False, True]
 
         # Test for a failed cluster bootstrapping.
-        # TODO: test replicas start.
+        # TODO: test replicas start (DPE-494).
         self.harness.set_leader()
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()

@@ -85,7 +85,12 @@ class Patroni:
         return self.start_patroni()
 
     def configure_patroni_on_unit(self, replica: bool = False):
-        """Configure Patroni (configuration files and service) on the unit."""
+        """Configure Patroni (configuration files and service) on the unit.
+
+        Args:
+            replica: whether the unit should be configured as a replica
+            (defaults to False, which configures the unit as a leader)
+        """
         self._change_owner(self.storage_path)
         self._render_patroni_yml_file(replica)
         self._render_patroni_service_file()
