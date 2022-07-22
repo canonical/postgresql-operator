@@ -112,11 +112,13 @@ class PostgresqlOperatorCharm(CharmBase):
         # Try switchover and raise an exception if it doesn't succeed.
         # If it doesn't happen on time, Patroni will automatically run a fail-over.
         try:
+            # Get the current primary to check if it has changed later.
+            current_primary = self._patroni.get_primary()
+
             # Trigger the switchover.
             self._patroni.switchover()
 
             # Wait for the switchover to complete.
-            current_primary = self._patroni.get_primary()
             self._patroni.primary_changed(current_primary)
 
             logger.info("successful switchover")
