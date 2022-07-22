@@ -109,8 +109,8 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
-        return set([member["name"] for member in r.json()["members"]])
+        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        return set([member["name"] for member in cluster_status.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
@@ -142,8 +142,8 @@ class Patroni:
         """
         primary = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
-        for member in r.json()["members"]:
+        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        for member in cluster_status.json()["members"]:
             if member["role"] == "leader":
                 primary = member["name"]
                 if unit_name_pattern:
@@ -164,11 +164,11 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+                    cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
         except RetryError:
             return False
 
-        return all(member["state"] == "running" for member in r.json()["members"])
+        return all(member["state"] == "running" for member in cluster_status.json()["members"])
 
     @property
     def member_started(self) -> bool:
