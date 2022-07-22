@@ -255,20 +255,20 @@ class Patroni:
         service_start(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
 
-    def switchover(self, candidate: str = None) -> None:
-        """Schedule a switchover to a given candidate member."""
-        current_primary = self.get_primary()
-        r = requests.post(
-            f"http://{self.unit_ip}:8008/switchover",
-            json={"leader": current_primary, "candidate": candidate},
-        )
+    def switchover(self) -> None:
+        """Trigger a switchover."""
+        # Try to trigger the switchover.
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                current_primary = self.get_primary()
+                r = requests.post(
+                    f"http://{self.unit_ip}:8008/switchover",
+                    json={"leader": current_primary},
+                )
+
+        # Check whether the switchover was unsuccessful.
         if r.status_code != 200:
             raise SwitchoverFailedError(f"received {r.status_code}")
-
-        try:
-            self.primary_changed(current_primary)
-        except RetryError:
-            raise SwitchoverFailedError("primary hasn't changed")
 
     @retry(
         retry=retry_if_result(lambda x: not x),

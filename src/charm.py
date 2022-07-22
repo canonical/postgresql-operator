@@ -61,19 +61,23 @@ class PostgresqlOperatorCharm(CharmBase):
     )
     def _change_primary(self) -> None:
         """Change the primary member of the cluster."""
-        # Inform the first of the remaining available members to not incur the risk
-        # of triggering a switchover to a member that is also being removed.
-        if not self._patroni.are_all_members_ready():
-            logger.info("could not switchover because not all members are ready")
-            return
-
-        # Try switchover and raise and exception if it doesn't succeed.
+        # Try to switchover to another member and raise an exception if it doesn't succeed.
         # If it doesn't happen on time, Patroni will automatically run a fail-over.
         try:
+            # Get the current primary to check if it has changed later.
+            current_primary = self._patroni.get_primary()
+
+            # Trigger the switchover.
             self._patroni.switchover()
+
+            # Wait for the switchover to complete.
+            self._patroni.primary_changed(current_primary)
+
             logger.info("successful switchover")
-        except SwitchoverFailedError as e:
-            logger.error(f"switchover failed with reason: {e}")
+        except (RetryError, SwitchoverFailedError) as e:
+            logger.warning(
+                f"switchover failed with reason: {e} - an automatic failover will be triggered"
+            )
 
     def _get_peer_unit_ip(self, unit: Unit) -> str:
         """Get the IP address of a specific peer unit."""
