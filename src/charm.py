@@ -232,17 +232,17 @@ class PostgresqlOperatorCharm(CharmBase):
             self._cluster_name,
             self._member_name,
             self.app.planned_units(),
-            self._peers_ips,
+            self._peer_members_ips,
             self._get_postgres_password(),
             self._replication_password,
         )
 
     @property
-    def _peers_ips(self) -> Set[str]:
-        """Fetch current list of peers IPs.
+    def _peer_members_ips(self) -> Set[str]:
+        """Fetch current list of peer members IPs.
 
         Returns:
-            A list of peers addresses (strings).
+            A list of peer members addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
         addresses = self.members_ips
