@@ -148,7 +148,14 @@ class PostgresqlOperatorCharm(CharmBase):
         self._update_members_ips(ip_to_remove=ip)
 
     def _update_members_ips(self, ip_to_add: str = None, ip_to_remove: str = None) -> None:
-        """Update cluster members IPs."""
+        """Update cluster member IPs on application data.
+
+        Member IPs on application data are used to determine when a unit of PostgreSQL
+        should be added or removed from the PostgreSQL cluster.
+
+        NOTE: this function does not update the IPs on the PostgreSQL cluster
+        in the Patroni configuration.
+        """
         # Allow leader to reset which members are part of the cluster.
         if not self.unit.is_leader():
             return
