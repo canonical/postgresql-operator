@@ -104,12 +104,7 @@ class PostgresqlOperatorCharm(CharmBase):
             )
             return
 
-        # Change the primary using the switchover mechanism.
-        self._change_primary()
-
-    def _change_primary(self) -> None:
-        """Change the primary member of the cluster."""
-        # Try switchover and raise an exception if it doesn't succeed.
+        # Try to switchover to another member and raise an exception if it doesn't succeed.
         # If it doesn't happen on time, Patroni will automatically run a fail-over.
         try:
             # Get the current primary to check if it has changed later.
