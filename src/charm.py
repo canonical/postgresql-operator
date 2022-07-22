@@ -29,7 +29,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError, retry, stop_after_delay, wait_fixed
+from tenacity import RetryError
 
 from cluster import NotReadyError, Patroni, SwitchoverFailedError
 
@@ -104,28 +104,25 @@ class PostgresqlOperatorCharm(CharmBase):
             )
             return
 
-        try:
-            self._change_primary()
-        except RetryError:
-            logger.warning(
-                "failed to change primary;" " - an automatic failover will be triggered"
-            )
+        # Change the primary using the switchover mechanism.
+        self._change_primary()
 
-    @retry(
-        stop=stop_after_delay(60),
-        wait=wait_fixed(5),
-        reraise=True,
-    )
     def _change_primary(self) -> None:
         """Change the primary member of the cluster."""
-        # Try switchover and raise and exception if it doesn't succeed.
+        # Try switchover and raise an exception if it doesn't succeed.
         # If it doesn't happen on time, Patroni will automatically run a fail-over.
         try:
+            # Trigger the switchover.
             self._patroni.switchover()
+
+            # Wait for the switchover to complete.
+            current_primary = self._patroni.get_primary()
+            self._patroni.primary_changed(current_primary)
+
             logger.info("successful switchover")
-        except SwitchoverFailedError as e:
+        except (RetryError, SwitchoverFailedError) as e:
             logger.warning(
-                f"switchover failed with reason: {e}" " - an automatic failover will be triggered"
+                f"switchover failed with reason: {e} - an automatic failover will be triggered"
             )
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
