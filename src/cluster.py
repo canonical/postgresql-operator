@@ -258,7 +258,7 @@ class Patroni:
         return service_running(PATRONI_SERVICE)
 
     def switchover(self, candidate: str = None) -> None:
-        """Schedule a switchover to a given candidate member????."""
+        """Schedule a switchover to a given candidate member."""
         current_primary = self.get_primary()
         r = requests.post(
             f"http://{self.unit_ip}:8008/switchover",

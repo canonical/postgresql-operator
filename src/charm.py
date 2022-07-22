@@ -189,7 +189,7 @@ class PostgresqlOperatorCharm(CharmBase):
             NotReadyError if either the new member or the current members are not ready.
         """
         unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
-        member_ip = self._get_ip_by_unit(unit)
+        member_ip = self._get_peer_unit_ip(unit)
 
         if not self._patroni.are_all_members_ready():
             logger.info("not all members are ready")
@@ -204,8 +204,8 @@ class PostgresqlOperatorCharm(CharmBase):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_ip_by_unit(self, unit: Unit) -> str:
-        """Get the IP address of a specific unit."""
+    def _get_peer_unit_ip(self, unit: Unit) -> str:
+        """Get the IP address of a specific peer unit."""
         return self._peers.data[unit].get("private-address")
 
     @property
@@ -214,7 +214,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
         Returns:
             a set containing the current Juju hosts
-                with the names in the k8s pod name format
+                with the names using - instead of /
+                to match Patroni members names
         """
         peers = self.model.get_relation(PEER)
         hosts = [self.unit.name.replace("/", "-")] + [
@@ -258,7 +259,7 @@ class PostgresqlOperatorCharm(CharmBase):
             A list of peers addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
-        addresses = {self._get_ip_by_unit(unit) for unit in self._peers.units}
+        addresses = {self._get_peer_unit_ip(unit) for unit in self._peers.units}
         addresses.add(self._unit_ip)
         return addresses
 
@@ -276,7 +277,14 @@ class PostgresqlOperatorCharm(CharmBase):
         self._update_members_ips(ip_to_remove=ip)
 
     def _update_members_ips(self, ip_to_add: str = None, ip_to_remove: str = None) -> None:
-        """Update cluster members IPs."""
+        """Update cluster member IPs on application data.
+
+        Member IPs on application data are used to determine when a unit of PostgreSQL
+        should be added or removed from the PostgreSQL cluster.
+
+        NOTE: this function does not update the IPs on the PostgreSQL cluster
+        in the Patroni configuration.
+        """
         # Allow leader to reset which members are part of the cluster.
         if not self.unit.is_leader():
             return
