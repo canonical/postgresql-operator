@@ -94,7 +94,15 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
-        if self.unit.name != self._patroni.get_primary(unit_name_pattern=True):
+        try:
+            primary = self._patroni.get_primary(unit_name_pattern=True)
+        except RetryError:
+            # Ignore the event if the primary couldn't be retrieved.
+            # If a switchover is needed, an automatic failover will be triggered
+            # when the unit is removed.
+            return
+
+        if self.unit.name != primary:
             return
 
         if not self._patroni.are_all_members_ready():
@@ -180,6 +188,9 @@ class PostgresqlOperatorCharm(CharmBase):
                 self.add_cluster_member(member)
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
+            event.defer()
+        except RetryError:
+            logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
             event.defer()
 
     def add_cluster_member(self, member: str) -> None:
