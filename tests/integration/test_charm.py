@@ -92,24 +92,24 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     # Connect to PostgreSQL.
     host = await get_unit_address(ops_test, f"{application_name}/{unit_id}")
     logger.info("connecting to the database host: %s", host)
-    with psycopg2.connect(
-        f"dbname='postgres' user='postgres' host='{host}' password='{password}' connect_timeout=1"
-    ) as connection:
+    connection = db_connect(host, password)
+    with connection:
         assert connection.status == psycopg2.extensions.STATUS_READY
 
         # Retrieve settings from PostgreSQL pg_settings table.
         # Here the SQL query gets a key-value pair composed by the name of the setting
         # and its value, filtering the retrieved data to return only the settings
         # that were set by Patroni.
-        cursor = connection.cursor()
-        cursor.execute(
-            """SELECT name,setting
-                FROM pg_settings
-                WHERE name IN
-                ('data_directory', 'cluster_name', 'data_checksums', 'listen_addresses');"""
-        )
-        records = cursor.fetchall()
-        settings = convert_records_to_dict(records)
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """SELECT name,setting
+                    FROM pg_settings
+                    WHERE name IN
+                    ('data_directory', 'cluster_name', 'data_checksums', 'listen_addresses');"""
+            )
+            records = cursor.fetchall()
+            settings = convert_records_to_dict(records)
+    connection.close()
 
     # Validate each configuration set by Patroni on PostgreSQL.
     assert settings["cluster_name"] == f"{APP_NAME}-{series}"
@@ -164,9 +164,12 @@ async def test_persist_data_through_leader_deletion(ops_test: OpsTest, series: s
     # Write data to primary IP.
     host = await get_unit_address(ops_test, primary)
     logger.info(f"connecting to primary {primary} on {host}")
-    with db_connect(host=host, password=password) as connection:
+    connection = db_connect(host, password)
+    with connection:
         connection.autocommit = True
-        connection.cursor().execute("CREATE TABLE leaderdeletiontest (testcol INT );")
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TABLE leaderdeletiontest (testcol INT );")
+    connection.close()
 
     # Remove one unit.
     await ops_test.model.destroy_units(
@@ -182,6 +185,9 @@ async def test_persist_data_through_leader_deletion(ops_test: OpsTest, series: s
     for unit in ops_test.model.applications[application_name].units:
         host = unit.public_address
         logger.info("connecting to the database host: %s", host)
-        with db_connect(host=host, password=password) as connection:
-            # Ensure we can read from "leaderdeletiontest" table
-            connection.cursor().execute("SELECT * FROM leaderdeletiontest;")
+        connection = db_connect(host, password)
+        with connection:
+            with connection.cursor() as cursor:
+                # Ensure we can read from "leaderdeletiontest" table
+                cursor.execute("SELECT * FROM leaderdeletiontest;")
+        connection.close()
