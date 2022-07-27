@@ -153,8 +153,8 @@ async def test_scale_down_and_up(ops_test: OpsTest, series: str):
 
 
 @pytest.mark.parametrize("series", SERIES)
-async def test_persist_data_through_leader_deletion(ops_test: OpsTest, series: str):
-    """Test data persists through a leader deletion."""
+async def test_persist_data_through_primary_deletion(ops_test: OpsTest, series: str):
+    """Test data persists through a primary deletion."""
     # Set a composite application name in order to test in more than one series at the same time.
     application_name = build_application_name(series)
     any_unit_name = ops_test.model.applications[application_name].units[0].name
@@ -168,7 +168,7 @@ async def test_persist_data_through_leader_deletion(ops_test: OpsTest, series: s
     with connection:
         connection.autocommit = True
         with connection.cursor() as cursor:
-            cursor.execute("CREATE TABLE leaderdeletiontest (testcol INT );")
+            cursor.execute("CREATE TABLE primarydeletiontest (testcol INT);")
     connection.close()
 
     # Remove one unit.
@@ -188,6 +188,6 @@ async def test_persist_data_through_leader_deletion(ops_test: OpsTest, series: s
         connection = db_connect(host, password)
         with connection:
             with connection.cursor() as cursor:
-                # Ensure we can read from "leaderdeletiontest" table
-                cursor.execute("SELECT * FROM leaderdeletiontest;")
+                # Ensure we can read from "primarydeletiontest" table
+                cursor.execute("SELECT * FROM primarydeletiontest;")
         connection.close()
