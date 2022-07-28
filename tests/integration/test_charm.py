@@ -161,7 +161,7 @@ async def test_scale_down_and_up(ops_test: OpsTest, series: str):
 
     # Trigger a switchover if the primary and the leader are not the same unit.
     if primary != leader_unit.name:
-        switchover(ops_test, primary)
+        switchover(ops_test, primary, leader_unit.name)
 
         # Get the new primary unit.
         primary = await get_primary(ops_test, any_unit_name)
