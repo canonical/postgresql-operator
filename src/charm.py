@@ -29,7 +29,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError
+from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
 from cluster import NotReadyError, Patroni, SwitchoverFailedError
 
@@ -306,6 +306,31 @@ class PostgresqlOperatorCharm(CharmBase):
         elif ip_to_remove:
             ips.remove(ip_to_remove)
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
+
+    @retry(
+        stop=stop_after_delay(60),
+        wait=wait_fixed(5),
+        reraise=True,
+    )
+    def _change_primary(self) -> None:
+        """Change the primary member of the cluster."""
+        # Try to switchover to another member and raise an exception if it doesn't succeed.
+        # If it doesn't happen on time, Patroni will automatically run a fail-over.
+        try:
+            # Get the current primary to check if it has changed later.
+            current_primary = self._patroni.get_primary()
+
+            # Trigger the switchover.
+            self._patroni.switchover()
+
+            # Wait for the switchover to complete.
+            self._patroni.primary_changed(current_primary)
+
+            logger.info("successful switchover")
+        except (RetryError, SwitchoverFailedError) as e:
+            logger.warning(
+                f"switchover failed with reason: {e} - an automatic failover will be triggered"
+            )
 
     @property
     def _unit_ip(self) -> str:
