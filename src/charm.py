@@ -31,7 +31,12 @@ from ops.model import (
 )
 from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
-from cluster import NotReadyError, Patroni, SwitchoverFailedError
+from cluster import (
+    NotReadyError,
+    Patroni,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +74,21 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """The leader removes the departing units from the list of cluster members."""
-        # Allow leader to update hosts if it isn't leaving.
-        if not self.unit.is_leader() or event.departing_unit == self.unit:
+        # Don't handle this event in the same unit that is departing.
+        if event.departing_unit == self.unit:
+            return
+
+        # Remove the departing member from the raft cluster.
+        try:
+            departing_member = event.departing_unit.name.replace("/", "-")
+            member_ip = self._patroni.get_member_ip(departing_member)
+            self._patroni.remove_raft_member(member_ip)
+        except RemoveRaftMemberFailedError:
+            event.defer()
+            return
+
+        # Allow leader to update the cluster members.
+        if not self.unit.is_leader():
             return
 
         if "cluster_initialised" not in self._peers.data[self.app]:
