@@ -7,7 +7,8 @@
 import logging
 import os
 import pwd
-from typing import List
+import subprocess
+from typing import Set
 
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
@@ -37,6 +38,10 @@ class NotReadyError(Exception):
     """Raised when not all cluster members healthy or finished initial sync."""
 
 
+class RemoveRaftMemberFailedError(Exception):
+    """Raised when a remove raft member failed for some reason."""
+
+
 class SwitchoverFailedError(Exception):
     """Raised when a switchover failed for some reason."""
 
@@ -53,7 +58,7 @@ class Patroni:
         cluster_name: str,
         member_name: str,
         planned_units: int,
-        peers_ips: List[str],
+        peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
     ):
@@ -85,7 +90,12 @@ class Patroni:
         return self.start_patroni()
 
     def configure_patroni_on_unit(self, replica: bool = False):
-        """Configure Patroni (configuration files and service) on the unit."""
+        """Configure Patroni (configuration files and service) on the unit.
+
+        Args:
+            replica: whether the unit should be configured as a replica
+            (defaults to False, which configures the unit as a leader)
+        """
         self._change_owner(self.storage_path)
         self._render_patroni_yml_file(replica)
         self._render_patroni_service_file()
@@ -109,8 +119,8 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
-        return set([member["name"] for member in r.json()["members"]])
+        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        return set([member["name"] for member in cluster_status.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
@@ -131,6 +141,24 @@ class Patroni:
         # Remove the Ubuntu revision from the version.
         return str(package.version).split("+")[0]
 
+    def get_member_ip(self, member_name: str) -> str:
+        """Get cluster member IP address.
+
+        Args:
+            member_name: cluster member name.
+
+        Returns:
+            IP address of the cluster member.
+        """
+        ip = None
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        for member in cluster_status.json()["members"]:
+            if member["name"] == member_name:
+                ip = member["host"]
+                break
+        return ip
+
     def get_primary(self, unit_name_pattern=False) -> str:
         """Get primary instance.
 
@@ -142,8 +170,8 @@ class Patroni:
         """
         primary = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        r = requests.get(f"http://{self.unit_ip}:8008/cluster")
-        for member in r.json()["members"]:
+        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        for member in cluster_status.json()["members"]:
             if member["role"] == "leader":
                 primary = member["name"]
                 if unit_name_pattern:
@@ -164,11 +192,11 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"http://{self.unit_ip}:8008/cluster")
+                    cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
         except RetryError:
             return False
 
-        return all(member["state"] == "running" for member in r.json()["members"])
+        return all(member["state"] == "running" for member in cluster_status.json()["members"])
 
     @property
     def member_started(self) -> bool:
@@ -257,20 +285,20 @@ class Patroni:
         service_start(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
 
-    def switchover(self, candidate: str = None) -> None:
-        """Schedule a switchover to a given candidate member????."""
-        current_primary = self.get_primary()
-        r = requests.post(
-            f"http://{self.unit_ip}:8008/switchover",
-            json={"leader": current_primary, "candidate": candidate},
-        )
+    def switchover(self) -> None:
+        """Trigger a switchover."""
+        # Try to trigger the switchover.
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                current_primary = self.get_primary()
+                r = requests.post(
+                    f"http://{self.unit_ip}:8008/switchover",
+                    json={"leader": current_primary},
+                )
+
+        # Check whether the switchover was unsuccessful.
         if r.status_code != 200:
             raise SwitchoverFailedError(f"received {r.status_code}")
-
-        try:
-            self.primary_changed(current_primary)
-        except RetryError:
-            raise SwitchoverFailedError("primary hasn't changed")
 
     @retry(
         retry=retry_if_result(lambda x: not x),
@@ -289,6 +317,33 @@ class Patroni:
 
         if service_running(PATRONI_SERVICE):
             self._reload_patroni_configuration()
+
+    def remove_raft_member(self, member_ip: str) -> None:
+        """Remove a member from the raft cluster.
+
+        The raft cluster is a different cluster from the Patroni cluster.
+        It is responsible for defining which Patroni member can update
+        the primary member in the DCS.
+
+        Raises:
+            RaftMemberNotFoundError: if the member to be removed
+                is not part of the raft cluster.
+        """
+        # Get the status of the raft cluster.
+        raft_status = subprocess.check_output(
+            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-status"]
+        ).decode("UTF-8")
+
+        # Check whether the member is still part of the raft cluster.
+        if not member_ip or member_ip not in raft_status:
+            return
+
+        # Remove the member from the raft cluster.
+        result = subprocess.check_output(
+            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-remove", f"{member_ip}:2222"]
+        ).decode("UTF-8")
+        if "SUCCESS" not in result:
+            raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def _reload_patroni_configuration(self):
