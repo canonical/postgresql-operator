@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import subprocess
-from typing import List
+from typing import List, Set
 
 from charms.operator_libs_linux.v0 import apt
 from ops.charm import (
@@ -27,9 +27,14 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError, retry, stop_after_delay, wait_fixed
+from tenacity import RetryError
 
-from cluster import NotReadyError, Patroni, SwitchoverFailedError
+from cluster import (
+    NotReadyError,
+    Patroni,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+)
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
 
@@ -71,8 +76,21 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """The leader removes the departing units from the list of cluster members."""
-        # Allow leader to update hosts if it isn't leaving.
-        if not self.unit.is_leader() or event.departing_unit == self.unit:
+        # Don't handle this event in the same unit that is departing.
+        if event.departing_unit == self.unit:
+            return
+
+        # Remove the departing member from the raft cluster.
+        try:
+            departing_member = event.departing_unit.name.replace("/", "-")
+            member_ip = self._patroni.get_member_ip(departing_member)
+            self._patroni.remove_raft_member(member_ip)
+        except RemoveRaftMemberFailedError:
+            event.defer()
+            return
+
+        # Allow leader to update the cluster members.
+        if not self.unit.is_leader():
             return
 
         if "cluster_initialised" not in self._peers.data[self.app]:
@@ -98,32 +116,41 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
-        if self.unit.name == self._patroni.get_primary(unit_name_pattern=True):
-            try:
-                self._change_primary()
-            except RetryError:
-                logger.error("failed to change primary")
-
-    @retry(
-        stop=stop_after_delay(60),
-        wait=wait_fixed(5),
-        reraise=True,
-    )
-    def _change_primary(self) -> None:
-        """Change the primary member of the cluster."""
-        # Inform the first of the remaining available members to not incur the risk
-        # of triggering a switchover to a member that is also being removed.
-        if not self._patroni.are_all_members_ready():
-            logger.info("could not switchover because not all members are ready")
+        try:
+            primary = self._patroni.get_primary(unit_name_pattern=True)
+        except RetryError:
+            # Ignore the event if the primary couldn't be retrieved.
+            # If a switchover is needed, an automatic failover will be triggered
+            # when the unit is removed.
             return
 
-        # Try switchover and raise and exception if it doesn't succeed.
+        if self.unit.name != primary:
+            return
+
+        if not self._patroni.are_all_members_ready():
+            logger.warning(
+                "could not switchover because not all members are ready"
+                " - an automatic failover will be triggered"
+            )
+            return
+
+        # Try to switchover to another member and raise an exception if it doesn't succeed.
         # If it doesn't happen on time, Patroni will automatically run a fail-over.
         try:
+            # Get the current primary to check if it has changed later.
+            current_primary = self._patroni.get_primary()
+
+            # Trigger the switchover.
             self._patroni.switchover()
+
+            # Wait for the switchover to complete.
+            self._patroni.primary_changed(current_primary)
+
             logger.info("successful switchover")
-        except SwitchoverFailedError as e:
-            logger.error(f"switchover failed with reason: {e}")
+        except (RetryError, SwitchoverFailedError) as e:
+            logger.warning(
+                f"switchover failed with reason: {e} - an automatic failover will be triggered"
+            )
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -137,7 +164,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._add_members(event)
 
         # Don't update this member before it's part of the members list.
-        if self.unit_ip not in self.members_ips:
+        if self._unit_ip not in self.members_ips:
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
@@ -179,12 +206,14 @@ class PostgresqlOperatorCharm(CharmBase):
 
             logger.info("Reconfiguring cluster")
             self.unit.status = MaintenanceStatus("reconfiguring cluster")
-            self.unit.status = MaintenanceStatus("reconfiguring cluster")
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
+            event.defer()
+        except RetryError:
+            logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
             event.defer()
 
     def add_cluster_member(self, member: str) -> None:
@@ -194,7 +223,7 @@ class PostgresqlOperatorCharm(CharmBase):
             NotReadyError if either the new member or the current members are not ready.
         """
         unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
-        member_ip = self._get_ip_by_unit(unit)
+        member_ip = self._get_peer_unit_ip(unit)
 
         if not self._patroni.are_all_members_ready():
             logger.info("not all members are ready")
@@ -209,8 +238,8 @@ class PostgresqlOperatorCharm(CharmBase):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_ip_by_unit(self, unit: Unit) -> str:
-        """Get the IP address of a specific unit."""
+    def _get_peer_unit_ip(self, unit: Unit) -> str:
+        """Get the IP address of a specific peer unit."""
         return self._peers.data[unit].get("private-address")
 
     @property
@@ -219,7 +248,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
         Returns:
             a set containing the current Juju hosts
-                with the names in the k8s pod name format
+                with the names using - instead of /
+                to match Patroni members names
         """
         peers = self.model.get_relation(PEER)
         hosts = [self.unit.name.replace("/", "-")] + [
@@ -231,46 +261,46 @@ class PostgresqlOperatorCharm(CharmBase):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
-            self.unit_ip,
+            self._unit_ip,
             self._storage_path,
             self._cluster_name,
             self._member_name,
             self.app.planned_units(),
-            self.peers_ips,
+            self._peer_members_ips,
             self._get_postgres_password(),
             self._replication_password,
         )
 
     @property
-    def peers_ips(self) -> List[str]:
-        """Fetch current list of peers IPs.
+    def _peer_members_ips(self) -> Set[str]:
+        """Fetch current list of peer members IPs.
 
         Returns:
-            A list of peers addresses (strings).
+            A list of peer members addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
         addresses = self.members_ips
-        current_unit_ip = self.unit_ip
+        current_unit_ip = self._unit_ip
         if current_unit_ip in addresses:
             addresses.remove(current_unit_ip)
         return addresses
 
     @property
-    def _units_ips(self) -> List[str]:
+    def _units_ips(self) -> Set[str]:
         """Fetch current list of peers IPs.
 
         Returns:
             A list of peers addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
-        addresses = [self._get_ip_by_unit(unit) for unit in self._peers.units]
-        addresses.append(self.unit_ip)
+        addresses = {self._get_peer_unit_ip(unit) for unit in self._peers.units}
+        addresses.add(self._unit_ip)
         return addresses
 
     @property
-    def members_ips(self) -> List[str]:
+    def members_ips(self) -> Set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
-        return json.loads(self._peers.data[self.app].get("members_ips", "[]"))
+        return set(json.loads(self._peers.data[self.app].get("members_ips", "[]")))
 
     def _add_to_members_ips(self, ip: str) -> None:
         """Add one IP to the members list."""
@@ -281,7 +311,14 @@ class PostgresqlOperatorCharm(CharmBase):
         self._update_members_ips(ip_to_remove=ip)
 
     def _update_members_ips(self, ip_to_add: str = None, ip_to_remove: str = None) -> None:
-        """Update cluster members IPs."""
+        """Update cluster member IPs on application data.
+
+        Member IPs on application data are used to determine when a unit of PostgreSQL
+        should be added or removed from the PostgreSQL cluster.
+
+        NOTE: this function does not update the IPs on the PostgreSQL cluster
+        in the Patroni configuration.
+        """
         # Allow leader to reset which members are part of the cluster.
         if not self.unit.is_leader():
             return
@@ -294,7 +331,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
 
     @property
-    def unit_ip(self) -> str:
+    def _unit_ip(self) -> str:
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
@@ -346,8 +383,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
         # (the cluster should start with only this member).
-        if self.unit_ip not in self.members_ips:
-            self._add_to_members_ips(self.unit_ip)
+        if self._unit_ip not in self.members_ips:
+            self._add_to_members_ips(self._unit_ip)
 
         # Remove departing units when the leader changes.
         for ip in self._get_ips_to_remove():
@@ -355,12 +392,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self._patroni.update_cluster_members()
 
-    def _get_ips_to_remove(self) -> List[str]:
+    def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
         current = self._units_ips
-        endpoints_to_remove = list(set(old) - set(current))
-        return endpoints_to_remove
+        return old - current
 
     def _on_start(self, event) -> None:
         """Handle the start event."""

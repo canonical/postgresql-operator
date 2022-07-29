@@ -7,6 +7,7 @@ from typing import List
 import psycopg2
 import requests
 import yaml
+from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
@@ -32,12 +33,14 @@ async def check_cluster_members(ops_test: OpsTest, application_name: str) -> Non
         with attempt:
             any_unit_name = ops_test.model.applications[application_name].units[0].name
             primary = await get_primary(ops_test, any_unit_name)
-            address = await get_unit_address(ops_test, primary)
+            address = get_unit_address(ops_test, primary)
 
             expected_members = get_application_units(ops_test, application_name)
+            expected_members_ips = get_application_units_ips(ops_test, application_name)
 
             r = requests.get(f"http://{address}:8008/cluster")
             assert [member["name"] for member in r.json()["members"]] == expected_members
+            assert [member["host"] for member in r.json()["members"]] == expected_members_ips
 
 
 def convert_records_to_dict(records: List[tuple]) -> dict:
@@ -64,6 +67,25 @@ def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
     )
 
 
+async def find_unit(ops_test: OpsTest, application: str, leader: bool) -> Unit:
+    """Helper function that retrieves a unit, based on need for leader or non-leader.
+
+    Args:
+        ops_test: The ops test framework instance.
+        application: The name of the application.
+        leader: Whether the unit is a leader or not.
+
+    Returns:
+        A unit instance.
+    """
+    ret_unit = None
+    for unit in ops_test.model.applications[application].units:
+        if await unit.is_leader_from_status() == leader:
+            ret_unit = unit
+
+    return ret_unit
+
+
 def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]:
     """List the unit names of an application.
 
@@ -77,6 +99,19 @@ def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]
     return [
         unit.name.replace("/", "-") for unit in ops_test.model.applications[application_name].units
     ]
+
+
+def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[str]:
+    """List the unit IPs of an application.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+
+    Returns:
+        list of current unit IPs of the application
+    """
+    return [unit.public_address for unit in ops_test.model.applications[application_name].units]
 
 
 async def get_postgres_password(ops_test: OpsTest, unit_name: str) -> str:
@@ -110,7 +145,7 @@ async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
     return action.results["primary"]
 
 
-async def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
+def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
     """Get unit IP address.
 
     Args:
@@ -142,3 +177,22 @@ async def scale_application(ops_test: OpsTest, application_name: str, count: int
     await ops_test.model.wait_for_idle(
         apps=[application_name], status="active", timeout=1000, wait_for_exact_units=count
     )
+
+
+def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -> None:
+    """Trigger a switchover.
+
+    Args:
+        ops_test: The ops test framework instance.
+        current_primary: The current primary unit.
+        candidate: The unit that should be elected the new primary.
+    """
+    primary_ip = get_unit_address(ops_test, current_primary)
+    response = requests.post(
+        f"http://{primary_ip}:8008/switchover",
+        json={
+            "leader": current_primary.replace("/", "-"),
+            "candidate": candidate.replace("/", "-") if candidate else None,
+        },
+    )
+    assert response.status_code == 200

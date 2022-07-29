@@ -139,7 +139,7 @@ class PostgreSQLProvider(Object):
 
         # If there are no replicas, remove the read-only endpoint.
         endpoints = (
-            ",".join(f"{x}:{DATABASE_PORT}" for x in self.charm.peers_ips)
+            ",".join(f"{x}:{DATABASE_PORT}" for x in self.charm._peer_members_ips)
             if len(self.charm._peers.units) > 0
             else ""
         )
