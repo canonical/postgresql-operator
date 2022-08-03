@@ -180,21 +180,6 @@ class Patroni:
                 break
         return primary
 
-    # def get_replicas_ips(self) -> Set[str]:
-    #     """Get the set of replicas IPs.
-    #
-    #     Returns:
-    #         set of replicas IPs.
-    #     """
-    #     # TODO: generalize this method to also return the primary IP.
-    #     replicas_ips = set()
-    #     # Request info from cluster endpoint (which returns all members of the cluster).
-    #     cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
-    #     for member in cluster_status.json()["members"]:
-    #         if member["role"] == "replica" and member["state"] == "running":
-    #             replicas_ips.add(member["host"])
-    #     return replicas_ips
-
     def are_all_members_ready(self) -> bool:
         """Check if all members are correctly running Patroni and PostgreSQL.
 

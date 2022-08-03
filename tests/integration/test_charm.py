@@ -95,8 +95,7 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     # Connect to PostgreSQL.
     host = get_unit_address(ops_test, f"{application_name}/{unit_id}")
     logger.info("connecting to the database host: %s", host)
-    connection = db_connect(host, password)
-    with connection:
+    with db_connect(host, password) as connection:
         assert connection.status == psycopg2.extensions.STATUS_READY
 
         # Retrieve settings from PostgreSQL pg_settings table.
@@ -228,8 +227,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest, series: 
     # Write data to primary IP.
     host = get_unit_address(ops_test, primary)
     logger.info(f"connecting to primary {primary} on {host}")
-    connection = db_connect(host, password)
-    with connection:
+    with db_connect(host, password) as connection:
         connection.autocommit = True
         with connection.cursor() as cursor:
             cursor.execute("CREATE TABLE primarydeletiontest (testcol INT);")
@@ -249,8 +247,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest, series: 
     for unit in ops_test.model.applications[application_name].units:
         host = unit.public_address
         logger.info("connecting to the database host: %s", host)
-        connection = db_connect(host, password)
-        with connection:
+        with db_connect(host, password) as connection:
             with connection.cursor() as cursor:
                 # Ensure we can read from "primarydeletiontest" table
                 cursor.execute("SELECT * FROM primarydeletiontest;")
