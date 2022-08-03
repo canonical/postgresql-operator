@@ -4,3 +4,4 @@
 """File containing constants to be used in the charm."""
 
 DATABASE_PORT = "5432"
+PEER = "database-peers"

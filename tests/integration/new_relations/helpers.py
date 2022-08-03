@@ -5,8 +5,6 @@ import json
 from typing import Optional
 
 import yaml
-from lightkube.core.client import AsyncClient
-from lightkube.resources.core_v1 import Service
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_exponential
 
@@ -53,14 +51,8 @@ async def build_connection_string(
     )
     host = endpoints.split(",")[0].split(":")[0]
 
-    # Translate the service hostname to an IP address.
-    model = await ops_test.model.get_info()
-    client = AsyncClient(namespace=model.name)
-    service = await client.get(Service, name=host.split(".")[0])
-    ip = service.spec.clusterIP
-
     # Build the complete connection string to connect to the database.
-    return f"dbname='{database}' user='{username}' host='{ip}' password='{password}' connect_timeout=10"
+    return f"dbname='{database}' user='{username}' host='{host}' password='{password}' connect_timeout=10"
 
 
 async def check_relation_data_existence(

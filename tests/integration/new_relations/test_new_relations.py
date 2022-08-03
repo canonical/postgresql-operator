@@ -44,39 +44,73 @@ async def test_deploy_charms(ops_test: OpsTest, application_charm, database_char
             ),
             ops_test.model.deploy(
                 database_charm,
-                resources={
-                    "postgresql-image": DATABASE_APP_METADATA["resources"]["postgresql-image"][
-                        "upstream-source"
-                    ]
-                },
+                resources={"patroni": "patroni.tar.gz"},
                 application_name=DATABASE_APP_NAME,
-                num_units=3,
+                num_units=1,
                 trust=True,
             ),
             ops_test.model.deploy(
                 database_charm,
-                resources={
-                    "postgresql-image": DATABASE_APP_METADATA["resources"]["postgresql-image"][
-                        "upstream-source"
-                    ]
-                },
+                resources={"patroni": "patroni.tar.gz"},
                 application_name=ANOTHER_DATABASE_APP_NAME,
-                num_units=3,
+                num_units=2,
                 trust=True,
             ),
         )
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", wait_for_units=1)
+
+        # Attach the Patroni resource to the databases.
+        await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")
+        await ops_test.juju("attach-resource", ANOTHER_DATABASE_APP_NAME, "patroni=patroni.tar.gz")
+
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
+
+
+async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
+    """Test that there is no read-only endpoint in a standalone cluster."""
+    async with ops_test.fast_forward():
+        # Ensure the cluster starts with only one member.
+        # We cant scale down a running cluster to 1 unit because the way
+        # Patroni raft implementation works (to scale from 2 units to 1 Patroni
+        # needs at least one mode unit that run only raft to have quorum).
+        assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 1
+
+        # Relate the charms and wait for them exchanging some connection data.
+        await ops_test.model.add_relation(
+            f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
+        )
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
+
+        # Try to get the connection string of the database using the read-only endpoint.
+        # It should not be available anymore.
+        assert await check_relation_data_existence(
+            ops_test,
+            APPLICATION_APP_NAME,
+            FIRST_DATABASE_RELATION_NAME,
+            "read-only-endpoints",
+            exists=False,
+        )
+
+
+async def test_read_only_endpoint_in_scaled_up_cluster(ops_test: OpsTest):
+    """Test that there is read-only endpoint in a scaled up cluster."""
+    async with ops_test.fast_forward():
+        # Scale up the database.
+        await scale_application(ops_test, DATABASE_APP_NAME, 2)
+
+        # Try to get the connection string of the database using the read-only endpoint.
+        # It should be available again.
+        assert await check_relation_data_existence(
+            ops_test,
+            APPLICATION_APP_NAME,
+            FIRST_DATABASE_RELATION_NAME,
+            "read-only-endpoints",
+            exists=True,
+        )
 
 
 @pytest.mark.abort_on_fail
 async def test_database_relation_with_charm_libraries(ops_test: OpsTest):
     """Test basic functionality of database relation interface."""
-    # Relate the charms and wait for them exchanging some connection data.
-    await ops_test.model.add_relation(
-        f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
-    )
-    await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
-
     # Get the connection string to connect to the database using the read/write endpoint.
     connection_string = await build_connection_string(
         ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME
@@ -261,37 +295,3 @@ async def test_an_application_can_request_multiple_databases(ops_test: OpsTest, 
 
     # Assert the two application have different relation (connection) data.
     assert first_database_connection_string != second_database_connection_string
-
-
-async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
-    """Test that there is no read-only endpoint in a standalone cluster."""
-    async with ops_test.fast_forward():
-        # Scale down the database.
-        await scale_application(ops_test, DATABASE_APP_NAME, 1)
-
-        # Try to get the connection string of the database using the read-only endpoint.
-        # It should not be available anymore.
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=False,
-        )
-
-
-async def test_read_only_endpoint_in_scaled_up_cluster(ops_test: OpsTest):
-    """Test that there is read-only endpoint in a scaled up cluster."""
-    async with ops_test.fast_forward():
-        # Scale up the database.
-        await scale_application(ops_test, DATABASE_APP_NAME, 3)
-
-        # Try to get the connection string of the database using the read-only endpoint.
-        # It should be available again.
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=True,
-        )
