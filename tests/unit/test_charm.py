@@ -10,6 +10,7 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
+from constants import PEER
 from tests.helpers import patch_network_get
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -17,7 +18,7 @@ CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 class TestCharm(unittest.TestCase):
     def setUp(self):
-        self._peer_relation = "postgresql-replicas"
+        self._peer_relation = PEER
         self._postgresql_container = "postgresql"
         self._postgresql_service = "postgresql"
 
@@ -106,9 +107,10 @@ class TestCharm(unittest.TestCase):
             ]
             handle.write.assert_has_calls(calls)
 
+    @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.Patroni.update_cluster_members")
     @patch_network_get(private_address="1.1.1.1")
-    def test_on_leader_elected(self, _update_cluster_members):
+    def test_on_leader_elected(self, _update_cluster_members, _update_endpoints):
         # Assert that there is no password in the peer relation.
         self.assertIsNone(self.charm._peers.data[self.charm.app].get("postgres-password", None))
 
@@ -116,6 +118,7 @@ class TestCharm(unittest.TestCase):
         self.harness.set_leader()
         password = self.charm._peers.data[self.charm.app].get("postgres-password", None)
         _update_cluster_members.assert_called_once()
+        _update_endpoints.assert_called_once()
         self.assertIsNotNone(password)
 
         # Trigger a new leader election and check that the password is still the same.
@@ -126,6 +129,7 @@ class TestCharm(unittest.TestCase):
         )
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.Patroni.update_cluster_members")
     @patch("charm.Patroni.member_started")
     @patch("charm.Patroni.bootstrap_cluster")
@@ -138,6 +142,7 @@ class TestCharm(unittest.TestCase):
         _bootstrap_cluster,
         _member_started,
         _,
+        __,
     ):
         # Test before the passwords are generated.
         _get_postgres_password.return_value = None
@@ -192,9 +197,10 @@ class TestCharm(unittest.TestCase):
         _get_postgres_password.assert_called_once()
         mock_event.set_results.assert_called_once_with({"postgres-password": "test-password"})
 
+    @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.Patroni.update_cluster_members")
     @patch_network_get(private_address="1.1.1.1")
-    def test_get_postgres_password(self, _):
+    def test_get_postgres_password(self, _, __):
         # Test for a None password.
         self.assertIsNone(self.charm._get_postgres_password())
 

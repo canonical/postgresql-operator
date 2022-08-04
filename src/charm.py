@@ -7,9 +7,10 @@ import json
 import logging
 import os
 import subprocess
-from typing import List, Set
+from typing import List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
+from charms.postgresql_k8s.v0.postgresql import PostgreSQL
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -27,7 +28,8 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError
+from requests.exceptions import ConnectionError
+from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
 from cluster import (
     NotReadyError,
@@ -35,13 +37,13 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
+from constants import PEER
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
 
 logger = logging.getLogger(__name__)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
-PEER = "postgresql-replicas"
 
 
 class PostgresqlOperatorCharm(CharmBase):
@@ -65,6 +67,23 @@ class PostgresqlOperatorCharm(CharmBase):
         self._storage_path = self.meta.storages["pgdata"].location
 
         self.postgresql_client_relation = PostgreSQLProvider(self)
+
+    @property
+    def postgresql(self) -> PostgreSQL:
+        """Returns an instance of the object used to interact with the database."""
+        return PostgreSQL(
+            host=self.primary_endpoint,
+            user="postgres",
+            password=self._get_postgres_password(),
+            database="postgres",
+        )
+
+    @property
+    def primary_endpoint(self) -> str:
+        """Returns the endpoint of the primary instance."""
+        primary = self._patroni.get_primary(unit_name_pattern=True)
+        primary_unit = self.framework.model.get_unit(primary)
+        return self._get_unit_ip(primary_unit)
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -105,11 +124,11 @@ class PostgresqlOperatorCharm(CharmBase):
                 if not self._patroni.are_all_members_ready():
                     raise NotReadyError("not all members are ready")
 
-                self.postgresql_client_relation.update_read_only_endpoint()
-
                 # Update the list of the current members.
                 self._remove_from_members_ips(member_ip)
                 self._patroni.update_cluster_members()
+
+                self.postgresql_client_relation.update_endpoints()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
@@ -151,6 +170,8 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.warning(
                 f"switchover failed with reason: {e} - an automatic failover will be triggered"
             )
+        else:
+            self.postgresql_client_relation.update_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -186,7 +207,7 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        self.postgresql_client_relation.update_read_only_endpoint()
+        self.postgresql_client_relation.update_endpoints()
         self.unit.status = ActiveStatus()
 
     def _add_members(self, event):
@@ -223,7 +244,7 @@ class PostgresqlOperatorCharm(CharmBase):
             NotReadyError if either the new member or the current members are not ready.
         """
         unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
-        member_ip = self._get_peer_unit_ip(unit)
+        member_ip = self._get_unit_ip(unit)
 
         if not self._patroni.are_all_members_ready():
             logger.info("not all members are ready")
@@ -238,9 +259,17 @@ class PostgresqlOperatorCharm(CharmBase):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_peer_unit_ip(self, unit: Unit) -> str:
-        """Get the IP address of a specific peer unit."""
-        return self._peers.data[unit].get("private-address")
+    def _get_unit_ip(self, unit: Unit) -> Optional[str]:
+        """Get the IP address of a specific unit."""
+        # Check if host is current host.
+        if unit == self.unit:
+            return str(self.model.get_binding(PEER).network.bind_address)
+        # Check if host is a peer.
+        elif unit in self._peers.data:
+            return str(self._peers.data[unit].get("private-address"))
+        # Return None if the unit is not a peer neither the current unit.
+        else:
+            return None
 
     @property
     def _hosts(self) -> set:
@@ -293,7 +322,7 @@ class PostgresqlOperatorCharm(CharmBase):
             A list of peers addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
-        addresses = {self._get_peer_unit_ip(unit) for unit in self._peers.units}
+        addresses = {self._get_unit_ip(unit) for unit in self._peers.units}
         addresses.add(self._unit_ip)
         return addresses
 
@@ -329,6 +358,31 @@ class PostgresqlOperatorCharm(CharmBase):
         elif ip_to_remove:
             ips.remove(ip_to_remove)
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
+
+    @retry(
+        stop=stop_after_delay(60),
+        wait=wait_fixed(5),
+        reraise=True,
+    )
+    def _change_primary(self) -> None:
+        """Change the primary member of the cluster."""
+        # Try to switchover to another member and raise an exception if it doesn't succeed.
+        # If it doesn't happen on time, Patroni will automatically run a fail-over.
+        try:
+            # Get the current primary to check if it has changed later.
+            current_primary = self._patroni.get_primary()
+
+            # Trigger the switchover.
+            self._patroni.switchover()
+
+            # Wait for the switchover to complete.
+            self._patroni.primary_changed(current_primary)
+
+            logger.info("successful switchover")
+        except (RetryError, SwitchoverFailedError) as e:
+            logger.warning(
+                f"switchover failed with reason: {e} - an automatic failover will be triggered"
+            )
 
     @property
     def _unit_ip(self) -> str:
@@ -391,6 +445,11 @@ class PostgresqlOperatorCharm(CharmBase):
             self._remove_from_members_ips(ip)
 
         self._patroni.update_cluster_members()
+
+        try:
+            self.postgresql_client_relation.update_endpoints()
+        except (ConnectionError, RetryError):
+            pass  # This error can happen in the first leader election, as Patroni is not running yet.
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""

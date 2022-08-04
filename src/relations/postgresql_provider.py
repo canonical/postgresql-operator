@@ -86,14 +86,8 @@ class PostgreSQLProvider(Object):
             # Share the credentials with the application.
             self.database_provides.set_credentials(event.relation.id, user, password)
 
-            # Set the read/write endpoint.
-            self.database_provides.set_endpoints(
-                event.relation.id,
-                f"{self.charm.unit_ip}:{DATABASE_PORT}",
-            )
-
-            # Update the read-only endpoint.
-            self.update_read_only_endpoint(event)
+            # Update the read/write and read-only endpoints.
+            self.update_endpoints(event)
 
             # Set the database version.
             self.database_provides.set_version(
@@ -132,24 +126,32 @@ class PostgreSQLProvider(Object):
                 f"Failed to delete user during {self.relation_name} relation broken event"
             )
 
-    def update_read_only_endpoint(self, event: DatabaseRequestedEvent = None) -> None:
-        """Set the read-only endpoint only if there are replicas."""
+    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
+        """Set the read/write and read-only endpoints."""
         if not self.charm.unit.is_leader():
             return
-
-        # If there are no replicas, remove the read-only endpoint.
-        endpoints = (
-            ",".join(f"{x}:{DATABASE_PORT}" for x in self.charm._peer_members_ips)
-            if len(self.charm._peers.units) > 0
-            else ""
-        )
 
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
         relations = [event.relation] if event else self.model.relations[self.relation_name]
 
+        # If there are no replicas, remove the read-only endpoint.
+        replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
+        read_only_endpoints = (
+            ",".join(f"{x}:{DATABASE_PORT}" for x in replicas_endpoint)
+            if len(replicas_endpoint) > 0
+            else ""
+        )
+
         for relation in relations:
+            # Set the read/write endpoint.
+            self.database_provides.set_endpoints(
+                relation.id,
+                f"{self.charm.primary_endpoint}:{DATABASE_PORT}",
+            )
+
+            # Set the read-only endpoint.
             self.database_provides.set_read_only_endpoints(
                 relation.id,
-                endpoints,
+                read_only_endpoints,
             )
