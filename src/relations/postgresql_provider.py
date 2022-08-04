@@ -137,7 +137,6 @@ class PostgreSQLProvider(Object):
 
         # If there are no replicas, remove the read-only endpoint.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
-        logger.warning(f"Replicas endpoint: {replicas_endpoint}")
         read_only_endpoints = (
             ",".join(f"{x}:{DATABASE_PORT}" for x in replicas_endpoint)
             if len(replicas_endpoint) > 0
