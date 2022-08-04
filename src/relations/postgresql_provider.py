@@ -57,10 +57,7 @@ class PostgreSQLProvider(Object):
         )
 
     def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
-        """Handle the legacy postgresql-client relation changed event.
-
-        Generate password and handle user and database creation for the related application.
-        """
+        """Generate password and handle user and database creation for the related application."""
         # Check for some conditions before trying to access the PostgreSQL instance.
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
