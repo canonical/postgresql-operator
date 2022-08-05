@@ -78,10 +78,27 @@ class PostgresqlOperatorCharm(CharmBase):
         )
 
     @property
-    def primary_endpoint(self) -> str:
-        """Returns the endpoint of the primary instance."""
-        primary = self._patroni.get_primary()
-        return self._patroni.get_member_ip(primary)
+    def primary_endpoint(self) -> Optional[str]:
+        """Returns the endpoint of the primary instance of None if no primary available."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    primary = self._patroni.get_primary()
+                    primary_endpoint = self._patroni.get_member_ip(primary)
+                    logger.warning(primary_endpoint)
+                    logger.warning(self._units_ips)
+                    # Force a retry if there is no primary or the member that was
+                    # returned is not in the list of the current cluster members
+                    # (like when the cluster was not updated yet after a failed switchover).
+                    if (
+                        not primary_endpoint
+                        or primary_endpoint.split(":")[0] not in self._units_ips
+                    ):
+                        raise ValueError()
+        except RetryError:
+            return None
+        else:
+            return primary_endpoint
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -96,7 +113,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Don't handle this event in the same unit that is departing.
         if event.departing_unit == self.unit:
             # Set a flag to avoid deleting database users when this unit
-            # receives relation broken events from related applications.
+            # is removed and receives relation broken events from related applications.
             self._peers.data[self.unit].update({"departing": "True"})
             return
 
@@ -118,21 +135,22 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Remove cluster members one at a time.
-        try:
-            members_ips = set(self.members_ips)
-            for member_ip in members_ips - set(self._units_ips):
-                # Check that all members are ready before removing unit from the cluster.
-                if not self._patroni.are_all_members_ready():
-                    raise NotReadyError("not all members are ready")
+        for member_ip in self._get_ips_to_remove():
+            # Check that all members are ready before removing unit from the cluster.
+            if not self._patroni.are_all_members_ready():
+                logger.info("Deferring reconfigure: another member doing sync right now")
+                event.defer()
+                return
 
-                # Update the list of the current members.
-                self._remove_from_members_ips(member_ip)
-                self._patroni.update_cluster_members()
+            # Update the list of the current members.
+            self._remove_from_members_ips(member_ip)
+            self._patroni.update_cluster_members()
 
+            if self.primary_endpoint:
                 self.postgresql_client_relation.update_endpoints()
-        except NotReadyError:
-            logger.info("Deferring reconfigure: another member doing sync right now")
-            event.defer()
+            else:
+                self.unit.status = BlockedStatus("no primary in the cluster")
+                return
 
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
@@ -171,8 +189,15 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.warning(
                 f"switchover failed with reason: {e} - an automatic failover will be triggered"
             )
-        else:
+            return
+
+        # Only update the connection endpoints if there is a primary.
+        # A cluster can have all members as replicas for some time after
+        # a failed switchover, so wait until the primary is elected.
+        if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+        else:
+            self.unit.status = BlockedStatus("no primary in the cluster")
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -208,8 +233,14 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        self.postgresql_client_relation.update_endpoints()
-        self.unit.status = ActiveStatus()
+        # Only update the connection endpoints if there is a primary.
+        # A cluster can have all members as replicas for some time after
+        # a failed switchover, so wait until the primary is elected.
+        if self.primary_endpoint:
+            self.postgresql_client_relation.update_endpoints()
+            self.unit.status = ActiveStatus()
+        else:
+            self.unit.status = BlockedStatus("no primary in the cluster")
 
     def _add_members(self, event):
         """Add new cluster members.
@@ -455,21 +486,10 @@ class PostgresqlOperatorCharm(CharmBase):
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
-        try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-                with attempt:
-                    primary_endpoint = self.primary_endpoint
-                    logger.warning(primary_endpoint)
-                    logger.warning(self._units_ips)
-                    if (
-                        not primary_endpoint
-                        or primary_endpoint.split(":")[0] not in self._units_ips
-                    ):
-                        raise Exception()
-        except RetryError:
-            self.unit.status = BlockedStatus("no primary in the cluster")
-        else:
+        if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+        else:
+            self.unit.status = BlockedStatus("no primary in the cluster")
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""

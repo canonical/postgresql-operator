@@ -16,7 +16,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent
+from ops.charm import CharmBase, RelationBrokenEvent, RelationDepartedEvent
 from ops.framework import Object
 from ops.model import BlockedStatus
 
@@ -101,9 +101,18 @@ class PostgreSQLProvider(Object):
                 f"Failed to initialize {self.relation_name} relation"
             )
 
+    def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
+        # Set a flag to avoid deleting database users when this unit
+        # is removed and receives relation broken events from related applications.
+        print(event.departing_unit)
+        print(self.charm.unit)
+        if event.departing_unit == self.charm.unit:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the user created for this relation."""
         # Check for some conditions before trying to access the PostgreSQL instance.
+        print(123)
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
