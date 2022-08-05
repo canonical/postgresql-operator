@@ -62,6 +62,7 @@ class PostgreSQLProvider(Object):
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
+            or not self.charm.primary_endpoint
         ):
             event.defer()
             return
@@ -106,17 +107,27 @@ class PostgreSQLProvider(Object):
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
+            or not self.charm.primary_endpoint
         ):
             event.defer()
             return
 
-        if not self.charm.unit.is_leader():
+        logger.warning(self.model.app.planned_units())
+        logger.warning(str(self.charm._peers.units))
+        logger.warning(len(self.charm._peers.units))
+        logger.warning(str(self.charm._peers.data[self.charm.unit]))
+        if (
+            not self.charm.unit.is_leader()
+            or "departing" in self.charm._peers.data[self.charm.unit]
+            # or len(self.charm._peers.units) >= self.model.app.planned_units()
+        ):
             return
 
         # Delete the user.
         user = f"relation_id_{event.relation.id}"
         try:
             self.charm.postgresql.delete_user(user)
+            logger.warning(f"user {user} was deleted")
         except PostgreSQLDeleteUserError as e:
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(

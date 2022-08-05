@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Helper class used to manage cluster lifecycle."""
-
+import json
 import logging
 import os
 import pwd
@@ -196,7 +196,12 @@ class Patroni:
         except RetryError:
             return False
 
-        return all(member["state"] == "running" for member in cluster_status.json()["members"])
+        # Check if all members are running and one of them is a leader (primary),
+        # because sometimes there may exist (for some period of time) only
+        # replicas after a failed switchover.
+        return all(
+            member["state"] == "running" for member in cluster_status.json()["members"]
+        ) and any(member["role"] == "leader" for member in cluster_status.json()["members"])
 
     @property
     def member_started(self) -> bool:
@@ -295,6 +300,7 @@ class Patroni:
                     f"http://{self.unit_ip}:8008/switchover",
                     json={"leader": current_primary},
                 )
+                logger.warning(json.loads(r.content))
 
         # Check whether the switchover was unsuccessful.
         if r.status_code != 200:

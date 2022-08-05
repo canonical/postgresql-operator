@@ -28,8 +28,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from requests.exceptions import ConnectionError
-from tenacity import RetryError, retry, stop_after_delay, wait_fixed
+from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
 
 from cluster import (
     NotReadyError,
@@ -81,9 +80,8 @@ class PostgresqlOperatorCharm(CharmBase):
     @property
     def primary_endpoint(self) -> str:
         """Returns the endpoint of the primary instance."""
-        primary = self._patroni.get_primary(unit_name_pattern=True)
-        primary_unit = self.framework.model.get_unit(primary)
-        return self._get_unit_ip(primary_unit)
+        primary = self._patroni.get_primary()
+        return self._patroni.get_member_ip(primary)
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -97,6 +95,9 @@ class PostgresqlOperatorCharm(CharmBase):
         """The leader removes the departing units from the list of cluster members."""
         # Don't handle this event in the same unit that is departing.
         if event.departing_unit == self.unit:
+            # Set a flag to avoid deleting database users when this unit
+            # receives relation broken events from related applications.
+            self._peers.data[self.unit].update({"departing": "True"})
             return
 
         # Remove the departing member from the raft cluster.
@@ -446,10 +447,29 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self._patroni.update_cluster_members()
 
+        # Don't update connection endpoints in the first time this event run for
+        # this application because there are no primary and replicas yet.
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            return
+
+        # Only update the connection endpoints if there is a primary.
+        # A cluster can have all members as replicas for some time after
+        # a failed switchover, so wait until the primary is elected.
         try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    primary_endpoint = self.primary_endpoint
+                    logger.warning(primary_endpoint)
+                    logger.warning(self._units_ips)
+                    if (
+                        not primary_endpoint
+                        or primary_endpoint.split(":")[0] not in self._units_ips
+                    ):
+                        raise Exception()
+        except RetryError:
+            self.unit.status = BlockedStatus("no primary in the cluster")
+        else:
             self.postgresql_client_relation.update_endpoints()
-        except (ConnectionError, RetryError):
-            pass  # This error can happen in the first leader election, as Patroni is not running yet.
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
