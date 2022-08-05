@@ -85,8 +85,6 @@ class PostgresqlOperatorCharm(CharmBase):
                 with attempt:
                     primary = self._patroni.get_primary()
                     primary_endpoint = self._patroni.get_member_ip(primary)
-                    logger.warning(primary_endpoint)
-                    logger.warning(self._units_ips)
                     # Force a retry if there is no primary or the member that was
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).

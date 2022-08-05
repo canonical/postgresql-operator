@@ -323,9 +323,6 @@ async def test_replication_data_is_updated_correctly_when_scaling(ops_test: OpsT
         ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME, read_only_endpoint=True
     )
 
-    print(primary_connection_string)
-    print(replica_connection_string)
-
     # Connect to the database using the primary connection string.
     with psycopg2.connect(primary_connection_string) as connection:
         connection.autocommit = True
