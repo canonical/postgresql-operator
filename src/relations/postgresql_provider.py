@@ -107,7 +107,9 @@ class PostgreSQLProvider(Object):
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         # Set a flag to avoid deleting database users when this unit
         # is removed and receives relation broken events from related applications.
-        # This is done due to https://bugs.launchpad.net/juju/+bug/1979811.
+        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
+        # Neither peer relation data nor stored state are good solutions,
+        # just a temporary solution.
         if event.departing_unit == self.charm.unit:
             self.charm._peers.data[self.charm.unit].update({"departing": "True"})
 
@@ -125,8 +127,10 @@ class PostgreSQLProvider(Object):
         # Run this event only in the leader unit and
         # if this unit isn't being removed while the
         # others from this application are still alive.
-        # The second check is done due to
+        # The second check is needed because of
         # https://bugs.launchpad.net/juju/+bug/1979811.
+        # Neither peer relation data nor stored state
+        # are good solutions, just a temporary solution.
         if (
             not self.charm.unit.is_leader()
             or "departing" in self.charm._peers.data[self.charm.unit]
