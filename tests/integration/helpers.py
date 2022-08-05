@@ -33,7 +33,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_postgres_password(ops_test)
+    password = await get_postgres_password(ops_test, unit.name)
 
     # Retrieve all users in the database.
     output = await execute_query_on_unit(
@@ -52,14 +52,15 @@ async def check_database_users_existence(
         assert user not in output
 
 
-async def check_database_creation(ops_test: OpsTest, databases: List[str]) -> None:
+async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> None:
     """Checks that database and tables are successfully created for the application.
 
     Args:
         ops_test: The ops test framework
         databases: List of database names that should have been created
     """
-    password = await get_postgres_password(ops_test)
+    unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
+    password = await get_postgres_password(ops_test, unit.name)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
@@ -168,7 +169,7 @@ async def deploy_and_relate_application_with_postgresql(
     )
     await ops_test.model.wait_for_idle(
         apps=[application_name],
-        status="blocked",
+        status="active",
         raise_on_blocked=False,
         timeout=1000,
     )

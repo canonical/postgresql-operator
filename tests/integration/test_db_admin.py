@@ -7,8 +7,8 @@ from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
     DATABASE_APP_NAME,
-    check_database_creation,
     check_database_users_existence,
+    check_databases_creation,
     deploy_and_relate_bundle_with_postgresql,
 )
 
@@ -44,7 +44,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         LANDSCAPE_SCALABLE_BUNDLE_OVERLAY_PATH,
         LANDSCAPE_APP_NAME,
     )
-    await check_database_creation(
+    await check_databases_creation(
         ops_test,
         [
             "landscape-account-1",

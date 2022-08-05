@@ -24,6 +24,7 @@ from ops.model import BlockedStatus, Relation, Unit
 from pgconnstr import ConnectionString
 
 from constants import LEGACY_DB, LEGACY_DB_ADMIN
+from utils import new_password
 
 logger = logging.getLogger(__name__)
 
@@ -86,7 +87,7 @@ class LegacyRelation(Object):
         )
 
         user = f"relation_id_{event.relation.id}"
-        password = unit_relation_databag.get("password", self._charm._new_password())
+        password = unit_relation_databag.get("password", new_password())
         database = event.relation.data[event.app].get(
             "database", event.relation.data[event.unit].get("database")
         )
@@ -166,7 +167,7 @@ class LegacyRelation(Object):
         )
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
-        def _csplit(s) -> Iterable[str]:
+        def _comma_split(s) -> Iterable[str]:
             if s:
                 for b in s.split(","):
                     b = b.strip()
@@ -179,7 +180,7 @@ class LegacyRelation(Object):
             logger.warning(reldata)
             if isinstance(unit, Unit) and not unit.name.startswith(self.model.app.name):
                 # NB. egress-subnets is not always available.
-                subnets.update(set(_csplit(reldata.get("egress-subnets", ""))))
+                subnets.update(set(_comma_split(reldata.get("egress-subnets", ""))))
         return ",".join(sorted(subnets))
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
@@ -191,7 +192,7 @@ class LegacyRelation(Object):
             return
 
         if event.departing_unit.app == self._charm.app:
-            # Just run for departing of remote units
+            # Just run for departing of remote units.
             return
 
         departing_unit = event.departing_unit.name
