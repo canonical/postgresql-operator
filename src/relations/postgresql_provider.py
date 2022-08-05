@@ -45,6 +45,9 @@ class PostgreSQLProvider(Object):
 
         super().__init__(charm, self.relation_name)
         self.framework.observe(
+            charm.on[self.relation_name].relation_departed, self._on_relation_departed
+        )
+        self.framework.observe(
             charm.on[self.relation_name].relation_broken, self._on_relation_broken
         )
 
@@ -104,15 +107,12 @@ class PostgreSQLProvider(Object):
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         # Set a flag to avoid deleting database users when this unit
         # is removed and receives relation broken events from related applications.
-        print(event.departing_unit)
-        print(self.charm.unit)
         if event.departing_unit == self.charm.unit:
             self.charm._peers.data[self.charm.unit].update({"departing": "True"})
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the user created for this relation."""
         # Check for some conditions before trying to access the PostgreSQL instance.
-        print(123)
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
@@ -121,10 +121,6 @@ class PostgreSQLProvider(Object):
             event.defer()
             return
 
-        logger.warning(self.model.app.planned_units())
-        logger.warning(str(self.charm._peers.units))
-        logger.warning(len(self.charm._peers.units))
-        logger.warning(str(self.charm._peers.data[self.charm.unit]))
         if (
             not self.charm.unit.is_leader()
             or "departing" in self.charm._peers.data[self.charm.unit]
@@ -136,7 +132,6 @@ class PostgreSQLProvider(Object):
         user = f"relation_id_{event.relation.id}"
         try:
             self.charm.postgresql.delete_user(user)
-            logger.warning(f"user {user} was deleted")
         except PostgreSQLDeleteUserError as e:
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(
