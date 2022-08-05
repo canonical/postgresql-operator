@@ -110,9 +110,6 @@ class PostgresqlOperatorCharm(CharmBase):
         """The leader removes the departing units from the list of cluster members."""
         # Don't handle this event in the same unit that is departing.
         if event.departing_unit == self.unit:
-            # Set a flag to avoid deleting database users when this unit
-            # is removed and receives relation broken events from related applications.
-            self._peers.data[self.unit].update({"departing": "True"})
             return
 
         # Remove the departing member from the raft cluster.
