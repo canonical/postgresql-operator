@@ -81,7 +81,7 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
         # Try to get the connection string of the database using the read-only endpoint.
-        # It should not be available anymore.
+        # It should not be available.
         assert await check_relation_data_existence(
             ops_test,
             APPLICATION_APP_NAME,
@@ -352,3 +352,12 @@ async def test_replication_data_is_updated_correctly_when_scaling(ops_test: OpsT
             with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
                 cursor.execute("DROP TABLE test;")
     connection.close()
+
+    # Remove the relation and test that its user was deleted
+    # (by checking that the connection string doesn't work anymore).
+    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+        f"{DATABASE_APP_NAME}:database", f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}"
+    )
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    with pytest.raises(psycopg2.OperationalError):
+        psycopg2.connect(primary_connection_string)
