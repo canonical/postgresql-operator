@@ -1,0 +1,46 @@
+series: bionic
+services:
+    rabbitmq-server:
+        charm: cs:rabbitmq-server-111
+        num_units: 1
+        annotations:
+            "gui-x": "600"
+            "gui-y": "370"
+    postgresql:
+        charm: cs:postgresql-234
+        constraints: mem=2048
+        num_units: 1
+        options:
+            extra_packages: python-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython.*
+            max_connections: 500
+            max_prepared_transactions: 500
+        annotations:
+            "gui-x": "600"
+            "gui-y": "120"
+    haproxy:
+        charm: cs:haproxy-61
+        expose: True
+        num_units: 1
+        options:
+            default_timeouts: "queue 60000, connect 5000, client 120000, server 120000"
+            # Don't deploy default haproxy service on port 80
+            services: ""
+            source: backports
+            ssl_cert: SELFSIGNED
+            global_default_bind_options: "no-tlsv10"
+        annotations:
+            "gui-x": "1200"
+            "gui-y": "120"
+    landscape-server:
+        charm: cs:landscape-server-42
+        constraints: mem=4096
+        num_units: 1
+        options:
+            install_keys: 4652B4E6
+        annotations:
+            "gui-x": "950"
+            "gui-y": "120"
+relations:
+    - [landscape-server, rabbitmq-server]
+    - [landscape-server, haproxy]
+    - ["landscape-server:db", "postgresql:db-admin"]
