@@ -6,17 +6,6 @@ services:
         annotations:
             "gui-x": "600"
             "gui-y": "370"
-    postgresql:
-        charm: cs:postgresql-234
-        constraints: mem=2048
-        num_units: 1
-        options:
-            extra_packages: python-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython.*
-            max_connections: 500
-            max_prepared_transactions: 500
-        annotations:
-            "gui-x": "600"
-            "gui-y": "120"
     haproxy:
         charm: cs:haproxy-61
         expose: True
@@ -43,4 +32,3 @@ services:
 relations:
     - [landscape-server, rabbitmq-server]
     - [landscape-server, haproxy]
-    - ["landscape-server:db", "postgresql:db-admin"]
