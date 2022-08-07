@@ -41,7 +41,6 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     relation_id = await deploy_and_relate_bundle_with_postgresql(
         ops_test,
         LANDSCAPE_SCALABLE_BUNDLE_NAME,
-        LANDSCAPE_SCALABLE_BUNDLE_OVERLAY_PATH,
         LANDSCAPE_APP_NAME,
     )
     await check_databases_creation(
@@ -61,7 +60,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     await check_database_users_existence(ops_test, landscape_users, [])
 
     # Remove the applications from the bundle.
-    await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(LANDSCAPE_SCALABLE_BUNDLE_NAME, block_until_done=True)
-    await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+    # await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
+    # await ops_test.model.remove_application(LANDSCAPE_SCALABLE_BUNDLE_NAME, block_until_done=True)
+    # await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
+    # await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
