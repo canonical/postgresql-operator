@@ -59,10 +59,10 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
     await check_database_users_existence(ops_test, mailman3_core_users, [])
 
-    # Deploy and test another deployment of Finos Waltz.
+    # Deploy and test another deployment of Mailman3 Core.
     another_relation_id = await deploy_and_relate_application_with_postgresql(
         ops_test,
-        "finos-waltz-k8s",
+        "mailman3-core",
         ANOTHER_MAILMAN3_CORE_APP_NAME,
         APPLICATION_UNITS,
     )
