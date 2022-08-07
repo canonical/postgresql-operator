@@ -56,12 +56,37 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     )
 
     mailman3_core_users = [f"relation_id_{relation_id}"]
-    # mailman3_core_users = ["relation_id_1"]
 
     await check_database_users_existence(ops_test, mailman3_core_users, [])
 
-    # Remove the first deployment of Mailman3 Core.
-    await ops_test.model.remove_application(MAILMAN3_CORE_APP_NAME, block_until_done=True)
+    # Deploy and test another deployment of Finos Waltz.
+    another_relation_id = await deploy_and_relate_application_with_postgresql(
+        ops_test,
+        "finos-waltz-k8s",
+        ANOTHER_MAILMAN3_CORE_APP_NAME,
+        APPLICATION_UNITS,
+    )
+    # In this case, the database name is the same as in the first deployment
+    # because it's a fixed value in Mailman3 Core charm.
+    await check_databases_creation(ops_test, ["mailman3"])
 
-    # Remove the PostgreSQL application.
-    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+    another_mailman3_core_users = [f"relation_id_{another_relation_id}"]
+
+    await check_database_users_existence(
+        ops_test, mailman3_core_users + another_mailman3_core_users, []
+    )
+
+    # Scale down the second deployment of Mailman3 Core and confirm that the first deployment
+    # is still active.
+    await ops_test.model.remove_application(ANOTHER_MAILMAN3_CORE_APP_NAME, block_until_done=True)
+
+    another_mailman3_core_users = []
+    await check_database_users_existence(
+        ops_test, mailman3_core_users, another_mailman3_core_users
+    )
+
+    # # Remove the first deployment of Mailman3 Core.
+    # await ops_test.model.remove_application(MAILMAN3_CORE_APP_NAME, block_until_done=True)
+    #
+    # # Remove the PostgreSQL application.
+    # await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)

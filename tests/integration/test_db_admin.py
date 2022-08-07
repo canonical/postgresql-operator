@@ -19,6 +19,7 @@ LANDSCAPE_APP_NAME = "landscape-server"
 LANDSCAPE_SCALABLE_BUNDLE_NAME = "ch:landscape-scalable"
 LANDSCAPE_SCALABLE_BUNDLE_OVERLAY_PATH = "./tests/integration/landscape_scalable_overlay.yaml"
 RABBITMQ_APP_NAME = "rabbitmq-server"
+DATABASE_UNITS = 3
 
 
 # async def test_landscape_scalable_bundle_db(ops_test: OpsTest) -> None:
@@ -32,7 +33,11 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     }
     resources = {"patroni": "patroni.tar.gz"}
     await ops_test.model.deploy(
-        charm, config=config, resources=resources, application_name=DATABASE_APP_NAME
+        charm,
+        config=config,
+        resources=resources,
+        application_name=DATABASE_APP_NAME,
+        num_units=DATABASE_UNITS,
     )
     # Attach the resource to the controller.
     await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")

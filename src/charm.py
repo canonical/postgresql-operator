@@ -38,7 +38,7 @@ from cluster import (
     SwitchoverFailedError,
 )
 from constants import PEER
-from relations.db import LegacyRelation
+from relations.db import DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
 
@@ -68,8 +68,9 @@ class PostgresqlOperatorCharm(CharmBase):
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
 
-        self.legacy_relation = LegacyRelation(self)
         self.postgresql_client_relation = PostgreSQLProvider(self)
+        self.legacy_db_relation = DbProvides(self, admin=False)
+        self.legacy_db_admin_relation = DbProvides(self, admin=True)
 
     @property
     def postgresql(self) -> PostgreSQL:

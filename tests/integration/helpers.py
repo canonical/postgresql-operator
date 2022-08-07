@@ -2,7 +2,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import itertools
-import os
 import tempfile
 import zipfile
 from pathlib import Path
@@ -206,7 +205,8 @@ async def deploy_and_relate_bundle_with_postgresql(
         # Download the original bundle.
         await ops_test.juju("download", bundle, "--filepath", original.name)
 
-        # Open the bundle compressed file and update the contents of the bundle.yaml file to deploy it.
+        # Open the bundle compressed file and update the contents
+        # of the bundle.yaml file to deploy it.
         with zipfile.ZipFile(original.name, "r") as archive:
             bundle_yaml = archive.read("bundle.yaml")
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
