@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import logging
 
+import requests
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
@@ -15,7 +16,6 @@ from tests.integration.helpers import (
 logger = logging.getLogger(__name__)
 
 MAILMAN3_CORE_APP_NAME = "mailman3-core"
-ANOTHER_MAILMAN3_CORE_APP_NAME = "another-mailman3-core"
 APPLICATION_UNITS = 1
 DATABASE_UNITS = 3
 
@@ -44,7 +44,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         assert unit.workload_status == "active"
 
-    # Deploy and test the first deployment of Mailman3 Core.
+    # Deploy and test the deployment of Mailman3 Core.
     relation_id = await deploy_and_relate_application_with_postgresql(
         ops_test, "mailman3-core", MAILMAN3_CORE_APP_NAME, APPLICATION_UNITS
     )
@@ -59,34 +59,24 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
     await check_database_users_existence(ops_test, mailman3_core_users, [])
 
-    # Deploy and test another deployment of Mailman3 Core.
-    another_relation_id = await deploy_and_relate_application_with_postgresql(
-        ops_test,
-        "mailman3-core",
-        ANOTHER_MAILMAN3_CORE_APP_NAME,
-        APPLICATION_UNITS,
+    # Assert Mailman3 Core is configured to use PostgreSQL instead of SQLite.
+    unit = ops_test.model.applications[MAILMAN3_CORE_APP_NAME].units[0]
+    action = await unit.run("mailman info")
+    result = action.results.get("Stdout", None)
+    assert "db url: postgres://" in result
+
+    # And also test the workload by issuing a request to the REST API.
+    credentials = (
+        result.split("credentials: ")[1].strip().split(":")
+    )  # This outputs a list containing username and password.
+    response = requests.get(
+        f"http://{unit.public_address}:8001/3.1/system/versions",
+        auth=(credentials[0], credentials[1]),
     )
-    # In this case, the database name is the same as in the first deployment
-    # because it's a fixed value in Mailman3 Core charm.
-    await check_databases_creation(ops_test, ["mailman3"])
+    assert response.status_code == 200
 
-    another_mailman3_core_users = [f"relation_id_{another_relation_id}"]
+    # Remove the deployment of Mailman3 Core.
+    await ops_test.model.remove_application(MAILMAN3_CORE_APP_NAME, block_until_done=True)
 
-    await check_database_users_existence(
-        ops_test, mailman3_core_users + another_mailman3_core_users, []
-    )
-
-    # Scale down the second deployment of Mailman3 Core and confirm that the first deployment
-    # is still active.
-    await ops_test.model.remove_application(ANOTHER_MAILMAN3_CORE_APP_NAME, block_until_done=True)
-
-    another_mailman3_core_users = []
-    await check_database_users_existence(
-        ops_test, mailman3_core_users, another_mailman3_core_users
-    )
-
-    # # Remove the first deployment of Mailman3 Core.
-    # await ops_test.model.remove_application(MAILMAN3_CORE_APP_NAME, block_until_done=True)
-    #
-    # # Remove the PostgreSQL application.
-    # await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+    # Remove the PostgreSQL application.
+    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
