@@ -72,15 +72,16 @@ class DbProvides(Object):
         Generate password and handle user and database creation for the related application.
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
+        if not self.charm.unit.is_leader():
+            return
+
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
             event.defer()
-            return
-
-        if not self.charm.unit.is_leader():
+            print("Deferring relation changed event")
             return
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
@@ -105,6 +106,7 @@ class DbProvides(Object):
         if not database:
             logger.warning("No database name provided")
             event.defer()
+            print("Deferring relation changed event because of database")
             return
 
         try:
@@ -114,6 +116,7 @@ class DbProvides(Object):
             password = unit_relation_databag.get("password", new_password())
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
+            postgresql_version = self.charm.postgresql.get_postgresql_version()
         except (
             PostgreSQLCreateDatabaseError,
             PostgreSQLCreateUserError,
@@ -131,13 +134,14 @@ class DbProvides(Object):
         # is connecting to this database will receive a "database gone" event from the
         # old PostgreSQL library (ops-lib-pgsql) and the connection between the
         # application and this charm will not work.
+        allowed_subnets = self._get_allowed_subnets(event.relation)
+        allowed_units = self._get_allowed_units(event.relation)
         for databag in [application_relation_databag, unit_relation_databag]:
             updates = {
-                "allowed-subnets": self._get_allowed_subnets(event.relation),
-                "allowed-units": self._get_allowed_units(event.relation),
-                # "hostname": primary,
+                "allowed-subnets": allowed_subnets,
+                "allowed-units": allowed_units,
                 "port": DATABASE_PORT,
-                "version": self.charm.postgresql.get_postgresql_version(),
+                "version": postgresql_version,
                 "user": user,
                 "password": password,
                 "database": database,
@@ -151,6 +155,9 @@ class DbProvides(Object):
         Remove unit name from allowed_units key.
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
+        if not self.charm.unit.is_leader():
+            return
+
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
@@ -159,11 +166,14 @@ class DbProvides(Object):
             event.defer()
             return
 
-        if not self.charm.unit.is_leader():
-            return
-
-        if event.departing_unit.app == self.charm.app:
-            # Just run for departing of remote units.
+        # Set a flag to avoid deleting database users when this unit
+        # is removed and receives relation broken events from related applications.
+        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
+        # Neither peer relation data nor stored state are good solutions,
+        # just a temporary solution.
+        if event.departing_unit == self.charm.unit:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+            # Just run the rest of the logic for departing of remote units.
             return
 
         departing_unit = event.departing_unit.name
@@ -188,7 +198,17 @@ class DbProvides(Object):
             event.defer()
             return
 
-        if not self.charm.unit.is_leader():
+        # Run this event only in the leader unit and
+        # if this unit isn't being removed while the
+        # others from this application are still alive.
+        # The second check is needed because of
+        # https://bugs.launchpad.net/juju/+bug/1979811.
+        # Neither peer relation data nor stored state
+        # are good solutions, just a temporary solution.
+        if (
+            not self.charm.unit.is_leader()
+            or "departing" in self.charm._peers.data[self.charm.unit]
+        ):
             return
 
         # Delete the user.
@@ -257,12 +277,14 @@ class DbProvides(Object):
             )
 
             # Set the read/write endpoint.
-            unit_relation_databag.update(
-                {"primary": primary_endpoint, "standbys": read_only_endpoints}
-            )
-            application_relation_databag.update(
-                {"primary": primary_endpoint, "standbys": read_only_endpoints}
-            )
+            data = {
+                "host": self.charm.primary_endpoint,
+                "master": primary_endpoint,
+                "standbys": read_only_endpoints,
+                "state": self._get_state(),
+            }
+            unit_relation_databag.update(data)
+            application_relation_databag.update(data)
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
         """Build the list of allowed subnets as in the legacy charm."""
@@ -290,3 +312,16 @@ class DbProvides(Object):
                 if isinstance(unit, Unit) and not unit.name.startswith(self.model.app.name)
             )
         )
+
+    def _get_state(self) -> str:
+        """Gets the given state for this unit.
+
+        Returns:
+            The state of this unit. Can be 'standalone', 'master', or 'standby'.
+        """
+        if len(self.charm._peers.units) == 0:
+            return "standalone"
+        if self.charm._patroni.get_primary(unit_name_pattern=True) == self.charm.unit.name:
+            return "master"
+        else:
+            return "standby"
