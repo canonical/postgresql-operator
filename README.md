@@ -8,10 +8,15 @@ This operator provides a Postgres database with replication enabled (one master 
 
 ## Usage
 
-To deploy this charm using Juju 2.9.0 or later, run:
+Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) to juju and create a model:
 
 ```shell
 juju add-model postgresql
+```
+
+To deploy this charm using Juju 2.9.0 or later, run:
+
+```shell
 charmcraft pack
 juju deploy ./postgresql_ubuntu-20.04-amd64.charm
 ```
