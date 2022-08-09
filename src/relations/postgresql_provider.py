@@ -59,14 +59,14 @@ class PostgreSQLProvider(Object):
     def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
         """Generate password and handle user and database creation for the related application."""
         # Check for some conditions before trying to access the PostgreSQL instance.
+        if not self.charm.unit.is_leader():
+            return
+
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
         ):
             event.defer()
-            return
-
-        if not self.charm.unit.is_leader():
             return
 
         # Retrieve the database name and extra user roles using the charm library.
@@ -75,7 +75,7 @@ class PostgreSQLProvider(Object):
 
         try:
             # Creates the user and the database for this specific relation.
-            user = f"relation_id_{event.relation.id}"
+            user = f"relation-{event.relation.id}"
             password = new_password()
             self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
             self.charm.postgresql.create_database(database, user)
@@ -103,6 +103,9 @@ class PostgreSQLProvider(Object):
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the user created for this relation."""
         # Check for some conditions before trying to access the PostgreSQL instance.
+        if not self.charm.unit.is_leader():
+            return
+
         if (
             "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
@@ -110,11 +113,8 @@ class PostgreSQLProvider(Object):
             event.defer()
             return
 
-        if not self.charm.unit.is_leader():
-            return
-
         # Delete the user.
-        user = f"relation_id_{event.relation.id}"
+        user = f"relation-{event.relation.id}"
         try:
             self.charm.postgresql.delete_user(user)
         except PostgreSQLDeleteUserError as e:
