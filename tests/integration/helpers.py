@@ -142,6 +142,7 @@ async def deploy_and_relate_application_with_postgresql(
     charm: str,
     application_name: str,
     number_of_units: int,
+    config: dict = None,
     channel: str = "stable",
     relation: str = "db",
 ) -> int:
@@ -152,6 +153,7 @@ async def deploy_and_relate_application_with_postgresql(
         charm: Charm identifier.
         application_name: The name of the application to deploy.
         number_of_units: The number of units to deploy.
+        config: Extra config options for the application.
         channel: The channel to use for the charm.
         relation: Name of the PostgreSQL relation to relate
             the application to.
@@ -165,6 +167,7 @@ async def deploy_and_relate_application_with_postgresql(
         channel=channel,
         application_name=application_name,
         num_units=number_of_units,
+        config=config,
     )
     await ops_test.model.wait_for_idle(
         apps=[application_name],

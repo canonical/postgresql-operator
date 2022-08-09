@@ -3,7 +3,7 @@
 # See LICENSE file for licensing details.
 import logging
 
-import requests
+from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
@@ -44,9 +44,15 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         assert unit.workload_status == "active"
 
+    # Extra config option for Mailman3 Core.
+    config = {"hostname": "example.org"}
     # Deploy and test the deployment of Mailman3 Core.
     relation_id = await deploy_and_relate_application_with_postgresql(
-        ops_test, "mailman3-core", MAILMAN3_CORE_APP_NAME, APPLICATION_UNITS
+        ops_test,
+        "mailman3-core",
+        MAILMAN3_CORE_APP_NAME,
+        APPLICATION_UNITS,
+        config,
     )
     await check_databases_creation(
         ops_test,
@@ -65,15 +71,27 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     result = action.results.get("Stdout", None)
     assert "db url: postgres://" in result
 
-    # And also test the workload by issuing a request to the REST API.
+    # Do some CRUD operations using Mailman3 Core client.
+    domain_name = "canonical.com"
+    list_name = "postgresql-list"
     credentials = (
         result.split("credentials: ")[1].strip().split(":")
     )  # This outputs a list containing username and password.
-    response = requests.get(
-        f"http://{unit.public_address}:8001/3.1/system/versions",
-        auth=(credentials[0], credentials[1]),
-    )
-    assert response.status_code == 200
+    client = Client(f"http://{unit.public_address}:8001/3.1", credentials[0], credentials[1])
+
+    # Create a domain and list the domains to check that the new one is there.
+    domain = client.create_domain(domain_name)
+    assert domain_name in [domain.mail_host for domain in client.domains]
+
+    # Update the domain by creating a mailing list into it.
+    mailing_list = domain.create_list(list_name)
+    assert mailing_list.fqdn_listname in [
+        mailing_list.fqdn_listname for mailing_list in domain.lists
+    ]
+
+    # Delete the domain and check that the change was persisted.
+    domain.delete()
+    assert domain_name not in [domain.mail_host for domain in client.domains]
 
     # Remove the deployment of Mailman3 Core.
     await ops_test.model.remove_application(MAILMAN3_CORE_APP_NAME, block_until_done=True)
