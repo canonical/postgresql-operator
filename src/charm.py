@@ -192,8 +192,6 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
-        else:
-            self.unit.status = BlockedStatus("no primary in the cluster")
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -227,6 +225,11 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.member_started:
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
+            return
+
+        # If the unit is not the leader, just set an ActiveStatus.
+        if not self.unit.is_leader():
+            self.unit.status = ActiveStatus()
             return
 
         # Only update the connection endpoints if there is a primary.
