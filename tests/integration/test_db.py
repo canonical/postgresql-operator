@@ -61,7 +61,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         ],
     )
 
-    mailman3_core_users = [f"relation_id_{relation_id}"]
+    mailman3_core_users = [f"relation-{relation_id}"]
 
     await check_database_users_existence(ops_test, mailman3_core_users, [])
 

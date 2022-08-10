@@ -129,7 +129,7 @@ class TestDbProvides(unittest.TestCase):
             self.request_database()
 
             # Assert that the correct calls were made.
-            user = f"relation_id_{self.rel_id}"
+            user = f"relation-{self.rel_id}"
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
             postgresql_mock.get_postgresql_version.assert_called_once()
@@ -204,7 +204,7 @@ class TestDbProvides(unittest.TestCase):
             # Assert that the correct calls were made after a relation broken event.
             self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
             self.harness.remove_relation(self.rel_id)
-            user = f"relation_id_{self.rel_id}"
+            user = f"relation-{self.rel_id}"
             postgresql_mock.delete_user.assert_called_once_with(user)
 
             # Test a failed user deletion.
@@ -254,7 +254,7 @@ class TestDbProvides(unittest.TestCase):
                 rel_id,
                 self.app,
                 {
-                    "user": f"relation_id_{rel_id}",
+                    "user": f"relation-{rel_id}",
                     "password": password,
                     "database": DATABASE,
                 },
@@ -267,7 +267,7 @@ class TestDbProvides(unittest.TestCase):
         for rel_id in [self.rel_id, self.another_rel_id]:
             # Get the relation data and set the expected username based on the relation id.
             relation_data = self.harness.get_relation_data(rel_id, self.app)
-            user = f"relation_id_{rel_id}"
+            user = f"relation-{rel_id}"
 
             # Set the assert function based on each relation (whether it should have data).
             assert_based_on_relation = (
@@ -297,7 +297,7 @@ class TestDbProvides(unittest.TestCase):
         for rel_id in [self.rel_id, self.another_rel_id]:
             # Get the relation data and set the expected username based on the relation id.
             relation_data = self.harness.get_relation_data(rel_id, self.app)
-            user = f"relation_id_{rel_id}"
+            user = f"relation-{rel_id}"
 
             # Set the assert function based on each relation (whether it should have data).
             assert_based_on_relation = (
@@ -355,7 +355,7 @@ class TestDbProvides(unittest.TestCase):
                 rel_id,
                 self.app,
                 {
-                    "user": f"relation_id_{rel_id}",
+                    "user": f"relation-{rel_id}",
                     "password": password,
                     "database": DATABASE,
                 },
@@ -367,7 +367,7 @@ class TestDbProvides(unittest.TestCase):
         for rel_id in [self.rel_id, self.another_rel_id]:
             # Get the relation data and set the expected username based on the relation id.
             relation_data = self.harness.get_relation_data(rel_id, self.app)
-            user = f"relation_id_{rel_id}"
+            user = f"relation-{rel_id}"
 
             # Check that the application relation databag contains the endpoints.
             self.assertTrue("master" in relation_data and master + user == relation_data["master"])
@@ -390,7 +390,7 @@ class TestDbProvides(unittest.TestCase):
         for rel_id in [self.rel_id, self.another_rel_id]:
             # Get the relation data and set the expected username based on the relation id.
             relation_data = self.harness.get_relation_data(rel_id, self.app)
-            user = f"relation_id_{rel_id}"
+            user = f"relation-{rel_id}"
 
             # Check that the application relation databag contains the endpoints.
             self.assertTrue("master" in relation_data and master + user == relation_data["master"])

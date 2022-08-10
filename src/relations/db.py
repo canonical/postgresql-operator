@@ -110,7 +110,7 @@ class DbProvides(Object):
         try:
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            user = f"relation_id_{event.relation.id}"
+            user = f"relation-{event.relation.id}"
             password = unit_relation_databag.get("password", new_password())
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
@@ -210,7 +210,7 @@ class DbProvides(Object):
             return
 
         # Delete the user.
-        user = f"relation_id_{event.relation.id}"
+        user = f"relation-{event.relation.id}"
         try:
             self.charm.postgresql.delete_user(user)
         except PostgreSQLDeleteUserError as e:

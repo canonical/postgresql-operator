@@ -58,7 +58,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         ],
     )
 
-    landscape_users = [f"relation_id_{relation_id}"]
+    landscape_users = [f"relation-{relation_id}"]
 
     await check_database_users_existence(ops_test, landscape_users, [])
 
