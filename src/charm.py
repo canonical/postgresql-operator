@@ -149,6 +149,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
             if self.primary_endpoint:
                 self.postgresql_client_relation.update_endpoints()
+                self.legacy_db_relation.update_endpoints()
+                self.legacy_db_admin_relation.update_endpoints()
             else:
                 self.unit.status = BlockedStatus("no primary in the cluster")
                 return
@@ -197,6 +199,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+            self.legacy_db_relation.update_endpoints()
+            self.legacy_db_admin_relation.update_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -242,6 +246,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+            self.legacy_db_relation.update_endpoints()
+            self.legacy_db_admin_relation.update_endpoints()
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
@@ -492,6 +498,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+            self.legacy_db_relation.update_endpoints()
+            self.legacy_db_admin_relation.update_endpoints()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
 
@@ -560,6 +568,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_update_status(self, _) -> None:
         """Update endpoints of the postgres client relation."""
         self.postgresql_client_relation.update_endpoints()
+        self.legacy_db_relation.update_endpoints()
+        self.legacy_db_admin_relation.update_endpoints()
 
     @property
     def _has_blocked_status(self) -> bool:
