@@ -120,13 +120,14 @@ class PostgreSQL:
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(f"SELECT TRUE FROM pg_roles WHERE rolname='{user}';")
-                user_definition = f"{user} WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
+                user_definition = f" WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 if extra_user_roles:
                     user_definition += f' {extra_user_roles.replace(",", " ")}'
                 if cursor.fetchone() is not None:
-                    cursor.execute(f"ALTER ROLE {user_definition};")
+                    statement = "ALTER ROLE {}"
                 else:
-                    cursor.execute(f"CREATE ROLE {user_definition};")
+                    statement = "CREATE ROLE {}"
+                cursor.execute(sql.SQL(statement + user_definition + ";").format(sql.Identifier(user)))
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError()
