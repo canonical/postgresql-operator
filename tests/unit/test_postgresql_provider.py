@@ -126,7 +126,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
             self.request_database()
 
             # Assert that the correct calls were made.
-            user = f"relation_id_{self.rel_id}"
+            user = f"relation-{self.rel_id}"
             postgresql_mock.create_user.assert_called_once_with(
                 user, "test-password", extra_user_roles=EXTRA_USER_ROLES
             )
@@ -221,7 +221,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
             # Assert that the correct calls were made after a relation broken event.
             self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
             self.harness.remove_relation(self.rel_id)
-            user = f"relation_id_{self.rel_id}"
+            user = f"relation-{self.rel_id}"
             postgresql_mock.delete_user.assert_called_once_with(user)
 
             # Test a failed user deletion.

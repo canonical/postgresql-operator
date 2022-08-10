@@ -64,6 +64,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
+        self.framework.observe(self.on.update_status, self._on_update_status)
         self._cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
@@ -552,6 +553,10 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_get_initial_password(self, event: ActionEvent) -> None:
         """Returns the password for the postgres user as an action response."""
         event.set_results({"postgres-password": self._get_postgres_password()})
+
+    def _on_update_status(self, _) -> None:
+        """Update endpoints of the postgres client relation."""
+        self.postgresql_client_relation.update_endpoints()
 
     @property
     def _has_blocked_status(self) -> bool:
