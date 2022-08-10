@@ -4,14 +4,19 @@
 
 The PostgreSQL Operator deploys and operates the [PostgreSQL](https://www.postgresql.org/about/) database on machine clusters.
 
-This operator provides a Postgres database with replication enabled (one master instance and one or more hot standby replicas). The Operator in this repository is a Python script which wraps Postgres versions shipped by the Ubuntu focal series, providing lifecycle management and handling events (install, configure, integrate, remove).
+This operator provides a Postgres database with replication enabled (one master instance and one or more hot standby replicas). The Operator in this repository is a Python script which wraps Postgres versions shipped by the Ubuntu focal series, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
 
 ## Usage
+
+Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) to juju and create a model:
+
+```shell
+juju add-model postgresql
+```
 
 To deploy this charm using Juju 2.9.0 or later, run:
 
 ```shell
-juju add-model postgresql
 charmcraft pack
 juju deploy ./postgresql_ubuntu-20.04-amd64.charm
 ```
@@ -21,7 +26,7 @@ Note: the above model must exist outside of a k8s environment (you could bootstr
 To confirm the deployment, you can run:
 
 ```shell
-juju status --color
+juju status
 ```
 
 Once PostgreSQL starts up, it will be running on the default port (5432).
@@ -42,11 +47,6 @@ To relate to it, use the [requires data-platform library](https://charmhub.io/da
 Adding a relation is accomplished with:
 
 ```shell
-# Deploy the relevant charms.
-charmcraft pack
-juju deploy ./postgresql_ubuntu-20.04-amd64.charm
-juju deploy mycharm
-# Relate mycharm with postgresql.
 juju relate mycharm:database postgresql:database
 ```
 
