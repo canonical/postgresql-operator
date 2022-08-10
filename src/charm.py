@@ -6,12 +6,11 @@
 import json
 import logging
 import os
-import secrets
-import string
 import subprocess
-from typing import List, Set
+from typing import List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
+from charms.postgresql_k8s.v0.postgresql import PostgreSQL
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -29,6 +28,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
+from requests.exceptions import ConnectionError
 from tenacity import RetryError, retry, stop_after_delay, wait_fixed
 
 from cluster import (
@@ -37,11 +37,13 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
+from constants import PEER
+from relations.postgresql_provider import PostgreSQLProvider
+from utils import new_password
 
 logger = logging.getLogger(__name__)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
-PEER = "postgresql-replicas"
 
 
 class PostgresqlOperatorCharm(CharmBase):
@@ -60,9 +62,29 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
+        self.framework.observe(self.on.update_status, self._on_update_status)
         self._cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
+
+        self.postgresql_client_relation = PostgreSQLProvider(self)
+
+    @property
+    def postgresql(self) -> PostgreSQL:
+        """Returns an instance of the object used to interact with the database."""
+        return PostgreSQL(
+            host=self.primary_endpoint,
+            user="postgres",
+            password=self._get_postgres_password(),
+            database="postgres",
+        )
+
+    @property
+    def primary_endpoint(self) -> str:
+        """Returns the endpoint of the primary instance."""
+        primary = self._patroni.get_primary(unit_name_pattern=True)
+        primary_unit = self.framework.model.get_unit(primary)
+        return self._get_unit_ip(primary_unit)
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -106,6 +128,8 @@ class PostgresqlOperatorCharm(CharmBase):
                 # Update the list of the current members.
                 self._remove_from_members_ips(member_ip)
                 self._patroni.update_cluster_members()
+
+                self.postgresql_client_relation.update_endpoints()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
@@ -147,6 +171,8 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.warning(
                 f"switchover failed with reason: {e} - an automatic failover will be triggered"
             )
+        else:
+            self.postgresql_client_relation.update_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -182,6 +208,7 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.postgresql_client_relation.update_endpoints()
         self.unit.status = ActiveStatus()
 
     def _add_members(self, event):
@@ -218,7 +245,7 @@ class PostgresqlOperatorCharm(CharmBase):
             NotReadyError if either the new member or the current members are not ready.
         """
         unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
-        member_ip = self._get_peer_unit_ip(unit)
+        member_ip = self._get_unit_ip(unit)
 
         if not self._patroni.are_all_members_ready():
             logger.info("not all members are ready")
@@ -233,9 +260,17 @@ class PostgresqlOperatorCharm(CharmBase):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_peer_unit_ip(self, unit: Unit) -> str:
-        """Get the IP address of a specific peer unit."""
-        return self._peers.data[unit].get("private-address")
+    def _get_unit_ip(self, unit: Unit) -> Optional[str]:
+        """Get the IP address of a specific unit."""
+        # Check if host is current host.
+        if unit == self.unit:
+            return str(self.model.get_binding(PEER).network.bind_address)
+        # Check if host is a peer.
+        elif unit in self._peers.data:
+            return str(self._peers.data[unit].get("private-address"))
+        # Return None if the unit is not a peer neither the current unit.
+        else:
+            return None
 
     @property
     def _hosts(self) -> set:
@@ -288,7 +323,7 @@ class PostgresqlOperatorCharm(CharmBase):
             A list of peers addresses (strings).
         """
         # Get all members IPs and remove the current unit IP from the list.
-        addresses = {self._get_peer_unit_ip(unit) for unit in self._peers.units}
+        addresses = {self._get_unit_ip(unit) for unit in self._peers.units}
         addresses.add(self._unit_ip)
         return addresses
 
@@ -397,8 +432,8 @@ class PostgresqlOperatorCharm(CharmBase):
         """Handle the leader-elected event."""
         data = self._peers.data[self.app]
         # The leader sets the needed password on peer relation databag if they weren't set before.
-        data.setdefault("postgres-password", self._new_password())
-        data.setdefault("replication-password", self._new_password())
+        data.setdefault("postgres-password", new_password())
+        data.setdefault("replication-password", new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -411,6 +446,11 @@ class PostgresqlOperatorCharm(CharmBase):
             self._remove_from_members_ips(ip)
 
         self._patroni.update_cluster_members()
+
+        try:
+            self.postgresql_client_relation.update_endpoints()
+        except (ConnectionError, RetryError):
+            pass  # This error can happen in the first leader election, as Patroni is not running yet.
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
@@ -464,6 +504,10 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_get_initial_password(self, event: ActionEvent) -> None:
         """Returns the password for the postgres user as an action response."""
         event.set_results({"postgres-password": self._get_postgres_password()})
+
+    def _on_update_status(self, _) -> None:
+        """Update endpoints of the postgres client relation."""
+        self.postgresql_client_relation.update_endpoints()
 
     @property
     def _has_blocked_status(self) -> bool:
@@ -534,16 +578,6 @@ class PostgresqlOperatorCharm(CharmBase):
         except subprocess.SubprocessError:
             logger.error("could not install pip packages")
             raise
-
-    def _new_password(self) -> str:
-        """Generate a random password string.
-
-        Returns:
-           A random password string.
-        """
-        choices = string.ascii_letters + string.digits
-        password = "".join([secrets.choice(choices) for i in range(16)])
-        return password
 
     @property
     def _peers(self) -> Relation:
