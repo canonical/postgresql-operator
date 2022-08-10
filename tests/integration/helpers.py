@@ -40,7 +40,6 @@ async def check_database_users_existence(
         password,
         "SELECT usename FROM pg_catalog.pg_user;",
     )
-    print(f"output: {output}")
 
     # Assert users that should exist.
     for user in users_that_should_exist:
@@ -71,7 +70,6 @@ async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> N
                 password,
                 "SELECT datname FROM pg_database;",
             )
-            print(f"output: {output}")
             assert database in output
 
             # Ensure that application tables exist in the database
@@ -81,7 +79,6 @@ async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> N
                 "SELECT table_name FROM information_schema.tables;",
                 database=database,
             )
-            print(f"output: {output}")
             assert len(output)
 
 
@@ -353,26 +350,6 @@ def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
         IP address of the unit
     """
     return ops_test.model.units.get(unit_name).public_address
-
-
-async def prepare_overlay(ops_test: OpsTest, overlay: str) -> str:
-    """Downloads a bundle and generates a version of it without PostgreSQL.
-
-    Args:
-        ops_test: The ops test framework instance.
-        overlay: The identifier of the overlay.
-
-    Returns:
-        Temporary path of the generated overlay.
-    """
-    # with tempfile.NamedTemporaryFile(delete=False) as temp:
-    #     print(temp.name)
-    #     # Download the original bundle.
-    #     await ops_test.juju("download", overlay, "--filepath", temp.name)
-    #     # Open the bundle compressed file and update the contents of the bundle.yaml file.
-    #     with zipfile.ZipFile(temp.name, "r") as archive, archive.read("bundle.yaml") as bundle:
-    #         data = yaml.load(bundle, Loader=yaml.FullLoader)
-    #         print(data)
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
