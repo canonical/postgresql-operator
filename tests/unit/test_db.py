@@ -4,18 +4,18 @@
 import unittest
 from unittest.mock import Mock, PropertyMock, patch
 
-from charm import PostgresqlOperatorCharm
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
 )
-from constants import DATABASE_PORT, PEER
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
 
+from charm import PostgresqlOperatorCharm
+from constants import DATABASE_PORT, PEER
 from tests.helpers import patch_network_get
 
 DATABASE = "test_database"
@@ -47,7 +47,7 @@ class TestDbProvides(unittest.TestCase):
             self.app,
             {"cluster_initialised": "True"},
         )
-        # self.provider = self.harness.charm.postgresql_client_relation
+        self.legacy_db_relation = self.harness.charm.legacy_db_relation
 
     def request_database(self):
         # Reset the charm status.
@@ -213,6 +213,10 @@ class TestDbProvides(unittest.TestCase):
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     # @patch(
+    #     "charm.DbProvides._get_state",
+    #     side_effect="postgresql/0",
+    # )
+    # @patch(
     #     "charm.PostgresqlOperatorCharm.primary_endpoint",
     #     new_callable=PropertyMock(return_value="1.1.1.1"),
     # )
@@ -220,7 +224,7 @@ class TestDbProvides(unittest.TestCase):
     #     "charm.PostgresqlOperatorCharm.members_ips",
     #     new_callable=PropertyMock,
     # )
-    # def test_update_endpoints_with_event(self, _members_ips, _primary_endpoint):
+    # def test_update_endpoints_with_event(self, _members_ips, _primary_endpoint, _get_state):
     #     # Mock the members_ips list to simulate different scenarios
     #     # (with and without a replica).
     #     _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
@@ -230,18 +234,47 @@ class TestDbProvides(unittest.TestCase):
     #     self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
     #
     #     # Define a mock relation changed event to be used in the subsequent update endpoints calls.
+    #     user = f"relation_id_{self.rel_id}"
+    #     password = "test-password"
     #     mock_event = Mock()
     #     # Set the app, id and the initial data for the relation.
     #     mock_event.app = self.harness.charm.model.get_app("application")
+    #     mock_event.unit = self.harness.charm.model.get_app("application/0")
     #     mock_event.relation.id = self.rel_id
+    #     mock_event.relation.data = self.harness.get_relation_data(self.rel_id, self.unit)
+    #     mock_event.relation.data = {
+    #         self.harness.charm.app: {
+    #             "database": DATABASE,
+    #             "user": user,
+    #             "password": password,
+    #         },
+    #         # self.harness.charm.app: self.harness.get_relation_data(self.rel_id, self.app),
+    #         self.harness.charm.unit: {}  # self.harness.get_relation_data(self.rel_id, self.unit),
+    #     }
+    #     # self.harness.update_relation_data(self.rel_id, self.harness.charm.app, user, password)
     #
     #     # Test with both a primary and a replica.
-    #     # Update the endpoints with the event and check that it updated
-    #     # only the right relation databag (the one from the event).
-    #     self.provider.update_endpoints(mock_event)
+    #     # Update the endpoints with the event and check that it updated only
+    #     # the right relation databags (the app and unit databags from the event).
+    #     self.legacy_db_relation.update_endpoints(mock_event)
+    #     print(self.harness.get_relation_data(self.rel_id, self.harness.charm.app.name))
+    #     print(self.harness.get_relation_data(self.rel_id, self.harness.charm.unit.name))
+    #     print(self.harness.get_relation_data(self.another_rel_id, self.harness.charm.app.name))
+    #     print(self.harness.get_relation_data(self.another_rel_id, self.harness.charm.unit.name))
+    #     print(self.harness.get_relation_data(self.rel_id, "application"))
+    #     print(self.harness.get_relation_data(self.rel_id, "application/0"))
+    #     print(self.harness.get_relation_data(self.another_rel_id, "application"))
+    #     print(self.harness.get_relation_data(self.another_rel_id, "application/0"))
+    #     print(self.rel_id)
+    #     print(self.app)
+    #     print(self.unit)
     #     self.assertEqual(
     #         self.harness.get_relation_data(self.rel_id, self.app),
     #         {"endpoints": "1.1.1.1:5432", "read-only-endpoints": "2.2.2.2:5432"},
+    #     )
+    #     self.assertEqual(
+    #         self.harness.get_relation_data(self.rel_id, self.app),
+    #         self.harness.get_relation_data(self.rel_id, self.unit),
     #     )
     #     self.assertEqual(
     #         self.harness.get_relation_data(self.another_rel_id, self.app),
@@ -249,7 +282,7 @@ class TestDbProvides(unittest.TestCase):
     #     )
     #
     #     # Also test with only a primary instance.
-    #     self.provider.update_endpoints(mock_event)
+    #     self.legacy_db_relation.update_endpoints(mock_event)
     #     self.assertEqual(
     #         self.harness.get_relation_data(self.rel_id, self.app),
     #         {"endpoints": "1.1.1.1:5432"},
@@ -258,43 +291,89 @@ class TestDbProvides(unittest.TestCase):
     #         self.harness.get_relation_data(self.another_rel_id, self.app),
     #         {},
     #     )
-    #
-    # @patch(
-    #     "charm.PostgresqlOperatorCharm.primary_endpoint",
-    #     new_callable=PropertyMock(return_value="1.1.1.1"),
-    # )
-    # @patch(
-    #     "charm.PostgresqlOperatorCharm.members_ips",
-    #     new_callable=PropertyMock,
-    # )
-    # def test_update_endpoints_without_event(self, _members_ips, _primary_endpoint):
-    #     # Mock the members_ips list to simulate different scenarios
-    #     # (with and without a replica).
-    #     _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
-    #
-    #     # Add two different relations.
-    #     self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-    #     self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
-    #
-    #     # Test with both a primary and a replica.
-    #     # Update the endpoints and check that all relations' databags are updated.
-    #     self.provider.update_endpoints()
-    #     self.assertEqual(
-    #         self.harness.get_relation_data(self.rel_id, self.app),
-    #         {"endpoints": "1.1.1.1:5432", "read-only-endpoints": "2.2.2.2:5432"},
-    #     )
-    #     self.assertEqual(
-    #         self.harness.get_relation_data(self.another_rel_id, self.app),
-    #         {"endpoints": "1.1.1.1:5432", "read-only-endpoints": "2.2.2.2:5432"},
-    #     )
-    #
-    #     # Also test with only a primary instance.
-    #     self.provider.update_endpoints()
-    #     self.assertEqual(
-    #         self.harness.get_relation_data(self.rel_id, self.app),
-    #         {"endpoints": "1.1.1.1:5432"},
-    #     )
-    #     self.assertEqual(
-    #         self.harness.get_relation_data(self.another_rel_id, self.app),
-    #         {"endpoints": "1.1.1.1:5432"},
-    #     )
+
+    @patch(
+        "charm.DbProvides._get_state",
+        side_effect="postgresql/0",
+    )
+    @patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock(return_value="1.1.1.1"),
+    )
+    @patch(
+        "charm.PostgresqlOperatorCharm.members_ips",
+        new_callable=PropertyMock,
+    )
+    def test_update_endpoints_without_event(self, _members_ips, _primary_endpoint, _get_state):
+        # Mock the members_ips list to simulate different scenarios
+        # (with and without a replica).
+        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
+
+        # Add two different relations.
+        self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
+        self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
+
+        # Set some data to be used and compared in the relations.
+        password = "test-password"
+        master = (
+            f"dbname={DATABASE} fallback_application_name=application host=1.1.1.1 "
+            f"password={password} port=5432 user="
+        )
+        standbys = (
+            f"dbname={DATABASE} fallback_application_name=application host=2.2.2.2 "
+            f"password={password} port=5432 user="
+        )
+
+        # Set some required data before update_endpoints is called.
+        for rel_id in [self.rel_id, self.another_rel_id]:
+            self.harness.update_relation_data(
+                rel_id,
+                self.app,
+                {
+                    "user": f"relation_id_{rel_id}",
+                    "password": password,
+                    "database": DATABASE,
+                },
+            )
+
+        # Test with both a primary and a replica.
+        # Update the endpoints and check that all relations' databags are updated.
+        self.legacy_db_relation.update_endpoints()
+        for rel_id in [self.rel_id, self.another_rel_id]:
+            # Get the relation data and set the expected username based on the relation id.
+            relation_data = self.harness.get_relation_data(rel_id, self.app)
+            user = f"relation_id_{rel_id}"
+
+            # Check that the application relation databag contains the endpoints.
+            self.assertTrue("master" in relation_data and master + user == relation_data["master"])
+            self.assertTrue(
+                "standbys" in relation_data and standbys + user == relation_data["standbys"]
+            )
+
+            # Check that the unit relation databag contains the endpoints.
+            unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+            self.assertTrue(
+                "master" in unit_relation_data and master + user == unit_relation_data["master"]
+            )
+            self.assertTrue(
+                "standbys" in unit_relation_data
+                and standbys + user == unit_relation_data["standbys"]
+            )
+
+        # Also test with only a primary instance.
+        self.legacy_db_relation.update_endpoints()
+        for rel_id in [self.rel_id, self.another_rel_id]:
+            # Get the relation data and set the expected username based on the relation id.
+            relation_data = self.harness.get_relation_data(rel_id, self.app)
+            user = f"relation_id_{rel_id}"
+
+            # Check that the application relation databag contains the endpoints.
+            self.assertTrue("master" in relation_data and master + user == relation_data["master"])
+            self.assertTrue("standbys" not in relation_data)
+
+            # Check that the unit relation databag contains the endpoints.
+            unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+            self.assertTrue(
+                "master" in unit_relation_data and master + user == unit_relation_data["master"]
+            )
+            self.assertTrue("standbys" not in unit_relation_data)

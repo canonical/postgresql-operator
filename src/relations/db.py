@@ -81,7 +81,6 @@ class DbProvides(Object):
             or not self.charm.primary_endpoint
         ):
             event.defer()
-            print("Deferring relation changed event")
             return
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
@@ -106,7 +105,6 @@ class DbProvides(Object):
         if not database:
             logger.warning("No database name provided")
             event.defer()
-            print("Deferring relation changed event because of database")
             return
 
         try:
@@ -253,7 +251,7 @@ class DbProvides(Object):
                     port=DATABASE_PORT,
                     user=user,
                     password=password,
-                    fallback_application_name=event.app.name,
+                    fallback_application_name=relation.app.name,
                 )
             )
 
@@ -267,7 +265,7 @@ class DbProvides(Object):
                             port=DATABASE_PORT,
                             user=user,
                             password=password,
-                            fallback_application_name=event.app.name,
+                            fallback_application_name=relation.app.name,
                         )
                     )
                     for replica_endpoint in replicas_endpoint
