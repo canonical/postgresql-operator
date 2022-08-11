@@ -19,7 +19,6 @@ from constants import DATABASE_PORT, PEER
 from tests.helpers import patch_network_get
 
 DATABASE = "test_database"
-EXTRA_USER_ROLES = "CREATEDB,CREATEROLE"
 RELATION_NAME = "db"
 POSTGRESQL_VERSION = "12"
 

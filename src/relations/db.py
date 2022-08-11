@@ -152,6 +152,16 @@ class DbProvides(Object):
 
         Remove unit name from allowed_units key.
         """
+        # Set a flag to avoid deleting database users when this unit
+        # is removed and receives relation broken events from related applications.
+        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
+        # Neither peer relation data nor stored state are good solutions,
+        # just a temporary solution.
+        if event.departing_unit == self.charm.unit:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+            # Just run the rest of the logic for departing of remote units.
+            return
+
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.unit.is_leader():
             return
@@ -162,16 +172,6 @@ class DbProvides(Object):
             or not self.charm.primary_endpoint
         ):
             event.defer()
-            return
-
-        # Set a flag to avoid deleting database users when this unit
-        # is removed and receives relation broken events from related applications.
-        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
-        # Neither peer relation data nor stored state are good solutions,
-        # just a temporary solution.
-        if event.departing_unit == self.charm.unit:
-            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
-            # Just run the rest of the logic for departing of remote units.
             return
 
         departing_unit = event.departing_unit.name
