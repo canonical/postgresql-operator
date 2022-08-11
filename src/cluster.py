@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 
 """Helper class used to manage cluster lifecycle."""
-import json
 import logging
 import os
 import pwd
@@ -300,7 +299,6 @@ class Patroni:
                     f"http://{self.unit_ip}:8008/switchover",
                     json={"leader": current_primary},
                 )
-                logger.warning(json.loads(r.content))
 
         # Check whether the switchover was unsuccessful.
         if r.status_code != 200:
