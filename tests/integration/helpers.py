@@ -2,6 +2,8 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import itertools
+import tempfile
+import zipfile
 from pathlib import Path
 from typing import List
 
@@ -215,6 +217,55 @@ async def deploy_and_relate_application_with_postgresql(
         apps=[application_name],
         status="active",
         raise_on_blocked=False,  # Application that needs a relation is blocked initially.
+        timeout=1000,
+    )
+
+    return relation.id
+
+
+async def deploy_and_relate_bundle_with_postgresql(
+    ops_test: OpsTest,
+    bundle: str,
+    application_name: str,
+) -> str:
+    """Helper function to deploy and relate a bundle with PostgreSQL.
+
+    Args:
+        ops_test: The ops test framework.
+        bundle: Bundle identifier.
+        application_name: The name of the application to check for
+            an active state after the deployment.
+    """
+    # Deploy the bundle.
+    with tempfile.NamedTemporaryFile() as original:
+        # Download the original bundle.
+        await ops_test.juju("download", bundle, "--filepath", original.name)
+
+        # Open the bundle compressed file and update the contents
+        # of the bundle.yaml file to deploy it.
+        with zipfile.ZipFile(original.name, "r") as archive:
+            bundle_yaml = archive.read("bundle.yaml")
+            data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
+
+            # Remove PostgreSQL and relations with it from the bundle.yaml file.
+            del data["services"]["postgresql"]
+            data["relations"] = [
+                relation
+                for relation in data["relations"]
+                if "postgresql:db" not in relation and "postgresql:db-admin" not in relation
+            ]
+
+            # Write the new bundle content to a temporary file and deploy it.
+            with tempfile.NamedTemporaryFile() as patched:
+                patched.write(yaml.dump(data).encode("utf_8"))
+                patched.seek(0)
+                await ops_test.juju("deploy", patched.name)
+
+    # Relate application to PostgreSQL.
+    relation = await ops_test.model.relate(f"{application_name}", f"{DATABASE_APP_NAME}:db-admin")
+    await ops_test.model.wait_for_idle(
+        apps=[application_name],
+        status="active",
         timeout=1000,
     )
 
