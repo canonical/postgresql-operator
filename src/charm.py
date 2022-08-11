@@ -14,7 +14,6 @@ from charms.postgresql_k8s.v0.postgresql import PostgreSQL
 from ops.charm import (
     ActionEvent,
     CharmBase,
-    ConfigChangedEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
@@ -56,7 +55,6 @@ class PostgresqlOperatorCharm(CharmBase):
         self._postgresql_service = "postgresql"
 
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
@@ -499,15 +497,6 @@ class PostgresqlOperatorCharm(CharmBase):
             self.legacy_db_admin_relation.update_endpoints()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
-
-    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
-        """Install additional packages through APT."""
-        try:
-            extra_packages = self.config.get("extra-packages")
-            if extra_packages:
-                self._install_apt_packages(event, extra_packages.split(" "))
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            logger.warning("failed to install apts packages")
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
