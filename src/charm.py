@@ -94,10 +94,7 @@ class PostgresqlOperatorCharm(CharmBase):
                     # Force a retry if there is no primary or the member that was
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).
-                    if (
-                        not primary_endpoint
-                        or primary_endpoint.split(":")[0] not in self._units_ips
-                    ):
+                    if not primary_endpoint or primary_endpoint not in self._units_ips:
                         raise ValueError()
         except RetryError:
             return None
