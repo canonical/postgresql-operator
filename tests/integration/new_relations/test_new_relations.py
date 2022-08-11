@@ -297,7 +297,7 @@ async def test_an_application_can_request_multiple_databases(ops_test: OpsTest, 
     assert first_database_connection_string != second_database_connection_string
 
 
-async def test_replication_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
+async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
     # Retrieve the list of current database unit names.
     units_to_remove = [unit.name for unit in ops_test.model.applications[DATABASE_APP_NAME].units]
