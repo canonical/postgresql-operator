@@ -18,6 +18,42 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 
 
+async def build_connection_string(
+    ops_test: OpsTest,
+    application_name: str,
+    relation_name: str,
+    read_only_endpoint: bool = False,
+) -> str:
+    """Returns a PostgreSQL connection string.
+
+    Args:
+        ops_test: The ops test framework instance
+        application_name: The name of the application
+        relation_name: name of the relation to get connection data from
+        read_only_endpoint: whether to choose the read-only endpoint
+            instead of the read/write endpoint
+
+    Returns:
+        a PostgreSQL connection string
+    """
+    unit_name = f"{application_name}/0"
+    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {unit_name}")
+    data = yaml.safe_load(raw_data)
+    # Filter the data based on the relation name.
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
+    if len(relation_data) == 0:
+        raise ValueError(
+            f"no relation data could be grabbed on relation with endpoint {relation_name}"
+        )
+    data = relation_data[0]["application-data"]
+    if read_only_endpoint:
+        return data.get("standbys").split(",")[0]
+    else:
+        return data.get("master")
+
+
 async def check_database_users_existence(
     ops_test: OpsTest,
     users_that_should_exist: List[str],
