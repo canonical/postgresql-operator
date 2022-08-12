@@ -354,7 +354,8 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         # Remove the relation and test that its user was deleted
         # (by checking that the connection string doesn't work anymore).
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:database", f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}"
+            f"{DATABASE_APP_NAME}:database",
+            f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
         with pytest.raises(psycopg2.OperationalError):
