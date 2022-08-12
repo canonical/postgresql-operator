@@ -194,13 +194,12 @@ class TestPostgreSQLProvider(unittest.TestCase):
             peer_relation_data = self.harness.get_relation_data(self.peer_rel_id, self.unit)
             self.assertDictEqual(peer_relation_data, {"departing": "True"})
 
-    @patch.object(EventBase, "defer")
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
-    def test_on_relation_broken(self, _member_started, _primary_endpoint, _defer):
+    def test_on_relation_broken(self, _member_started, _primary_endpoint):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.
             _member_started.side_effect = [False, True, True, True]
@@ -211,12 +210,12 @@ class TestPostgreSQLProvider(unittest.TestCase):
 
             # Break the relation before the database is ready.
             self.harness.remove_relation(self.rel_id)
-            _defer.assert_called_once()
+            postgresql_mock.delete_user.assert_not_called()
 
             # Break the relation before primary endpoint is available.
             self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
             self.harness.remove_relation(self.rel_id)
-            self.assertEqual(_defer.call_count, 2)
+            postgresql_mock.delete_user.assert_not_called()
 
             # Assert that the correct calls were made after a relation broken event.
             self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
