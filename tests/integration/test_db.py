@@ -43,10 +43,6 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         timeout=1000,
         wait_for_exact_units=DATABASE_UNITS,
     )
-    assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == DATABASE_UNITS
-
-    for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-        assert unit.workload_status == "active"
 
     # Extra config option for Mailman3 Core.
     config = {"hostname": "example.org"}
@@ -58,20 +54,15 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         APPLICATION_UNITS,
         config,
     )
-    await check_databases_creation(
-        ops_test,
-        [
-            "mailman3",
-        ],
-    )
+    await check_databases_creation(ops_test, ["mailman3"])
 
     mailman3_core_users = [f"relation-{relation_id}"]
 
     await check_database_users_existence(ops_test, mailman3_core_users, [])
 
     # Assert Mailman3 Core is configured to use PostgreSQL instead of SQLite.
-    unit = ops_test.model.applications[MAILMAN3_CORE_APP_NAME].units[0]
-    action = await unit.run("mailman info")
+    mailman_unit = ops_test.model.applications[MAILMAN3_CORE_APP_NAME].units[0]
+    action = await mailman_unit.run("mailman info")
     result = action.results.get("Stdout", None)
     assert "db url: postgres://" in result
 
@@ -81,8 +72,9 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     credentials = (
         result.split("credentials: ")[1].strip().split(":")
     )  # This outputs a list containing username and password.
-    print(f"unit.public_address: {unit.public_address}")
-    client = Client(f"http://{unit.public_address}:8001/3.1", credentials[0], credentials[1])
+    client = Client(
+        f"http://{mailman_unit.public_address}:8001/3.1", credentials[0], credentials[1]
+    )
 
     # Create a domain and list the domains to check that the new one is there.
     domain = client.create_domain(domain_name)

@@ -69,7 +69,7 @@ async def check_database_users_existence(
     password = await get_postgres_password(ops_test, unit.name)
 
     # Retrieve all users in the database.
-    output = await execute_query_on_unit(
+    users_in_db = await execute_query_on_unit(
         unit_address,
         password,
         "SELECT usename FROM pg_catalog.pg_user;",
@@ -77,11 +77,11 @@ async def check_database_users_existence(
 
     # Assert users that should exist.
     for user in users_that_should_exist:
-        assert user in output
+        assert user in users_in_db
 
     # Assert users that should not exist.
     for user in users_that_should_not_exist:
-        assert user not in output
+        assert user not in users_in_db
 
 
 async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> None:
