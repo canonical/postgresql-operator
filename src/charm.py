@@ -83,7 +83,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
     @property
     def primary_endpoint(self) -> Optional[str]:
-        """Returns the endpoint of the primary instance of None if no primary available."""
+        """Returns the endpoint of the primary instance or None when no primary available."""
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
