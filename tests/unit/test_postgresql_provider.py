@@ -255,7 +255,6 @@ class TestPostgreSQLProvider(unittest.TestCase):
                     PostgreSQLListUsersError,
                 ]
             )
-            # postgresql_mock.delete_user = PropertyMock()
 
             # Call the method and check that no users were deleted.
             self.provider.oversee_users()

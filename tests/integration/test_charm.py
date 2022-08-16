@@ -13,7 +13,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential
 
 from tests.helpers import STORAGE_PATH
 from tests.integration.helpers import (
-    APP_NAME,
+    DATABASE_APP_NAME,
     build_application_name,
     check_cluster_members,
     convert_records_to_dict,
@@ -32,13 +32,6 @@ SERIES = ["focal"]
 UNIT_IDS = [0, 1, 2]
 
 
-@pytest.fixture(scope="module")
-async def charm(ops_test: OpsTest):
-    """Build the charm-under-test."""
-    # Build charm from local source folder.
-    yield await ops_test.build_charm(".")
-
-
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("series", SERIES)
 async def test_deploy(ops_test: OpsTest, charm: str, series: str):
@@ -47,7 +40,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, series: str):
     Assert on the unit status before any relations/configurations take place.
     """
     # Set a composite application name in order to test in more than one series at the same time.
-    application_name = f"{APP_NAME}-{series}"
+    application_name = build_application_name(series)
 
     # Deploy the charm with Patroni resource.
     resources = {"patroni": "patroni.tar.gz"}
@@ -114,7 +107,7 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     connection.close()
 
     # Validate each configuration set by Patroni on PostgreSQL.
-    assert settings["cluster_name"] == f"{APP_NAME}-{series}"
+    assert settings["cluster_name"] == f"{DATABASE_APP_NAME}-{series}"
     assert settings["data_directory"] == f"{STORAGE_PATH}/pgdata"
     assert settings["data_checksums"] == "on"
     assert settings["listen_addresses"] == host
