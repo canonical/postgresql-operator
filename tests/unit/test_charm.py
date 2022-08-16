@@ -213,7 +213,7 @@ class TestCharm(unittest.TestCase):
     def test_on_get_operator_password(self, _get_operator_password):
         mock_event = Mock()
         _get_operator_password.return_value = "test-password"
-        self.charm._on_get_initial_password(mock_event)
+        self.charm._on_get_operator_password(mock_event)
         _get_operator_password.assert_called_once()
         mock_event.set_results.assert_called_once_with({"operator-password": "test-password"})
 

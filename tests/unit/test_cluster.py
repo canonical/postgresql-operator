@@ -110,6 +110,7 @@ class TestCharm(unittest.TestCase):
             peers_ips=self.peers_ips,
             scope=scope,
             self_ip=self.patroni.unit_ip,
+            superuser="operator",
             superuser_password=superuser_password,
             replication_password=replication_password,
             version=self.patroni._get_postgresql_version(),
