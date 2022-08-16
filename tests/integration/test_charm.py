@@ -87,7 +87,7 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
 
     # Retrieving the operator user password using the action.
     action = await ops_test.model.units.get(f"{application_name}/{unit_id}").run_action(
-        "get-initial-password"
+        "get-operator-password"
     )
     action = await action.wait()
     password = action.results["operator-password"]
