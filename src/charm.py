@@ -37,6 +37,7 @@ from cluster import (
     SwitchoverFailedError,
 )
 from constants import PEER
+from relations.db import DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
 
@@ -67,6 +68,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self._storage_path = self.meta.storages["pgdata"].location
 
         self.postgresql_client_relation = PostgreSQLProvider(self)
+        self.legacy_db_relation = DbProvides(self, admin=False)
+        self.legacy_db_admin_relation = DbProvides(self, admin=True)
 
     @property
     def postgresql(self) -> PostgreSQL:
@@ -141,6 +144,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
             if self.primary_endpoint:
                 self.postgresql_client_relation.update_endpoints()
+                self.legacy_db_relation.update_endpoints()
+                self.legacy_db_admin_relation.update_endpoints()
             else:
                 self.unit.status = BlockedStatus("no primary in the cluster")
                 return
@@ -189,6 +194,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+            self.legacy_db_relation.update_endpoints()
+            self.legacy_db_admin_relation.update_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -234,6 +241,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+            self.legacy_db_relation.update_endpoints()
+            self.legacy_db_admin_relation.update_endpoints()
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
@@ -484,6 +493,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
+            self.legacy_db_relation.update_endpoints()
+            self.legacy_db_admin_relation.update_endpoints()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
 
@@ -545,6 +556,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_update_status(self, _) -> None:
         """Update endpoints of the postgres client relation and update users list."""
         self.postgresql_client_relation.update_endpoints()
+        self.legacy_db_relation.update_endpoints()
+        self.legacy_db_admin_relation.update_endpoints()
         self.postgresql_client_relation.oversee_users()
 
     @property
