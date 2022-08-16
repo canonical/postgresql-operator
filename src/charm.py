@@ -85,7 +85,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
     @property
     def primary_endpoint(self) -> Optional[str]:
-        """Returns the endpoint of the primary instance of None if no primary available."""
+        """Returns the endpoint of the primary instance or None when no primary available."""
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
@@ -554,6 +554,8 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.postgresql_client_relation.oversee_users()
+
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
         self.unit.status = ActiveStatus()
@@ -563,10 +565,11 @@ class PostgresqlOperatorCharm(CharmBase):
         event.set_results({"postgres-password": self._get_postgres_password()})
 
     def _on_update_status(self, _) -> None:
-        """Update endpoints of the postgres client relation."""
+        """Update endpoints of the postgres client relation and update users list."""
         self.postgresql_client_relation.update_endpoints()
         self.legacy_db_relation.update_endpoints()
         self.legacy_db_admin_relation.update_endpoints()
+        self.postgresql_client_relation.oversee_users()
 
     @property
     def _has_blocked_status(self) -> bool:
