@@ -28,8 +28,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from requests.exceptions import ConnectionError
-from tenacity import RetryError, retry, stop_after_delay, wait_fixed
+from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
 
 from cluster import (
     NotReadyError,
@@ -80,11 +79,22 @@ class PostgresqlOperatorCharm(CharmBase):
         )
 
     @property
-    def primary_endpoint(self) -> str:
-        """Returns the endpoint of the primary instance."""
-        primary = self._patroni.get_primary(unit_name_pattern=True)
-        primary_unit = self.framework.model.get_unit(primary)
-        return self._get_unit_ip(primary_unit)
+    def primary_endpoint(self) -> Optional[str]:
+        """Returns the endpoint of the primary instance or None when no primary available."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    primary = self._patroni.get_primary()
+                    primary_endpoint = self._patroni.get_member_ip(primary)
+                    # Force a retry if there is no primary or the member that was
+                    # returned is not in the list of the current cluster members
+                    # (like when the cluster was not updated yet after a failed switchover).
+                    if not primary_endpoint or primary_endpoint not in self._units_ips:
+                        raise ValueError()
+        except RetryError:
+            return None
+        else:
+            return primary_endpoint
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -118,21 +128,22 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Remove cluster members one at a time.
-        try:
-            members_ips = set(self.members_ips)
-            for member_ip in members_ips - set(self._units_ips):
-                # Check that all members are ready before removing unit from the cluster.
-                if not self._patroni.are_all_members_ready():
-                    raise NotReadyError("not all members are ready")
+        for member_ip in self._get_ips_to_remove():
+            # Check that all members are ready before removing unit from the cluster.
+            if not self._patroni.are_all_members_ready():
+                logger.info("Deferring reconfigure: another member doing sync right now")
+                event.defer()
+                return
 
-                # Update the list of the current members.
-                self._remove_from_members_ips(member_ip)
-                self._patroni.update_cluster_members()
+            # Update the list of the current members.
+            self._remove_from_members_ips(member_ip)
+            self._patroni.update_cluster_members()
 
+            if self.primary_endpoint:
                 self.postgresql_client_relation.update_endpoints()
-        except NotReadyError:
-            logger.info("Deferring reconfigure: another member doing sync right now")
-            event.defer()
+            else:
+                self.unit.status = BlockedStatus("no primary in the cluster")
+                return
 
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
@@ -171,7 +182,12 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.warning(
                 f"switchover failed with reason: {e} - an automatic failover will be triggered"
             )
-        else:
+            return
+
+        # Only update the connection endpoints if there is a primary.
+        # A cluster can have all members as replicas for some time after
+        # a failed switchover, so wait until the primary is elected.
+        if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
@@ -208,8 +224,19 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        self.postgresql_client_relation.update_endpoints()
-        self.unit.status = ActiveStatus()
+        # If the unit is not the leader, just set an ActiveStatus.
+        if not self.unit.is_leader():
+            self.unit.status = ActiveStatus()
+            return
+
+        # Only update the connection endpoints if there is a primary.
+        # A cluster can have all members as replicas for some time after
+        # a failed switchover, so wait until the primary is elected.
+        if self.primary_endpoint:
+            self.postgresql_client_relation.update_endpoints()
+            self.unit.status = ActiveStatus()
+        else:
+            self.unit.status = BlockedStatus("no primary in the cluster")
 
     def _add_members(self, event):
         """Add new cluster members.
@@ -447,10 +474,18 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self._patroni.update_cluster_members()
 
-        try:
+        # Don't update connection endpoints in the first time this event run for
+        # this application because there are no primary and replicas yet.
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            return
+
+        # Only update the connection endpoints if there is a primary.
+        # A cluster can have all members as replicas for some time after
+        # a failed switchover, so wait until the primary is elected.
+        if self.primary_endpoint:
             self.postgresql_client_relation.update_endpoints()
-        except (ConnectionError, RetryError):
-            pass  # This error can happen in the first leader election, as Patroni is not running yet.
+        else:
+            self.unit.status = BlockedStatus("no primary in the cluster")
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
@@ -497,6 +532,8 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.postgresql_client_relation.oversee_users()
+
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
         self.unit.status = ActiveStatus()
@@ -506,8 +543,9 @@ class PostgresqlOperatorCharm(CharmBase):
         event.set_results({"postgres-password": self._get_postgres_password()})
 
     def _on_update_status(self, _) -> None:
-        """Update endpoints of the postgres client relation."""
+        """Update endpoints of the postgres client relation and update users list."""
         self.postgresql_client_relation.update_endpoints()
+        self.postgresql_client_relation.oversee_users()
 
     @property
     def _has_blocked_status(self) -> bool:
