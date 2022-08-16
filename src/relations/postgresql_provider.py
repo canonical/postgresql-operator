@@ -134,19 +134,6 @@ class PostgreSQLProvider(Object):
         if "departing" in self.charm._peers.data[self.charm.unit]:
             return
 
-        # Run this event only in the leader unit and
-        # if this unit isn't being removed while the
-        # others from this application are still alive.
-        # The second check is needed because of
-        # https://bugs.launchpad.net/juju/+bug/1979811.
-        # Neither peer relation data nor stored state
-        # are good solutions, just a temporary solution.
-        if (
-            not self.charm.unit.is_leader()
-            or "departing" in self.charm._peers.data[self.charm.unit]
-        ):
-            return
-
         # Delete the user.
         user = f"relation-{event.relation.id}"
         try:
