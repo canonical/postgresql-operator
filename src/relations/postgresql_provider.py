@@ -166,9 +166,8 @@ class PostgreSQLProvider(Object):
         ]
         relation_users = set()
         for relation in relations:
-            username = relation.data[self.charm.app].get("username")
-            if username is not None:
-                relation_users.add(username)
+            username = f"relation-{relation.id}"
+            relation_users.add(username)
 
         # Delete that users that exist in the database but not in the active relations.
         for user in database_users - relation_users:
