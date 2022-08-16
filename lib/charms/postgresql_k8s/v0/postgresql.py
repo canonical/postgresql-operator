@@ -155,7 +155,7 @@ class PostgreSQL:
                 with self._connect_to_database(
                     database
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute(sql.SQL("REASSIGN OWNED BY {} TO postgres;").format(sql.Identifier(user)))
+                    cursor.execute(sql.SQL("REASSIGN OWNED BY {} TO operator;").format(sql.Identifier(user)))
                     cursor.execute(sql.SQL("DROP OWNED BY {};").format(sql.Identifier(user)))
 
             # Delete the user.

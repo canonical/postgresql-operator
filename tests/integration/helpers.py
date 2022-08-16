@@ -57,13 +57,13 @@ def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
 
     Args:
         host: the IP of the postgres host
-        password: postgres password
+        password: operator user password
 
     Returns:
-        psycopg2 connection object linked to postgres db, under "postgres" user.
+        psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='postgres' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
@@ -114,20 +114,20 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
 
 
-async def get_postgres_password(ops_test: OpsTest, unit_name: str) -> str:
-    """Retrieve the postgres user password using the action.
+async def get_operator_password(ops_test: OpsTest, unit_name: str) -> str:
+    """Retrieve the operator user password using the action.
 
     Args:
         ops_test: ops_test instance.
         unit_name: the name of the unit.
 
     Returns:
-        the postgres user password.
+        the operator user password.
     """
     unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-initial-password")
+    action = await unit.run_action("get-operator-password")
     result = await action.wait()
-    return result.results["postgres-password"]
+    return result.results["operator-password"]
 
 
 async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
