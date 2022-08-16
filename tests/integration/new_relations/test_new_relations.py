@@ -81,7 +81,7 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
         # Try to get the connection string of the database using the read-only endpoint.
-        # It should not be available anymore.
+        # It should not be available.
         assert await check_relation_data_existence(
             ops_test,
             APPLICATION_APP_NAME,
@@ -295,3 +295,68 @@ async def test_an_application_can_request_multiple_databases(ops_test: OpsTest, 
 
     # Assert the two application have different relation (connection) data.
     assert first_database_connection_string != second_database_connection_string
+
+
+async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
+    """Test that relation data, like connection data, is updated correctly when scaling."""
+    # Retrieve the list of current database unit names.
+    units_to_remove = [unit.name for unit in ops_test.model.applications[DATABASE_APP_NAME].units]
+
+    async with ops_test.fast_forward():
+        # Add two more units.
+        await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=4
+        )
+
+        # Remove the original units.
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*units_to_remove)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=3000, wait_for_exact_units=2
+        )
+
+        # Get the updated connection data and assert it can be used
+        # to write and read some data properly.
+        primary_connection_string = await build_connection_string(
+            ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME
+        )
+        replica_connection_string = await build_connection_string(
+            ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME, read_only_endpoint=True
+        )
+
+        # Connect to the database using the primary connection string.
+        with psycopg2.connect(primary_connection_string) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                # Check that it's possible to write and read data from the database that
+                # was created for the application.
+                cursor.execute("DROP TABLE IF EXISTS test;")
+                cursor.execute("CREATE TABLE test(data TEXT);")
+                cursor.execute("INSERT INTO test(data) VALUES('some data');")
+                cursor.execute("SELECT data FROM test;")
+                data = cursor.fetchone()
+                assert data[0] == "some data"
+        connection.close()
+
+        # Connect to the database using the replica endpoint.
+        with psycopg2.connect(replica_connection_string) as connection:
+            with connection.cursor() as cursor:
+                # Read some data.
+                cursor.execute("SELECT data FROM test;")
+                data = cursor.fetchone()
+                assert data[0] == "some data"
+
+                # Try to alter some data in a read-only transaction.
+                with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
+                    cursor.execute("DROP TABLE test;")
+        connection.close()
+
+        # Remove the relation and test that its user was deleted
+        # (by checking that the connection string doesn't work anymore).
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}:database",
+            f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+        with pytest.raises(psycopg2.OperationalError):
+            psycopg2.connect(primary_connection_string)
