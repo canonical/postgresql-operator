@@ -172,16 +172,13 @@ class TestDbProvides(unittest.TestCase):
             self.request_database()
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
-    @patch.object(EventBase, "defer")
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.DbProvides._on_relation_departed")
-    def test_on_relation_broken(
-        self, _on_relation_departed, _member_started, _primary_endpoint, _defer
-    ):
+    def test_on_relation_broken(self, _on_relation_departed, _member_started, _primary_endpoint):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.
             _member_started.side_effect = [False, True, True, True]
@@ -191,14 +188,13 @@ class TestDbProvides(unittest.TestCase):
             )
 
             # Break the relation before the database is ready.
-            _defer.assert_not_called()
             self.harness.remove_relation(self.rel_id)
-            _defer.assert_called_once()
+            postgresql_mock.delete_user.assert_not_called()
 
             # Break the relation before primary endpoint is available.
             self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
             self.harness.remove_relation(self.rel_id)
-            self.assertEqual(_defer.call_count, 2)
+            postgresql_mock.delete_user.assert_not_called()
 
             # Assert that the correct calls were made after a relation broken event.
             self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
