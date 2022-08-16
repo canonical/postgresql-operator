@@ -15,12 +15,13 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
+    PostgreSQLListUsersError,
 )
 from ops.charm import CharmBase, RelationBrokenEvent, RelationDepartedEvent
 from ops.framework import Object
 from ops.model import BlockedStatus
 
-from constants import DATABASE_PORT
+from constants import ALL_CLIENT_RELATIONS, DATABASE_PORT
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -142,6 +143,40 @@ class PostgreSQLProvider(Object):
             self.charm.unit.status = BlockedStatus(
                 f"Failed to delete user during {self.relation_name} relation broken event"
             )
+
+    def oversee_users(self) -> None:
+        """Remove users from database if their relations were broken."""
+        if not self.charm.unit.is_leader():
+            return
+
+        # Retrieve database users.
+        try:
+            database_users = {
+                user for user in self.charm.postgresql.list_users() if user.startswith("relation-")
+            }
+        except PostgreSQLListUsersError:
+            return
+
+        # Retrieve the users from the active relations.
+        relations = [
+            relation
+            for relation_name, relations_list in self.model.relations.items()
+            for relation in relations_list
+            if relation_name in ALL_CLIENT_RELATIONS
+        ]
+        relation_users = set()
+        for relation in relations:
+            username = relation.data[self.charm.app].get("username")
+            if username is not None:
+                relation_users.add(username)
+
+        # Delete that users that exist in the database but not in the active relations.
+        for user in database_users - relation_users:
+            try:
+                logger.info("Remove relation user: %s", user)
+                self.charm.postgresql.delete_user(user)
+            except PostgreSQLDeleteUserError:
+                logger.error(f"Failed to delete user {user}")
 
     def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""
