@@ -149,6 +149,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgreSQLProvider.oversee_users")
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.Patroni.update_cluster_members")
     @patch("charm.Patroni.member_started")
@@ -163,6 +164,7 @@ class TestCharm(unittest.TestCase):
         _member_started,
         _,
         __,
+        _oversee_users,
     ):
         # Test before the passwords are generated.
         _get_postgres_password.return_value = None
@@ -182,6 +184,7 @@ class TestCharm(unittest.TestCase):
         self.harness.set_leader()
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_called_once()
+        _oversee_users.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
         # Set an initial waiting status (like after the install hook was triggered).
@@ -189,6 +192,7 @@ class TestCharm(unittest.TestCase):
 
         # Then test the event of a correct cluster bootstrapping.
         self.charm.on.start.emit()
+        _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch("charm.Patroni.bootstrap_cluster")
