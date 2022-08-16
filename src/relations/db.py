@@ -188,25 +188,21 @@ class DbProvides(Object):
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the user created for this relation."""
         # Check for some conditions before trying to access the PostgreSQL instance.
-        # Run this event only in the leader unit and
-        # if this unit isn't being removed while the
-        # others from this application are still alive.
-        # The second check is needed because of
-        # https://bugs.launchpad.net/juju/+bug/1979811.
-        # Neither peer relation data nor stored state
-        # are good solutions, just a temporary solution.
         if (
             not self.charm.unit.is_leader()
-            or "departing" in self.charm._peers.data[self.charm.unit]
-        ):
-            return
-
-        if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            or "cluster_initialised" not in self.charm._peers.data[self.charm.app]
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
-            event.defer()
+            return
+
+        # Run this event only if this unit isn't being
+        # removed while the others from this application
+        # are still alive. This check is needed because of
+        # https://bugs.launchpad.net/juju/+bug/1979811.
+        # Neither peer relation data nor stored state
+        # are good solutions, just a temporary solution.
+        if "departing" in self.charm._peers.data[self.charm.unit]:
             return
 
         # Delete the user.
