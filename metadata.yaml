@@ -13,8 +13,16 @@ series:
   - bionic
 
 peers:
-  postgresql-replicas:
-    interface: postgresql-replicas
+  database-peers:
+    interface: postgresql_peers
+
+provides:
+  database:
+    interface: postgresql_client
+  db:
+    interface: pgsql
+  db-admin:
+    interface: pgsql
 
 resources:
   patroni:
