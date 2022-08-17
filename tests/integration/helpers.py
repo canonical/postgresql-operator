@@ -290,7 +290,7 @@ async def execute_query_on_unit(
         A list of rows that were potentially returned from the query.
     """
     with psycopg2.connect(
-        f"dbname='{database}' user='postgres' host='{unit_address}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='operator' host='{unit_address}' password='{password}' connect_timeout=10"
     ) as connection, connection.cursor() as cursor:
         cursor.execute(query)
         output = list(itertools.chain(*cursor.fetchall()))
