@@ -68,7 +68,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_postgres_password(ops_test, unit.name)
+    password = await get_operator_password(ops_test, unit.name)
 
     # Retrieve all users in the database.
     users_in_db = await execute_query_on_unit(
@@ -94,7 +94,7 @@ async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> N
         databases: List of database names that should have been created
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_postgres_password(ops_test, unit.name)
+    password = await get_operator_password(ops_test, unit.name)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
