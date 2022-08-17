@@ -1,8 +1,8 @@
-# PostgreSQL Operator
+# Charmed PostgreSQL Operator
 
 ## Description
 
-The PostgreSQL Operator deploys and operates the [PostgreSQL](https://www.postgresql.org/about/) database on machine clusters.
+The Charmed PostgreSQL Operator deploys and operates the [PostgreSQL](https://www.postgresql.org/about/) database on machine clusters.
 
 This operator provides a Postgres database with replication enabled (one master instance and one or more hot standby replicas). The Operator in this repository is a Python script which wraps Postgres versions shipped by the Ubuntu focal series, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
 
@@ -14,42 +14,71 @@ Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-cont
 juju add-model postgresql
 ```
 
-To deploy this charm using Juju 2.9.0 or later, run:
+### Basic Usage
+To deploy a single unit of PostgreSQL using its default configuration.
 
 ```shell
-charmcraft pack
-juju deploy ./postgresql_ubuntu-20.04-amd64.charm
+juju deploy postgresql --channel edge
 ```
 
-Note: the above model must exist outside of a k8s environment (you could bootstrap an lxd environment).
-
-To confirm the deployment, you can run:
+It is customary to use PostgreSQL with replication. Hence usually more than one unit (preferably an odd number to prohibit a "split-brain" scenario) is deployed. To deploy PostgreSQL with multiple replicas, specify the number of desired units with the `-n` option.
 
 ```shell
-juju status
+juju deploy postgresql --channel edge -n <number_of_units>
 ```
 
-Once PostgreSQL starts up, it will be running on the default port (5432).
-
-If required, you can remove the deployment completely by running:
-
+To retrieve primary replica one can use the action `get-primary` on any of the units running PostgreSQL.
 ```shell
-juju destroy-model -y postgresql --destroy-storage
+juju run-action postgresql/<unit_number> get-primary --wait
 ```
 
-Note: the `--destroy-storage` will delete any data persisted by PostgreSQL.
+### Replication
+#### Adding Replicas
+To add more replicas one can use the `juju add-unit` functionality i.e.
+```shell
+juju add-unit postgresql -n <number_of_units_to_add>
+```
+The implementation of `add-unit` allows the operator to add more than one unit, but functions internally by adding one replica at a time, avoiding multiple replicas syncing from the primary at the same time.
+
+#### Removing Replicas
+Similarly to scale down the number of replicas the `juju remove-unit` functionality may be used i.e.
+```shell
+juju remove-unit postgresql <name_of_unit1> <name_of_unit2>
+```
+The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
+
+
 
 ## Relations
 
-This charm implements the [provides data platform library](https://charmhub.io/data-platform-libs/libraries/database_provides), with the `mysql_client` interface.
-To relate to it, use the [requires data-platform library](https://charmhub.io/data-platform-libs/libraries/database_requires).
+Supported [relations](https://juju.is/docs/olm/relations):
 
-Adding a relation is accomplished with:
+#### New `postgresql_client` interface:
+
+Relations to new applications are supported via the `postgresql_client` interface. To create a relation: 
 
 ```shell
-juju relate mycharm:database postgresql:database
+juju relate postgresql application
 ```
+
+To remove a relation:
+```shell
+juju remove-relation postgresql application
+```
+
+#### Legacy `pgsql` interface:
+We have also added support for the two database legacy relations from the [original version](https://launchpad.net/postgresql-charm) of the charm via the `pgsql` interface. Please note that these relations will be deprecated.
+ ```shell
+juju relate postgresql:db mailman3-core
+juju relate postgresql:db-admin landscape-server
+```
+
+## Security
+Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not file GitHub issues about security issues.
 
 ## Contributing
 
 Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/postgresql-operator/blob/main/CONTRIBUTING.md) for developer guidance.
+
+## License
+The Charmed PostgreSQL Operator is free software, distributed under the Apache Software License, version 2.0. See [LICENSE](https://github.com/canonical/postgresql-operator/blob/main/LICENSE) for more information.
