@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import Mock, PropertyMock, call, mock_open, patch
 
 from charms.operator_libs_linux.v0 import apt
+from charms.postgresql_k8s.v0.postgresql import PostgreSQLCreateUserError
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 
@@ -150,6 +151,7 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgreSQLProvider.oversee_users")
+    @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.Patroni.update_cluster_members")
     @patch("charm.Patroni.member_started")
@@ -164,6 +166,7 @@ class TestCharm(unittest.TestCase):
         _member_started,
         _,
         __,
+        _postgresql,
         _oversee_users,
     ):
         # Test before the passwords are generated.
@@ -176,8 +179,9 @@ class TestCharm(unittest.TestCase):
         _get_operator_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
 
-        # Mock cluster start success values.
-        _bootstrap_cluster.side_effect = [False, True]
+        # Mock cluster start and postgres user creation success values.
+        _bootstrap_cluster.side_effect = [False, True, True]
+        _postgresql.create_user.side_effect = [PostgreSQLCreateUserError, None]
 
         # Test for a failed cluster bootstrapping.
         # TODO: test replicas start (DPE-494).
@@ -190,8 +194,20 @@ class TestCharm(unittest.TestCase):
         # Set an initial waiting status (like after the install hook was triggered).
         self.harness.model.unit.status = WaitingStatus("fake message")
 
+        # Test the event of an error happening when trying to create the default postgres user.
+        self.charm.on.start.emit()
+        _postgresql.create_user.assert_called_once()
+        _oversee_users.assert_not_called()
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+
+        # Set an initial waiting status again (like after the install hook was triggered).
+        self.harness.model.unit.status = WaitingStatus("fake message")
+
         # Then test the event of a correct cluster bootstrapping.
         self.charm.on.start.emit()
+        self.assertEqual(
+            _postgresql.create_user.call_count, 2
+        )  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 

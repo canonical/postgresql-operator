@@ -10,7 +10,7 @@ import subprocess
 from typing import List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
-from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+from charms.postgresql_k8s.v0.postgresql import PostgreSQL, PostgreSQLCreateUserError
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -553,6 +553,15 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.member_started:
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
+            return
+
+        # Create the default postgres database user that is needed for some
+        # applications (not charms) like Landscape Server.
+        try:
+            self.postgresql.create_user("postgres", new_password(), admin=True)
+        except PostgreSQLCreateUserError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to create postgres user")
             return
 
         self.postgresql_client_relation.oversee_users()
