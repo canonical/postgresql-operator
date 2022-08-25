@@ -9,4 +9,6 @@ LEGACY_DB = "db"
 LEGACY_DB_ADMIN = "db-admin"
 PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE, LEGACY_DB, LEGACY_DB_ADMIN]
+REPLICATION_PASSWORD_KEY = "replication-password"
 USER = "operator"
+USER_PASSWORD_KEY = "operator-password"
