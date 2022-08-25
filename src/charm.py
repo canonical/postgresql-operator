@@ -63,9 +63,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(
-            self.on.get_operator_password_action, self._on_get_operator_password
-        )
+        self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self._cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -81,7 +79,7 @@ class PostgresqlOperatorCharm(CharmBase):
         return PostgreSQL(
             host=self.primary_endpoint,
             user=USER,
-            password=self._get_operator_password(),
+            password=self._get_password(),
             database="postgres",
         )
 
@@ -337,7 +335,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._member_name,
             self.app.planned_units(),
             self._peer_members_ips,
-            self._get_operator_password(),
+            self._get_password(),
             self._replication_password,
         )
 
@@ -524,7 +522,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if self._has_blocked_status:
             return
 
-        postgres_password = self._get_operator_password()
+        postgres_password = self._get_password()
         # If the leader was not elected (and the needed passwords were not generated yet),
         # the cluster cannot be bootstrapped yet.
         if not postgres_password or not self._replication_password:
@@ -570,9 +568,9 @@ class PostgresqlOperatorCharm(CharmBase):
         self._peers.data[self.app]["cluster_initialised"] = "True"
         self.unit.status = ActiveStatus()
 
-    def _on_get_operator_password(self, event: ActionEvent) -> None:
+    def _on_get_password(self, event: ActionEvent) -> None:
         """Returns the password for the operator user as an action response."""
-        event.set_results({"operator-password": self._get_operator_password()})
+        event.set_results({"operator-password": self._get_password()})
 
     def _on_update_status(self, _) -> None:
         """Update endpoints of the postgres client relation and update users list."""
@@ -586,7 +584,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """Returns whether the unit is in a blocked state."""
         return isinstance(self.unit.status, BlockedStatus)
 
-    def _get_operator_password(self) -> str:
+    def _get_password(self) -> str:
         """Get operator user password.
 
         Returns:

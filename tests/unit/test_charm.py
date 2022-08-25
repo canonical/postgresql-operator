@@ -157,10 +157,10 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Patroni.member_started")
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
-    @patch("charm.PostgresqlOperatorCharm._get_operator_password")
+    @patch("charm.PostgresqlOperatorCharm._get_password")
     def test_on_start(
         self,
-        _get_operator_password,
+        _get_password,
         _replication_password,
         _bootstrap_cluster,
         _member_started,
@@ -170,13 +170,13 @@ class TestCharm(unittest.TestCase):
         _oversee_users,
     ):
         # Test before the passwords are generated.
-        _get_operator_password.return_value = None
+        _get_password.return_value = None
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
         # Mock the passwords.
-        _get_operator_password.return_value = "fake-operator-password"
+        _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
 
         # Mock cluster start and postgres user creation success values.
@@ -213,9 +213,9 @@ class TestCharm(unittest.TestCase):
 
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
-    @patch("charm.PostgresqlOperatorCharm._get_operator_password")
+    @patch("charm.PostgresqlOperatorCharm._get_password")
     def test_on_start_after_blocked_state(
-        self, _get_operator_password, _replication_password, _bootstrap_cluster
+        self, _get_password, _replication_password, _bootstrap_cluster
     ):
         # Set an initial blocked status (like after the install hook was triggered).
         initial_status = BlockedStatus("fake message")
@@ -223,30 +223,30 @@ class TestCharm(unittest.TestCase):
 
         # Test for a failed cluster bootstrapping.
         self.charm.on.start.emit()
-        _get_operator_password.assert_not_called()
+        _get_password.assert_not_called()
         _replication_password.assert_not_called()
         _bootstrap_cluster.assert_not_called()
         # Assert the status didn't change.
         self.assertEqual(self.harness.model.unit.status, initial_status)
 
-    @patch("charm.PostgresqlOperatorCharm._get_operator_password")
-    def test_on_get_operator_password(self, _get_operator_password):
+    @patch("charm.PostgresqlOperatorCharm._get_password")
+    def test_on_get_password(self, _get_password):
         mock_event = Mock()
-        _get_operator_password.return_value = "test-password"
-        self.charm._on_get_operator_password(mock_event)
-        _get_operator_password.assert_called_once()
+        _get_password.return_value = "test-password"
+        self.charm._on_get_password(mock_event)
+        _get_password.assert_called_once()
         mock_event.set_results.assert_called_once_with({"operator-password": "test-password"})
 
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.Patroni.update_cluster_members")
     @patch_network_get(private_address="1.1.1.1")
-    def test_get_operator_password(self, _, __):
+    def test_get_password(self, _, __):
         # Test for a None password.
-        self.assertIsNone(self.charm._get_operator_password())
+        self.assertIsNone(self.charm._get_password())
 
         # Then test for a non empty password after leader election and peer data set.
         self.harness.set_leader()
-        password = self.charm._get_operator_password()
+        password = self.charm._get_password()
         self.assertIsNotNone(password)
         self.assertNotEqual(password, "")
 

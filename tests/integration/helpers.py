@@ -68,7 +68,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_operator_password(ops_test, unit.name)
+    password = await get_password(ops_test, unit.name)
 
     # Retrieve all users in the database.
     users_in_db = await execute_query_on_unit(
@@ -94,7 +94,7 @@ async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> N
         databases: List of database names that should have been created
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_operator_password(ops_test, unit.name)
+    password = await get_password(ops_test, unit.name)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
@@ -344,7 +344,7 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
 
 
-async def get_operator_password(ops_test: OpsTest, unit_name: str) -> str:
+async def get_password(ops_test: OpsTest, unit_name: str) -> str:
     """Retrieve the operator user password using the action.
 
     Args:
@@ -355,7 +355,7 @@ async def get_operator_password(ops_test: OpsTest, unit_name: str) -> str:
         the operator user password.
     """
     unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-operator-password")
+    action = await unit.run_action("get-password")
     result = await action.wait()
     return result.results["operator-password"]
 
