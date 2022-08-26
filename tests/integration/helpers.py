@@ -381,14 +381,15 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
     Args:
         ops_test: ops_test instance.
         unit_name: the name of the unit.
+        username: the user to get the password.
 
     Returns:
         the user password.
     """
     unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-password")
+    action = await unit.run_action("get-password", **{"username": username})
     result = await action.wait()
-    return result.results["operator-password"]
+    return result.results[f"{username}-password"]
 
 
 async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
@@ -452,7 +453,16 @@ def restart_patroni(ops_test: OpsTest, unit_name: str) -> None:
 
 
 async def set_password(ops_test: OpsTest, unit_name: str, username: str = "operator"):
-    """Retrieve a user password using the action."""
+    """Retrieve a user password using the action.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: the name of the unit.
+        username: the user to set the password.
+
+    Returns:
+        the results from the action.
+    """
     unit = ops_test.model.units.get(unit_name)
     action = await unit.run_action("set-password", **{"username": username})
     result = await action.wait()
