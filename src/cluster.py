@@ -98,7 +98,7 @@ class Patroni:
             (defaults to False, which configures the unit as a leader)
         """
         self._change_owner(self.storage_path)
-        self._render_patroni_yml_file(replica)
+        self.render_patroni_yml_file(replica)
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
@@ -248,7 +248,7 @@ class Patroni:
         rendered = template.render(conf_path=self.storage_path)
         self._render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def _render_patroni_yml_file(self, replica: bool = False) -> None:
+    def render_patroni_yml_file(self, replica: bool = False) -> None:
         """Render the Patroni configuration file."""
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
@@ -320,10 +320,10 @@ class Patroni:
     def update_cluster_members(self) -> None:
         """Update the list of members of the cluster."""
         # Update the members in the Patroni configuration.
-        self._render_patroni_yml_file()
+        self.render_patroni_yml_file()
 
         if service_running(PATRONI_SERVICE):
-            self._reload_patroni_configuration()
+            self.reload_patroni_configuration()
 
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
@@ -353,6 +353,6 @@ class Patroni:
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def _reload_patroni_configuration(self):
+    def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         requests.post(f"http://{self.unit_ip}:8008/reload")

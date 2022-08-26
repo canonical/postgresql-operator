@@ -123,7 +123,7 @@ class TestCharm(unittest.TestCase):
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):
             # Call the method.
-            self.patroni._render_patroni_yml_file()
+            self.patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
