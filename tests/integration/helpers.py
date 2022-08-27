@@ -4,6 +4,7 @@
 import itertools
 import tempfile
 import zipfile
+from datetime import datetime
 from pathlib import Path
 from typing import List
 
@@ -12,7 +13,13 @@ import requests
 import yaml
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, wait_exponential
+from tenacity import (
+    Retrying,
+    retry,
+    retry_if_result,
+    stop_after_attempt,
+    wait_exponential,
+)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
@@ -68,7 +75,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_postgres_password(ops_test, unit.name)
+    password = await get_password(ops_test, unit.name)
 
     # Retrieve all users in the database.
     users_in_db = await execute_query_on_unit(
@@ -94,7 +101,7 @@ async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> N
         databases: List of database names that should have been created
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_postgres_password(ops_test, unit.name)
+    password = await get_password(ops_test, unit.name)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
@@ -116,6 +123,30 @@ async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> N
                 database=database,
             )
             assert len(output)
+
+
+@retry(
+    retry=retry_if_result(lambda x: not x),
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+)
+def check_patroni(ops_test: OpsTest, unit_name: str, restart_time: float) -> bool:
+    """Check if Patroni is running correctly on a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit
+        restart_time: Point in time before the unit was restarted.
+
+    Returns:
+        whether Patroni is running correctly.
+    """
+    unit_ip = get_unit_address(ops_test, unit_name)
+    health_info = requests.get(f"http://{unit_ip}:8008/health").json()
+    postmaster_start_time = datetime.strptime(
+        health_info["postmaster_start_time"], "%Y-%m-%d %H:%M:%S.%f%z"
+    ).timestamp()
+    return postmaster_start_time > restart_time and health_info["state"] == "running"
 
 
 def build_application_name(series: str) -> str:
@@ -160,13 +191,13 @@ def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
 
     Args:
         host: the IP of the postgres host
-        password: postgres password
+        password: operator user password
 
     Returns:
-        psycopg2 connection object linked to postgres db, under "postgres" user.
+        psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='postgres' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
@@ -290,7 +321,7 @@ async def execute_query_on_unit(
         A list of rows that were potentially returned from the query.
     """
     with psycopg2.connect(
-        f"dbname='{database}' user='postgres' host='{unit_address}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='operator' host='{unit_address}' password='{password}' connect_timeout=10"
     ) as connection, connection.cursor() as cursor:
         cursor.execute(query)
         output = list(itertools.chain(*cursor.fetchall()))
@@ -344,20 +375,21 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
 
 
-async def get_postgres_password(ops_test: OpsTest, unit_name: str) -> str:
-    """Retrieve the postgres user password using the action.
+async def get_password(ops_test: OpsTest, unit_name: str, username: str = "operator") -> str:
+    """Retrieve a user password using the action.
 
     Args:
         ops_test: ops_test instance.
         unit_name: the name of the unit.
+        username: the user to get the password.
 
     Returns:
-        the postgres user password.
+        the user password.
     """
     unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-initial-password")
+    action = await unit.run_action("get-password", **{"username": username})
     result = await action.wait()
-    return result.results["postgres-password"]
+    return result.results[f"{username}-password"]
 
 
 async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
@@ -407,6 +439,34 @@ async def scale_application(ops_test: OpsTest, application_name: str, count: int
     await ops_test.model.wait_for_idle(
         apps=[application_name], status="active", timeout=1000, wait_for_exact_units=count
     )
+
+
+def restart_patroni(ops_test: OpsTest, unit_name: str) -> None:
+    """Restart Patroni on a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit
+    """
+    unit_ip = get_unit_address(ops_test, unit_name)
+    requests.post(f"http://{unit_ip}:8008/restart")
+
+
+async def set_password(ops_test: OpsTest, unit_name: str, username: str = "operator"):
+    """Retrieve a user password using the action.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: the name of the unit.
+        username: the user to set the password.
+
+    Returns:
+        the results from the action.
+    """
+    unit = ops_test.model.units.get(unit_name)
+    action = await unit.run_action("set-password", **{"username": username})
+    result = await action.wait()
+    return result.results
 
 
 def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -> None:

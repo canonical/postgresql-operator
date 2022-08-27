@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 1
+LIBPATCH = 2
 
 
 logger = logging.getLogger(__name__)
@@ -56,6 +56,10 @@ class PostgreSQLGetPostgreSQLVersionError(Exception):
 
 class PostgreSQLListUsersError(Exception):
     """Exception raised when retrieving PostgreSQL users list fails."""
+
+
+class PostgreSQLUpdateUserPasswordError(Exception):
+    """Exception raised when updating a user password fails."""
 
 
 class PostgreSQL:
@@ -155,7 +159,9 @@ class PostgreSQL:
                 with self._connect_to_database(
                     database
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute(sql.SQL("REASSIGN OWNED BY {} TO postgres;").format(sql.Identifier(user)))
+                    cursor.execute(sql.SQL("REASSIGN OWNED BY {} TO {};").format(
+                        sql.Identifier(user), sql.Identifier(self.user)
+                    ))
                     cursor.execute(sql.SQL("DROP OWNED BY {};").format(sql.Identifier(user)))
 
             # Delete the user.
@@ -194,3 +200,25 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to list PostgreSQL database users: {e}")
             raise PostgreSQLListUsersError()
+
+    def update_user_password(self, username: str, password: str) -> None:
+        """Update a user password.
+        Args:
+            username: the user to update the password.
+            password: the new password for the user.
+        Raises:
+            PostgreSQLUpdateUserPasswordError if the password couldn't be changed.
+        """
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("ALTER USER {} WITH ENCRYPTED PASSWORD '" + password + "';").format(
+                        sql.Identifier(username)
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to update user password: {e}")
+            raise PostgreSQLUpdateUserPasswordError()
+        finally:
+            if connection is not None:
+                connection.close()
