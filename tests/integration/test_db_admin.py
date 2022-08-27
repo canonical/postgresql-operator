@@ -5,6 +5,7 @@ import ast
 import json
 import logging
 
+import pytest as pytest
 from landscape_api.base import run_query
 from pytest_operator.plugin import OpsTest
 
@@ -24,6 +25,7 @@ RABBITMQ_APP_NAME = "rabbitmq-server"
 DATABASE_UNITS = 3
 
 
+@pytest.mark.db_admin_relation
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     config = {

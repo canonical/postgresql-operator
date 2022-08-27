@@ -32,7 +32,9 @@ SERIES = ["focal"]
 UNIT_IDS = [0, 1, 2]
 
 
+@pytest.mark.skip_if_deployed
 @pytest.mark.abort_on_fail
+@pytest.mark.charm
 @pytest.mark.parametrize("series", SERIES)
 async def test_deploy(ops_test: OpsTest, charm: str, series: str):
     """Deploy the charm-under-test.
@@ -58,6 +60,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, series: str):
 
 
 @pytest.mark.abort_on_fail
+@pytest.mark.charm
 @pytest.mark.parametrize("series", SERIES)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_database_is_up(ops_test: OpsTest, series: str, unit_id: int):
@@ -71,6 +74,7 @@ async def test_database_is_up(ops_test: OpsTest, series: str, unit_id: int):
     assert result.status_code == 200
 
 
+@pytest.mark.charm
 @pytest.mark.parametrize("series", SERIES)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int):
@@ -123,6 +127,7 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     assert settings["maximum_lag_on_failover"] == 1048576
 
 
+@pytest.mark.charm
 @pytest.mark.parametrize("series", SERIES)
 async def test_scale_down_and_up(ops_test: OpsTest, series: str):
     """Test data is replicated to new units after a scale up."""
@@ -208,6 +213,7 @@ async def test_scale_down_and_up(ops_test: OpsTest, series: str):
     await scale_application(ops_test, application_name, initial_scale)
 
 
+@pytest.mark.charm
 @pytest.mark.parametrize("series", SERIES)
 async def test_persist_data_through_primary_deletion(ops_test: OpsTest, series: str):
     """Test data persists through a primary deletion."""
