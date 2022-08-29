@@ -19,7 +19,7 @@ from tests.integration.helpers import (
     convert_records_to_dict,
     db_connect,
     find_unit,
-    get_postgres_password,
+    get_password,
     get_primary,
     get_unit_address,
     scale_application,
@@ -78,12 +78,9 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     # Set a composite application name in order to test in more than one series at the same time.
     application_name = build_application_name(series)
 
-    # Retrieving the postgres user password using the action.
-    action = await ops_test.model.units.get(f"{application_name}/{unit_id}").run_action(
-        "get-initial-password"
-    )
-    action = await action.wait()
-    password = action.results["postgres-password"]
+    # Retrieving the operator user password using the action.
+    any_unit_name = ops_test.model.applications[application_name].units[0].name
+    password = await get_password(ops_test, any_unit_name)
 
     # Connect to PostgreSQL.
     host = get_unit_address(ops_test, f"{application_name}/{unit_id}")
@@ -215,7 +212,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest, series: 
     application_name = build_application_name(series)
     any_unit_name = ops_test.model.applications[application_name].units[0].name
     primary = await get_primary(ops_test, any_unit_name)
-    password = await get_postgres_password(ops_test, primary)
+    password = await get_password(ops_test, primary)
 
     # Write data to primary IP.
     host = get_unit_address(ops_test, primary)

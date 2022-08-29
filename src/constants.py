@@ -9,3 +9,4 @@ LEGACY_DB = "db"
 LEGACY_DB_ADMIN = "db-admin"
 PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE, LEGACY_DB, LEGACY_DB_ADMIN]
+USER = "operator"
