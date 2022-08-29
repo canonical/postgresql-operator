@@ -10,7 +10,7 @@ import subprocess
 from typing import List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
-from charms.postgresql_k8s.v0.postgresql import PostgreSQL
+from charms.postgresql_k8s.v0.postgresql import PostgreSQL, PostgreSQLCreateUserError
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -37,7 +37,7 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
-from constants import PEER
+from constants import PEER, USER
 from relations.db import DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
@@ -63,7 +63,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
-        self.framework.observe(self.on.get_initial_password_action, self._on_get_initial_password)
+        self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self._cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -78,8 +78,8 @@ class PostgresqlOperatorCharm(CharmBase):
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
             host=self.primary_endpoint,
-            user="postgres",
-            password=self._get_postgres_password(),
+            user=USER,
+            password=self._get_password(),
             database="postgres",
         )
 
@@ -335,7 +335,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._member_name,
             self.app.planned_units(),
             self._peer_members_ips,
-            self._get_postgres_password(),
+            self._get_password(),
             self._replication_password,
         )
 
@@ -470,7 +470,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """Handle the leader-elected event."""
         data = self._peers.data[self.app]
         # The leader sets the needed password on peer relation databag if they weren't set before.
-        data.setdefault("postgres-password", new_password())
+        data.setdefault("operator-password", new_password())
         data.setdefault("replication-password", new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
@@ -522,11 +522,10 @@ class PostgresqlOperatorCharm(CharmBase):
         if self._has_blocked_status:
             return
 
-        postgres_password = self._get_postgres_password()
-        replication_password = self._get_postgres_password()
+        postgres_password = self._get_password()
         # If the leader was not elected (and the needed passwords were not generated yet),
         # the cluster cannot be bootstrapped yet.
-        if not postgres_password or not replication_password:
+        if not postgres_password or not self._replication_password:
             logger.info("leader not elected and/or passwords not yet generated")
             self.unit.status = WaitingStatus("awaiting passwords generation")
             event.defer()
@@ -554,15 +553,24 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        # Create the default postgres database user that is needed for some
+        # applications (not charms) like Landscape Server.
+        try:
+            self.postgresql.create_user("postgres", new_password(), admin=True)
+        except PostgreSQLCreateUserError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to create postgres user")
+            return
+
         self.postgresql_client_relation.oversee_users()
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
         self.unit.status = ActiveStatus()
 
-    def _on_get_initial_password(self, event: ActionEvent) -> None:
-        """Returns the password for the postgres user as an action response."""
-        event.set_results({"postgres-password": self._get_postgres_password()})
+    def _on_get_password(self, event: ActionEvent) -> None:
+        """Returns the password for the operator user as an action response."""
+        event.set_results({"operator-password": self._get_password()})
 
     def _on_update_status(self, _) -> None:
         """Update endpoints of the postgres client relation and update users list."""
@@ -576,15 +584,15 @@ class PostgresqlOperatorCharm(CharmBase):
         """Returns whether the unit is in a blocked state."""
         return isinstance(self.unit.status, BlockedStatus)
 
-    def _get_postgres_password(self) -> str:
-        """Get postgres user password.
+    def _get_password(self) -> str:
+        """Get operator user password.
 
         Returns:
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
         data = self._peers.data[self.app]
-        return data.get("postgres-password")
+        return data.get("operator-password")
 
     @property
     def _replication_password(self) -> str:

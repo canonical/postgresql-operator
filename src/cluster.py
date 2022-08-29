@@ -28,6 +28,8 @@ from tenacity import (
     wait_fixed,
 )
 
+from constants import USER
+
 logger = logging.getLogger(__name__)
 
 PATRONI_SERVICE = "patroni"
@@ -70,7 +72,7 @@ class Patroni:
             member_name: name of the member inside the cluster
             peers_ips: IP addresses of the peer units
             planned_units: number of units planned for the cluster
-            superuser_password: password for the postgres user
+            superuser_password: password for the operator user
             replication_password: password for the user used in the replication
         """
         self.unit_ip = unit_ip
@@ -259,6 +261,7 @@ class Patroni:
             scope=self.cluster_name,
             self_ip=self.unit_ip,
             replica=replica,
+            superuser=USER,
             superuser_password=self.superuser_password,
             replication_password=self.replication_password,
             version=self._get_postgresql_version(),
