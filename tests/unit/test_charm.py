@@ -27,7 +27,7 @@ class TestCharm(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
         self.harness.begin()
         self.charm = self.harness.charm
-        self.harness.add_relation(self._peer_relation, self.charm.app.name)
+        self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
@@ -305,3 +305,43 @@ class TestCharm(unittest.TestCase):
         # Then, test for an error.
         with self.assertRaises(subprocess.SubprocessError):
             self.charm._install_pip_packages(packages)
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    def test_get_secret(self, _):
+        self.harness.set_leader()
+
+        # Test application scope.
+        assert self.charm._get_secret("app", "password") is None
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.app.name, {"password": "test-password"}
+        )
+        assert self.charm._get_secret("app", "password") == "test-password"
+
+        # Test unit scope.
+        assert self.charm._get_secret("unit", "password") is None
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.unit.name, {"password": "test-password"}
+        )
+        assert self.charm._get_secret("unit", "password") == "test-password"
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    def test_set_secret(self, _):
+        self.harness.set_leader()
+
+        # Test application scope.
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
+        self.charm._set_secret("app", "password", "test-password")
+        assert (
+            self.harness.get_relation_data(self.rel_id, self.charm.app.name)["password"]
+            == "test-password"
+        )
+
+        # Test unit scope.
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+        self.charm._set_secret("unit", "password", "test-password")
+        assert (
+            self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
+            == "test-password"
+        )
