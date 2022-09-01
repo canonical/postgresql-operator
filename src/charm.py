@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import subprocess
-from typing import List, Optional, Set
+from typing import Dict, List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
 from charms.postgresql_k8s.v0.postgresql import PostgreSQL, PostgreSQLCreateUserError
@@ -37,7 +37,7 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
-from constants import PEER, USER
+from constants import PEER, REPLICATION_PASSWORD_KEY, USER, USER_PASSWORD_KEY
 from relations.db import DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
@@ -72,6 +72,48 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
+
+    @property
+    def app_peer_data(self) -> Dict:
+        """Application peer relation data object."""
+        relation = self.model.get_relation(PEER)
+        if relation is None:
+            return {}
+
+        return relation.data[self.app]
+
+    @property
+    def unit_peer_data(self) -> Dict:
+        """Unit peer relation data object."""
+        relation = self.model.get_relation(PEER)
+        if relation is None:
+            return {}
+
+        return relation.data[self.unit]
+
+    def _get_secret(self, scope: str, key: str) -> Optional[str]:
+        """Get secret from the secret storage."""
+        if scope == "unit":
+            return self.unit_peer_data.get(key, None)
+        elif scope == "app":
+            return self.app_peer_data.get(key, None)
+        else:
+            raise RuntimeError("Unknown secret scope.")
+
+    def _set_secret(self, scope: str, key: str, value: Optional[str]) -> None:
+        """Get secret from the secret storage."""
+        if scope == "unit":
+            if not value:
+                del self.unit_peer_data[key]
+                return
+            self.unit_peer_data.update({key: value})
+        elif scope == "app":
+            if not value:
+                del self.app_peer_data[key]
+                return
+            self.app_peer_data.update({key: value})
+        else:
+            raise RuntimeError("Unknown secret scope.")
 
     @property
     def postgresql(self) -> PostgreSQL:
@@ -468,10 +510,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
-        data = self._peers.data[self.app]
-        # The leader sets the needed password on peer relation databag if they weren't set before.
-        data.setdefault("operator-password", new_password())
-        data.setdefault("replication-password", new_password())
+        # The leader sets the needed passwords if they weren't set before.
+        if self._get_secret("app", USER_PASSWORD_KEY) is None:
+            self._set_secret("app", USER_PASSWORD_KEY, new_password())
+        if self._get_secret("app", REPLICATION_PASSWORD_KEY) is None:
+            self._set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -570,7 +613,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_get_password(self, event: ActionEvent) -> None:
         """Returns the password for the operator user as an action response."""
-        event.set_results({"operator-password": self._get_password()})
+        event.set_results({USER_PASSWORD_KEY: self._get_password()})
 
     def _on_update_status(self, _) -> None:
         """Update endpoints of the postgres client relation and update users list."""
@@ -591,8 +634,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        data = self._peers.data[self.app]
-        return data.get("operator-password")
+        return self._get_secret("app", USER_PASSWORD_KEY)
 
     @property
     def _replication_password(self) -> str:
@@ -602,8 +644,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        data = self._peers.data[self.app]
-        return data.get("replication-password")
+        return self._get_secret("app", REPLICATION_PASSWORD_KEY)
 
     def _install_apt_packages(self, _, packages: List[str]) -> None:
         """Simple wrapper around 'apt-get install -y.
