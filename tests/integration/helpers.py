@@ -452,19 +452,26 @@ def restart_patroni(ops_test: OpsTest, unit_name: str) -> None:
     requests.post(f"http://{unit_ip}:8008/restart")
 
 
-async def set_password(ops_test: OpsTest, unit_name: str, username: str = "operator"):
-    """Retrieve a user password using the action.
+async def set_password(
+    ops_test: OpsTest, unit_name: str, username: str = "operator", password: str = None
+):
+    """Set a user password using the action.
 
     Args:
         ops_test: ops_test instance.
         unit_name: the name of the unit.
         username: the user to set the password.
+        password: optional password to use
+            instead of auto-generating
 
     Returns:
         the results from the action.
     """
     unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("set-password", **{"username": username})
+    parameters = {"username": username}
+    if password is not None:
+        parameters["password"] = password
+    action = await unit.run_action("set-password", **parameters)
     result = await action.wait()
     return result.results
 
