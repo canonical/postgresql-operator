@@ -203,9 +203,11 @@ class PostgreSQL:
 
     def update_user_password(self, username: str, password: str) -> None:
         """Update a user password.
+
         Args:
             username: the user to update the password.
             password: the new password for the user.
+
         Raises:
             PostgreSQLUpdateUserPasswordError if the password couldn't be changed.
         """
