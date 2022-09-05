@@ -653,9 +653,7 @@ class PostgresqlOperatorCharm(CharmBase):
             )
             return
 
-        password = new_password()
-        if "password" in event.params:
-            password = event.params["password"]
+        password = event.params.get("password", new_password())
 
         if password == self._get_secret("app", f"{username}-password"):
             event.log("The old and new passwords are equal.")
