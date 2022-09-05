@@ -10,7 +10,11 @@ import subprocess
 from typing import Dict, List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
-from charms.postgresql_k8s.v0.postgresql import PostgreSQL, PostgreSQLCreateUserError
+from charms.postgresql_k8s.v0.postgresql import (
+    PostgreSQL,
+    PostgreSQLCreateUserError,
+    PostgreSQLUpdateUserPasswordError,
+)
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -37,7 +41,13 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
-from constants import PEER, REPLICATION_PASSWORD_KEY, USER, USER_PASSWORD_KEY
+from constants import (
+    PEER,
+    REPLICATION_PASSWORD_KEY,
+    SYSTEM_USERS,
+    USER,
+    USER_PASSWORD_KEY,
+)
 from relations.db import DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
@@ -64,6 +74,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
+        self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self._cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -121,7 +132,7 @@ class PostgresqlOperatorCharm(CharmBase):
         return PostgreSQL(
             host=self.primary_endpoint,
             user=USER,
-            password=self._get_password(),
+            password=self._get_secret("app", f"{USER}-password"),
             database="postgres",
         )
 
@@ -612,8 +623,71 @@ class PostgresqlOperatorCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     def _on_get_password(self, event: ActionEvent) -> None:
-        """Returns the password for the operator user as an action response."""
-        event.set_results({USER_PASSWORD_KEY: self._get_password()})
+        """Returns the password for a user as an action response.
+
+        If no user is provided, the password of the operator user is returned.
+        """
+        username = event.params.get("username", USER)
+        if username not in SYSTEM_USERS:
+            event.fail(
+                f"The action can be run only for users used by the charm or Patroni:"
+                f" {', '.join(SYSTEM_USERS)} not {username}"
+            )
+            return
+        event.set_results(
+            {f"{username}-password": self._get_secret("app", f"{username}-password")}
+        )
+
+    def _on_set_password(self, event: ActionEvent) -> None:
+        """Set the password for the specified user."""
+        # Only leader can write the new password into peer relation.
+        if not self.unit.is_leader():
+            event.fail("The action can be run only on leader unit")
+            return
+
+        username = event.params.get("username", USER)
+        if username not in SYSTEM_USERS:
+            event.fail(
+                f"The action can be run only for users used by the charm:"
+                f" {', '.join(SYSTEM_USERS)} not {username}"
+            )
+            return
+
+        password = event.params.get("password", new_password())
+
+        if password == self._get_secret("app", f"{username}-password"):
+            event.log("The old and new passwords are equal.")
+            event.set_results({f"{username}-password": password})
+            return
+
+        # Ensure all members are ready before trying to reload Patroni
+        # configuration to avoid errors (like the API not responding in
+        # one instance because PostgreSQL and/or Patroni are not ready).
+        if not self._patroni.are_all_members_ready():
+            event.fail(
+                "Failed changing the password: Not all members healthy or finished initial sync."
+            )
+            return
+
+        # Update the password in the PostgreSQL instance.
+        try:
+            self.postgresql.update_user_password(username, password)
+        except PostgreSQLUpdateUserPasswordError as e:
+            logger.exception(e)
+            event.fail(
+                "Failed changing the password: Not all members healthy or finished initial sync."
+            )
+            return
+
+        # Update the password in the secret store.
+        self._set_secret("app", f"{username}-password", password)
+
+        # Update and reload Patroni configuration in this unit to use the new password.
+        # Other units Patroni configuration will be reloaded in the peer relation changed event.
+        self._patroni.render_patroni_yml_file()
+        self._patroni.reload_patroni_configuration()
+
+        event.set_results({f"{username}-password": password})
 
     def _on_update_status(self, _) -> None:
         """Update endpoints of the postgres client relation and update users list."""

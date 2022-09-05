@@ -4,5 +4,21 @@
 get-primary:
   description: Get the unit which is the primary/leader in the replication.
 get-password:
-  description: Get the operator user password used by charm.
-    It is internal charm user, SHOULD NOT be used by applications.
+  description: Get the system user's password, which is used by charm.
+    It is for internal charm users and SHOULD NOT be used by applications.
+  params:
+    username:
+      type: string
+      description: The username, the default value 'operator'.
+        Possible values - operator, replication.
+set-password:
+  description: Change the system user's password, which is used by charm.
+    It is for internal charm users and SHOULD NOT be used by applications.
+  params:
+    username:
+      type: string
+      description: The username, the default value 'operator'.
+        Possible values - operator, replication.
+    password:
+      type: string
+      description: The password will be auto-generated if this option is not specified.
