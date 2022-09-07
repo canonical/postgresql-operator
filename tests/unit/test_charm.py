@@ -116,11 +116,9 @@ class TestCharm(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
-    @patch("charm.Patroni.update_cluster_members")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch_network_get(private_address="1.1.1.1")
-    def test_on_leader_elected(
-        self, _update_cluster_members, _primary_endpoint, _update_endpoints
-    ):
+    def test_on_leader_elected(self, _update_config, _primary_endpoint, _update_endpoints):
         # Assert that there is no password in the peer relation.
         self.assertIsNone(self.charm._peers.data[self.charm.app].get("operator-password", None))
 
@@ -128,7 +126,7 @@ class TestCharm(unittest.TestCase):
         _primary_endpoint.return_value = "1.1.1.1"
         self.harness.set_leader()
         password = self.charm._peers.data[self.charm.app].get("operator-password", None)
-        _update_cluster_members.assert_called_once()
+        _update_config.assert_called_once()
         _update_endpoints.assert_not_called()
         self.assertIsNotNone(password)
 
@@ -156,7 +154,7 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgreSQLProvider.oversee_users")
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.PostgreSQLProvider.update_endpoints")
-    @patch("charm.Patroni.update_cluster_members")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.Patroni.member_started")
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
@@ -265,9 +263,8 @@ class TestCharm(unittest.TestCase):
         )
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.Patroni.reload_patroni_configuration")
-    @patch("charm.Patroni.render_patroni_yml_file")
-    @patch("charm.PostgresqlOperatorCharm._set_secret")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.PostgresqlOperatorCharm.set_secret")
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.Patroni.are_all_members_ready")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
@@ -277,8 +274,7 @@ class TestCharm(unittest.TestCase):
         _are_all_members_ready,
         _postgresql,
         _set_secret,
-        _render_patroni_yml_file,
-        _reload_patroni_configuration,
+        __,
     ):
         # Create a mock event.
         mock_event = MagicMock(params={})
@@ -391,22 +387,22 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_get_secret(self, _):
+    def testget_secret(self, _):
         self.harness.set_leader()
 
         # Test application scope.
-        assert self.charm._get_secret("app", "password") is None
+        assert self.charm.get_secret("app", "password") is None
         self.harness.update_relation_data(
             self.rel_id, self.charm.app.name, {"password": "test-password"}
         )
-        assert self.charm._get_secret("app", "password") == "test-password"
+        assert self.charm.get_secret("app", "password") == "test-password"
 
         # Test unit scope.
-        assert self.charm._get_secret("unit", "password") is None
+        assert self.charm.get_secret("unit", "password") is None
         self.harness.update_relation_data(
             self.rel_id, self.charm.unit.name, {"password": "test-password"}
         )
-        assert self.charm._get_secret("unit", "password") == "test-password"
+        assert self.charm.get_secret("unit", "password") == "test-password"
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
@@ -415,7 +411,7 @@ class TestCharm(unittest.TestCase):
 
         # Test application scope.
         assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
-        self.charm._set_secret("app", "password", "test-password")
+        self.charm.set_secret("app", "password", "test-password")
         assert (
             self.harness.get_relation_data(self.rel_id, self.charm.app.name)["password"]
             == "test-password"
@@ -423,7 +419,7 @@ class TestCharm(unittest.TestCase):
 
         # Test unit scope.
         assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
-        self.charm._set_secret("unit", "password", "test-password")
+        self.charm.set_secret("unit", "password", "test-password")
         assert (
             self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
             == "test-password"

@@ -15,6 +15,8 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLUpdateUserPasswordError,
 )
+from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
+from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -45,6 +47,9 @@ from constants import (
     PEER,
     REPLICATION_PASSWORD_KEY,
     SYSTEM_USERS,
+    TLS_CA_FILE,
+    TLS_CERT_FILE,
+    TLS_KEY_FILE,
     USER,
     USER_PASSWORD_KEY,
 )
@@ -83,6 +88,10 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
+        self.tls = PostgreSQLTLS(self, PEER)
+        self.restart_manager = RollingOpsManager(
+            charm=self, relation="restart", callback=self._restart
+        )
 
     @property
     def app_peer_data(self) -> Dict:
@@ -102,7 +111,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         return relation.data[self.unit]
 
-    def _get_secret(self, scope: str, key: str) -> Optional[str]:
+    def get_secret(self, scope: str, key: str) -> Optional[str]:
         """Get secret from the secret storage."""
         if scope == "unit":
             return self.unit_peer_data.get(key, None)
@@ -111,7 +120,7 @@ class PostgresqlOperatorCharm(CharmBase):
         else:
             raise RuntimeError("Unknown secret scope.")
 
-    def _set_secret(self, scope: str, key: str, value: Optional[str]) -> None:
+    def set_secret(self, scope: str, key: str, value: Optional[str]) -> None:
         """Get secret from the secret storage."""
         if scope == "unit":
             if not value:
@@ -133,7 +142,7 @@ class PostgresqlOperatorCharm(CharmBase):
             primary_host=self.primary_endpoint,
             current_host=self._unit_ip,
             user=USER,
-            password=self._get_secret("app", f"{USER}-password"),
+            password=self.get_secret("app", f"{USER}-password"),
             database="postgres",
         )
 
@@ -154,6 +163,18 @@ class PostgresqlOperatorCharm(CharmBase):
             return None
         else:
             return primary_endpoint
+
+    def get_hostname_by_unit(self, unit_name: str) -> str:
+        """Create a DNS name for a PostgreSQL unit.
+
+        Args:
+            unit_name: the juju unit name, e.g. "postgresql/1".
+
+        Returns:
+            A string representing the hostname of the PostgreSQL unit.
+        """
+        unit_id = unit_name.split("/")[1]
+        return f"{self.app.name}-{unit_id}.{self.app.name}-endpoints"
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -196,7 +217,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
             # Update the list of the current members.
             self._remove_from_members_ips(member_ip)
-            self._patroni.update_cluster_members()
+            self.update_config()
 
             if self.primary_endpoint:
                 self.postgresql_client_relation.update_endpoints()
@@ -271,7 +292,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update the list of the cluster members in the replicas to make them know each other.
         try:
             # Update the members of the cluster in the Patroni configuration on this unit.
-            self._patroni.update_cluster_members()
+            self.update_config()
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
             return
@@ -348,7 +369,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Update Patroni configuration file.
         try:
-            self._patroni.update_cluster_members()
+            self.update_config()
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
@@ -523,10 +544,10 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
         # The leader sets the needed passwords if they weren't set before.
-        if self._get_secret("app", USER_PASSWORD_KEY) is None:
-            self._set_secret("app", USER_PASSWORD_KEY, new_password())
-        if self._get_secret("app", REPLICATION_PASSWORD_KEY) is None:
-            self._set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
+        if self.get_secret("app", USER_PASSWORD_KEY) is None:
+            self.set_secret("app", USER_PASSWORD_KEY, new_password())
+        if self.get_secret("app", REPLICATION_PASSWORD_KEY) is None:
+            self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -538,7 +559,7 @@ class PostgresqlOperatorCharm(CharmBase):
         for ip in self._get_ips_to_remove():
             self._remove_from_members_ips(ip)
 
-        self._patroni.update_cluster_members()
+        self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
         # this application because there are no primary and replicas yet.
@@ -635,9 +656,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
-        event.set_results(
-            {f"{username}-password": self._get_secret("app", f"{username}-password")}
-        )
+        event.set_results({f"{username}-password": self.get_secret("app", f"{username}-password")})
 
     def _on_set_password(self, event: ActionEvent) -> None:
         """Set the password for the specified user."""
@@ -656,7 +675,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         password = event.params.get("password", new_password())
 
-        if password == self._get_secret("app", f"{username}-password"):
+        if password == self.get_secret("app", f"{username}-password"):
             event.log("The old and new passwords are equal.")
             event.set_results({f"{username}-password": password})
             return
@@ -681,12 +700,11 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Update the password in the secret store.
-        self._set_secret("app", f"{username}-password", password)
+        self.set_secret("app", f"{username}-password", password)
 
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
-        self._patroni.render_patroni_yml_file()
-        self._patroni.reload_patroni_configuration()
+        self.update_config()
 
         event.set_results({f"{username}-password": password})
 
@@ -709,7 +727,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        return self._get_secret("app", USER_PASSWORD_KEY)
+        return self.get_secret("app", USER_PASSWORD_KEY)
 
     @property
     def _replication_password(self) -> str:
@@ -719,7 +737,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        return self._get_secret("app", REPLICATION_PASSWORD_KEY)
+        return self.get_secret("app", REPLICATION_PASSWORD_KEY)
 
     def _install_apt_packages(self, _, packages: List[str]) -> None:
         """Simple wrapper around 'apt-get install -y.
@@ -774,6 +792,43 @@ class PostgresqlOperatorCharm(CharmBase):
              the peer relation.
         """
         return self.model.get_relation(PEER)
+
+    def push_tls_files_to_workload(self) -> None:
+        """Uploads TLS files to the workload container."""
+        key, ca, cert = self.tls.get_tls_files()
+        if key is not None:
+            self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
+        if ca is not None:
+            self._patroni.render_file(f"{self._storage_path}/{TLS_CA_FILE}", ca, 0o600)
+        if cert is not None:
+            self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
+
+        self.update_config()
+
+    def _restart(self, _) -> None:
+        """Restart PostgreSQL."""
+        try:
+            self._patroni.restart_postgresql()
+        except RetryError as e:
+            logger.error("failed to restart PostgreSQL")
+            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
+
+    def update_config(self) -> None:
+        """Updates Patroni config file based on the existence of the TLS files."""
+        enable_tls = all(self.tls.get_tls_files())
+
+        # Update and reload configuration based on TLS files availability.
+        self._patroni.render_patroni_yml_file(enable_tls=enable_tls)
+        if not self._patroni.member_started:
+            return
+
+        restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
+        self._patroni.reload_patroni_configuration()
+
+        # Restart PostgreSQL if TLS configuration has changed
+        # (so the both old and new connections use the configuration).
+        if restart_postgresql:
+            self.on[self.restart_manager.name].acquire_lock.emit()
 
 
 if __name__ == "__main__":
