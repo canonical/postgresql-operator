@@ -14,6 +14,7 @@ import yaml
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 from tenacity import (
+    RetryError,
     Retrying,
     retry,
     retry_if_result,
@@ -308,6 +309,7 @@ async def execute_query_on_unit(
     password: str,
     query: str,
     database: str = "postgres",
+    sslmode: str = None,
 ):
     """Execute given PostgreSQL query on a unit.
 
@@ -316,12 +318,15 @@ async def execute_query_on_unit(
         password: The PostgreSQL superuser password.
         query: Query to execute.
         database: Optional database to connect to (defaults to postgres database).
+        sslmode: Optional ssl mode to use (defaults to None).
 
     Returns:
         A list of rows that were potentially returned from the query.
     """
+    extra_connection_parameters = f" sslmode={sslmode}" if sslmode is not None else ""
     with psycopg2.connect(
-        f"dbname='{database}' user='operator' host='{unit_address}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='operator' host='{unit_address}'"
+        f"password='{password}' connect_timeout=10{extra_connection_parameters}"
     ) as connection, connection.cursor() as cursor:
         cursor.execute(query)
         output = list(itertools.chain(*cursor.fetchall()))
@@ -418,6 +423,33 @@ def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
         IP address of the unit
     """
     return ops_test.model.units.get(unit_name).public_address
+
+
+async def is_tls_enabled(ops_test: OpsTest, unit_name: str) -> bool:
+    """Returns whether TLS is enabled on the specific PostgreSQL instance.
+
+    Args:
+        ops_test: The ops test framework instance.
+        unit_name: The name of the unit of the PostgreSQL instance.
+
+    Returns:
+        Whether TLS is enabled.
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    password = await get_password(ops_test, unit_name)
+    try:
+        for attempt in Retrying(
+            stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt:
+                output = await execute_query_on_unit(
+                    unit_address, password, "SHOW ssl;", sslmode="require"
+                )
+                if "on" not in output:
+                    raise ValueError(f"TLS is not enabled on {unit_name}")
+    except RetryError:
+        return False
+    return "on" in output
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
