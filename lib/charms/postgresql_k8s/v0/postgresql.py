@@ -19,7 +19,7 @@ The `postgresql` module provides methods for interacting with the PostgreSQL ins
 Any charm using this library should import the `psycopg2` or `psycopg2-binary` dependency.
 """
 import logging
-from typing import List, Set
+from typing import Set
 
 import psycopg2
 from psycopg2 import sql
@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 5
 
 
 logger = logging.getLogger(__name__)
@@ -67,28 +67,36 @@ class PostgreSQL:
 
     def __init__(
         self,
-        host: str,
+        primary_host: str,
+        current_host: str,
         user: str,
         password: str,
         database: str,
     ):
-        self.host = host
+        self.primary_host = primary_host
+        self.current_host = current_host
         self.user = user
         self.password = password
         self.database = database
 
-    def _connect_to_database(self, database: str = None) -> psycopg2.extensions.connection:
+    def _connect_to_database(
+        self, database: str = None, connect_to_current_host: bool = False
+    ) -> psycopg2.extensions.connection:
         """Creates a connection to the database.
 
         Args:
             database: database to connect to (defaults to the database
                 provided when the object for this class was created).
+            connect_to_current_host: whether to connect to the current host
+                instead of the primary host.
 
         Returns:
              psycopg2 connection object.
         """
+        host = self.current_host if connect_to_current_host else self.primary_host
         connection = psycopg2.connect(
-            f"dbname='{database if database else self.database}' user='{self.user}' host='{self.host}' password='{self.password}' connect_timeout=1"
+            f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
+            f"password='{self.password}' connect_timeout=1"
         )
         connection.autocommit = True
         return connection
@@ -129,14 +137,18 @@ class PostgreSQL:
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(f"SELECT TRUE FROM pg_roles WHERE rolname='{user}';")
-                user_definition = f" WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
+                user_definition = (
+                    f" WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
+                )
                 if extra_user_roles:
                     user_definition += f' {extra_user_roles.replace(",", " ")}'
                 if cursor.fetchone() is not None:
                     statement = "ALTER ROLE {}"
                 else:
                     statement = "CREATE ROLE {}"
-                cursor.execute(sql.SQL(statement + user_definition + ";").format(sql.Identifier(user)))
+                cursor.execute(
+                    sql.SQL(statement + user_definition + ";").format(sql.Identifier(user))
+                )
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError()
@@ -159,9 +171,11 @@ class PostgreSQL:
                 with self._connect_to_database(
                     database
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute(sql.SQL("REASSIGN OWNED BY {} TO {};").format(
-                        sql.Identifier(user), sql.Identifier(self.user)
-                    ))
+                    cursor.execute(
+                        sql.SQL("REASSIGN OWNED BY {} TO {};").format(
+                            sql.Identifier(user), sql.Identifier(self.user)
+                        )
+                    )
                     cursor.execute(sql.SQL("DROP OWNED BY {};").format(sql.Identifier(user)))
 
             # Delete the user.
@@ -185,6 +199,26 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to get PostgreSQL version: {e}")
             raise PostgreSQLGetPostgreSQLVersionError()
+
+    def is_tls_enabled(self, check_current_host: bool = False) -> bool:
+        """Returns whether TLS is enabled.
+
+        Args:
+            check_current_host: whether to check the current host
+                instead of the primary host.
+
+        Returns:
+            whether TLS is enabled.
+        """
+        try:
+            with self._connect_to_database(
+                connect_to_current_host=check_current_host
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute("SHOW ssl;")
+                return "on" in cursor.fetchone()[0]
+        except psycopg2.Error:
+            # Connection errors happen when PostgreSQL has not started yet.
+            return False
 
     def list_users(self) -> Set[str]:
         """Returns the list of PostgreSQL database users.
