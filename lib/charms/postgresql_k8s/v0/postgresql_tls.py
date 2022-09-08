@@ -125,7 +125,9 @@ class PostgreSQLTLS(Object):
             logger.error("An unknown certificate expiring.")
             return
 
-        self.charm.set_secret(SCOPE, "chain", event.chain)
+        self.charm.set_secret(
+            SCOPE, "chain", "\n".join(event.chain) if event.chain is not None else None
+        )
         self.charm.set_secret(SCOPE, "cert", event.certificate)
         self.charm.set_secret(SCOPE, "ca", event.ca)
 
@@ -175,7 +177,7 @@ class PostgreSQLTLS(Object):
         basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
         return [basic_constraints]
 
-    def get_tls_files(self) -> (Optional[str], Optional[str], Optional[str]):
+    def get_tls_files(self) -> (Optional[str], Optional[str]):
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
