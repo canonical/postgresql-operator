@@ -41,7 +41,6 @@ class TestPostgreSQLProvider(unittest.TestCase):
         # Define some relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
         self.harness.add_relation_unit(self.rel_id, "application/0")
-        self.harness.add_relation_unit(self.rel_id, self.unit)
         self.peer_rel_id = self.harness.add_relation(PEER, self.app)
         self.harness.add_relation_unit(self.peer_rel_id, self.unit)
         self.harness.update_relation_data(
@@ -191,6 +190,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
             # Test that a flag for preventing user deletion is set in peer relation data
             # when the unit that is being removed is the current unit.
             mock_departing_unit.return_value = self.harness.model.get_unit(self.unit)
+            self.harness.add_relation_unit(self.rel_id, self.unit)
             self.harness.remove_relation_unit(self.rel_id, self.unit)
             peer_relation_data = self.harness.get_relation_data(self.peer_rel_id, self.unit)
             self.assertDictEqual(peer_relation_data, {"departing": "True"})
