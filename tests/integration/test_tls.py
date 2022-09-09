@@ -5,7 +5,7 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
 from tests.helpers import METADATA
-from tests.integration.helpers import DATABASE_APP_NAME, is_tls_enabled
+from tests.integration.helpers import DATABASE_APP_NAME, check_tls
 
 APP_NAME = METADATA["name"]
 TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
@@ -42,4 +42,14 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Wait for all units enabling TLS.
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-            assert await is_tls_enabled(ops_test, unit.name)
+            assert await check_tls(ops_test, unit.name, enabled=True)
+
+        # Remove the relation.
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}:certificates", f"{TLS_CERTIFICATES_APP_NAME}:certificates"
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+
+        # Wait for all units disabling TLS.
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+            assert await check_tls(ops_test, unit.name, enabled=False)
