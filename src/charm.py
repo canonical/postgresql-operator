@@ -164,17 +164,15 @@ class PostgresqlOperatorCharm(CharmBase):
         else:
             return primary_endpoint
 
-    def get_hostname_by_unit(self, unit_name: str) -> str:
+    def get_hostname_by_unit(self, _) -> str:
         """Create a DNS name for a PostgreSQL unit.
-
-        Args:
-            unit_name: the juju unit name, e.g. "postgresql/1".
 
         Returns:
             A string representing the hostname of the PostgreSQL unit.
         """
-        unit_id = unit_name.split("/")[1]
-        return f"{self.app.name}-{unit_id}.{self.app.name}-endpoints"
+        # For now, as there is no DNS hostnames on VMs, and it would also depend on
+        # the underlying provider (LXD, MAAS, etc.), the unit IP is returned.
+        return self._unit_ip
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
