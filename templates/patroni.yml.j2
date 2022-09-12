@@ -17,6 +17,18 @@ log:
 restapi:
   listen: '{{ self_ip }}:8008'
   connect_address: '{{ self_ip }}:8008'
+  {%- if enable_tls %}
+  cafile: {{ conf_path }}/ca.pem
+  certfile: {{ conf_path }}/cert.pem
+  keyfile: {{ conf_path }}/key.pem
+  {%- endif %}
+
+{%- if enable_tls %}
+ctl:
+  cacert: {{ conf_path }}/ca.pem
+  certfile: {{ conf_path }}/cert.pem
+  keyfile: {{ conf_path }}/key.pem
+{%- endif %}
 
 raft:
   data_dir: {{ conf_path }}/raft

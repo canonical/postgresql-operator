@@ -821,7 +821,7 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
-        self._patroni.reload_patroni_configuration()
+        self._patroni.reload_patroni_configuration(restart_postgresql)
 
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).

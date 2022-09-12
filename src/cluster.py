@@ -28,7 +28,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import USER
+from constants import TLS_CA_FILE, USER
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +83,52 @@ class Patroni:
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
+        # Variable mapping to requests library verify parameter.
+        self.verify = f"{self.storage_path}/{TLS_CA_FILE}" if self._tls_enabled else True
+
+    @property
+    def _tls_enabled(self) -> bool:
+        # return False
+        def demote(user_uid, user_gid):
+            def result():
+                os.setgid(user_gid)
+                os.setuid(user_uid)
+
+            return result
+
+        pw_record = pwd.getpwnam("postgres")
+        user_uid = pw_record.pw_uid
+        user_gid = pw_record.pw_gid
+
+        try:
+            env = dict(os.environ, PGPASSWORD=self.superuser_password)
+            ssl_query_result = subprocess.check_output(
+                [
+                    "patronictl",
+                    "-c",
+                    f"{self.storage_path}/patroni.yml",
+                    "query",
+                    self.cluster_name,
+                    "--command",
+                    "SHOW ssl;",
+                    "--dbname",
+                    "postgres",
+                    "--username",
+                    USER,
+                ],
+                env=env,
+                preexec_fn=demote(user_uid, user_gid),
+                timeout=10,
+            ).decode("UTF-8")
+            # logger.warning(ssl_query_result)
+            return "on" in ssl_query_result
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            return False
+
+    @property
+    def _patroni_url(self) -> str:
+        """Patroni REST API URL."""
+        return f"{'https' if self._tls_enabled else 'http'}://{self.unit_ip}:8008"
 
     def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""
@@ -117,7 +163,7 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
         return set([member["name"] for member in cluster_status.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
@@ -150,7 +196,7 @@ class Patroni:
         """
         ip = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
         for member in cluster_status.json()["members"]:
             if member["name"] == member_name:
                 ip = member["host"]
@@ -168,7 +214,7 @@ class Patroni:
         """
         primary = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
         for member in cluster_status.json()["members"]:
             if member["role"] == "leader":
                 primary = member["name"]
@@ -190,7 +236,9 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/cluster", verify=self.verify
+                    )
         except RetryError:
             return False
 
@@ -212,7 +260,7 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"http://{self.unit_ip}:8008/health")
+                    r = requests.get(f"{self._patroni_url}/health", verify=self.verify)
         except RetryError:
             return False
 
@@ -300,8 +348,9 @@ class Patroni:
             with attempt:
                 current_primary = self.get_primary()
                 r = requests.post(
-                    f"http://{self.unit_ip}:8008/switchover",
+                    f"{self._patroni_url}/switchover",
                     json={"leader": current_primary},
+                    verify=self.verify,
                 )
 
         # Check whether the switchover was unsuccessful.
@@ -346,11 +395,14 @@ class Patroni:
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def reload_patroni_configuration(self):
+    def reload_patroni_configuration(self, restart_postgresql: bool = False):
         """Reload Patroni configuration after it was changed."""
-        requests.post(f"http://{self.unit_ip}:8008/reload")
+        url = self._patroni_url
+        if restart_postgresql:
+            url.replace("https", "http")
+        requests.post(f"{url}/reload", verify=self.verify)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
-        requests.post(f"http://{self.unit_ip}:8008/restart")
+        requests.post(f"{self._patroni_url}/restart", verify=self.verify)
