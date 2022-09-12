@@ -490,7 +490,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Install the PostgreSQL and Patroni requirements packages.
         try:
-            self._install_apt_packages(event, ["postgresql", "python3-pip", "python3-psycopg2"])
+            self._install_apt_packages(
+                event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
+            )
         except (subprocess.CalledProcessError, apt.PackageNotFoundError):
             self.unit.status = BlockedStatus("failed to install apt packages")
             return
