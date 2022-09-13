@@ -147,7 +147,7 @@ class PostgreSQL:
                 else:
                     statement = "CREATE ROLE {}"
                 cursor.execute(
-                    sql.SQL(statement + user_definition + ";").format(sql.Identifier(user))
+                    sql.SQL(f"{statement} {user_definition};").format(sql.Identifier(user))
                 )
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
