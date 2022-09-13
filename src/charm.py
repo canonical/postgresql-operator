@@ -410,6 +410,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
+            bool(self.unit_peer_data.get("tls")),
         )
 
     @property
@@ -821,7 +822,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
-        self._patroni.reload_patroni_configuration(restart_postgresql)
+        self._patroni.reload_patroni_configuration()
+        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
 
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).

@@ -62,6 +62,7 @@ class Patroni:
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
+        tls_enabled: bool,
     ):
         """Initialize the Patroni class.
 
@@ -74,6 +75,7 @@ class Patroni:
             planned_units: number of units planned for the cluster
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
+            tls_enabled: whether TLS is enabled
         """
         self.unit_ip = unit_ip
         self.storage_path = storage_path
@@ -83,52 +85,16 @@ class Patroni:
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
+        self.tls_enabled = tls_enabled
         # Variable mapping to requests library verify parameter.
-        self.verify = f"{self.storage_path}/{TLS_CA_FILE}" if self._tls_enabled else True
-
-    @property
-    def _tls_enabled(self) -> bool:
-        # return False
-        def demote(user_uid, user_gid):
-            def result():
-                os.setgid(user_gid)
-                os.setuid(user_uid)
-
-            return result
-
-        pw_record = pwd.getpwnam("postgres")
-        user_uid = pw_record.pw_uid
-        user_gid = pw_record.pw_gid
-
-        try:
-            env = dict(os.environ, PGPASSWORD=self.superuser_password)
-            ssl_query_result = subprocess.check_output(
-                [
-                    "patronictl",
-                    "-c",
-                    f"{self.storage_path}/patroni.yml",
-                    "query",
-                    self.cluster_name,
-                    "--command",
-                    "SHOW ssl;",
-                    "--dbname",
-                    "postgres",
-                    "--username",
-                    USER,
-                ],
-                env=env,
-                preexec_fn=demote(user_uid, user_gid),
-                timeout=10,
-            ).decode("UTF-8")
-            # logger.warning(ssl_query_result)
-            return "on" in ssl_query_result
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
-            return False
+        # The CA bundle file is used to validate the server certificate when
+        # TLS is enabled, otherwise True is set because it's the default value.
+        self.verify = f"{self.storage_path}/{TLS_CA_FILE}" if tls_enabled else True
 
     @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
-        return f"{'https' if self._tls_enabled else 'http'}://{self.unit_ip}:8008"
+        return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
 
     def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""
@@ -395,12 +361,9 @@ class Patroni:
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def reload_patroni_configuration(self, restart_postgresql: bool = False):
+    def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        url = self._patroni_url
-        if restart_postgresql:
-            url.replace("https", "http")
-        requests.post(f"{url}/reload", verify=self.verify)
+        requests.post(f"{self._patroni_url}/reload", verify=self.verify)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
