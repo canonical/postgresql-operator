@@ -130,7 +130,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
-            host=self.primary_endpoint,
+            primary_host=self.primary_endpoint,
+            current_host=self._unit_ip,
             user=USER,
             password=self._get_secret("app", f"{USER}-password"),
             database="postgres",
