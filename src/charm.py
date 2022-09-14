@@ -824,7 +824,7 @@ class PostgresqlOperatorCharm(CharmBase):
         try:
             self._patroni.restart_postgresql()
         except RetryError as e:
-            logger.error("failed to restart PostgreSQL")
+            logger.exception("failed to restart PostgreSQL")
             self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
 
     def update_config(self) -> None:
