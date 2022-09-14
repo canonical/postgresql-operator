@@ -808,7 +808,7 @@ class PostgresqlOperatorCharm(CharmBase):
         return self.model.get_relation(PEER)
 
     def push_tls_files_to_workload(self) -> None:
-        """Uploads TLS files to the workload container."""
+        """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
             self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
