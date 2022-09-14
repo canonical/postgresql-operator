@@ -583,6 +583,8 @@ class PostgresqlOperatorCharm(CharmBase):
         except (subprocess.CalledProcessError, apt.PackageNotFoundError):
             logger.warning("failed to install apts packages")
 
+        self._update_certificate()
+
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
@@ -712,7 +714,10 @@ class PostgresqlOperatorCharm(CharmBase):
         self.legacy_db_relation.update_endpoints()
         self.legacy_db_admin_relation.update_endpoints()
         self.postgresql_client_relation.oversee_users()
+        self._update_certificate()
 
+    def _update_certificate(self) -> None:
+        """Updates the TLS certificate if the unit IP changes."""
         # Update the certificate if the IP changes because the IP
         # is used as the hostname in the certificate subject field.
         if self.get_hostname_by_unit(None) != self.unit_peer_data.get("ip"):
