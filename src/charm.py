@@ -713,6 +713,17 @@ class PostgresqlOperatorCharm(CharmBase):
         self.legacy_db_admin_relation.update_endpoints()
         self.postgresql_client_relation.oversee_users()
 
+        # Update the certificate if the IP changes because the IP
+        # is used as the hostname in the certificate subject field.
+        if self.get_hostname_by_unit(None) != self.unit_peer_data.get("ip"):
+            self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
+            # Request the certificate only if there is already one. If there isn't,
+            # the certificate will be generated in the relation joined event when
+            # relating to the TLS Certificates Operator.
+            if all(self.tls.get_tls_files()):
+                self.tls._request_certificate(self.get_secret("unit", "private-key"))
+
     @property
     def _has_blocked_status(self) -> bool:
         """Returns whether the unit is in a blocked state."""

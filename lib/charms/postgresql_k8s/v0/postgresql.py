@@ -138,7 +138,7 @@ class PostgreSQL:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(f"SELECT TRUE FROM pg_roles WHERE rolname='{user}';")
                 user_definition = (
-                    f" WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
+                    f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
                 if extra_user_roles:
                     user_definition += f' {extra_user_roles.replace(",", " ")}'
@@ -147,7 +147,7 @@ class PostgreSQL:
                 else:
                     statement = "CREATE ROLE {}"
                 cursor.execute(
-                    sql.SQL(statement + user_definition + ";").format(sql.Identifier(user))
+                    sql.SQL(f"{statement} {user_definition};").format(sql.Identifier(user))
                 )
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
