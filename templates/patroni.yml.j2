@@ -49,13 +49,20 @@ postgresql:
   # Path to PostgreSQL binaries used in the database bootstrap process.
   bin_dir: /usr/lib/postgresql/{{ version }}/bin/
   data_dir: {{ conf_path }}/pgdata
+  {%- if enable_tls %}
+  parameters:
+    ssl: on
+    ssl_ca_file: {{ conf_path }}/ca.pem
+    ssl_cert_file: {{ conf_path }}/cert.pem
+    ssl_key_file: {{ conf_path }}/key.pem
+  {%- endif %}
   pgpass: /tmp/pgpass
   pg_hba:
-    - host replication replication 127.0.0.1/32 md5
-    - host all all 0.0.0.0/0 md5
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
+    - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 md5
     # Allow replications connections from other cluster members.
     {%- for peer_ip in peers_ips %}
-    - host     replication    replication    {{ peer_ip }}/0    md5
+    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
     {% endfor %}
   authentication:
     replication:
