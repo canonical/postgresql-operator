@@ -583,6 +583,8 @@ class PostgresqlOperatorCharm(CharmBase):
         except (subprocess.CalledProcessError, apt.PackageNotFoundError):
             logger.warning("failed to install apts packages")
 
+        self._update_certificate()
+
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
@@ -712,6 +714,20 @@ class PostgresqlOperatorCharm(CharmBase):
         self.legacy_db_relation.update_endpoints()
         self.legacy_db_admin_relation.update_endpoints()
         self.postgresql_client_relation.oversee_users()
+        self._update_certificate()
+
+    def _update_certificate(self) -> None:
+        """Updates the TLS certificate if the unit IP changes."""
+        # Update the certificate if the IP changes because the IP
+        # is used as the hostname in the certificate subject field.
+        if self.get_hostname_by_unit(None) != self.unit_peer_data.get("ip"):
+            self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
+            # Request the certificate only if there is already one. If there isn't,
+            # the certificate will be generated in the relation joined event when
+            # relating to the TLS Certificates Operator.
+            if all(self.tls.get_tls_files()):
+                self.tls._request_certificate(self.get_secret("unit", "private-key"))
 
     @property
     def _has_blocked_status(self) -> bool:
@@ -792,7 +808,7 @@ class PostgresqlOperatorCharm(CharmBase):
         return self.model.get_relation(PEER)
 
     def push_tls_files_to_workload(self) -> None:
-        """Uploads TLS files to the workload container."""
+        """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
             self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
@@ -808,7 +824,7 @@ class PostgresqlOperatorCharm(CharmBase):
         try:
             self._patroni.restart_postgresql()
         except RetryError as e:
-            logger.error("failed to restart PostgreSQL")
+            logger.exception("failed to restart PostgreSQL")
             self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
 
     def update_config(self) -> None:
