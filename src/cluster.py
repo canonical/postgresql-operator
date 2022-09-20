@@ -13,6 +13,7 @@ import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
+    service_restart,
     service_running,
     service_start,
 )
@@ -364,6 +365,15 @@ class Patroni:
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         requests.post(f"{self._patroni_url}/reload", verify=self.verify)
+
+    def restart_patroni(self) -> bool:
+        """Restart Patroni.
+
+        Returns:
+            Whether the service restarted successfully.
+        """
+        service_restart(PATRONI_SERVICE)
+        return service_running(PATRONI_SERVICE)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:

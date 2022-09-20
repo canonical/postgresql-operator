@@ -821,12 +821,10 @@ class PostgresqlOperatorCharm(CharmBase):
         self.update_config()
 
     def _restart(self, _) -> None:
-        """Restart PostgreSQL."""
-        try:
-            self._patroni.restart_postgresql()
-        except RetryError as e:
+        """Restart Patroni and PostgreSQL."""
+        if not self._patroni.restart_patroni():
             logger.exception("failed to restart PostgreSQL")
-            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
+            self.unit.status = BlockedStatus("failed to restart Patroni and PostgreSQL")
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
