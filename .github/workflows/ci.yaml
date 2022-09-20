@@ -91,3 +91,16 @@ jobs:
           provider: lxd
       - name: Run integration tests
         run: tox -e password-rotation-integration
+
+  integration-test-lxd-tls:
+    name: Integration tests for TLS (lxd)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+      - name: Run integration tests
+        run: tox -e tls-integration
