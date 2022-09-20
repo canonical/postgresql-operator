@@ -107,6 +107,19 @@ jobs:
       - name: Run integration tests
         run: tox -e password-rotation-integration
 
+  integration-test-tls:
+    name: Integration tests for TLS
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+      - name: Run integration tests
+        run: tox -e tls-integration
+
   release-to-charmhub:
     name: Release to CharmHub
     needs:
@@ -118,6 +131,7 @@ jobs:
       - integration-test-db-relation
       - integration-test-db-admin-relation
       - integration-test-password-rotation
+      - integration-test-tls
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
