@@ -530,6 +530,12 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     """
     unit_address = get_unit_address(ops_test, unit_name)
     tls_ca = await get_tls_ca(ops_test, unit_name)
+
+    # If there is no TLS CA in the relation, something is wrong in
+    # the relation between the TLS Certificates Operator and PostgreSQL.
+    if enabled and not tls_ca:
+        return False
+
     try:
         for attempt in Retrying(
             stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
