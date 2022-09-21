@@ -47,7 +47,17 @@ juju remove-unit postgresql <name_of_unit1> <name_of_unit2>
 ```
 The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
 
+### Password rotation
+#### Charm users
+For users used internally by the Charmed PostgreSQL Operator an action can be used to rotate their passwords.
+```shell
+juju run-action postgresql/0 set-password username=<username> password=<password> --wait
+```
+Currently, the users used by the operator are `operator` and `replication`. Those users should not be used outside the operator.
 
+#### Related applications users
+
+To rotate the passwords of users created for related applications the relation should be removed and the application should be related again to the Charmed PostgreSQL Operator. That process will generate a new user and password for the application (removing the old user).
 
 ## Relations
 
