@@ -73,6 +73,23 @@ juju relate postgresql:db mailman3-core
 juju relate postgresql:db-admin landscape-server
 ```
 
+#### `tls-certificates` interface:
+
+The Charmed PostgreSQL Operator also supports TLS encryption on internal and external connections. To enable TLS:
+
+```shell
+# Deploy the TLS Certificates Operator. 
+juju deploy tls-certificates-operator --channel=edge
+# Add the necessary configurations for TLS.
+juju config tls-certificates-operator generate-self-signed-certificates="true" ca-common-name="Test CA" 
+# Enable TLS via relation.
+juju relate postgresql tls-certificates-operator
+# Disable TLS by removing relation.
+juju remove-relation postgresql tls-certificates-operator
+```
+
+Note: The TLS settings shown here are for self-signed-certificates, which are not recommended for production clusters. The TLS Certificates Operator offers a variety of configurations. Read more on the TLS Certificates Operator [here](https://charmhub.io/tls-certificates-operator).
+
 ## Security
 Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not file GitHub issues about security issues.
 
