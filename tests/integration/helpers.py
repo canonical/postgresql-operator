@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import itertools
+import json
 import tempfile
 import zipfile
 from datetime import datetime
@@ -412,6 +413,32 @@ async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
     return action.results["primary"]
 
 
+async def get_tls_ca(
+    ops_test: OpsTest,
+    unit_name: str,
+) -> str:
+    """Returns the TLS CA used by the unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit
+
+    Returns:
+        TLS CA or an empty string if there is no CA.
+    """
+    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {unit_name}")
+    data = yaml.safe_load(raw_data)
+    # Filter the data based on the relation name.
+    relation_data = [
+        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
+    ]
+    if len(relation_data) == 0:
+        return ""
+    return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
+
+
 def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
     """Get unit IP address.
 
@@ -488,6 +515,47 @@ async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
                 return True
     except RetryError:
         return False
+
+
+async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
+    """Returns whether TLS is enabled on Patroni REST API.
+
+    Args:
+        ops_test: The ops test framework instance.
+        unit_name: The name of the unit where Patroni is running.
+        enabled: check if TLS is enabled/disabled
+
+    Returns:
+        Whether TLS is enabled/disabled on Patroni REST API.
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name)
+
+    # If there is no TLS CA in the relation, something is wrong in
+    # the relation between the TLS Certificates Operator and PostgreSQL.
+    if enabled and not tls_ca:
+        return False
+
+    try:
+        for attempt in Retrying(
+            stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt, tempfile.NamedTemporaryFile() as temp_ca_file:
+                # Write the TLS CA to a temporary file to use it in a request.
+                temp_ca_file.write(tls_ca.encode("utf-8"))
+                temp_ca_file.seek(0)
+
+                # The CA bundle file is used to validate the server certificate when
+                # TLS is enabled, otherwise True is set because it's the default value
+                # for the verify parameter.
+                health_info = requests.get(
+                    f"{'https' if enabled else 'http'}://{unit_address}:8008/health",
+                    verify=temp_ca_file.name if enabled else True,
+                )
+                return health_info.status_code == 200
+    except RetryError:
+        return False
+    return False
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
