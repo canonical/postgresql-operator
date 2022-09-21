@@ -94,6 +94,19 @@ jobs:
       - name: Run integration tests
         run: tox -e db-admin-relation-integration
 
+  integration-test-ha-self-healing-rotation:
+    name: Integration tests for high availability self healing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+      - name: Run integration tests
+        run: tox -e ha-self-healing-integration
+
   integration-test-password-rotation:
     name: Integration tests for password rotation
     runs-on: ubuntu-latest
@@ -130,6 +143,7 @@ jobs:
       - integration-test-database-relation
       - integration-test-db-relation
       - integration-test-db-admin-relation
+      - integration-test-ha-self-healing-rotation
       - integration-test-password-rotation
       - integration-test-tls
     runs-on: ubuntu-latest
