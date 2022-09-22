@@ -27,6 +27,7 @@ class TestCharm(unittest.TestCase):
             peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
+            False,
         )
 
     @patch("charms.operator_libs_linux.v0.apt.DebianPackage.from_system")
@@ -55,7 +56,7 @@ class TestCharm(unittest.TestCase):
             _pwnam.return_value.pw_uid = 35
             _pwnam.return_value.pw_gid = 35
             # Call the method using a temporary configuration file.
-            self.patroni._render_file(filename, "rendered-content", 0o640)
+            self.patroni.render_file(filename, "rendered-content", 0o640)
 
         # Check the rendered file is opened with "w+" mode.
         self.assertEqual(mock.call_args_list[0][0], (filename, "w+"))
@@ -66,7 +67,7 @@ class TestCharm(unittest.TestCase):
         # Ensure the file is chown'd correctly.
         _chown.assert_called_with(filename, uid=35, gid=35)
 
-    @patch("charm.Patroni._render_file")
+    @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
     def test_render_patroni_service_file(self, _, _render_file):
         # Get the expected content from a file.
@@ -92,7 +93,7 @@ class TestCharm(unittest.TestCase):
             0o644,
         )
 
-    @patch("charm.Patroni._render_file")
+    @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
     def test_render_patroni_yml_file(self, _, _render_file):
         # Define variables to render in the template.
@@ -134,7 +135,7 @@ class TestCharm(unittest.TestCase):
             0o644,
         )
 
-    @patch("charm.Patroni._render_file")
+    @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
     def test_render_postgresql_conf_file(self, _, _render_file):
         # Get the expected content from a file.

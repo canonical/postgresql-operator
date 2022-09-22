@@ -13,6 +13,7 @@ import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
+    service_restart,
     service_running,
     service_start,
 )
@@ -28,7 +29,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import USER
+from constants import TLS_CA_FILE, USER
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +63,7 @@ class Patroni:
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
+        tls_enabled: bool,
     ):
         """Initialize the Patroni class.
 
@@ -74,6 +76,7 @@ class Patroni:
             planned_units: number of units planned for the cluster
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
+            tls_enabled: whether TLS is enabled
         """
         self.unit_ip = unit_ip
         self.storage_path = storage_path
@@ -83,22 +86,29 @@ class Patroni:
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
+        self.tls_enabled = tls_enabled
+        # Variable mapping to requests library verify parameter.
+        # The CA bundle file is used to validate the server certificate when
+        # TLS is enabled, otherwise True is set because it's the default value.
+        self.verify = f"{self.storage_path}/{TLS_CA_FILE}" if tls_enabled else True
 
-    def bootstrap_cluster(self, replica: bool = False) -> bool:
+    @property
+    def _patroni_url(self) -> str:
+        """Patroni REST API URL."""
+        return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
+
+    def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""
         # Render the configuration files and start the cluster.
-        self.configure_patroni_on_unit(replica)
+        self.configure_patroni_on_unit()
         return self.start_patroni()
 
-    def configure_patroni_on_unit(self, replica: bool = False):
-        """Configure Patroni (configuration files and service) on the unit.
-
-        Args:
-            replica: whether the unit should be configured as a replica
-            (defaults to False, which configures the unit as a leader)
-        """
+    def configure_patroni_on_unit(self):
+        """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
-        self.render_patroni_yml_file(replica)
+        # Avoid rendering the Patroni config file if it was already rendered.
+        if not os.path.exists(f"{self.storage_path}/patroni.yml"):
+            self.render_patroni_yml_file()
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
@@ -120,7 +130,7 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
         return set([member["name"] for member in cluster_status.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
@@ -153,7 +163,7 @@ class Patroni:
         """
         ip = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
         for member in cluster_status.json()["members"]:
             if member["name"] == member_name:
                 ip = member["host"]
@@ -171,7 +181,7 @@ class Patroni:
         """
         primary = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
         for member in cluster_status.json()["members"]:
             if member["role"] == "leader":
                 primary = member["name"]
@@ -193,7 +203,9 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    cluster_status = requests.get(f"http://{self.unit_ip}:8008/cluster")
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/cluster", verify=self.verify
+                    )
         except RetryError:
             return False
 
@@ -215,13 +227,13 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"http://{self.unit_ip}:8008/health")
+                    r = requests.get(f"{self._patroni_url}/health", verify=self.verify)
         except RetryError:
             return False
 
         return r.json()["state"] == "running"
 
-    def _render_file(self, path: str, content: str, mode: int) -> None:
+    def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
         Args:
@@ -246,27 +258,31 @@ class Patroni:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(conf_path=self.storage_path)
-        self._render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
+        self.render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def render_patroni_yml_file(self, replica: bool = False) -> None:
-        """Render the Patroni configuration file."""
+    def render_patroni_yml_file(self, enable_tls: bool = False) -> None:
+        """Render the Patroni configuration file.
+
+        Args:
+            enable_tls: whether to enable TLS.
+        """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
             conf_path=self.storage_path,
+            enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
-            replica=replica,
             superuser=USER,
             superuser_password=self.superuser_password,
             replication_password=self.replication_password,
             version=self._get_postgresql_version(),
         )
-        self._render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
+        self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
     def render_postgresql_conf_file(self) -> None:
         """Render the PostgreSQL configuration file."""
@@ -281,7 +297,7 @@ class Patroni:
             synchronous_standby_names="*",
         )
         self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
-        self._render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
+        self.render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using systemd.
@@ -299,8 +315,9 @@ class Patroni:
             with attempt:
                 current_primary = self.get_primary()
                 r = requests.post(
-                    f"http://{self.unit_ip}:8008/switchover",
+                    f"{self._patroni_url}/switchover",
                     json={"leader": current_primary},
+                    verify=self.verify,
                 )
 
         # Check whether the switchover was unsuccessful.
@@ -316,14 +333,6 @@ class Patroni:
         """Checks whether the primary unit has changed."""
         primary = self.get_primary()
         return primary != old_primary
-
-    def update_cluster_members(self) -> None:
-        """Update the list of members of the cluster."""
-        # Update the members in the Patroni configuration.
-        self.render_patroni_yml_file()
-
-        if service_running(PATRONI_SERVICE):
-            self.reload_patroni_configuration()
 
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
@@ -355,4 +364,18 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(f"http://{self.unit_ip}:8008/reload")
+        requests.post(f"{self._patroni_url}/reload", verify=self.verify)
+
+    def restart_patroni(self) -> bool:
+        """Restart Patroni.
+
+        Returns:
+            Whether the service restarted successfully.
+        """
+        service_restart(PATRONI_SERVICE)
+        return service_running(PATRONI_SERVICE)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def restart_postgresql(self) -> None:
+        """Restart PostgreSQL."""
+        requests.post(f"{self._patroni_url}/restart", verify=self.verify)

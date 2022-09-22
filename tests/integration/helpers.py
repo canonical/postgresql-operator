@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import itertools
+import json
 import tempfile
 import zipfile
 from datetime import datetime
@@ -14,6 +15,7 @@ import yaml
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 from tenacity import (
+    RetryError,
     Retrying,
     retry,
     retry_if_result,
@@ -308,6 +310,7 @@ async def execute_query_on_unit(
     password: str,
     query: str,
     database: str = "postgres",
+    sslmode: str = None,
 ):
     """Execute given PostgreSQL query on a unit.
 
@@ -316,12 +319,15 @@ async def execute_query_on_unit(
         password: The PostgreSQL superuser password.
         query: Query to execute.
         database: Optional database to connect to (defaults to postgres database).
+        sslmode: Optional ssl mode to use (defaults to None).
 
     Returns:
         A list of rows that were potentially returned from the query.
     """
+    extra_connection_parameters = f"sslmode={sslmode}" if sslmode else ""
     with psycopg2.connect(
-        f"dbname='{database}' user='operator' host='{unit_address}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='operator' host='{unit_address}'"
+        f"password='{password}' connect_timeout=10 {extra_connection_parameters}"
     ) as connection, connection.cursor() as cursor:
         cursor.execute(query)
         output = list(itertools.chain(*cursor.fetchall()))
@@ -407,6 +413,32 @@ async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
     return action.results["primary"]
 
 
+async def get_tls_ca(
+    ops_test: OpsTest,
+    unit_name: str,
+) -> str:
+    """Returns the TLS CA used by the unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit
+
+    Returns:
+        TLS CA or an empty string if there is no CA.
+    """
+    raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {unit_name}")
+    data = yaml.safe_load(raw_data)
+    # Filter the data based on the relation name.
+    relation_data = [
+        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
+    ]
+    if len(relation_data) == 0:
+        return ""
+    return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
+
+
 def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
     """Get unit IP address.
 
@@ -418,6 +450,112 @@ def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
         IP address of the unit
     """
     return ops_test.model.units.get(unit_name).public_address
+
+
+async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
+    """Returns whether TLS is enabled on the specific PostgreSQL instance.
+
+    Args:
+        ops_test: The ops test framework instance.
+        unit_name: The name of the unit of the PostgreSQL instance.
+        enabled: check if TLS is enabled/disabled
+
+    Returns:
+        Whether TLS is enabled/disabled.
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    password = await get_password(ops_test, unit_name)
+    # Get the IP addresses of the other units to check that they
+    # are connecting to the primary unit (if unit_name is the
+    # primary unit name) using encrypted connections.
+    app_name = unit_name.split("/")[0]
+    unit_addresses = [
+        f"'{get_unit_address(ops_test, other_unit_name)}'"
+        for other_unit_name in ops_test.model.units
+        if other_unit_name.split("/")[0] == app_name and other_unit_name != unit_name
+    ]
+    try:
+        for attempt in Retrying(
+            stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt:
+                output = await execute_query_on_unit(
+                    unit_address,
+                    password,
+                    "SHOW ssl;",
+                    sslmode="require" if enabled else "disable",
+                )
+                tls_enabled = "on" in output
+
+                # Check for the number of bits in the encryption algorithm used
+                # on each connection. If a connection is not encrypted, None
+                # is returned instead of an integer.
+                connections_encryption_info = await execute_query_on_unit(
+                    unit_address,
+                    password,
+                    "SELECT bits FROM pg_stat_ssl INNER JOIN pg_stat_activity"
+                    " ON pg_stat_ssl.pid = pg_stat_activity.pid"
+                    " WHERE pg_stat_ssl.pid = pg_backend_pid()"
+                    f" OR client_addr IN ({','.join(unit_addresses)});",
+                )
+
+                # This flag indicates whether all the connections are encrypted
+                # when checking for TLS enabled or all the connections are not
+                # encrypted when checking for TLS disabled.
+                connections_encrypted = (
+                    all(connections_encryption_info)
+                    if enabled
+                    else any(connections_encryption_info)
+                )
+
+                if enabled != tls_enabled or tls_enabled != connections_encrypted:
+                    raise ValueError(
+                        f"TLS is{' not' if not tls_enabled else ''} enabled on {unit_name}"
+                    )
+                return True
+    except RetryError:
+        return False
+
+
+async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
+    """Returns whether TLS is enabled on Patroni REST API.
+
+    Args:
+        ops_test: The ops test framework instance.
+        unit_name: The name of the unit where Patroni is running.
+        enabled: check if TLS is enabled/disabled
+
+    Returns:
+        Whether TLS is enabled/disabled on Patroni REST API.
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name)
+
+    # If there is no TLS CA in the relation, something is wrong in
+    # the relation between the TLS Certificates Operator and PostgreSQL.
+    if enabled and not tls_ca:
+        return False
+
+    try:
+        for attempt in Retrying(
+            stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt, tempfile.NamedTemporaryFile() as temp_ca_file:
+                # Write the TLS CA to a temporary file to use it in a request.
+                temp_ca_file.write(tls_ca.encode("utf-8"))
+                temp_ca_file.seek(0)
+
+                # The CA bundle file is used to validate the server certificate when
+                # TLS is enabled, otherwise True is set because it's the default value
+                # for the verify parameter.
+                health_info = requests.get(
+                    f"{'https' if enabled else 'http'}://{unit_address}:8008/health",
+                    verify=temp_ca_file.name if enabled else True,
+                )
+                return health_info.status_code == 200
+    except RetryError:
+        return False
+    return False
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
