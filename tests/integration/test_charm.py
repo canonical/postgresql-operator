@@ -8,6 +8,7 @@ import logging
 import psycopg2
 import pytest
 import requests
+from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
@@ -96,12 +97,20 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
         # Here the SQL query gets a key-value pair composed by the name of the setting
         # and its value, filtering the retrieved data to return only the settings
         # that were set by Patroni.
+        settings_names = [
+            "data_directory",
+            "cluster_name",
+            "data_checksums",
+            "listen_addresses",
+            "max_wal_senders",
+            "wal_level",
+        ]
         with connection.cursor() as cursor:
             cursor.execute(
-                """SELECT name,setting
-                    FROM pg_settings
-                    WHERE name IN
-                    ('data_directory', 'cluster_name', 'data_checksums', 'listen_addresses');"""
+                sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
+                    sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
+                ),
+                settings_names,
             )
             records = cursor.fetchall()
             settings = convert_records_to_dict(records)
@@ -112,6 +121,8 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     assert settings["data_directory"] == f"{STORAGE_PATH}/pgdata"
     assert settings["data_checksums"] == "on"
     assert settings["listen_addresses"] == host
+    assert settings["max_wal_senders"] == "3"
+    assert settings["wal_level"] == "logical"
 
     # Retrieve settings from Patroni REST API.
     result = requests.get(f"http://{host}:8008/config")
