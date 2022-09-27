@@ -7,6 +7,7 @@ from unittest.mock import mock_open, patch
 from jinja2 import Template
 
 from cluster import Patroni
+from constants import BACKUP_USER
 from lib.charms.operator_libs_linux.v0.apt import DebianPackage, PackageState
 from tests.helpers import STORAGE_PATH
 
@@ -16,7 +17,7 @@ PATRONI_SERVICE = "patroni"
 class TestCharm(unittest.TestCase):
     def setUp(self):
         # Setup a cluster.
-        self.peers_ips = peers_ips = ["2.2.2.2", "3.3.3.3"]
+        self.peers_ips = peers_ips = {"2.2.2.2", "3.3.3.3"}
 
         self.patroni = Patroni(
             "1.1.1.1",
@@ -27,6 +28,7 @@ class TestCharm(unittest.TestCase):
             peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
+            "fake-backup-password",
             False,
         )
 
@@ -101,12 +103,14 @@ class TestCharm(unittest.TestCase):
         scope = "postgresql"
         superuser_password = "fake-superuser-password"
         replication_password = "fake-replication-password"
+        backup_password = "fake-backup-password"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
             conf_path=STORAGE_PATH,
+            max_wal_senders=len(self.peers_ips) + 3,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
@@ -114,6 +118,8 @@ class TestCharm(unittest.TestCase):
             superuser="operator",
             superuser_password=superuser_password,
             replication_password=replication_password,
+            backup_user=BACKUP_USER,
+            backup_password=backup_password,
             version=self.patroni._get_postgresql_version(),
         )
 

@@ -98,10 +98,13 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
         # and its value, filtering the retrieved data to return only the settings
         # that were set by Patroni.
         settings_names = [
+            "archive_command",
+            "archive_mode",
             "data_directory",
             "cluster_name",
             "data_checksums",
             "listen_addresses",
+            "max_replication_slots",
             "max_wal_senders",
             "wal_level",
         ]
@@ -117,11 +120,18 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
     connection.close()
 
     # Validate each configuration set by Patroni on PostgreSQL.
+    assert settings["archive_command"] == "/bin/true"
+    assert settings["archive_mode"] == "on"
     assert settings["cluster_name"] == f"{DATABASE_APP_NAME}-{series}"
     assert settings["data_directory"] == f"{STORAGE_PATH}/pgdata"
     assert settings["data_checksums"] == "on"
     assert settings["listen_addresses"] == host
-    assert settings["max_wal_senders"] == "3"
+    assert settings["max_replication_slots"] == str(
+        len(UNIT_IDS) + 2
+    )  # Number of units - 1 (primary) + 3 (backup WAL senders).
+    assert settings["max_wal_senders"] == str(
+        len(UNIT_IDS) + 2
+    )  # Number of units - 1 (primary) + 3 (backup WAL senders).
     assert settings["wal_level"] == "logical"
 
     # Retrieve settings from Patroni REST API.
@@ -130,6 +140,8 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
 
     # Validate each configuration related to Patroni
     assert settings["postgresql"]["use_pg_rewind"]
+    assert settings["postgresql"]["remove_data_directory_on_rewind_failure"]
+    assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"]
     assert settings["loop_wait"] == 10
     assert settings["retry_timeout"] == 10
     assert settings["maximum_lag_on_failover"] == 1048576

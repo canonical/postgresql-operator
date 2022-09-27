@@ -3,6 +3,8 @@
 
 """File containing constants to be used in the charm."""
 
+BACKUP_USER = "backup"
+BACKUP_PASSWORD_KEY = "backup-password"
 DATABASE = "database"
 DATABASE_PORT = "5432"
 LEGACY_DB = "db"
@@ -17,4 +19,4 @@ TLS_CERT_FILE = "cert.pem"
 USER = "operator"
 USER_PASSWORD_KEY = "operator-password"
 # List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [REPLICATION_USER, USER]
+SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, USER]
