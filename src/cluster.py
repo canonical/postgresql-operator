@@ -276,8 +276,6 @@ class Patroni:
         rendered = template.render(
             conf_path=self.storage_path,
             enable_tls=enable_tls,
-            max_wal_senders=len(self.peers_ips)
-            + 3,  # One WAL sender for each replica plus 3 backup WAL senders.
             member_name=self.member_name,
             peers_ips=self.peers_ips,
             scope=self.cluster_name,

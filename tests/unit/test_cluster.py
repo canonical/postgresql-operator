@@ -110,7 +110,6 @@ class TestCharm(unittest.TestCase):
             template = Template(file.read())
         expected_content = template.render(
             conf_path=STORAGE_PATH,
-            max_wal_senders=len(self.peers_ips) + 3,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
