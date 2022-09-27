@@ -7,7 +7,7 @@ from unittest.mock import mock_open, patch
 from jinja2 import Template
 
 from cluster import Patroni
-from constants import BACKUP_USER
+from constants import REWIND_USER
 from lib.charms.operator_libs_linux.v0.apt import DebianPackage, PackageState
 from tests.helpers import STORAGE_PATH
 
@@ -28,7 +28,7 @@ class TestCharm(unittest.TestCase):
             peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
-            "fake-backup-password",
+            "fake-rewind-password",
             False,
         )
 
@@ -103,7 +103,7 @@ class TestCharm(unittest.TestCase):
         scope = "postgresql"
         superuser_password = "fake-superuser-password"
         replication_password = "fake-replication-password"
-        backup_password = "fake-backup-password"
+        rewind_password = "fake-rewind-password"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
@@ -117,8 +117,8 @@ class TestCharm(unittest.TestCase):
             superuser="operator",
             superuser_password=superuser_password,
             replication_password=replication_password,
-            backup_user=BACKUP_USER,
-            backup_password=backup_password,
+            rewind_user=REWIND_USER,
+            rewind_password=rewind_password,
             version=self.patroni._get_postgresql_version(),
         )
 

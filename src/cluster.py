@@ -29,7 +29,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import BACKUP_USER, TLS_CA_FILE, USER
+from constants import REWIND_USER, TLS_CA_FILE, USER
 
 logger = logging.getLogger(__name__)
 
@@ -63,7 +63,7 @@ class Patroni:
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
-        backup_password: str,
+        rewind_password: str,
         tls_enabled: bool,
     ):
         """Initialize the Patroni class.
@@ -77,7 +77,7 @@ class Patroni:
             planned_units: number of units planned for the cluster
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
-            backup_password: password for the user used on backups
+            rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
         self.unit_ip = unit_ip
@@ -88,7 +88,7 @@ class Patroni:
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
-        self.backup_password = backup_password
+        self.rewind_password = rewind_password
         self.tls_enabled = tls_enabled
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
@@ -283,8 +283,8 @@ class Patroni:
             superuser=USER,
             superuser_password=self.superuser_password,
             replication_password=self.replication_password,
-            backup_user=BACKUP_USER,
-            backup_password=self.backup_password,
+            rewind_user=REWIND_USER,
+            rewind_password=self.rewind_password,
             version=self._get_postgresql_version(),
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)

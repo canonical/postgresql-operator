@@ -44,9 +44,9 @@ from cluster import (
     SwitchoverFailedError,
 )
 from constants import (
-    BACKUP_PASSWORD_KEY,
     PEER,
     REPLICATION_PASSWORD_KEY,
+    REWIND_PASSWORD_KEY,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -411,7 +411,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
-            self.get_secret("app", BACKUP_PASSWORD_KEY),
+            self.get_secret("app", REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
 
@@ -551,8 +551,8 @@ class PostgresqlOperatorCharm(CharmBase):
             self.set_secret("app", USER_PASSWORD_KEY, new_password())
         if self.get_secret("app", REPLICATION_PASSWORD_KEY) is None:
             self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
-        if self.get_secret("app", BACKUP_PASSWORD_KEY) is None:
-            self.set_secret("app", BACKUP_PASSWORD_KEY, new_password())
+        if self.get_secret("app", REWIND_PASSWORD_KEY) is None:
+            self.set_secret("app", REWIND_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
