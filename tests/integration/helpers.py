@@ -18,6 +18,7 @@ from tenacity import (
     RetryError,
     Retrying,
     retry,
+    retry_if_exception,
     retry_if_result,
     stop_after_attempt,
     wait_exponential,
@@ -305,6 +306,21 @@ async def deploy_and_relate_bundle_with_postgresql(
     return relation.id
 
 
+def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
+    """Turn on the log of all connections made to a PostgreSQL instance.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to turn on the connection logs
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    requests.patch(
+        f"https://{unit_address}:8008/config",
+        json={"postgresql": {"parameters": {"log_connections": True}}},
+        verify=False,
+    )
+
+
 async def execute_query_on_unit(
     unit_address: str,
     password: str,
@@ -398,6 +414,11 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
     return result.results[f"{username}-password"]
 
 
+@retry(
+    retry=retry_if_exception(KeyError),
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+)
 async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
     """Get the primary unit.
 
@@ -556,6 +577,47 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     except RetryError:
         return False
     return False
+
+
+@retry(
+    retry=retry_if_result(lambda x: not x),
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+)
+async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
+    """Checks whether the primary unit has changed.
+
+    Args:
+        ops_test: The ops test framework instance
+        old_primary: The name of the unit that was the primary before.
+    """
+    other_unit = [
+        unit.name
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+        if unit.name != old_primary
+    ][0]
+    primary = await get_primary(ops_test, other_unit)
+    return primary != old_primary
+
+
+async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -> str:
+    """Run a command on a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to run the command on
+        command: The command to run
+
+    Returns:
+        the command output if it succeeds, otherwise raises an exception.
+    """
+    complete_command = f"run --unit {unit_name} -- {command}"
+    return_code, stdout, _ = await ops_test.juju(*complete_command.split())
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s", command, return_code
+        )
+    return stdout
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
