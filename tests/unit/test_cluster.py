@@ -27,6 +27,7 @@ class TestCharm(unittest.TestCase):
             peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
+            False,
         )
 
     @patch("charms.operator_libs_linux.v0.apt.DebianPackage.from_system")

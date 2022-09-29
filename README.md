@@ -47,7 +47,17 @@ juju remove-unit postgresql <name_of_unit1> <name_of_unit2>
 ```
 The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
 
+### Password rotation
+#### Charm users
+For users used internally by the Charmed PostgreSQL Operator an action can be used to rotate their passwords.
+```shell
+juju run-action postgresql/0 set-password username=<username> password=<password> --wait
+```
+Currently, the users used by the operator are `operator` and `replication`. Those users should not be used outside the operator.
 
+#### Related applications users
+
+To rotate the passwords of users created for related applications the relation should be removed and the application should be related again to the Charmed PostgreSQL Operator. That process will generate a new user and password for the application (removing the old user).
 
 ## Relations
 
@@ -72,6 +82,23 @@ We have also added support for the two database legacy relations from the [origi
 juju relate postgresql:db mailman3-core
 juju relate postgresql:db-admin landscape-server
 ```
+
+#### `tls-certificates` interface:
+
+The Charmed PostgreSQL Operator also supports TLS encryption on internal and external connections. To enable TLS:
+
+```shell
+# Deploy the TLS Certificates Operator. 
+juju deploy tls-certificates-operator --channel=edge
+# Add the necessary configurations for TLS.
+juju config tls-certificates-operator generate-self-signed-certificates="true" ca-common-name="Test CA" 
+# Enable TLS via relation.
+juju relate postgresql tls-certificates-operator
+# Disable TLS by removing relation.
+juju remove-relation postgresql tls-certificates-operator
+```
+
+Note: The TLS settings shown here are for self-signed-certificates, which are not recommended for production clusters. The TLS Certificates Operator offers a variety of configurations. Read more on the TLS Certificates Operator [here](https://charmhub.io/tls-certificates-operator).
 
 ## Security
 Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not file GitHub issues about security issues.

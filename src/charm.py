@@ -410,6 +410,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
+            bool(self.unit_peer_data.get("tls")),
         )
 
     @property
@@ -820,12 +821,10 @@ class PostgresqlOperatorCharm(CharmBase):
         self.update_config()
 
     def _restart(self, _) -> None:
-        """Restart PostgreSQL."""
-        try:
-            self._patroni.restart_postgresql()
-        except RetryError as e:
+        """Restart Patroni and PostgreSQL."""
+        if not self._patroni.restart_patroni():
             logger.exception("failed to restart PostgreSQL")
-            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
+            self.unit.status = BlockedStatus("failed to restart Patroni and PostgreSQL")
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
@@ -838,6 +837,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
         self._patroni.reload_patroni_configuration()
+        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
 
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).
