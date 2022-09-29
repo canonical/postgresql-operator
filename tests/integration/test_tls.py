@@ -10,8 +10,11 @@ from tests.integration.helpers import (
     DATABASE_APP_NAME,
     check_tls,
     check_tls_patroni_api,
+    db_connect,
     enable_connections_logging,
+    get_password,
     get_primary,
+    get_unit_address,
     primary_changed,
     run_command_on_unit,
 )
@@ -76,6 +79,17 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
         )
 
+        # Write some data to the initial primary (this causes a divergence
+        # in the instances' timelines).
+        host = get_unit_address(ops_test, primary)
+        password = await get_password(ops_test, primary)
+        with db_connect(host, password) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                cursor.execute("CREATE TABLE pgrewindtest (testcol INT);")
+                cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
+        connection.close()
+
         # Stop the initial primary.
         await run_command_on_unit(ops_test, primary, "systemctl stop patroni")
 
@@ -84,11 +98,11 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Restart the initial primary and check the logs to ensure TLS is being used by pg_rewind.
         # It can take some time for the rewind operation to happen.
+        await run_command_on_unit(ops_test, primary, "systemctl start patroni")
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
             with attempt:
-                await run_command_on_unit(ops_test, primary, "systemctl start patroni")
                 logs = await run_command_on_unit(
                     ops_test, replica, "journalctl -u patroni.service"
                 )
