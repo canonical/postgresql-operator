@@ -10,11 +10,8 @@ from tests.integration.helpers import (
     DATABASE_APP_NAME,
     check_tls,
     check_tls_patroni_api,
-    db_connect,
     enable_connections_logging,
-    get_password,
     get_primary,
-    get_unit_address,
     primary_changed,
     run_command_on_unit,
 )
@@ -78,16 +75,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             replica,
             "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
         )
-
-        # Write some data to the initial primary (this causes a divergence
-        # in the instances' timelines).
-        host = get_unit_address(ops_test, primary)
-        password = await get_password(ops_test, primary)
-        with db_connect(host, password) as connection:
-            connection.autocommit = True
-            with connection.cursor() as cursor:
-                cursor.execute("CREATE TABLE pgrewindtest (testcol INT);")
-        connection.close()
 
         # Stop the initial primary.
         await run_command_on_unit(ops_test, primary, "systemctl stop patroni")
