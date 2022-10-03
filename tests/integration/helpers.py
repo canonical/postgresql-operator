@@ -300,7 +300,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     await ops_test.model.wait_for_idle(
         apps=[application_name],
         status="active",
-        timeout=1000,
+        timeout=2000,
     )
 
     return relation.id
