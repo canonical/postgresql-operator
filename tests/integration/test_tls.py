@@ -99,6 +99,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await list_wal_files(ops_test, "before stop")
 
         # Stop the initial primary.
+        await run_command_on_unit(ops_test, primary, "systemctl stop patroni")
         await run_command_on_unit(ops_test, primary, "pkill --signal SIGKILL -f postgres")
         await list_wal_files(ops_test, "before primary change check")
 
