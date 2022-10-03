@@ -99,8 +99,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Check that the primary changed.
         assert await primary_changed(ops_test, primary), "primary not changed"
 
-        # Check the logs to ensure TLS is being used by pg_rewind.
+        # Restart the initial primary and check the logs to ensure TLS is being used by pg_rewind.
         # It can take some time for the rewind operation to happen.
+        await run_command_on_unit(ops_test, primary, "systemctl restart patroni")
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
