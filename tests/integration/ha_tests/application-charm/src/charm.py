@@ -114,6 +114,7 @@ class ApplicationCharm(CharmBase):
         if self._connection_string is None:
             return
 
+        # Stop any writes that might be going.
         self._stop_continuous_writes()
 
         # Run continuous writes in the background.
