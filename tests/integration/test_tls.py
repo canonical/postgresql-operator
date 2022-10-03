@@ -79,15 +79,13 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
         )
 
-        # Write some data to the initial primary (this causes a divergence
-        # in the instances' timelines).
+        # Switch the WAL segment to force a rewind on the former primary later.
         host = get_unit_address(ops_test, primary)
         password = await get_password(ops_test, primary)
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
-                cursor.execute("CREATE TABLE pgrewindtest (testcol INT);")
-                cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
+                cursor.execute("SELECT pg_switch_wal();")
         connection.close()
 
         # Stop the initial primary by killing both Patroni and PostgreSQL OS processes.
