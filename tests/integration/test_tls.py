@@ -74,6 +74,13 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         enable_connections_logging(ops_test, primary)
         change_master_start_timeout(ops_test, primary, 0)
 
+        # Promote the replica to primary.
+        await run_command_on_unit(
+            ops_test,
+            replica,
+            "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
+        )
+
         # Write some data to the initial primary (this causes a divergence
         # in the instances' timelines).
         host = get_unit_address(ops_test, primary)
