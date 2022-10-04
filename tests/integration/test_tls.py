@@ -8,6 +8,7 @@ from tenacity import Retrying, stop_after_delay, wait_exponential
 from tests.helpers import METADATA
 from tests.integration.helpers import (
     DATABASE_APP_NAME,
+    change_master_start_timeout,
     check_tls,
     check_tls_patroni_api,
     db_connect,
@@ -69,8 +70,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         ][0]
 
         # Enable additional logs on the PostgreSQL instance to check TLS
-        # being used in a later step.
+        # being used in a later step and make the fail-over to happens faster.
         enable_connections_logging(ops_test, primary)
+        change_master_start_timeout(ops_test, primary, 0)
 
         # Promote the replica to primary.
         await run_command_on_unit(
@@ -98,10 +100,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check that the primary changed.
         assert await primary_changed(ops_test, primary), "primary not changed"
+        change_master_start_timeout(ops_test, primary, 300)
 
-        # Restart the initial primary and check the logs to ensure TLS is being used by pg_rewind.
+        # Check the logs to ensure TLS is being used by pg_rewind.
         # It can take some time for the rewind operation to happen.
-        await run_command_on_unit(ops_test, primary, "systemctl restart patroni")
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):

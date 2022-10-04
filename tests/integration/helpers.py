@@ -7,7 +7,7 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import psycopg2
 import requests
@@ -21,7 +21,9 @@ from tenacity import (
     retry_if_exception,
     retry_if_result,
     stop_after_attempt,
+    stop_after_delay,
     wait_exponential,
+    wait_fixed,
 )
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -62,6 +64,24 @@ async def build_connection_string(
         return data.get("standbys").split(",")[0]
     else:
         return data.get("master")
+
+
+def change_master_start_timeout(ops_test: OpsTest, unit_name: str, seconds: Optional[int]) -> None:
+    """Change master start timeout configuration.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: the unit used to set the configuration.
+        seconds: number of seconds to set in master_start_timeout configuration.
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            unit_ip = get_unit_address(ops_test, unit_name)
+            requests.patch(
+                f"https://{unit_ip}:8008/config",
+                json={"master_start_timeout": seconds},
+                verify=False,
+            )
 
 
 async def check_database_users_existence(
