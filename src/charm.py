@@ -831,6 +831,20 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.restart_patroni():
             logger.exception("failed to restart PostgreSQL")
             self.unit.status = BlockedStatus("failed to restart Patroni and PostgreSQL")
+            return
+
+        self._reinitialize_replica()
+
+    def _reinitialize_replica(self) -> None:
+        if (
+            not self._patroni.member_started
+            and self._patroni.get_primary(unit_name_pattern=True) != self.unit.name
+        ):
+            try:
+                self._patroni.reinitialize_replica()
+                logger.info("replica reinitializing")
+            except RetryError:
+                self.unit.status = BlockedStatus("failed to reinitialize replica data directory")
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
