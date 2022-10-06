@@ -77,6 +77,7 @@ def change_master_start_timeout(ops_test: OpsTest, unit_name: str, seconds: Opti
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             unit_ip = get_unit_address(ops_test, unit_name)
+            print(f"unit_ip: {unit_ip}")
             requests.patch(
                 f"https://{unit_ip}:8008/config",
                 json={"master_start_timeout": seconds},
