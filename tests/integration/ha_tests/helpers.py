@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -7,7 +8,13 @@ import psycopg2
 import requests
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
+from tenacity import (
+    RetryError,
+    Retrying,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
 
 from tests.integration.helpers import get_unit_address
 
@@ -57,22 +64,39 @@ async def change_master_start_timeout(ops_test: OpsTest, seconds: Optional[int])
 async def count_writes(ops_test: OpsTest) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
+    print(11)
     password = await get_password(ops_test, app)
-    host = ops_test.model.applications[app].units[0].public_address
-    connection_string = (
-        f"dbname='application' user='operator'"
-        f" host='{host}' password='{password}' connect_timeout=10"
-    )
+    print(12)
     try:
-        for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        for attempt in Retrying(
+            stop=stop_after_attempt(len(ops_test.model.applications[app].units))
+        ):
             with attempt:
+                host = (
+                    ops_test.model.applications[app]
+                    .units[attempt.retry_state.attempt_number - 1]
+                    .public_address
+                )
+                print(13)
+                connection_string = (
+                    f"dbname='application' user='operator'"
+                    f" host='{host}' password='{password}' connect_timeout=10"
+                )
+                print(14)
                 with psycopg2.connect(
                     connection_string
                 ) as connection, connection.cursor() as cursor:
+                    print(15)
                     cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
+                    print(16)
                     count = cursor.fetchone()[0]
+                    print(17)
                 connection.close()
+                print(18)
     except RetryError:
+        return -1
+    except Exception as e:
+        print(str(e))
         return -1
     return count
 
@@ -103,10 +127,15 @@ async def get_password(ops_test: OpsTest, app) -> str:
         string with the password stored on the peer relation databag.
     """
     # Can retrieve from any unit running unit, so we pick the first.
-    unit_name = ops_test.model.applications[app].units[0].name
-    action = await ops_test.model.units.get(unit_name).run_action("get-password")
-    action = await action.wait()
-    return action.results["operator-password"]
+    for attempt in Retrying(stop=stop_after_attempt(len(ops_test.model.applications[app].units))):
+        with attempt:
+            unit_name = (
+                ops_test.model.applications[app].units[attempt.retry_state.attempt_number - 1].name
+            )
+            print(f"unit_name: {unit_name}")
+            action = await ops_test.model.units.get(unit_name).run_action("get-password")
+            action = await asyncio.wait_for(action.wait(), 10)
+            return action.results["operator-password"]
 
 
 async def get_primary(ops_test: OpsTest, app) -> str:
@@ -122,7 +151,9 @@ async def get_primary(ops_test: OpsTest, app) -> str:
     return action.results["primary"]
 
 
-async def kill_process(ops_test: OpsTest, unit_name: str, process: str, kill_code: str) -> None:
+async def send_signal_to_process(
+    ops_test: OpsTest, unit_name: str, process: str, kill_code: str
+) -> None:
     """Kills process on the unit according to the provided kill code."""
     # Killing the only instance can be disastrous.
     app = await app_name(ops_test)

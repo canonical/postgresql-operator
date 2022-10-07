@@ -9,6 +9,8 @@ high availability of the PostgreSQL charm.
 """
 
 import logging
+import os
+import signal
 import subprocess
 from typing import Optional
 
@@ -74,15 +76,24 @@ class ApplicationCharm(CharmBase):
 
     def _on_database_created(self, _) -> None:
         """Event triggered when a database was created for this application."""
+        logger.error(
+            "--------------------------------- _on_database_created ---------------------------------"
+        )
         self._start_continuous_writes(1)
 
     def _on_endpoints_changed(self, _) -> None:
         """Event triggered when the read/write endpoints of the database change."""
+        logger.error(
+            "--------------------------------- _on_endpoints_changed ---------------------------------"
+        )
         count = self._count_writes()
         self._start_continuous_writes(count + 1)
 
     def _count_writes(self) -> int:
         """Count the number of records in the continuous_writes table."""
+        logger.error(
+            "--------------------------------- _count_writes ---------------------------------"
+        )
         with psycopg2.connect(
             self._connection_string
         ) as connection, connection.cursor() as cursor:
@@ -93,6 +104,9 @@ class ApplicationCharm(CharmBase):
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
+        logger.error(
+            "--------------------------------- _on_clear_continuous_writes_action ---------------------------------"
+        )
         self._stop_continuous_writes()
         with psycopg2.connect(
             self._connection_string
@@ -101,15 +115,24 @@ class ApplicationCharm(CharmBase):
         connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
+        logger.error(
+            "--------------------------------- _on_start_continuous_writes_action ---------------------------------"
+        )
         """Start the continuous writes process."""
         self._start_continuous_writes(1)
 
     def _on_stop_continuous_writes_action(self, event: ActionEvent) -> None:
         """Stops the continuous writes process."""
+        logger.error(
+            "--------------------------------- _on_stop_continuous_writes_action ---------------------------------"
+        )
         writes = self._stop_continuous_writes()
         event.set_results({"writes": writes})
 
     def _start_continuous_writes(self, starting_number: int) -> None:
+        logger.error(
+            "--------------------------------- _start_continuous_writes ---------------------------------"
+        )
         """Starts continuous writes to PostgreSQL instance."""
         if self._connection_string is None:
             return
@@ -134,12 +157,22 @@ class ApplicationCharm(CharmBase):
         """Stops continuous writes to PostgreSQL and returns the last written value."""
         if self._stored.continuous_writes_pid is None:
             return None
+        logger.error(
+            "--------------------------------- _stop_continuous_writes ---------------------------------"
+        )
 
         # Stop the process.
         proc = subprocess.Popen(["pkill", "--signal", "SIGKILL", "-f", "src/continuous_writes.py"])
+        # os.kill(self._stored.continuous_writes_pid, signal.SIGINT)
+        logger.error(
+            "--------------------------------- after kill ---------------------------------"
+        )
 
         # Wait for process to be killed.
         proc.communicate()
+        logger.error(
+            "--------------------------------- after communicate ---------------------------------"
+        )
 
         self._stored.continuous_writes_pid = None
 
@@ -156,6 +189,9 @@ class ApplicationCharm(CharmBase):
         except RetryError as e:
             logger.exception(e)
             return -1
+        logger.error(
+            "--------------------------------- after retry ---------------------------------"
+        )
 
         return last_written_value
 

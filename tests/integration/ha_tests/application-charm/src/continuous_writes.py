@@ -2,9 +2,12 @@
 # See LICENSE file for licensing details.
 
 """This file is meant to run in the background continuously writing entries to PostgreSQL."""
+import logging
 import sys
 
 import psycopg2 as psycopg2
+
+logger = logging.getLogger(__name__)
 
 
 def continuous_writes(connection_string: str, starting_number: int):
@@ -30,6 +33,11 @@ def continuous_writes(connection_string: str, starting_number: int):
 
     # Continuously write the record to the database (incrementing it at each iteration).
     while True:
+        logger.error("starting loop again...")
+        f = open("/tmp/demofile0.txt", "a")
+        f.write(str(write_value))
+        f.write("\n\n")
+        f.close()
         try:
             with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
                 connection.autocommit = True
@@ -38,19 +46,49 @@ def continuous_writes(connection_string: str, starting_number: int):
             psycopg2.InterfaceError,
             psycopg2.OperationalError,
             psycopg2.errors.ReadOnlySqlTransaction,
-        ):
+        ) as e:
             # We should not raise any of those exceptions that can happen when a connection failure
             # happens, for example, when a primary is being reelected after a failure on the old
             # primary.
+            f = open("/tmp/demofile1.txt", "a")
+            f.write(str(write_value))
+            f.write("\n")
+            f.write(str(e))
+            f.write("\n")
+            f.write(str(type(e)))
+            f.write("\n\n")
+            f.close()
             continue
-        except psycopg2.Error:
+        except psycopg2.Error as e:
             # If another error happens, like writing a duplicate number when a connection failed
             # in a previous iteration (but the transaction was already committed), just increment
             # the number.
+            f = open("/tmp/demofile2.txt", "a")
+            f.write(str(write_value))
+            f.write("\n")
+            f.write(str(e))
+            f.write("\n")
+            f.write(str(type(e)))
+            f.write("\n\n")
+            f.close()
+            pass
+        except Exception as e:
+            f = open("/tmp/demofile3.txt", "a")
+            f.write(str(write_value))
+            f.write("\n")
+            f.write(str(e))
+            f.write("\n")
+            f.write(str(type(e)))
+            f.write("\n\n")
+            f.close()
             pass
         finally:
             connection.close()
 
+        f = open("/tmp/demofile4.txt", "a")
+        f.write(str(write_value))
+        f.write("\n\n")
+        f.close()
         write_value += 1
 
 

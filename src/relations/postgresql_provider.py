@@ -179,9 +179,11 @@ class PostgreSQLProvider(Object):
 
     def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""
+        logger.error("update_endpoints before leader check")
         if not self.charm.unit.is_leader():
             return
 
+        logger.error("update_endpoints after leader check")
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
         relations = [event.relation] if event else self.model.relations[self.relation_name]
@@ -194,6 +196,7 @@ class PostgreSQLProvider(Object):
             else ""
         )
 
+        logger.error(f"update_endpoints relations: {relations}")
         for relation in relations:
             # Set the read/write endpoint.
             self.database_provides.set_endpoints(
