@@ -163,12 +163,15 @@ class Patroni:
         """
         ip = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
-        for member in cluster_status.json()["members"]:
-            if member["name"] == member_name:
-                ip = member["host"]
-                break
-        return ip
+        for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_server_url(attempt)
+                cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
+                for member in cluster_status.json()["members"]:
+                    if member["name"] == member_name:
+                        ip = member["host"]
+                        break
+                return ip
 
     def get_primary(self, unit_name_pattern=False) -> str:
         """Get primary instance.
@@ -181,15 +184,28 @@ class Patroni:
         """
         primary = None
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
-        for member in cluster_status.json()["members"]:
-            if member["role"] == "leader":
-                primary = member["name"]
-                if unit_name_pattern:
-                    # Change the last dash to / in order to match unit name pattern.
-                    primary = "/".join(primary.rsplit("-", 1))
-                break
+        for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_server_url(attempt)
+                cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
+                for member in cluster_status.json()["members"]:
+                    if member["role"] == "leader":
+                        primary = member["name"]
+                        if unit_name_pattern:
+                            # Change the last dash to / in order to match unit name pattern.
+                            primary = "/".join(primary.rsplit("-", 1))
+                        break
         return primary
+
+    def _get_alternative_server_url(self, attempt) -> str:
+        if attempt.retry_state.attempt_number > 1:
+            url = self._patroni_url.replace(
+                self.unit_ip, list(self.peers_ips)[attempt.retry_state.attempt_number - 2]
+            )
+        else:
+            url = self._patroni_url
+        logger.warning(f"url for get primary: {url}")
+        return url
 
     def are_all_members_ready(self) -> bool:
         """Check if all members are correctly running Patroni and PostgreSQL.
