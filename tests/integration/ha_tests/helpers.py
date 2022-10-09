@@ -134,7 +134,7 @@ async def get_password(ops_test: OpsTest, app) -> str:
             )
             print(f"unit_name: {unit_name}")
             action = await ops_test.model.units.get(unit_name).run_action("get-password")
-            action = await asyncio.wait_for(action.wait(), 10)
+            action = await asyncio.wait_for(action.wait(), 30)
             return action.results["operator-password"]
 
 

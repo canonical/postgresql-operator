@@ -9,8 +9,6 @@ high availability of the PostgreSQL charm.
 """
 
 import logging
-import os
-import signal
 import subprocess
 from typing import Optional
 

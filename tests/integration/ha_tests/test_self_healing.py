@@ -64,7 +64,7 @@ async def test_kill_db_process(
         # considered to trigger a fail-over after master_start_timeout is changed).
         writes = await count_writes(ops_test)
         print(3)
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes = await count_writes(ops_test)
                 print(4)
@@ -121,11 +121,11 @@ async def test_freeze_db_process(
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
-        # 60 seconds wait (this is a little more than the loop wait configuration, that is
+        # 3 minutes wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
         writes = await count_writes(ops_test)
         print(4)
-        for attempt in Retrying(stop=stop_after_delay(60 * 2), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes = await count_writes(ops_test)
                 print(4.1)
