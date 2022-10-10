@@ -52,52 +52,38 @@ async def test_kill_db_process(
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
-    print(1)
 
     # Kill the database process.
     await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
-    print(2)
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
         writes = await count_writes(ops_test)
-        print(3)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes = await count_writes(ops_test)
-                print(4)
                 assert more_writes > writes, "writes not continuing to DB"
-                print(4.1)
 
-        print(4.2)
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
-        print(5)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
-    print(6)
     assert new_primary_name != primary_name
-    print(7)
 
     # Verify that no writes to the database were missed after stopping the writes.
     total_expected_writes = await stop_continuous_writes(ops_test)
-    print(8)
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
             actual_writes = await count_writes(ops_test)
-            print(9)
             assert total_expected_writes == actual_writes, "writes to the db were missed."
-            print(9.1)
 
     # Verify that old primary is up-to-date.
-    print(9.2)
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-    print(10)
 
 
 @pytest.mark.ha_self_healing_tests
@@ -108,15 +94,12 @@ async def test_freeze_db_process(
     # Locate primary unit.
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
-    print(1)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
-    print(2)
 
     # Freeze the database process.
     await send_signal_to_process(ops_test, primary_name, process, "SIGSTOP")
-    print(3)
     sleep(30)
 
     async with ops_test.fast_forward():
@@ -124,40 +107,29 @@ async def test_freeze_db_process(
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
         writes = await count_writes(ops_test)
-        print(4)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes = await count_writes(ops_test)
-                print(4.1)
                 assert more_writes > writes, "writes not continuing to DB"
 
         # Un-freeze the old primary.
-        print(4.2)
         await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
-        print(5)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
-        print(6)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
-    print(7)
     assert new_primary_name != primary_name
-    print(8)
 
     # Verify that no writes to the database were missed after stopping the writes.
     total_expected_writes = await stop_continuous_writes(ops_test)
-    print(9)
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
             actual_writes = await count_writes(ops_test)
-            print(9.1)
             assert total_expected_writes == actual_writes, "writes to the db were missed."
 
-    print(9.2)
     # Verify that old primary is up-to-date.
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-    print(10)
