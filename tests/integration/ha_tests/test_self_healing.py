@@ -103,7 +103,8 @@ async def test_freeze_db_process(
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after master_start_timeout is changed, and also
+        # when freezing the DB process it take some more time to trigger the fail-over).
         writes = await count_writes(ops_test)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:

@@ -137,7 +137,6 @@ class ApplicationCharm(CharmBase):
 
         # Stop the process.
         proc = subprocess.Popen(["pkill", "--signal", "SIGKILL", "-f", "src/continuous_writes.py"])
-        # os.kill(self._stored.continuous_writes_pid, signal.SIGINT)
 
         # Wait for process to be killed.
         proc.communicate()
