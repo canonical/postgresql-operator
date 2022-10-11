@@ -19,6 +19,7 @@ from charms.operator_libs_linux.v1.systemd import (
 )
 from jinja2 import Template
 from tenacity import (
+    AttemptManager,
     RetryError,
     Retrying,
     retry,
@@ -197,14 +198,14 @@ class Patroni:
                         break
         return primary
 
-    def _get_alternative_server_url(self, attempt) -> str:
+    def _get_alternative_server_url(self, attempt: AttemptManager) -> str:
+        """Get an alternative URL from another member each time."""
         if attempt.retry_state.attempt_number > 1:
             url = self._patroni_url.replace(
                 self.unit_ip, list(self.peers_ips)[attempt.retry_state.attempt_number - 2]
             )
         else:
             url = self._patroni_url
-        logger.warning(f"url for get primary: {url}")
         return url
 
     def are_all_members_ready(self) -> bool:
