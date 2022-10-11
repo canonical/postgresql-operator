@@ -53,14 +53,14 @@ class TestCharm(unittest.TestCase):
             False,
         )
 
-    def test_get_alternative_server_url(self):
+    def test_get_alternative_patroni_url(self):
         # Mock tenacity attempt.
         retry = tenacity.Retrying()
         retry_state = tenacity.RetryCallState(retry, None, None, None)
         attempt = tenacity.AttemptManager(retry_state)
 
         # Test the first URL that is returned (it should have the current unit IP).
-        url = self.patroni._get_alternative_server_url(attempt)
+        url = self.patroni._get_alternative_patroni_url(attempt)
         self.assertEqual(url, f"http://{self.patroni.unit_ip}:8008")
 
         # Test returning the other servers URLs.
@@ -68,19 +68,19 @@ class TestCharm(unittest.TestCase):
             attempt.retry_state.attempt_number + 1, len(self.peers_ips) + 2
         ):
             attempt.retry_state.attempt_number = attempt_number
-            url = self.patroni._get_alternative_server_url(attempt)
+            url = self.patroni._get_alternative_patroni_url(attempt)
             self.assertIn(url.split("http://")[1].split(":8008")[0], self.peers_ips)
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
-    @patch("charm.Patroni._get_alternative_server_url")
-    def test_get_member_ip(self, _get_alternative_server_url, _get):
+    @patch("charm.Patroni._get_alternative_patroni_url")
+    def test_get_member_ip(self, _get_alternative_patroni_url, _get):
         # Test error on trying to get the member IP.
-        _get_alternative_server_url.side_effect = "http://server2"
+        _get_alternative_patroni_url.side_effect = "http://server2"
         with self.assertRaises(tenacity.RetryError):
             self.patroni.get_member_ip(self.patroni.member_name)
 
-        # Test using an alternative server URL.
-        _get_alternative_server_url.side_effect = [
+        # Test using an alternative Patroni URL.
+        _get_alternative_patroni_url.side_effect = [
             "http://server3",
             "http://server2",
             "http://server1",
@@ -88,13 +88,13 @@ class TestCharm(unittest.TestCase):
         ip = self.patroni.get_member_ip(self.patroni.member_name)
         self.assertEqual(ip, "1.1.1.1")
 
-        # Test using the current server URL.
-        _get_alternative_server_url.side_effect = ["http://server1"]
+        # Test using the current Patroni URL.
+        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = self.patroni.get_member_ip(self.patroni.member_name)
         self.assertEqual(ip, "1.1.1.1")
 
         # Test when not having that specific member in the cluster.
-        _get_alternative_server_url.side_effect = ["http://server1"]
+        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = self.patroni.get_member_ip("other-member-name")
         self.assertIsNone(ip)
 
@@ -109,15 +109,15 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(version, "12")
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
-    @patch("charm.Patroni._get_alternative_server_url")
-    def test_get_primary(self, _get_alternative_server_url, _get):
+    @patch("charm.Patroni._get_alternative_patroni_url")
+    def test_get_primary(self, _get_alternative_patroni_url, _get):
         # Test error on trying to get the member IP.
-        _get_alternative_server_url.side_effect = "http://server2"
+        _get_alternative_patroni_url.side_effect = "http://server2"
         with self.assertRaises(tenacity.RetryError):
             self.patroni.get_primary(self.patroni.member_name)
 
-        # Test using an alternative server URL.
-        _get_alternative_server_url.side_effect = [
+        # Test using an alternative Patroni URL.
+        _get_alternative_patroni_url.side_effect = [
             "http://server3",
             "http://server2",
             "http://server1",
@@ -125,13 +125,13 @@ class TestCharm(unittest.TestCase):
         primary = self.patroni.get_primary()
         self.assertEqual(primary, "postgresql-0")
 
-        # Test using the current server URL.
-        _get_alternative_server_url.side_effect = ["http://server1"]
+        # Test using the current Patroni URL.
+        _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = self.patroni.get_primary()
         self.assertEqual(primary, "postgresql-0")
 
         # Test requesting the primary in the unit name pattern.
-        _get_alternative_server_url.side_effect = ["http://server1"]
+        _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = self.patroni.get_primary(unit_name_pattern=True)
         self.assertEqual(primary, "postgresql/0")
 
