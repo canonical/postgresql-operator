@@ -162,7 +162,6 @@ class Patroni:
         Returns:
             IP address of the cluster member.
         """
-        ip = None
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
             with attempt:
@@ -170,9 +169,7 @@ class Patroni:
                 cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
                 for member in cluster_status.json()["members"]:
                     if member["name"] == member_name:
-                        ip = member["host"]
-                        break
-                return ip
+                        return member["host"]
 
     def get_primary(self, unit_name_pattern=False) -> str:
         """Get primary instance.
@@ -183,7 +180,6 @@ class Patroni:
         Returns:
             primary pod or unit name.
         """
-        primary = None
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
             with attempt:
@@ -195,8 +191,7 @@ class Patroni:
                         if unit_name_pattern:
                             # Change the last dash to / in order to match unit name pattern.
                             primary = "/".join(primary.rsplit("-", 1))
-                        break
-        return primary
+                        return primary
 
     def _get_alternative_patroni_url(self, attempt: AttemptManager) -> str:
         """Get an alternative REST API URL from another member each time.
