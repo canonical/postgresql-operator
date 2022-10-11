@@ -16,6 +16,14 @@ PORT = 5432
 APP_NAME = METADATA["name"]
 
 
+class MemberNotListedOnClusterError(Exception):
+    """Raised when a member is not listed in the cluster."""
+
+
+class MemberNotUpdatedOnClusterError(Exception):
+    """Raised when a member is not yet updated in the cluster."""
+
+
 class ProcessError(Exception):
     pass
 
@@ -80,6 +88,27 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     return count
 
 
+async def fetch_cluster_members(ops_test: OpsTest):
+    """Fetches the IPs listed by Patroni as cluster members.
+
+    Args:
+        ops_test: OpsTest instance.
+    """
+    app = await app_name(ops_test)
+    member_ips = {}
+    for unit in ops_test.model.applications[app].units:
+        cluster_info = requests.get(f"http://{unit.public_address}:8008/cluster")
+        if len(member_ips) > 0:
+            # If the list of members IPs was already fetched, also compare the
+            # list provided by other members.
+            assert member_ips == {
+                member["host"] for member in cluster_info.json()["members"]
+            }, "members report different lists of cluster members."
+        else:
+            member_ips = {member["host"] for member in cluster_info.json()["members"]}
+    return member_ips
+
+
 async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
     """Get the master start timeout configuration.
 
@@ -113,6 +142,36 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
     action = await ops_test.model.units.get(unit_name).run_action("get-password")
     action = await action.wait()
     return action.results["operator-password"]
+
+
+def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
+    """Returns whether the unit a replica in the cluster."""
+    unit_ip = get_unit_address(ops_test, unit_name)
+    member_name = unit_name.replace("/", "-")
+
+    try:
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+
+                # The unit may take some time to be listed on Patroni REST API cluster endpoint.
+                if member_name not in {
+                    member["name"] for member in cluster_info.json()["members"]
+                }:
+                    raise MemberNotListedOnClusterError()
+
+                for member in cluster_info.json()["members"]:
+                    if member["name"] == member_name:
+                        role = member["role"]
+
+                # A member that restarted has the DB process stopped may
+                # take some time to know that a new primary was elected.
+                if role == "replica":
+                    return True
+                else:
+                    raise MemberNotUpdatedOnClusterError()
+    except RetryError:
+        return False
 
 
 async def get_primary(ops_test: OpsTest, app) -> str:
