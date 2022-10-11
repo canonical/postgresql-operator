@@ -1,6 +1,5 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 from pathlib import Path
 from typing import Optional
 
@@ -8,13 +7,7 @@ import psycopg2
 import requests
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import (
-    RetryError,
-    Retrying,
-    stop_after_attempt,
-    stop_after_delay,
-    wait_fixed,
-)
+from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.helpers import get_unit_address
 
@@ -61,24 +54,21 @@ async def change_master_start_timeout(ops_test: OpsTest, seconds: Optional[int])
             )
 
 
-async def count_writes(ops_test: OpsTest) -> int:
+async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, app, down_unit)
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            host = unit.public_address
+            break
+    connection_string = (
+        f"dbname='application' user='operator'"
+        f" host='{host}' password='{password}' connect_timeout=10"
+    )
     try:
-        for attempt in Retrying(
-            stop=stop_after_attempt(len(ops_test.model.applications[app].units))
-        ):
+        for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
             with attempt:
-                host = (
-                    ops_test.model.applications[app]
-                    .units[attempt.retry_state.attempt_number - 1]
-                    .public_address
-                )
-                connection_string = (
-                    f"dbname='application' user='operator'"
-                    f" host='{host}' password='{password}' connect_timeout=10"
-                )
                 with psycopg2.connect(
                     connection_string
                 ) as connection, connection.cursor() as cursor:
@@ -109,21 +99,20 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             return int(master_start_timeout) if master_start_timeout is not None else None
 
 
-async def get_password(ops_test: OpsTest, app) -> str:
+async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 
     Returns:
         string with the password stored on the peer relation databag.
     """
     # Can retrieve from any unit running unit, so we pick the first.
-    for attempt in Retrying(stop=stop_after_attempt(len(ops_test.model.applications[app].units))):
-        with attempt:
-            unit_name = (
-                ops_test.model.applications[app].units[attempt.retry_state.attempt_number - 1].name
-            )
-            action = await ops_test.model.units.get(unit_name).run_action("get-password")
-            action = await asyncio.wait_for(action.wait(), 30)
-            return action.results["operator-password"]
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            unit_name = unit.name
+            break
+    action = await ops_test.model.units.get(unit_name).run_action("get-password")
+    action = await action.wait()
+    return action.results["operator-password"]
 
 
 async def get_primary(ops_test: OpsTest, app) -> str:

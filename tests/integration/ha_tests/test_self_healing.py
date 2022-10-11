@@ -105,10 +105,10 @@ async def test_freeze_db_process(
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
-        writes = await count_writes(ops_test)
+        writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
-                more_writes = await count_writes(ops_test)
+                more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"
 
         # Verify that a new primary gets elected (ie old primary is secondary).
