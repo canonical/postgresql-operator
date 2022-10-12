@@ -16,6 +16,14 @@ PORT = 5432
 APP_NAME = METADATA["name"]
 
 
+class MemberNotListedOnClusterError(Exception):
+    """Raised when a member is not listed in the cluster."""
+
+
+class MemberNotUpdatedOnClusterError(Exception):
+    """Raised when a member is not yet updated in the cluster."""
+
+
 class ProcessError(Exception):
     pass
 
@@ -54,11 +62,14 @@ async def change_master_start_timeout(ops_test: OpsTest, seconds: Optional[int])
             )
 
 
-async def count_writes(ops_test: OpsTest) -> int:
+async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app)
-    host = ops_test.model.applications[app].units[0].public_address
+    password = await get_password(ops_test, app, down_unit)
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            host = unit.public_address
+            break
     connection_string = (
         f"dbname='application' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
@@ -75,6 +86,27 @@ async def count_writes(ops_test: OpsTest) -> int:
     except RetryError:
         return -1
     return count
+
+
+async def fetch_cluster_members(ops_test: OpsTest):
+    """Fetches the IPs listed by Patroni as cluster members.
+
+    Args:
+        ops_test: OpsTest instance.
+    """
+    app = await app_name(ops_test)
+    member_ips = {}
+    for unit in ops_test.model.applications[app].units:
+        cluster_info = requests.get(f"http://{unit.public_address}:8008/cluster")
+        if len(member_ips) > 0:
+            # If the list of members IPs was already fetched, also compare the
+            # list provided by other members.
+            assert member_ips == {
+                member["host"] for member in cluster_info.json()["members"]
+            }, "members report different lists of cluster members."
+        else:
+            member_ips = {member["host"] for member in cluster_info.json()["members"]}
+    return member_ips
 
 
 async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
@@ -96,17 +128,50 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             return int(master_start_timeout) if master_start_timeout is not None else None
 
 
-async def get_password(ops_test: OpsTest, app) -> str:
+async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 
     Returns:
         string with the password stored on the peer relation databag.
     """
     # Can retrieve from any unit running unit, so we pick the first.
-    unit_name = ops_test.model.applications[app].units[0].name
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            unit_name = unit.name
+            break
     action = await ops_test.model.units.get(unit_name).run_action("get-password")
     action = await action.wait()
     return action.results["operator-password"]
+
+
+def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
+    """Returns whether the unit a replica in the cluster."""
+    unit_ip = get_unit_address(ops_test, unit_name)
+    member_name = unit_name.replace("/", "-")
+
+    try:
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+
+                # The unit may take some time to be listed on Patroni REST API cluster endpoint.
+                if member_name not in {
+                    member["name"] for member in cluster_info.json()["members"]
+                }:
+                    raise MemberNotListedOnClusterError()
+
+                for member in cluster_info.json()["members"]:
+                    if member["name"] == member_name:
+                        role = member["role"]
+
+                # A member that restarted has the DB process stopped may
+                # take some time to know that a new primary was elected.
+                if role == "replica":
+                    return True
+                else:
+                    raise MemberNotUpdatedOnClusterError()
+    except RetryError:
+        return False
 
 
 async def get_primary(ops_test: OpsTest, app) -> str:
@@ -122,7 +187,9 @@ async def get_primary(ops_test: OpsTest, app) -> str:
     return action.results["primary"]
 
 
-async def kill_process(ops_test: OpsTest, unit_name: str, process: str, kill_code: str) -> None:
+async def send_signal_to_process(
+    ops_test: OpsTest, unit_name: str, process: str, kill_code: str
+) -> None:
     """Kills process on the unit according to the provided kill code."""
     # Killing the only instance can be disastrous.
     app = await app_name(ops_test)
