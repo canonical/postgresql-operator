@@ -21,7 +21,6 @@ from tests.integration.ha_tests.helpers import (
     start_continuous_writes,
     stop_continuous_writes,
 )
-from tests.integration.helpers import get_unit_address
 
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/usr/local/bin/patroni"
