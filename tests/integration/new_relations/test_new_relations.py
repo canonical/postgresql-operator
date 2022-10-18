@@ -48,6 +48,7 @@ async def test_deploy_charms(ops_test: OpsTest, application_charm, database_char
                 resources={"patroni": "patroni.tar.gz"},
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
+                series="focal",
                 trust=True,
             ),
             ops_test.model.deploy(
@@ -55,6 +56,7 @@ async def test_deploy_charms(ops_test: OpsTest, application_charm, database_char
                 resources={"patroni": "patroni.tar.gz"},
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
+                series="focal",
                 trust=True,
             ),
         )
