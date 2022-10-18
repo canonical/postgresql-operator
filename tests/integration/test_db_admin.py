@@ -37,7 +37,6 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         config=config,
         resources=resources,
         application_name=DATABASE_APP_NAME,
-        series="focal",
         num_units=DATABASE_UNITS,
     )
     # Attach the resource to the controller.
