@@ -26,7 +26,8 @@ async def test_deploy_active(ops_test: OpsTest):
             charm, resources={"patroni": "patroni.tar.gz"}, application_name=APP_NAME, num_units=3
         )
         await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
-        await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+        # No wait between deploying charms, since we can't guarantee users will wait. Furthermore,
+        # bundles don't wait between deploying charms.
 
 
 @pytest.mark.tls_tests
@@ -36,10 +37,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Deploy TLS Certificates operator.
         config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
         await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, channel="edge", config=config)
-        await ops_test.model.wait_for_idle(
-            apps=[TLS_CERTIFICATES_APP_NAME], status="active", timeout=1000
-        )
-
         # Relate it to the PostgreSQL to enable TLS.
         await ops_test.model.relate(DATABASE_APP_NAME, TLS_CERTIFICATES_APP_NAME)
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
