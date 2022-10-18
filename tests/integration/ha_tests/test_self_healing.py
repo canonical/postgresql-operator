@@ -173,7 +173,9 @@ async def test_freeze_db_process(
 
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
-async def test_sst(ops_test: OpsTest, process: str, continuous_writes) -> None:
+async def test_sst(
+    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+) -> None:
     """The SST test.
 
     A forceful restart instance with deleted data and without transaction logs (forced clone).
@@ -188,43 +190,22 @@ async def test_sst(ops_test: OpsTest, process: str, continuous_writes) -> None:
     original_master_start_timeout = await get_master_start_timeout(ops_test)
     await change_master_start_timeout(ops_test, 0)
 
-    # copy data dir content removal script
+    # Copy data dir content removal script.
     await ops_test.juju(
         "scp", "tests/integration/ha_tests/clean-data-dir.sh", f"{primary_name}:/tmp"
     )
 
-    await send_signal_to_process(ops_test, primary_name, process, "SIGTERM")
+    # Force a restart of the database process.
+    await send_signal_to_process(ops_test, primary_name, process, "SIGKILL")
 
-    # data removal run within a script
-    # so it allow `*` expansion
-    try:
-        return_code, stdout, stderr = await ops_test.juju(
-            "ssh",
-            primary_name,
-            "sudo",
-            "/tmp/clean-data-dir.sh",
-        )
-        print(f"return code: {return_code}")
-        print(f"stdout: {stdout}")
-        print(f"stderr: {stderr}")
-    except Exception as e:
-        print(str(e))
-        print(str(type(e)))
-
-    assert return_code == 0, "❌ Failed to remove data directory"
-
-    # async with ops_test.fast_forward():
-    #     # Wait for unit switch to maintenance status
-    #     await ops_test.model.block_until(
-    #         lambda: primary.workload_status == "maintenance",
-    #         timeout=5 * 60,
-    #     )
-    #
-    #     # Wait for unit switch back to active status, this is where self-healing happens
-    #     await ops_test.model.block_until(
-    #         lambda: primary.workload_status == "active",
-    #         timeout=5 * 60,
-    #     )
+    # Data removal runs within a script, so it allows `*` expansion.
+    return_code, _, _ = await ops_test.juju(
+        "ssh",
+        primary_name,
+        "sudo",
+        "/tmp/clean-data-dir.sh",
+    )
+    assert return_code == 0, "Failed to remove data directory"
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
@@ -269,6 +250,6 @@ async def test_sst(ops_test: OpsTest, process: str, continuous_writes) -> None:
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
 
-    # verify instance is part of the cluster
+    # Verify instance is part of the cluster
     cluster_members = await fetch_cluster_members(ops_test)
     assert get_unit_address(ops_test, primary_name) in cluster_members
