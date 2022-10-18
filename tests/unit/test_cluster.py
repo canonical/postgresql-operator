@@ -277,7 +277,6 @@ class TestCharm(unittest.TestCase):
         success = self.patroni.start_patroni()
         assert not success
 
-
     @patch("cluster.service_running")
     @patch("requests.post")
     def test_reload_patroni_configuration(self, _post, _service_running):
