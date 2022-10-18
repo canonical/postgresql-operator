@@ -249,7 +249,3 @@ async def test_sst(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-
-    # Verify instance is part of the cluster
-    cluster_members = await fetch_cluster_members(ops_test)
-    assert get_unit_address(ops_test, primary_name) in cluster_members
