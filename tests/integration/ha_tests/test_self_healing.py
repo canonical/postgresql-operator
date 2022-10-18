@@ -76,9 +76,11 @@ async def test_kill_db_process(
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
 
-    # Verify that a new primary gets elected (ie old primary is secondary).
-    new_primary_name = await get_primary(ops_test, app)
-    assert new_primary_name != primary_name
+        # Verify that a new primary gets elected (ie old primary is secondary).
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                new_primary_name = await get_primary(ops_test, app)
+                assert new_primary_name != primary_name
 
     # Revert the "master_start_timeout" parameter to avoid fail-over again.
     await change_master_start_timeout(ops_test, original_master_start_timeout)
