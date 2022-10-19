@@ -34,7 +34,7 @@ from cryptography import x509
 from cryptography.x509.extensions import ExtensionType
 from ops.charm import ActionEvent
 from ops.framework import Object
-from ops.pebble import PathError, ProtocolError
+from ops.pebble import ConnectionError, PathError, ProtocolError
 
 # The unique Charmhub library identifier, never change it
 LIBID = "c27af44a92df4ef38d7ae06418b2800f"
@@ -44,7 +44,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 1
+LIBPATCH = 3
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -133,7 +133,7 @@ class PostgreSQLTLS(Object):
 
         try:
             self.charm.push_tls_files_to_workload()
-        except (PathError, ProtocolError) as e:
+        except (ConnectionError, PathError, ProtocolError) as e:
             logger.error("Cannot push TLS certificates: %r", e)
             event.defer()
             return
@@ -167,6 +167,7 @@ class PostgreSQLTLS(Object):
         unit_id = self.charm.unit.name.split("/")[1]
         return [
             f"{self.charm.app.name}-{unit_id}",
+            self.charm.get_hostname_by_unit(self.charm.unit.name),
             socket.getfqdn(),
             str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
         ]
@@ -177,7 +178,7 @@ class PostgreSQLTLS(Object):
         basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
         return [basic_constraints]
 
-    def get_tls_files(self) -> (Optional[str], Optional[str]):
+    def get_tls_files(self) -> (Optional[str], Optional[str], Optional[str]):
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
