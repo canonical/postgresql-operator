@@ -86,8 +86,8 @@ class PostgreSQLTLS(Object):
         csr = generate_csr(
             private_key=key,
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
-            sans=self._get_sans(),
             additional_critical_extensions=self._get_tls_extensions(),
+            **self._get_sans(),
         )
 
         self.charm.set_secret(SCOPE, "key", key.decode("utf-8"))
@@ -149,8 +149,8 @@ class PostgreSQLTLS(Object):
         new_csr = generate_csr(
             private_key=key,
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
-            sans=self._get_sans(),
             additional_critical_extensions=self._get_tls_extensions(),
+            **self._get_sans(),
         )
         self.certs.request_certificate_renewal(
             old_certificate_signing_request=old_csr,
@@ -158,19 +158,29 @@ class PostgreSQLTLS(Object):
         )
         self.charm.set_secret(SCOPE, "csr", new_csr.decode("utf-8"))
 
-    def _get_sans(self) -> List[str]:
-        """Create a list of DNS names for a PostgreSQL unit.
+    def _get_sans(self) -> dict:
+        """Create a list of Subject Alternative Names for a PostgreSQL unit.
 
         Returns:
-            A list representing the hostnames of the PostgreSQL unit.
+            A list representing the IP and hostnames of the PostgreSQL unit.
         """
         unit_id = self.charm.unit.name.split("/")[1]
-        return [
-            f"{self.charm.app.name}-{unit_id}",
-            self.charm.get_hostname_by_unit(self.charm.unit.name),
-            socket.getfqdn(),
-            str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
-        ]
+        # return [
+        #     f"{self.charm.app.name}-{unit_id}",
+        #     self.charm.get_hostname_by_unit(self.charm.unit.name),
+        #     socket.getfqdn(),
+        #     str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
+        # ]
+        return {
+            # "sans_oid": "1.2.3.4.5.5",
+            "sans_ip": [
+                self.charm.get_hostname_by_unit(self.charm.unit.name)
+            ], "sans_dns": [
+                f"{self.charm.app.name}-{unit_id}",
+                socket.getfqdn(),
+                str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
+            ]
+        }
 
     @staticmethod
     def _get_tls_extensions() -> Optional[List[ExtensionType]]:

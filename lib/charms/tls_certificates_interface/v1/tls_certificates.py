@@ -222,6 +222,7 @@ import json
 import logging
 import uuid
 from datetime import datetime, timedelta
+from ipaddress import IPv4Address
 from typing import Dict, List, Optional
 
 from cryptography import x509
@@ -657,7 +658,9 @@ def generate_csr(
     email_address: str = None,
     country_name: str = None,
     private_key_password: Optional[bytes] = None,
-    sans: Optional[List[str]] = None,
+    sans_oid: Optional[str] = None,
+    sans_ip: Optional[List[str]] = None,
+    sans_dns: Optional[List[str]] = None,
     additional_critical_extensions: Optional[List] = None,
 ) -> bytes:
     """Generates a CSR using private key and subject.
@@ -672,7 +675,9 @@ def generate_csr(
         email_address (str): Email address.
         country_name (str): Country Name.
         private_key_password (bytes): Private key password
-        sans (list): List of subject alternative names
+        sans_dns (list): List of DNS subject alternative names
+        sans_ip (list): List of IP subject alternative names
+        sans_oid (str): Additional OID
         additional_critical_extensions (list): List if critical additional extension objects.
             Object must be a x509 ExtensionType.
 
@@ -693,10 +698,17 @@ def generate_csr(
     if country_name:
         subject_name.append(x509.NameAttribute(x509.NameOID.COUNTRY_NAME, country_name))
     csr = x509.CertificateSigningRequestBuilder(subject_name=x509.Name(subject_name))
-    if sans:
-        csr = csr.add_extension(
-            x509.SubjectAlternativeName([x509.DNSName(san) for san in sans]), critical=False
-        )
+
+    _sans = []
+    if sans_oid:
+        _sans.append(x509.RegisteredID(x509.ObjectIdentifier(sans_oid)))
+    if sans_ip:
+        _sans.extend([x509.IPAddress(IPv4Address(san)) for san in sans_ip])
+    if sans_dns:
+        _sans.extend([x509.DNSName(san) for san in sans_dns])
+    if _sans:
+        csr = csr.add_extension(x509.SubjectAlternativeName(_sans), critical=False)
+
     if additional_critical_extensions:
         for extension in additional_critical_extensions:
             csr = csr.add_extension(extension, critical=True)

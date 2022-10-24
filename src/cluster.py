@@ -244,7 +244,8 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     r = requests.get(f"{self._patroni_url}/health", verify=self.verify)
-        except RetryError:
+        except RetryError as e:
+            logger.exception(str(e))
             return False
 
         return r.json()["state"] == "running"
@@ -380,8 +381,7 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        if service_running(PATRONI_SERVICE):
-            requests.post(f"{self._patroni_url}/reload", verify=self.verify)
+        requests.post(f"{self._patroni_url}/reload", verify=self.verify)
 
     def restart_patroni(self) -> bool:
         """Restart Patroni.
