@@ -277,13 +277,13 @@ class TestCharm(unittest.TestCase):
         success = self.patroni.start_patroni()
         assert not success
 
-    @patch("cluster.service_running")
-    @patch("requests.post")
-    def test_reload_patroni_configuration(self, _post, _service_running):
-        _service_running.side_effect = [False, True]
+    # @patch("cluster.service_running")
+    # @patch("requests.post")
+    # def test_reload_patroni_configuration(self, _post, _service_running):
+    #     _service_running.side_effect = [False, True]
 
-        self.patroni.reload_patroni_configuration()
-        _post.assert_not_called()
+    #     self.patroni.reload_patroni_configuration()
+    #     _post.assert_not_called()
 
-        self.patroni.reload_patroni_configuration()
-        _post.assert_called()
+    #     self.patroni.reload_patroni_configuration()
+    #     _post.assert_called()
