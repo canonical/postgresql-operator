@@ -174,7 +174,7 @@ class PostgreSQLTLS(Object):
             try:
                 ipaddress.ip_address(address)
                 return True
-            except ValueError:
+            except (ipaddress.AddressValueError, ValueError):
                 return False
 
         unit_id = self.charm.unit.name.split("/")[1]
