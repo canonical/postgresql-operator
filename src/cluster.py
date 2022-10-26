@@ -244,8 +244,7 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     r = requests.get(f"{self._patroni_url}/health", verify=self.verify)
-        except RetryError as e:
-            logger.exception(str(e))
+        except RetryError:
             return False
 
         return r.json()["state"] == "running"
