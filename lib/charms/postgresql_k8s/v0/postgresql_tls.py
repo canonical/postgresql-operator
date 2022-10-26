@@ -18,6 +18,7 @@ It also needs the following methods in the charm class:
 """
 
 import base64
+import ipaddress
 import logging
 import re
 import socket
@@ -44,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 3
+LIBPATCH = 4
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -54,11 +55,14 @@ TLS_RELATION = "certificates"
 class PostgreSQLTLS(Object):
     """In this class we manage certificates relation."""
 
-    def __init__(self, charm, peer_relation):
+    def __init__(
+        self, charm, peer_relation: str, additional_dns_names: Optional[List[str]] = None
+    ):
         """Manager of PostgreSQL relation with TLS Certificates Operator."""
         super().__init__(charm, "client-relations")
         self.charm = charm
         self.peer_relation = peer_relation
+        self.additional_dns_names = [] if additional_dns_names is None else additional_dns_names
         self.certs = TLSCertificatesRequiresV1(self.charm, TLS_RELATION)
         self.framework.observe(
             self.charm.on.set_tls_private_key_action, self._on_set_tls_private_key
@@ -164,22 +168,33 @@ class PostgreSQLTLS(Object):
         Returns:
             A list representing the IP and hostnames of the PostgreSQL unit.
         """
+
+        def is_ip_address(address: str) -> bool:
+            """Returns whether and address is an IP address."""
+            try:
+                ipaddress.ip_address(address)
+                return True
+            except ValueError:
+                return False
+
         unit_id = self.charm.unit.name.split("/")[1]
-        # return [
-        #     f"{self.charm.app.name}-{unit_id}",
-        #     self.charm.get_hostname_by_unit(self.charm.unit.name),
-        #     socket.getfqdn(),
-        #     str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
-        # ]
+
+        # Create a list of all the Subject Alternative Names.
+        sans = [
+            f"{self.charm.app.name}-{unit_id}",
+            self.charm.get_hostname_by_unit(self.charm.unit.name),
+            socket.getfqdn(),
+            str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
+        ]
+        sans.extend(self.additional_dns_names)
+
+        # Separate IP addresses and DNS names.
+        sans_ip = [san for san in sans if is_ip_address(san)]
+        sans_dns = [san for san in sans if not is_ip_address(san)]
+
         return {
-            # "sans_oid": "1.2.3.4.5.5",
-            "sans_ip": [
-                self.charm.get_hostname_by_unit(self.charm.unit.name)
-            ], "sans_dns": [
-                f"{self.charm.app.name}-{unit_id}",
-                socket.getfqdn(),
-                str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
-            ]
+            "sans_ip": sans_ip,
+            "sans_dns": sans_dns,
         }
 
     @staticmethod
