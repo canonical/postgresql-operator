@@ -12,6 +12,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
+from tenacity import RetryError
 
 from charm import PostgresqlOperatorCharm
 from constants import PEER
@@ -424,3 +425,15 @@ class TestCharm(unittest.TestCase):
             self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
             == "test-password"
         )
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.Patroni.restart_postgresql")
+    def test_restart(self, _restart_postgresql):
+        # Test a successful restart.
+        self.charm._restart(None)
+        self.assertFalse(isinstance(self.charm.unit.status, BlockedStatus))
+
+        # Test a failed restart.
+        _restart_postgresql.side_effect = RetryError(last_attempt=1)
+        self.charm._restart(None)
+        self.assertTrue(isinstance(self.charm.unit.status, BlockedStatus))
