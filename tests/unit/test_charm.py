@@ -437,3 +437,62 @@ class TestCharm(unittest.TestCase):
         _restart_postgresql.side_effect = RetryError(last_attempt=1)
         self.charm._restart(None)
         self.assertTrue(isinstance(self.charm.unit.status, BlockedStatus))
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
+    @patch("charm.Patroni.reload_patroni_configuration")
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.Patroni.render_patroni_yml_file")
+    @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files")
+    def test_update_config(
+        self,
+        _get_tls_files,
+        _render_patroni_yml_file,
+        _member_started,
+        _reload_patroni_configuration,
+        _restart,
+    ):
+        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+            # Mock some properties.
+            postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False])
+            _member_started.side_effect = [True, True, False]
+
+            # Test without TLS files available.
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"tls": "enabled"}
+            )  # Mock some data in the relation to test that it change.
+            _get_tls_files.return_value = [None]
+            self.charm.update_config()
+            _render_patroni_yml_file.assert_called_once_with(enable_tls=False)
+            _reload_patroni_configuration.assert_called_once()
+            _restart.assert_not_called()
+            self.assertNotIn(
+                "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+            )
+
+            # Test with TLS files available.
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"tls": ""}
+            )  # Mock some data in the relation to test that it change.
+            _get_tls_files.return_value = ["something"]
+            _render_patroni_yml_file.reset_mock()
+            _reload_patroni_configuration.reset_mock()
+            self.charm.update_config()
+            _render_patroni_yml_file.assert_called_once_with(enable_tls=True)
+            _reload_patroni_configuration.assert_called_once()
+            _restart.assert_called_once()
+            self.assertEqual(
+                self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
+            )
+
+            # Test with member not started yet.
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"tls": ""}
+            )  # Mock some data in the relation to test that it change.
+            _reload_patroni_configuration.reset_mock()
+            self.charm.update_config()
+            _reload_patroni_configuration.assert_not_called()
+            _restart.assert_called_once()
+            self.assertEqual(
+                self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
+            )
