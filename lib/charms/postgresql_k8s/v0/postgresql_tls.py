@@ -62,7 +62,7 @@ class PostgreSQLTLS(Object):
         super().__init__(charm, "client-relations")
         self.charm = charm
         self.peer_relation = peer_relation
-        self.additional_dns_names = [] if additional_dns_names is None else additional_dns_names
+        self.additional_dns_names = additional_dns_names or []
         self.certs = TLSCertificatesRequiresV1(self.charm, TLS_RELATION)
         self.framework.observe(
             self.charm.on.set_tls_private_key_action, self._on_set_tls_private_key
