@@ -836,7 +836,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self._patroni.render_patroni_yml_file(enable_tls=enable_tls)
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
-            # then mark TLS as enabled.
+            # then mark TLS as enabled. This commonly happens when the charm is deployed
+            # in a bundle together with the TLS certificates operator.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
             return
 
