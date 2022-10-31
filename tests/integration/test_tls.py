@@ -75,25 +75,27 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         enable_connections_logging(ops_test, primary)
         change_master_start_timeout(ops_test, primary, 0)
 
-        # Promote the replica to primary.
-        await run_command_on_unit(
-            ops_test,
-            replica,
-            "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
-        )
-
-        # Check that the replica was promoted.
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
             with attempt:
+                # Promote the replica to primary.
+                await run_command_on_unit(
+                    ops_test,
+                    replica,
+                    "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
+                )
+
+                # Check that the replica was promoted.
                 host = get_unit_address(ops_test, replica)
                 password = await get_password(ops_test, replica)
                 with db_connect(host, password) as connection:
                     connection.autocommit = True
                     with connection.cursor() as cursor:
                         cursor.execute("SELECT pg_is_in_recovery();")
-                        assert not cursor.fetchone()[0]
+                        in_recovery = cursor.fetchone()[0]
+                        print(f"in_recovery: {in_recovery}")
+                        assert not in_recovery
                 connection.close()
 
         # Write some data to the initial primary (this causes a divergence
