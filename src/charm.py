@@ -827,24 +827,12 @@ class PostgresqlOperatorCharm(CharmBase):
         self.update_config()
 
     def _restart(self, _) -> None:
-        """Restart Patroni and PostgreSQL."""
-        if not self._patroni.restart_patroni():
-            logger.exception("failed to restart PostgreSQL")
-            self.unit.status = BlockedStatus("failed to restart Patroni and PostgreSQL")
-            return
-
-        self._reinitialize_replica()
-
-    def _reinitialize_replica(self) -> None:
-        if (
-            not self._patroni.member_started
-            and self._patroni.get_primary(unit_name_pattern=True) != self.unit.name
-        ):
-            try:
-                self._patroni.reinitialize_replica()
-                logger.info("replica reinitializing")
-            except RetryError:
-                self.unit.status = BlockedStatus("failed to reinitialize replica data directory")
+        """Restart PostgreSQL."""
+        try:
+            self._patroni.restart_postgresql()
+        except RetryError as e:
+            logger.error("failed to restart PostgreSQL")
+            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
@@ -853,6 +841,10 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(enable_tls=enable_tls)
         if not self._patroni.member_started:
+            # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
+            # then mark TLS as enabled. This commonly happens when the charm is deployed
+            # in a bundle together with the TLS certificates operator.
+            self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
             return
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()

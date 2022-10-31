@@ -1,6 +1,7 @@
 name: Tests
 on:
   pull_request:
+  workflow_call:
 
 jobs:
   lint:
@@ -29,6 +30,9 @@ jobs:
 
   integration-test-lxd-charm:
     name: Integration tests for charm deployment (lxd)
+    needs:
+      - lint
+      - unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -42,6 +46,9 @@ jobs:
 
   integration-test-lxd-database-relation:
     name: Integration tests for database relation (lxd)
+    needs:
+      - lint
+      - unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -50,11 +57,16 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: lxd
+          # This is needed until https://bugs.launchpad.net/juju/+bug/1992833 is fixed.
+          bootstrap-options: "--agent-version 2.9.34"
       - name: Run integration tests
         run: tox -e database-relation-integration
 
   integration-test-lxd-db-relation:
     name: Integration tests for db relation (lxd)
+    needs:
+      - lint
+      - unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -68,6 +80,9 @@ jobs:
 
   integration-test-lxd-db-admin-relation:
     name: Integration tests for db-admin relation (lxd)
+    needs:
+      - lint
+      - unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -79,8 +94,29 @@ jobs:
       - name: Run integration tests
         run: tox -e db-admin-relation-integration
 
+  integration-test-ha-self-healing-rotation:
+    name: Integration tests for high availability self healing (lxd)
+    needs:
+      - lint
+      - unit-test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Setup operator environment
+        uses: charmed-kubernetes/actions-operator@main
+        with:
+          provider: lxd
+          # This is needed until https://bugs.launchpad.net/juju/+bug/1992833 is fixed.
+          bootstrap-options: "--agent-version 2.9.34"
+      - name: Run integration tests
+        run: tox -e ha-self-healing-integration
+
   integration-test-lxd-password-rotation:
     name: Integration tests for password rotation (lxd)
+    needs:
+      - lint
+      - unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -94,6 +130,9 @@ jobs:
 
   integration-test-lxd-tls:
     name: Integration tests for TLS (lxd)
+    needs:
+      - lint
+      - unit-test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
