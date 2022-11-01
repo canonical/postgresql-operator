@@ -238,7 +238,7 @@ async def test_restart_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [PATRONI_PROCESS])
 async def test_full_cluster_restart(
     ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
 ) -> None:
@@ -296,7 +296,7 @@ async def test_full_cluster_restart(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [PATRONI_PROCESS])
 async def test_full_cluster_crash(
     ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
 ) -> None:
