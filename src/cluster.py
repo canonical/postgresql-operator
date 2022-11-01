@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Set
+from typing import Optional, Set
 
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
@@ -207,6 +207,20 @@ class Patroni:
             url = self._patroni_url
         return url
 
+    def get_replication_lag(self) -> Optional[str]:
+        """Get the replication lag value from the current cluster member."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/cluster", verify=self.verify
+                    )
+                    for member in cluster_status.json()["members"]:
+                        if member["name"] == self.member_name:
+                            return member["lag"]
+        except RetryError:
+            return None
+
     def are_all_members_ready(self) -> bool:
         """Check if all members are correctly running Patroni and PostgreSQL.
 
@@ -248,6 +262,11 @@ class Patroni:
             return False
 
         return r.json()["state"] == "running"
+
+    @retry(stop=stop_after_attempt(3))
+    def reinitialize_replica(self) -> None:
+        """Reinitialize replica data directory."""
+        requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
 
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.

@@ -12,6 +12,7 @@ from tests.integration.ha_tests.helpers import (
     RESTART_DELAY,
     all_db_processes_down,
     app_name,
+    change_loop_wait,
     change_master_start_timeout,
     count_writes,
     fetch_cluster_members,
@@ -29,7 +30,16 @@ from tests.integration.ha_tests.helpers import (
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/usr/local/bin/patroni"
 POSTGRESQL_PROCESS = "postgres"
-DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
+DB_PROCESSES = [POSTGRESQL_PROCESS]
+
+
+def pytest_generate_tests(metafunc):
+    square_parameters = (x**2 for x in range(7))
+    if "square" in metafunc.fixturenames:
+        metafunc.parametrize("process", DB_PROCESSES)
+    if "odd_square" in metafunc.fixturenames:
+        odd_square_parameters = (x for x in square_parameters if x % 2 == 1)
+        metafunc.parametrize("pause_cluster_management", odd_square_parameters)
 
 
 @pytest.mark.abort_on_fail
@@ -108,7 +118,7 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.ha_self_healing_tests
+# @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -174,7 +184,7 @@ async def test_freeze_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -187,7 +197,7 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await kill_process(ops_test, primary_name, process, kill_code="SIGTERM")
+    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
@@ -206,6 +216,14 @@ async def test_restart_db_process(
     new_primary_name = await get_primary(ops_test, app)
     assert new_primary_name != primary_name
 
+    # Verify that the old primary is now a replica.
+    assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
     # Verify that no writes to the database were missed after stopping the writes.
     total_expected_writes = await stop_continuous_writes(ops_test)
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
@@ -222,11 +240,14 @@ async def test_restart_db_process(
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_full_cluster_restart(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout, reset_restart_delay
+    ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
 ) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
+
+    # await pause_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
+    await change_loop_wait(ops_test, 30)
 
     # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
     # should ensure enough time for all replicas to be down at the same time.
@@ -236,7 +257,7 @@ async def test_full_cluster_restart(
     # Restart all units "simultaneously".
     await asyncio.gather(
         *[
-            kill_process(ops_test, unit.name, process, kill_code="SIGTERM")
+            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGTERM")
             for unit in ops_test.model.applications[app].units
         ]
     )
@@ -245,9 +266,88 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
+    await change_loop_wait(ops_test, 20)
 
-    # # Verify all units are up and running.
-    # for unit in ops_test.model.applications[app].units:
-    #     assert await postgresql_ready(
-    #         ops_test, unit.public_address
-    #     ), f"unit {unit.name} not restarted after cluster crash."
+    #     await resume_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
+
+    # Verify all units are up and running.
+    for unit in ops_test.model.applications[app].units:
+        assert await postgresql_ready(
+            ops_test, unit.name
+        ), f"unit {unit.name} not restarted after cluster crash."
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    writes = await count_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+        with attempt:
+            more_writes = await count_writes(ops_test)
+            assert more_writes > writes, "writes not continuing to DB"
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            actual_writes = await count_writes(ops_test)
+            assert total_expected_writes == actual_writes, "writes to the db were missed."
+
+
+@pytest.mark.ha_self_healing_tests
+@pytest.mark.parametrize("process", DB_PROCESSES)
+async def test_full_cluster_crash(
+    ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
+) -> None:
+    # Start an application that continuously writes data to the database.
+    app = await app_name(ops_test)
+    await start_continuous_writes(ops_test, app)
+
+    # await pause_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
+    await change_loop_wait(ops_test, 20)
+
+    # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
+    # should ensure enough time for all replicas to be down at the same time.
+    for unit in ops_test.model.applications[app].units:
+        await update_restart_delay(ops_test, unit, RESTART_DELAY)
+
+    # Restart all units "simultaneously".
+    await asyncio.gather(
+        *[
+            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGKILL")
+            for unit in ops_test.model.applications[app].units
+        ]
+    )
+
+    # This test serves to verify behavior when all replicas are down at the same time that when
+    # they come back online they operate as expected. This check verifies that we meet the criteria
+    # of all replicas being down at the same time.
+    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
+    await change_loop_wait(ops_test, 10)
+
+    # await resume_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
+
+    # Verify all units are up and running.
+    for unit in ops_test.model.applications[app].units:
+        assert await postgresql_ready(
+            ops_test, unit.name
+        ), f"unit {unit.name} not restarted after cluster crash."
+
+    writes = await count_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+        with attempt:
+            more_writes = await count_writes(ops_test)
+            assert more_writes > writes, "writes not continuing to DB"
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            actual_writes = await count_writes(ops_test)
+            assert total_expected_writes == actual_writes, "writes to the db were missed."

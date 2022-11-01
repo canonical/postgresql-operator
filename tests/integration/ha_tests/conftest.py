@@ -44,6 +44,16 @@ async def master_start_timeout(ops_test: OpsTest) -> None:
     await change_master_start_timeout(ops_test, initial_master_start_timeout)
 
 
+# @pytest.fixture()
+# async def pause_cluster_management(ops_test: OpsTest) -> None:
+#     """Temporary step down Patroni from managing the cluster.
+#
+#     More information on https://patroni.readthedocs.io/en/latest/pause.html.
+#     """
+#     yield
+#     await resume_cluster_management(ops_test, False)
+
+
 @pytest.fixture()
 async def reset_restart_delay(ops_test: OpsTest):
     """Resets service file delay on all units."""

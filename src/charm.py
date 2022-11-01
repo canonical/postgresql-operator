@@ -716,6 +716,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.legacy_db_admin_relation.update_endpoints()
         self.postgresql_client_relation.oversee_users()
         self._update_certificate()
+        # self._reinitialize_replica()
 
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
@@ -820,11 +821,40 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.update_config()
 
+    def _reinitialize_replica(self) -> None:
+        """Reinitialize the replica data directory by copying the data from the primary.
+
+        The reinitialization should and is triggered only when it has a high replication lag.
+        """
+        # Run this operation only on replicas that are stuck (not being able to start again).
+        return
+        if (
+            self._patroni.member_started
+            or self._patroni.get_primary(unit_name_pattern=True) == self.unit.name
+        ):
+            return
+
+        # Reinitialize the replica if the lag is unknown or too high (more than 1GB).
+        replication_lag = self._patroni.get_replication_lag()
+        if replication_lag is None:
+            self.unit.status = BlockedStatus("failed to retrieve member replication lag")
+            return
+
+        if replication_lag == "unknown" or int(replication_lag) > 1048576:
+            try:
+                logger.info("replica reinitializing 1")
+                self._patroni.reinitialize_replica()
+                logger.info("replica reinitializing 2")
+            except RetryError:
+                self.unit.status = BlockedStatus("failed to reinitialize replica data directory")
+
     def _restart(self, _) -> None:
         """Restart Patroni and PostgreSQL."""
         if not self._patroni.restart_patroni():
             logger.exception("failed to restart PostgreSQL")
             self.unit.status = BlockedStatus("failed to restart Patroni and PostgreSQL")
+
+        # self._reinitialize_replica()
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""

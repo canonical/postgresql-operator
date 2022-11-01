@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import random
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -45,10 +46,10 @@ async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    search_db_process = f"run --unit {unit.name} ps aux | grep {process}"
+                    search_db_process = f'run --unit {unit.name} ps ax | grep "{process} "'
                     _, processes, _ = await ops_test.juju(*search_db_process.split())
 
-                    # `ps aux | grep {DB_PROCESS}` is a process on its own and will be shown in
+                    # `ps ax | grep "{DB_PROCESS} "` is a process on its own and will be shown in
                     # the output of ps aux, hence it is important that we check if there is
                     # more than one process containing the name `DB_PROCESS`
                     # splitting processes by "\n" results in one or more empty lines, hence we
@@ -91,11 +92,31 @@ async def change_master_start_timeout(ops_test: OpsTest, seconds: Optional[int])
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
-            primary_name = await get_primary(ops_test, app)
-            unit_ip = get_unit_address(ops_test, primary_name)
+            unit = get_random_unit(ops_test, app)
+            unit_ip = get_unit_address(ops_test, unit)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
                 json={"master_start_timeout": seconds},
+            )
+
+
+async def change_loop_wait(ops_test: OpsTest, seconds: Optional[int]) -> None:
+    """Change master start timeout configuration.
+
+    Args:
+        ops_test: ops_test instance.
+        seconds: number of seconds to set in master_start_timeout configuration.
+    """
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+        with attempt:
+            app = await app_name(ops_test)
+            unit = get_random_unit(ops_test, app)
+            print(f"unit: {unit}")
+            unit_ip = get_unit_address(ops_test, unit)
+            requests.patch(
+                f"http://{unit_ip}:8008/config",
+                json={"loop_wait": seconds},
+                timeout=10,
             )
 
 
@@ -112,7 +133,7 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
         f" host='{host}' password='{password}' connect_timeout=10"
     )
     try:
-        for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 with psycopg2.connect(
                     connection_string
@@ -163,6 +184,10 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
             master_start_timeout = configuration_info.json().get("master_start_timeout")
             return int(master_start_timeout) if master_start_timeout is not None else None
+
+
+def get_random_unit(ops_test: OpsTest, app: str) -> str:
+    return random.choice(ops_test.model.applications[app].units).name
 
 
 async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
@@ -243,6 +268,28 @@ async def send_signal_to_process(
         )
 
 
+async def pause_cluster_management(ops_test: OpsTest, unit_name: str) -> None:
+    """Pause cluster management.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: name of the unit used to pause the cluster management.
+    """
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            command = f"run --unit {unit_name} -- patronictl -c /var/lib/postgresql/data/patroni.yml pause --wait"
+            return_code, stdout, stderr = await ops_test.juju(*command.split())
+
+            print(f"stdout: {stdout}")
+            print(f"stderr: {stderr}")
+            if return_code != 0:
+                raise ProcessError(
+                    "Expected pause command %s to succeed instead it failed: %s",
+                    command,
+                    return_code,
+                )
+
+
 async def postgresql_ready(ops_test, unit_name: str) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
     unit_ip = get_unit_address(ops_test, unit_name)
@@ -255,6 +302,28 @@ async def postgresql_ready(ops_test, unit_name: str) -> bool:
         return False
 
     return True
+
+
+async def resume_cluster_management(ops_test: OpsTest, unit_name: str) -> None:
+    """Resume cluster management.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: name of the unit used to resume the cluster management.
+    """
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            command = f"run --unit {unit_name} -- patronictl -c /var/lib/postgresql/data/patroni.yml resume --wait"
+            return_code, stdout, stderr = await ops_test.juju(*command.split())
+
+            print(f"stdout: {stdout}")
+            print(f"stderr: {stderr}")
+            if return_code != 0:
+                raise ProcessError(
+                    "Expected resume command %s to succeed instead it failed: %s",
+                    command,
+                    return_code,
+                )
 
 
 async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
