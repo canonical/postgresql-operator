@@ -252,6 +252,25 @@ class Patroni:
 
         return r.json()["state"] == "running"
 
+    @property
+    def member_replication_lag(self) -> str:
+        """Member replication lag."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/cluster", verify=self.verify
+                    )
+        except RetryError:
+            return "unknown"
+
+        for member in cluster_status.json()["members"]:
+            logger.warning(self.member_name)
+            if member["name"] == self.member_name:
+                return member["lag"]
+
+        return "unknown"
+
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
@@ -405,3 +424,8 @@ class Patroni:
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
         requests.post(f"{self._patroni_url}/restart", verify=self.verify)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def reinitialize_postgresql(self) -> None:
+        """Reinitialize PostgreSQL."""
+        requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)

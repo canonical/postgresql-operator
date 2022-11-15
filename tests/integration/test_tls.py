@@ -103,7 +103,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
-                cursor.execute("CREATE TABLE pgrewindtest (testcol INT);")
+                cursor.execute("CREATE TABLE IF NOT EXISTS pgrewindtest (testcol INT);")
                 cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
         connection.close()
 
