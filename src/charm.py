@@ -724,7 +724,10 @@ class PostgresqlOperatorCharm(CharmBase):
         self._update_certificate()
 
         # Wait for the workload to be ready.
-        if not self._patroni.member_started:
+        if (
+            not self._patroni.member_started
+            and "postgresql_restarted" in self._peers.data[self.unit]
+        ):
             # Check lag.
             logger.warning(f"lag: {self._patroni.member_replication_lag}")
             if self._patroni.member_replication_lag == "unknown":
@@ -838,6 +841,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """Restart PostgreSQL."""
         try:
             self._patroni.restart_postgresql()
+            self._peers.data[self.unit]["postgresql_restarted"] = "True"
         except RetryError as e:
             logger.error("failed to restart PostgreSQL")
             self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
@@ -862,6 +866,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).
         if restart_postgresql:
+            self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
 
 
