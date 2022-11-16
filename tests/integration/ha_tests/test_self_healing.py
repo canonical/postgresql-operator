@@ -30,7 +30,7 @@ from tests.integration.ha_tests.helpers import (
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/usr/local/bin/patroni"
 POSTGRESQL_PROCESS = "postgres"
-DB_PROCESSES = [POSTGRESQL_PROCESS]
+DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
 def pytest_generate_tests(metafunc):
@@ -58,7 +58,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -118,7 +118,7 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
