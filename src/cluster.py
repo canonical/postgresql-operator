@@ -249,11 +249,6 @@ class Patroni:
 
         return r.json()["state"] == "running"
 
-    @retry(stop=stop_after_attempt(3))
-    def reinitialize_replica(self) -> None:
-        """Reinitialize replica data directory."""
-        requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
-
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
