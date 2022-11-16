@@ -54,9 +54,7 @@ async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
                     # more than one process containing the name `DB_PROCESS`
                     # splitting processes by "\n" results in one or more empty lines, hence we
                     # need to process these lines accordingly.
-                    print(f"first list of processes: {processes}")
                     processes = [proc for proc in processes.split("\n") if len(proc) > 0]
-                    print(f"second list of processes: {processes}")
 
                     if len(processes) > 1:
                         raise ProcessRunningError
@@ -111,7 +109,6 @@ async def change_loop_wait(ops_test: OpsTest, seconds: Optional[int]) -> None:
         with attempt:
             app = await app_name(ops_test)
             unit = get_random_unit(ops_test, app)
-            print(f"unit: {unit}")
             unit_ip = get_unit_address(ops_test, unit)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
@@ -268,28 +265,6 @@ async def send_signal_to_process(
         )
 
 
-async def pause_cluster_management(ops_test: OpsTest, unit_name: str) -> None:
-    """Pause cluster management.
-
-    Args:
-        ops_test: ops_test instance.
-        unit_name: name of the unit used to pause the cluster management.
-    """
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            command = f"run --unit {unit_name} -- patronictl -c /var/lib/postgresql/data/patroni.yml pause --wait"
-            return_code, stdout, stderr = await ops_test.juju(*command.split())
-
-            print(f"stdout: {stdout}")
-            print(f"stderr: {stderr}")
-            if return_code != 0:
-                raise ProcessError(
-                    "Expected pause command %s to succeed instead it failed: %s",
-                    command,
-                    return_code,
-                )
-
-
 async def postgresql_ready(ops_test, unit_name: str) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
     unit_ip = get_unit_address(ops_test, unit_name)
@@ -302,28 +277,6 @@ async def postgresql_ready(ops_test, unit_name: str) -> bool:
         return False
 
     return True
-
-
-async def resume_cluster_management(ops_test: OpsTest, unit_name: str) -> None:
-    """Resume cluster management.
-
-    Args:
-        ops_test: ops_test instance.
-        unit_name: name of the unit used to resume the cluster management.
-    """
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            command = f"run --unit {unit_name} -- patronictl -c /var/lib/postgresql/data/patroni.yml resume --wait"
-            return_code, stdout, stderr = await ops_test.juju(*command.split())
-
-            print(f"stdout: {stdout}")
-            print(f"stderr: {stderr}")
-            if return_code != 0:
-                raise ProcessError(
-                    "Expected resume command %s to succeed instead it failed: %s",
-                    command,
-                    return_code,
-                )
 
 
 async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:

@@ -33,15 +33,6 @@ POSTGRESQL_PROCESS = "postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
-def pytest_generate_tests(metafunc):
-    square_parameters = (x**2 for x in range(7))
-    if "square" in metafunc.fixturenames:
-        metafunc.parametrize("process", DB_PROCESSES)
-    if "odd_square" in metafunc.fixturenames:
-        odd_square_parameters = (x for x in square_parameters if x % 2 == 1)
-        metafunc.parametrize("pause_cluster_management", odd_square_parameters)
-
-
 @pytest.mark.abort_on_fail
 @pytest.mark.ha_self_healing_tests
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -246,7 +237,6 @@ async def test_full_cluster_restart(
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
 
-    # await pause_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
     await change_loop_wait(ops_test, 30)
 
     # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
@@ -267,8 +257,6 @@ async def test_full_cluster_restart(
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
     await change_loop_wait(ops_test, 20)
-
-    #     await resume_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
@@ -304,7 +292,6 @@ async def test_full_cluster_crash(
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
 
-    # await pause_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
     await change_loop_wait(ops_test, 20)
 
     # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
@@ -325,8 +312,6 @@ async def test_full_cluster_crash(
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
     await change_loop_wait(ops_test, 10)
-
-    # await resume_cluster_management(ops_test, ops_test.model.applications[app].units[0].name)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
