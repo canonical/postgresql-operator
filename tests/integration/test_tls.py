@@ -37,6 +37,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Deploy TLS Certificates operator.
         config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
         await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, channel="edge", config=config)
+
         # Relate it to the PostgreSQL to enable TLS.
         await ops_test.model.relate(DATABASE_APP_NAME, TLS_CERTIFICATES_APP_NAME)
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
