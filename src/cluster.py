@@ -374,11 +374,6 @@ class Patroni:
         primary = self.get_primary()
         return primary != old_primary
 
-    @retry(stop=stop_after_attempt(3))
-    def reinitialize_replica(self) -> None:
-        """Reinitialize replica data directory."""
-        requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
-
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
 

@@ -723,16 +723,13 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation.oversee_users()
         self._update_certificate()
 
-        # Wait for the workload to be ready.
+        # Restart the workload if it's stuck on the starting state after a restart.
         if (
             not self._patroni.member_started
             and "postgresql_restarted" in self._peers.data[self.unit]
+            and self._patroni.member_replication_lag == "unknown"
         ):
-            # Check lag.
-            logger.warning(f"lag: {self._patroni.member_replication_lag}")
-            if self._patroni.member_replication_lag == "unknown":
-                logger.warning("reinitializing...")
-                self._patroni.reinitialize_postgresql()
+            self._patroni.reinitialize_postgresql()
 
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
