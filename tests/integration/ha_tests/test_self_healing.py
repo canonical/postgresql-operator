@@ -173,7 +173,7 @@ async def test_freeze_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
 async def test_sst(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
 ) -> None:
