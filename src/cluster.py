@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Optional, Set
+from typing import Set
 
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
