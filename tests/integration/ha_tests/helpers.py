@@ -184,6 +184,7 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
 
 
 def get_random_unit(ops_test: OpsTest, app: str) -> str:
+    """Returns a random unit name."""
     return random.choice(ops_test.model.applications[app].units).name
 
 
