@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -9,10 +8,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.helpers import (
     METADATA,
-    RESTART_DELAY,
-    all_db_processes_down,
     app_name,
-    change_loop_wait,
     change_master_start_timeout,
     count_writes,
     fetch_cluster_members,
@@ -24,7 +20,6 @@ from tests.integration.ha_tests.helpers import (
     send_signal_to_process,
     start_continuous_writes,
     stop_continuous_writes,
-    update_restart_delay,
 )
 
 APP_NAME = METADATA["name"]
@@ -226,113 +221,3 @@ async def test_restart_db_process(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-
-
-@pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
-async def test_full_cluster_restart(
-    ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
-) -> None:
-    # Start an application that continuously writes data to the database.
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
-
-    await change_loop_wait(ops_test, 30)
-
-    # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
-    # should ensure enough time for all replicas to be down at the same time.
-    for unit in ops_test.model.applications[app].units:
-        await update_restart_delay(ops_test, unit, RESTART_DELAY)
-
-    # Restart all units "simultaneously".
-    await asyncio.gather(
-        *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGTERM")
-            for unit in ops_test.model.applications[app].units
-        ]
-    )
-
-    # This test serves to verify behavior when all replicas are down at the same time that when
-    # they come back online they operate as expected. This check verifies that we meet the criteria
-    # of all replicas being down at the same time.
-    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-    await change_loop_wait(ops_test, 20)
-
-    # Verify all units are up and running.
-    for unit in ops_test.model.applications[app].units:
-        assert await postgresql_ready(
-            ops_test, unit.name
-        ), f"unit {unit.name} not restarted after cluster crash."
-
-    # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-
-    writes = await count_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test)
-            assert more_writes > writes, "writes not continuing to DB"
-
-    # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
-
-
-@pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
-async def test_full_cluster_crash(
-    ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
-) -> None:
-    # Start an application that continuously writes data to the database.
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
-
-    await change_loop_wait(ops_test, 20)
-
-    # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
-    # should ensure enough time for all replicas to be down at the same time.
-    for unit in ops_test.model.applications[app].units:
-        await update_restart_delay(ops_test, unit, RESTART_DELAY)
-
-    # Restart all units "simultaneously".
-    await asyncio.gather(
-        *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGKILL")
-            for unit in ops_test.model.applications[app].units
-        ]
-    )
-
-    # This test serves to verify behavior when all replicas are down at the same time that when
-    # they come back online they operate as expected. This check verifies that we meet the criteria
-    # of all replicas being down at the same time.
-    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-    await change_loop_wait(ops_test, 10)
-
-    # Verify all units are up and running.
-    for unit in ops_test.model.applications[app].units:
-        assert await postgresql_ready(
-            ops_test, unit.name
-        ), f"unit {unit.name} not restarted after cluster crash."
-
-    writes = await count_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test)
-            assert more_writes > writes, "writes not continuing to DB"
-
-    # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-
-    # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
