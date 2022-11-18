@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -10,7 +9,6 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from tests.integration.ha_tests.helpers import (
     METADATA,
     RESTART_DELAY,
-    all_db_processes_down,
     app_name,
     change_master_start_timeout,
     count_writes,
@@ -179,7 +177,7 @@ async def test_freeze_db_process(
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
 async def test_sst(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout, reset_restart_delay
 ) -> None:
     """The SST test.
 
@@ -203,20 +201,12 @@ async def test_sst(
     # Update all units to have a new RESTART_DELAY.  Modifying the Restart delay to 3 minutes
     # should ensure enough time for all replicas to be down at the same time.
     for unit in ops_test.model.applications[app].units:
-        await update_restart_delay(ops_test, unit, RESTART_DELAY)
+        if unit.name == primary_name:
+            await update_restart_delay(ops_test, unit, RESTART_DELAY)
+            break
 
     # Restart all units "simultaneously".
-    await asyncio.gather(
-        *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGTERM")
-            for unit in ops_test.model.applications[app].units
-        ]
-    )
-
-    # This test serves to verify behavior when all replicas are down at the same time that when
-    # they come back online they operate as expected. This check verifies that we meet the criteria
-    # of all replicas being down at the same time.
-    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
+    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
 
     # Data removal runs within a script, so it allows `*` expansion.
     return_code, _, _ = await ops_test.juju(

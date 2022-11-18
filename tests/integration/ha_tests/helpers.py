@@ -30,37 +30,7 @@ class MemberNotUpdatedOnClusterError(Exception):
 
 
 class ProcessError(Exception):
-    """Raised when a process fails."""
-
-
-class ProcessRunningError(Exception):
-    """Raised when a process is running when it is not expected to be."""
-
-
-async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
-    """Verifies that all units of the charm do not have the DB process running."""
-    app = await app_name(ops_test)
-
-    try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                for unit in ops_test.model.applications[app].units:
-                    search_db_process = f'run --unit {unit.name} ps ax | grep "{process} "'
-                    _, processes, _ = await ops_test.juju(*search_db_process.split())
-
-                    # `ps ax | grep "{DB_PROCESS} "` is a process on its own and will be shown in
-                    # the output of ps aux, hence it is important that we check if there is
-                    # more than one process containing the name `DB_PROCESS`
-                    # splitting processes by "\n" results in one or more empty lines, hence we
-                    # need to process these lines accordingly.
-                    processes = [proc for proc in processes.split("\n") if len(proc) > 0]
-
-                    if len(processes) > 1:
-                        raise ProcessRunningError
-    except RetryError:
-        return False
-
-    return True
+    pass
 
 
 async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
