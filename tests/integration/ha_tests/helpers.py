@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import subprocess
 from pathlib import Path
 from typing import Optional
 
@@ -14,6 +15,10 @@ from tests.integration.helpers import get_unit_address
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
+PATRONI_SERVICE_DEFAULT_PATH = "/etc/systemd/system/patroni.service"
+TMP_SERVICE_PATH = "tests/integration/ha_tests/tmp.service"
+RESTART_DELAY = 60 * 3
+ORIGINAL_RESTART_DELAY = 30
 
 
 class MemberNotListedOnClusterError(Exception):
@@ -25,7 +30,37 @@ class MemberNotUpdatedOnClusterError(Exception):
 
 
 class ProcessError(Exception):
-    pass
+    """Raised when a process fails."""
+
+
+class ProcessRunningError(Exception):
+    """Raised when a process is running when it is not expected to be."""
+
+
+async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+    """Verifies that all units of the charm do not have the DB process running."""
+    app = await app_name(ops_test)
+
+    try:
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                for unit in ops_test.model.applications[app].units:
+                    search_db_process = f'run --unit {unit.name} ps ax | grep "{process} "'
+                    _, processes, _ = await ops_test.juju(*search_db_process.split())
+
+                    # `ps ax | grep "{DB_PROCESS} "` is a process on its own and will be shown in
+                    # the output of ps aux, hence it is important that we check if there is
+                    # more than one process containing the name `DB_PROCESS`
+                    # splitting processes by "\n" results in one or more empty lines, hence we
+                    # need to process these lines accordingly.
+                    processes = [proc for proc in processes.split("\n") if len(proc) > 0]
+
+                    if len(processes) > 1:
+                        raise ProcessRunningError
+    except RetryError:
+        return False
+
+    return True
 
 
 async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
@@ -286,3 +321,41 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     )
     action = await action.wait()
     return int(action.results["writes"])
+
+
+async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
+    """Updates the restart delay in the DB service file.
+
+    When the DB service fails it will now wait for `delay` number of seconds.
+    """
+    # Load the service file from the unit and update it with the new delay.
+    await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=TMP_SERVICE_PATH)
+    with open(TMP_SERVICE_PATH, "r") as patroni_service_file:
+        patroni_service = patroni_service_file.readlines()
+
+    for index, line in enumerate(patroni_service):
+        if "RestartSec" in line:
+            patroni_service[index] = f"RestartSec={delay}s\n"
+
+    with open(TMP_SERVICE_PATH, "w") as service_file:
+        service_file.writelines(patroni_service)
+
+    # Upload the changed file back to the unit, we cannot scp this file directly to
+    # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
+    # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
+    await unit.scp_to(source=TMP_SERVICE_PATH, destination="patroni.service")
+    mv_cmd = (
+        f"run --unit {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
+    )
+    return_code, _, _ = await ops_test.juju(*mv_cmd.split())
+    if return_code != 0:
+        raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
+
+    # Remove temporary file from machine.
+    subprocess.call(["rm", TMP_SERVICE_PATH])
+
+    # Reload the daemon for systemd otherwise changes are not saved.
+    reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
+    return_code, _, _ = await ops_test.juju(*reload_cmd.split())
+    if return_code != 0:
+        raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
