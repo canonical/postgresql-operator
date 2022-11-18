@@ -183,13 +183,27 @@ async def get_primary(ops_test: OpsTest, app) -> str:
     """Use the charm action to retrieve the primary from provided application.
 
     Returns:
-        string with the password stored on the peer relation databag.
+        primary unit name.
     """
-    # Can retrieve from any unit running unit, so we pick the first.
-    unit_name = ops_test.model.applications[app].units[0].name
-    action = await ops_test.model.units.get(unit_name).run_action("get-primary")
-    action = await action.wait()
-    return action.results["primary"]
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        # Can retrieve from any unit running unit, so we pick the first.
+        unit_name = ops_test.model.applications[app].units[0].name
+        action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+        action = await action.wait()
+        assert action.results["primary"] is not None
+        return action.results["primary"]
+
+
+async def list_wal_files(ops_test: OpsTest, app: str):
+    units = [unit.name for unit in ops_test.model.applications[app].units]
+    command = "ls -al /var/lib/postgresql/data/pgdata/pg_wal/"
+    for unit in units:
+        print(f"unit name: {unit}")
+        complete_command = f"run --unit {unit} -- {command}"
+        return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
+        print(f"return_code: {return_code}")
+        print(f"stdout: {stdout}")
+        print(f"stderr: {stderr}")
 
 
 async def send_signal_to_process(

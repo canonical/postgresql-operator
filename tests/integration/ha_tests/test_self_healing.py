@@ -16,6 +16,7 @@ from tests.integration.ha_tests.helpers import (
     get_master_start_timeout,
     get_primary,
     is_replica,
+    list_wal_files,
     postgresql_ready,
     secondary_up_to_date,
     send_signal_to_process,
@@ -23,6 +24,7 @@ from tests.integration.ha_tests.helpers import (
     stop_continuous_writes,
     update_restart_delay,
 )
+from tests.integration.helpers import db_connect, get_password, get_unit_address
 
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/usr/local/bin/patroni"
@@ -218,6 +220,15 @@ async def test_sst(
     assert return_code == 0, "Failed to remove data directory"
 
     async with ops_test.fast_forward():
+        # Verify that a new primary gets elected (ie old primary is secondary).
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                new_primary_name = await get_primary(ops_test, app)
+                assert new_primary_name != primary_name
+
+        # Revert the "master_start_timeout" parameter to avoid fail-over again.
+        await change_master_start_timeout(ops_test, original_master_start_timeout)
+
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
@@ -227,14 +238,20 @@ async def test_sst(
                 more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"
 
-        # Verify that a new primary gets elected (ie old primary is secondary).
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                new_primary_name = await get_primary(ops_test, app)
-                assert new_primary_name != primary_name
-
-        # Revert the "master_start_timeout" parameter to avoid fail-over again.
-        await change_master_start_timeout(ops_test, original_master_start_timeout)
+        # Write some data to the initial primary (this causes a divergence
+        # in the instances' timelines).
+        await list_wal_files(ops_test, app)
+        print(f"primary_name: {primary_name}")
+        print(f"new_primary_name: {new_primary_name}")
+        host = get_unit_address(ops_test, new_primary_name)
+        password = await get_password(ops_test, new_primary_name)
+        with db_connect(host, password) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT pg_switch_wal();")
+        connection.close()
+        print("...")
+        await list_wal_files(ops_test, app)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
