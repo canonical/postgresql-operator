@@ -75,7 +75,7 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
         f" host='{host}' password='{password}' connect_timeout=10"
     )
     try:
-        for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 with psycopg2.connect(
                     connection_string
