@@ -18,6 +18,7 @@ It also needs the following methods in the charm class:
 """
 
 import base64
+import ipaddress
 import logging
 import re
 import socket
@@ -34,7 +35,7 @@ from cryptography import x509
 from cryptography.x509.extensions import ExtensionType
 from ops.charm import ActionEvent
 from ops.framework import Object
-from ops.pebble import PathError, ProtocolError
+from ops.pebble import ConnectionError, PathError, ProtocolError
 
 # The unique Charmhub library identifier, never change it
 LIBID = "c27af44a92df4ef38d7ae06418b2800f"
@@ -44,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 1
+LIBPATCH = 4
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -54,11 +55,14 @@ TLS_RELATION = "certificates"
 class PostgreSQLTLS(Object):
     """In this class we manage certificates relation."""
 
-    def __init__(self, charm, peer_relation):
+    def __init__(
+        self, charm, peer_relation: str, additional_dns_names: Optional[List[str]] = None
+    ):
         """Manager of PostgreSQL relation with TLS Certificates Operator."""
         super().__init__(charm, "client-relations")
         self.charm = charm
         self.peer_relation = peer_relation
+        self.additional_dns_names = additional_dns_names or []
         self.certs = TLSCertificatesRequiresV1(self.charm, TLS_RELATION)
         self.framework.observe(
             self.charm.on.set_tls_private_key_action, self._on_set_tls_private_key
@@ -86,8 +90,8 @@ class PostgreSQLTLS(Object):
         csr = generate_csr(
             private_key=key,
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
-            sans=self._get_sans(),
             additional_critical_extensions=self._get_tls_extensions(),
+            **self._get_sans(),
         )
 
         self.charm.set_secret(SCOPE, "key", key.decode("utf-8"))
@@ -133,7 +137,7 @@ class PostgreSQLTLS(Object):
 
         try:
             self.charm.push_tls_files_to_workload()
-        except (PathError, ProtocolError) as e:
+        except (ConnectionError, PathError, ProtocolError) as e:
             logger.error("Cannot push TLS certificates: %r", e)
             event.defer()
             return
@@ -149,8 +153,8 @@ class PostgreSQLTLS(Object):
         new_csr = generate_csr(
             private_key=key,
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
-            sans=self._get_sans(),
             additional_critical_extensions=self._get_tls_extensions(),
+            **self._get_sans(),
         )
         self.certs.request_certificate_renewal(
             old_certificate_signing_request=old_csr,
@@ -158,18 +162,40 @@ class PostgreSQLTLS(Object):
         )
         self.charm.set_secret(SCOPE, "csr", new_csr.decode("utf-8"))
 
-    def _get_sans(self) -> List[str]:
-        """Create a list of DNS names for a PostgreSQL unit.
+    def _get_sans(self) -> dict:
+        """Create a list of Subject Alternative Names for a PostgreSQL unit.
 
         Returns:
-            A list representing the hostnames of the PostgreSQL unit.
+            A list representing the IP and hostnames of the PostgreSQL unit.
         """
+
+        def is_ip_address(address: str) -> bool:
+            """Returns whether and address is an IP address."""
+            try:
+                ipaddress.ip_address(address)
+                return True
+            except (ipaddress.AddressValueError, ValueError):
+                return False
+
         unit_id = self.charm.unit.name.split("/")[1]
-        return [
+
+        # Create a list of all the Subject Alternative Names.
+        sans = [
             f"{self.charm.app.name}-{unit_id}",
+            self.charm.get_hostname_by_unit(self.charm.unit.name),
             socket.getfqdn(),
             str(self.charm.model.get_binding(self.peer_relation).network.bind_address),
         ]
+        sans.extend(self.additional_dns_names)
+
+        # Separate IP addresses and DNS names.
+        sans_ip = [san for san in sans if is_ip_address(san)]
+        sans_dns = [san for san in sans if not is_ip_address(san)]
+
+        return {
+            "sans_ip": sans_ip,
+            "sans_dns": sans_dns,
+        }
 
     @staticmethod
     def _get_tls_extensions() -> Optional[List[ExtensionType]]:
@@ -177,7 +203,7 @@ class PostgreSQLTLS(Object):
         basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
         return [basic_constraints]
 
-    def get_tls_files(self) -> (Optional[str], Optional[str]):
+    def get_tls_files(self) -> (Optional[str], Optional[str], Optional[str]):
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
