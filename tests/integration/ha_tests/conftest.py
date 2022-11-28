@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError
 
 from tests.integration.ha_tests.helpers import (
     ORIGINAL_RESTART_DELAY,
@@ -42,12 +41,7 @@ async def master_start_timeout(ops_test: OpsTest) -> None:
     initial_master_start_timeout = await get_master_start_timeout(ops_test)
     yield
     # Rollback to the initial configuration.
-    try:
-        await change_master_start_timeout(ops_test, initial_master_start_timeout)
-    except RetryError:
-        await change_master_start_timeout(
-            ops_test, initial_master_start_timeout, use_random_unit=True
-        )
+    await change_master_start_timeout(ops_test, initial_master_start_timeout, use_random_unit=True)
 
 
 @pytest.fixture()

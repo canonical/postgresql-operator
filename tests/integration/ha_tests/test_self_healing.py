@@ -12,7 +12,6 @@ from tests.integration.ha_tests.helpers import (
     RESTART_DELAY,
     all_db_processes_down,
     app_name,
-    change_loop_wait,
     change_master_start_timeout,
     count_writes,
     fetch_cluster_members,
@@ -239,9 +238,7 @@ async def test_full_cluster_restart(
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
 
-    await change_loop_wait(ops_test, 30)
-
-    # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
+    # Update all units to have a new RESTART_DELAY. Modifying the Restart delay to 3 minutes
     # should ensure enough time for all replicas to be down at the same time.
     for unit in ops_test.model.applications[app].units:
         await update_restart_delay(ops_test, unit, RESTART_DELAY)
@@ -258,7 +255,6 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-    await change_loop_wait(ops_test, 20)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
@@ -294,8 +290,6 @@ async def test_full_cluster_crash(
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
 
-    await change_loop_wait(ops_test, 20)
-
     # Update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
     # should ensure enough time for all replicas to be down at the same time.
     for unit in ops_test.model.applications[app].units:
@@ -313,7 +307,6 @@ async def test_full_cluster_crash(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-    await change_loop_wait(ops_test, 10)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:

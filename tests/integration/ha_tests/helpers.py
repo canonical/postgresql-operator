@@ -106,33 +106,6 @@ async def change_master_start_timeout(
             )
 
 
-async def change_loop_wait(
-    ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
-) -> None:
-    """Change master start timeout configuration.
-
-    Args:
-        ops_test: ops_test instance.
-        seconds: number of seconds to set in master_start_timeout configuration.
-        use_random_unit: whether to use a random unit (default is False,
-            so it uses the primary)
-    """
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            app = await app_name(ops_test)
-            if use_random_unit:
-                unit = get_random_unit(ops_test, app)
-                unit_ip = get_unit_address(ops_test, unit)
-            else:
-                primary_name = await get_primary(ops_test, app)
-                unit_ip = get_unit_address(ops_test, primary_name)
-            requests.patch(
-                f"http://{unit_ip}:8008/config",
-                json={"loop_wait": seconds},
-                timeout=10,
-            )
-
-
 async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
