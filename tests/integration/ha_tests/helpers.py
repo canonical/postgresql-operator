@@ -70,11 +70,11 @@ async def change_master_start_timeout(ops_test: OpsTest, seconds: Optional[int])
 async def change_wal_settings(
     ops_test: OpsTest, unit_name: str, max_wal_size: int, min_wal_size, wal_keep_segments
 ) -> None:
-    """Change wal_keep_segments configuration.
+    """Change WAL settings in the unit.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: name of the unit to change wal_keep_segments configuration.
+        unit_name: name of the unit to change the WAL settings.
         max_wal_size: maximum amount of WAL to keep (MB).
         min_wal_size: minimum amount of WAL to keep (MB).
         wal_keep_segments: number of WAL segments to keep.
@@ -231,10 +231,9 @@ async def list_wal_files(ops_test: OpsTest, app: str):
         complete_command = f"run --unit {unit} -- {command}"
         return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
         files[unit] = stdout.splitlines()
-        files[unit] = [
+        files[unit] = {
             i for i in files[unit] if ".history" not in i and i != "" and i != "archive_status"
-        ]
-        files[unit].append("archive_status/*")
+        }
     return files
 
 

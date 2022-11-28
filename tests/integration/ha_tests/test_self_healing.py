@@ -177,7 +177,7 @@ async def test_freeze_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.ha_self_healing_tests
+# @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -231,7 +231,7 @@ async def test_restart_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
 async def test_sst(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout, reset_restart_delay
 ) -> None:
@@ -254,8 +254,8 @@ async def test_sst(
     original_master_start_timeout = await get_master_start_timeout(ops_test)
     await change_master_start_timeout(ops_test, 0)
 
-    # Update all units to have a new RESTART_DELAY.  Modifying the Restart delay to 3 minutes
-    # should ensure enough time for all replicas to be down at the same time.
+    # Update the primary unit to have a new RESTART_DELAY. Modifying the Restart delay to 3 minutes
+    # should ensure enough time for the test.
     for unit in ops_test.model.applications[app].units:
         if unit.name == primary_name:
             await update_restart_delay(ops_test, unit, RESTART_DELAY)
@@ -293,12 +293,12 @@ async def test_sst(
                 assert more_writes > writes, "writes not continuing to DB"
 
         for unit in ops_test.model.applications[app].units:
-            if unit.name == primary_name:
+            if unit.name == new_primary_name:
                 continue
             await change_wal_settings(ops_test, unit.name, 32, 32, 1)
+            break
 
-        # Write some data to the initial primary (this causes a divergence
-        # in the instances' timelines).
+        # Rotate the WAL segments.
         files = await list_wal_files(ops_test, app)
         host = get_unit_address(ops_test, new_primary_name)
         password = await get_password(ops_test, new_primary_name)
@@ -312,15 +312,14 @@ async def test_sst(
                 cursor.execute("SELECT pg_switch_wal();")
                 cursor.execute("CHECKPOINT;")
                 cursor.execute("SELECT pg_switch_wal();")
-                # cursor.execute("CHECKPOINT;")
-                # cursor.execute("SELECT pg_switch_wal();")
-                # cursor.execute("CHECKPOINT;")
-                # cursor.execute("SELECT pg_switch_wal();")
         connection.close()
         new_files = await list_wal_files(ops_test, app)
-        print(f"files: {files}")
-        print(f"new_files: {new_files}")
-        await list_wal_files(ops_test, app)
+        for unit_name in files:
+            assert not files[unit_name].intersection(
+                new_files
+            ), "WAL segments weren't correctly rotated"
+
+        # await update_restart_delay(ops_test, primary_unit, ORIGINAL_RESTART_DELAY)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
@@ -344,6 +343,3 @@ async def test_sst(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-
-    # for unit in ops_test.model.applications[app].units:
-    #     await change_wal_keep_segments(ops_test, unit.name, 0)
