@@ -233,7 +233,12 @@ async def test_restart_db_process(
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
 async def test_sst(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout, reset_restart_delay
+    ops_test: OpsTest,
+    process: str,
+    continuous_writes,
+    master_start_timeout,
+    reset_restart_delay,
+    wal_settings,
 ) -> None:
     """The SST test.
 
@@ -292,11 +297,11 @@ async def test_sst(
                 more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"
 
+        # Change some settings to enable WAL rotation.
         for unit in ops_test.model.applications[app].units:
-            if unit.name == new_primary_name:
+            if unit.name == primary_name:
                 continue
             await change_wal_settings(ops_test, unit.name, 32, 32, 1)
-            break
 
         # Rotate the WAL segments.
         files = await list_wal_files(ops_test, app)
@@ -305,21 +310,22 @@ async def test_sst(
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
+                # Remove the replication slot of the former primary to enable WAL rotation.
                 slot_name = primary_name.replace("/", "_")
                 cursor.execute(
                     f"SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = '{slot_name}';"
                 )
+                # Run some commands to make PostgreSQL do WAL rotation.
                 cursor.execute("SELECT pg_switch_wal();")
                 cursor.execute("CHECKPOINT;")
                 cursor.execute("SELECT pg_switch_wal();")
         connection.close()
         new_files = await list_wal_files(ops_test, app)
+        # Check that the WAL was correctly rotated.
         for unit_name in files:
             assert not files[unit_name].intersection(
                 new_files
             ), "WAL segments weren't correctly rotated"
-
-        # await update_restart_delay(ops_test, primary_unit, ORIGINAL_RESTART_DELAY)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)

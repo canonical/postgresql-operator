@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import psycopg2
 import requests
@@ -162,6 +162,25 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             return int(master_start_timeout) if master_start_timeout is not None else None
 
 
+async def get_wal_settings(ops_test: OpsTest) -> Optional[int]:
+    """Get a list of the WAL settings used in the tests.
+
+    Args:
+        ops_test: ops_test instance.
+
+    Returns:
+        master start timeout in seconds or None if it's using the default value.
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            app = await app_name(ops_test)
+            primary_name = await get_primary(ops_test, app)
+            unit_ip = get_unit_address(ops_test, primary_name)
+            configuration_info = requests.get(f"http://{unit_ip}:8008/config")
+            initial_max_wal_size = configuration_info.json().get("initial_max_wal_size")
+            return int(initial_max_wal_size) if initial_max_wal_size is not None else None
+
+
 async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 
@@ -223,7 +242,8 @@ async def get_primary(ops_test: OpsTest, app) -> str:
         return action.results["primary"]
 
 
-async def list_wal_files(ops_test: OpsTest, app: str):
+async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
+    """Returns the list of WAL segment files in each unit."""
     units = [unit.name for unit in ops_test.model.applications[app].units]
     command = "ls -1 /var/lib/postgresql/data/pgdata/pg_wal/"
     files = {}

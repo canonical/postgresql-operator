@@ -51,3 +51,19 @@ async def reset_restart_delay(ops_test: OpsTest):
     app = await app_name(ops_test)
     for unit in ops_test.model.applications[app].units:
         await update_restart_delay(ops_test, unit, ORIGINAL_RESTART_DELAY)
+
+
+@pytest.fixture()
+async def wal_settings(ops_test: OpsTest) -> None:
+    # """Restore the WAL settings to the initial values."""
+    # # Get the value for each setting.
+    # initial_max_wal_size, initial_min_wal_size, initial_wal_keep_segments =
+    # await get_wal_settings(
+    #     ops_test
+    # )
+    # yield
+    # # Rollback to the initial settings.
+    # await change_wal_settings(
+    #     ops_test, initial_max_wal_size, initial_min_wal_size, initial_wal_keep_segments
+    # )
+    pass
