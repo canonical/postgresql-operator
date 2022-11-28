@@ -11,6 +11,7 @@ from tests.integration.ha_tests.helpers import (
     RESTART_DELAY,
     app_name,
     change_master_start_timeout,
+    change_wal_settings,
     count_writes,
     fetch_cluster_members,
     get_master_start_timeout,
@@ -208,9 +209,29 @@ async def test_restart_db_process(
     new_primary_name = await get_primary(ops_test, app)
     assert new_primary_name != primary_name
 
+    # Verify that the old primary is now a replica.
+    assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            actual_writes = await count_writes(ops_test)
+            assert total_expected_writes == actual_writes, "writes to the db were missed."
+
+    # Verify that old primary is up-to-date.
+    assert await secondary_up_to_date(
+        ops_test, primary_name, total_expected_writes
+    ), "secondary not up to date with the cluster after restarting."
+
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
+@pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_sst(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout, reset_restart_delay
 ) -> None:
@@ -271,19 +292,34 @@ async def test_sst(
                 more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"
 
+        for unit in ops_test.model.applications[app].units:
+            if unit.name == primary_name:
+                continue
+            await change_wal_settings(ops_test, unit.name, 32, 32, 1)
+
         # Write some data to the initial primary (this causes a divergence
         # in the instances' timelines).
-        await list_wal_files(ops_test, app)
-        print(f"primary_name: {primary_name}")
-        print(f"new_primary_name: {new_primary_name}")
+        files = await list_wal_files(ops_test, app)
         host = get_unit_address(ops_test, new_primary_name)
         password = await get_password(ops_test, new_primary_name)
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
+                slot_name = primary_name.replace("/", "_")
+                cursor.execute(
+                    f"SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = '{slot_name}';"
+                )
                 cursor.execute("SELECT pg_switch_wal();")
+                cursor.execute("CHECKPOINT;")
+                cursor.execute("SELECT pg_switch_wal();")
+                # cursor.execute("CHECKPOINT;")
+                # cursor.execute("SELECT pg_switch_wal();")
+                # cursor.execute("CHECKPOINT;")
+                # cursor.execute("SELECT pg_switch_wal();")
         connection.close()
-        print("...")
+        new_files = await list_wal_files(ops_test, app)
+        print(f"files: {files}")
+        print(f"new_files: {new_files}")
         await list_wal_files(ops_test, app)
 
         # Verify that the database service got restarted and is ready in the old primary.
@@ -308,3 +344,6 @@ async def test_sst(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
+
+    # for unit in ops_test.model.applications[app].units:
+    #     await change_wal_keep_segments(ops_test, unit.name, 0)

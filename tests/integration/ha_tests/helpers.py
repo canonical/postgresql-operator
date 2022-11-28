@@ -67,6 +67,35 @@ async def change_master_start_timeout(ops_test: OpsTest, seconds: Optional[int])
             )
 
 
+async def change_wal_settings(
+    ops_test: OpsTest, unit_name: str, max_wal_size: int, min_wal_size, wal_keep_segments
+) -> None:
+    """Change wal_keep_segments configuration.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: name of the unit to change wal_keep_segments configuration.
+        max_wal_size: maximum amount of WAL to keep (MB).
+        min_wal_size: minimum amount of WAL to keep (MB).
+        wal_keep_segments: number of WAL segments to keep.
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            unit_ip = get_unit_address(ops_test, unit_name)
+            requests.patch(
+                f"http://{unit_ip}:8008/config",
+                json={
+                    "postgresql": {
+                        "parameters": {
+                            "max_wal_size": max_wal_size,
+                            "min_wal_size": min_wal_size,
+                            "wal_keep_segments": wal_keep_segments,
+                        }
+                    }
+                },
+            )
+
+
 async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
@@ -196,14 +225,17 @@ async def get_primary(ops_test: OpsTest, app) -> str:
 
 async def list_wal_files(ops_test: OpsTest, app: str):
     units = [unit.name for unit in ops_test.model.applications[app].units]
-    command = "ls -al /var/lib/postgresql/data/pgdata/pg_wal/"
+    command = "ls -1 /var/lib/postgresql/data/pgdata/pg_wal/"
+    files = {}
     for unit in units:
-        print(f"unit name: {unit}")
         complete_command = f"run --unit {unit} -- {command}"
         return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
-        print(f"return_code: {return_code}")
-        print(f"stdout: {stdout}")
-        print(f"stderr: {stderr}")
+        files[unit] = stdout.splitlines()
+        files[unit] = [
+            i for i in files[unit] if ".history" not in i and i != "" and i != "archive_status"
+        ]
+        files[unit].append("archive_status/*")
+    return files
 
 
 async def send_signal_to_process(
@@ -257,7 +289,7 @@ async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_write
     )
 
     try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 with psycopg2.connect(
                     connection_string
