@@ -296,7 +296,7 @@ async def test_full_cluster_crash(
 
     await change_loop_wait(ops_test, 20)
 
-    # update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
+    # Update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
     # should ensure enough time for all replicas to be down at the same time.
     for unit in ops_test.model.applications[app].units:
         await update_restart_delay(ops_test, unit, RESTART_DELAY)

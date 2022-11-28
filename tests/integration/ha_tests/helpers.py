@@ -369,7 +369,7 @@ async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
 
     When the DB service fails it will now wait for `delay` number of seconds.
     """
-    # load the service file from the unit and update it with the new delay
+    # Load the service file from the unit and update it with the new delay.
     await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=TMP_SERVICE_PATH)
     with open(TMP_SERVICE_PATH, "r") as patroni_service_file:
         patroni_service = patroni_service_file.readlines()
@@ -381,7 +381,7 @@ async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
     with open(TMP_SERVICE_PATH, "w") as service_file:
         service_file.writelines(patroni_service)
 
-    # upload the changed file back to the unit, we cannot scp this file directly to
+    # Upload the changed file back to the unit, we cannot scp this file directly to
     # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
     await unit.scp_to(source=TMP_SERVICE_PATH, destination="patroni.service")
@@ -392,10 +392,10 @@ async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
 
-    # remove tmp file from machine
+    # Remove temporary file from machine.
     subprocess.call(["rm", TMP_SERVICE_PATH])
 
-    # reload the daemon for systemd otherwise changes are not saved
+    # Reload the daemon for systemd otherwise changes are not saved.
     reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
     return_code, _, _ = await ops_test.juju(*reload_cmd.split())
     if return_code != 0:
