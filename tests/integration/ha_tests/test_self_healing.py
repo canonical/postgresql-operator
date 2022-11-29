@@ -303,11 +303,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
-                # Remove the replication slot of the former primary to enable WAL rotation.
-                slot_name = primary_name.replace("/", "_")
-                cursor.execute(
-                    f"SELECT pg_drop_replication_slot(slot_name) FROM pg_replication_slots WHERE slot_name = '{slot_name}';"
-                )
                 # Run some commands to make PostgreSQL do WAL rotation.
                 cursor.execute("SELECT pg_switch_wal();")
                 cursor.execute("CHECKPOINT;")
