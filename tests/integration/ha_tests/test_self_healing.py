@@ -52,7 +52,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -84,11 +84,9 @@ async def test_kill_db_process(
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
 
-        # Verify that a new primary gets elected (ie old primary is secondary).
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                new_primary_name = await get_primary(ops_test, app)
-                assert new_primary_name != primary_name
+    # Verify that a new primary gets elected (ie old primary is secondary).
+    new_primary_name = await get_primary(ops_test, app)
+    assert new_primary_name != primary_name
 
     # Revert the "master_start_timeout" parameter to avoid fail-over again.
     await change_master_start_timeout(ops_test, original_master_start_timeout)
@@ -114,7 +112,7 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -180,7 +178,7 @@ async def test_freeze_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout

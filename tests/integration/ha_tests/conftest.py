@@ -62,4 +62,3 @@ async def wal_settings(ops_test: OpsTest) -> None:
             initial_min_wal_size,
             initial_wal_keep_segments,
         )
-    pass

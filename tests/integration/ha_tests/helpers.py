@@ -14,10 +14,6 @@ from tests.integration.helpers import get_unit_address
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
-PATRONI_SERVICE_DEFAULT_PATH = "/etc/systemd/system/patroni.service"
-TMP_SERVICE_PATH = "tests/integration/ha_tests/tmp.service"
-RESTART_DELAY = 60 * 3
-ORIGINAL_RESTART_DELAY = 30
 
 
 class MemberNotListedOnClusterError(Exception):
