@@ -229,9 +229,15 @@ async def test_restart_db_process(
 
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", [PATRONI_PROCESS])
+@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
-    ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
+    ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_delay
 ) -> None:
+    """This tests checks that a cluster recovers from a full cluster restart.
+
+    The test can be called a full cluster crash when the signal sent to the OS process
+    is SIGKILL.
+    """
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
@@ -244,7 +250,7 @@ async def test_full_cluster_restart(
     # Restart all units "simultaneously".
     await asyncio.gather(
         *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGTERM")
+            send_signal_to_process(ops_test, unit.name, process, kill_code=signal)
             for unit in ops_test.model.applications[app].units
         ]
     )
@@ -258,59 +264,7 @@ async def test_full_cluster_restart(
     for unit in ops_test.model.applications[app].units:
         assert await postgresql_ready(
             ops_test, unit.name
-        ), f"unit {unit.name} not restarted after cluster crash."
-
-    # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-
-    writes = await count_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test)
-            assert more_writes > writes, "writes not continuing to DB"
-
-    # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
-
-
-@pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
-async def test_full_cluster_crash(
-    ops_test: OpsTest, process: str, continuous_writes, reset_restart_delay
-) -> None:
-    # Start an application that continuously writes data to the database.
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
-
-    # Update all units to have a new RESTART_DELAY,  Modifying the Restart delay to 3 minutes
-    # should ensure enough time for all replicas to be down at the same time.
-    for unit in ops_test.model.applications[app].units:
-        await update_restart_delay(ops_test, unit, RESTART_DELAY)
-
-    # Restart all units "simultaneously".
-    await asyncio.gather(
-        *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code="SIGKILL")
-            for unit in ops_test.model.applications[app].units
-        ]
-    )
-
-    # This test serves to verify behavior when all replicas are down at the same time that when
-    # they come back online they operate as expected. This check verifies that we meet the criteria
-    # of all replicas being down at the same time.
-    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-
-    # Verify all units are up and running.
-    for unit in ops_test.model.applications[app].units:
-        assert await postgresql_ready(
-            ops_test, unit.name
-        ), f"unit {unit.name} not restarted after cluster crash."
+        ), f"unit {unit.name} not restarted after cluster restart."
 
     writes = await count_writes(ops_test)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
