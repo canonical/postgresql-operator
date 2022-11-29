@@ -232,10 +232,8 @@ async def test_restart_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
-    process: str,
     continuous_writes,
     master_start_timeout,
     wal_settings,
