@@ -1,6 +1,5 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import subprocess
 from pathlib import Path
 from typing import Optional, Set
 
@@ -162,23 +161,30 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             return int(master_start_timeout) if master_start_timeout is not None else None
 
 
-async def get_wal_settings(ops_test: OpsTest) -> Optional[int]:
-    """Get a list of the WAL settings used in the tests.
+async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
+    """Get the value of a PostgreSQL parameter from Patroni API.
 
     Args:
         ops_test: ops_test instance.
+        parameter_name: the name of the parameter to get the value for.
 
     Returns:
-        master start timeout in seconds or None if it's using the default value.
+        the value of the requested PostgreSQL parameter.
     """
-    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
-            initial_max_wal_size = configuration_info.json().get("initial_max_wal_size")
-            return int(initial_max_wal_size) if initial_max_wal_size is not None else None
+            postgresql_dict = configuration_info.json().get("postgresql")
+            if postgresql_dict is None:
+                return None
+            parameters = postgresql_dict.get("parameters")
+            if parameters is None:
+                return None
+            parameter_value = parameters.get(parameter_name)
+            return parameter_value
 
 
 async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
@@ -356,41 +362,3 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     )
     action = await action.wait()
     return int(action.results["writes"])
-
-
-async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
-    """Updates the restart delay in the DB service file.
-
-    When the DB service fails it will now wait for `delay` number of seconds.
-    """
-    # Load the service file from the unit and update it with the new delay.
-    await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=TMP_SERVICE_PATH)
-    with open(TMP_SERVICE_PATH, "r") as patroni_service_file:
-        patroni_service = patroni_service_file.readlines()
-
-    for index, line in enumerate(patroni_service):
-        if "RestartSec" in line:
-            patroni_service[index] = f"RestartSec={delay}s\n"
-
-    with open(TMP_SERVICE_PATH, "w") as service_file:
-        service_file.writelines(patroni_service)
-
-    # Upload the changed file back to the unit, we cannot scp this file directly to
-    # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
-    # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
-    await unit.scp_to(source=TMP_SERVICE_PATH, destination="patroni.service")
-    mv_cmd = (
-        f"run --unit {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
-    )
-    return_code, _, _ = await ops_test.juju(*mv_cmd.split())
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
-
-    # Remove temporary file from machine.
-    subprocess.call(["rm", TMP_SERVICE_PATH])
-
-    # Reload the daemon for systemd otherwise changes are not saved.
-    reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
-    return_code, _, _ = await ops_test.juju(*reload_cmd.split())
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)

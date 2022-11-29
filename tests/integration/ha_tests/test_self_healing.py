@@ -8,7 +8,6 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.helpers import (
     METADATA,
-    RESTART_DELAY,
     app_name,
     change_master_start_timeout,
     change_wal_settings,
@@ -23,9 +22,13 @@ from tests.integration.ha_tests.helpers import (
     send_signal_to_process,
     start_continuous_writes,
     stop_continuous_writes,
-    update_restart_delay,
 )
-from tests.integration.helpers import db_connect, get_password, get_unit_address
+from tests.integration.helpers import (
+    db_connect,
+    get_password,
+    get_unit_address,
+    run_command_on_unit,
+)
 
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/usr/local/bin/patroni"
@@ -232,18 +235,14 @@ async def test_restart_db_process(
 
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", [POSTGRESQL_PROCESS])
-async def test_sst(
+async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     process: str,
     continuous_writes,
     master_start_timeout,
-    reset_restart_delay,
     wal_settings,
 ) -> None:
-    """The SST test.
-
-    A forceful restart instance with deleted data and without transaction logs (forced clone).
-    """
+    """A forceful restart with deleted data and without transaction logs (forced clone)."""
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
 
@@ -259,15 +258,8 @@ async def test_sst(
     original_master_start_timeout = await get_master_start_timeout(ops_test)
     await change_master_start_timeout(ops_test, 0)
 
-    # Update the primary unit to have a new RESTART_DELAY. Modifying the Restart delay to 3 minutes
-    # should ensure enough time for the test.
-    for unit in ops_test.model.applications[app].units:
-        if unit.name == primary_name:
-            await update_restart_delay(ops_test, unit, RESTART_DELAY)
-            break
-
-    # Restart all units "simultaneously".
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
+    # Stop the systemd service on the primary unit.
+    await run_command_on_unit(ops_test, primary_name, "systemctl stop patroni")
 
     # Data removal runs within a script, so it allows `*` expansion.
     return_code, _, _ = await ops_test.juju(
@@ -283,6 +275,7 @@ async def test_sst(
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 new_primary_name = await get_primary(ops_test, app)
+                assert new_primary_name is not None
                 assert new_primary_name != primary_name
 
         # Revert the "master_start_timeout" parameter to avoid fail-over again.
@@ -326,6 +319,9 @@ async def test_sst(
             assert not files[unit_name].intersection(
                 new_files
             ), "WAL segments weren't correctly rotated"
+
+        # Start the systemd service in the old primary.
+        await run_command_on_unit(ops_test, primary_name, "systemctl start patroni")
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
