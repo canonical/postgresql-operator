@@ -594,6 +594,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_start(self, event) -> None:
         """Handle the start event."""
+        # Push TLS files to the right path for PostgreSQL and Patroni.
+        self.push_tls_files_to_workload()
+
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
         if self._has_blocked_status:
@@ -633,7 +636,10 @@ class PostgresqlOperatorCharm(CharmBase):
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
-            self.postgresql.create_user("postgres", new_password(), admin=True)
+            # This event can be run on a non leader unit if the machines are restarted.
+            # For that case, check whether the postgres user already exits.
+            if "postgres" not in self.postgresql.list_users():
+                self.postgresql.create_user("postgres", new_password(), admin=True)
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
