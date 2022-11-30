@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import itertools
 import json
+import subprocess
 import tempfile
 import zipfile
 from datetime import datetime
@@ -556,6 +557,21 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     except RetryError:
         return False
     return False
+
+
+async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
+    """Restart the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to restart the machine
+    """
+    hostname_command = f"run --unit {unit_name} -- hostname"
+    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
+    if return_code != 0:
+        raise Exception("Failed to get the unit machine name: %s", return_code)
+    restart_machine_command = f"lxc restart {raw_hostname.strip()}"
+    subprocess.check_call(restart_machine_command.split())
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:

@@ -21,6 +21,7 @@ from tests.integration.ha_tests.helpers import (
     start_continuous_writes,
     stop_continuous_writes,
 )
+from tests.integration.helpers import restart_machine
 
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/usr/local/bin/patroni"
@@ -221,3 +222,44 @@ async def test_restart_db_process(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
+
+
+@pytest.mark.ha_self_healing_tests
+async def test_restart_machines(ops_test: OpsTest, continuous_writes) -> None:
+    # Start an application that continuously writes data to the database.
+    app = await app_name(ops_test)
+    await start_continuous_writes(ops_test, app)
+
+    # Restart the machine of each unit.
+    for unit in ops_test.model.applications[app].units:
+        await restart_machine(ops_test, unit.name)
+
+    async with ops_test.fast_forward():
+        # Wait for the machines to restart. Some blocked status can be set when
+        # there is some problem in the database.
+        await ops_test.model.wait_for_idle(
+            apps=[app], status="active", raise_on_blocked=True, timeout=1000
+        )
+
+        # Verify new writes are continuing by counting the number of writes.
+        writes = await count_writes(ops_test)
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                more_writes = await count_writes(ops_test)
+                assert more_writes > writes, "writes not continuing to DB"
+
+        # Verify that the database service got restarted and is ready in each unit.
+        for unit in ops_test.model.applications[app].units:
+            assert await postgresql_ready(ops_test, unit.name)
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            actual_writes = await count_writes(ops_test)
+            assert total_expected_writes == actual_writes, "writes to the db were missed."
