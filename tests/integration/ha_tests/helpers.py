@@ -3,7 +3,7 @@
 import random
 import subprocess
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Set
 
 import psycopg2
 import requests
@@ -106,6 +106,35 @@ async def change_master_start_timeout(
             )
 
 
+async def change_wal_settings(
+    ops_test: OpsTest, unit_name: str, max_wal_size: int, min_wal_size, wal_keep_segments
+) -> None:
+    """Change WAL settings in the unit.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: name of the unit to change the WAL settings.
+        max_wal_size: maximum amount of WAL to keep (MB).
+        min_wal_size: minimum amount of WAL to keep (MB).
+        wal_keep_segments: number of WAL segments to keep.
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            unit_ip = get_unit_address(ops_test, unit_name)
+            requests.patch(
+                f"http://{unit_ip}:8008/config",
+                json={
+                    "postgresql": {
+                        "parameters": {
+                            "max_wal_size": max_wal_size,
+                            "min_wal_size": min_wal_size,
+                            "wal_keep_segments": wal_keep_segments,
+                        }
+                    }
+                },
+            )
+
+
 async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
@@ -172,6 +201,32 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             return int(master_start_timeout) if master_start_timeout is not None else None
 
 
+async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
+    """Get the value of a PostgreSQL parameter from Patroni API.
+
+    Args:
+        ops_test: ops_test instance.
+        parameter_name: the name of the parameter to get the value for.
+
+    Returns:
+        the value of the requested PostgreSQL parameter.
+    """
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            app = await app_name(ops_test)
+            primary_name = await get_primary(ops_test, app)
+            unit_ip = get_unit_address(ops_test, primary_name)
+            configuration_info = requests.get(f"http://{unit_ip}:8008/config")
+            postgresql_dict = configuration_info.json().get("postgresql")
+            if postgresql_dict is None:
+                return None
+            parameters = postgresql_dict.get("parameters")
+            if parameters is None:
+                return None
+            parameter_value = parameters.get(parameter_name)
+            return parameter_value
+
+
 def get_random_unit(ops_test: OpsTest, app: str) -> str:
     """Returns a random unit name."""
     return random.choice(ops_test.model.applications[app].units).name
@@ -227,13 +282,30 @@ async def get_primary(ops_test: OpsTest, app) -> str:
     """Use the charm action to retrieve the primary from provided application.
 
     Returns:
-        string with the password stored on the peer relation databag.
+        primary unit name.
     """
-    # Can retrieve from any unit running unit, so we pick the first.
-    unit_name = ops_test.model.applications[app].units[0].name
-    action = await ops_test.model.units.get(unit_name).run_action("get-primary")
-    action = await action.wait()
-    return action.results["primary"]
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        # Can retrieve from any unit running unit, so we pick the first.
+        unit_name = ops_test.model.applications[app].units[0].name
+        action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+        action = await action.wait()
+        assert action.results["primary"] is not None
+        return action.results["primary"]
+
+
+async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
+    """Returns the list of WAL segment files in each unit."""
+    units = [unit.name for unit in ops_test.model.applications[app].units]
+    command = "ls -1 /var/lib/postgresql/data/pgdata/pg_wal/"
+    files = {}
+    for unit in units:
+        complete_command = f"run --unit {unit} -- {command}"
+        return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
+        files[unit] = stdout.splitlines()
+        files[unit] = {
+            i for i in files[unit] if ".history" not in i and i != "" and i != "archive_status"
+        }
+    return files
 
 
 async def send_signal_to_process(
@@ -287,7 +359,7 @@ async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_write
     )
 
     try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 with psycopg2.connect(
                     connection_string
