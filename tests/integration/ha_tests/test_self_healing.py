@@ -280,7 +280,20 @@ async def test_full_cluster_restart(
             more_writes = await count_writes(ops_test)
             assert more_writes > writes, "writes not continuing to DB"
 
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            actual_writes = await count_writes(ops_test)
+            assert total_expected_writes == actual_writes, "writes to the db were missed."
+
+
+@pytest.mark.ha_self_healing_tests
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
