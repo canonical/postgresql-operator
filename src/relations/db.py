@@ -80,6 +80,9 @@ class DbProvides(Object):
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
+            logger.debug(
+                "Deferring on_relation_changed: cluster not initialized, Patroni not started or primary endpoint not available"
+            )
             event.defer()
             return
 
@@ -160,6 +163,7 @@ class DbProvides(Object):
         if event.departing_unit == self.charm.unit:
             self.charm._peers.data[self.charm.unit].update({"departing": "True"})
             # Just run the rest of the logic for departing of remote units.
+            logger.debug("Early exit on_relation_departed: Skipping departing unit")
             return
 
         # Check for some conditions before trying to access the PostgreSQL instance.
@@ -171,6 +175,9 @@ class DbProvides(Object):
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
+            logger.debug(
+                "Deferring on_relation_departed: cluster not initialized, Patroni not started or primary endpoint not available"
+            )
             event.defer()
             return
 
@@ -194,6 +201,9 @@ class DbProvides(Object):
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
+            logger.debug(
+                "Early exit on_relation_broken: Not leader, cluster not initialized, Patroni not started or no primary endpoint"
+            )
             return
 
         # Run this event only if this unit isn't being
@@ -203,6 +213,7 @@ class DbProvides(Object):
         # Neither peer relation data nor stored state
         # are good solutions, just a temporary solution.
         if "departing" in self.charm._peers.data[self.charm.unit]:
+            logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 
         # Delete the user.
