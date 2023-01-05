@@ -5,6 +5,7 @@ import subprocess
 import unittest
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch
 
+import ops.testing
 from charms.operator_libs_linux.v0 import apt
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
@@ -26,6 +27,9 @@ class TestCharm(unittest.TestCase):
         self._peer_relation = PEER
         self._postgresql_container = "postgresql"
         self._postgresql_service = "postgresql"
+
+        ops.testing.SIMULATE_CAN_CONNECT = True
+        self.addCleanup(setattr, ops.testing, "SIMULATE_CAN_CONNECT", False)
 
         self.harness = Harness(PostgresqlOperatorCharm)
         self.addCleanup(self.harness.cleanup)
@@ -212,6 +216,30 @@ class TestCharm(unittest.TestCase):
         )  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm.postgresql")
+    @patch("charm.Patroni")
+    @patch("charm.PostgresqlOperatorCharm._get_password")
+    def test_on_start_no_patroni_member(
+        self,
+        _get_password,
+        patroni,
+        _postgresql,
+    ):
+
+        # Mock the passwords.
+        patroni.return_value.member_started = False
+        _get_password.return_value = "fake-operator-password"
+        bootstrap_cluster = patroni.return_value.bootstrap_cluster
+        bootstrap_cluster.return_value = True
+
+        self.harness.set_leader()
+        self.charm.on.start.emit()
+        bootstrap_cluster.assert_called_once()
+        _postgresql.create_user.assert_not_called()
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
+        self.assertEqual(self.harness.model.unit.status.message, "awaiting for member to start")
 
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
