@@ -188,9 +188,10 @@ class TestCharm(unittest.TestCase):
             0o644,
         )
 
+    @patch("charm.Patroni._get_postgresql_version")
     @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
-    def test_render_patroni_yml_file(self, _, _render_file):
+    def test_render_patroni_yml_file(self, _, _render_file, __):
         # Define variables to render in the template.
         member_name = "postgresql-0"
         scope = "postgresql"
