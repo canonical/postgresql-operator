@@ -103,6 +103,9 @@ class ApplicationCharm(CharmBase):
             self._on_cluster2_endpoints_changed,
         )
 
+        # Relation used to test the situation where no database name is provided.
+        self.no_database = DatabaseRequires(self, "no-database", database_name="")
+
     def _on_start(self, _) -> None:
         """Only sets an Active status."""
         self.unit.status = ActiveStatus()
