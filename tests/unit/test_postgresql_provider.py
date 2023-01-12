@@ -4,6 +4,7 @@
 import unittest
 from unittest.mock import Mock, PropertyMock, patch
 
+import ops.testing
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
@@ -29,6 +30,9 @@ POSTGRESQL_VERSION = "12"
 @patch_network_get(private_address="1.1.1.1")
 class TestPostgreSQLProvider(unittest.TestCase):
     def setUp(self):
+        ops.testing.SIMULATE_CAN_CONNECT = True
+        self.addCleanup(setattr, ops.testing, "SIMULATE_CAN_CONNECT", False)
+
         self.harness = Harness(PostgresqlOperatorCharm)
         self.addCleanup(self.harness.cleanup)
 
