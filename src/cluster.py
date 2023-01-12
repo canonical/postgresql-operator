@@ -30,7 +30,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import REWIND_USER, TLS_CA_FILE, USER
+from constants import API_REQUEST_TIMEOUT, REWIND_USER, TLS_CA_FILE, USER
 
 logger = logging.getLogger(__name__)
 
@@ -134,7 +134,9 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
+        cluster_status = requests.get(
+            f"{self._patroni_url}/cluster", verify=self.verify, timeout=API_REQUEST_TIMEOUT
+        )
         return set([member["name"] for member in cluster_status.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
@@ -169,7 +171,9 @@ class Patroni:
         for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
+                cluster_status = requests.get(
+                    f"{url}/cluster", verify=self.verify, timeout=API_REQUEST_TIMEOUT
+                )
                 for member in cluster_status.json()["members"]:
                     if member["name"] == member_name:
                         return member["host"]
@@ -187,7 +191,9 @@ class Patroni:
         for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
+                cluster_status = requests.get(
+                    f"{url}/cluster", verify=self.verify, timeout=API_REQUEST_TIMEOUT
+                )
                 for member in cluster_status.json()["members"]:
                     if member["role"] == "leader":
                         primary = member["name"]
@@ -223,7 +229,9 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
                     cluster_status = requests.get(
-                        f"{self._patroni_url}/cluster", verify=self.verify
+                        f"{self._patroni_url}/cluster",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
                     )
         except RetryError:
             return False
@@ -246,7 +254,11 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"{self._patroni_url}/health", verify=self.verify)
+                    r = requests.get(
+                        f"{self._patroni_url}/health",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
         except RetryError:
             return False
 
@@ -259,7 +271,9 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     cluster_status = requests.get(
-                        f"{self._patroni_url}/cluster", verify=self.verify
+                        f"{self._patroni_url}/cluster",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
                     )
         except RetryError:
             return "unknown"

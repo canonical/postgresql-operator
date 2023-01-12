@@ -9,6 +9,7 @@ LEGACY_DB = "db"
 LEGACY_DB_ADMIN = "db-admin"
 PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE, LEGACY_DB, LEGACY_DB_ADMIN]
+API_REQUEST_TIMEOUT = 5
 REPLICATION_USER = "replication"
 REPLICATION_PASSWORD_KEY = "replication-password"
 REWIND_USER = "rewind"
