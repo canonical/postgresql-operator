@@ -92,7 +92,9 @@ class DbProvides(Object):
         application_relation_databag = event.relation.data[self.charm.app]
 
         # Do not allow apps requesting extensions to be installed.
-        if "extensions" in unit_relation_databag or "extensions" in application_relation_databag:
+        if "extensions" in event.relation.data[
+            event.app
+        ] or "extensions" in event.relation.data.get(event.unit, {}):
             logger.error(
                 "ERROR - `extensions` cannot be requested through relations"
                 " - they should be installed through a database charm config in the future"
