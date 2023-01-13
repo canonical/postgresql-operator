@@ -3,7 +3,7 @@
 
 import unittest
 from unittest import mock
-from unittest.mock import mock_open, patch
+from unittest.mock import Mock, PropertyMock, mock_open, patch
 
 import requests as requests
 import tenacity as tenacity
@@ -28,8 +28,8 @@ def mocked_requests_get(*args, **kwargs):
 
     data = {
         "http://server1/cluster": {
-            "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader"}]
-        },
+            "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
+        }
     }
     if args[0] in data:
         return MockResponse(data[args[0]])
@@ -282,3 +282,29 @@ class TestCharm(unittest.TestCase):
         # Test a fail scenario.
         success = self.patroni.start_patroni()
         assert not success
+
+    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
+    def test_member_replication_lag(self, _patroni_url, _get):
+        # Test when the cluster member has a value for the lag field.
+        _patroni_url.return_value = "http://server1"
+        lag = self.patroni.member_replication_lag
+        assert lag == "1"
+
+        # Test when the cluster member doesn't have a value for the lag field.
+        self.patroni.member_name = "postgresql-1"
+        lag = self.patroni.member_replication_lag
+        assert lag == "unknown"
+
+        # Test when the API call fails.
+        _patroni_url.return_value = "http://server2"
+        with patch.object(tenacity.Retrying, "iter", Mock(side_effect=tenacity.RetryError(None))):
+            lag = self.patroni.member_replication_lag
+            assert lag == "unknown"
+
+    @patch("requests.post")
+    def test_reinitialize_postgresql(self, _post):
+        self.patroni.reinitialize_postgresql()
+        _post.assert_called_once_with(
+            f"http://{self.patroni.unit_ip}:8008/reinitialize", verify=True
+        )
