@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 7
 
 
 logger = logging.getLogger(__name__)
@@ -119,6 +119,31 @@ class PostgreSQL:
                     sql.Identifier(database), sql.Identifier(user)
                 )
             )
+            with self._connect_to_database(database=database) as conn:
+                with conn.cursor() as curs:
+                    statements = []
+                    curs.execute(
+                        "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' and schema_name <> 'information_schema';"
+                    )
+                    for row in curs:
+                        schema = sql.Identifier(row[0])
+                        statements.append(
+                            sql.SQL(
+                                "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} TO {};"
+                            ).format(schema, sql.Identifier(user))
+                        )
+                        statements.append(
+                            sql.SQL(
+                                "GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} TO {};"
+                            ).format(schema, sql.Identifier(user))
+                        )
+                        statements.append(
+                            sql.SQL(
+                                "GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};"
+                            ).format(schema, sql.Identifier(user))
+                        )
+                    for statement in statements:
+                        curs.execute(statement)
         except psycopg2.Error as e:
             logger.error(f"Failed to create database: {e}")
             raise PostgreSQLCreateDatabaseError()
@@ -159,6 +184,11 @@ class PostgreSQL:
         Args:
             user: user to be deleted.
         """
+        # First of all, check whether the user exists. Otherwise, do nothing.
+        users = self.list_users()
+        if user not in users:
+            return
+
         # List all databases.
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
