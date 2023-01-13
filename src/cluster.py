@@ -279,7 +279,6 @@ class Patroni:
             return "unknown"
 
         for member in cluster_status.json()["members"]:
-            logger.warning(self.member_name)
             if member["name"] == self.member_name:
                 return member["lag"]
 
