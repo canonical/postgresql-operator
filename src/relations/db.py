@@ -211,17 +211,6 @@ class DbProvides(Object):
             {unit for unit in current_allowed_units.split() if unit != departing_unit}
         )
 
-        # Clean up Blocked status if caused by the departed relation
-        if (
-            self.charm._has_blocked_status
-            and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE
-        ):
-            if "extensions" in event.relation.data.get(
-                event.app, {}
-            ) or "extensions" in event.relation.data.get(event.unit, {}):
-                if not self._check_for_blocking_relations(event.relation.id):
-                    self.charm.unit.status = ActiveStatus()
-
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the user created for this relation."""
         # Check for some conditions before trying to access the PostgreSQL instance.
@@ -255,6 +244,17 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(
                 f"Failed to delete user during {self.relation_name} relation broken event"
             )
+
+        # Clean up Blocked status if caused by the departed relation
+        if (
+            self.charm._has_blocked_status
+            and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE
+        ):
+            if "extensions" in event.relation.data.get(
+                event.app, {}
+            ) or "extensions" in event.relation.data.get(event.unit, {}):
+                if not self._check_for_blocking_relations(event.relation.id):
+                    self.charm.unit.status = ActiveStatus()
 
     def update_endpoints(self, event: RelationChangedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""
