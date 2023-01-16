@@ -28,6 +28,7 @@ FIRST_DATABASE_RELATION_NAME = "first-database"
 SECOND_DATABASE_RELATION_NAME = "second-database"
 MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "multiple-database-clusters"
 ALIASED_MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "aliased-multiple-database-clusters"
+NO_DATABASE_RELATION_NAME = "no-database"
 
 
 @pytest.mark.abort_on_fail
@@ -369,3 +370,20 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
         with pytest.raises(psycopg2.OperationalError):
             psycopg2.connect(primary_connection_string)
+
+
+@pytest.mark.database_relation_tests
+async def test_relation_with_no_database_name(ops_test: OpsTest):
+    """Test that a relation with no database name doesn't block the charm."""
+    async with ops_test.fast_forward():
+        # Relate the charms using a relation that doesn't provide a database name.
+        await ops_test.model.add_relation(
+            f"{APPLICATION_APP_NAME}:{NO_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
+        )
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
+
+        # Break the relation.
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}", f"{APPLICATION_APP_NAME}:{NO_DATABASE_RELATION_NAME}"
+        )
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
