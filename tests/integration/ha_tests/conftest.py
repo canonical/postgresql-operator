@@ -5,11 +5,13 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.ha_tests.helpers import (
+    ORIGINAL_RESTART_DELAY,
     app_name,
     change_master_start_timeout,
     change_wal_settings,
     get_master_start_timeout,
     get_postgresql_parameter,
+    update_restart_delay,
 )
 
 APPLICATION_NAME = "application"
@@ -41,7 +43,16 @@ async def master_start_timeout(ops_test: OpsTest) -> None:
     initial_master_start_timeout = await get_master_start_timeout(ops_test)
     yield
     # Rollback to the initial configuration.
-    await change_master_start_timeout(ops_test, initial_master_start_timeout)
+    await change_master_start_timeout(ops_test, initial_master_start_timeout, use_random_unit=True)
+
+
+@pytest.fixture()
+async def reset_restart_delay(ops_test: OpsTest):
+    """Resets service file delay on all units."""
+    yield
+    app = await app_name(ops_test)
+    for unit in ops_test.model.applications[app].units:
+        await update_restart_delay(ops_test, unit, ORIGINAL_RESTART_DELAY)
 
 
 @pytest.fixture()

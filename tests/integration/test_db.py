@@ -5,6 +5,7 @@ import logging
 
 import psycopg2 as psycopg2
 import pytest as pytest
+from juju.errors import JujuUnitError
 from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 
@@ -14,6 +15,7 @@ from tests.integration.helpers import (
     check_database_users_existence,
     check_databases_creation,
     deploy_and_relate_application_with_postgresql,
+    find_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -156,3 +158,39 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
         with pytest.raises(psycopg2.OperationalError):
             psycopg2.connect(primary_connection_string)
+
+
+@pytest.mark.db_relation_tests
+async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
+    async with ops_test.fast_forward():
+        # Deploy Nextcloud.
+        await ops_test.model.deploy(
+            "nextcloud",
+            channel="edge",
+            application_name="nextcloud",
+            num_units=APPLICATION_UNITS,
+        )
+        await ops_test.model.wait_for_idle(
+            apps=["nextcloud"],
+            status="blocked",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
+
+        await ops_test.model.relate("nextcloud:db", f"{DATABASE_APP_NAME}:db")
+
+        # Only the leader will block
+        leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)
+
+        try:
+            await ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME],
+                status="blocked",
+                raise_on_blocked=True,
+                timeout=1000,
+            )
+            assert False, "Leader didn't block"
+        except JujuUnitError:
+            pass
+
+        leader_unit.workload_status_message == "extensions requested through relation"

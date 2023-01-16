@@ -72,6 +72,9 @@ class PostgreSQLProvider(Object):
             or not self.charm.primary_endpoint
         ):
             event.defer()
+            logger.debug(
+                "Deferring on_database_requested: cluster not initialized, Patroni not started or primary endpoint not available"
+            )
             return
 
         # Retrieve the database name and extra user roles using the charm library.
@@ -123,6 +126,9 @@ class PostgreSQLProvider(Object):
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
+            logger.debug(
+                "Early exit on_relation_broken: Not leader, cluster not initialized, Patroni not started or no primary endpoint"
+            )
             return
 
         # Run this event only if this unit isn't being
@@ -132,6 +138,7 @@ class PostgreSQLProvider(Object):
         # Neither peer relation data nor stored state
         # are good solutions, just a temporary solution.
         if "departing" in self.charm._peers.data[self.charm.unit]:
+            logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 
         # Delete the user.
