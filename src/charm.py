@@ -186,6 +186,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """The leader removes the departing units from the list of cluster members."""
         # Don't handle this event in the same unit that is departing.
         if event.departing_unit == self.unit:
+            logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return
 
         # Remove the departing member from the raft cluster.
@@ -194,6 +195,9 @@ class PostgresqlOperatorCharm(CharmBase):
             member_ip = self._patroni.get_member_ip(departing_member)
             self._patroni.remove_raft_member(member_ip)
         except RemoveRaftMemberFailedError:
+            logger.debug(
+                "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
+            )
             event.defer()
             return
 
@@ -202,6 +206,7 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         if "cluster_initialised" not in self._peers.data[self.app]:
+            logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
 
@@ -233,6 +238,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # Ignore the event if the primary couldn't be retrieved.
             # If a switchover is needed, an automatic failover will be triggered
             # when the unit is removed.
+            logger.debug("Early exit on_pgdata_storage_detaching: primary cannot be retrieved")
             return
 
         if self.unit.name != primary:
@@ -276,6 +282,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """Reconfigure cluster members when something changes."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
+            logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
             return
 
@@ -285,6 +292,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Don't update this member before it's part of the members list.
         if self._unit_ip not in self.members_ips:
+            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
@@ -302,6 +310,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Assert the member is up and running before marking the unit as active.
         if not self._patroni.member_started:
+            logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
             return
@@ -335,6 +344,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # Compare set of Patroni cluster members and Juju hosts
             # to avoid the unnecessary reconfiguration.
             if self._patroni.cluster_members == self._hosts:
+                logger.debug("Early exit add_members: Patroni members equal Juju hosts")
                 return
 
             logger.info("Reconfiguring cluster")
@@ -563,6 +573,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Don't update connection endpoints in the first time this event run for
         # this application because there are no primary and replicas yet.
         if "cluster_initialised" not in self._peers.data[self.app]:
+            logger.debug("Early exit on_leader_elected: Cluster not initialized")
             return
 
         # Only update the connection endpoints if there is a primary.
@@ -600,6 +611,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
         if self._has_blocked_status:
+            logger.debug("Early exit on_start: Unit blocked")
             return
 
         postgres_password = self._get_password()
@@ -612,6 +624,7 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         if not self.unit.is_leader() and "cluster_initialised" not in self._peers.data[self.app]:
+            logger.debug("Deferring on_start: awaiting for cluster to start")
             self.unit.status = WaitingStatus("awaiting for cluster to start")
             event.defer()
             return
@@ -629,6 +642,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Assert the member is up and running before marking it as initialised.
         if not self._patroni.member_started:
+            logger.debug("Deferring on_start: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
             return
@@ -845,6 +859,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            logger.debug("Early exit update_config: Patroni not started yet")
             return
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()

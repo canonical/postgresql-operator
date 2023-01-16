@@ -574,6 +574,22 @@ async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
     subprocess.check_call(restart_machine_command.split())
 
 
+async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -> None:
+    """Run a command on a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to run the command on
+        command: The command to run
+    """
+    complete_command = f"run --unit {unit_name} -- {command}"
+    return_code, stdout, _ = await ops_test.juju(*complete_command.split())
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s", command, return_code
+        )
+
+
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
     """Scale a given application to a specific unit count.
 
