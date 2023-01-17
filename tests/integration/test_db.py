@@ -66,8 +66,8 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
         # Assert Mailman3 Core is configured to use PostgreSQL instead of SQLite.
         mailman_unit = ops_test.model.applications[MAILMAN3_CORE_APP_NAME].units[0]
-        action = await mailman_unit.run("mailman info")
-        result = action.results.get("Stdout", None)
+        action = await mailman_unit.run("mailman info", block=True)
+        result = action.results.get("stdout", None)
         assert "db url: postgres://" in result
 
         # Do some CRUD operations using Mailman3 Core client.
