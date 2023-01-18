@@ -517,7 +517,7 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_install(self, event) -> None:
         """Install prerequisites for the application."""
         if not self._is_storage_attached():
-            self._reboot_on_detached_storage(event)
+            self._reboot_on_detached_storage()
             return
 
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
@@ -613,16 +613,23 @@ class PostgresqlOperatorCharm(CharmBase):
         current = self._units_ips
         return old - current
 
-    def _on_start(self, event) -> None:
-        """Handle the start event."""
+    def _can_start(self, _):
         if not self._is_storage_attached():
-            self._reboot_on_detached_storage(event)
-            return
+            self._reboot_on_detached_storage()
+            logger.debug("Early exit on_start: Unit blocked")
+            return False
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
         if self._has_blocked_status:
             logger.debug("Early exit on_start: Unit blocked")
+            return False
+
+        return True
+
+    def _on_start(self, event) -> None:
+        """Handle the start event."""
+        if not self._can_start(event):
             return
 
         postgres_password = self._get_password()
@@ -867,20 +874,16 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.update_config()
 
-    def _reboot_on_detached_storage(self, event) -> None:
+    def _reboot_on_detached_storage(self) -> None:
         """Reboot on detached storage.
 
         Workaround for lxd containers not getting storage attached on startups.
-
-        Args:
-            event: the event that triggered this handler
         """
         logger.error("Data directory not attached. Reboot unit.")
         try:
-            subprocess.check_call(["sudo", "touch", "/neppel_waiting_reboot.txt"])
             subprocess.check_call(["systemctl", "reboot"])
-        except subprocess.CalledProcessError as e:
-            logger.error(str(e))
+        except subprocess.CalledProcessError:
+            pass
 
     def _restart(self, _) -> None:
         """Restart PostgreSQL."""

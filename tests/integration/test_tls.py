@@ -4,7 +4,7 @@
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_delay, wait_exponential
+from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
 from tests.helpers import METADATA
 from tests.integration.helpers import (
