@@ -514,6 +514,10 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_install(self, event) -> None:
         """Install prerequisites for the application."""
+        if not self._is_storage_attached():
+            self._reboot_on_detached_storage(event)
+            return
+
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
 
         # Prevent the default cluster creation.
@@ -605,8 +609,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_start(self, event) -> None:
         """Handle the start event."""
-        # Push TLS files to the right path for PostgreSQL and Patroni.
-        self.push_tls_files_to_workload()
+        if not self._is_storage_attached():
+            self._reboot_on_detached_storage(event)
+            return
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
@@ -650,7 +655,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
-            # This event can be run on a non leader unit if the machines are restarted.
+            # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             if "postgres" not in self.postgresql.list_users():
                 self.postgresql.create_user("postgres", new_password(), admin=True)
@@ -818,6 +823,14 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.error("could not install pip packages")
             raise
 
+    def _is_storage_attached(self) -> bool:
+        """Returns if storage is attached."""
+        try:
+            subprocess.check_call(["mountpoint", "-q", self._storage_path])
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
     @property
     def _peers(self) -> Relation:
         """Fetch the peer relation.
@@ -839,6 +852,21 @@ class PostgresqlOperatorCharm(CharmBase):
             self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
 
         self.update_config()
+
+    def _reboot_on_detached_storage(self, event) -> None:
+        """Reboot on detached storage.
+
+        Workaround for lxd containers not getting storage attached on startups.
+
+        Args:
+            event: the event that triggered this handler
+        """
+        logger.error("Data directory not attached. Reboot unit.")
+        try:
+            subprocess.check_call(["sudo", "touch", "/neppel_waiting_reboot.txt"])
+            subprocess.check_call(["systemctl", "reboot"])
+        except subprocess.CalledProcessError as e:
+            logger.error(str(e))
 
     def _restart(self, _) -> None:
         """Restart PostgreSQL."""
