@@ -8,6 +8,7 @@ import logging
 import psycopg2
 import pytest
 import requests
+from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
@@ -96,22 +97,34 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
         # Here the SQL query gets a key-value pair composed by the name of the setting
         # and its value, filtering the retrieved data to return only the settings
         # that were set by Patroni.
+        settings_names = [
+            "archive_command",
+            "archive_mode",
+            "data_directory",
+            "cluster_name",
+            "data_checksums",
+            "listen_addresses",
+            "wal_level",
+        ]
         with connection.cursor() as cursor:
             cursor.execute(
-                """SELECT name,setting
-                    FROM pg_settings
-                    WHERE name IN
-                    ('data_directory', 'cluster_name', 'data_checksums', 'listen_addresses');"""
+                sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
+                    sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
+                ),
+                settings_names,
             )
             records = cursor.fetchall()
             settings = convert_records_to_dict(records)
     connection.close()
 
     # Validate each configuration set by Patroni on PostgreSQL.
+    assert settings["archive_command"] == "/bin/true"
+    assert settings["archive_mode"] == "on"
     assert settings["cluster_name"] == f"{DATABASE_APP_NAME}-{series}"
     assert settings["data_directory"] == f"{STORAGE_PATH}/pgdata"
     assert settings["data_checksums"] == "on"
     assert settings["listen_addresses"] == host
+    assert settings["wal_level"] == "logical"
 
     # Retrieve settings from Patroni REST API.
     result = requests.get(f"http://{host}:8008/config")
@@ -119,6 +132,8 @@ async def test_settings_are_correct(ops_test: OpsTest, series: str, unit_id: int
 
     # Validate each configuration related to Patroni
     assert settings["postgresql"]["use_pg_rewind"]
+    assert settings["postgresql"]["remove_data_directory_on_rewind_failure"]
+    assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"]
     assert settings["loop_wait"] == 10
     assert settings["retry_timeout"] == 10
     assert settings["maximum_lag_on_failover"] == 1048576

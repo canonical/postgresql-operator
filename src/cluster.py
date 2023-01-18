@@ -30,7 +30,13 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import TLS_CA_FILE, USER
+from constants import (
+    API_REQUEST_TIMEOUT,
+    PATRONI_CLUSTER_STATUS_ENDPOINT,
+    REWIND_USER,
+    TLS_CA_FILE,
+    USER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -64,6 +70,7 @@ class Patroni:
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
+        rewind_password: str,
         tls_enabled: bool,
     ):
         """Initialize the Patroni class.
@@ -77,6 +84,7 @@ class Patroni:
             planned_units: number of units planned for the cluster
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
+            rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
         self.unit_ip = unit_ip
@@ -87,6 +95,7 @@ class Patroni:
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
+        self.rewind_password = rewind_password
         self.tls_enabled = tls_enabled
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
@@ -131,7 +140,11 @@ class Patroni:
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
+        cluster_status = requests.get(
+            f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+        )
         return set([member["name"] for member in cluster_status.json()["members"]])
 
     def _create_directory(self, path: str, mode: int) -> None:
@@ -166,7 +179,11 @@ class Patroni:
         for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
                 for member in cluster_status.json()["members"]:
                     if member["name"] == member_name:
                         return member["host"]
@@ -184,7 +201,11 @@ class Patroni:
         for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(f"{url}/cluster", verify=self.verify, timeout=10)
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
                 for member in cluster_status.json()["members"]:
                     if member["role"] == "leader":
                         primary = member["name"]
@@ -220,7 +241,9 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
                     cluster_status = requests.get(
-                        f"{self._patroni_url}/cluster", verify=self.verify
+                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
                     )
         except RetryError:
             return False
@@ -243,11 +266,35 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"{self._patroni_url}/health", verify=self.verify)
+                    r = requests.get(
+                        f"{self._patroni_url}/health",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
         except RetryError:
             return False
 
         return r.json()["state"] == "running"
+
+    @property
+    def member_replication_lag(self) -> str:
+        """Member replication lag."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
+        except RetryError:
+            return "unknown"
+
+        for member in cluster_status.json()["members"]:
+            if member["name"] == self.member_name:
+                return member["lag"]
+
+        return "unknown"
 
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
@@ -296,6 +343,8 @@ class Patroni:
             superuser=USER,
             superuser_password=self.superuser_password,
             replication_password=self.replication_password,
+            rewind_user=REWIND_USER,
+            rewind_password=self.rewind_password,
             version=self._get_postgresql_version(),
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
@@ -395,3 +444,8 @@ class Patroni:
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
         requests.post(f"{self._patroni_url}/restart", verify=self.verify)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def reinitialize_postgresql(self) -> None:
+        """Reinitialize PostgreSQL."""
+        requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)

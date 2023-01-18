@@ -50,6 +50,12 @@ bootstrap:
     maximum_lag_on_failover: 1048576
     postgresql:
       use_pg_rewind: true
+      remove_data_directory_on_rewind_failure: true
+      remove_data_directory_on_diverged_timelines: true
+      parameters:
+        archive_command: /bin/true
+        archive_mode: on
+        wal_level: logical
 
   initdb:
   - encoding: UTF8
@@ -80,6 +86,9 @@ postgresql:
     replication:
       username: replication
       password: {{ replication_password }}
+    rewind:
+      username: {{ rewind_user }}
+      password: {{ rewind_password }}
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
