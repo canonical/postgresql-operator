@@ -5,7 +5,7 @@ import asyncio
 
 import pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_fixed
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.helpers import (
     METADATA,
@@ -31,7 +31,6 @@ from tests.integration.helpers import (
     db_connect,
     get_password,
     get_unit_address,
-    restart_machine,
     run_command_on_unit,
 )
 
@@ -52,12 +51,12 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(charm, resources={"patroni": "patroni.tar.gz"}, num_units=2)
+        await ops_test.model.deploy(charm, resources={"patroni": "patroni.tar.gz"}, num_units=3)
         await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -117,7 +116,7 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -183,7 +182,7 @@ async def test_freeze_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -236,7 +235,7 @@ async def test_restart_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", [PATRONI_PROCESS])
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
@@ -294,7 +293,7 @@ async def test_full_cluster_restart(
             assert total_expected_writes == actual_writes, "writes to the db were missed."
 
 
-# @pytest.mark.ha_self_healing_tests
+@pytest.mark.ha_self_healing_tests
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
@@ -399,57 +398,3 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-
-
-@pytest.mark.ha_self_healing_tests
-async def test_restart_machines(ops_test: OpsTest, continuous_writes) -> None:
-    # Start an application that continuously writes data to the database.
-    app = await app_name(ops_test)
-    await start_continuous_writes(ops_test, app)
-
-    for attempt in Retrying(stop=stop_after_attempt(10)):
-        with attempt:
-            # Restart the machine of each unit.
-            issue_found = False
-            for unit in ops_test.model.applications[app].units:
-                await restart_machine(ops_test, unit.name)
-                result = await run_command_on_unit(
-                    ops_test, unit.name, "ls -al /var/lib/postgresql/data"
-                )
-                print(f"{attempt.retry_state.attempt_number} - result for {unit.name}: {result}")
-                result = await run_command_on_unit(ops_test, unit.name, "lsblk")
-                print(f"{attempt.retry_state.attempt_number} - result for {unit.name}: {result}")
-                if "/var/lib/postgresql/data" not in result:
-                    print("issue found!!!")
-                    issue_found = True
-                    break
-
-            if issue_found:
-                break
-
-            assert (
-                False
-            ), "Couldn't reproduce the issue from https://bugs.launchpad.net/juju/+bug/1999758"
-
-    # Verify new writes are continuing by counting the number of writes.
-    writes = await count_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test)
-            assert more_writes > writes, "writes not continuing to DB"
-
-    # Verify that the database service got restarted and is ready in each unit.
-    for unit in ops_test.model.applications[app].units:
-        assert await postgresql_ready(ops_test, unit.name)
-
-    # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-
-    # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
