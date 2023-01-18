@@ -244,9 +244,8 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
-    @patch("charm.PostgresqlOperatorCharm.push_tls_files_to_workload")
     def test_on_start_after_blocked_state(
-        self, _push_tls_files_to_workload, _get_password, _replication_password, _bootstrap_cluster
+        self, _get_password, _replication_password, _bootstrap_cluster
     ):
         # Set an initial blocked status (like after the install hook was triggered).
         initial_status = BlockedStatus("fake message")
