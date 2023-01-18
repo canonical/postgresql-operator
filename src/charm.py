@@ -46,6 +46,7 @@ from cluster import (
 from constants import (
     PEER,
     REPLICATION_PASSWORD_KEY,
+    REWIND_PASSWORD_KEY,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -420,6 +421,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
+            self.get_secret("app", REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
 
@@ -525,7 +527,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Install the PostgreSQL and Patroni requirements packages.
         try:
-            self._install_apt_packages(event, ["postgresql", "python3-pip", "python3-psycopg2"])
+            self._install_apt_packages(
+                event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
+            )
         except (subprocess.CalledProcessError, apt.PackageNotFoundError):
             self.unit.status = BlockedStatus("failed to install apt packages")
             return
@@ -561,6 +565,8 @@ class PostgresqlOperatorCharm(CharmBase):
             self.set_secret("app", USER_PASSWORD_KEY, new_password())
         if self.get_secret("app", REPLICATION_PASSWORD_KEY) is None:
             self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
+        if self.get_secret("app", REWIND_PASSWORD_KEY) is None:
+            self.set_secret("app", REWIND_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -742,6 +748,14 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation.oversee_users()
         self._update_certificate()
 
+        # Restart the workload if it's stuck on the starting state after a restart.
+        if (
+            not self._patroni.member_started
+            and "postgresql_restarted" in self._peers.data[self.unit]
+            and self._patroni.member_replication_lag == "unknown"
+        ):
+            self._patroni.reinitialize_postgresql()
+
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
         # Update the certificate if the IP changes because the IP
@@ -872,6 +886,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """Restart PostgreSQL."""
         try:
             self._patroni.restart_postgresql()
+            self._peers.data[self.unit]["postgresql_restarted"] = "True"
         except RetryError as e:
             logger.error("failed to restart PostgreSQL")
             self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
@@ -897,6 +912,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).
         if restart_postgresql:
+            self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
 
 
