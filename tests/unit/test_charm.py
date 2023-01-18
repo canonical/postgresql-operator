@@ -41,8 +41,13 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
     @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_install(
-        self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
+        self,
+        _is_storage_attached,
+        _inhibit_default_cluster_creation,
+        _install_apt_packages,
+        _install_pip_packages,
     ):
         # Test without adding Patroni resource.
         self.charm.on.install.emit()
@@ -65,8 +70,13 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
     @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_install_apt_failure(
-        self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
+        self,
+        _is_storage_attached,
+        _inhibit_default_cluster_creation,
+        _install_apt_packages,
+        _install_pip_packages,
     ):
         # Mock the result of the call.
         _install_apt_packages.side_effect = apt.PackageNotFoundError
@@ -82,8 +92,13 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
     @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_install_pip_failure(
-        self, _inhibit_default_cluster_creation, _install_apt_packages, _install_pip_packages
+        self,
+        _is_storage_attached,
+        _inhibit_default_cluster_creation,
+        _install_apt_packages,
+        _install_pip_packages,
     ):
         # Mock the result of the call.
         _install_pip_packages.side_effect = subprocess.CalledProcessError(
@@ -164,8 +179,10 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_start(
         self,
+        _is_storage_attached,
         _get_password,
         _replication_password,
         _bootstrap_cluster,
@@ -221,8 +238,10 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.Patroni")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_start_no_patroni_member(
         self,
+        _is_storage_attached,
         _get_password,
         patroni,
         _postgresql,
@@ -244,8 +263,9 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_start_after_blocked_state(
-        self, _get_password, _replication_password, _bootstrap_cluster
+        self, _is_storage_attached, _get_password, _replication_password, _bootstrap_cluster
     ):
         # Set an initial blocked status (like after the install hook was triggered).
         initial_status = BlockedStatus("fake message")
