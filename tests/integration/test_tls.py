@@ -168,11 +168,8 @@ async def test_restart_machines(ops_test: OpsTest) -> None:
                     issue_found = True
                     break
 
-            if issue_found:
-                break
-
             assert (
-                False
+                issue_found
             ), "Couldn't reproduce the issue from https://bugs.launchpad.net/juju/+bug/1999758"
 
     # Wait for all units enabling TLS.
