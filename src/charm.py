@@ -880,6 +880,7 @@ class PostgresqlOperatorCharm(CharmBase):
         Workaround for lxd containers not getting storage attached on startups.
         """
         logger.error("Data directory not attached. Reboot unit.")
+        self.unit.status = WaitingStatus("Data directory not attached")
         try:
             subprocess.check_call(["systemctl", "reboot"])
         except subprocess.CalledProcessError:
