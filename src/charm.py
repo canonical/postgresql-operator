@@ -517,7 +517,7 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_install(self, event) -> None:
         """Install prerequisites for the application."""
         if not self._is_storage_attached():
-            self._reboot_on_detached_storage()
+            self._reboot_on_detached_storage(event)
             return
 
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
@@ -613,9 +613,9 @@ class PostgresqlOperatorCharm(CharmBase):
         current = self._units_ips
         return old - current
 
-    def _can_start(self, _):
+    def _can_start(self, event):
         if not self._is_storage_attached():
-            self._reboot_on_detached_storage()
+            self._reboot_on_detached_storage(event)
             logger.debug("Early exit on_start: Unit blocked")
             return False
 
@@ -874,11 +874,15 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.update_config()
 
-    def _reboot_on_detached_storage(self) -> None:
+    def _reboot_on_detached_storage(self, event) -> None:
         """Reboot on detached storage.
 
         Workaround for lxd containers not getting storage attached on startups.
+
+        Args:
+            event: the event that triggered this handler
         """
+        event.defer()
         logger.error("Data directory not attached. Reboot unit.")
         self.unit.status = WaitingStatus("Data directory not attached")
         try:
