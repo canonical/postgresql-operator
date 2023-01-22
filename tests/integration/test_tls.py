@@ -148,25 +148,26 @@ async def test_restart_machines(ops_test: OpsTest) -> None:
 
     # Wait for all units enabling TLS.
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+        print(f"checking TLS on {unit.name}")
         assert await check_tls(ops_test, unit.name, enabled=True)
+        print(f"checking TLS on {unit.name} - Patroni API")
         assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
 
     for attempt in Retrying(stop=stop_after_attempt(10)):
         with attempt:
             # Restart the machine of each unit.
             issue_found = False
-            for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-                await restart_machine(ops_test, unit.name)
-                # result = await run_command_on_unit(
-                #     ops_test, unit.name, "ls -al /var/lib/postgresql/data"
-                # )
-                # print(f"{attempt.retry_state.attempt_number} - result for {unit.name}: {result}")
-                result = await run_command_on_unit(ops_test, unit.name, "lsblk")
-                print(f"{attempt.retry_state.attempt_number} - result for {unit.name}: {result}")
-                if "/var/lib/postgresql/data" not in result:
-                    print("issue found!!!")
-                    issue_found = True
-                    break
+            print(f"restarting postgresql/0 {attempt.retry_state.attempt_number}")
+            await restart_machine(ops_test, "postgresql/0")
+            # result = await run_command_on_unit(
+            #     ops_test, unit.name, "ls -al /var/lib/postgresql/data"
+            # )
+            # print(f"{attempt.retry_state.attempt_number} - result for {unit.name}: {result}")
+            result = await run_command_on_unit(ops_test, "postgresql/0", "lsblk")
+            print(f"{attempt.retry_state.attempt_number} - result for postgresql/0: {result}")
+            if "/var/lib/postgresql/data" not in result:
+                print("issue found!!!")
+                issue_found = True
 
             assert (
                 issue_found
