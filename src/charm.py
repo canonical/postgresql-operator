@@ -625,6 +625,8 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.debug("Early exit on_start: Unit blocked")
             return False
 
+        self.unit.status = WaitingStatus("awaiting for workload initialisation")
+
         return True
 
     def _on_start(self, event) -> None:
@@ -885,12 +887,12 @@ class PostgresqlOperatorCharm(CharmBase):
         event.defer()
         logger.error("Data directory not attached. Reboot unit.")
         self.unit.status = WaitingStatus("Data directory not attached")
-        # try:
-        #     subprocess.check_call(["systemctl", "reboot"])
-        # except subprocess.CalledProcessError:
-        #     pass
-        proc = subprocess.Popen("systemctl reboot", shell=True)
-        logger.error(f"pid: {proc.pid}")
+        try:
+            subprocess.check_call(["systemctl", "reboot"])
+        except subprocess.CalledProcessError:
+            pass
+        # proc = subprocess.Popen("systemctl reboot", shell=True)
+        # logger.error(f"pid: {proc.pid}")
 
     def _restart(self, _) -> None:
         """Restart PostgreSQL."""
