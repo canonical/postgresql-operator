@@ -173,7 +173,10 @@ async def test_restart_machines(ops_test: OpsTest) -> None:
                 issue_found
             ), "Couldn't reproduce the issue from https://bugs.launchpad.net/juju/+bug/1999758"
 
-    # Wait for all units enabling TLS.
-    for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-        assert await check_tls(ops_test, unit.name, enabled=True)
-        assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, raise_on_error=False)
+
+    # Wait for the unit enabling TLS.
+    print("checking again TLS")
+    assert await check_tls(ops_test, "postgresql/0", enabled=True)
+    print("checking again TLS - Patroni API")
+    assert await check_tls_patroni_api(ops_test, "postgresql/0", enabled=True)

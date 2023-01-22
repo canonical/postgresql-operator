@@ -685,7 +685,7 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Only the leader can bootstrap the cluster.
-        if not self.unit.is_leader() and not self._patroni.member_started:
+        if not self._patroni.member_started:
             self._patroni.configure_patroni_on_unit()
             return
 
