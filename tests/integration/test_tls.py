@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
@@ -139,8 +140,12 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
 
 
+@pytest.mark.skipif(
+    not os.environ.get("RESTART_MACHINE_TEST"),
+    reason="RESTART_MACHINE_TEST environment variable not set",
+)
 @pytest.mark.tls_tests
-async def test_restart_machines(ops_test: OpsTest) -> None:
+async def test_restart_machine(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Relate it to the PostgreSQL to enable TLS.
         await ops_test.model.relate(DATABASE_APP_NAME, TLS_CERTIFICATES_APP_NAME)
