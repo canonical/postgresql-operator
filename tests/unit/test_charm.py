@@ -175,14 +175,22 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.PostgresqlOperatorCharm.update_config")
-    @patch("charm.Patroni.member_started")
+    @patch(
+        "charm.Patroni.member_started",
+        new_callable=PropertyMock,
+    )
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
-    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
+    @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
+    @patch(
+        "charm.PostgresqlOperatorCharm._is_storage_attached",
+        side_effect=[False, True, True, True, True],
+    )
     def test_on_start(
         self,
         _is_storage_attached,
+        _reboot_on_detached_storage,
         _get_password,
         _replication_password,
         _bootstrap_cluster,
@@ -192,7 +200,12 @@ class TestCharm(unittest.TestCase):
         _postgresql,
         _oversee_users,
     ):
+        # Test without storage.
+        self.charm.on.start.emit()
+        _reboot_on_detached_storage.assert_called_once()
+
         # Test before the passwords are generated.
+        _member_started.return_value = False
         _get_password.return_value = None
         self.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
@@ -204,6 +217,7 @@ class TestCharm(unittest.TestCase):
 
         # Mock cluster start and postgres user creation success values.
         _bootstrap_cluster.side_effect = [False, True, True]
+        _postgresql.list_users.side_effect = [[], []]
         _postgresql.create_user.side_effect = [PostgreSQLCreateUserError, None]
 
         # Test for a failed cluster bootstrapping.
@@ -218,6 +232,7 @@ class TestCharm(unittest.TestCase):
         self.harness.model.unit.status = WaitingStatus("fake message")
 
         # Test the event of an error happening when trying to create the default postgres user.
+        _member_started.return_value = True
         self.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _oversee_users.assert_not_called()

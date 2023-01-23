@@ -620,7 +620,6 @@ class PostgresqlOperatorCharm(CharmBase):
         """Returns whether the workload can be started on this unit."""
         if not self._is_storage_attached():
             self._reboot_on_detached_storage(event)
-            logger.debug("Early exit on_start: Unit blocked")
             return False
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
@@ -634,12 +633,6 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_start(self, event: StartEvent) -> None:
         """Handle the start event."""
         if not self._can_start(event):
-            return
-
-        # Member already started, so we can set an ActiveStatus.
-        # This can happen after a reboot.
-        if self._patroni.member_started:
-            self.unit.status = ActiveStatus()
             return
 
         postgres_password = self._get_password()
@@ -663,11 +656,13 @@ class PostgresqlOperatorCharm(CharmBase):
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
+        print(3)
         if not self._patroni.bootstrap_cluster():
             self.unit.status = BlockedStatus("failed to start Patroni")
             return
 
         # Assert the member is up and running before marking it as initialised.
+        print(2)
         if not self._patroni.member_started:
             logger.debug("Deferring on_start: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
@@ -679,6 +674,7 @@ class PostgresqlOperatorCharm(CharmBase):
         try:
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
+            print(1)
             if "postgres" not in self.postgresql.list_users():
                 self.postgresql.create_user("postgres", new_password(), admin=True)
         except PostgreSQLCreateUserError as e:
@@ -700,10 +696,14 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # Configure Patroni in the replica but don't start it yet.
-        if not self._patroni.member_started:
-            self._patroni.configure_patroni_on_unit()
+        # Member already started, so we can set an ActiveStatus.
+        # This can happen after a reboot.
+        if self._patroni.member_started:
+            self.unit.status = ActiveStatus()
             return
+
+        # Configure Patroni in the replica but don't start it yet.
+        self._patroni.configure_patroni_on_unit()
 
     def _on_get_password(self, event: ActionEvent) -> None:
         """Returns the password for a user as an action response.
