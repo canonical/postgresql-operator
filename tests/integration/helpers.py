@@ -319,7 +319,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     # Relate application to PostgreSQL.
     relation = await ops_test.model.relate(f"{application_name}", f"{DATABASE_APP_NAME}:db-admin")
     await ops_test.model.wait_for_idle(
-        apps=[application_name],
+        apps=[application_name, DATABASE_APP_NAME],
         status="active",
         timeout=1000,
     )
