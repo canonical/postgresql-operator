@@ -27,7 +27,6 @@ from tests.integration.helpers import (
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-# STORAGE_MOUNTPOINT = METADATA
 TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
 
 

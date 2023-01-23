@@ -656,13 +656,11 @@ class PostgresqlOperatorCharm(CharmBase):
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
-        print(3)
         if not self._patroni.bootstrap_cluster():
             self.unit.status = BlockedStatus("failed to start Patroni")
             return
 
         # Assert the member is up and running before marking it as initialised.
-        print(2)
         if not self._patroni.member_started:
             logger.debug("Deferring on_start: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
@@ -674,7 +672,6 @@ class PostgresqlOperatorCharm(CharmBase):
         try:
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
-            print(1)
             if "postgres" not in self.postgresql.list_users():
                 self.postgresql.create_user("postgres", new_password(), admin=True)
         except PostgreSQLCreateUserError as e:
