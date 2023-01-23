@@ -21,10 +21,13 @@ from ops.charm import (
     ActionEvent,
     CharmBase,
     ConfigChangedEvent,
+    InstallEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
+    StartEvent,
 )
+from ops.framework import EventBase
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -514,7 +517,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
-    def _on_install(self, event) -> None:
+    def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
         if not self._is_storage_attached():
             self._reboot_on_detached_storage(event)
@@ -613,7 +616,8 @@ class PostgresqlOperatorCharm(CharmBase):
         current = self._units_ips
         return old - current
 
-    def _can_start(self, event):
+    def _can_start(self, event: StartEvent) -> bool:
+        """Returns whether the workload can be started on this unit."""
         if not self._is_storage_attached():
             self._reboot_on_detached_storage(event)
             logger.debug("Early exit on_start: Unit blocked")
@@ -627,7 +631,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         return True
 
-    def _on_start(self, event) -> None:
+    def _on_start(self, event: StartEvent) -> None:
         """Handle the start event."""
         if not self._can_start(event):
             return
@@ -882,7 +886,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.update_config()
 
-    def _reboot_on_detached_storage(self, event) -> None:
+    def _reboot_on_detached_storage(self, event: EventBase) -> None:
         """Reboot on detached storage.
 
         Workaround for lxd containers not getting storage attached on startups.
@@ -897,8 +901,6 @@ class PostgresqlOperatorCharm(CharmBase):
             subprocess.check_call(["systemctl", "reboot"])
         except subprocess.CalledProcessError:
             pass
-        # proc = subprocess.Popen("systemctl reboot", shell=True)
-        # logger.error(f"pid: {proc.pid}")
 
     def _restart(self, _) -> None:
         """Restart PostgreSQL."""
