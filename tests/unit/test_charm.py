@@ -474,6 +474,28 @@ class TestCharm(unittest.TestCase):
             == "test-password"
         )
 
+    @patch(
+        "subprocess.check_call",
+        side_effect=[None, subprocess.CalledProcessError(1, "fake command")],
+    )
+    def test_is_storage_attached(self, _check_call):
+        # Test with attached storage.
+        is_storage_attached = self.charm._is_storage_attached()
+        _check_call.assert_called_once_with(["mountpoint", "-q", self.charm._storage_path])
+        self.assertTrue(is_storage_attached)
+
+        # Test with detached storage.
+        is_storage_attached = self.charm._is_storage_attached()
+        self.assertFalse(is_storage_attached)
+
+    @patch("subprocess.check_call")
+    def test_reboot_on_detached_storage(self, _check_call):
+        mock_event = MagicMock()
+        self.charm._reboot_on_detached_storage(mock_event)
+        mock_event.defer.assert_called_once()
+        self.assertTrue(isinstance(self.charm.unit.status, WaitingStatus))
+        _check_call.assert_called_once_with(["systemctl", "reboot"])
+
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.restart_postgresql")
     def test_restart(self, _restart_postgresql):
