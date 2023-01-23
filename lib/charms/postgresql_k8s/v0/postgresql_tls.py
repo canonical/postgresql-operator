@@ -45,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 4
+LIBPATCH = 5
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -125,8 +125,8 @@ class PostgreSQLTLS(Object):
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Enable TLS when TLS certificate available."""
-        if event.certificate_signing_request != self.charm.get_secret(SCOPE, "csr"):
-            logger.error("An unknown certificate expiring.")
+        if event.certificate_signing_request.strip() != self.charm.get_secret(SCOPE, "csr").strip():
+            logger.error("An unknown certificate available.")
             return
 
         self.charm.set_secret(
@@ -144,7 +144,7 @@ class PostgreSQLTLS(Object):
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         """Request the new certificate when old certificate is expiring."""
-        if event.certificate != self.charm.get_secret(SCOPE, "cert"):
+        if event.certificate.strip() != self.charm.get_secret(SCOPE, "cert").strip():
             logger.error("An unknown certificate expiring.")
             return
 
