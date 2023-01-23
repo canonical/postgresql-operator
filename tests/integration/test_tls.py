@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 import os
 
 import pytest as pytest
@@ -22,6 +23,8 @@ from tests.integration.helpers import (
     restart_machine,
     run_command_on_unit,
 )
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
 # STORAGE_MOUNTPOINT = METADATA
@@ -153,35 +156,35 @@ async def test_restart_machine(ops_test: OpsTest) -> None:
 
     # Wait for all units enabling TLS.
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-        print(f"checking TLS on {unit.name}")
         assert await check_tls(ops_test, unit.name, enabled=True)
-        print(f"checking TLS on {unit.name} - Patroni API")
         assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
 
+    unit_name = "postgresql/0"
+    issue_found = False
     for attempt in Retrying(stop=stop_after_attempt(10)):
         with attempt:
-            # Restart the machine of each unit.
-            issue_found = False
-            print(f"restarting postgresql/0 {attempt.retry_state.attempt_number}")
-            await restart_machine(ops_test, "postgresql/0")
-            # result = await run_command_on_unit(
-            #     ops_test, unit.name, "ls -al /var/lib/postgresql/data"
-            # )
-            # print(f"{attempt.retry_state.attempt_number} - result for {unit.name}: {result}")
-            result = await run_command_on_unit(ops_test, "postgresql/0", "lsblk")
-            print(f"{attempt.retry_state.attempt_number} - result for postgresql/0: {result}")
+            # Restart the machine of the unit.
+            logger.info(f"restarting {unit_name}")
+            await restart_machine(ops_test, unit_name)
+
+            # Check whether the issue happened (the storage wasn't mounted).
+            logger.info(
+                f"checking whether storage was mounted - attempt {attempt.retry_state.attempt_number}"
+            )
+            result = await run_command_on_unit(ops_test, unit_name, "lsblk")
             if "/var/lib/postgresql/data" not in result:
-                print("issue found!!!")
                 issue_found = True
 
             assert (
                 issue_found
             ), "Couldn't reproduce the issue from https://bugs.launchpad.net/juju/+bug/1999758"
 
+    # Wait for the unit to be ready again. Some errors in the start hook may happen due
+    # to rebooting in the middle of a hook.
     await ops_test.model.wait_for_idle(status="active", timeout=1000, raise_on_error=False)
 
-    # Wait for the unit enabling TLS.
-    print("checking again TLS")
+    # Wait for the unit enabling TLS again.
+    logger.info(f"checking TLS on {unit_name}")
     assert await check_tls(ops_test, "postgresql/0", enabled=True)
-    print("checking again TLS - Patroni API")
+    logger.info(f"checking TLS on Patroni API from {unit_name}")
     assert await check_tls_patroni_api(ops_test, "postgresql/0", enabled=True)

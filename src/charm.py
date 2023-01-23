@@ -636,7 +636,11 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._can_start(event):
             return
 
-        self.unit.status = WaitingStatus("awaiting for workload initialisation")
+        # Member already started, so we can set an ActiveStatus.
+        # This can happen after a reboot.
+        if self._patroni.member_started:
+            self.unit.status = ActiveStatus()
+            return
 
         postgres_password = self._get_password()
         # If the leader was not elected (and the needed passwords were not generated yet),
@@ -647,10 +651,17 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        # Only the leader can bootstrap the cluster.
+        # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
             self._start_replica(event)
             return
 
+        # Bootstrap the cluster in the leader unit.
+        self._start_primary(event)
+
+    def _start_primary(self, event: StartEvent) -> None:
+        """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
             self.unit.status = BlockedStatus("failed to start Patroni")
@@ -682,18 +693,17 @@ class PostgresqlOperatorCharm(CharmBase):
         self.unit.status = ActiveStatus()
 
     def _start_replica(self, event) -> None:
+        """Configure the replica if the cluster was already initialised."""
         if "cluster_initialised" not in self._peers.data[self.app]:
             logger.debug("Deferring on_start: awaiting for cluster to start")
             self.unit.status = WaitingStatus("awaiting for cluster to start")
             event.defer()
             return
 
-        # Only the leader can bootstrap the cluster.
+        # Configure Patroni in the replica but don't start it yet.
         if not self._patroni.member_started:
             self._patroni.configure_patroni_on_unit()
             return
-
-        self.unit.status = ActiveStatus()
 
     def _on_get_password(self, event: ActionEvent) -> None:
         """Returns the password for a user as an action response.
