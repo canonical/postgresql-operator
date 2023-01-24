@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import itertools
 import json
+import subprocess
 import tempfile
 import zipfile
 from datetime import datetime
@@ -318,7 +319,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     # Relate application to PostgreSQL.
     relation = await ops_test.model.relate(f"{application_name}", f"{DATABASE_APP_NAME}:db-admin")
     await ops_test.model.wait_for_idle(
-        apps=[application_name],
+        apps=[application_name, DATABASE_APP_NAME],
         status="active",
         timeout=1000,
     )
@@ -618,6 +619,21 @@ async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
     ][0]
     primary = await get_primary(ops_test, other_unit)
     return primary != old_primary
+
+
+async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
+    """Restart the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to restart the machine
+    """
+    hostname_command = f"run --unit {unit_name} -- hostname"
+    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
+    if return_code != 0:
+        raise Exception("Failed to get the unit machine name: %s", return_code)
+    restart_machine_command = f"lxc restart {raw_hostname.strip()}"
+    subprocess.check_call(restart_machine_command.split())
 
 
 async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -> str:

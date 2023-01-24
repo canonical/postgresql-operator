@@ -21,10 +21,13 @@ from ops.charm import (
     ActionEvent,
     CharmBase,
     ConfigChangedEvent,
+    InstallEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
+    StartEvent,
 )
+from ops.framework import EventBase
 from ops.main import main
 from ops.model import (
     ActiveStatus,
@@ -514,8 +517,12 @@ class PostgresqlOperatorCharm(CharmBase):
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
-    def _on_install(self, event) -> None:
+    def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
+        if not self._is_storage_attached():
+            self._reboot_on_detached_storage(event)
+            return
+
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
 
         # Prevent the default cluster creation.
@@ -609,12 +616,23 @@ class PostgresqlOperatorCharm(CharmBase):
         current = self._units_ips
         return old - current
 
-    def _on_start(self, event) -> None:
-        """Handle the start event."""
+    def _can_start(self, event: StartEvent) -> bool:
+        """Returns whether the workload can be started on this unit."""
+        if not self._is_storage_attached():
+            self._reboot_on_detached_storage(event)
+            return False
+
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
         if self._has_blocked_status:
             logger.debug("Early exit on_start: Unit blocked")
+            return False
+
+        return True
+
+    def _on_start(self, event: StartEvent) -> None:
+        """Handle the start event."""
+        if not self._can_start(event):
             return
 
         postgres_password = self._get_password()
@@ -626,18 +644,17 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        if not self.unit.is_leader() and "cluster_initialised" not in self._peers.data[self.app]:
-            logger.debug("Deferring on_start: awaiting for cluster to start")
-            self.unit.status = WaitingStatus("awaiting for cluster to start")
-            event.defer()
-            return
-
         # Only the leader can bootstrap the cluster.
+        # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
-            self._patroni.configure_patroni_on_unit()
-            event.defer()
+            self._start_replica(event)
             return
 
+        # Bootstrap the cluster in the leader unit.
+        self._start_primary(event)
+
+    def _start_primary(self, event: StartEvent) -> None:
+        """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
             self.unit.status = BlockedStatus("failed to start Patroni")
@@ -653,7 +670,10 @@ class PostgresqlOperatorCharm(CharmBase):
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
-            self.postgresql.create_user("postgres", new_password(), admin=True)
+            # This event can be run on a replica if the machines are restarted.
+            # For that case, check whether the postgres user already exits.
+            if "postgres" not in self.postgresql.list_users():
+                self.postgresql.create_user("postgres", new_password(), admin=True)
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
@@ -664,6 +684,23 @@ class PostgresqlOperatorCharm(CharmBase):
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
         self.unit.status = ActiveStatus()
+
+    def _start_replica(self, event) -> None:
+        """Configure the replica if the cluster was already initialised."""
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            logger.debug("Deferring on_start: awaiting for cluster to start")
+            self.unit.status = WaitingStatus("awaiting for cluster to start")
+            event.defer()
+            return
+
+        # Member already started, so we can set an ActiveStatus.
+        # This can happen after a reboot.
+        if self._patroni.member_started:
+            self.unit.status = ActiveStatus()
+            return
+
+        # Configure Patroni in the replica but don't start it yet.
+        self._patroni.configure_patroni_on_unit()
 
     def _on_get_password(self, event: ActionEvent) -> None:
         """Returns the password for a user as an action response.
@@ -826,6 +863,14 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.error("could not install pip packages")
             raise
 
+    def _is_storage_attached(self) -> bool:
+        """Returns if storage is attached."""
+        try:
+            subprocess.check_call(["mountpoint", "-q", self._storage_path])
+            return True
+        except subprocess.CalledProcessError:
+            return False
+
     @property
     def _peers(self) -> Relation:
         """Fetch the peer relation.
@@ -847,6 +892,22 @@ class PostgresqlOperatorCharm(CharmBase):
             self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
 
         self.update_config()
+
+    def _reboot_on_detached_storage(self, event: EventBase) -> None:
+        """Reboot on detached storage.
+
+        Workaround for lxd containers not getting storage attached on startups.
+
+        Args:
+            event: the event that triggered this handler
+        """
+        event.defer()
+        logger.error("Data directory not attached. Reboot unit.")
+        self.unit.status = WaitingStatus("Data directory not attached")
+        try:
+            subprocess.check_call(["systemctl", "reboot"])
+        except subprocess.CalledProcessError:
+            pass
 
     def _restart(self, _) -> None:
         """Restart PostgreSQL."""

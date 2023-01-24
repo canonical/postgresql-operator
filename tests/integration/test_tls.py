@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
+import os
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_delay, wait_exponential
+from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
 from tests.helpers import METADATA
 from tests.integration.helpers import (
@@ -18,8 +20,11 @@ from tests.integration.helpers import (
     get_primary,
     get_unit_address,
     primary_changed,
+    restart_machine,
     run_command_on_unit,
 )
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
 TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
@@ -135,3 +140,50 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
             assert await check_tls(ops_test, unit.name, enabled=False)
             assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
+
+
+@pytest.mark.skipif(
+    not os.environ.get("RESTART_MACHINE_TEST"),
+    reason="RESTART_MACHINE_TEST environment variable not set",
+)
+@pytest.mark.tls_tests
+async def test_restart_machine(ops_test: OpsTest) -> None:
+    async with ops_test.fast_forward():
+        # Relate it to the PostgreSQL to enable TLS.
+        await ops_test.model.relate(DATABASE_APP_NAME, TLS_CERTIFICATES_APP_NAME)
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+
+    # Wait for all units enabling TLS.
+    for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+        assert await check_tls(ops_test, unit.name, enabled=True)
+        assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
+
+    unit_name = "postgresql/0"
+    issue_found = False
+    for attempt in Retrying(stop=stop_after_attempt(10)):
+        with attempt:
+            # Restart the machine of the unit.
+            logger.info(f"restarting {unit_name}")
+            await restart_machine(ops_test, unit_name)
+
+            # Check whether the issue happened (the storage wasn't mounted).
+            logger.info(
+                f"checking whether storage was mounted - attempt {attempt.retry_state.attempt_number}"
+            )
+            result = await run_command_on_unit(ops_test, unit_name, "lsblk")
+            if "/var/lib/postgresql/data" not in result:
+                issue_found = True
+
+            assert (
+                issue_found
+            ), "Couldn't reproduce the issue from https://bugs.launchpad.net/juju/+bug/1999758"
+
+    # Wait for the unit to be ready again. Some errors in the start hook may happen due
+    # to rebooting in the middle of a hook.
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, raise_on_error=False)
+
+    # Wait for the unit enabling TLS again.
+    logger.info(f"checking TLS on {unit_name}")
+    assert await check_tls(ops_test, "postgresql/0", enabled=True)
+    logger.info(f"checking TLS on Patroni API from {unit_name}")
+    assert await check_tls_patroni_api(ops_test, "postgresql/0", enabled=True)
