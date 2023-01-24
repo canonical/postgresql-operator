@@ -14,6 +14,7 @@ from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
     service_restart,
+    service_resume,
     service_running,
     service_start,
 )
@@ -370,7 +371,9 @@ class Patroni:
         Returns:
             Whether the service started successfully.
         """
+        # Start the service and enable it to start at boot.
         service_start(PATRONI_SERVICE)
+        service_resume(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
 
     def switchover(self) -> None:

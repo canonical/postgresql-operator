@@ -269,13 +269,17 @@ class TestCharm(unittest.TestCase):
 
     @patch("cluster.service_start")
     @patch("cluster.service_running")
+    @patch("cluster.service_resume")
     @patch("charm.Patroni._create_directory")
-    def test_start_patroni(self, _create_directory, _service_running, _service_start):
+    def test_start_patroni(
+        self, _create_directory, _service_resume, _service_running, _service_start
+    ):
         _service_running.side_effect = [True, False]
 
         # Test a success scenario.
         success = self.patroni.start_patroni()
         _service_start.assert_called_with(PATRONI_SERVICE)
+        _service_resume.assert_called_with(PATRONI_SERVICE)
         _service_running.assert_called_with(PATRONI_SERVICE)
         assert success
 
