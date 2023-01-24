@@ -240,7 +240,7 @@ async def test_restart_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
+@pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
     ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_delay
