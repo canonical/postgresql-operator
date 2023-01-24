@@ -11,6 +11,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLUpdateUserPasswordError,
 )
+from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 from tenacity import RetryError
@@ -41,14 +42,23 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._install_pip_packages")
     @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
     @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
-    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
+    @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
+    @patch(
+        "charm.PostgresqlOperatorCharm._is_storage_attached",
+        side_effect=[False, True, True],
+    )
     def test_on_install(
         self,
         _is_storage_attached,
+        _reboot_on_detached_storage,
         _inhibit_default_cluster_creation,
         _install_apt_packages,
         _install_pip_packages,
     ):
+        # Test without storage.
+        self.charm.on.install.emit()
+        _reboot_on_detached_storage.assert_called_once()
+
         # Test without adding Patroni resource.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
@@ -248,6 +258,60 @@ class TestCharm(unittest.TestCase):
         )  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.Patroni.configure_patroni_on_unit")
+    @patch(
+        "charm.Patroni.member_started",
+        new_callable=PropertyMock,
+    )
+    @patch.object(EventBase, "defer")
+    @patch("charm.PostgresqlOperatorCharm._replication_password")
+    @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch(
+        "charm.PostgresqlOperatorCharm._is_storage_attached",
+        return_value=True,
+    )
+    def test_on_start_replica(
+        self,
+        _is_storage_attached,
+        _get_password,
+        _replication_password,
+        _defer,
+        _member_started,
+        _configure_patroni_on_unit,
+    ):
+        # Set the current unit to be a replica (non leader unit).
+        self.harness.set_leader(False)
+
+        # Mock the passwords.
+        _get_password.return_value = "fake-operator-password"
+        _replication_password.return_value = "fake-replication-password"
+
+        # Test an uninitialized cluster.
+        self.charm._peers.data[self.charm.app].update({"cluster_initialised": ""})
+        self.charm.on.start.emit()
+        _defer.assert_called_once()
+
+        # Set an initial waiting status again (like after a machine restart).
+        self.harness.model.unit.status = WaitingStatus("fake message")
+
+        # Mark the cluster as initialised and with the workload up and running.
+        self.charm._peers.data[self.charm.app].update({"cluster_initialised": "True"})
+        _member_started.return_value = True
+        self.charm.on.start.emit()
+        _configure_patroni_on_unit.assert_not_called()
+        self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
+
+        # Set an initial waiting status (like after the install hook was triggered).
+        self.harness.model.unit.status = WaitingStatus("fake message")
+
+        # Check that the unit status doesn't change when the workload is not running.
+        # In that situation only Patroni is configured in the unit (but not started).
+        _member_started.return_value = False
+        self.charm.on.start.emit()
+        _configure_patroni_on_unit.assert_called_once()
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm.postgresql")
