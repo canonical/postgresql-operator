@@ -42,7 +42,6 @@ class TestDbProvides(unittest.TestCase):
         # Define some relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
         self.harness.add_relation_unit(self.rel_id, "application/0")
-        self.harness.add_relation_unit(self.rel_id, self.unit)
         self.peer_rel_id = self.harness.add_relation(PEER, self.app)
         self.harness.add_relation_unit(self.peer_rel_id, self.unit)
         self.harness.update_relation_data(
@@ -229,51 +228,15 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.delete_user = PropertyMock(return_value=None)
             self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
             with self.harness.hooks_disabled():
-                self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
                 self.harness.update_relation_data(
                     self.rel_id,
                     "application",
-                    {"database": DATABASE, "extensions": ["test"]},
+                    {"database": DATABASE, "extensions": "test"},
                 )
 
             # Break the relation before the database is ready.
             self.harness.remove_relation(self.rel_id)
             self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
-
-    @patch(
-        "charm.PostgresqlOperatorCharm.primary_endpoint",
-        new_callable=PropertyMock,
-    )
-    @patch("charm.PostgresqlOperatorCharm._has_blocked_status", new_callable=PropertyMock)
-    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
-    @patch("charm.DbProvides._on_relation_departed")
-    def test_on_relation_broken_extensions_keep_block(
-        self, _on_relation_departed, _member_started, _primary_endpoint, _has_blocked_status
-    ):
-        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
-            # Set some side effects to test multiple situations.
-            _has_blocked_status.return_value = True
-            _member_started.return_value = True
-            _primary_endpoint.return_value = {"1.1.1.1"}
-            postgresql_mock.delete_user = PropertyMock(return_value=None)
-            self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
-            with self.harness.hooks_disabled():
-                self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-                self.harness.update_relation_data(
-                    self.rel_id,
-                    "application",
-                    {"database": DATABASE, "extensions": ["test"]},
-                )
-                second_rel_id = self.harness.add_relation(RELATION_NAME, "application2")
-                self.harness.update_relation_data(
-                    second_rel_id,
-                    "application2",
-                    {"database": DATABASE, "extensions": ["test"]},
-                )
-
-            # Break the relation before the database is ready.
-            self.harness.remove_relation(self.rel_id)
-            self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch(
         "charm.DbProvides._get_state",

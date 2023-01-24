@@ -250,11 +250,8 @@ class DbProvides(Object):
             self.charm._has_blocked_status
             and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE
         ):
-            if "extensions" in event.relation.data.get(
-                event.app, {}
-            ) or "extensions" in event.relation.data.get(event.unit, {}):
-                if not self._check_for_blocking_relations(event.relation.id):
-                    self.charm.unit.status = ActiveStatus()
+            if not self._check_for_blocking_relations(event.relation.id):
+                self.charm.unit.status = ActiveStatus()
 
     def update_endpoints(self, event: RelationChangedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""
