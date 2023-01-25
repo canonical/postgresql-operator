@@ -256,6 +256,12 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.delete_user = PropertyMock(return_value=None)
             self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
             with self.harness.hooks_disabled():
+                first_rel_id = self.harness.add_relation(RELATION_NAME, "application1")
+                self.harness.update_relation_data(
+                    first_rel_id,
+                    "application1",
+                    {"database": DATABASE, "extensions": "test"},
+                )
                 second_rel_id = self.harness.add_relation(RELATION_NAME, "application2")
                 self.harness.update_relation_data(
                     second_rel_id,
@@ -264,7 +270,7 @@ class TestDbProvides(unittest.TestCase):
                 )
 
             event = Mock()
-            event.relation.id = 1
+            event.relation.id = first_rel_id
             # Break one of the relations that block the charm.
             self.harness.charm.legacy_db_relation._on_relation_broken(event)
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
