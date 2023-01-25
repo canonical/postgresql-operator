@@ -42,7 +42,6 @@ class TestDbProvides(unittest.TestCase):
         # Define some relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
         self.harness.add_relation_unit(self.rel_id, "application/0")
-        self.harness.add_relation_unit(self.rel_id, self.unit)
         self.peer_rel_id = self.harness.add_relation(PEER, self.app)
         self.harness.add_relation_unit(self.peer_rel_id, self.unit)
         self.harness.update_relation_data(
@@ -229,14 +228,13 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.delete_user = PropertyMock(return_value=None)
             self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
             with self.harness.hooks_disabled():
-                self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
                 self.harness.update_relation_data(
                     self.rel_id,
                     "application",
-                    {"database": DATABASE, "extensions": ["test"]},
+                    {"database": DATABASE, "extensions": "test"},
                 )
 
-            # Break the relation before the database is ready.
+            # Break the relation that blocked the charm.
             self.harness.remove_relation(self.rel_id)
             self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
@@ -258,21 +256,23 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.delete_user = PropertyMock(return_value=None)
             self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
             with self.harness.hooks_disabled():
-                self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
+                first_rel_id = self.harness.add_relation(RELATION_NAME, "application1")
                 self.harness.update_relation_data(
-                    self.rel_id,
-                    "application",
-                    {"database": DATABASE, "extensions": ["test"]},
+                    first_rel_id,
+                    "application1",
+                    {"database": DATABASE, "extensions": "test"},
                 )
                 second_rel_id = self.harness.add_relation(RELATION_NAME, "application2")
                 self.harness.update_relation_data(
                     second_rel_id,
                     "application2",
-                    {"database": DATABASE, "extensions": ["test"]},
+                    {"database": DATABASE, "extensions": "test"},
                 )
 
-            # Break the relation before the database is ready.
-            self.harness.remove_relation(self.rel_id)
+            event = Mock()
+            event.relation.id = first_rel_id
+            # Break one of the relations that block the charm.
+            self.harness.charm.legacy_db_relation._on_relation_broken(event)
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch(
