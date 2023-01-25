@@ -125,7 +125,10 @@ class PostgreSQLTLS(Object):
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Enable TLS when TLS certificate available."""
-        if event.certificate_signing_request.strip() != self.charm.get_secret(SCOPE, "csr").strip():
+        if (
+            event.certificate_signing_request.strip()
+            != str(self.charm.get_secret(SCOPE, "csr")).strip()
+        ):
             logger.error("An unknown certificate available.")
             return
 
@@ -144,7 +147,7 @@ class PostgreSQLTLS(Object):
 
     def _on_certificate_expiring(self, event: CertificateExpiringEvent) -> None:
         """Request the new certificate when old certificate is expiring."""
-        if event.certificate.strip() != self.charm.get_secret(SCOPE, "cert").strip():
+        if event.certificate.strip() != str(self.charm.get_secret(SCOPE, "cert")).strip():
             logger.error("An unknown certificate expiring.")
             return
 
