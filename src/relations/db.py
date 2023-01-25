@@ -255,12 +255,14 @@ class DbProvides(Object):
 
     def update_endpoints(self, event: RelationChangedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""
-        if not self.charm.unit.is_leader():
-            return
-
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
         relations = [event.relation] if event else self.model.relations[self.relation_name]
+
+        if not self.charm.unit.is_leader():
+            for relation in relations:
+                relation.data[self.charm.unit].clear()
+            return
 
         # List the replicas endpoints.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}

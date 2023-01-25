@@ -418,6 +418,23 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
 
 
+async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
+    """Get the name of the machine from a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to get the machine
+
+    Returns:
+        The name of the machine.
+    """
+    hostname_command = f"run --unit {unit_name} -- hostname"
+    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
+    if return_code != 0:
+        raise Exception("Failed to get the unit machine name: %s", return_code)
+    return raw_hostname.strip()
+
+
 async def get_password(ops_test: OpsTest, unit_name: str, username: str = "operator") -> str:
     """Retrieve a user password using the action.
 
@@ -712,6 +729,30 @@ async def set_password(
     action = await unit.run_action("set-password", **parameters)
     result = await action.wait()
     return result.results
+
+
+async def start_machine(ops_test: OpsTest, unit_name: str) -> None:
+    """Start the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to start the machine
+    """
+    machine = await get_machine_from_unit(ops_test, unit_name)
+    restart_machine_command = f"lxc restart {machine}"
+    subprocess.check_call(restart_machine_command.split())
+
+
+async def stop_machine(ops_test: OpsTest, unit_name: str) -> None:
+    """Stop the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to stop the machine
+    """
+    machine = await get_machine_from_unit(ops_test, unit_name)
+    restart_machine_command = f"lxc restart {machine}"
+    subprocess.check_call(restart_machine_command.split())
 
 
 def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -> None:

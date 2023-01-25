@@ -46,6 +46,10 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
+from cluster_topology_observer import (
+    ClusterTopologyChangeCharmEvents,
+    ClusterTopologyObserver,
+)
 from constants import (
     PEER,
     REPLICATION_PASSWORD_KEY,
@@ -66,14 +70,24 @@ logger = logging.getLogger(__name__)
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
+class MonitorClusterMembersEvent(EventBase):
+    """And event that is triggered periodically to monitor cluster members."""
+
+
 class PostgresqlOperatorCharm(CharmBase):
     """Charmed Operator for the PostgreSQL database."""
+
+    on = ClusterTopologyChangeCharmEvents()
 
     def __init__(self, *args):
         super().__init__(*args)
 
         self._postgresql_service = "postgresql"
 
+        # self.on.define_event("monitor_cluster_members", MonitorClusterMembersEvent)
+        # self.framework.observe(self.on.monitor_cluster_members, self._on_monitor_cluster_members)
+        self._observer = ClusterTopologyObserver(self)
+        self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -227,9 +241,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self.update_config()
 
             if self.primary_endpoint:
-                self.postgresql_client_relation.update_endpoints()
-                self.legacy_db_relation.update_endpoints()
-                self.legacy_db_admin_relation.update_endpoints()
+                self._update_relation_endpoints()
             else:
                 self.unit.status = BlockedStatus("no primary in the cluster")
                 return
@@ -278,9 +290,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
-            self.postgresql_client_relation.update_endpoints()
-            self.legacy_db_relation.update_endpoints()
-            self.legacy_db_admin_relation.update_endpoints()
+            self._update_relation_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -328,9 +338,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
-            self.postgresql_client_relation.update_endpoints()
-            self.legacy_db_relation.update_endpoints()
-            self.legacy_db_admin_relation.update_endpoints()
+            self._update_relation_endpoints()
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
@@ -517,6 +525,37 @@ class PostgresqlOperatorCharm(CharmBase):
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
+    # def _schedule_monitor_cluster_members_event(self):
+    #     logger.error("called _schedule_monitor_cluster_members_event")
+    #     command = "sleep 10; juju-run JUJU_DISPATCH_PATH=hooks/monitor_cluster_members ./dispatch"
+    #     env = os.environ.copy()
+    #     if "JUJU_CONTEXT_ID" in env:
+    #         env.pop("JUJU_CONTEXT_ID")
+    #     env["JUJU_HOOK_NAME"] = "start"
+    #     logger.error(f"env: {env}")
+    #     proc = subprocess.Popen(command, env=env, shell=True)
+    #     logger.error(f"pid: {proc.pid}")
+    #
+    # def _on_monitor_cluster_members(self, _):
+    #     logger.error("called _on_monitor_cluster_members!!!!")
+    #     if not self.unit.is_leader():
+    #         return
+    #
+    #     if "cluster_initialised" not in self._peers.data[self.app]:
+    #         logger.error("Early exit _on_monitor_cluster_members: Cluster not initialized")
+    #         self._schedule_monitor_cluster_members_event()
+    #         return
+    #
+    #     self.postgresql_client_relation.update_endpoints()
+    #     self.legacy_db_relation.update_endpoints()
+    #     self.legacy_db_admin_relation.update_endpoints()
+    #     logger.error("calling _on_monitor_cluster_members again!!!!")
+    #     self._schedule_monitor_cluster_members_event()
+    def _on_cluster_topology_change(self, _):
+        """Updates endpoints and (optionally) certificates when the cluster topology changes."""
+        self._update_relation_endpoints()
+        self._update_certificate()
+
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
         if not self._is_storage_attached():
@@ -593,9 +632,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
-            self.postgresql_client_relation.update_endpoints()
-            self.legacy_db_relation.update_endpoints()
-            self.legacy_db_admin_relation.update_endpoints()
+            self._update_relation_endpoints()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
 
@@ -667,6 +704,20 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        try:
+            primary = self._patroni.get_primary()
+            logger.error(f"primary: {primary}")
+            if primary is None:
+                logger.error("Deferring on_start: awaiting for primary to be elected1")
+                self.unit.status = WaitingStatus("awaiting for primary to be elected")
+                event.defer()
+                return
+        except RetryError:
+            logger.error("Deferring on_start: awaiting for primary to be elected1")
+            self.unit.status = WaitingStatus("awaiting for primary to be elected")
+            event.defer()
+            return
+
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
@@ -683,6 +734,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
+        # self._schedule_monitor_cluster_members_event()
         self.unit.status = ActiveStatus()
 
     def _start_replica(self, event) -> None:
@@ -692,6 +744,9 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = WaitingStatus("awaiting for cluster to start")
             event.defer()
             return
+
+        # Clear unit data.
+        self._update_relation_endpoints()
 
         # Member already started, so we can set an ActiveStatus.
         # This can happen after a reboot.
@@ -767,12 +822,8 @@ class PostgresqlOperatorCharm(CharmBase):
         event.set_results({f"{username}-password": password})
 
     def _on_update_status(self, _) -> None:
-        """Update endpoints of the postgres client relation and update users list."""
-        self.postgresql_client_relation.update_endpoints()
-        self.legacy_db_relation.update_endpoints()
-        self.legacy_db_admin_relation.update_endpoints()
+        """Update users list in the database."""
         self.postgresql_client_relation.oversee_users()
-        self._update_certificate()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
@@ -941,6 +992,12 @@ class PostgresqlOperatorCharm(CharmBase):
         if restart_postgresql:
             self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
+
+    def _update_relation_endpoints(self) -> None:
+        """Updates endpoints and read-only endpoint in all relations."""
+        self.postgresql_client_relation.update_endpoints()
+        self.legacy_db_relation.update_endpoints()
+        self.legacy_db_admin_relation.update_endpoints()
 
 
 if __name__ == "__main__":

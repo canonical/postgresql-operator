@@ -6,7 +6,7 @@ import json
 import logging
 
 import pytest as pytest
-from landscape_api.base import run_query
+from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
@@ -14,6 +14,11 @@ from tests.integration.helpers import (
     check_database_users_existence,
     check_databases_creation,
     deploy_and_relate_bundle_with_postgresql,
+    get_primary,
+    primary_changed,
+    start_machine,
+    stop_machine,
+    switchover,
 )
 
 logger = logging.getLogger(__name__)
@@ -82,9 +87,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # Connect to the Landscape API through HAProxy and do some CRUD calls (without the update).
     haproxy_unit = ops_test.model.applications[HAPROXY_APP_NAME].units[0]
     api_uri = f"https://{haproxy_unit.public_address}/api/"
-    role_name = "User"
 
     # Create a role and list the available roles later to check that the new one is there.
+    role_name = "User1"
     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
     api_response = run_query(key, secret, "GetRoles", {}, api_uri, False)
     assert role_name in [user["name"] for user in json.loads(api_response)]
@@ -94,10 +99,61 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     api_response = run_query(key, secret, "GetRoles", {}, api_uri, False)
     assert role_name not in [user["name"] for user in json.loads(api_response)]
 
-    # Remove the applications from the bundle.
-    await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
+    # Stop the primary unit machine.
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    await stop_machine(ops_test, primary)
 
-    # Remove the PostgreSQL application.
-    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+    # Await for a new primary to be elected.
+    await primary_changed(ops_test, primary)
+
+    # Start the former primary unit machine again.
+    await start_machine(ops_test, primary)
+
+    # Wait for the unit to be ready again. Some errors in the start hook may happen due to
+    # rebooting the unit machine in the middle of a hook (what is needed when the issue from
+    # https://bugs.launchpad.net/juju/+bug/1999758 happens).
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
+    )
+
+    # Create a role and list the available roles later to check that the new one is there.
+    role_name = "User2"
+    try:
+        run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
+    except HTTPError:
+        pass
+
+    # Trigger a switchover.
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    switchover(ops_test, primary)
+
+    # Await for a new primary to be elected.
+    await primary_changed(ops_test, primary)
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+
+    # Stop the primary unit machine.
+    await stop_machine(ops_test, primary)
+
+    # Await for a new primary to be elected.
+    await primary_changed(ops_test, primary)
+
+    # Start the former primary unit machine again.
+    await start_machine(ops_test, primary)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
+    )
+
+    # Create a role and list the available roles later to check that the new one is there.
+    role_name = "User3"
+    try:
+        run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
+    except HTTPError:
+        pass
+
+    # # Remove the applications from the bundle.
+    # await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
+    # await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
+    # await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
+    #
+    # # Remove the PostgreSQL application.
+    # await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
