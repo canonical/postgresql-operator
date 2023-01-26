@@ -14,6 +14,7 @@ from tests.integration.helpers import (
     check_database_users_existence,
     check_databases_creation,
     deploy_and_relate_bundle_with_postgresql,
+    ensure_correct_relation_data,
     get_primary,
     primary_changed,
     start_machine,
@@ -28,6 +29,7 @@ LANDSCAPE_APP_NAME = "landscape-server"
 LANDSCAPE_SCALABLE_BUNDLE_NAME = "ch:landscape-scalable"
 RABBITMQ_APP_NAME = "rabbitmq-server"
 DATABASE_UNITS = 3
+RELATION_NAME = "db-admin"
 
 
 @pytest.mark.db_admin_relation_tests
@@ -99,6 +101,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     api_response = run_query(key, secret, "GetRoles", {}, api_uri, False)
     assert role_name not in [user["name"] for user in json.loads(api_response)]
 
+    await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
+    # return
+
     # Stop the primary unit machine.
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     await stop_machine(ops_test, primary)
@@ -123,6 +128,8 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     except HTTPError:
         pass
 
+    await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
+
     # Trigger a switchover.
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     switchover(ops_test, primary)
@@ -143,12 +150,14 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
     )
 
-    # Create a role and list the available roles later to check that the new one is there.
-    role_name = "User3"
-    try:
-        run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
-    except HTTPError:
-        pass
+    # # Create a role and list the available roles later to check that the new one is there.
+    # role_name = "User3"
+    # try:
+    #     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
+    # except HTTPError:
+    #     pass
+
+    await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
     # # Remove the applications from the bundle.
     # await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)

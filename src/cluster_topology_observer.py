@@ -1,6 +1,8 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+"""Cluster topology changes observer."""
+
 import logging
 import os
 import signal
@@ -21,26 +23,26 @@ LOG_FILE_PATH = "/var/log/cluster_topology_observer.log"
 
 
 class ClusterTopologyChangeEvent(EventBase):
-    """A custom event for metrics endpoint changes."""
+    """A custom event for cluster topology changes."""
 
 
 class ClusterTopologyChangeCharmEvents(CharmEvents):
-    """A CharmEvents extension for metrics endpoint changes.
+    """A CharmEvents extension for cluster topology changes.
 
-    Includes :class:`MetricsEndpointChangeEvent` in those that can be handled.
+    Includes :class:`ClusterTopologyChangeEvent` in those that can be handled.
     """
 
     cluster_topology_change = EventSource(ClusterTopologyChangeEvent)
 
 
 class ClusterTopologyObserver(Object):
-    """Observes changing metrics endpoints in the cluster.
+    """Observes changing topology in the cluster.
 
-    Observed endpoint changes cause :class"`MetricsEndpointChangeEvent` to be emitted.
+    Observed cluster topology changes cause :class"`ClusterTopologyChangeEvent` to be emitted.
     """
 
     def __init__(self, charm: CharmBase):
-        """Constructor for MetricsEndpointObserver.
+        """Constructor for ClusterTopologyObserver.
 
         Args:
             charm: the charm that is instantiating the library.
@@ -51,7 +53,7 @@ class ClusterTopologyObserver(Object):
         self._observer_pid = 0
 
     def start_observer(self):
-        """Start the metrics endpoint observer running in a new process."""
+        """Start the cluster topology observer running in a new process."""
         self.stop_observer()
 
         logging.info("Starting cluster topology observer process")
@@ -78,7 +80,7 @@ class ClusterTopologyObserver(Object):
         ).pid
 
         self._observer_pid = pid
-        logging.info("Started metrics endopint observer process with PID {}".format(pid))
+        logging.info("Started cluster topology observer process with PID {}".format(pid))
 
     def stop_observer(self):
         """Stop the running observer process if we have previously started it."""
@@ -108,8 +110,7 @@ def dispatch(run_cmd, unit, charm_dir):
 def main():
     """Main watch and dispatch loop.
 
-    Watch the input k8s service names. When changes are detected, write the
-    observed data to the payload file, and dispatch the change event.
+    Watch the Patroni API cluster info. When changes are detected, dispatch the change event.
     """
     patroni_url, verify, run_cmd, unit, charm_dir = sys.argv[1:]
 

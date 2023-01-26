@@ -134,6 +134,8 @@ class DbProvides(Object):
             # created in a previous relation changed event.
             user = f"relation-{event.relation.id}"
             password = unit_relation_databag.get("password", new_password())
+            self.charm.set_secret("app", user, password)
+            self.charm.set_secret("app", f"{user}-database", database)
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
             postgresql_version = self.charm.postgresql.get_postgresql_version()
@@ -238,6 +240,8 @@ class DbProvides(Object):
         # Delete the user.
         user = f"relation-{event.relation.id}"
         try:
+            self.charm.set_secret("app", user)
+            self.charm.set_secret("app", f"{user}-database")
             self.charm.postgresql.delete_user(user)
         except PostgreSQLDeleteUserError as e:
             logger.exception(e)
@@ -259,10 +263,8 @@ class DbProvides(Object):
         # if this is triggered by another type of event.
         relations = [event.relation] if event else self.model.relations[self.relation_name]
 
-        if not self.charm.unit.is_leader():
-            for relation in relations:
-                relation.data[self.charm.unit].clear()
-            return
+        primary_unit = self.charm._patroni.get_primary(unit_name_pattern=True)
+        is_replica = self.charm.unit.name != primary_unit
 
         # List the replicas endpoints.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
@@ -271,9 +273,9 @@ class DbProvides(Object):
             # Retrieve some data from the relation.
             unit_relation_databag = relation.data[self.charm.unit]
             application_relation_databag = relation.data[self.charm.app]
-            database = application_relation_databag.get("database")
-            user = application_relation_databag.get("user")
-            password = application_relation_databag.get("password")
+            user = f"relation-{relation.id}"
+            password = self.charm.get_secret("app", user)
+            database = self.charm.get_secret("app", f"{user}-database")
 
             # If the relation data is not complete, the relations was not initialised yet.
             if not database or not user or not password:
@@ -317,8 +319,14 @@ class DbProvides(Object):
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
             }
-            unit_relation_databag.update(data)
-            application_relation_databag.update(data)
+
+            if is_replica:
+                relation.data[self.charm.unit].clear()
+            else:
+                unit_relation_databag.update(data)
+
+            if self.charm.unit.is_leader():
+                application_relation_databag.update(data)
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
         """Build the list of allowed subnets as in the legacy charm."""

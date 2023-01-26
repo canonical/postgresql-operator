@@ -84,8 +84,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self._postgresql_service = "postgresql"
 
-        # self.on.define_event("monitor_cluster_members", MonitorClusterMembersEvent)
-        # self.framework.observe(self.on.monitor_cluster_members, self._on_monitor_cluster_members)
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -525,34 +523,9 @@ class PostgresqlOperatorCharm(CharmBase):
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
-    # def _schedule_monitor_cluster_members_event(self):
-    #     logger.error("called _schedule_monitor_cluster_members_event")
-    #     command = "sleep 10; juju-run JUJU_DISPATCH_PATH=hooks/monitor_cluster_members ./dispatch"
-    #     env = os.environ.copy()
-    #     if "JUJU_CONTEXT_ID" in env:
-    #         env.pop("JUJU_CONTEXT_ID")
-    #     env["JUJU_HOOK_NAME"] = "start"
-    #     logger.error(f"env: {env}")
-    #     proc = subprocess.Popen(command, env=env, shell=True)
-    #     logger.error(f"pid: {proc.pid}")
-    #
-    # def _on_monitor_cluster_members(self, _):
-    #     logger.error("called _on_monitor_cluster_members!!!!")
-    #     if not self.unit.is_leader():
-    #         return
-    #
-    #     if "cluster_initialised" not in self._peers.data[self.app]:
-    #         logger.error("Early exit _on_monitor_cluster_members: Cluster not initialized")
-    #         self._schedule_monitor_cluster_members_event()
-    #         return
-    #
-    #     self.postgresql_client_relation.update_endpoints()
-    #     self.legacy_db_relation.update_endpoints()
-    #     self.legacy_db_admin_relation.update_endpoints()
-    #     logger.error("calling _on_monitor_cluster_members again!!!!")
-    #     self._schedule_monitor_cluster_members_event()
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
+        logger.info("Cluster topology changed")
         self._update_relation_endpoints()
         self._update_certificate()
 
@@ -704,20 +677,6 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        try:
-            primary = self._patroni.get_primary()
-            logger.error(f"primary: {primary}")
-            if primary is None:
-                logger.error("Deferring on_start: awaiting for primary to be elected1")
-                self.unit.status = WaitingStatus("awaiting for primary to be elected")
-                event.defer()
-                return
-        except RetryError:
-            logger.error("Deferring on_start: awaiting for primary to be elected1")
-            self.unit.status = WaitingStatus("awaiting for primary to be elected")
-            event.defer()
-            return
-
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
@@ -734,7 +693,10 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
-        # self._schedule_monitor_cluster_members_event()
+
+        # Clear unit data if this unit became a replica after a failover/switchover.
+        self._update_relation_endpoints()
+
         self.unit.status = ActiveStatus()
 
     def _start_replica(self, event) -> None:
@@ -745,7 +707,7 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # Clear unit data.
+        # Clear unit data if this unit is still replica.
         self._update_relation_endpoints()
 
         # Member already started, so we can set an ActiveStatus.

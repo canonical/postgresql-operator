@@ -36,7 +36,8 @@ async def build_connection_string(
     application_name: str,
     relation_name: str,
     read_only_endpoint: bool = False,
-) -> str:
+    remote_unit_name: str = None,
+) -> Optional[str]:
     """Returns a PostgreSQL connection string.
 
     Args:
@@ -45,6 +46,8 @@ async def build_connection_string(
         relation_name: name of the relation to get connection data from
         read_only_endpoint: whether to choose the read-only endpoint
             instead of the read/write endpoint
+        remote_unit_name: Optional remote unit name used to retrieve
+            unit data instead of application data
 
     Returns:
         a PostgreSQL connection string
@@ -54,14 +57,22 @@ async def build_connection_string(
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
+    # print(f"data: {data}")
     # Filter the data based on the relation name.
-    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
+    relation_data = [
+        v for v in data[unit_name]["relation-info"] if v["related-endpoint"] == relation_name
+    ]
     if len(relation_data) == 0:
         raise ValueError(
             f"no relation data could be grabbed on relation with endpoint {relation_name}"
         )
-    data = relation_data[0]["application-data"]
+    if remote_unit_name:
+        data = relation_data[0]["related-units"][remote_unit_name]["data"]
+    else:
+        data = relation_data[0]["application-data"]
     if read_only_endpoint:
+        if data.get("standbys") is None:
+            return None
         return data.get("standbys").split(",")[0]
     else:
         return data.get("master")
@@ -340,6 +351,34 @@ def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
         json={"postgresql": {"parameters": {"log_connections": True}}},
         verify=False,
     )
+
+
+async def ensure_correct_relation_data(
+    ops_test: OpsTest, database_units: int, app_name: str, relation_name: str
+) -> None:
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    print(f"primary 0: {primary}")
+    for unit_number in range(database_units):
+        unit_name = f"{DATABASE_APP_NAME}/{unit_number}"
+        primary_connection_string = await build_connection_string(
+            ops_test, app_name, relation_name, remote_unit_name=unit_name
+        )
+        print(f"primary_connection_string 0: {primary_connection_string}")
+        replica_connection_string = await build_connection_string(
+            ops_test,
+            app_name,
+            relation_name,
+            read_only_endpoint=True,
+            remote_unit_name=unit_name,
+        )
+        print(f"replica_connection_string 0: {replica_connection_string}")
+        if unit_name == primary:
+            unit_ip = get_unit_address(ops_test, unit_name)
+            assert unit_ip in primary_connection_string
+            assert unit_ip not in replica_connection_string
+        else:
+            assert not primary_connection_string
+            assert not replica_connection_string
 
 
 async def execute_query_on_unit(
