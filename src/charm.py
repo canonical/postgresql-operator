@@ -327,11 +327,6 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # If the unit is not the leader, just set an ActiveStatus.
-        if not self.unit.is_leader():
-            self.unit.status = ActiveStatus()
-            return
-
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.

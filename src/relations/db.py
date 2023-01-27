@@ -321,9 +321,11 @@ class DbProvides(Object):
             }
 
             if is_replica:
-                relation.data[self.charm.unit].clear()
+                unit_relation_databag.clear()
+                self.charm._peers.data[self.charm.unit].update({"replica": "True"})
             else:
                 unit_relation_databag.update(data)
+                self.charm._peers.data[self.charm.unit].update({"replica": ""})
 
             if self.charm.unit.is_leader():
                 application_relation_databag.update(data)

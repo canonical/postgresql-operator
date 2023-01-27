@@ -90,6 +90,10 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     haproxy_unit = ops_test.model.applications[HAPROXY_APP_NAME].units[0]
     api_uri = f"https://{haproxy_unit.public_address}/api/"
 
+    print(f"api_uri: {api_uri}")
+    print(f"key: {key}")
+    print(f"secret: {secret}")
+
     # Create a role and list the available roles later to check that the new one is there.
     role_name = "User1"
     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
@@ -102,9 +106,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     assert role_name not in [user["name"] for user in json.loads(api_response)]
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
-    # return
 
     # Stop the primary unit machine.
+    print("restarting primary")
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     await stop_machine(ops_test, primary)
 
@@ -125,12 +129,13 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     role_name = "User2"
     try:
         run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
-    except HTTPError:
-        pass
+    except HTTPError as e:
+        assert False, f"error when trying to create role on Landscape: {e}"
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
     # Trigger a switchover.
+    print("triggering a switchover")
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     switchover(ops_test, primary)
 
@@ -150,12 +155,12 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
     )
 
-    # # Create a role and list the available roles later to check that the new one is there.
-    # role_name = "User3"
-    # try:
-    #     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
-    # except HTTPError:
-    #     pass
+    # Create a role and list the available roles later to check that the new one is there.
+    role_name = "User3"
+    try:
+        run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
+    except HTTPError as e:
+        assert False, f"error when trying to create role on Landscape: {e}"
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
