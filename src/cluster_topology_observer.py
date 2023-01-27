@@ -13,6 +13,7 @@ from time import sleep
 import requests
 from ops.charm import CharmBase, CharmEvents
 from ops.framework import EventBase, EventSource, Object
+from ops.model import ActiveStatus
 
 from constants import API_REQUEST_TIMEOUT, PATRONI_CLUSTER_STATUS_ENDPOINT
 
@@ -50,11 +51,15 @@ class ClusterTopologyObserver(Object):
         super().__init__(charm, "cluster-topology-observer")
 
         self._charm = charm
-        self._observer_pid = 0
 
     def start_observer(self):
         """Start the cluster topology observer running in a new process."""
-        self.stop_observer()
+        if (
+            not isinstance(self._charm.unit.status, ActiveStatus)
+            or self._charm._peers is None
+            or "observer-pid" in self._charm._peers.data[self._charm.unit]
+        ):
+            return
 
         logging.info("Starting cluster topology observer process")
 
@@ -69,8 +74,8 @@ class ClusterTopologyObserver(Object):
                 "/usr/bin/python3",
                 "src/cluster_topology_observer.py",
                 self._charm._patroni._patroni_url,
-                self._charm._patroni.verify,
-                "/var/lib/juju/tools/{}/juju-run".format(self.unit_tag),
+                f"{self._charm._patroni.verify}",
+                "/usr/bin/juju-run",
                 self._charm.unit.name,
                 self._charm.charm_dir,
             ],
@@ -79,18 +84,24 @@ class ClusterTopologyObserver(Object):
             env=new_env,
         ).pid
 
-        self._observer_pid = pid
+        self._charm._peers.data[self._charm.unit].update({"observer-pid": f"{pid}"})
         logging.info("Started cluster topology observer process with PID {}".format(pid))
 
     def stop_observer(self):
         """Stop the running observer process if we have previously started it."""
-        if not self._observer_pid:
+        if (
+            self._charm._peers is None
+            or "observer-pid" not in self._charm._peers.data[self._charm.unit]
+        ):
             return
 
+        observer_pid = int(self._charm._peers.data[self._charm.unit].get("observer-pid"))
+
         try:
-            os.kill(self._observer_pid, signal.SIGINT)
+            os.kill(observer_pid, signal.SIGINT)
             msg = "Stopped running cluster topology observer process with PID {}"
-            logging.info(msg.format(self._observer_pid))
+            logging.info(msg.format(observer_pid))
+            self._charm._peers.data[self._charm.unit].update({"observer-pid": ""})
         except OSError:
             pass
 
@@ -127,6 +138,7 @@ def main():
         if not previous_cluster_topology:
             previous_cluster_topology = current_cluster_topology
         elif current_cluster_topology != previous_cluster_topology:
+            previous_cluster_topology = current_cluster_topology
             dispatch(run_cmd, unit, charm_dir)
         sleep(10)
 

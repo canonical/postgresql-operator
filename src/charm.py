@@ -108,6 +108,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
+        self._observer.start_observer()
 
     @property
     def app_peer_data(self) -> Dict:

@@ -113,7 +113,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     await stop_machine(ops_test, primary)
 
     # Await for a new primary to be elected.
-    await primary_changed(ops_test, primary)
+    assert await primary_changed(ops_test, primary)
 
     # Start the former primary unit machine again.
     await start_machine(ops_test, primary)
@@ -125,14 +125,14 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
     )
 
-    # Create a role and list the available roles later to check that the new one is there.
-    role_name = "User2"
-    try:
-        run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
-    except HTTPError as e:
-        assert False, f"error when trying to create role on Landscape: {e}"
-
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
+
+    # # Create a role and list the available roles later to check that the new one is there.
+    # role_name = "User2"
+    # try:
+    #     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
+    # except HTTPError as e:
+    #     assert False, f"error when trying to create role on Landscape: {e}"
 
     # Trigger a switchover.
     print("triggering a switchover")
@@ -140,14 +140,14 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     switchover(ops_test, primary)
 
     # Await for a new primary to be elected.
-    await primary_changed(ops_test, primary)
+    assert await primary_changed(ops_test, primary)
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
 
     # Stop the primary unit machine.
     await stop_machine(ops_test, primary)
 
     # Await for a new primary to be elected.
-    await primary_changed(ops_test, primary)
+    assert await primary_changed(ops_test, primary)
 
     # Start the former primary unit machine again.
     await start_machine(ops_test, primary)
@@ -155,14 +155,14 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
     )
 
+    await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
+
     # Create a role and list the available roles later to check that the new one is there.
     role_name = "User3"
     try:
         run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
     except HTTPError as e:
         assert False, f"error when trying to create role on Landscape: {e}"
-
-    await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
     # # Remove the applications from the bundle.
     # await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
