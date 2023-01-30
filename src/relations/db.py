@@ -134,8 +134,12 @@ class DbProvides(Object):
             # created in a previous relation changed event.
             user = f"relation-{event.relation.id}"
             password = unit_relation_databag.get("password", new_password())
+
+            # Store the user, password and database name in the secret store to be accessible by
+            # non-leader units when the cluster topology changes.
             self.charm.set_secret("app", user, password)
             self.charm.set_secret("app", f"{user}-database", database)
+
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
             postgresql_version = self.charm.postgresql.get_postgresql_version()
@@ -320,9 +324,12 @@ class DbProvides(Object):
                 "state": self._get_state(),
             }
 
+            # Clear the unit data in the replica databag to keep the same behavior we have
+            # when the relation is created (only one unit has the databag filled).
             if is_replica:
                 unit_relation_databag.clear()
                 self.charm._peers.data[self.charm.unit].update({"replica": "True"})
+            # Set the data only in the primary unit databag.
             else:
                 unit_relation_databag.update(data)
                 self.charm._peers.data[self.charm.unit].update({"replica": ""})

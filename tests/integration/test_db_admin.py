@@ -90,10 +90,6 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     haproxy_unit = ops_test.model.applications[HAPROXY_APP_NAME].units[0]
     api_uri = f"https://{haproxy_unit.public_address}/api/"
 
-    print(f"api_uri: {api_uri}")
-    print(f"key: {key}")
-    print(f"secret: {secret}")
-
     # Create a role and list the available roles later to check that the new one is there.
     role_name = "User1"
     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
@@ -108,7 +104,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
     # Stop the primary unit machine.
-    print("restarting primary")
+    logger.info("restarting primary")
     former_primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     await stop_machine(ops_test, former_primary)
 
@@ -127,15 +123,8 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
-    # # Create a role and list the available roles later to check that the new one is there.
-    # role_name = "User2"
-    # try:
-    #     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
-    # except HTTPError as e:
-    #     assert False, f"error when trying to create role on Landscape: {e}"
-
     # Trigger a switchover.
-    print("triggering a switchover")
+    logger.info("triggering a switchover")
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     switchover(ops_test, primary, former_primary)
 
@@ -144,22 +133,10 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     assert primary == former_primary
 
-    # # Stop the primary unit machine.
-    # await stop_machine(ops_test, primary)
-    #
-    # # Await for a new primary to be elected.
-    # assert await primary_changed(ops_test, primary)
-    #
-    # # Start the former primary unit machine again.
-    # await start_machine(ops_test, primary)
-    # await ops_test.model.wait_for_idle(
-    #     apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
-    # )
-
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
     # Create a role and list the available roles later to check that the new one is there.
-    role_name = "User3"
+    role_name = "User2"
     try:
         run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
     except HTTPError as e:

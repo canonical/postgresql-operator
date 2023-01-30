@@ -70,10 +70,6 @@ logger = logging.getLogger(__name__)
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
-class MonitorClusterMembersEvent(EventBase):
-    """And event that is triggered periodically to monitor cluster members."""
-
-
 class PostgresqlOperatorCharm(CharmBase):
     """Charmed Operator for the PostgreSQL database."""
 

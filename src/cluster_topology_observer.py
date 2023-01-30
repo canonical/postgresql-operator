@@ -135,11 +135,17 @@ def main():
         current_cluster_topology = {
             member["name"]: member["role"] for member in cluster_status.json()["members"]
         }
+
+        # If it's the first time the cluster topology was retrieved, then store it and use
+        # it for subsequent checks.
         if not previous_cluster_topology:
             previous_cluster_topology = current_cluster_topology
+        # If the cluster topology changed, dispatch a charm event to handle this change.
         elif current_cluster_topology != previous_cluster_topology:
             previous_cluster_topology = current_cluster_topology
             dispatch(run_cmd, unit, charm_dir)
+
+        # Wait some time before checking again for a cluster topology change.
         sleep(10)
 
 

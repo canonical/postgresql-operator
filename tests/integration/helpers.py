@@ -57,7 +57,6 @@ async def build_connection_string(
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
-    # print(f"data: {data}")
     # Filter the data based on the relation name.
     relation_data = [
         v for v in data[unit_name]["relation-info"] if v["related-endpoint"] == relation_name
@@ -359,8 +358,8 @@ def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
 async def ensure_correct_relation_data(
     ops_test: OpsTest, database_units: int, app_name: str, relation_name: str
 ) -> None:
+    """Asserts that the correct database relation data is shared from the right unit to the app."""
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    print(f"primary 0: {primary}")
     for unit_number in range(database_units):
         for attempt in Retrying(
             stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -370,7 +369,6 @@ async def ensure_correct_relation_data(
                 primary_connection_string = await build_connection_string(
                     ops_test, app_name, relation_name, remote_unit_name=unit_name
                 )
-                print(f"primary_connection_string 0: {primary_connection_string}")
                 replica_connection_string = await build_connection_string(
                     ops_test,
                     app_name,
@@ -378,15 +376,22 @@ async def ensure_correct_relation_data(
                     read_only_endpoint=True,
                     remote_unit_name=unit_name,
                 )
-                print(f"replica_connection_string 0: {replica_connection_string}")
                 if unit_name == primary:
                     unit_ip = get_unit_address(ops_test, unit_name)
                     host_parameter = f"host={unit_ip} "
-                    assert host_parameter in primary_connection_string
-                    assert host_parameter not in replica_connection_string
+                    assert (
+                        host_parameter in primary_connection_string
+                    ), f"{unit_name} is not the host of the primary connection string"
+                    assert (
+                        host_parameter not in replica_connection_string
+                    ), f"{unit_name} is the host of the replica connection string"
                 else:
-                    assert not primary_connection_string
-                    assert not replica_connection_string
+                    assert (
+                        not primary_connection_string
+                    ), f"{unit_name} is sharing a primary connection string"
+                    assert (
+                        not replica_connection_string
+                    ), f"{unit_name} is sharing a replica connection string"
 
 
 async def execute_query_on_unit(
@@ -712,9 +717,7 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
         the command output if it succeeds, otherwise raises an exception.
     """
     complete_command = f"run --unit {unit_name} -- {command}"
-    return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
-    print(f"stdout: {stdout}")
-    print(f"stdout: {stderr}")
+    return_code, stdout, _ = await ops_test.juju(*complete_command.split())
     if return_code != 0:
         raise Exception(
             "Expected command %s to succeed instead it failed: %s", command, return_code
@@ -786,8 +789,8 @@ async def start_machine(ops_test: OpsTest, unit_name: str) -> None:
         unit_name: The name of the unit to start the machine
     """
     machine = await get_machine_from_unit(ops_test, unit_name)
-    restart_machine_command = f"lxc restart {machine}"
-    subprocess.check_call(restart_machine_command.split())
+    start_machine_command = f"lxc start {machine}"
+    subprocess.check_call(start_machine_command.split())
 
 
 async def stop_machine(ops_test: OpsTest, unit_name: str) -> None:
@@ -798,8 +801,8 @@ async def stop_machine(ops_test: OpsTest, unit_name: str) -> None:
         unit_name: The name of the unit to stop the machine
     """
     machine = await get_machine_from_unit(ops_test, unit_name)
-    restart_machine_command = f"lxc restart {machine}"
-    subprocess.check_call(restart_machine_command.split())
+    stop_machine_command = f"lxc stop {machine}"
+    subprocess.check_call(stop_machine_command.split())
 
 
 def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -> None:
