@@ -3,11 +3,12 @@
 # See LICENSE file for licensing details.
 import itertools
 import json
+import subprocess
 import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 import psycopg2
 import requests
@@ -18,9 +19,12 @@ from tenacity import (
     RetryError,
     Retrying,
     retry,
+    retry_if_exception,
     retry_if_result,
     stop_after_attempt,
+    stop_after_delay,
     wait_exponential,
+    wait_fixed,
 )
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -61,6 +65,24 @@ async def build_connection_string(
         return data.get("standbys").split(",")[0]
     else:
         return data.get("master")
+
+
+def change_master_start_timeout(ops_test: OpsTest, unit_name: str, seconds: Optional[int]) -> None:
+    """Change master start timeout configuration.
+
+    Args:
+        ops_test: ops_test instance.
+        unit_name: the unit used to set the configuration.
+        seconds: number of seconds to set in master_start_timeout configuration.
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            unit_ip = get_unit_address(ops_test, unit_name)
+            requests.patch(
+                f"https://{unit_ip}:8008/config",
+                json={"master_start_timeout": seconds},
+                verify=False,
+            )
 
 
 async def check_database_users_existence(
@@ -297,12 +319,27 @@ async def deploy_and_relate_bundle_with_postgresql(
     # Relate application to PostgreSQL.
     relation = await ops_test.model.relate(f"{application_name}", f"{DATABASE_APP_NAME}:db-admin")
     await ops_test.model.wait_for_idle(
-        apps=[application_name],
+        apps=[application_name, DATABASE_APP_NAME],
         status="active",
         timeout=1000,
     )
 
     return relation.id
+
+
+def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
+    """Turn on the log of all connections made to a PostgreSQL instance.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to turn on the connection logs
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    requests.patch(
+        f"https://{unit_address}:8008/config",
+        json={"postgresql": {"parameters": {"log_connections": True}}},
+        verify=False,
+    )
 
 
 async def execute_query_on_unit(
@@ -398,6 +435,11 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
     return result.results[f"{username}-password"]
 
 
+@retry(
+    retry=retry_if_exception(KeyError),
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+)
 async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
     """Get the primary unit.
 
@@ -558,20 +600,62 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     return False
 
 
-async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -> None:
+@retry(
+    retry=retry_if_result(lambda x: not x),
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+)
+async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
+    """Checks whether the primary unit has changed.
+
+    Args:
+        ops_test: The ops test framework instance
+        old_primary: The name of the unit that was the primary before.
+    """
+    other_unit = [
+        unit.name
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+        if unit.name != old_primary
+    ][0]
+    primary = await get_primary(ops_test, other_unit)
+    return primary != old_primary
+
+
+async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
+    """Restart the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to restart the machine
+    """
+    hostname_command = f"run --unit {unit_name} -- hostname"
+    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
+    if return_code != 0:
+        raise Exception("Failed to get the unit machine name: %s", return_code)
+    restart_machine_command = f"lxc restart {raw_hostname.strip()}"
+    subprocess.check_call(restart_machine_command.split())
+
+
+async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -> str:
     """Run a command on a specific unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit to run the command on
         command: The command to run
+
+    Returns:
+        the command output if it succeeds, otherwise raises an exception.
     """
     complete_command = f"run --unit {unit_name} -- {command}"
-    return_code, stdout, _ = await ops_test.juju(*complete_command.split())
+    return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
+    print(f"stdout: {stdout}")
+    print(f"stdout: {stderr}")
     if return_code != 0:
         raise Exception(
             "Expected command %s to succeed instead it failed: %s", command, return_code
         )
+    return stdout
 
 
 async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:

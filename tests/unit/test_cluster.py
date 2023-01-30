@@ -3,13 +3,14 @@
 
 import unittest
 from unittest import mock
-from unittest.mock import mock_open, patch
+from unittest.mock import Mock, PropertyMock, mock_open, patch
 
 import requests as requests
 import tenacity as tenacity
 from jinja2 import Template
 
 from cluster import Patroni
+from constants import REWIND_USER
 from lib.charms.operator_libs_linux.v0.apt import DebianPackage, PackageState
 from tests.helpers import STORAGE_PATH
 
@@ -27,8 +28,8 @@ def mocked_requests_get(*args, **kwargs):
 
     data = {
         "http://server1/cluster": {
-            "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader"}]
-        },
+            "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
+        }
     }
     if args[0] in data:
         return MockResponse(data[args[0]])
@@ -50,6 +51,7 @@ class TestCharm(unittest.TestCase):
             self.peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
+            "fake-rewind-password",
             False,
         )
 
@@ -197,6 +199,7 @@ class TestCharm(unittest.TestCase):
         scope = "postgresql"
         superuser_password = "fake-superuser-password"
         replication_password = "fake-replication-password"
+        rewind_password = "fake-rewind-password"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
@@ -210,6 +213,8 @@ class TestCharm(unittest.TestCase):
             superuser="operator",
             superuser_password=superuser_password,
             replication_password=replication_password,
+            rewind_user=REWIND_USER,
+            rewind_password=rewind_password,
             version=self.patroni._get_postgresql_version(),
         )
 
@@ -264,16 +269,46 @@ class TestCharm(unittest.TestCase):
 
     @patch("cluster.service_start")
     @patch("cluster.service_running")
+    @patch("cluster.service_resume")
     @patch("charm.Patroni._create_directory")
-    def test_start_patroni(self, _create_directory, _service_running, _service_start):
+    def test_start_patroni(
+        self, _create_directory, _service_resume, _service_running, _service_start
+    ):
         _service_running.side_effect = [True, False]
 
         # Test a success scenario.
         success = self.patroni.start_patroni()
         _service_start.assert_called_with(PATRONI_SERVICE)
+        _service_resume.assert_called_with(PATRONI_SERVICE)
         _service_running.assert_called_with(PATRONI_SERVICE)
         assert success
 
         # Test a fail scenario.
         success = self.patroni.start_patroni()
         assert not success
+
+    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
+    def test_member_replication_lag(self, _patroni_url, _get):
+        # Test when the cluster member has a value for the lag field.
+        _patroni_url.return_value = "http://server1"
+        lag = self.patroni.member_replication_lag
+        assert lag == "1"
+
+        # Test when the cluster member doesn't have a value for the lag field.
+        self.patroni.member_name = "postgresql-1"
+        lag = self.patroni.member_replication_lag
+        assert lag == "unknown"
+
+        # Test when the API call fails.
+        _patroni_url.return_value = "http://server2"
+        with patch.object(tenacity.Retrying, "iter", Mock(side_effect=tenacity.RetryError(None))):
+            lag = self.patroni.member_replication_lag
+            assert lag == "unknown"
+
+    @patch("requests.post")
+    def test_reinitialize_postgresql(self, _post):
+        self.patroni.reinitialize_postgresql()
+        _post.assert_called_once_with(
+            f"http://{self.patroni.unit_ip}:8008/reinitialize", verify=True
+        )
