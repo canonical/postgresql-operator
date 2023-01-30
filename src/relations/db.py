@@ -240,8 +240,8 @@ class DbProvides(Object):
         # Delete the user.
         user = f"relation-{event.relation.id}"
         try:
-            self.charm.set_secret("app", user)
-            self.charm.set_secret("app", f"{user}-database")
+            self.charm.set_secret("app", user, None)
+            self.charm.set_secret("app", f"{user}-database", None)
             self.charm.postgresql.delete_user(user)
         except PostgreSQLDeleteUserError as e:
             logger.exception(e)

@@ -287,7 +287,10 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.members_ips",
         new_callable=PropertyMock,
     )
-    def test_update_endpoints_with_event(self, _members_ips, _primary_endpoint, _get_state):
+    @patch("charm.Patroni.get_primary", new_callable=PropertyMock)
+    def test_update_endpoints_with_event(
+        self, _get_primary, _members_ips, _primary_endpoint, _get_state
+    ):
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
         _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
