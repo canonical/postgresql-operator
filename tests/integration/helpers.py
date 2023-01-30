@@ -781,27 +781,25 @@ async def set_password(
     return result.results
 
 
-async def start_machine(ops_test: OpsTest, unit_name: str) -> None:
+async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
     """Start the machine where a unit run on.
 
     Args:
         ops_test: The ops test framework instance
-        unit_name: The name of the unit to start the machine
+        machine_name: The name of the machine to start
     """
-    machine = await get_machine_from_unit(ops_test, unit_name)
-    start_machine_command = f"lxc start {machine}"
+    start_machine_command = f"lxc start {machine_name}"
     subprocess.check_call(start_machine_command.split())
 
 
-async def stop_machine(ops_test: OpsTest, unit_name: str) -> None:
+async def stop_machine(ops_test: OpsTest, machine_name: str) -> None:
     """Stop the machine where a unit run on.
 
     Args:
         ops_test: The ops test framework instance
-        unit_name: The name of the unit to stop the machine
+        machine_name: The name of the machine to stop
     """
-    machine = await get_machine_from_unit(ops_test, unit_name)
-    stop_machine_command = f"lxc stop {machine}"
+    stop_machine_command = f"lxc stop {machine_name}"
     subprocess.check_call(stop_machine_command.split())
 
 

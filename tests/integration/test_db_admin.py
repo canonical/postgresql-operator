@@ -15,6 +15,7 @@ from tests.integration.helpers import (
     check_databases_creation,
     deploy_and_relate_bundle_with_postgresql,
     ensure_correct_relation_data,
+    get_machine_from_unit,
     get_primary,
     primary_changed,
     start_machine,
@@ -106,13 +107,14 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # Stop the primary unit machine.
     logger.info("restarting primary")
     former_primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    await stop_machine(ops_test, former_primary)
+    former_primary_machine = await get_machine_from_unit(ops_test, former_primary)
+    await stop_machine(ops_test, former_primary_machine)
 
     # Await for a new primary to be elected.
     assert await primary_changed(ops_test, former_primary)
 
     # Start the former primary unit machine again.
-    await start_machine(ops_test, former_primary)
+    await start_machine(ops_test, former_primary_machine)
 
     # Wait for the unit to be ready again. Some errors in the start hook may happen due to
     # rebooting the unit machine in the middle of a hook (what is needed when the issue from
