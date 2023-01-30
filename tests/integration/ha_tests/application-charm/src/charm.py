@@ -94,10 +94,12 @@ class ApplicationCharm(CharmBase):
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
         self._stop_continuous_writes()
-        with psycopg2.connect(
-            self._connection_string
-        ) as connection, connection.cursor() as cursor:
-            cursor.execute("DROP TABLE continuous_writes;")
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                with psycopg2.connect(
+                    self._connection_string
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute("DROP TABLE continuous_writes;")
         connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
