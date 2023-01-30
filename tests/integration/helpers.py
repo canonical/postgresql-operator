@@ -362,26 +362,31 @@ async def ensure_correct_relation_data(
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     print(f"primary 0: {primary}")
     for unit_number in range(database_units):
-        unit_name = f"{DATABASE_APP_NAME}/{unit_number}"
-        primary_connection_string = await build_connection_string(
-            ops_test, app_name, relation_name, remote_unit_name=unit_name
-        )
-        print(f"primary_connection_string 0: {primary_connection_string}")
-        replica_connection_string = await build_connection_string(
-            ops_test,
-            app_name,
-            relation_name,
-            read_only_endpoint=True,
-            remote_unit_name=unit_name,
-        )
-        print(f"replica_connection_string 0: {replica_connection_string}")
-        if unit_name == primary:
-            unit_ip = get_unit_address(ops_test, unit_name)
-            assert unit_ip in primary_connection_string
-            assert unit_ip not in replica_connection_string
-        else:
-            assert not primary_connection_string
-            assert not replica_connection_string
+        for attempt in Retrying(
+            stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt:
+                unit_name = f"{DATABASE_APP_NAME}/{unit_number}"
+                primary_connection_string = await build_connection_string(
+                    ops_test, app_name, relation_name, remote_unit_name=unit_name
+                )
+                print(f"primary_connection_string 0: {primary_connection_string}")
+                replica_connection_string = await build_connection_string(
+                    ops_test,
+                    app_name,
+                    relation_name,
+                    read_only_endpoint=True,
+                    remote_unit_name=unit_name,
+                )
+                print(f"replica_connection_string 0: {replica_connection_string}")
+                if unit_name == primary:
+                    unit_ip = get_unit_address(ops_test, unit_name)
+                    host_parameter = f"host={unit_ip} "
+                    assert host_parameter in primary_connection_string
+                    assert host_parameter not in replica_connection_string
+                else:
+                    assert not primary_connection_string
+                    assert not replica_connection_string
 
 
 async def execute_query_on_unit(
