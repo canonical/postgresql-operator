@@ -12,25 +12,37 @@ import logging
 import os
 import signal
 import subprocess
-from typing import Optional
+from typing import Dict, Optional
 
 import psycopg2
 from charms.data_platform_libs.v0.database_requires import DatabaseRequires
 from ops.charm import ActionEvent, CharmBase
-from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus
+from ops.model import ActiveStatus, Relation
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 logger = logging.getLogger(__name__)
 
+PEER = "application-peers"
 LAST_WRITTEN_FILE = "/tmp/last_written_value"
+PROC_PID_KEY = "proc-pid"
 
 
 class ApplicationCharm(CharmBase):
     """Application charm that connects to PostgreSQL charm."""
 
-    _stored = StoredState()
+    @property
+    def _peers(self) -> Optional[Relation]:
+        """Retrieve the peer relation (`ops.model.Relation`)."""
+        return self.model.get_relation(PEER)
+
+    @property
+    def app_peer_data(self) -> Dict:
+        """Application peer relation data object."""
+        if self._peers is None:
+            return {}
+
+        return self._peers.data[self.app]
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -52,9 +64,6 @@ class ApplicationCharm(CharmBase):
         self.framework.observe(
             self.on.stop_continuous_writes_action, self._on_stop_continuous_writes_action
         )
-
-        # PID of the continuous writes OS process.
-        self._stored.set_default(continuous_writes_pid=None)
 
     @property
     def _connection_string(self) -> Optional[str]:
@@ -92,19 +101,17 @@ class ApplicationCharm(CharmBase):
         ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
             count = cursor.fetchone()[0]
-        connection.close()
         return count
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
         self._stop_continuous_writes()
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
                 with psycopg2.connect(
                     self._connection_string
                 ) as connection, connection.cursor() as cursor:
                     cursor.execute("DROP TABLE continuous_writes;")
-        connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
         """Start the continuous writes process."""
@@ -134,17 +141,17 @@ class ApplicationCharm(CharmBase):
         )
 
         # Store the continuous writes process ID to stop the process later.
-        self._stored.continuous_writes_pid = popen.pid
+        self.app_peer_data[PROC_PID_KEY] = str(popen.pid)
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stops continuous writes to PostgreSQL and returns the last written value."""
-        if self._stored.continuous_writes_pid is None:
+        if not self.app_peer_data.get(PROC_PID_KEY):
             return None
 
         # Stop the process.
-        os.kill(int(self._stored.continuous_writes_pid), signal.SIGTERM)
+        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGTERM)
 
-        self._stored.continuous_writes_pid = None
+        del self.app_peer_data[PROC_PID_KEY]
 
         # Return the max written value (or -1 if it was not possible to get that value).
         try:
