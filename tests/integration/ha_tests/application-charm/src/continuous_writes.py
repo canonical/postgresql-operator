@@ -2,9 +2,17 @@
 # See LICENSE file for licensing details.
 
 """This file is meant to run in the background continuously writing entries to PostgreSQL."""
+import signal
 import sys
 
 import psycopg2 as psycopg2
+
+run = True
+
+
+def sigterm_handler(_signo, _stack_frame):
+    global run
+    run = False
 
 
 def continuous_writes(connection_string: str, starting_number: int):
@@ -29,7 +37,7 @@ def continuous_writes(connection_string: str, starting_number: int):
         connection.close()
 
     # Continuously write the record to the database (incrementing it at each iteration).
-    while True:
+    while run:
         try:
             with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
                 connection.autocommit = True
@@ -53,6 +61,9 @@ def continuous_writes(connection_string: str, starting_number: int):
 
         write_value += 1
 
+    with open("/tmp/last_written_value", "w") as fd:
+        fd.write(str(write_value - 1))
+
 
 def main():
     connection_string = sys.argv[1]
@@ -61,4 +72,5 @@ def main():
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, sigterm_handler)
     main()

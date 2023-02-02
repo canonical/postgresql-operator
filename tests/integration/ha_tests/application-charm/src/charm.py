@@ -9,6 +9,8 @@ high availability of the PostgreSQL charm.
 """
 
 import logging
+import os
+import signal
 import subprocess
 from typing import Optional
 
@@ -21,6 +23,8 @@ from ops.model import ActiveStatus
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 logger = logging.getLogger(__name__)
+
+LAST_WRITTEN_FILE = "/tmp/last_written_value"
 
 
 class ApplicationCharm(CharmBase):
@@ -138,25 +142,18 @@ class ApplicationCharm(CharmBase):
             return None
 
         # Stop the process.
-        proc = subprocess.Popen(["pkill", "--signal", "SIGKILL", "-f", "src/continuous_writes.py"])
-
-        # Wait for process to be killed.
-        proc.communicate()
+        os.kill(int(self._stored.continuous_writes_pid), signal.SIGTERM)
 
         self._stored.continuous_writes_pid = None
 
         # Return the max written value (or -1 if it was not possible to get that value).
         try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5)):
                 with attempt:
-                    with psycopg2.connect(
-                        self._connection_string
-                    ) as connection, connection.cursor() as cursor:
-                        cursor.execute("SELECT MAX(number) FROM continuous_writes;")
-                        last_written_value = int(cursor.fetchone()[0])
-                    connection.close()
+                    with open(LAST_WRITTEN_FILE, "r") as fd:
+                        last_written_value = int(fd.read())
         except RetryError as e:
-            logger.exception(e)
+            logger.exception("Unable to query the database", exc_info=e)
             return -1
 
         return last_written_value
