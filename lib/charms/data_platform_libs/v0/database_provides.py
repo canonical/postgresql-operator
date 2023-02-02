@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-"""Relation provider side abstraction for database relation.
+"""[DEPRECATED] Relation provider side abstraction for database relation.
 
 This library is a uniform interface to a selection of common database
 metadata, with added custom events that add convenience to database management,
@@ -80,7 +80,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 logger = logging.getLogger(__name__)
 
