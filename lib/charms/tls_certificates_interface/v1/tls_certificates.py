@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+
 """Library for the tls-certificates relation.
 
 This library contains the Requires and Provides classes for handling the tls-certificates
@@ -126,6 +127,7 @@ Example:
 from charms.tls_certificates_interface.v1.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
+    CertificateRevokedEvent,
     TLSCertificatesRequiresV1,
     generate_csr,
     generate_private_key,
@@ -149,7 +151,10 @@ class ExampleRequirerCharm(CharmBase):
             self.certificates.on.certificate_available, self._on_certificate_available
         )
         self.framework.observe(
-            self.on.certificates.on.certificate_expiring, self._on_certificate_expiring
+            self.certificates.on.certificate_expiring, self._on_certificate_expiring
+        )
+        self.framework.observe(
+            self.certificates.on.certificate_revoked, self._on_certificate_revoked
         )
 
     def _on_install(self, event) -> None:
@@ -211,6 +216,30 @@ class ExampleRequirerCharm(CharmBase):
         )
         replicas_relation.data[self.app].update({"csr": new_csr.decode()})
 
+    def _on_certificate_revoked(self, event: CertificateRevokedEvent) -> None:
+        replicas_relation = self.model.get_relation("replicas")
+        if not replicas_relation:
+            self.unit.status = WaitingStatus("Waiting for peer relation to be created")
+            event.defer()
+            return
+        old_csr = replicas_relation.data[self.app].get("csr")
+        private_key_password = replicas_relation.data[self.app].get("private_key_password")
+        private_key = replicas_relation.data[self.app].get("private_key")
+        new_csr = generate_csr(
+            private_key=private_key.encode(),
+            private_key_password=private_key_password.encode(),
+            subject=self.cert_subject,
+        )
+        self.certificates.request_certificate_renewal(
+            old_certificate_signing_request=old_csr,
+            new_certificate_signing_request=new_csr,
+        )
+        replicas_relation.data[self.app].update({"csr": new_csr.decode()})
+        replicas_relation.data[self.app].pop("certificate")
+        replicas_relation.data[self.app].pop("ca")
+        replicas_relation.data[self.app].pop("chain")
+        self.unit.status = WaitingStatus("Waiting for new certificate")
+
 
 if __name__ == "__main__":
     main(ExampleRequirerCharm)
@@ -226,9 +255,11 @@ from ipaddress import IPv4Address
 from typing import Dict, List, Optional
 
 from cryptography import x509
+from cryptography.hazmat._oid import ExtensionOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
+from cryptography.x509.extensions import Extension, ExtensionNotFound
 from jsonschema import exceptions, validate  # type: ignore[import]
 from ops.charm import CharmBase, CharmEvents, RelationChangedEvent, UpdateStatusEvent
 from ops.framework import EventBase, EventSource, Handle, Object
@@ -241,7 +272,8 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 12
+
 
 REQUIRER_JSON_SCHEMA = {
     "$schema": "http://json-schema.org/draft-04/schema#",
@@ -281,7 +313,7 @@ PROVIDER_JSON_SCHEMA = {
     "type": "object",
     "title": "`tls_certificates` provider root schema",
     "description": "The `tls_certificates` root schema comprises the entire provider databag for this interface.",  # noqa: E501
-    "example": [
+    "examples": [
         {
             "certificates": [
                 {
@@ -293,7 +325,20 @@ PROVIDER_JSON_SCHEMA = {
                     "certificate": "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCFFPAOD7utDTsgFrm0vS4We18OcnKMA0GCSqGSIb3DQEBCwUAMCAx\nCzAJBgNVBAYTAlVTMREwDwYDVQQDDAh3aGF0ZXZlcjAeFw0yMjA3MjkyMTE5Mzha\nFw0yMzA3MjkyMTE5MzhaMBUxEzARBgNVBAMMCmJhbmFuYS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDVpcfcBOnFuyZG+A2WQzmaBI5NXgwTCfvE\neKciqRQXhzJdUkEg7eqwFrK3y9yjhoiB6q0WNAeR+nOdS/Cw7layRtGz5skOq7Aa\nN4FZHg0or30i7Rrx7afJcGJyLpxfK/OfLmJm5QEdLXV0DZp0L5vuhhEb1EUOrMaY\nGe4iwqTyg6D7fuBili9dBVn9IvNhYMVgtiqkWVLTW4ChE0LgES4oO3rQZgp4dtM5\nsp6KwHGO766UzwGnkKRizaqmLylfVusllWNPFfp6gEaxa45N70oqGUrvGSVHWeHf\nfvkhpWx+wOnu+2A5F/Yv3UNz2v4g7Vjt7V0tjL4KMV9YklpRjTh3AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAChjRzuba8zjQ7NYBVas89Oy7u++MlS8xWxh++yiUsV6\nWMk3ZemsPtXc1YmXorIQohtxLxzUPm2JhyzFzU/sOLmJQ1E/l+gtZHyRCwsb20fX\nmphuJsMVd7qv/GwEk9PBsk2uDqg4/Wix0Rx5lf95juJP7CPXQJl5FQauf3+LSz0y\nwF/j+4GqvrwsWr9hKOLmPdkyKkR6bHKtzzsxL9PM8GnElk2OpaPMMnzbL/vt2IAt\nxK01ZzPxCQCzVwHo5IJO5NR/fIyFbEPhxzG17QsRDOBR9fl9cOIvDeSO04vyZ+nz\n+kA2c3fNrZFAtpIlOOmFh8Q12rVL4sAjI5mVWnNEgvI=\n-----END CERTIFICATE-----\n",  # noqa: E501
                 }
             ]
-        }
+        },
+        {
+            "certificates": [
+                {
+                    "ca": "-----BEGIN CERTIFICATE-----\\nMIIDJTCCAg2gAwIBAgIUMsSK+4FGCjW6sL/EXMSxColmKw8wDQYJKoZIhvcNAQEL\\nBQAwIDELMAkGA1UEBhMCVVMxETAPBgNVBAMMCHdoYXRldmVyMB4XDTIyMDcyOTIx\\nMTgyN1oXDTIzMDcyOTIxMTgyN1owIDELMAkGA1UEBhMCVVMxETAPBgNVBAMMCHdo\\nYXRldmVyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA55N9DkgFWbJ/\\naqcdQhso7n1kFvt6j/fL1tJBvRubkiFMQJnZFtekfalN6FfRtA3jq+nx8o49e+7t\\nLCKT0xQ+wufXfOnxv6/if6HMhHTiCNPOCeztUgQ2+dfNwRhYYgB1P93wkUVjwudK\\n13qHTTZ6NtEF6EzOqhOCe6zxq6wrr422+ZqCvcggeQ5tW9xSd/8O1vNID/0MTKpy\\nET3drDtBfHmiUEIBR3T3tcy6QsIe4Rz/2sDinAcM3j7sG8uY6drh8jY3PWar9til\\nv2l4qDYSU8Qm5856AB1FVZRLRJkLxZYZNgreShAIYgEd0mcyI2EO/UvKxsIcxsXc\\nd45GhGpKkwIDAQABo1cwVTAfBgNVHQ4EGAQWBBRXBrXKh3p/aFdQjUcT/UcvICBL\\nODAhBgNVHSMEGjAYgBYEFFcGtcqHen9oV1CNRxP9Ry8gIEs4MA8GA1UdEwEB/wQF\\nMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAGmCEvcoFUrT9e133SHkgF/ZAgzeIziO\\nBjfAdU4fvAVTVfzaPm0yBnGqzcHyacCzbZjKQpaKVgc5e6IaqAQtf6cZJSCiJGhS\\nJYeosWrj3dahLOUAMrXRr8G/Ybcacoqc+osKaRa2p71cC3V6u2VvcHRV7HDFGJU7\\noijbdB+WhqET6Txe67rxZCJG9Ez3EOejBJBl2PJPpy7m1Ml4RR+E8YHNzB0lcBzc\\nEoiJKlDfKSO14E2CPDonnUoWBJWjEvJys3tbvKzsRj2fnLilytPFU0gH3cEjCopi\\nzFoWRdaRuNHYCqlBmso1JFDl8h4fMmglxGNKnKRar0WeGyxb4xXBGpI=\\n-----END CERTIFICATE-----\\n",  # noqa: E501
+                    "chain": [
+                        "-----BEGIN CERTIFICATE-----\\nMIIDJTCCAg2gAwIBAgIUMsSK+4FGCjW6sL/EXMSxColmKw8wDQYJKoZIhvcNAQEL\\nBQAwIDELMAkGA1UEBhMCVVMxETAPBgNVBAMMCHdoYXRldmVyMB4XDTIyMDcyOTIx\\nMTgyN1oXDTIzMDcyOTIxMTgyN1owIDELMAkGA1UEBhMCVVMxETAPBgNVBAMMCHdo\\nYXRldmVyMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEA55N9DkgFWbJ/\\naqcdQhso7n1kFvt6j/fL1tJBvRubkiFMQJnZFtekfalN6FfRtA3jq+nx8o49e+7t\\nLCKT0xQ+wufXfOnxv6/if6HMhHTiCNPOCeztUgQ2+dfNwRhYYgB1P93wkUVjwudK\\n13qHTTZ6NtEF6EzOqhOCe6zxq6wrr422+ZqCvcggeQ5tW9xSd/8O1vNID/0MTKpy\\nET3drDtBfHmiUEIBR3T3tcy6QsIe4Rz/2sDinAcM3j7sG8uY6drh8jY3PWar9til\\nv2l4qDYSU8Qm5856AB1FVZRLRJkLxZYZNgreShAIYgEd0mcyI2EO/UvKxsIcxsXc\\nd45GhGpKkwIDAQABo1cwVTAfBgNVHQ4EGAQWBBRXBrXKh3p/aFdQjUcT/UcvICBL\\nODAhBgNVHSMEGjAYgBYEFFcGtcqHen9oV1CNRxP9Ry8gIEs4MA8GA1UdEwEB/wQF\\nMAMBAf8wDQYJKoZIhvcNAQELBQADggEBAGmCEvcoFUrT9e133SHkgF/ZAgzeIziO\\nBjfAdU4fvAVTVfzaPm0yBnGqzcHyacCzbZjKQpaKVgc5e6IaqAQtf6cZJSCiJGhS\\nJYeosWrj3dahLOUAMrXRr8G/Ybcacoqc+osKaRa2p71cC3V6u2VvcHRV7HDFGJU7\\noijbdB+WhqET6Txe67rxZCJG9Ez3EOejBJBl2PJPpy7m1Ml4RR+E8YHNzB0lcBzc\\nEoiJKlDfKSO14E2CPDonnUoWBJWjEvJys3tbvKzsRj2fnLilytPFU0gH3cEjCopi\\nzFoWRdaRuNHYCqlBmso1JFDl8h4fMmglxGNKnKRar0WeGyxb4xXBGpI=\\n-----END CERTIFICATE-----\\n"  # noqa: E501, W505
+                    ],
+                    "certificate_signing_request": "-----BEGIN CERTIFICATE REQUEST-----\nMIICWjCCAUICAQAwFTETMBEGA1UEAwwKYmFuYW5hLmNvbTCCASIwDQYJKoZIhvcN\nAQEBBQADggEPADCCAQoCggEBANWlx9wE6cW7Jkb4DZZDOZoEjk1eDBMJ+8R4pyKp\nFBeHMl1SQSDt6rAWsrfL3KOGiIHqrRY0B5H6c51L8LDuVrJG0bPmyQ6rsBo3gVke\nDSivfSLtGvHtp8lwYnIunF8r858uYmblAR0tdXQNmnQvm+6GERvURQ6sxpgZ7iLC\npPKDoPt+4GKWL10FWf0i82FgxWC2KqRZUtNbgKETQuARLig7etBmCnh20zmynorA\ncY7vrpTPAaeQpGLNqqYvKV9W6yWVY08V+nqARrFrjk3vSioZSu8ZJUdZ4d9++SGl\nbH7A6e77YDkX9i/dQ3Pa/iDtWO3tXS2MvgoxX1iSWlGNOHcCAwEAAaAAMA0GCSqG\nSIb3DQEBCwUAA4IBAQCW1fKcHessy/ZhnIwAtSLznZeZNH8LTVOzkhVd4HA7EJW+\nKVLBx8DnN7L3V2/uPJfHiOg4Rx7fi7LkJPegl3SCqJZ0N5bQS/KvDTCyLG+9E8Y+\n7wqCmWiXaH1devimXZvazilu4IC2dSks2D8DPWHgsOdVks9bme8J3KjdNMQudegc\newWZZ1Dtbd+Rn7cpKU3jURMwm4fRwGxbJ7iT5fkLlPBlyM/yFEik4SmQxFYrZCQg\n0f3v4kBefTh5yclPy5tEH+8G0LMsbbo3dJ5mPKpAShi0QEKDLd7eR1R/712lYTK4\ndi4XaEfqERgy68O4rvb4PGlJeRGS7AmL7Ss8wfAq\n-----END CERTIFICATE REQUEST-----\n",  # noqa: E501
+                    "certificate": "-----BEGIN CERTIFICATE-----\nMIICvDCCAaQCFFPAOD7utDTsgFrm0vS4We18OcnKMA0GCSqGSIb3DQEBCwUAMCAx\nCzAJBgNVBAYTAlVTMREwDwYDVQQDDAh3aGF0ZXZlcjAeFw0yMjA3MjkyMTE5Mzha\nFw0yMzA3MjkyMTE5MzhaMBUxEzARBgNVBAMMCmJhbmFuYS5jb20wggEiMA0GCSqG\nSIb3DQEBAQUAA4IBDwAwggEKAoIBAQDVpcfcBOnFuyZG+A2WQzmaBI5NXgwTCfvE\neKciqRQXhzJdUkEg7eqwFrK3y9yjhoiB6q0WNAeR+nOdS/Cw7layRtGz5skOq7Aa\nN4FZHg0or30i7Rrx7afJcGJyLpxfK/OfLmJm5QEdLXV0DZp0L5vuhhEb1EUOrMaY\nGe4iwqTyg6D7fuBili9dBVn9IvNhYMVgtiqkWVLTW4ChE0LgES4oO3rQZgp4dtM5\nsp6KwHGO766UzwGnkKRizaqmLylfVusllWNPFfp6gEaxa45N70oqGUrvGSVHWeHf\nfvkhpWx+wOnu+2A5F/Yv3UNz2v4g7Vjt7V0tjL4KMV9YklpRjTh3AgMBAAEwDQYJ\nKoZIhvcNAQELBQADggEBAChjRzuba8zjQ7NYBVas89Oy7u++MlS8xWxh++yiUsV6\nWMk3ZemsPtXc1YmXorIQohtxLxzUPm2JhyzFzU/sOLmJQ1E/l+gtZHyRCwsb20fX\nmphuJsMVd7qv/GwEk9PBsk2uDqg4/Wix0Rx5lf95juJP7CPXQJl5FQauf3+LSz0y\nwF/j+4GqvrwsWr9hKOLmPdkyKkR6bHKtzzsxL9PM8GnElk2OpaPMMnzbL/vt2IAt\nxK01ZzPxCQCzVwHo5IJO5NR/fIyFbEPhxzG17QsRDOBR9fl9cOIvDeSO04vyZ+nz\n+kA2c3fNrZFAtpIlOOmFh8Q12rVL4sAjI5mVWnNEgvI=\n-----END CERTIFICATE-----\n",  # noqa: E501
+                    "revoked": True,
+                }
+            ]
+        },
     ],
     "properties": {
         "certificates": {
@@ -320,6 +365,10 @@ PROVIDER_JSON_SCHEMA = {
                             "type": "string",
                             "$id": "#/properties/certificates/items/chain/items",
                         },
+                    },
+                    "revoked": {
+                        "$id": "#/properties/certificates/items/revoked",
+                        "type": "boolean",
                     },
                 },
                 "additionalProperties": True,
@@ -371,13 +420,13 @@ class CertificateAvailableEvent(EventBase):
 class CertificateExpiringEvent(EventBase):
     """Charm Event triggered when a TLS certificate is almost expired."""
 
-    def __init__(self, handle, certificate: str, expiry: datetime):
+    def __init__(self, handle, certificate: str, expiry: str):
         """CertificateExpiringEvent.
 
         Args:
             handle (Handle): Juju framework handle
             certificate (str): TLS Certificate
-            expiry (datetime): Datetime object reprensenting the time at which the certificate
+            expiry (str): Datetime string reprensenting the time at which the certificate
                 won't be valid anymore.
         """
         super().__init__(handle)
@@ -408,6 +457,44 @@ class CertificateExpiredEvent(EventBase):
     def restore(self, snapshot: dict):
         """Restores snapshot."""
         self.certificate = snapshot["certificate"]
+
+
+class CertificateRevokedEvent(EventBase):
+    """Charm Event triggered when a TLS certificate is revoked."""
+
+    def __init__(
+        self,
+        handle: Handle,
+        certificate: str,
+        certificate_signing_request: str,
+        ca: str,
+        chain: List[str],
+        revoked: bool,
+    ):
+        super().__init__(handle)
+        self.certificate = certificate
+        self.certificate_signing_request = certificate_signing_request
+        self.ca = ca
+        self.chain = chain
+        self.revoked = revoked
+
+    def snapshot(self) -> dict:
+        """Returns snapshot."""
+        return {
+            "certificate": self.certificate,
+            "certificate_signing_request": self.certificate_signing_request,
+            "ca": self.ca,
+            "chain": self.chain,
+            "revoked": self.revoked,
+        }
+
+    def restore(self, snapshot: dict):
+        """Restores snapshot."""
+        self.certificate = snapshot["certificate"]
+        self.certificate_signing_request = snapshot["certificate_signing_request"]
+        self.ca = snapshot["ca"]
+        self.chain = snapshot["chain"]
+        self.revoked = snapshot["revoked"]
 
 
 class CertificateCreationRequestEvent(EventBase):
@@ -480,7 +567,7 @@ def _load_relation_data(raw_relation_data: dict) -> dict:
     for key in raw_relation_data:
         try:
             certificate_data[key] = json.loads(raw_relation_data[key])
-        except json.decoder.JSONDecodeError:
+        except (json.decoder.JSONDecodeError, TypeError):
             certificate_data[key] = raw_relation_data[key]
     return certificate_data
 
@@ -549,7 +636,7 @@ def generate_certificate(
     ca_key: bytes,
     ca_key_password: Optional[bytes] = None,
     validity: int = 365,
-    alt_names: list = None,
+    alt_names: Optional[List[str]] = None,
 ) -> bytes:
     """Generates a TLS certificate based on a CSR.
 
@@ -559,7 +646,7 @@ def generate_certificate(
         ca_key (bytes): CA private key
         ca_key_password: CA private key password
         validity (int): Certificate validity (in days)
-        alt_names: Certificate Subject alternative names
+        alt_names (list): List of alt names to put on cert - prefer putting SANs in CSR
 
     Returns:
         bytes: Certificate
@@ -578,13 +665,36 @@ def generate_certificate(
         .not_valid_before(datetime.utcnow())
         .not_valid_after(datetime.utcnow() + timedelta(days=validity))
     )
+
+    extensions_list = csr_object.extensions
+    san_ext: Optional[x509.Extension] = None
     if alt_names:
-        names = [x509.DNSName(n) for n in alt_names]
+        full_sans_dns = alt_names.copy()
+        try:
+            loaded_san_ext = csr_object.extensions.get_extension_for_class(
+                x509.SubjectAlternativeName
+            )
+            full_sans_dns.extend(loaded_san_ext.value.get_values_for_type(x509.DNSName))
+        except ExtensionNotFound:
+            pass
+        finally:
+            san_ext = Extension(
+                ExtensionOID.SUBJECT_ALTERNATIVE_NAME,
+                False,
+                x509.SubjectAlternativeName([x509.DNSName(name) for name in full_sans_dns]),
+            )
+            if not extensions_list:
+                extensions_list = x509.Extensions([san_ext])
+
+    for extension in extensions_list:
+        if extension.value.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME and san_ext:
+            extension = san_ext
+
         certificate_builder = certificate_builder.add_extension(
-            x509.SubjectAlternativeName(names),
-            critical=False,
+            extension.value,
+            critical=extension.critical,
         )
-    certificate_builder._version = x509.Version.v1
+    certificate_builder._version = x509.Version.v3
     cert = certificate_builder.sign(private_key, hashes.SHA256())  # type: ignore[arg-type]
     return cert.public_bytes(serialization.Encoding.PEM)
 
@@ -654,11 +764,12 @@ def generate_csr(
     private_key: bytes,
     subject: str,
     add_unique_id_to_subject_name: bool = True,
-    organization: str = None,
-    email_address: str = None,
-    country_name: str = None,
+    organization: Optional[str] = None,
+    email_address: Optional[str] = None,
+    country_name: Optional[str] = None,
     private_key_password: Optional[bytes] = None,
-    sans_oid: Optional[str] = None,
+    sans: Optional[List[str]] = None,
+    sans_oid: Optional[List[str]] = None,
     sans_ip: Optional[List[str]] = None,
     sans_dns: Optional[List[str]] = None,
     additional_critical_extensions: Optional[List] = None,
@@ -675,9 +786,11 @@ def generate_csr(
         email_address (str): Email address.
         country_name (str): Country Name.
         private_key_password (bytes): Private key password
-        sans_dns (list): List of DNS subject alternative names
+        sans (list): Use sans_dns - this will be deprecated in a future release
+            List of DNS subject alternative names (keeping it for now for backward compatibility)
+        sans_oid (list): List of registered ID SANs
+        sans_dns (list): List of DNS subject alternative names (similar to the arg: sans)
         sans_ip (list): List of IP subject alternative names
-        sans_oid (str): Additional OID
         additional_critical_extensions (list): List if critical additional extension objects.
             Object must be a x509 ExtensionType.
 
@@ -699,19 +812,22 @@ def generate_csr(
         subject_name.append(x509.NameAttribute(x509.NameOID.COUNTRY_NAME, country_name))
     csr = x509.CertificateSigningRequestBuilder(subject_name=x509.Name(subject_name))
 
-    _sans = []
+    _sans: List[x509.GeneralName] = []
     if sans_oid:
-        _sans.append(x509.RegisteredID(x509.ObjectIdentifier(sans_oid)))
+        _sans.extend([x509.RegisteredID(x509.ObjectIdentifier(san)) for san in sans_oid])
     if sans_ip:
         _sans.extend([x509.IPAddress(IPv4Address(san)) for san in sans_ip])
+    if sans:
+        _sans.extend([x509.DNSName(san) for san in sans])
     if sans_dns:
         _sans.extend([x509.DNSName(san) for san in sans_dns])
     if _sans:
-        csr = csr.add_extension(x509.SubjectAlternativeName(_sans), critical=False)
+        csr = csr.add_extension(x509.SubjectAlternativeName(set(_sans)), critical=False)
 
     if additional_critical_extensions:
         for extension in additional_critical_extensions:
             csr = csr.add_extension(extension, critical=True)
+
     signed_certificate = csr.sign(signing_key, hashes.SHA256())  # type: ignore[arg-type]
     return signed_certificate.public_bytes(serialization.Encoding.PEM)
 
@@ -729,6 +845,7 @@ class CertificatesRequirerCharmEvents(CharmEvents):
     certificate_available = EventSource(CertificateAvailableEvent)
     certificate_expiring = EventSource(CertificateExpiringEvent)
     certificate_expired = EventSource(CertificateExpiredEvent)
+    certificate_revoked = EventSource(CertificateRevokedEvent)
 
 
 class TLSCertificatesProvidesV1(Object):
@@ -744,29 +861,18 @@ class TLSCertificatesProvidesV1(Object):
         self.charm = charm
         self.relationship_name = relationship_name
 
-    @property
-    def _provider_certificates(self) -> List[Dict]:
-        """Returns list of provider CSR's from relation data."""
-        relation = self.model.get_relation(self.relationship_name)
-        if not relation:
-            raise RuntimeError(f"Relation {self.relationship_name} does not exist")
-        provider_relation_data = _load_relation_data(relation.data[self.model.app])
-        return provider_relation_data.get("certificates", [])
-
-    def _requirer_csrs(self, unit) -> List[Dict[str, str]]:
-        """Returns list of requirer CSR's from relation data."""
-        relation = self.model.get_relation(self.relationship_name)
-        if not relation:
-            raise RuntimeError(f"Relation {self.relationship_name} does not exist")
-        requirer_relation_data = _load_relation_data(relation.data[unit])
-        return requirer_relation_data.get("certificate_signing_requests", [])
-
     def _add_certificate(
-        self, certificate: str, certificate_signing_request: str, ca: str, chain: List[str]
+        self,
+        relation_id: int,
+        certificate: str,
+        certificate_signing_request: str,
+        ca: str,
+        chain: List[str],
     ) -> None:
         """Adds certificate to relation data.
 
         Args:
+            relation_id (int): Relation id
             certificate (str): Certificate
             certificate_signing_request (str): Certificate Signing Request
             ca (str): CA Certificate
@@ -775,7 +881,9 @@ class TLSCertificatesProvidesV1(Object):
         Returns:
             None
         """
-        relation = self.model.get_relation(self.relationship_name)
+        relation = self.model.get_relation(
+            relation_name=self.relationship_name, relation_id=relation_id
+        )
         if not relation:
             raise RuntimeError(
                 f"Relation {self.relationship_name} does not exist - "
@@ -787,7 +895,9 @@ class TLSCertificatesProvidesV1(Object):
             "ca": ca,
             "chain": chain,
         }
-        certificates = copy.deepcopy(self._provider_certificates)
+        provider_relation_data = _load_relation_data(relation.data[self.charm.app])
+        provider_certificates = provider_relation_data.get("certificates", [])
+        certificates = copy.deepcopy(provider_certificates)
         if new_certificate in certificates:
             logger.info("Certificate already in relation data - Doing nothing")
             return
@@ -797,8 +907,8 @@ class TLSCertificatesProvidesV1(Object):
     def _remove_certificate(
         self,
         relation_id: int,
-        certificate: str = None,
-        certificate_signing_request: str = None,
+        certificate: Optional[str] = None,
+        certificate_signing_request: Optional[str] = None,
     ) -> None:
         """Removes certificate from a given relation based on user provided certificate or csr.
 
@@ -818,7 +928,9 @@ class TLSCertificatesProvidesV1(Object):
             raise RuntimeError(
                 f"Relation {self.relationship_name} with relation id {relation_id} does not exist"
             )
-        certificates = copy.deepcopy(self._provider_certificates)
+        provider_relation_data = _load_relation_data(relation.data[self.charm.app])
+        provider_certificates = provider_relation_data.get("certificates", [])
+        certificates = copy.deepcopy(provider_certificates)
         for certificate_dict in certificates:
             if certificate and certificate_dict["certificate"] == certificate:
                 certificates.remove(certificate_dict)
@@ -844,6 +956,18 @@ class TLSCertificatesProvidesV1(Object):
             return True
         except exceptions.ValidationError:
             return False
+
+    def revoke_all_certificates(self) -> None:
+        """Revokes all certificates of this provider.
+
+        This method is meant to be used when the Root CA has changed.
+        """
+        for relation in self.model.relations[self.relationship_name]:
+            provider_relation_data = _load_relation_data(relation.data[self.charm.app])
+            provider_certificates = copy.deepcopy(provider_relation_data.get("certificates", []))
+            for certificate in provider_certificates:
+                certificate["revoked"] = True
+            relation.data[self.model.app]["certificates"] = json.dumps(provider_certificates)
 
     def set_relation_certificate(
         self,
@@ -875,6 +999,7 @@ class TLSCertificatesProvidesV1(Object):
             relation_id=relation_id,
         )
         self._add_certificate(
+            relation_id=relation_id,
             certificate=certificate.strip(),
             certificate_signing_request=certificate_signing_request.strip(),
             ca=ca.strip(),
@@ -911,19 +1036,23 @@ class TLSCertificatesProvidesV1(Object):
         Returns:
             None
         """
+        assert event.unit is not None
         requirer_relation_data = _load_relation_data(event.relation.data[event.unit])
+        provider_relation_data = _load_relation_data(event.relation.data[self.charm.app])
         if not self._relation_data_is_valid(requirer_relation_data):
             logger.warning(
                 f"Relation data did not pass JSON Schema validation: {requirer_relation_data}"
             )
             return
+        provider_certificates = provider_relation_data.get("certificates", [])
+        requirer_csrs = requirer_relation_data.get("certificate_signing_requests", [])
         provider_csrs = [
             certificate_creation_request["certificate_signing_request"]
-            for certificate_creation_request in self._provider_certificates
+            for certificate_creation_request in provider_certificates
         ]
         requirer_unit_csrs = [
             certificate_creation_request["certificate_signing_request"]
-            for certificate_creation_request in self._requirer_csrs(event.unit)
+            for certificate_creation_request in requirer_csrs
         ]
         for certificate_signing_request in requirer_unit_csrs:
             if certificate_signing_request not in provider_csrs:
@@ -950,12 +1079,14 @@ class TLSCertificatesProvidesV1(Object):
         )
         if not certificates_relation:
             raise RuntimeError(f"Relation {self.relationship_name} does not exist")
+        provider_relation_data = _load_relation_data(certificates_relation.data[self.charm.app])
         list_of_csrs: List[str] = []
         for unit in certificates_relation.units:
-            list_of_csrs.extend(
-                csr["certificate_signing_request"] for csr in self._requirer_csrs(unit)
-            )
-        for certificate in self._provider_certificates:
+            requirer_relation_data = _load_relation_data(certificates_relation.data[unit])
+            requirer_csrs = requirer_relation_data.get("certificate_signing_requests", [])
+            list_of_csrs.extend(csr["certificate_signing_request"] for csr in requirer_csrs)
+        provider_certificates = provider_relation_data.get("certificates", [])
+        for certificate in provider_certificates:
             if certificate["certificate_signing_request"] not in list_of_csrs:
                 self.on.certificate_revocation_request.emit(
                     certificate=certificate["certificate"],
@@ -1009,7 +1140,9 @@ class TLSCertificatesRequiresV1(Object):
         relation = self.model.get_relation(self.relationship_name)
         if not relation:
             raise RuntimeError(f"Relation {self.relationship_name} does not exist")
-        provider_relation_data = _load_relation_data(relation.data[relation.app])  # type: ignore[index]  # noqa: E501
+        if not relation.app:
+            raise RuntimeError(f"Remote app for relation {self.relationship_name} does not exist")
+        provider_relation_data = _load_relation_data(relation.data[relation.app])
         return provider_relation_data.get("certificates", [])
 
     def _add_requirer_csr(self, csr: str) -> None:
@@ -1136,7 +1269,7 @@ class TLSCertificatesRequiresV1(Object):
             return False
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
-        """Handler triggerred on relation changed events.
+        """Handler triggered on relation changed events.
 
         Args:
             event: Juju event
@@ -1148,11 +1281,14 @@ class TLSCertificatesRequiresV1(Object):
         if not relation:
             logger.warning(f"No relation: {self.relationship_name}")
             return
-        provider_relation_data = _load_relation_data(relation.data[relation.app])  # type: ignore[index]  # noqa: E501
+        if not relation.app:
+            logger.warning(f"No remote app in relation: {self.relationship_name}")
+            return
+        provider_relation_data = _load_relation_data(relation.data[relation.app])
         if not self._relation_data_is_valid(provider_relation_data):
             logger.warning(
                 f"Provider relation data did not pass JSON Schema validation: "
-                f"{event.relation.data[event.app]}"
+                f"{event.relation.data[relation.app]}"
             )
             return
         requirer_csrs = [
@@ -1161,12 +1297,21 @@ class TLSCertificatesRequiresV1(Object):
         ]
         for certificate in self._provider_certificates:
             if certificate["certificate_signing_request"] in requirer_csrs:
-                self.on.certificate_available.emit(
-                    certificate_signing_request=certificate["certificate_signing_request"],
-                    certificate=certificate["certificate"],
-                    ca=certificate["ca"],
-                    chain=certificate["chain"],
-                )
+                if certificate.get("revoked", False):
+                    self.on.certificate_revoked.emit(
+                        certificate_signing_request=certificate["certificate_signing_request"],
+                        certificate=certificate["certificate"],
+                        ca=certificate["ca"],
+                        chain=certificate["chain"],
+                        revoked=True,
+                    )
+                else:
+                    self.on.certificate_available.emit(
+                        certificate_signing_request=certificate["certificate_signing_request"],
+                        certificate=certificate["certificate"],
+                        ca=certificate["ca"],
+                        chain=certificate["chain"],
+                    )
 
     def _on_update_status(self, event: UpdateStatusEvent) -> None:
         """Triggered on update status event.
@@ -1185,15 +1330,23 @@ class TLSCertificatesRequiresV1(Object):
         if not relation:
             logger.warning(f"No relation: {self.relationship_name}")
             return
-        provider_relation_data = _load_relation_data(relation.data[relation.app])  # type: ignore[index]  # noqa: E501
+        if not relation.app:
+            logger.warning(f"No remote app in relation: {self.relationship_name}")
+            return
+        provider_relation_data = _load_relation_data(relation.data[relation.app])
         if not self._relation_data_is_valid(provider_relation_data):
             logger.warning(
-                f"Provider relation data did not pass JSON Schema validation: {relation.data[relation.app]}"  # type: ignore[index]  # noqa: W505
+                f"Provider relation data did not pass JSON Schema validation: "
+                f"{relation.data[relation.app]}"
             )
             return
         for certificate_dict in self._provider_certificates:
             certificate = certificate_dict["certificate"]
-            certificate_object = x509.load_pem_x509_certificate(data=certificate.encode())
+            try:
+                certificate_object = x509.load_pem_x509_certificate(data=certificate.encode())
+            except ValueError:
+                logger.warning("Could not load certificate.")
+                continue
             time_difference = certificate_object.not_valid_after - datetime.utcnow()
             if time_difference.total_seconds() < 0:
                 logger.warning("Certificate is expired")
@@ -1203,5 +1356,5 @@ class TLSCertificatesRequiresV1(Object):
             if time_difference.total_seconds() < (self.expiry_notification_time * 60 * 60):
                 logger.warning("Certificate almost expired")
                 self.on.certificate_expiring.emit(
-                    certificate=certificate, expiry=certificate_object.not_valid_after
+                    certificate=certificate, expiry=certificate_object.not_valid_after.isoformat()
                 )
