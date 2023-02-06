@@ -101,6 +101,7 @@ class ApplicationCharm(CharmBase):
         ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
             count = cursor.fetchone()[0]
+        connection.close()
         return count
 
     def _on_clear_continuous_writes_action(self, _) -> None:
@@ -112,6 +113,7 @@ class ApplicationCharm(CharmBase):
                     self._connection_string
                 ) as connection, connection.cursor() as cursor:
                     cursor.execute("DROP TABLE continuous_writes;")
+                connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
         """Start the continuous writes process."""
@@ -160,7 +162,7 @@ class ApplicationCharm(CharmBase):
                     with open(LAST_WRITTEN_FILE, "r") as fd:
                         last_written_value = int(fd.read())
         except RetryError as e:
-            logger.exception("Unable to query the database", exc_info=e)
+            logger.exception("Unable to read result", exc_info=e)
             return -1
 
         return last_written_value
