@@ -7,6 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
     RESTART_DELAY,
@@ -44,16 +45,26 @@ DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 @pytest.mark.ha_self_healing_tests
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy three unit of PostgreSQL."""
+    wait_for_apps = False
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
     # is a pre-existing cluster.
-    if await app_name(ops_test):
-        return
-
-    charm = await ops_test.build_charm(".")
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(charm, resources={"patroni": "patroni.tar.gz"}, num_units=3)
-        await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    if not await app_name(ops_test):
+        wait_for_apps = True
+        charm = await ops_test.build_charm(".")
+        async with ops_test.fast_forward():
+            await ops_test.model.deploy(
+                charm, resources={"patroni": "patroni.tar.gz"}, num_units=3
+            )
+            await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
+    # Deploy the continuous writes application charm if it wasn't already deployed.
+    if await app_name(ops_test, APPLICATION_NAME) is None:
+        wait_for_apps = True
+        async with ops_test.fast_forward():
+            charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
+            await ops_test.model.deploy(charm, application_name=APPLICATION_NAME)
+    if wait_for_apps:
+        async with ops_test.fast_forward():
+            await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
 @pytest.mark.ha_self_healing_tests
@@ -236,7 +247,7 @@ async def test_restart_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
+@pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
     ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_delay

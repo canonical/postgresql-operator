@@ -331,7 +331,6 @@ class TestCharm(unittest.TestCase):
         patroni,
         _postgresql,
     ):
-
         # Mock the passwords.
         patroni.return_value.member_started = False
         _get_password.return_value = "fake-operator-password"
