@@ -942,8 +942,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
-        logger.error(f"enable_tls: {enable_tls}")
-        logger.error(f"self.postgresql.is_tls_enabled(): {self.postgresql.is_tls_enabled()}")
+        # logger.error(f"enable_tls: {enable_tls}")
+        # logger.error(f"self.postgresql.is_tls_enabled(): {self.postgresql.is_tls_enabled()}")
         self._patroni.reload_patroni_configuration()
         self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
 
