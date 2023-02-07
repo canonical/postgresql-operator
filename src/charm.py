@@ -646,6 +646,8 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
@@ -792,6 +794,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update the certificate if the IP changes because the IP
         # is used as the hostname in the certificate subject field.
         if self.get_hostname_by_unit(None) != self.unit_peer_data.get("ip"):
+            logger.error(f"self.get_hostname_by_unit(None): {self.get_hostname_by_unit(None)}")
+            logger.error(f'self.unit_peer_data.get("ip"): {self.unit_peer_data.get("ip")}')
             self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
 
             # Request the certificate only if there is already one. If there isn't,
@@ -938,6 +942,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
+        logger.error(f"enable_tls: {enable_tls}")
+        logger.error(f"self.postgresql.is_tls_enabled(): {self.postgresql.is_tls_enabled()}")
         self._patroni.reload_patroni_configuration()
         self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
 
