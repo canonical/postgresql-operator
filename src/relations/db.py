@@ -266,6 +266,8 @@ class DbProvides(Object):
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
         relations = [event.relation] if event else self.model.relations[self.relation_name]
+        if len(relations) == 0:
+            return
 
         primary_unit = self.charm._patroni.get_primary(unit_name_pattern=True)
         is_replica = self.charm.unit.name != primary_unit
