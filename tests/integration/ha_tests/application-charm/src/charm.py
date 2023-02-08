@@ -9,40 +9,24 @@ high availability of the PostgreSQL charm.
 """
 
 import logging
-import os
-import signal
 import subprocess
-from typing import Dict, Optional
+from typing import Optional
 
 import psycopg2
 from charms.data_platform_libs.v0.database_requires import DatabaseRequires
 from ops.charm import ActionEvent, CharmBase
+from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus, Relation
+from ops.model import ActiveStatus
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 logger = logging.getLogger(__name__)
-
-PEER = "application-peers"
-LAST_WRITTEN_FILE = "/tmp/last_written_value"
-PROC_PID_KEY = "proc-pid"
 
 
 class ApplicationCharm(CharmBase):
     """Application charm that connects to PostgreSQL charm."""
 
-    @property
-    def _peers(self) -> Optional[Relation]:
-        """Retrieve the peer relation (`ops.model.Relation`)."""
-        return self.model.get_relation(PEER)
-
-    @property
-    def app_peer_data(self) -> Dict:
-        """Application peer relation data object."""
-        if self._peers is None:
-            return {}
-
-        return self._peers.data[self.app]
+    _stored = StoredState()
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -64,6 +48,9 @@ class ApplicationCharm(CharmBase):
         self.framework.observe(
             self.on.stop_continuous_writes_action, self._on_stop_continuous_writes_action
         )
+
+        # PID of the continuous writes OS process.
+        self._stored.set_default(continuous_writes_pid=None)
 
     @property
     def _connection_string(self) -> Optional[str]:
@@ -107,13 +94,11 @@ class ApplicationCharm(CharmBase):
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
         self._stop_continuous_writes()
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                with psycopg2.connect(
-                    self._connection_string
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute("DROP TABLE continuous_writes;")
-                connection.close()
+        with psycopg2.connect(
+            self._connection_string
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("DROP TABLE continuous_writes;")
+        connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
         """Start the continuous writes process."""
@@ -143,26 +128,33 @@ class ApplicationCharm(CharmBase):
         )
 
         # Store the continuous writes process ID to stop the process later.
-        self.app_peer_data[PROC_PID_KEY] = str(popen.pid)
+        self._stored.continuous_writes_pid = popen.pid
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stops continuous writes to PostgreSQL and returns the last written value."""
-        if not self.app_peer_data.get(PROC_PID_KEY):
+        if self._stored.continuous_writes_pid is None:
             return None
 
         # Stop the process.
-        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGTERM)
+        proc = subprocess.Popen(["pkill", "--signal", "SIGKILL", "-f", "src/continuous_writes.py"])
 
-        del self.app_peer_data[PROC_PID_KEY]
+        # Wait for process to be killed.
+        proc.communicate()
+
+        self._stored.continuous_writes_pid = None
 
         # Return the max written value (or -1 if it was not possible to get that value).
         try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5)):
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
-                    with open(LAST_WRITTEN_FILE, "r") as fd:
-                        last_written_value = int(fd.read())
+                    with psycopg2.connect(
+                        self._connection_string
+                    ) as connection, connection.cursor() as cursor:
+                        cursor.execute("SELECT MAX(number) FROM continuous_writes;")
+                        last_written_value = int(cursor.fetchone()[0])
+                    connection.close()
         except RetryError as e:
-            logger.exception("Unable to read result", exc_info=e)
+            logger.exception(e)
             return -1
 
         return last_written_value

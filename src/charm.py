@@ -779,6 +779,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_update_status(self, _) -> None:
         """Update users list in the database."""
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            return
+
         self.postgresql_client_relation.oversee_users()
         self._update_relation_endpoints()
 
