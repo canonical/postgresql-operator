@@ -278,12 +278,13 @@ async def get_primary(ops_test: OpsTest, app) -> str:
         primary unit name.
     """
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        # Can retrieve from any unit running unit, so we pick the first.
-        unit_name = ops_test.model.applications[app].units[0].name
-        action = await ops_test.model.units.get(unit_name).run_action("get-primary")
-        action = await action.wait()
-        assert action.results["primary"] is not None
-        return action.results["primary"]
+        with attempt:
+            # Can retrieve from any unit running unit, so we pick the first.
+            unit_name = ops_test.model.applications[app].units[0].name
+            action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+            action = await action.wait()
+            assert action.results["primary"] != "None"
+            return action.results["primary"]
 
 
 async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
