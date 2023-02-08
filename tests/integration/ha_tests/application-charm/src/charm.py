@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 PEER = "application-peers"
 LAST_WRITTEN_FILE = "/tmp/last_written_value"
+CONFIG_FILE = "/tmp/continuous_writes_config"
 PROC_PID_KEY = "proc-pid"
 
 
@@ -53,7 +54,6 @@ class ApplicationCharm(CharmBase):
         # Events related to the database that is requested.
         self.database_name = "application"
         self.database = DatabaseRequires(self, "database", self.database_name)
-        self.framework.observe(self.database.on.database_created, self._on_database_created)
         self.framework.observe(self.database.on.endpoints_changed, self._on_endpoints_changed)
         self.framework.observe(
             self.on.clear_continuous_writes_action, self._on_clear_continuous_writes_action
@@ -85,24 +85,19 @@ class ApplicationCharm(CharmBase):
         """Only sets an Active status."""
         self.unit.status = ActiveStatus()
 
-    def _on_database_created(self, _) -> None:
-        """Event triggered when a database was created for this application."""
-        self._start_continuous_writes(1)
-
     def _on_endpoints_changed(self, _) -> None:
         """Event triggered when the read/write endpoints of the database change."""
-        count = self._count_writes()
-        self._start_continuous_writes(count + 1)
+        if self._connection_string is None:
+            return
 
-    def _count_writes(self) -> int:
-        """Count the number of records in the continuous_writes table."""
-        with psycopg2.connect(
-            self._connection_string
-        ) as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-            count = cursor.fetchone()[0]
-        connection.close()
-        return count
+        if not self.app_peer_data.get(PROC_PID_KEY):
+            return None
+
+        with open(CONFIG_FILE, "w") as fd:
+            fd.write(self._connection_string)
+            os.fsync(fd)
+
+        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGHUP)
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
@@ -112,7 +107,7 @@ class ApplicationCharm(CharmBase):
                 with psycopg2.connect(
                     self._connection_string
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute("DROP TABLE continuous_writes;")
+                    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
                 connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
@@ -132,12 +127,15 @@ class ApplicationCharm(CharmBase):
         # Stop any writes that might be going.
         self._stop_continuous_writes()
 
+        with open(CONFIG_FILE, "w") as fd:
+            fd.write(self._connection_string)
+            os.fsync(fd)
+
         # Run continuous writes in the background.
         popen = subprocess.Popen(
             [
                 "/usr/bin/python3",
                 "src/continuous_writes.py",
-                self._connection_string,
                 str(starting_number),
             ]
         )
@@ -165,6 +163,8 @@ class ApplicationCharm(CharmBase):
             logger.exception("Unable to read result", exc_info=e)
             return -1
 
+        os.remove(LAST_WRITTEN_FILE)
+        os.remove(CONFIG_FILE)
         return last_written_value
 
 

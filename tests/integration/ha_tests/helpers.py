@@ -382,13 +382,12 @@ async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
     if not relations:
         await ops_test.model.relate(app, "application")
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
-    else:
-        action = (
-            await ops_test.model.applications["application"]
-            .units[0]
-            .run_action("start-continuous-writes")
-        )
-        await action.wait()
+    action = (
+        await ops_test.model.applications["application"]
+        .units[0]
+        .run_action("start-continuous-writes")
+    )
+    await action.wait()
 
 
 async def stop_continuous_writes(ops_test: OpsTest) -> int:

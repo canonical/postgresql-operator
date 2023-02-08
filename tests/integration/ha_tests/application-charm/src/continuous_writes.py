@@ -2,12 +2,14 @@
 # See LICENSE file for licensing details.
 
 """This file is meant to run in the background continuously writing entries to PostgreSQL."""
+import os
 import signal
 import sys
 
 import psycopg2 as psycopg2
 
 run = True
+connection_string = None
 
 
 def sigterm_handler(_signo, _stack_frame):
@@ -15,7 +17,17 @@ def sigterm_handler(_signo, _stack_frame):
     run = False
 
 
-def continuous_writes(connection_string: str, starting_number: int):
+def sighup_handler(_signo, _stack_frame):
+    read_config_file()
+
+
+def read_config_file():
+    with open("/tmp/continuous_writes_config") as fd:
+        global connection_string
+        connection_string = fd.read().strip()
+
+
+def continuous_writes(starting_number: int):
     """Continuously writes data do PostgreSQL database.
 
     Args:
@@ -24,6 +36,8 @@ def continuous_writes(connection_string: str, starting_number: int):
             is continuously incremented after each write to the database.
     """
     write_value = starting_number
+
+    read_config_file()
 
     try:
         # Create the table to write records on and also a unique index to prevent duplicate writes.
@@ -63,14 +77,15 @@ def continuous_writes(connection_string: str, starting_number: int):
 
     with open("/tmp/last_written_value", "w") as fd:
         fd.write(str(write_value - 1))
+        os.fsync(fd)
 
 
 def main():
-    connection_string = sys.argv[1]
-    starting_number = int(sys.argv[2])
-    continuous_writes(connection_string, starting_number)
+    starting_number = int(sys.argv[1])
+    continuous_writes(starting_number)
 
 
 if __name__ == "__main__":
     signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGHUP, sighup_handler)
     main()
