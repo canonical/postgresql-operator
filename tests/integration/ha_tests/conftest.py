@@ -13,7 +13,7 @@ from tests.integration.ha_tests.helpers import (
     get_postgresql_parameter,
     update_restart_delay,
 )
-from tests.integration.helpers import get_primary, run_command_on_unit
+from tests.integration.helpers import run_command_on_unit
 
 APPLICATION_NAME = "application"
 
