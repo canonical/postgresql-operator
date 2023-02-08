@@ -146,7 +146,7 @@ def main():
             dispatch(run_cmd, unit, charm_dir)
 
         # Wait some time before checking again for a cluster topology change.
-        sleep(10)
+        sleep(30)
 
 
 if __name__ == "__main__":
