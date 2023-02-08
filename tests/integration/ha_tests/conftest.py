@@ -13,6 +13,7 @@ from tests.integration.ha_tests.helpers import (
     get_postgresql_parameter,
     update_restart_delay,
 )
+from tests.integration.helpers import get_primary, run_command_on_unit
 
 APPLICATION_NAME = "application"
 
@@ -63,9 +64,12 @@ async def wal_settings(ops_test: OpsTest) -> None:
     initial_min_wal_size = await get_postgresql_parameter(ops_test, "min_wal_size")
     initial_wal_keep_segments = await get_postgresql_parameter(ops_test, "wal_keep_segments")
     yield
-    # Rollback to the initial settings.
     app = await app_name(ops_test)
     for unit in ops_test.model.applications[app].units:
+        # Start Patroni if it was previously stopped.
+        await run_command_on_unit(ops_test, unit.name, "systemctl start patroni")
+
+        # Rollback to the initial settings.
         await change_wal_settings(
             ops_test,
             unit.name,
