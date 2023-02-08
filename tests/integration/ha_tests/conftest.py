@@ -20,6 +20,12 @@ APPLICATION_NAME = "application"
 @pytest.fixture()
 async def continuous_writes(ops_test: OpsTest) -> None:
     """Deploy the charm that makes continuous writes to PostgreSQL."""
+    # Deploy the continuous writes application charm if it wasn't already deployed.
+    async with ops_test.fast_forward():
+        if await app_name(ops_test, APPLICATION_NAME) is None:
+            charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
+            await ops_test.model.deploy(charm, application_name=APPLICATION_NAME)
+            await ops_test.model.wait_for_idle(status="active", timeout=1000)
     yield
     # Clear the written data at the end.
     action = (
