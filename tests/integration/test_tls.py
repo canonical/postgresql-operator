@@ -10,6 +10,7 @@ from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_expone
 
 from tests.helpers import METADATA
 from tests.integration.helpers import (
+    CHARM_SERIES,
     DATABASE_APP_NAME,
     change_master_start_timeout,
     check_tls,
@@ -38,7 +39,11 @@ async def test_deploy_active(ops_test: OpsTest):
     charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
-            charm, resources={"patroni": "patroni.tar.gz"}, application_name=APP_NAME, num_units=3
+            charm,
+            resources={"patroni": "patroni.tar.gz"},
+            application_name=APP_NAME,
+            num_units=3,
+            series=CHARM_SERIES,
         )
         await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
         # No wait between deploying charms, since we can't guarantee users will wait. Furthermore,
@@ -86,7 +91,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
                 await run_command_on_unit(
                     ops_test,
                     replica,
-                    "su -c '/usr/lib/postgresql/12/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
+                    "su -c '/usr/lib/postgresql/14/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
                 )
 
                 # Check that the replica was promoted.
@@ -126,8 +131,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         primary = await get_primary(ops_test, primary)
         logs = await run_command_on_unit(ops_test, primary, "journalctl -u patroni.service")
         assert (
-            "connection authorized: user=rewind database=postgres SSL enabled"
-            " (protocol=TLSv1.3, cipher=TLS_AES_256_GCM_SHA384, bits=256, compression=off)" in logs
+            "connection authorized: user=rewind database=postgres SSL enabled" in logs
         ), "TLS is not being used on pg_rewind connections"
 
         # Remove the relation.

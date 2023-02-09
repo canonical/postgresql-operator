@@ -10,6 +10,7 @@ from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
+    CHARM_SERIES,
     DATABASE_APP_NAME,
     build_connection_string,
     check_database_users_existence,
@@ -36,6 +37,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             resources=resources,
             application_name=DATABASE_APP_NAME,
             num_units=DATABASE_UNITS,
+            series=CHARM_SERIES,
         )
         # Attach the resource to the controller.
         await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")

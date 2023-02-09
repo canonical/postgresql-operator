@@ -10,6 +10,7 @@ from landscape_api.base import run_query
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
+    CHARM_SERIES,
     DATABASE_APP_NAME,
     check_database_users_existence,
     check_databases_creation,
@@ -29,7 +30,7 @@ DATABASE_UNITS = 3
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     config = {
-        "extra-packages": "python-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython.*"
+        "extra-packages": "python3-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython*"
     }
     resources = {"patroni": "patroni.tar.gz"}
     await ops_test.model.deploy(
@@ -38,6 +39,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         resources=resources,
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
+        series=CHARM_SERIES,
     )
     # Attach the resource to the controller.
     await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")

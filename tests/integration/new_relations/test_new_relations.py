@@ -10,7 +10,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import scale_application
+from tests.integration.helpers import CHARM_SERIES, scale_application
 from tests.integration.new_relations.helpers import (
     build_connection_string,
     check_relation_data_existence,
@@ -43,20 +43,21 @@ async def test_deploy_charms(ops_test: OpsTest, application_charm, database_char
                 application_charm,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
+                series=CHARM_SERIES,
             ),
             ops_test.model.deploy(
                 database_charm,
                 resources={"patroni": "patroni.tar.gz"},
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
-                trust=True,
+                series=CHARM_SERIES,
             ),
             ops_test.model.deploy(
                 database_charm,
                 resources={"patroni": "patroni.tar.gz"},
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
-                trust=True,
+                series=CHARM_SERIES,
             ),
         )
 
