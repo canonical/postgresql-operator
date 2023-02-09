@@ -149,10 +149,10 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     except HTTPError as e:
         assert False, f"error when trying to create role on Landscape: {e}"
 
-    # # Remove the applications from the bundle.
-    # await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
-    # await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
-    # await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
-    #
-    # # Remove the PostgreSQL application.
-    # await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+    # Remove the applications from the bundle.
+    await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
+
+    # Remove the PostgreSQL application.
+    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
