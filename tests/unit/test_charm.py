@@ -3,7 +3,7 @@
 import os
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
 import ops.testing
 from charms.operator_libs_linux.v0 import apt
@@ -135,11 +135,7 @@ class TestCharm(unittest.TestCase):
             )
             # Check the write calls made to the file.
             handle = mock()
-            calls = [
-                call("create_main_cluster = false\n"),
-                call(f"include '{self.charm._storage_path}/conf.d/postgresql-operator.conf'"),
-            ]
-            handle.write.assert_has_calls(calls)
+            handle.write.assert_called_once_with("create_main_cluster = false\n")
 
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch(

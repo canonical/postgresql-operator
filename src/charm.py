@@ -559,7 +559,6 @@ class PostgresqlOperatorCharm(CharmBase):
         os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
         with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
             file.write("create_main_cluster = false\n")
-            file.write(f"include '{self._storage_path}/conf.d/postgresql-operator.conf'")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""

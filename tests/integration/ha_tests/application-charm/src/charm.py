@@ -97,7 +97,10 @@ class ApplicationCharm(CharmBase):
             fd.write(self._connection_string)
             os.fsync(fd)
 
-        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGHUP)
+        try:
+            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGHUP)
+        except ProcessLookupError:
+            del self.app_peer_data[PROC_PID_KEY]
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
@@ -149,7 +152,11 @@ class ApplicationCharm(CharmBase):
             return None
 
         # Stop the process.
-        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGTERM)
+        try:
+            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGTERM)
+        except ProcessLookupError:
+            del self.app_peer_data[PROC_PID_KEY]
+            return None
 
         del self.app_peer_data[PROC_PID_KEY]
 
