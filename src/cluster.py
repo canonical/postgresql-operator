@@ -123,7 +123,6 @@ class Patroni:
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
-        self.render_postgresql_conf_file()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -347,23 +346,11 @@ class Patroni:
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             version=self._get_postgresql_version(),
-        )
-        self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
-
-    def render_postgresql_conf_file(self) -> None:
-        """Render the PostgreSQL configuration file."""
-        # Open the template postgresql.conf file.
-        with open("templates/postgresql.conf.j2", "r") as file:
-            template = Template(file.read())
-        # Render the template file with the correct values.
-        # TODO: add extra configurations here later.
-        rendered = template.render(
-            listen_addresses="*",
+            synchronous_mode_strict="true" if self.planned_units > 1 else "false",
             synchronous_commit="on" if self.planned_units > 1 else "off",
             synchronous_standby_names="*",
         )
-        self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
-        self.render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
+        self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using systemd.
