@@ -15,6 +15,7 @@ from tests.integration.ha_tests.helpers import (
     app_name,
     change_master_start_timeout,
     change_wal_settings,
+    check_writes,
     count_writes,
     fetch_cluster_members,
     get_master_start_timeout,
@@ -25,7 +26,6 @@ from tests.integration.ha_tests.helpers import (
     secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
-    stop_continuous_writes,
     update_restart_delay,
 )
 from tests.integration.helpers import (
@@ -115,11 +115,7 @@ async def test_kill_db_process(
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    total_expected_writes = await check_writes(ops_test)
 
     # Verify that old primary is up-to-date.
     assert await secondary_up_to_date(
@@ -181,11 +177,7 @@ async def test_freeze_db_process(
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    total_expected_writes = await check_writes(ops_test)
 
     # Verify that old primary is up-to-date.
     assert await secondary_up_to_date(
@@ -234,11 +226,7 @@ async def test_restart_db_process(
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    total_expected_writes = await check_writes(ops_test)
 
     # Verify that old primary is up-to-date.
     assert await secondary_up_to_date(
@@ -297,11 +285,7 @@ async def test_full_cluster_restart(
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    await check_writes(ops_test)
 
 
 @pytest.mark.ha_self_healing_tests
@@ -399,11 +383,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    total_expected_writes = await check_writes(ops_test)
 
     # Verify that old primary is up-to-date.
     assert await secondary_up_to_date(

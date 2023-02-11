@@ -128,6 +128,16 @@ async def change_wal_settings(
             )
 
 
+async def check_writes(ops_test) -> int:
+    """Gets the total writes from the test charm and compares to the writes from db."""
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            actual_writes = await count_writes(ops_test)
+            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    return total_expected_writes
+
+
 async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
@@ -140,17 +150,11 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
         f"dbname='application' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
     )
-    try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                with psycopg2.connect(
-                    connection_string
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-                    count = cursor.fetchone()[0]
-                connection.close()
-    except RetryError:
-        return -1
+
+    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
+        count = cursor.fetchone()[0]
+    connection.close()
     return count
 
 
