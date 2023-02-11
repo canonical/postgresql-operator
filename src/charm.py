@@ -420,7 +420,6 @@ class PostgresqlOperatorCharm(CharmBase):
             self._storage_path,
             self._cluster_name,
             self._member_name,
-            self.app.planned_units(),
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,

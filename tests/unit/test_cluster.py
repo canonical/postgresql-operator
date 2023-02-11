@@ -47,7 +47,6 @@ class TestCharm(unittest.TestCase):
             STORAGE_PATH,
             "postgresql",
             "postgresql-0",
-            1,
             self.peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
@@ -216,9 +215,6 @@ class TestCharm(unittest.TestCase):
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
             version=self.patroni._get_postgresql_version(),
-            synchronous_mode_strict="false",
-            synchronous_commit="off",
-            synchronous_standby_names="*",
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.

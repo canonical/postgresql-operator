@@ -67,7 +67,6 @@ class Patroni:
         storage_path: str,
         cluster_name: str,
         member_name: str,
-        planned_units: int,
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
@@ -82,7 +81,6 @@ class Patroni:
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
             peers_ips: IP addresses of the peer units
-            planned_units: number of units planned for the cluster
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
@@ -92,7 +90,6 @@ class Patroni:
         self.storage_path = storage_path
         self.cluster_name = cluster_name
         self.member_name = member_name
-        self.planned_units = planned_units
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
@@ -346,9 +343,6 @@ class Patroni:
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             version=self._get_postgresql_version(),
-            synchronous_mode_strict="true" if self.planned_units > 1 else "false",
-            synchronous_commit="on" if self.planned_units > 1 else "off",
-            synchronous_standby_names="*",
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
