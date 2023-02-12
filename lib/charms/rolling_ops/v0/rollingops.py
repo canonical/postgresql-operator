@@ -49,7 +49,7 @@ class SomeCharm(...):
 
 To kick off the rolling restart, emit this library's AcquireLock event. The simplest way
 to do so would be with an action, though it might make sense to acquire the lock in
-response to another event.
+response to another event. 
 
 ```python
     def _on_trigger_restart(self, event):
