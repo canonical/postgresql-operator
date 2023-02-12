@@ -46,6 +46,10 @@ from cluster import (
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
 )
+from cluster_topology_observer import (
+    ClusterTopologyChangeCharmEvents,
+    ClusterTopologyObserver,
+)
 from constants import (
     PEER,
     REPLICATION_PASSWORD_KEY,
@@ -69,11 +73,15 @@ CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 class PostgresqlOperatorCharm(CharmBase):
     """Charmed Operator for the PostgreSQL database."""
 
+    on = ClusterTopologyChangeCharmEvents()
+
     def __init__(self, *args):
         super().__init__(*args)
 
         self._postgresql_service = "postgresql"
 
+        self._observer = ClusterTopologyObserver(self)
+        self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -96,6 +104,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
+        self._observer.start_observer()
 
     @property
     def app_peer_data(self) -> Dict:
@@ -227,9 +236,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self.update_config()
 
             if self.primary_endpoint:
-                self.postgresql_client_relation.update_endpoints()
-                self.legacy_db_relation.update_endpoints()
-                self.legacy_db_admin_relation.update_endpoints()
+                self._update_relation_endpoints()
             else:
                 self.unit.status = BlockedStatus("no primary in the cluster")
                 return
@@ -278,9 +285,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
-            self.postgresql_client_relation.update_endpoints()
-            self.legacy_db_relation.update_endpoints()
-            self.legacy_db_admin_relation.update_endpoints()
+            self._update_relation_endpoints()
 
     def _on_peer_relation_changed(self, event: RelationChangedEvent):
         """Reconfigure cluster members when something changes."""
@@ -319,18 +324,11 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # If the unit is not the leader, just set an ActiveStatus.
-        if not self.unit.is_leader():
-            self.unit.status = ActiveStatus()
-            return
-
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
-            self.postgresql_client_relation.update_endpoints()
-            self.legacy_db_relation.update_endpoints()
-            self.legacy_db_admin_relation.update_endpoints()
+            self._update_relation_endpoints()
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
@@ -516,6 +514,12 @@ class PostgresqlOperatorCharm(CharmBase):
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
+    def _on_cluster_topology_change(self, _):
+        """Updates endpoints and (optionally) certificates when the cluster topology changes."""
+        logger.info("Cluster topology changed")
+        self._update_relation_endpoints()
+        self._update_certificate()
+
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
         if not self._is_storage_attached():
@@ -591,9 +595,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
-            self.postgresql_client_relation.update_endpoints()
-            self.legacy_db_relation.update_endpoints()
-            self.legacy_db_admin_relation.update_endpoints()
+            self._update_relation_endpoints()
         else:
             self.unit.status = BlockedStatus("no primary in the cluster")
 
@@ -642,6 +644,8 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
@@ -681,6 +685,10 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
+
+        # Clear unit data if this unit became a replica after a failover/switchover.
+        self._update_relation_endpoints()
+
         self.unit.status = ActiveStatus()
 
     def _start_replica(self, event) -> None:
@@ -690,6 +698,9 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = WaitingStatus("awaiting for cluster to start")
             event.defer()
             return
+
+        # Clear unit data if this unit is still replica.
+        self._update_relation_endpoints()
 
         # Member already started, so we can set an ActiveStatus.
         # This can happen after a reboot.
@@ -765,12 +776,12 @@ class PostgresqlOperatorCharm(CharmBase):
         event.set_results({f"{username}-password": password})
 
     def _on_update_status(self, _) -> None:
-        """Update endpoints of the postgres client relation and update users list."""
-        self.postgresql_client_relation.update_endpoints()
-        self.legacy_db_relation.update_endpoints()
-        self.legacy_db_admin_relation.update_endpoints()
+        """Update users list in the database."""
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            return
+
         self.postgresql_client_relation.oversee_users()
-        self._update_certificate()
+        self._update_relation_endpoints()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
@@ -939,6 +950,12 @@ class PostgresqlOperatorCharm(CharmBase):
         if restart_postgresql:
             self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
+
+    def _update_relation_endpoints(self) -> None:
+        """Updates endpoints and read-only endpoint in all relations."""
+        self.postgresql_client_relation.update_endpoints()
+        self.legacy_db_relation.update_endpoints()
+        self.legacy_db_admin_relation.update_endpoints()
 
 
 if __name__ == "__main__":

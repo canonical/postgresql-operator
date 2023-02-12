@@ -137,14 +137,16 @@ class TestCharm(unittest.TestCase):
             handle = mock()
             handle.write.assert_called_once_with("create_main_cluster = false\n")
 
-    @patch("charm.PostgreSQLProvider.update_endpoints")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch_network_get(private_address="1.1.1.1")
-    def test_on_leader_elected(self, _update_config, _primary_endpoint, _update_endpoints):
+    def test_on_leader_elected(
+        self, _update_config, _primary_endpoint, _update_relation_endpoints
+    ):
         # Assert that there is no password in the peer relation.
         self.assertIsNone(self.charm._peers.data[self.charm.app].get("operator-password", None))
 
@@ -153,7 +155,7 @@ class TestCharm(unittest.TestCase):
         self.harness.set_leader()
         password = self.charm._peers.data[self.charm.app].get("operator-password", None)
         _update_config.assert_called_once()
-        _update_endpoints.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
         self.assertIsNotNone(password)
 
         # Mark the cluster as initialised.
@@ -166,18 +168,19 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(
             self.charm._peers.data[self.charm.app].get("operator-password", None), password
         )
-        _update_endpoints.assert_called_once()
+        _update_relation_endpoints.assert_called_once()
         self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
 
         # Check for a BlockedStatus when there is no primary endpoint.
         _primary_endpoint.return_value = None
         self.harness.set_leader(False)
         self.harness.set_leader()
-        _update_endpoints.assert_called_once()  # Assert it was not called again.
+        _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgreSQLProvider.oversee_users")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("charm.PostgresqlOperatorCharm.update_config")
@@ -204,6 +207,7 @@ class TestCharm(unittest.TestCase):
         _,
         __,
         _postgresql,
+        _update_relation_endpoints,
         _oversee_users,
     ):
         # Test without storage.
@@ -261,6 +265,7 @@ class TestCharm(unittest.TestCase):
         "charm.Patroni.member_started",
         new_callable=PropertyMock,
     )
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch.object(EventBase, "defer")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
@@ -274,6 +279,7 @@ class TestCharm(unittest.TestCase):
         _get_password,
         _replication_password,
         _defer,
+        _update_relation_endpoints,
         _member_started,
         _configure_patroni_on_unit,
     ):
