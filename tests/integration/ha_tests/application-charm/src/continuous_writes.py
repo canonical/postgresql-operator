@@ -51,7 +51,7 @@ def continuous_writes(starting_number: int):
         connection.close()
 
     # Continuously write the record to the database (incrementing it at each iteration).
-    while run:
+    while True:
         try:
             with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
                 connection.autocommit = True

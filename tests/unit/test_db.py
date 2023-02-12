@@ -43,6 +43,7 @@ class TestDbProvides(unittest.TestCase):
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
         self.harness.add_relation_unit(self.rel_id, "application/0")
         self.peer_rel_id = self.harness.add_relation(PEER, self.app)
+        self.harness.add_relation_unit(self.peer_rel_id, f"{self.app}/1")
         self.harness.add_relation_unit(self.peer_rel_id, self.unit)
         self.harness.update_relation_data(
             self.peer_rel_id,
@@ -287,10 +288,18 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.members_ips",
         new_callable=PropertyMock,
     )
-    def test_update_endpoints_with_event(self, _members_ips, _primary_endpoint, _get_state):
+    @patch("charm.Patroni.get_primary", return_value="postgresql/0")
+    def test_update_endpoints_with_event(
+        self, _get_primary, _members_ips, _primary_endpoint, _get_state
+    ):
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
+        _members_ips.side_effect = [
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1"},
+            {"1.1.1.1"},
+        ]
 
         # Add two different relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
@@ -313,13 +322,22 @@ class TestDbProvides(unittest.TestCase):
 
         # Set some required data before update_endpoints is called.
         for rel_id in [self.rel_id, self.another_rel_id]:
+            user = f"relation-{rel_id}"
             self.harness.update_relation_data(
                 rel_id,
                 self.app,
                 {
-                    "user": f"relation-{rel_id}",
+                    "user": user,
                     "password": password,
                     "database": DATABASE,
+                },
+            )
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.app,
+                {
+                    user: password,
+                    f"{user}-database": DATABASE,
                 },
             )
 
@@ -392,10 +410,19 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.members_ips",
         new_callable=PropertyMock,
     )
-    def test_update_endpoints_without_event(self, _members_ips, _primary_endpoint, _get_state):
+    @patch("charm.Patroni.get_primary")
+    def test_update_endpoints_without_event(
+        self, _get_primary, _members_ips, _primary_endpoint, _get_state
+    ):
+        _get_primary.return_value = self.unit
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
+        _members_ips.side_effect = [
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1"},
+            {"1.1.1.1"},
+        ]
 
         # Add two different relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
@@ -414,13 +441,22 @@ class TestDbProvides(unittest.TestCase):
 
         # Set some required data before update_endpoints is called.
         for rel_id in [self.rel_id, self.another_rel_id]:
+            user = f"relation-{rel_id}"
             self.harness.update_relation_data(
                 rel_id,
                 self.app,
                 {
-                    "user": f"relation-{rel_id}",
+                    "user": user,
                     "password": password,
                     "database": DATABASE,
+                },
+            )
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.app,
+                {
+                    user: password,
+                    f"{user}-database": DATABASE,
                 },
             )
 

@@ -173,7 +173,7 @@ class Patroni:
             IP address of the cluster member.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
                 cluster_status = requests.get(
@@ -195,7 +195,7 @@ class Patroni:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(len(self.peers_ips) + 1)):
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
                 cluster_status = requests.get(
@@ -217,10 +217,18 @@ class Patroni:
         When the Patroni process is not running in the current unit it's needed
         to use a URL from another cluster member REST API to do some operations.
         """
-        if attempt.retry_state.attempt_number > 1:
-            url = self._patroni_url.replace(
-                self.unit_ip, list(self.peers_ips)[attempt.retry_state.attempt_number - 2]
-            )
+        attempt_number = attempt.retry_state.attempt_number
+        if attempt_number > 1:
+            url = self._patroni_url
+            # Build the URL using http and later using https for each peer.
+            if (attempt_number - 1) <= len(self.peers_ips):
+                url = url.replace("https://", "http://")
+                unit_number = attempt_number - 2
+            else:
+                url = url.replace("http://", "https://")
+                unit_number = attempt_number - 2 - len(self.peers_ips)
+            other_unit_ip = list(self.peers_ips)[unit_number]
+            url = url.replace(self.unit_ip, other_unit_ip)
         else:
             url = self._patroni_url
         return url
