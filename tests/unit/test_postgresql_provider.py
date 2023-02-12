@@ -8,11 +8,9 @@ import ops.testing
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
-    PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import RelationDepartedEvent
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus
 from ops.testing import Harness
@@ -178,64 +176,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
             self.request_database()
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
-    def test_on_relation_departed(self):
-        # Workaround ops.testing not setting `departing_unit` in v1.5.0
-        # ref https://github.com/canonical/operator/pull/790
-        with patch.object(
-            RelationDepartedEvent, "departing_unit", new_callable=PropertyMock
-        ) as mock_departing_unit:
-            # Test that no flag is set in peer relation data if the remote unit
-            # is the unit that is being removed.
-            mock_departing_unit.return_value = self.harness.model.get_unit("application/0")
-            self.harness.remove_relation_unit(self.rel_id, "application/0")
-            peer_relation_data = self.harness.get_relation_data(self.peer_rel_id, self.unit)
-            self.assertDictEqual(peer_relation_data, {})
-
-            # Test that a flag for preventing user deletion is set in peer relation data
-            # when the unit that is being removed is the current unit.
-            mock_departing_unit.return_value = self.harness.model.get_unit(self.unit)
-            self.harness.add_relation_unit(self.rel_id, self.unit)
-            self.harness.remove_relation_unit(self.rel_id, self.unit)
-            peer_relation_data = self.harness.get_relation_data(self.peer_rel_id, self.unit)
-            self.assertDictEqual(peer_relation_data, {"departing": "True"})
-
-    @patch(
-        "charm.PostgresqlOperatorCharm.primary_endpoint",
-        new_callable=PropertyMock,
-    )
-    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
-    def test_on_relation_broken(self, _member_started, _primary_endpoint):
-        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
-            # Set some side effects to test multiple situations.
-            _member_started.side_effect = [False, True, True, True]
-            _primary_endpoint.side_effect = [None, {"1.1.1.1"}, {"1.1.1.1"}]
-            postgresql_mock.delete_user = PropertyMock(
-                side_effect=[None, PostgreSQLDeleteUserError]
-            )
-
-            # Break the relation before the database is ready.
-            self.harness.remove_relation(self.rel_id)
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Break the relation before primary endpoint is available.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Assert that the correct calls were made after a relation broken event.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            user = f"relation-{self.rel_id}"
-            postgresql_mock.delete_user.assert_called_once_with(user)
-
-            # Test a failed user deletion.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    @patch("charm.PostgreSQLProvider._on_relation_broken")
-    @patch("charm.PostgreSQLProvider._on_relation_departed")
-    def test_oversee_users(self, _on_relation_departed, _on_relation_broken):
+    def test_oversee_users(self):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Create two relations and add the username in their databags.
             rel_id = self.harness.add_relation(RELATION_NAME, "application")

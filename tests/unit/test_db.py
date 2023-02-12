@@ -8,7 +8,6 @@ import ops.testing
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
-    PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
 )
 from ops.framework import EventBase
@@ -174,41 +173,6 @@ class TestDbProvides(unittest.TestCase):
 
             # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
             self.request_database()
-            self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    @patch(
-        "charm.PostgresqlOperatorCharm.primary_endpoint",
-        new_callable=PropertyMock,
-    )
-    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
-    @patch("charm.DbProvides._on_relation_departed")
-    def test_on_relation_broken(self, _on_relation_departed, _member_started, _primary_endpoint):
-        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
-            # Set some side effects to test multiple situations.
-            _member_started.side_effect = [False, True, True, True]
-            _primary_endpoint.side_effect = [None, {"1.1.1.1"}, {"1.1.1.1"}]
-            postgresql_mock.delete_user = PropertyMock(
-                side_effect=[None, PostgreSQLDeleteUserError]
-            )
-
-            # Break the relation before the database is ready.
-            self.harness.remove_relation(self.rel_id)
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Break the relation before primary endpoint is available.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Assert that the correct calls were made after a relation broken event.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            user = f"relation-{self.rel_id}"
-            postgresql_mock.delete_user.assert_called_once_with(user)
-
-            # Test a failed user deletion.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch(
