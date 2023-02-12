@@ -150,7 +150,7 @@ class ApplicationCharm(CharmBase):
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stops continuous writes to PostgreSQL and returns the last written value."""
-        if self._stored.continuous_writes_pid is None:
+        if not self.app_peer_data.get(PROC_PID_KEY):
             return None
 
         # Stop the process.
