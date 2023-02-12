@@ -10,7 +10,6 @@ from typing import Iterable
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
-    PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
 )
 from ops.charm import (
@@ -240,18 +239,6 @@ class DbProvides(Object):
         if "departing" in self.charm._peers.data[self.charm.unit]:
             logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
-
-        # Delete the user.
-        user = f"relation-{event.relation.id}"
-        try:
-            self.charm.set_secret("app", user, None)
-            self.charm.set_secret("app", f"{user}-database", None)
-            self.charm.postgresql.delete_user(user)
-        except PostgreSQLDeleteUserError as e:
-            logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
-                f"Failed to delete user during {self.relation_name} relation broken event"
-            )
 
         # Clean up Blocked status if caused by the departed relation
         if (
