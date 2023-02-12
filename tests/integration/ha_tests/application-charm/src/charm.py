@@ -12,14 +12,13 @@ import logging
 import os
 import signal
 import subprocess
-from typing import Optional
+from typing import Dict, Optional
 
 import psycopg2
 from charms.data_platform_libs.v0.database_requires import DatabaseRequires
 from ops.charm import ActionEvent, CharmBase
-from ops.framework import StoredState
 from ops.main import main
-from ops.model import ActiveStatus
+from ops.model import ActiveStatus, Relation
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 logger = logging.getLogger(__name__)
@@ -33,7 +32,18 @@ PROC_PID_KEY = "proc-pid"
 class ApplicationCharm(CharmBase):
     """Application charm that connects to PostgreSQL charm."""
 
-    _stored = StoredState()
+    @property
+    def _peers(self) -> Optional[Relation]:
+        """Retrieve the peer relation (`ops.model.Relation`)."""
+        return self.model.get_relation(PEER)
+
+    @property
+    def app_peer_data(self) -> Dict:
+        """Application peer relation data object."""
+        if self._peers is None:
+            return {}
+
+        return self._peers.data[self.app]
 
     def __init__(self, *args):
         super().__init__(*args)
@@ -136,7 +146,7 @@ class ApplicationCharm(CharmBase):
         )
 
         # Store the continuous writes process ID to stop the process later.
-        self._stored.continuous_writes_pid = popen.pid
+        self.app_peer_data[PROC_PID_KEY] = str(popen.pid)
 
     def _stop_continuous_writes(self) -> Optional[int]:
         """Stops continuous writes to PostgreSQL and returns the last written value."""
@@ -149,6 +159,8 @@ class ApplicationCharm(CharmBase):
         except ProcessLookupError:
             del self.app_peer_data[PROC_PID_KEY]
             return None
+
+        del self.app_peer_data[PROC_PID_KEY]
 
         # Return the max written value (or -1 if it was not possible to get that value).
         try:
