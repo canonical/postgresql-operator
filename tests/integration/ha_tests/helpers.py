@@ -161,10 +161,8 @@ async def change_wal_settings(
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            actual_writes = await count_writes(ops_test)
-            assert total_expected_writes == actual_writes, "writes to the db were missed."
+    actual_writes = await count_writes(ops_test)
+    assert total_expected_writes == actual_writes, "writes to the db were missed."
     return total_expected_writes
 
 
