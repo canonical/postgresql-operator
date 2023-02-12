@@ -23,12 +23,13 @@ async def continuous_writes(ops_test: OpsTest) -> None:
     """Deploy the charm that makes continuous writes to PostgreSQL."""
     yield
     # Clear the written data at the end.
-    action = (
-        await ops_test.model.applications[APPLICATION_NAME]
-        .units[0]
-        .run_action("clear-continuous-writes")
-    )
-    await action.wait()
+    async with ops_test.fast_forward():
+        action = (
+            await ops_test.model.applications[APPLICATION_NAME]
+            .units[0]
+            .run_action("clear-continuous-writes")
+        )
+        await action.wait()
 
 
 @pytest.fixture()
