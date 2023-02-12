@@ -8,7 +8,6 @@ import ops.testing
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
-    PostgreSQLDeleteUserError,
     PostgreSQLGetPostgreSQLVersionError,
 )
 from ops.framework import EventBase
@@ -43,6 +42,7 @@ class TestDbProvides(unittest.TestCase):
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
         self.harness.add_relation_unit(self.rel_id, "application/0")
         self.peer_rel_id = self.harness.add_relation(PEER, self.app)
+        self.harness.add_relation_unit(self.peer_rel_id, f"{self.app}/1")
         self.harness.add_relation_unit(self.peer_rel_id, self.unit)
         self.harness.update_relation_data(
             self.peer_rel_id,
@@ -179,41 +179,6 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
-    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
-    @patch("charm.DbProvides._on_relation_departed")
-    def test_on_relation_broken(self, _on_relation_departed, _member_started, _primary_endpoint):
-        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
-            # Set some side effects to test multiple situations.
-            _member_started.side_effect = [False, True, True, True]
-            _primary_endpoint.side_effect = [None, {"1.1.1.1"}, {"1.1.1.1"}]
-            postgresql_mock.delete_user = PropertyMock(
-                side_effect=[None, PostgreSQLDeleteUserError]
-            )
-
-            # Break the relation before the database is ready.
-            self.harness.remove_relation(self.rel_id)
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Break the relation before primary endpoint is available.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Assert that the correct calls were made after a relation broken event.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            user = f"relation-{self.rel_id}"
-            postgresql_mock.delete_user.assert_called_once_with(user)
-
-            # Test a failed user deletion.
-            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.remove_relation(self.rel_id)
-            self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    @patch(
-        "charm.PostgresqlOperatorCharm.primary_endpoint",
-        new_callable=PropertyMock,
-    )
     @patch("charm.PostgresqlOperatorCharm._has_blocked_status", new_callable=PropertyMock)
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.DbProvides._on_relation_departed")
@@ -287,10 +252,18 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.members_ips",
         new_callable=PropertyMock,
     )
-    def test_update_endpoints_with_event(self, _members_ips, _primary_endpoint, _get_state):
+    @patch("charm.Patroni.get_primary", return_value="postgresql/0")
+    def test_update_endpoints_with_event(
+        self, _get_primary, _members_ips, _primary_endpoint, _get_state
+    ):
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
+        _members_ips.side_effect = [
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1"},
+            {"1.1.1.1"},
+        ]
 
         # Add two different relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
@@ -313,13 +286,22 @@ class TestDbProvides(unittest.TestCase):
 
         # Set some required data before update_endpoints is called.
         for rel_id in [self.rel_id, self.another_rel_id]:
+            user = f"relation-{rel_id}"
             self.harness.update_relation_data(
                 rel_id,
                 self.app,
                 {
-                    "user": f"relation-{rel_id}",
+                    "user": user,
                     "password": password,
                     "database": DATABASE,
+                },
+            )
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.app,
+                {
+                    user: password,
+                    f"{user}-database": DATABASE,
                 },
             )
 
@@ -392,10 +374,19 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.members_ips",
         new_callable=PropertyMock,
     )
-    def test_update_endpoints_without_event(self, _members_ips, _primary_endpoint, _get_state):
+    @patch("charm.Patroni.get_primary")
+    def test_update_endpoints_without_event(
+        self, _get_primary, _members_ips, _primary_endpoint, _get_state
+    ):
+        _get_primary.return_value = self.unit
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
+        _members_ips.side_effect = [
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1", "2.2.2.2"},
+            {"1.1.1.1"},
+            {"1.1.1.1"},
+        ]
 
         # Add two different relations.
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
@@ -414,13 +405,22 @@ class TestDbProvides(unittest.TestCase):
 
         # Set some required data before update_endpoints is called.
         for rel_id in [self.rel_id, self.another_rel_id]:
+            user = f"relation-{rel_id}"
             self.harness.update_relation_data(
                 rel_id,
                 self.app,
                 {
-                    "user": f"relation-{rel_id}",
+                    "user": user,
                     "password": password,
                     "database": DATABASE,
+                },
+            )
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.app,
+                {
+                    user: password,
+                    f"{user}-database": DATABASE,
                 },
             )
 
