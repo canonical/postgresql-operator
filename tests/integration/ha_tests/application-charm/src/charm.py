@@ -104,6 +104,9 @@ class ApplicationCharm(CharmBase):
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
+        if self._connection_string is None:
+            return
+
         self._stop_continuous_writes()
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
