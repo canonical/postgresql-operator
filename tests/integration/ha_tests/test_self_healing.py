@@ -67,7 +67,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     await fake_strict_mode(ops_test)
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
@@ -117,7 +116,6 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
@@ -138,20 +136,21 @@ async def test_freeze_db_process(
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        try:
+            writes = await count_writes(ops_test, primary_name)
+            for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+                with attempt:
+                    more_writes = await count_writes(ops_test, primary_name)
+                    assert more_writes > writes, "writes not continuing to DB"
 
-        # Verify that a new primary gets elected (ie old primary is secondary).
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                new_primary_name = await get_primary(ops_test, app)
-                assert new_primary_name != primary_name
-
-        # Un-freeze the old primary.
-        await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
+            # Verify that a new primary gets elected (ie old primary is secondary).
+            for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+                with attempt:
+                    new_primary_name = await get_primary(ops_test, app)
+                    assert new_primary_name != primary_name
+        finally:
+            # Un-freeze the old primary.
+            await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
