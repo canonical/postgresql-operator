@@ -13,13 +13,11 @@ from tests.integration.ha_tests.helpers import (
     RESTART_DELAY,
     all_db_processes_down,
     app_name,
-    change_master_start_timeout,
     change_wal_settings,
     check_writes,
     count_writes,
     fake_strict_mode,
     fetch_cluster_members,
-    get_master_start_timeout,
     get_primary,
     is_replica,
     list_wal_files,
@@ -82,10 +80,6 @@ async def test_kill_db_process(
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Change the "master_start_timeout" parameter to speed up the fail-over.
-    original_master_start_timeout = await get_master_start_timeout(ops_test)
-    await change_master_start_timeout(ops_test, 0)
-
     # Kill the database process.
     await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
 
@@ -93,10 +87,10 @@ async def test_kill_db_process(
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
-        writes = await count_writes(ops_test)
+        writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
-                more_writes = await count_writes(ops_test)
+                more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"
 
         # Verify that the database service got restarted and is ready in the old primary.
@@ -105,9 +99,6 @@ async def test_kill_db_process(
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
     assert new_primary_name != primary_name
-
-    # Revert the "master_start_timeout" parameter to avoid fail-over again.
-    await change_master_start_timeout(ops_test, original_master_start_timeout)
 
     # Verify that the old primary is now a replica.
     assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
@@ -139,10 +130,6 @@ async def test_freeze_db_process(
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Change the "master_start_timeout" parameter to speed up the fail-over.
-    original_master_start_timeout = await get_master_start_timeout(ops_test)
-    await change_master_start_timeout(ops_test, 0)
-
     # Freeze the database process.
     await send_signal_to_process(ops_test, primary_name, process, "SIGSTOP")
 
@@ -162,9 +149,6 @@ async def test_freeze_db_process(
             with attempt:
                 new_primary_name = await get_primary(ops_test, app)
                 assert new_primary_name != primary_name
-
-        # Revert the "master_start_timeout" parameter to avoid fail-over again.
-        await change_master_start_timeout(ops_test, original_master_start_timeout)
 
         # Un-freeze the old primary.
         await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
@@ -189,7 +173,6 @@ async def test_freeze_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
@@ -209,10 +192,10 @@ async def test_restart_db_process(
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
-        writes = await count_writes(ops_test)
+        writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
-                more_writes = await count_writes(ops_test)
+                more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"
 
         # Verify that the database service got restarted and is ready in the old primary.
@@ -239,7 +222,6 @@ async def test_restart_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
@@ -294,7 +276,6 @@ async def test_full_cluster_restart(
     await check_writes(ops_test)
 
 
-@pytest.mark.abort_on_fail
 @pytest.mark.ha_self_healing_tests
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
@@ -313,10 +294,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
-
-    # Change the "master_start_timeout" parameter to speed up the fail-over.
-    original_master_start_timeout = await get_master_start_timeout(ops_test)
-    await change_master_start_timeout(ops_test, 0)
 
     # Stop the systemd service on the primary unit.
     await run_command_on_unit(ops_test, primary_name, "systemctl stop patroni")
@@ -337,9 +314,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
                 new_primary_name = await get_primary(ops_test, app)
                 assert new_primary_name is not None
                 assert new_primary_name != primary_name
-
-        # Revert the "master_start_timeout" parameter to avoid fail-over again.
-        await change_master_start_timeout(ops_test, original_master_start_timeout)
 
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
