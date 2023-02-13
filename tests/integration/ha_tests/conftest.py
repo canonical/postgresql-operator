@@ -32,7 +32,7 @@ async def continuous_writes(ops_test: OpsTest) -> None:
         await action.wait()
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 async def master_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the master start timeout configuration."""
     # Change the parameter that makes the primary reelection faster.
