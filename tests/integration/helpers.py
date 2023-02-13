@@ -36,7 +36,8 @@ async def build_connection_string(
     application_name: str,
     relation_name: str,
     read_only_endpoint: bool = False,
-) -> str:
+    remote_unit_name: str = None,
+) -> Optional[str]:
     """Returns a PostgreSQL connection string.
 
     Args:
@@ -45,6 +46,8 @@ async def build_connection_string(
         relation_name: name of the relation to get connection data from
         read_only_endpoint: whether to choose the read-only endpoint
             instead of the read/write endpoint
+        remote_unit_name: Optional remote unit name used to retrieve
+            unit data instead of application data
 
     Returns:
         a PostgreSQL connection string
@@ -55,13 +58,20 @@ async def build_connection_string(
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
-    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == relation_name]
+    relation_data = [
+        v for v in data[unit_name]["relation-info"] if v["related-endpoint"] == relation_name
+    ]
     if len(relation_data) == 0:
         raise ValueError(
             f"no relation data could be grabbed on relation with endpoint {relation_name}"
         )
-    data = relation_data[0]["application-data"]
+    if remote_unit_name:
+        data = relation_data[0]["related-units"][remote_unit_name]["data"]
+    else:
+        data = relation_data[0]["application-data"]
     if read_only_endpoint:
+        if data.get("standbys") is None:
+            return None
         return data.get("standbys").split(",")[0]
     else:
         return data.get("master")
@@ -317,12 +327,15 @@ async def deploy_and_relate_bundle_with_postgresql(
                 await ops_test.juju("deploy", patched.name)
 
     # Relate application to PostgreSQL.
-    relation = await ops_test.model.relate(f"{application_name}", f"{DATABASE_APP_NAME}:db-admin")
-    await ops_test.model.wait_for_idle(
-        apps=[application_name, DATABASE_APP_NAME],
-        status="active",
-        timeout=1000,
-    )
+    async with ops_test.fast_forward(fast_interval="30s"):
+        relation = await ops_test.model.relate(
+            f"{application_name}", f"{DATABASE_APP_NAME}:db-admin"
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[application_name, DATABASE_APP_NAME],
+            status="active",
+            timeout=1500,
+        )
 
     return relation.id
 
@@ -340,6 +353,45 @@ def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
         json={"postgresql": {"parameters": {"log_connections": True}}},
         verify=False,
     )
+
+
+async def ensure_correct_relation_data(
+    ops_test: OpsTest, database_units: int, app_name: str, relation_name: str
+) -> None:
+    """Asserts that the correct database relation data is shared from the right unit to the app."""
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    for unit_number in range(database_units):
+        for attempt in Retrying(
+            stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+        ):
+            with attempt:
+                unit_name = f"{DATABASE_APP_NAME}/{unit_number}"
+                primary_connection_string = await build_connection_string(
+                    ops_test, app_name, relation_name, remote_unit_name=unit_name
+                )
+                replica_connection_string = await build_connection_string(
+                    ops_test,
+                    app_name,
+                    relation_name,
+                    read_only_endpoint=True,
+                    remote_unit_name=unit_name,
+                )
+                if unit_name == primary:
+                    unit_ip = get_unit_address(ops_test, unit_name)
+                    host_parameter = f"host={unit_ip} "
+                    assert (
+                        host_parameter in primary_connection_string
+                    ), f"{unit_name} is not the host of the primary connection string"
+                    assert (
+                        host_parameter not in replica_connection_string
+                    ), f"{unit_name} is the host of the replica connection string"
+                else:
+                    assert (
+                        not primary_connection_string
+                    ), f"{unit_name} is sharing a primary connection string"
+                    assert (
+                        not replica_connection_string
+                    ), f"{unit_name} is sharing a replica connection string"
 
 
 async def execute_query_on_unit(
@@ -416,6 +468,23 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
         list of current unit IPs of the application
     """
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
+
+
+async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
+    """Get the name of the machine from a specific unit.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit to get the machine
+
+    Returns:
+        The name of the machine.
+    """
+    hostname_command = f"run --unit {unit_name} -- hostname"
+    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
+    if return_code != 0:
+        raise Exception("Failed to get the unit machine name: %s", return_code)
+    return raw_hostname.strip()
 
 
 async def get_password(ops_test: OpsTest, unit_name: str, username: str = "operator") -> str:
@@ -648,9 +717,7 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
         the command output if it succeeds, otherwise raises an exception.
     """
     complete_command = f"run --unit {unit_name} -- {command}"
-    return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
-    print(f"stdout: {stdout}")
-    print(f"stdout: {stderr}")
+    return_code, stdout, _ = await ops_test.juju(*complete_command.split())
     if return_code != 0:
         raise Exception(
             "Expected command %s to succeed instead it failed: %s", command, return_code
@@ -712,6 +779,28 @@ async def set_password(
     action = await unit.run_action("set-password", **parameters)
     result = await action.wait()
     return result.results
+
+
+async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
+    """Start the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        machine_name: The name of the machine to start
+    """
+    start_machine_command = f"lxc start {machine_name}"
+    subprocess.check_call(start_machine_command.split())
+
+
+async def stop_machine(ops_test: OpsTest, machine_name: str) -> None:
+    """Stop the machine where a unit run on.
+
+    Args:
+        ops_test: The ops test framework instance
+        machine_name: The name of the machine to stop
+    """
+    stop_machine_command = f"lxc stop {machine_name}"
+    subprocess.check_call(stop_machine_command.split())
 
 
 def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -> None:
