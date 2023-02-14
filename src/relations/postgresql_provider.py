@@ -17,7 +17,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent, RelationDepartedEvent
+from ops.charm import CharmBase
 from ops.framework import Object
 from ops.model import BlockedStatus
 
@@ -45,12 +45,6 @@ class PostgreSQLProvider(Object):
         self.relation_name = relation_name
 
         super().__init__(charm, self.relation_name)
-        self.framework.observe(
-            charm.on[self.relation_name].relation_departed, self._on_relation_departed
-        )
-        self.framework.observe(
-            charm.on[self.relation_name].relation_broken, self._on_relation_broken
-        )
 
         self.charm = charm
 
@@ -108,49 +102,6 @@ class PostgreSQLProvider(Object):
                 f"Failed to initialize {self.relation_name} relation"
             )
 
-    def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
-        # Set a flag to avoid deleting database users when this unit
-        # is removed and receives relation broken events from related applications.
-        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
-        # Neither peer relation data nor stored state are good solutions,
-        # just a temporary solution.
-        if event.departing_unit == self.charm.unit:
-            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
-
-    def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
-        """Remove the user created for this relation."""
-        # Check for some conditions before trying to access the PostgreSQL instance.
-        if (
-            not self.charm.unit.is_leader()
-            or "cluster_initialised" not in self.charm._peers.data[self.charm.app]
-            or not self.charm._patroni.member_started
-            or not self.charm.primary_endpoint
-        ):
-            logger.debug(
-                "Early exit on_relation_broken: Not leader, cluster not initialized, Patroni not started or no primary endpoint"
-            )
-            return
-
-        # Run this event only if this unit isn't being
-        # removed while the others from this application
-        # are still alive. This check is needed because of
-        # https://bugs.launchpad.net/juju/+bug/1979811.
-        # Neither peer relation data nor stored state
-        # are good solutions, just a temporary solution.
-        if "departing" in self.charm._peers.data[self.charm.unit]:
-            logger.debug("Early exit on_relation_broken: Skipping departing unit")
-            return
-
-        # Delete the user.
-        user = f"relation-{event.relation.id}"
-        try:
-            self.charm.postgresql.delete_user(user)
-        except PostgreSQLDeleteUserError as e:
-            logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
-                f"Failed to delete user during {self.relation_name} relation broken event"
-            )
-
     def oversee_users(self) -> None:
         """Remove users from database if their relations were broken."""
         if not self.charm.unit.is_leader():
@@ -180,6 +131,8 @@ class PostgreSQLProvider(Object):
         for user in database_users - relation_users:
             try:
                 logger.info("Remove relation user: %s", user)
+                self.charm.set_secret("app", user, None)
+                self.charm.set_secret("app", f"{user}-database", None)
                 self.charm.postgresql.delete_user(user)
             except PostgreSQLDeleteUserError:
                 logger.error(f"Failed to delete user {user}")
