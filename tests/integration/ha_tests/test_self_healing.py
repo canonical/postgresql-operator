@@ -261,7 +261,9 @@ async def test_full_cluster_restart(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
-    writes = await count_writes(ops_test)
+    for attempt in Retrying(stop=stop_after_delay(12), wait=wait_fixed(3)):
+        with attempt:
+            writes = await count_writes(ops_test)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
         with attempt:
             more_writes = await count_writes(ops_test)
