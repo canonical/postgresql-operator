@@ -87,7 +87,7 @@ class ApplicationCharm(CharmBase):
 
     def _on_endpoints_changed(self, _) -> None:
         """Event triggered when the read/write endpoints of the database change."""
-        if self._connection_string is None:
+        if self._connection_string is None or self._connection_string == "None":
             return
 
         if not self.app_peer_data.get(PROC_PID_KEY):
@@ -98,9 +98,22 @@ class ApplicationCharm(CharmBase):
             os.fsync(fd)
 
         try:
-            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGHUP)
+            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGKILL)
         except ProcessLookupError:
             del self.app_peer_data[PROC_PID_KEY]
+            return
+        count = self._count_writes()
+        self._start_continuous_writes(count + 1)
+
+    def _count_writes(self) -> int:
+        """Count the number of records in the continuous_writes table."""
+        with psycopg2.connect(
+            self._connection_string
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
+            count = cursor.fetchone()[0]
+        connection.close()
+        return count
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
