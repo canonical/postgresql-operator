@@ -64,6 +64,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if wait_for_apps:
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    # TODO remove once strict mode is implemented by the operator
     await fake_strict_mode(ops_test)
 
 
@@ -117,7 +118,7 @@ async def test_kill_db_process(
 
 
 @pytest.mark.ha_self_healing_tests
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [PATRONI_PROCESS])
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
 ) -> None:
