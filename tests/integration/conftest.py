@@ -10,7 +10,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def ops_test(ops_test: OpsTest) -> OpsTest:
     if os.environ.get("CI") == "true":
         # Running in GitHub Actions; skip build step
