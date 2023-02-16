@@ -5,7 +5,6 @@ import ast
 import json
 import logging
 
-import pytest as pytest
 from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
 
