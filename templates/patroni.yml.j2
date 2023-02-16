@@ -48,11 +48,15 @@ bootstrap:
     loop_wait: 10
     retry_timeout: 10
     maximum_lag_on_failover: 1048576
+    synchronous_mode: true
+    synchronous_mode_strict: false
     postgresql:
       use_pg_rewind: true
       remove_data_directory_on_rewind_failure: true
       remove_data_directory_on_diverged_timelines: true
       parameters:
+        synchronous_commit: on
+        synchronous_standby_names: "*"
         archive_command: /bin/true
         archive_mode: on
         wal_level: logical

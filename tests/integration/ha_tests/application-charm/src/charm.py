@@ -75,6 +75,9 @@ class ApplicationCharm(CharmBase):
         if None in [username, password, endpoints]:
             return None
 
+        if "None" in [username, password, endpoints]:
+            return None
+
         host = endpoints.split(":")[0]
         return (
             f"dbname='{self.database_name}' user='{username}'"
@@ -97,10 +100,29 @@ class ApplicationCharm(CharmBase):
             fd.write(self._connection_string)
             os.fsync(fd)
 
-        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGHUP)
+        try:
+            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGKILL)
+        except ProcessLookupError:
+            del self.app_peer_data[PROC_PID_KEY]
+            return
+        count = self._count_writes()
+        self._start_continuous_writes(count + 1)
+
+    def _count_writes(self) -> int:
+        """Count the number of records in the continuous_writes table."""
+        with psycopg2.connect(
+            self._connection_string
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
+            count = cursor.fetchone()[0]
+        connection.close()
+        return count
 
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
+        if self._connection_string is None:
+            return
+
         self._stop_continuous_writes()
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
@@ -149,7 +171,11 @@ class ApplicationCharm(CharmBase):
             return None
 
         # Stop the process.
-        os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGTERM)
+        try:
+            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGTERM)
+        except ProcessLookupError:
+            del self.app_peer_data[PROC_PID_KEY]
+            return None
 
         del self.app_peer_data[PROC_PID_KEY]
 

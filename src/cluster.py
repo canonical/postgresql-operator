@@ -67,7 +67,6 @@ class Patroni:
         storage_path: str,
         cluster_name: str,
         member_name: str,
-        planned_units: int,
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
@@ -82,7 +81,6 @@ class Patroni:
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
             peers_ips: IP addresses of the peer units
-            planned_units: number of units planned for the cluster
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
@@ -92,7 +90,6 @@ class Patroni:
         self.storage_path = storage_path
         self.cluster_name = cluster_name
         self.member_name = member_name
-        self.planned_units = planned_units
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
@@ -123,7 +120,6 @@ class Patroni:
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
-        self.render_postgresql_conf_file()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -357,21 +353,6 @@ class Patroni:
             version=self._get_postgresql_version(),
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
-
-    def render_postgresql_conf_file(self) -> None:
-        """Render the PostgreSQL configuration file."""
-        # Open the template postgresql.conf file.
-        with open("templates/postgresql.conf.j2", "r") as file:
-            template = Template(file.read())
-        # Render the template file with the correct values.
-        # TODO: add extra configurations here later.
-        rendered = template.render(
-            listen_addresses="*",
-            synchronous_commit="on" if self.planned_units > 1 else "off",
-            synchronous_standby_names="*",
-        )
-        self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
-        self.render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using systemd.
