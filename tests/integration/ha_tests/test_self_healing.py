@@ -41,7 +41,6 @@ DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.ha_self_healing_tests
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy three unit of PostgreSQL."""
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
@@ -56,7 +55,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
-@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -116,7 +114,6 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -182,7 +179,6 @@ async def test_freeze_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
@@ -235,7 +231,6 @@ async def test_restart_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.ha_self_healing_tests
 @pytest.mark.parametrize("process", [PATRONI_PROCESS])
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
@@ -293,7 +288,6 @@ async def test_full_cluster_restart(
             assert total_expected_writes == actual_writes, "writes to the db were missed."
 
 
-@pytest.mark.ha_self_healing_tests
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
