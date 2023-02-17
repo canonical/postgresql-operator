@@ -16,7 +16,6 @@ from tests.integration.ha_tests.helpers import (
     change_wal_settings,
     check_writes,
     count_writes,
-    fake_strict_mode,
     fetch_cluster_members,
     get_primary,
     is_replica,
@@ -64,8 +63,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if wait_for_apps:
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
-    # TODO remove once strict mode is implemented by the operator
-    await fake_strict_mode(ops_test)
 
 
 @pytest.mark.ha_self_healing_tests

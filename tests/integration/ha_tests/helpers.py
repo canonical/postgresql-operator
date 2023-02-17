@@ -73,32 +73,6 @@ async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> O
     return None
 
 
-async def fake_strict_mode(ops_test: OpsTest) -> None:
-    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
-        with attempt:
-            app = await app_name(ops_test)
-            primary_name = await get_primary(ops_test, app)
-            unit_ip = get_unit_address(ops_test, primary_name)
-            requests.patch(
-                f"http://{unit_ip}:8008/config",
-                json={"synchronous_mode_strict": True},
-            )
-    for unit in ops_test.model.applications[app].units:
-        uip = get_unit_address(ops_test, primary_name)
-        requests.post(f"http://{uip}:8008/config")
-    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
-        with attempt:
-            has_standby = False
-            cluster = get_patroni_cluster(unit_ip)
-            for member in cluster["members"]:
-                print
-                if member["role"] == "sync_standby":
-                    has_standby = True
-                    break
-            if not has_standby:
-                raise ValueError("No standby")
-
-
 def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
     resp = requests.get(f"http://{unit_ip}:8008/cluster")
     return resp.json()
