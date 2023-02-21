@@ -31,7 +31,6 @@ TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.tls_tests
 @pytest.mark.skip_if_deployed
 async def test_deploy_active(ops_test: OpsTest):
     """Build the charm and deploy it."""
@@ -45,7 +44,6 @@ async def test_deploy_active(ops_test: OpsTest):
         # bundles don't wait between deploying charms.
 
 
-@pytest.mark.tls_tests
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
@@ -146,7 +144,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     not os.environ.get("RESTART_MACHINE_TEST"),
     reason="RESTART_MACHINE_TEST environment variable not set",
 )
-@pytest.mark.tls_tests
 async def test_restart_machine(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Relate it to the PostgreSQL to enable TLS.
