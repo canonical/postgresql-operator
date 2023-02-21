@@ -75,10 +75,11 @@ class ApplicationCharm(CharmBase):
         if None in [username, password, endpoints]:
             return None
 
-        if "None" in [username, password, endpoints]:
+        host = endpoints.split(":")[0]
+
+        if not host or host == "None":
             return None
 
-        host = endpoints.split(":")[0]
         return (
             f"dbname='{self.database_name}' user='{username}'"
             f" host='{host}' password='{password}' connect_timeout=5"
@@ -124,7 +125,7 @@ class ApplicationCharm(CharmBase):
             return
 
         self._stop_continuous_writes()
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 with psycopg2.connect(
                     self._connection_string
