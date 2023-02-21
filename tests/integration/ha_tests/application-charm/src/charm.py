@@ -55,6 +55,7 @@ class ApplicationCharm(CharmBase):
         self.database_name = "application"
         self.database = DatabaseRequires(self, "database", self.database_name)
         self.framework.observe(self.database.on.endpoints_changed, self._on_endpoints_changed)
+        self.framework.observe(self.on.can_write_action, self._on_can_write_action)
         self.framework.observe(
             self.on.clear_continuous_writes_action, self._on_clear_continuous_writes_action
         )
@@ -119,19 +120,22 @@ class ApplicationCharm(CharmBase):
         connection.close()
         return count
 
+    def _on_can_write_action(self, event: ActionEvent) -> None:
+        """Check if connection string is set."""
+        event.set_results({"result": self._connection_string is not None})
+
     def _on_clear_continuous_writes_action(self, _) -> None:
         """Clears database writes."""
         if self._connection_string is None:
             return
 
         self._stop_continuous_writes()
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                with psycopg2.connect(
-                    self._connection_string
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
-                connection.close()
+
+        with psycopg2.connect(
+            self._connection_string
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+        connection.close()
 
     def _on_start_continuous_writes_action(self, _) -> None:
         """Start the continuous writes process."""
