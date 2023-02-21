@@ -26,7 +26,6 @@ DATABASE_UNITS = 2
 RELATION_NAME = "db"
 
 
-@pytest.mark.db_relation_tests
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
     async with ops_test.fast_forward():
@@ -95,7 +94,6 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         assert domain_name not in [domain.mail_host for domain in client.domains]
 
 
-@pytest.mark.db_relation_tests
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
     # Retrieve the list of current database unit names.
@@ -160,7 +158,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             psycopg2.connect(primary_connection_string)
 
 
-@pytest.mark.db_relation_tests
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         # Deploy Nextcloud.
@@ -198,7 +195,6 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("nextcloud", block_until_done=True)
 
 
-@pytest.mark.db_relation_tests
 async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
