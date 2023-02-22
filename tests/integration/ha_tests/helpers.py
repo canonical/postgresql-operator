@@ -399,12 +399,15 @@ async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
     if not relations:
         await ops_test.model.relate(app, "application")
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
-    action = (
-        await ops_test.model.applications["application"]
-        .units[0]
-        .run_action("start-continuous-writes")
-    )
-    await action.wait()
+    for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            action = (
+                await ops_test.model.applications["application"]
+                .units[0]
+                .run_action("start-continuous-writes")
+            )
+            await action.wait()
+            assert action.results["result"] == "True", "Unable to create continuous_writes table"
 
 
 async def stop_continuous_writes(ops_test: OpsTest) -> int:
