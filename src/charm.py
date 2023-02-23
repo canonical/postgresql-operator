@@ -40,6 +40,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
 
+from backups import PostgreSQLBackups
 from cluster import (
     NotReadyError,
     Patroni,
@@ -51,6 +52,7 @@ from cluster_topology_observer import (
     ClusterTopologyObserver,
 )
 from constants import (
+    BACKUP_USER,
     PEER,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
@@ -93,13 +95,14 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
-        self._cluster_name = self.app.name
+        self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
 
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
+        self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.tls = PostgreSQLTLS(self, PEER)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -416,7 +419,7 @@ class PostgresqlOperatorCharm(CharmBase):
         return Patroni(
             self._unit_ip,
             self._storage_path,
-            self._cluster_name,
+            self.cluster_name,
             self._member_name,
             self.app.planned_units(),
             self._peer_members_ips,
@@ -556,6 +559,12 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to install Patroni python package")
             return
 
+        try:
+            self._install_pip_packages(["python-dateutil"])
+        except subprocess.SubprocessError:
+            self.unit.status = BlockedStatus("failed to install Patroni python package")
+            return
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _inhibit_default_cluster_creation(self) -> None:
@@ -626,7 +635,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
-        if self._has_blocked_status:
+        if self.is_blocked:
             logger.debug("Early exit on_start: Unit blocked")
             return False
 
@@ -676,8 +685,12 @@ class PostgresqlOperatorCharm(CharmBase):
         try:
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
-            if "postgres" not in self.postgresql.list_users():
+            users = self.postgresql.list_users()
+            if "postgres" not in users:
                 self.postgresql.create_user("postgres", new_password(), admin=True)
+                # Create the backup user.
+            if BACKUP_USER not in users:
+                self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
@@ -807,7 +820,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 self.tls._request_certificate(self.get_secret("unit", "private-key"))
 
     @property
-    def _has_blocked_status(self) -> bool:
+    def is_blocked(self) -> bool:
         """Returns whether the unit is in a blocked state."""
         return isinstance(self.unit.status, BlockedStatus)
 
@@ -934,7 +947,10 @@ class PostgresqlOperatorCharm(CharmBase):
         enable_tls = all(self.tls.get_tls_files())
 
         # Update and reload configuration based on TLS files availability.
-        self._patroni.render_patroni_yml_file(enable_tls=enable_tls)
+        self._patroni.render_patroni_yml_file(
+            enable_tls=enable_tls,
+            stanza=self._peers.data[self.unit].get("stanza"),
+        )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
