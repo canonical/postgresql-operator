@@ -382,8 +382,8 @@ class Patroni:
             raise SwitchoverFailedError(f"received {r.status_code}")
 
     def failover(self) -> None:
-        """Trigger a switchover."""
-        # Try to trigger the switchover.
+        """Trigger a failover."""
+        # Try to trigger the failover.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.post(
