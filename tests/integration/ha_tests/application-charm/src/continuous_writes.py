@@ -39,17 +39,6 @@ def continuous_writes(starting_number: int):
 
     read_config_file()
 
-    try:
-        # Create the table to write records on and also a unique index to prevent duplicate writes.
-        with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-            connection.autocommit = True
-            cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
-            cursor.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS number ON continuous_writes(number);"
-            )
-    finally:
-        connection.close()
-
     # Continuously write the record to the database (incrementing it at each iteration).
     while run:
         try:

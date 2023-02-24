@@ -75,10 +75,11 @@ class ApplicationCharm(CharmBase):
         if None in [username, password, endpoints]:
             return None
 
-        if "None" in [username, password, endpoints]:
+        host = endpoints.split(":")[0]
+
+        if not host or host == "None":
             return None
 
-        host = endpoints.split(":")[0]
         return (
             f"dbname='{self.database_name}' user='{username}'"
             f" host='{host}' password='{password}' connect_timeout=5"
@@ -118,23 +119,64 @@ class ApplicationCharm(CharmBase):
         connection.close()
         return count
 
-    def _on_clear_continuous_writes_action(self, _) -> None:
+    def _on_clear_continuous_writes_action(self, event: ActionEvent) -> None:
         """Clears database writes."""
         if self._connection_string is None:
+            event.set_results({"result": "False"})
             return
 
-        self._stop_continuous_writes()
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                with psycopg2.connect(
-                    self._connection_string
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
-                connection.close()
+        try:
+            self._stop_continuous_writes()
+        except Exception as e:
+            event.set_results({"result": "False"})
+            logger.exception("Unable to stop writes to drop table", exc_info=e)
+            return
 
-    def _on_start_continuous_writes_action(self, _) -> None:
+        try:
+            with psycopg2.connect(
+                self._connection_string
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+                event.set_results({"result": "True"})
+        except Exception as e:
+            event.set_results({"result": "False"})
+            logger.exception("Unable to drop table", exc_info=e)
+        finally:
+            connection.close()
+
+    def _on_start_continuous_writes_action(self, event: ActionEvent) -> None:
         """Start the continuous writes process."""
+        if self._connection_string is None:
+            event.set_results({"result": "False"})
+            return
+
+        try:
+            self._stop_continuous_writes()
+        except Exception as e:
+            event.set_results({"result": "False"})
+            logger.exception("Unable to stop writes to create table", exc_info=e)
+            return
+
+        try:
+            # Create the table to write records on and also a unique index to prevent duplicate
+            # writes.
+            with psycopg2.connect(
+                self._connection_string
+            ) as connection, connection.cursor() as cursor:
+                connection.autocommit = True
+                cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
+                cursor.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS number ON continuous_writes(number);"
+                )
+        except Exception as e:
+            event.set_results({"result": "False"})
+            logger.exception("Unable to create table", exc_info=e)
+            return
+        finally:
+            connection.close()
+
         self._start_continuous_writes(1)
+        event.set_results({"result": "True"})
 
     def _on_stop_continuous_writes_action(self, event: ActionEvent) -> None:
         """Stops the continuous writes process."""

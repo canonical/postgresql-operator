@@ -381,6 +381,21 @@ class Patroni:
         if r.status_code != 200:
             raise SwitchoverFailedError(f"received {r.status_code}")
 
+    def failover(self) -> None:
+        """Trigger a failover."""
+        # Try to trigger the failover.
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                r = requests.post(
+                    f"{self._patroni_url}/failover",
+                    json={"candidate": self.member_name},
+                    verify=self.verify,
+                )
+
+        # Check whether the switchover was unsuccessful.
+        if r.status_code != 200:
+            raise SwitchoverFailedError(f"received {r.status_code}")
+
     @retry(
         retry=retry_if_result(lambda x: not x),
         stop=stop_after_attempt(10),

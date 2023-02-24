@@ -16,7 +16,6 @@ from tests.integration.ha_tests.helpers import (
     change_wal_settings,
     check_writes,
     count_writes,
-    fake_strict_mode,
     fetch_cluster_members,
     get_primary,
     is_replica,
@@ -63,8 +62,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if wait_for_apps:
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
-    # TODO remove once strict mode is implemented by the operator
-    await fake_strict_mode(ops_test)
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
@@ -186,10 +183,10 @@ async def test_restart_db_process(
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
-        # 60 seconds wait (this is a little more than the loop wait configuration, that is
+        # 3 minutes wait (this is a little more than the loop wait configuration, that is
         # considered to trigger a fail-over after master_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes = await count_writes(ops_test, primary_name)
                 assert more_writes > writes, "writes not continuing to DB"

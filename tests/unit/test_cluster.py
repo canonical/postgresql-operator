@@ -280,3 +280,26 @@ class TestCharm(unittest.TestCase):
         _post.assert_called_once_with(
             f"http://{self.patroni.unit_ip}:8008/reinitialize", verify=True
         )
+
+    @mock.patch("requests.post")
+    @patch("cluster.Patroni.get_primary", return_value="primary")
+    def test_switchover(self, _, _post):
+        response = _post.return_value
+        response.status_code = 200
+
+        self.patroni.switchover()
+
+        _post.assert_called_once_with(
+            "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
+        )
+
+    @mock.patch("requests.post")
+    def test_failover(self, _post):
+        response = _post.return_value
+        response.status_code = 200
+
+        self.patroni.failover()
+
+        _post.assert_called_once_with(
+            "http://1.1.1.1:8008/failover", json={"candidate": "postgresql-0"}, verify=True
+        )
