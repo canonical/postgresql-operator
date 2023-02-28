@@ -83,9 +83,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
-        self.framework.observe(
-            self.on.cluster_topology_failover, self._on_cluster_topology_failover
-        )
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -422,6 +419,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._storage_path,
             self._cluster_name,
             self._member_name,
+            self.app.planned_units(),
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
@@ -526,23 +524,6 @@ class PostgresqlOperatorCharm(CharmBase):
         if self._has_blocked_status and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
                 self.unit.status = ActiveStatus()
-
-    def _on_cluster_topology_failover(self, _):
-        """Failovers the primary if no standby or primary are detected."""
-        # Allow leader to update the cluster members.
-        if not self.unit.is_leader():
-            return
-
-        if (
-            "cluster_initialised" not in self._peers.data[self.app]
-            or not self._patroni.member_started
-        ):
-            logger.debug("Early exit _on_cluster_topology_failover: awaiting for cluster to start")
-            return
-
-        logger.info("No primary or standby detected. Failing over")
-
-        self._patroni.failover()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""

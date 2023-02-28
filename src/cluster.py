@@ -67,6 +67,7 @@ class Patroni:
         storage_path: str,
         cluster_name: str,
         member_name: str,
+        planned_units: int,
         peers_ips: Set[str],
         superuser_password: str,
         replication_password: str,
@@ -80,6 +81,7 @@ class Patroni:
             storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
+            planned_units: number of units planned for the cluster
             peers_ips: IP addresses of the peer units
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
@@ -90,6 +92,7 @@ class Patroni:
         self.storage_path = storage_path
         self.cluster_name = cluster_name
         self.member_name = member_name
+        self.planned_units = planned_units
         self.peers_ips = peers_ips
         self.superuser_password = superuser_password
         self.replication_password = replication_password
@@ -351,6 +354,7 @@ class Patroni:
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             version=self._get_postgresql_version(),
+            minority_count=self.planned_units // 2,
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
@@ -374,21 +378,6 @@ class Patroni:
                 r = requests.post(
                     f"{self._patroni_url}/switchover",
                     json={"leader": current_primary},
-                    verify=self.verify,
-                )
-
-        # Check whether the switchover was unsuccessful.
-        if r.status_code != 200:
-            raise SwitchoverFailedError(f"received {r.status_code}")
-
-    def failover(self) -> None:
-        """Trigger a failover."""
-        # Try to trigger the failover.
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                r = requests.post(
-                    f"{self._patroni_url}/failover",
-                    json={"candidate": self.member_name},
                     verify=self.verify,
                 )
 

@@ -109,7 +109,7 @@ class TestClusterTopologyChange(unittest.TestCase):
     def test_dispatch(self, _run):
         command = "test-command"
         charm_dir = "/path"
-        dispatch(command, self.charm.unit.name, charm_dir, "cluster_topology_change")
+        dispatch(command, self.charm.unit.name, charm_dir)
         _run.assert_called_once_with(
             [
                 command,

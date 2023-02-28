@@ -693,31 +693,3 @@ class TestCharm(unittest.TestCase):
         _update_certificate.assert_called_once_with()
         _primary_endpoint.assert_called_once_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
-
-    @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-    def test_on_cluster_topology_failover(self, _patroni):
-        with self.harness.hooks_disabled():
-            self.harness.set_leader()
-        _patroni.member_started = True
-        self.charm._peers.data[self.charm.app].update({"cluster_initialised": "True"})
-
-        self.charm._on_cluster_topology_failover(Mock())
-
-        _patroni.return_value.failover.assert_called_once_with()
-
-    @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-    def test_on_cluster_topology_failover_cluster_no_init(self, _patroni):
-        self.charm._on_cluster_topology_failover(Mock())
-
-        self.assertFalse(_patroni.return_value.failover.called)
-
-    @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-    def test_on_cluster_topology_failover_not_leader(self, _patroni):
-        with self.harness.hooks_disabled():
-            self.harness.set_leader()
-        _patroni.member_started = True
-        self.charm._peers.data[self.charm.app].update({"cluster_initialised": ""})
-
-        self.charm._on_cluster_topology_failover(Mock())
-
-        self.assertFalse(_patroni.return_value.failover.called)
