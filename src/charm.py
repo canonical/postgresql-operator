@@ -224,7 +224,7 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        self._patroni.update_synchronous_node_count()
+        self._patroni.update_synchronous_node_count(len(self._units_ips))
 
         # Remove cluster members one at a time.
         for member_ip in self._get_ips_to_remove():

@@ -450,14 +450,16 @@ class Patroni:
         """Reinitialize PostgreSQL."""
         requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
 
-    def update_synchronous_node_count(self) -> None:
+    def update_synchronous_node_count(self, units: int = None) -> None:
         """Update synchronous_node_count to the minority of the planned cluster."""
+        if units is None:
+            units = self.planned_units
         # Try to update synchronous_node_count.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={"synchronous_node_count": self.planned_units // 2},
+                    json={"synchronous_node_count": units // 2},
                     verify=self.verify,
                 )
 
