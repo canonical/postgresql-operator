@@ -224,6 +224,8 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self._patroni.update_synchronous_node_count()
+
         # Remove cluster members one at a time.
         for member_ip in self._get_ips_to_remove():
             # Check that all members are ready before removing unit from the cluster.
@@ -355,6 +357,7 @@ class PostgresqlOperatorCharm(CharmBase):
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
+            self._patroni.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()

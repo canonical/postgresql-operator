@@ -56,6 +56,10 @@ class SwitchoverFailedError(Exception):
     """Raised when a switchover failed for some reason."""
 
 
+class UpdateSyncNodeCountError(Exception):
+    """Raised when updating synchronous_node_count failed for some reason."""
+
+
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
@@ -445,3 +449,18 @@ class Patroni:
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
         requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
+
+    def update_synchronous_node_count(self) -> None:
+        """Update synchronous_node_count to the minority of the planned cluster."""
+        # Try to update synchronous_node_count.
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                r = requests.patch(
+                    f"{self._patroni_url}/config",
+                    json={"synchronous_node_count": self.planned_units // 2},
+                    verify=self.verify,
+                )
+
+                # Check whether the update was unsuccessful.
+                if r.status_code != 200:
+                    raise UpdateSyncNodeCountError(f"received {r.status_code}")

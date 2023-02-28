@@ -294,3 +294,14 @@ class TestCluster(unittest.TestCase):
         _post.assert_called_once_with(
             "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
         )
+
+    @mock.patch("requests.patch")
+    def test_update_synchronous_node_count(self, _patch):
+        response = _patch.return_value
+        response.status_code = 200
+
+        self.patroni.update_synchronous_node_count()
+
+        _patch.assert_called_once_with(
+            "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
+        )
