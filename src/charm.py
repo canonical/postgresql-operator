@@ -552,15 +552,15 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         try:
-            self._install_pip_packages(["python-dateutil"], user="postgres")
+            self._install_pip_package("python-dateutil", user="postgres")
         except subprocess.SubprocessError:
-            self.unit.status = BlockedStatus("failed to install Patroni python package")
+            self.unit.status = BlockedStatus("failed to install python-dateutil package")
             return
 
         # Build Patroni package path with raft dependency and install it.
         try:
             patroni_package_path = f"{str(resource_path)}[raft]"
-            self._install_pip_packages([patroni_package_path])
+            self._install_pip_package(patroni_package_path)
         except subprocess.SubprocessError:
             self.unit.status = BlockedStatus("failed to install Patroni python package")
             return
@@ -869,7 +869,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 logger.error(f"package error: {package}")
                 raise
 
-    def _install_pip_packages(self, packages: List[str], user: Optional[str] = None) -> None:
+    def _install_pip_package(self, package: str, user: Optional[str] = None) -> None:
         """Simple wrapper around pip install.
 
         Raises:
@@ -879,16 +879,16 @@ class PostgresqlOperatorCharm(CharmBase):
             command = [
                 "pip3",
                 "install",
-                " ".join(packages),
+                package,
             ]
             if user:
                 command.insert(0, "sudo")
                 command.insert(1, "-u")
                 command.insert(2, user)
-            logger.debug(f"installing python packages: {', '.join(packages)}")
+            logger.debug(f"installing python package: {package}")
             subprocess.check_call(command)
         except subprocess.SubprocessError:
-            logger.error("could not install pip packages")
+            logger.error("could not install pip package")
             raise
 
     def _is_storage_attached(self) -> bool:

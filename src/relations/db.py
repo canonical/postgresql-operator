@@ -241,10 +241,7 @@ class DbProvides(Object):
             return
 
         # Clean up Blocked status if caused by the departed relation
-        if (
-            self.charm._has_blocked_status
-            and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE
-        ):
+        if self.charm.is_blocked and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE:
             if not self._check_for_blocking_relations(event.relation.id):
                 self.charm.unit.status = ActiveStatus()
 
