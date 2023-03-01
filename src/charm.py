@@ -551,16 +551,16 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("Missing 'patroni' resource")
             return
 
-        # Build Patroni package path with raft dependency and install it.
         try:
-            patroni_package_path = f"{str(resource_path)}[raft]"
-            self._install_pip_packages([patroni_package_path])
+            self._install_pip_packages(["python-dateutil"], user="postgres")
         except subprocess.SubprocessError:
             self.unit.status = BlockedStatus("failed to install Patroni python package")
             return
 
+        # Build Patroni package path with raft dependency and install it.
         try:
-            self._install_pip_packages(["python-dateutil"])
+            patroni_package_path = f"{str(resource_path)}[raft]"
+            self._install_pip_packages([patroni_package_path])
         except subprocess.SubprocessError:
             self.unit.status = BlockedStatus("failed to install Patroni python package")
             return
@@ -869,7 +869,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 logger.error(f"package error: {package}")
                 raise
 
-    def _install_pip_packages(self, packages: List[str]) -> None:
+    def _install_pip_packages(self, packages: List[str], user: Optional[str] = None) -> None:
         """Simple wrapper around pip install.
 
         Raises:
@@ -881,6 +881,10 @@ class PostgresqlOperatorCharm(CharmBase):
                 "install",
                 " ".join(packages),
             ]
+            if user:
+                command.insert(0, "sudo")
+                command.insert(1, "-u")
+                command.insert(2, user)
             logger.debug(f"installing python packages: {', '.join(packages)}")
             subprocess.check_call(command)
         except subprocess.SubprocessError:
