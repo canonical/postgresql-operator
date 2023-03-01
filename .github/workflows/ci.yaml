@@ -1,6 +1,12 @@
+# Copyright 2022 Canonical Ltd.
+# See LICENSE file for licensing details.
 name: Tests
+
 on:
   pull_request:
+  schedule:
+    - cron: '53 0 * * *' # Daily at 00:53 UTC
+  # Triggered on push to branch "main" by .github/workflows/release.yaml
   workflow_call:
 
 jobs:
@@ -10,10 +16,11 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install dependencies
+      - name: Install tox
+        # TODO: Consider replacing with custom image on self-hosted runner OR pinning version
         run: python3 -m pip install tox
       - name: Run linters
-        run: tox -e lint
+        run: tox run -e lint
 
   unit-test:
     name: Unit tests
@@ -21,125 +28,62 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
-      - name: Install dependencies
-        run: python -m pip install tox
+      - name: Install tox
+        # TODO: Consider replacing with custom image on self-hosted runner OR pinning version
+        run: python3 -m pip install tox
       - name: Run tests
-        run: tox -e unit
+        run: tox run -e unit
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v3
 
-  integration-test-lxd-charm:
-    name: Integration tests for charm deployment (lxd)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: lxd
-      - name: Run integration tests
-        run: tox -e charm-integration
+  build:
+    name: Build charms
+    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v2
 
-  integration-test-lxd-database-relation:
-    name: Integration tests for database relation (lxd)
+  integration-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        tox-environments:
+          - charm-integration
+          - database-relation-integration
+          - db-relation-integration
+          - db-admin-relation-integration
+          - ha-self-healing-integration
+          - password-rotation-integration
+          - tls-integration
+    name: ${{ matrix.tox-environments }}
     needs:
       - lint
       - unit-test
+      - build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Setup operator environment
+        # TODO: Replace with custom image on self-hosted runner
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: lxd
           # This is needed until https://bugs.launchpad.net/juju/+bug/1992833 is fixed.
           bootstrap-options: "--agent-version 2.9.34"
-      - name: Run integration tests
-        run: tox -e database-relation-integration
-
-  integration-test-lxd-db-relation:
-    name: Integration tests for db relation (lxd)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
+      - name: Download packed charm(s)
+        uses: actions/download-artifact@v3
         with:
-          provider: lxd
+          name: ${{ needs.build.outputs.artifact-name }}
+      - name: Select tests
+        id: select-tests
+        run: |
+          if [ "${{ github.event_name }}" == "schedule" ]
+          then
+            echo Running unstable and stable tests
+            echo "mark_expression=" >> $GITHUB_OUTPUT
+          else
+            echo Skipping unstable tests
+            echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
+          fi
       - name: Run integration tests
-        run: tox -e db-relation-integration
-
-  integration-test-lxd-db-admin-relation:
-    name: Integration tests for db-admin relation (lxd)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: lxd
-      - name: Run integration tests
-        run: tox -e db-admin-relation-integration
-
-  integration-test-ha-self-healing-rotation:
-    name: Integration tests for high availability self healing (lxd)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: lxd
-          # This is needed until https://bugs.launchpad.net/juju/+bug/1992833 is fixed.
-          bootstrap-options: "--agent-version 2.9.34"
-      - name: Run integration tests
-        run: tox -e ha-self-healing-integration
-
-  integration-test-lxd-password-rotation:
-    name: Integration tests for password rotation (lxd)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: lxd
-      - name: Run integration tests
-        run: tox -e password-rotation-integration
-
-  integration-test-lxd-tls:
-    name: Integration tests for TLS (lxd)
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: lxd
-      - name: Run integration tests
-        run: tox -e tls-integration
+        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        env:
+          CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}

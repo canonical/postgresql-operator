@@ -33,7 +33,6 @@ UNIT_IDS = [0, 1, 2]
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.charm_tests
 @pytest.mark.skip_if_deployed
 async def test_deploy(ops_test: OpsTest, charm: str):
     """Deploy the charm-under-test.
@@ -60,7 +59,6 @@ async def test_deploy(ops_test: OpsTest, charm: str):
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.charm_tests
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     # Query Patroni REST API and check the status that indicates
@@ -70,7 +68,6 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     assert result.status_code == 200
 
 
-@pytest.mark.charm_tests
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Connect to the PostgreSQL instance.
@@ -130,7 +127,6 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert settings["maximum_lag_on_failover"] == 1048576
 
 
-@pytest.mark.charm_tests
 async def test_scale_down_and_up(ops_test: OpsTest):
     """Test data is replicated to new units after a scale up."""
     # Ensure the initial number of units in the application.
@@ -212,7 +208,6 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
 
 
-@pytest.mark.charm_tests
 async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     """Test data persists through a primary deletion."""
     # Set a composite application name in order to test in more than one series at the same time.
