@@ -15,6 +15,7 @@ REPLICATION_USER = "replication"
 REPLICATION_PASSWORD_KEY = "replication-password"
 REWIND_USER = "rewind"
 REWIND_PASSWORD_KEY = "rewind-password"
+SNAP_PACKAGES = [("charmed-postgresql", "14/edge/charm-fixes")]
 TLS_KEY_FILE = "key.pem"
 TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"

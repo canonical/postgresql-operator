@@ -11,6 +11,7 @@ from typing import Set
 
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
+from charms.operator_libs_linux.v1 import snap
 from charms.operator_libs_linux.v1.systemd import (
     daemon_reload,
     service_restart,
@@ -380,9 +381,18 @@ class Patroni:
             Whether the service started successfully.
         """
         # Start the service and enable it to start at boot.
-        service_start(PATRONI_SERVICE)
-        service_resume(PATRONI_SERVICE)
-        return service_running(PATRONI_SERVICE)
+        # service_start(PATRONI_SERVICE)
+        # service_resume(PATRONI_SERVICE)
+        # return service_running(PATRONI_SERVICE)
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.start(services=["patroni"])
+            logger.error(f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}')
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = f"Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
+            logger.exception(error_message, exc_info=e)
 
     def switchover(self) -> None:
         """Trigger a switchover."""

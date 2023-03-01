@@ -9,7 +9,8 @@ import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
-from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v0 import apt, passwd
+from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
@@ -29,14 +30,13 @@ from ops.charm import (
 )
 from ops.framework import EventBase
 from ops.main import main
-from ops.model import (
+from ops.model import (  # ModelError,
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
-    ModelError,
     Relation,
     Unit,
-    WaitingStatus,
+    WaitingStatus, ModelError,
 )
 from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
 
@@ -54,6 +54,7 @@ from constants import (
     PEER,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
+    SNAP_PACKAGES,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -532,29 +533,33 @@ class PostgresqlOperatorCharm(CharmBase):
         # Prevent the default cluster creation.
         self._inhibit_default_cluster_creation()
 
+        passwd.add_group(group_name="postgres")
+        passwd.add_user(username="postgres")
+
+        # try:
+        #     resource_path = self.model.resources.fetch("patroni")
+        # except ModelError as e:
+        #     logger.error(f"missing patroni resource {str(e)}")
+        #     self.unit.status = BlockedStatus("Missing 'patroni' resource")
+        #     return
+
+        # # Build Patroni package path with raft dependency and install it.
+        # try:
+        #     patroni_package_path = f"{str(resource_path)}[raft]"
+        #     self._install_pip_packages([patroni_package_path])
+        # except subprocess.SubprocessError:
+        #     self.unit.status = BlockedStatus("failed to install Patroni python package")
+        #     return
+        #
         # Install the PostgreSQL and Patroni requirements packages.
         try:
-            self._install_apt_packages(
-                event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
-            )
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            self.unit.status = BlockedStatus("failed to install apt packages")
-            return
-
-        try:
-            resource_path = self.model.resources.fetch("patroni")
-        except ModelError as e:
-            logger.error(f"missing patroni resource {str(e)}")
-            self.unit.status = BlockedStatus("Missing 'patroni' resource")
-            return
-
-        # Build Patroni package path with raft dependency and install it.
-        try:
-            patroni_package_path = f"{str(resource_path)}[raft]"
-            self._install_pip_packages([patroni_package_path])
-        except subprocess.SubprocessError:
-            self.unit.status = BlockedStatus("failed to install Patroni python package")
-            return
+            # self._install_apt_packages(
+            #     event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
+            # )
+            self._install_snap_packages(packages=SNAP_PACKAGES)
+        except snap.SnapError:
+            self.unit.status = BlockedStatus("failed to install snap packages")
+            # return
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
@@ -873,6 +878,32 @@ class PostgresqlOperatorCharm(CharmBase):
         except subprocess.SubprocessError:
             logger.error("could not install pip packages")
             raise
+
+    def _install_snap_packages(self, packages: List[str]) -> None:
+        """Installs package(s) to container.
+
+        Args:
+            packages: list of packages to install.
+        """
+        for snap_name, snap_channel in packages:
+            result = subprocess.check_output(
+                ["snap", "download", snap_name, f"--channel={snap_channel}"],
+                universal_newlines=True,
+            )
+            logger.error(f"install snap output: {result}")
+            snap.install_local("./charmed-postgresql_1.snap")
+            # try:
+            #     snap_cache = snap.SnapCache()
+            #     snap_package = snap_cache[snap_name]
+            #
+            #     if not snap_package.present:
+            #         snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+            #
+            # except snap.SnapError as e:
+            #     logger.error(
+            #         "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
+            #     )
+            #     raise
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
