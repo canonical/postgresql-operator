@@ -27,10 +27,6 @@ class ClusterTopologyChangeEvent(EventBase):
     """A custom event for cluster topology changes."""
 
 
-class ClusterTopologyFailoverEvent(EventBase):
-    """A custom event for cluster failover when both primary and standby are down."""
-
-
 class ClusterTopologyChangeCharmEvents(CharmEvents):
     """A CharmEvents extension for cluster topology changes.
 
@@ -38,7 +34,6 @@ class ClusterTopologyChangeCharmEvents(CharmEvents):
     """
 
     cluster_topology_change = EventSource(ClusterTopologyChangeEvent)
-    cluster_topology_failover = EventSource(ClusterTopologyFailoverEvent)
 
 
 class ClusterTopologyObserver(Object):
@@ -117,10 +112,10 @@ class ClusterTopologyObserver(Object):
         return "unit-{}-{}".format(self._charm.app.name, unit_num)
 
 
-def dispatch(run_cmd, unit, charm_dir, event_type):
+def dispatch(run_cmd, unit, charm_dir):
     """Use the input juju-run command to dispatch a :class:`ClusterTopologyChangeEvent`."""
-    dispatch_sub_cmd = "JUJU_DISPATCH_PATH=hooks/{} {}/dispatch"
-    subprocess.run([run_cmd, "-u", unit, dispatch_sub_cmd.format(event_type, charm_dir)])
+    dispatch_sub_cmd = "JUJU_DISPATCH_PATH=hooks/cluster_topology_change {}/dispatch"
+    subprocess.run([run_cmd, "-u", unit, dispatch_sub_cmd.format(charm_dir)])
 
 
 def main():
@@ -148,17 +143,7 @@ def main():
         # If the cluster topology changed, dispatch a charm event to handle this change.
         elif current_cluster_topology != previous_cluster_topology:
             previous_cluster_topology = current_cluster_topology
-            dispatch(run_cmd, unit, charm_dir, "cluster_topology_change")
-
-        # check for leader or standby
-        roles = current_cluster_topology.values()
-        only_async_replicas = bool(len(roles)) and not bool(
-            len([role for role in roles if role != "replica"])
-        )
-
-        # Manually failover if only async replicas are left in the cluster
-        if only_async_replicas:
-            dispatch(run_cmd, unit, charm_dir, "cluster_topology_failover")
+            dispatch(run_cmd, unit, charm_dir)
 
         # Wait some time before checking again for a cluster topology change.
         sleep(30)

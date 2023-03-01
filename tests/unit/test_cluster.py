@@ -37,7 +37,7 @@ def mocked_requests_get(*args, **kwargs):
     raise requests.exceptions.Timeout()
 
 
-class TestCharm(unittest.TestCase):
+class TestCluster(unittest.TestCase):
     def setUp(self):
         # Setup a cluster.
         self.peers_ips = {"2.2.2.2", "3.3.3.3"}
@@ -47,6 +47,7 @@ class TestCharm(unittest.TestCase):
             STORAGE_PATH,
             "postgresql",
             "postgresql-0",
+            1,
             self.peers_ips,
             "fake-superuser-password",
             "fake-replication-password",
@@ -215,6 +216,7 @@ class TestCharm(unittest.TestCase):
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
             version=self.patroni._get_postgresql_version(),
+            minority_count=self.patroni.planned_units // 2,
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
@@ -293,13 +295,13 @@ class TestCharm(unittest.TestCase):
             "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
         )
 
-    @mock.patch("requests.post")
-    def test_failover(self, _post):
-        response = _post.return_value
+    @mock.patch("requests.patch")
+    def test_update_synchronous_node_count(self, _patch):
+        response = _patch.return_value
         response.status_code = 200
 
-        self.patroni.failover()
+        self.patroni.update_synchronous_node_count()
 
-        _post.assert_called_once_with(
-            "http://1.1.1.1:8008/failover", json={"candidate": "postgresql-0"}, verify=True
+        _patch.assert_called_once_with(
+            "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
