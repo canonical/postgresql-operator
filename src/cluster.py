@@ -341,9 +341,14 @@ class Patroni:
         Args:
             enable_tls: whether to enable TLS.
         """
+        minority_count = self.planned_units // 2
+        if minority_count < 2:
+            minority_count = 2
+
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
+
         # Render the template file with the correct values.
         rendered = template.render(
             conf_path=self.storage_path,
@@ -358,7 +363,7 @@ class Patroni:
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             version=self._get_postgresql_version(),
-            minority_count=self.planned_units // 2,
+            minority_count=minority_count,
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
 
@@ -454,12 +459,17 @@ class Patroni:
         """Update synchronous_node_count to the minority of the planned cluster."""
         if units is None:
             units = self.planned_units
+
+        synchronous_node_count = units // 2
+        if synchronous_node_count < 2:
+            return
+
         # Try to update synchronous_node_count.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={"synchronous_node_count": units // 2},
+                    json={"synchronous_node_count": synchronous_node_count},
                     verify=self.verify,
                 )
 

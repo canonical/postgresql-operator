@@ -216,7 +216,7 @@ class TestCluster(unittest.TestCase):
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
             version=self.patroni._get_postgresql_version(),
-            minority_count=self.patroni.planned_units // 2,
+            minority_count=2,
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
@@ -300,8 +300,8 @@ class TestCluster(unittest.TestCase):
         response = _patch.return_value
         response.status_code = 200
 
-        self.patroni.update_synchronous_node_count()
+        self.patroni.update_synchronous_node_count(4)
 
         _patch.assert_called_once_with(
-            "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
+            "http://1.1.1.1:8008/config", json={"synchronous_node_count": 2}, verify=True
         )
