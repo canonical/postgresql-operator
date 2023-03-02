@@ -8,6 +8,7 @@ from pytest_operator.plugin import OpsTest
 
 from tests.helpers import METADATA
 from tests.integration.helpers import (
+    CHARM_SERIES,
     check_patroni,
     get_password,
     restart_patroni,
@@ -24,7 +25,11 @@ async def test_deploy_active(ops_test: OpsTest):
     charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
-            charm, resources={"patroni": "patroni.tar.gz"}, application_name=APP_NAME, num_units=3
+            charm,
+            resources={"patroni": "patroni.tar.gz"},
+            application_name=APP_NAME,
+            num_units=3,
+            series=CHARM_SERIES,
         )
         await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
