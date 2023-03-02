@@ -27,6 +27,7 @@ from tenacity import (
     wait_fixed,
 )
 
+CHARM_SERIES = "jammy"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 
@@ -181,11 +182,6 @@ def check_patroni(ops_test: OpsTest, unit_name: str, restart_time: float) -> boo
         health_info["postmaster_start_time"], "%Y-%m-%d %H:%M:%S.%f%z"
     ).timestamp()
     return postmaster_start_time > restart_time and health_info["state"] == "running"
-
-
-def build_application_name(series: str) -> str:
-    """Return a composite application name combining application name and series."""
-    return f"{DATABASE_APP_NAME}-{series}"
 
 
 async def check_cluster_members(ops_test: OpsTest, application_name: str) -> None:
