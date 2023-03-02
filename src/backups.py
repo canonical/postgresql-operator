@@ -17,6 +17,7 @@ import botocore
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
 from jinja2 import Template
 from ops.framework import Object
+from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
@@ -94,7 +95,7 @@ class PostgreSQLBackups(Object):
 
         return endpoint
 
-    def _execute_command(self, command: List[str]) -> Tuple[str, str]:
+    def _execute_command(self, command: List[str]) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
         def demote():
@@ -107,7 +108,7 @@ class PostgreSQLBackups(Object):
             return result
 
         process = run(command, stdout=PIPE, stderr=PIPE, preexec_fn=demote())
-        return process.stdout.decode(), process.stderr.decode()
+        return process.returncode, process.stdout.decode(), process.stderr.decode()
 
     def _get_backup_ids(self, format_ids: bool = False) -> List[str]:
         """Return the list of backup ids.
@@ -116,7 +117,7 @@ class PostgreSQLBackups(Object):
             format_ids: whether to format the ids as (default is False).
         """
         backup_ids = []
-        output, _ = self._execute_command(
+        _, output, _ = self._execute_command(
             ["pgbackrest", "repo-ls", f"backup/{self.charm.cluster_name}"]
         )
         if output:
@@ -143,16 +144,13 @@ class PostgreSQLBackups(Object):
 
         self.charm.unit.status = MaintenanceStatus("initialising stanza")
 
-        try:
-            # Create the stanza.
-            self._execute_command(
-                ["pgbackrest", f"--stanza={self.charm.cluster_name}", "stanza-create"]
-            )
-        except CalledProcessError as e:
-            logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
-                f"failed to initialize stanza with error {str(e)}"
-            )
+        # Create the stanza.
+        return_code, _, stderr = self._execute_command(
+            ["pgbackrest", f"--stanza={self.charm.cluster_name}", "stanza-create"]
+        )
+        if return_code != 0:
+            logger.error(stderr)
+            self.charm.unit.status = BlockedStatus("failed to initialize stanza")
             return
 
         # Store the stanza name to be used in configurations updates.
@@ -166,9 +164,11 @@ class PostgreSQLBackups(Object):
             for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
                 with attempt:
                     self.charm._patroni.reload_patroni_configuration()
-                    self._execute_command(
+                    return_code, _, stderr = self._execute_command(
                         ["pgbackrest", f"--stanza={self.charm.cluster_name}", "check"]
                     )
+                    if return_code != 0:
+                        raise Exception(stderr)
             self.charm.unit.status = ActiveStatus()
         except RetryError as e:
             logger.exception(e)
@@ -204,30 +204,47 @@ class PostgreSQLBackups(Object):
         # Retrieve the S3 Parameters to use when uploading the backup logs to S3.
         s3_parameters, _ = self._retrieve_s3_parameters()
 
-        try:
-            self.charm.unit.status = MaintenanceStatus("creating backup")
+        # Test uploading metadata to S3 to test credentials before backup.
+        datetime_backup_requested = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
+        juju_version = JujuVersion.from_environ()
+        metadata = f"""Date Backup Requested: {datetime_backup_requested}
+        Model Name: {self.model.name}
+        Application Name: {self.model.app.name}
+        Unit Name: {self.charm.unit.name}
+        Juju Version: {str(juju_version)}
+        """
+        if not self._upload_content_to_s3(
+            metadata,
+            os.path.join(
+                s3_parameters["path"],
+                f"backup/{self.charm.cluster_name}/.metadata",
+            ),
+            s3_parameters,
+        ):
+            event.fail("Failed to upload metadata to provided S3")
+            return
 
-            # Remove the unit endpoint from the replicas endpoints list in the relation data.
-            if self.charm.app.planned_units() > 1:
-                pass
+        self.charm.unit.status = MaintenanceStatus("creating backup")
 
-            stdout, stderr = self._execute_command(
-                [
-                    "pgbackrest",
-                    f"--stanza={self.charm.cluster_name}",
-                    "--log-level-console=debug",
-                    "--type=full",
-                    "backup",
-                ]
-            )
-            backup_ids = self._get_backup_ids()
-            backup_id = backup_ids[-1]
-        except CalledProcessError as e:
-            logger.exception(e)
+        # Remove the unit endpoint from the replicas endpoints list in the relation data.
+        if self.charm.app.planned_units() > 1:
+            pass
+
+        return_code, stdout, stderr = self._execute_command(
+            [
+                "pgbackrest",
+                f"--stanza={self.charm.cluster_name}",
+                "--log-level-console=debug",
+                "--type=full",
+                "backup",
+            ]
+        )
+        if return_code != 0:
+            logger.error(stderr)
 
             # Recover the backup id from the logs.
             backup_label_stdout_line = re.findall(
-                r"(new backup label = )([0-9]{8}[-][0-9]{6}[F])$", e.stdout, re.MULTILINE
+                r"(new backup label = )([0-9]{8}[-][0-9]{6}[F])$", stdout, re.MULTILINE
             )
             if len(backup_label_stdout_line) > 0:
                 backup_id = backup_label_stdout_line[0][1]
@@ -237,21 +254,31 @@ class PostgreSQLBackups(Object):
                 backup_id = datetime.strftime(datetime.now(), "%Y%m%d-%H%M%SF")
 
             # Upload the logs to S3.
-            self._upload_logs_to_s3(
-                e.stdout,
-                e.stderr,
+            logs = f"""Stdout:
+{stdout}
+Stderr:
+{stderr}
+"""
+            self._upload_content_to_s3(
+                logs,
                 os.path.join(
                     s3_parameters["path"],
                     f"backup/{self.charm.cluster_name}/{backup_id}/backup.log",
                 ),
                 s3_parameters,
             )
-            event.fail(f"Failed to backup PostgreSQL with error: {str(e)}")
+            event.fail("Failed to backup PostgreSQL")
         else:
+            backup_ids = self._get_backup_ids()
+            backup_id = backup_ids[-1]
             # Upload the logs to S3 and fail the action if it doesn't succeed.
-            if not self._upload_logs_to_s3(
-                stdout,
-                stderr,
+            logs = f"""Stdout:
+{stdout}
+Stderr:
+{stderr}
+"""
+            if not self._upload_content_to_s3(
+                logs,
                 os.path.join(
                     s3_parameters["path"],
                     f"backup/{self.charm.cluster_name}/{backup_id}/backup.log",
@@ -261,9 +288,6 @@ class PostgreSQLBackups(Object):
                 event.fail("Error uploading logs to S3")
             else:
                 event.set_results({"backup-status": "backup created"})
-
-        # Add the unit endpoint back to the replicas endpoints list in the relation data.
-        ###
 
         self.charm.unit.status = ActiveStatus()
 
@@ -334,24 +358,27 @@ class PostgreSQLBackups(Object):
 
         return s3_parameters, []
 
-    def _upload_logs_to_s3(
+    def _upload_content_to_s3(
         self: str,
-        stdout: str,
-        stderr: str,
+        content: str,
         s3_path: str,
         s3_parameters: Dict,
     ) -> bool:
-        """Upload logs as a file to the S3 bucket."""
-        logs = f"""Stdout:
-{stdout}
+        """Uploads the provided contents to the provided S3 bucket.
 
-Stderr:
-{stderr}
-            """
-        logger.debug(f"Output of pgBackRest: {logs}")
-        logger.info("Uploading output of pgBackRest to S3")
+        Args:
+            content: The content to upload to S3
+            s3_path: The path to which to upload the content
+            s3_parameters: A dictionary containing the S3 parameters
+                The following are expected keys in the dictionary: bucket, region,
+                endpoint, access-key and secret-key
+
+        Returns:
+            a boolean indicating success.
+        """
         bucket_name = s3_parameters["bucket"]
         s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
+        logger.info(f"Uploading content to bucket={s3_parameters['bucket']}, path={s3_path}")
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={s3_path}")
             session = boto3.session.Session(
@@ -364,7 +391,7 @@ Stderr:
             bucket = s3.Bucket(bucket_name)
 
             with tempfile.NamedTemporaryFile() as temp_file:
-                temp_file.write(logs.encode("utf-8"))
+                temp_file.write(content.encode("utf-8"))
                 temp_file.flush()
                 bucket.upload_file(temp_file.name, s3_path)
         except Exception as e:
