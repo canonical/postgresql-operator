@@ -322,16 +322,9 @@ Stderr:
             stanza=self.charm.cluster_name,
             user=BACKUP_USER,
         )
-        # Delete the original file and render the one with the right info.
+        # Render pgBackRest config file.
         filename = "/etc/pgbackrest.conf"
         self.charm._patroni.render_file(filename, rendered, 0o640)
-        # container.remove_path(filename)
-        # container.push(
-        #     filename,
-        #     rendered,
-        #     user=WORKLOAD_OS_USER,
-        #     group=WORKLOAD_OS_GROUP,
-        # )
 
     def _retrieve_s3_parameters(self) -> Tuple[Dict, List[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""
