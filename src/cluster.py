@@ -119,9 +119,10 @@ class Patroni:
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
         # Avoid rendering the Patroni config file if it was already rendered.
-        if not os.path.exists(f"{self.storage_path}/patroni.yml"):
+        if not os.path.exists("/var/snap/charmed-postgresql/common/patroni/config.yaml"):
             self.render_patroni_yml_file()
         self._render_patroni_service_file()
+        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o644)
         # Reload systemd services before trying to start Patroni.
         daemon_reload()
         self.render_postgresql_conf_file()
@@ -333,18 +334,19 @@ class Patroni:
         rendered = template.render(conf_path=self.storage_path)
         self.render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def render_patroni_yml_file(self, enable_tls: bool = False) -> None:
+    def render_patroni_yml_file(self, enable_tls: bool = False, stanza: str = None) -> None:
         """Render the Patroni configuration file.
 
         Args:
             enable_tls: whether to enable TLS.
+            stanza: name of the stanza created by pgBackRest.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            conf_path=self.storage_path,
+            conf_path="/var/snap/charmed-postgresql/common/postgresql/",  # self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
@@ -355,9 +357,11 @@ class Patroni:
             replication_password=self.replication_password,
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
+            enable_pgbackrest=stanza is not None,
+            stanza=stanza,
             version=self._get_postgresql_version(),
         )
-        self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
+        self.render_file("/var/snap/charmed-postgresql/common/patroni/config.yaml", rendered, 0o644)
 
     def render_postgresql_conf_file(self) -> None:
         """Render the PostgreSQL configuration file."""
@@ -388,10 +392,12 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
-            logger.error(f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}')
+            logger.error(
+                f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}'
+            )
             return selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
-            error_message = f"Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
+            error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
             logger.exception(error_message, exc_info=e)
 
     def switchover(self) -> None:

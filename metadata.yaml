@@ -7,11 +7,6 @@ description: |
 summary: |
   Charm to operate the PostgreSQL database on machines
 
-series:
-  # TODO: add jammy when it's released
-  - focal
-  - bionic
-
 peers:
   database-peers:
     interface: postgresql_peers
@@ -29,6 +24,9 @@ provides:
 requires:
   certificates:
     interface: tls-certificates
+    limit: 1
+  s3-parameters:
+    interface: s3
     limit: 1
 
 resources:

@@ -28,6 +28,7 @@ from tests.integration.ha_tests.helpers import (
     update_restart_delay,
 )
 from tests.integration.helpers import (
+    CHARM_SERIES,
     db_connect,
     get_password,
     get_unit_address,
@@ -50,7 +51,9 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
     charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(charm, resources={"patroni": "patroni.tar.gz"}, num_units=3)
+        await ops_test.model.deploy(
+            charm, resources={"patroni": "patroni.tar.gz"}, num_units=3, series=CHARM_SERIES
+        )
         await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
