@@ -199,6 +199,15 @@ class PostgresqlOperatorCharm(CharmBase):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
+    def _updated_synchronous_node_count(self, num_units: int = None) -> bool:
+        """Tries to update synchronous_node_count configuration and reports the result."""
+        try:
+            self._patroni.update_synchronous_node_count(num_units)
+            return True
+        except RetryError:
+            logger.debug("Unable to set synchronous_node_count")
+            return False
+
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """The leader removes the departing units from the list of cluster members."""
         # Don't handle this event in the same unit that is departing.
@@ -222,12 +231,12 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self.unit.is_leader():
             return
 
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if "cluster_initialised" not in self._peers.data[
+            self.app
+        ] or not self._updated_synchronous_node_count(len(self._units_ips)):
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
-
-        self._patroni.update_synchronous_node_count(len(self._units_ips))
 
         # Remove cluster members one at a time.
         for member_ip in self._get_ips_to_remove():
@@ -527,7 +536,7 @@ class PostgresqlOperatorCharm(CharmBase):
         logger.info("Cluster topology changed")
         self._update_relation_endpoints()
         self._update_certificate()
-        if self._has_blocked_status and self.unit.status.message == NO_PRIMARY_MESSAGE:
+        if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
                 self.unit.status = ActiveStatus()
 
