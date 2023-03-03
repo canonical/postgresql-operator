@@ -11,6 +11,7 @@ PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE, LEGACY_DB, LEGACY_DB_ADMIN]
 API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
+BACKUP_USER = "backup"
 REPLICATION_USER = "replication"
 REPLICATION_PASSWORD_KEY = "replication-password"
 REWIND_USER = "rewind"
@@ -21,4 +22,4 @@ TLS_CERT_FILE = "cert.pem"
 USER = "operator"
 USER_PASSWORD_KEY = "operator-password"
 # List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [REPLICATION_USER, REWIND_USER, USER]
+SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER]
