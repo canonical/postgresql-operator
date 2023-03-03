@@ -53,7 +53,11 @@ bootstrap:
       remove_data_directory_on_rewind_failure: true
       remove_data_directory_on_diverged_timelines: true
       parameters:
+        {%- if enable_pgbackrest %}
+        archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
+        {% else %}
         archive_command: /bin/true
+        {%- endif %}
         archive_mode: on
         wal_level: logical
 
@@ -67,21 +71,29 @@ postgresql:
   # Path to PostgreSQL binaries used in the database bootstrap process.
   bin_dir: /usr/lib/postgresql/{{ version }}/bin/
   data_dir: {{ conf_path }}/pgdata
-  {%- if enable_tls %}
   parameters:
+    {%- if enable_pgbackrest %}
+    archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
+    {% else %}
+    archive_command: /bin/true
+    {%- endif %}
+    {%- if enable_tls %}
     ssl: on
     ssl_ca_file: {{ conf_path }}/ca.pem
     ssl_cert_file: {{ conf_path }}/cert.pem
     ssl_key_file: {{ conf_path }}/key.pem
-  {%- endif %}
+    {%- endif %}
   pgpass: /tmp/pgpass
   pg_hba:
+    - local all backup peer map=operator
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 md5
     # Allow replications connections from other cluster members.
     {%- for peer_ip in peers_ips %}
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
     {% endfor %}
+  pg_ident:
+  - operator postgres backup
   authentication:
     replication:
       username: replication
@@ -92,3 +104,4 @@ postgresql:
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
+use_unix_socket: true
