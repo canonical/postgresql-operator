@@ -332,11 +332,12 @@ class Patroni:
         rendered = template.render(conf_path=self.storage_path)
         self.render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def render_patroni_yml_file(self, enable_tls: bool = False) -> None:
+    def render_patroni_yml_file(self, enable_tls: bool = False, stanza: str = None) -> None:
         """Render the Patroni configuration file.
 
         Args:
             enable_tls: whether to enable TLS.
+            stanza: name of the stanza created by pgBackRest.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
@@ -354,6 +355,8 @@ class Patroni:
             replication_password=self.replication_password,
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
+            enable_pgbackrest=stanza is not None,
+            stanza=stanza,
             version=self._get_postgresql_version(),
         )
         self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
