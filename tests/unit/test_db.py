@@ -179,15 +179,15 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
-    @patch("charm.PostgresqlOperatorCharm._has_blocked_status", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm.is_blocked", new_callable=PropertyMock)
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.DbProvides._on_relation_departed")
     def test_on_relation_broken_extensions_unblock(
-        self, _on_relation_departed, _member_started, _primary_endpoint, _has_blocked_status
+        self, _on_relation_departed, _member_started, _primary_endpoint, is_blocked
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.
-            _has_blocked_status.return_value = True
+            is_blocked.return_value = True
             _member_started.return_value = True
             _primary_endpoint.return_value = {"1.1.1.1"}
             postgresql_mock.delete_user = PropertyMock(return_value=None)
@@ -207,15 +207,15 @@ class TestDbProvides(unittest.TestCase):
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
     )
-    @patch("charm.PostgresqlOperatorCharm._has_blocked_status", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm.is_blocked", new_callable=PropertyMock)
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.DbProvides._on_relation_departed")
     def test_on_relation_broken_extensions_keep_block(
-        self, _on_relation_departed, _member_started, _primary_endpoint, _has_blocked_status
+        self, _on_relation_departed, _member_started, _primary_endpoint, is_blocked
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.
-            _has_blocked_status.return_value = True
+            is_blocked.return_value = True
             _member_started.return_value = True
             _primary_endpoint.return_value = {"1.1.1.1"}
             postgresql_mock.delete_user = PropertyMock(return_value=None)
