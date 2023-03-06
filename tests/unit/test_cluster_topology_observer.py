@@ -35,7 +35,7 @@ def mocked_requests_get(*args, **kwargs):
         return MockResponse(data[args[0]])
 
 
-class TestCharm(CharmBase):
+class MockCharm(CharmBase):
     on = ClusterTopologyChangeCharmEvents()
 
     def __init__(self, *args):
@@ -58,13 +58,13 @@ class TestCharm(CharmBase):
 
 class TestClusterTopologyChange(unittest.TestCase):
     def setUp(self) -> None:
-        self.harness = Harness(TestCharm, meta="name: test-charm")
+        self.harness = Harness(MockCharm, meta="name: test-charm")
         self.harness.begin()
         self.charm = self.harness.charm
 
     @patch("builtins.open")
     @patch("subprocess.Popen")
-    @patch.object(TestCharm, "_peers", new_callable=PropertyMock)
+    @patch.object(MockCharm, "_peers", new_callable=PropertyMock)
     def test_start_observer(self, _peers, _popen, _open):
         # Test that nothing is done if there is already a running process.
         _peers.return_value = Mock(data={self.charm.unit: {"observer-pid": "1"}})
@@ -90,7 +90,7 @@ class TestClusterTopologyChange(unittest.TestCase):
         _popen.assert_called_once()
 
     @patch("os.kill")
-    @patch.object(TestCharm, "_peers", new_callable=PropertyMock)
+    @patch.object(MockCharm, "_peers", new_callable=PropertyMock)
     def test_stop_observer(self, _peers, _kill):
         # Test that nothing is done if there is no process running.
         self.charm.observer.stop_observer()

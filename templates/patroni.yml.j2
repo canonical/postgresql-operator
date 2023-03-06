@@ -48,11 +48,15 @@ bootstrap:
     loop_wait: 10
     retry_timeout: 10
     maximum_lag_on_failover: 1048576
+    synchronous_mode: true
+    synchronous_node_count: {{ minority_count }}
     postgresql:
       use_pg_rewind: true
       remove_data_directory_on_rewind_failure: true
       remove_data_directory_on_diverged_timelines: true
       parameters:
+        synchronous_commit: on
+        synchronous_standby_names: "*"
         {%- if enable_pgbackrest %}
         archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
         {% else %}

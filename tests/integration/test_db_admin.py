@@ -133,12 +133,11 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # Trigger a switchover.
     logger.info("triggering a switchover")
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    switchover(ops_test, primary, former_primary)
+    switchover(ops_test, primary)
 
     # Await for a new primary to be elected.
     assert await primary_changed(ops_test, primary)
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    assert primary == former_primary
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 

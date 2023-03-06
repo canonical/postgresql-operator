@@ -2,12 +2,32 @@
 # See LICENSE file for licensing details.
 
 """This file is meant to run in the background continuously writing entries to PostgreSQL."""
+import os
+import signal
 import sys
 
 import psycopg2 as psycopg2
 
+run = True
+connection_string = None
 
-def continuous_writes(connection_string: str, starting_number: int):
+
+def sigterm_handler(_signo, _stack_frame):
+    global run
+    run = False
+
+
+def sighup_handler(_signo, _stack_frame):
+    read_config_file()
+
+
+def read_config_file():
+    with open("/tmp/continuous_writes_config") as fd:
+        global connection_string
+        connection_string = fd.read().strip()
+
+
+def continuous_writes(starting_number: int):
     """Continuously writes data do PostgreSQL database.
 
     Args:
@@ -17,19 +37,10 @@ def continuous_writes(connection_string: str, starting_number: int):
     """
     write_value = starting_number
 
-    try:
-        # Create the table to write records on and also a unique index to prevent duplicate writes.
-        with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-            connection.autocommit = True
-            cursor.execute("CREATE TABLE IF NOT EXISTS continuous_writes(number INTEGER);")
-            cursor.execute(
-                "CREATE UNIQUE INDEX IF NOT EXISTS number ON continuous_writes(number);"
-            )
-    finally:
-        connection.close()
+    read_config_file()
 
     # Continuously write the record to the database (incrementing it at each iteration).
-    while True:
+    while run:
         try:
             with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
                 connection.autocommit = True
@@ -53,12 +64,17 @@ def continuous_writes(connection_string: str, starting_number: int):
 
         write_value += 1
 
+    with open("/tmp/last_written_value", "w") as fd:
+        fd.write(str(write_value - 1))
+        os.fsync(fd)
+
 
 def main():
-    connection_string = sys.argv[1]
-    starting_number = int(sys.argv[2])
-    continuous_writes(connection_string, starting_number)
+    starting_number = int(sys.argv[1])
+    continuous_writes(starting_number)
 
 
 if __name__ == "__main__":
+    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGHUP, sighup_handler)
     main()
