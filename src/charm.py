@@ -69,6 +69,7 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
+NO_PRIMARY_MESSAGE = "no primary in the cluster"
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
@@ -198,6 +199,15 @@ class PostgresqlOperatorCharm(CharmBase):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
+    def _updated_synchronous_node_count(self, num_units: int = None) -> bool:
+        """Tries to update synchronous_node_count configuration and reports the result."""
+        try:
+            self._patroni.update_synchronous_node_count(num_units)
+            return True
+        except RetryError:
+            logger.debug("Unable to set synchronous_node_count")
+            return False
+
     def _on_peer_relation_departed(self, event: RelationDepartedEvent) -> None:
         """The leader removes the departing units from the list of cluster members."""
         # Don't handle this event in the same unit that is departing.
@@ -221,7 +231,9 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self.unit.is_leader():
             return
 
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if "cluster_initialised" not in self._peers.data[
+            self.app
+        ] or not self._updated_synchronous_node_count(len(self._units_ips)):
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
@@ -241,7 +253,7 @@ class PostgresqlOperatorCharm(CharmBase):
             if self.primary_endpoint:
                 self._update_relation_endpoints()
             else:
-                self.unit.status = BlockedStatus("no primary in the cluster")
+                self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
                 return
 
     def _on_pgdata_storage_detaching(self, _) -> None:
@@ -334,7 +346,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._update_relation_endpoints()
             self.unit.status = ActiveStatus()
         else:
-            self.unit.status = BlockedStatus("no primary in the cluster")
+            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
     def _add_members(self, event):
         """Add new cluster members.
@@ -357,6 +369,7 @@ class PostgresqlOperatorCharm(CharmBase):
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
+            self._patroni.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
@@ -523,6 +536,9 @@ class PostgresqlOperatorCharm(CharmBase):
         logger.info("Cluster topology changed")
         self._update_relation_endpoints()
         self._update_certificate()
+        if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
+            if self.primary_endpoint:
+                self.unit.status = ActiveStatus()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -572,7 +588,6 @@ class PostgresqlOperatorCharm(CharmBase):
         os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
         with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
             file.write("create_main_cluster = false\n")
-            file.write(f"include '{self._storage_path}/conf.d/postgresql-operator.conf'")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
@@ -608,7 +623,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if self.primary_endpoint:
             self._update_relation_endpoints()
         else:
-            self.unit.status = BlockedStatus("no primary in the cluster")
+            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
     def _on_config_changed(self, event: ConfigChangedEvent) -> None:
         """Install additional packages through APT."""
