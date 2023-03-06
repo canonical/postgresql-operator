@@ -44,7 +44,6 @@ def continuous_writes(starting_number: int):
         try:
             with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
                 connection.autocommit = True
-                cursor.execute("SET synchronous_commit = 'remote_apply';")
                 cursor.execute(f"INSERT INTO continuous_writes(number) VALUES({write_value});")
         except (
             psycopg2.InterfaceError,
