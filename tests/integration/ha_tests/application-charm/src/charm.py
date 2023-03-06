@@ -137,7 +137,7 @@ class ApplicationCharm(CharmBase):
                 self._connection_string
             ) as connection, connection.cursor() as cursor:
                 cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
-                event.set_results({"result": "True"})
+            event.set_results({"result": "True"})
         except Exception as e:
             event.set_results({"result": "False"})
             logger.exception("Unable to drop table", exc_info=e)
