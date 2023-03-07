@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import json
 from typing import Optional
 
 import yaml
@@ -96,6 +95,44 @@ async def check_relation_data_existence(
         return False
 
 
+async def get_alias_from_relation_data(
+    ops_test: OpsTest, unit_name: str, related_unit_name: str
+) -> Optional[str]:
+    """Get the alias that the unit assigned to the related unit application/cluster.
+
+    Args:
+        ops_test: The ops test framework instance
+        unit_name: The name of the unit
+        related_unit_name: name of the related unit
+
+    Returns:
+        the alias for the application/cluster of
+            the related unit
+
+    Raises:
+        ValueError if it's not possible to get unit data
+            or if there is no alias on that.
+    """
+    raw_data = (await ops_test.juju("show-unit", related_unit_name))[1]
+    if not raw_data:
+        raise ValueError(f"no unit info could be grabbed for {related_unit_name}")
+    data = yaml.safe_load(raw_data)
+
+    # Retrieve the relation data from the unit.
+    relation_data = {}
+    for relation in data[related_unit_name]["relation-info"]:
+        for name, unit in relation["related-units"].items():
+            if name == unit_name:
+                relation_data = unit["data"]
+                break
+
+    # Check whether the unit has set an alias for the related unit application/cluster.
+    if "alias" not in relation_data:
+        raise ValueError(f"no alias could be grabbed for {related_unit_name} application/cluster")
+
+    return relation_data["alias"]
+
+
 async def get_application_relation_data(
     ops_test: OpsTest,
     application_name: str,
@@ -116,10 +153,11 @@ async def get_application_relation_data(
             to get connection data from
 
     Returns:
-        the that that was requested or None
+        the data that was requested or None
             if no data in the relation
+
     Raises:
-        ValueError if it's not possible to get application unit data
+        ValueError if it's not possible to get application data
             or if there is no data for the particular relation endpoint
             and/or alias.
     """
@@ -138,7 +176,10 @@ async def get_application_relation_data(
         relation_data = [
             v
             for v in relation_data
-            if json.loads(v["application-data"]["data"])["alias"] == relation_alias
+            if await get_alias_from_relation_data(
+                ops_test, unit_name, next(iter(v["related-units"]))
+            )
+            == relation_alias
         ]
     if len(relation_data) == 0:
         raise ValueError(
