@@ -303,7 +303,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -661,6 +661,11 @@ class DatabaseRequiresEvent(RelationEvent):
     """Base class for database events."""
 
     @property
+    def database(self) -> Optional[str]:
+        """Returns the database name."""
+        return self.relation.data[self.relation.app].get("database")
+
+    @property
     def endpoints(self) -> Optional[str]:
         """Returns a comma separated list of read/write endpoints."""
         return self.relation.data[self.relation.app].get("endpoints")
@@ -742,6 +747,18 @@ class DatabaseProvides(DataProvides):
         # extra user roles) was added to the relation databag by the application.
         if "database" in diff.added:
             self.on.database_requested.emit(event.relation, app=event.app, unit=event.unit)
+
+    def set_database(self, relation_id: int, database_name: str) -> None:
+        """Set database name.
+
+        This function writes in the application data bag, therefore,
+        only the leader unit can call it.
+
+        Args:
+            relation_id: the identifier for a particular relation.
+            database_name: database name.
+        """
+        self._update_relation_data(relation_id, {"database": database_name})
 
     def set_endpoints(self, relation_id: int, connection_strings: str) -> None:
         """Set database primary connections.
@@ -973,6 +990,11 @@ class KafkaProvidesEvent(RelationEvent):
         """Returns the topic that was requested."""
         return self.relation.data[self.relation.app].get("topic")
 
+    @property
+    def consumer_group_prefix(self) -> Optional[str]:
+        """Returns the consumer-group-prefix that was requested."""
+        return self.relation.data[self.relation.app].get("consumer-group-prefix")
+
 
 class TopicRequestedEvent(KafkaProvidesEvent, ExtraRoleEvent):
     """Event emitted when a new topic is requested for use on this relation."""
@@ -989,6 +1011,11 @@ class KafkaProvidesEvents(CharmEvents):
 
 class KafkaRequiresEvent(RelationEvent):
     """Base class for Kafka events."""
+
+    @property
+    def topic(self) -> Optional[str]:
+        """Returns the topic."""
+        return self.relation.data[self.relation.app].get("topic")
 
     @property
     def bootstrap_server(self) -> Optional[str]:
@@ -1049,6 +1076,15 @@ class KafkaProvides(DataProvides):
         if "topic" in diff.added:
             self.on.topic_requested.emit(event.relation, app=event.app, unit=event.unit)
 
+    def set_topic(self, relation_id: int, topic: str) -> None:
+        """Set topic name in the application relation databag.
+
+        Args:
+            relation_id: the identifier for a particular relation.
+            topic: the topic name.
+        """
+        self._update_relation_data(relation_id, {"topic": topic})
+
     def set_bootstrap_server(self, relation_id: int, bootstrap_server: str) -> None:
         """Set the bootstrap server in the application relation databag.
 
@@ -1082,26 +1118,30 @@ class KafkaRequires(DataRequires):
 
     on = KafkaRequiresEvents()
 
-    def __init__(self, charm, relation_name: str, topic: str, extra_user_roles: str = None):
+    def __init__(
+        self,
+        charm,
+        relation_name: str,
+        topic: str,
+        extra_user_roles: Optional[str] = None,
+        consumer_group_prefix: Optional[str] = None,
+    ):
         """Manager of Kafka client relations."""
         # super().__init__(charm, relation_name)
         super().__init__(charm, relation_name, extra_user_roles)
         self.charm = charm
         self.topic = topic
+        self.consumer_group_prefix = consumer_group_prefix or ""
 
     def _on_relation_joined_event(self, event: RelationJoinedEvent) -> None:
         """Event emitted when the application joins the Kafka relation."""
-        # Sets both topic and extra user roles in the relation
-        # if the roles are provided. Otherwise, sets only the topic.
-        self._update_relation_data(
-            event.relation.id,
-            {
-                "topic": self.topic,
-                "extra-user-roles": self.extra_user_roles,
-            }
-            if self.extra_user_roles is not None
-            else {"topic": self.topic},
-        )
+        # Sets topic, extra user roles, and "consumer-group-prefix" in the relation
+        relation_data = {
+            f: getattr(self, f.replace("-", "_"), "")
+            for f in ["consumer-group-prefix", "extra-user-roles", "topic"]
+        }
+
+        self._update_relation_data(event.relation.id, relation_data)
 
     def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Event emitted when the Kafka relation has changed."""
