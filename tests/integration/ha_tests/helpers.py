@@ -43,7 +43,7 @@ async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     app = await app_name(ops_test)
 
     try:
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
                     _, raw_pid, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-f", process)
