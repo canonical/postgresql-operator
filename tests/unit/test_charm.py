@@ -493,7 +493,7 @@ class TestCharm(unittest.TestCase):
 
         _call.side_effect = [None, subprocess.SubprocessError]
 
-        # Then test for a succesful install.
+        # Then test for a successful install.
         self.charm._install_pip_package(package)
         # Check that check_call was invoked with the correct arguments.
         _call.assert_called_once_with(
