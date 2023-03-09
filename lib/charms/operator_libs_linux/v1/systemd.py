@@ -60,7 +60,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 
 class SystemdError(Exception):
@@ -131,7 +131,7 @@ def service_running(service_name: str) -> bool:
     """Determine whether a system service is running.
 
     Args:
-        service_name: the name of the service
+        service_name: the name of the service to check
     """
     return _systemctl("is-active", service_name, quiet=True)
 
@@ -140,7 +140,7 @@ def service_start(service_name: str) -> bool:
     """Start a system service.
 
     Args:
-        service_name: the name of the service to stop
+        service_name: the name of the service to start
     """
     return _systemctl("start", service_name)
 

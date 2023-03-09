@@ -6,28 +6,13 @@ on:
       - main
 
 jobs:
-  lib-check:
-    name: Check libraries
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v2
-        with:
-          fetch-depth: 0
-      - name: Check libs
-        uses: canonical/charming-actions/check-libraries@1.0.3
-        with:
-          credentials: "${{ secrets.CHARMHUB_TOKEN }}" # FIXME: current token will expire in 2023-07-04
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   ci-tests:
     uses: ./.github/workflows/ci.yaml
+    secrets: inherit
 
   release-to-charmhub:
     name: Release to CharmHub
     needs:
-      - lib-check
       - ci-tests
     runs-on: ubuntu-latest
     timeout-minutes: 60
@@ -37,10 +22,10 @@ jobs:
         with:
           fetch-depth: 0
       - name: Select charmhub channel
-        uses: canonical/charming-actions/channel@2.2.0
+        uses: canonical/charming-actions/channel@2.2.2
         id: channel
       - name: Upload charm to charmhub
-        uses: canonical/charming-actions/upload-charm@2.2.0
+        uses: canonical/charming-actions/upload-charm@2.2.2
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
