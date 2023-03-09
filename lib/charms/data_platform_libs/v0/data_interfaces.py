@@ -16,7 +16,7 @@
 
 This library contains the Requires and Provides classes for handling the relation
 between an application and multiple managed application supported by the data-team:
-MySQL, Postgresql, MongoDB, Redis,  and Kakfa.
+MySQL, Postgresql, MongoDB, Redis, and Kafka.
 
 ### Database (MySQL, Postgresql, MongoDB, and Redis)
 
@@ -303,7 +303,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -1159,7 +1159,7 @@ class KafkaRequires(DataRequires):
             # “endpoints_changed“ event if “topic_created“ is triggered.
             return
 
-        # Emit an endpoints (bootstap-server) changed event if the Kakfa endpoints
+        # Emit an endpoints (bootstap-server) changed event if the Kafka endpoints
         # added or changed this info in the relation databag.
         if "endpoints" in diff.added or "endpoints" in diff.changed:
             # Emit the default event (the one without an alias).
