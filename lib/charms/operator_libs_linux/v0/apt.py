@@ -124,7 +124,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -841,6 +841,68 @@ def update() -> None:
     check_call(["apt-get", "update"], stderr=PIPE, stdout=PIPE)
 
 
+def import_key(key: str) -> str:
+    """Import an ASCII Armor key.
+
+    A Radix64 format keyid is also supported for backwards
+    compatibility. In this case Ubuntu keyserver will be
+    queried for a key via HTTPS by its keyid. This method
+    is less preferable because https proxy servers may
+    require traffic decryption which is equivalent to a
+    man-in-the-middle attack (a proxy server impersonates
+    keyserver TLS certificates and has to be explicitly
+    trusted by the system).
+
+    Args:
+        key: A GPG key in ASCII armor format, including BEGIN
+            and END markers or a keyid.
+
+    Returns:
+        The GPG key filename written.
+
+    Raises:
+        GPGKeyError if the key could not be imported
+    """
+    key = key.strip()
+    if "-" in key or "\n" in key:
+        # Send everything not obviously a keyid to GPG to import, as
+        # we trust its validation better than our own. eg. handling
+        # comments before the key.
+        logger.debug("PGP key found (looks like ASCII Armor format)")
+        if (
+            "-----BEGIN PGP PUBLIC KEY BLOCK-----" in key
+            and "-----END PGP PUBLIC KEY BLOCK-----" in key
+        ):
+            logger.debug("Writing provided PGP key in the binary format")
+            key_bytes = key.encode("utf-8")
+            key_name = DebianRepository._get_keyid_by_gpg_key(key_bytes)
+            key_gpg = DebianRepository._dearmor_gpg_key(key_bytes)
+            gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key_name)
+            DebianRepository._write_apt_gpg_keyfile(
+                key_name=gpg_key_filename, key_material=key_gpg
+            )
+            return gpg_key_filename
+        else:
+            raise GPGKeyError("ASCII armor markers missing from GPG key")
+    else:
+        logger.warning(
+            "PGP key found (looks like Radix64 format). "
+            "SECURELY importing PGP key from keyserver; "
+            "full key not provided."
+        )
+        # as of bionic add-apt-repository uses curl with an HTTPS keyserver URL
+        # to retrieve GPG keys. `apt-key adv` command is deprecated as is
+        # apt-key in general as noted in its manpage. See lp:1433761 for more
+        # history. Instead, /etc/apt/trusted.gpg.d is used directly to drop
+        # gpg
+        key_asc = DebianRepository._get_key_by_keyid(key)
+        # write the key in GPG format so that apt-key list shows it
+        key_gpg = DebianRepository._dearmor_gpg_key(key_asc.encode("utf-8"))
+        gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key)
+        DebianRepository._write_apt_gpg_keyfile(key_name=gpg_key_filename, key_material=key_gpg)
+        return gpg_key_filename
+
+
 class InvalidSourceError(Error):
     """Exceptions for invalid source entries."""
 
@@ -1020,40 +1082,7 @@ class DebianRepository:
         Raises:
           GPGKeyError if the key could not be imported
         """
-        key = key.strip()
-        if "-" in key or "\n" in key:
-            # Send everything not obviously a keyid to GPG to import, as
-            # we trust its validation better than our own. eg. handling
-            # comments before the key.
-            logger.debug("PGP key found (looks like ASCII Armor format)")
-            if (
-                "-----BEGIN PGP PUBLIC KEY BLOCK-----" in key
-                and "-----END PGP PUBLIC KEY BLOCK-----" in key
-            ):
-                logger.debug("Writing provided PGP key in the binary format")
-                key_bytes = key.encode("utf-8")
-                key_name = self._get_keyid_by_gpg_key(key_bytes)
-                key_gpg = self._dearmor_gpg_key(key_bytes)
-                self._gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key_name)
-                self._write_apt_gpg_keyfile(key_name=self._gpg_key_filename, key_material=key_gpg)
-            else:
-                raise GPGKeyError("ASCII armor markers missing from GPG key")
-        else:
-            logger.warning(
-                "PGP key found (looks like Radix64 format). "
-                "SECURELY importing PGP key from keyserver; "
-                "full key not provided."
-            )
-            # as of bionic add-apt-repository uses curl with an HTTPS keyserver URL
-            # to retrieve GPG keys. `apt-key adv` command is deprecated as is
-            # apt-key in general as noted in its manpage. See lp:1433761 for more
-            # history. Instead, /etc/apt/trusted.gpg.d is used directly to drop
-            # gpg
-            key_asc = self._get_key_by_keyid(key)
-            # write the key in GPG format so that apt-key list shows it
-            key_gpg = self._dearmor_gpg_key(key_asc.encode("utf-8"))
-            self._gpg_key_filename = "/etc/apt/trusted.gpg.d/{}.gpg".format(key)
-            self._write_apt_gpg_keyfile(key_name=key, key_material=key_gpg)
+        self._gpg_key_filename = import_key(key)
 
     @staticmethod
     def _get_keyid_by_gpg_key(key_material: bytes) -> str:

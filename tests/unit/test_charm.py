@@ -5,7 +5,6 @@ import subprocess
 import unittest
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
-import ops.testing
 from charms.operator_libs_linux.v0 import apt
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
@@ -28,9 +27,6 @@ class TestCharm(unittest.TestCase):
         self._peer_relation = PEER
         self._postgresql_container = "postgresql"
         self._postgresql_service = "postgresql"
-
-        ops.testing.SIMULATE_CAN_CONNECT = True
-        self.addCleanup(setattr, ops.testing, "SIMULATE_CAN_CONNECT", False)
 
         self.harness = Harness(PostgresqlOperatorCharm)
         self.addCleanup(self.harness.cleanup)
