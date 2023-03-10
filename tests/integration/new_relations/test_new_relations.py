@@ -71,7 +71,7 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
     """Test that there is no read-only endpoint in a standalone cluster."""
     async with ops_test.fast_forward():
         # Ensure the cluster starts with only one member.
-        # We cant scale down a running cluster to 1 unit because the way
+        # We can't scale down a running cluster to 1 unit because the way
         # Patroni raft implementation works (to scale from 2 units to 1 Patroni
         # needs at least one mode unit that run only raft to have quorum).
         assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 1

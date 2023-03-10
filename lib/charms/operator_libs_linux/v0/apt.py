@@ -78,7 +78,6 @@ Keys are constructed as `{repo_type}-{}-{release}` in order to uniquely identify
 Repositories can be added with explicit values through a Python constructor.
 
 Example:
-
 ```python
 repositories = apt.RepositoryMapping()
 
@@ -91,7 +90,6 @@ Alternatively, any valid `sources.list` line may be used to construct a new
 `DebianRepository`.
 
 Example:
-
 ```python
 repositories = apt.RepositoryMapping()
 
@@ -124,7 +122,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 
 VALID_SOURCE_TYPES = ("deb", "deb-src")
@@ -135,7 +133,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        """String representation of Error."""
+        """Represent the Error."""
         return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
@@ -212,15 +210,15 @@ class DebianPackage:
         ) == (other._name, other._version.number)
 
     def __hash__(self):
-        """A basic hash so this class can be used in Mappings and dicts."""
+        """Return a hash of this package."""
         return hash((self._name, self._version.number))
 
     def __repr__(self):
-        """A representation of the package."""
+        """Represent the package."""
         return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
-        """A human-readable representation of the package."""
+        """Return a human-readable representation of the package."""
         return "<{}: {}-{}.{} -- {}>".format(
             self.__class__.__name__,
             self._name,
@@ -267,7 +265,7 @@ class DebianPackage:
         )
 
     def _remove(self) -> None:
-        """Removes a package from the system. Implementation-specific."""
+        """Remove a package from the system. Implementation-specific."""
         return self._apt("remove", "{}={}".format(self.name, self.version))
 
     @property
@@ -276,7 +274,7 @@ class DebianPackage:
         return self._name
 
     def ensure(self, state: PackageState):
-        """Ensures that a package is in a given state.
+        """Ensure that a package is in a given state.
 
         Args:
           state: a `PackageState` to reconcile the package to
@@ -308,7 +306,7 @@ class DebianPackage:
 
     @state.setter
     def state(self, state: PackageState) -> None:
-        """Sets the package state to a given value.
+        """Set the package state to a given value.
 
         Args:
           state: a `PackageState` to reconcile the package to
@@ -527,11 +525,11 @@ class Version:
         self._epoch = epoch or ""
 
     def __repr__(self):
-        """A representation of the package."""
+        """Represent the package."""
         return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
-        """A human-readable representation of the package."""
+        """Return human-readable representation of the package."""
         return "{}{}".format("{}:".format(self._epoch) if self._epoch else "", self._version)
 
     @property
@@ -732,6 +730,7 @@ def add_package(
     """Add a package or list of packages to the system.
 
     Args:
+        package_names: single package name, or list of package names
         name: the name(s) of the package(s)
         version: an (Optional) version as a string. Defaults to the latest known
         arch: an optional architecture for the package
@@ -788,7 +787,7 @@ def _add(
     version: Optional[str] = "",
     arch: Optional[str] = "",
 ) -> Tuple[Union[DebianPackage, str], bool]:
-    """Adds a package.
+    """Add a package to the system.
 
     Args:
         name: the name(s) of the package(s)
@@ -809,7 +808,7 @@ def _add(
 def remove_package(
     package_names: Union[str, List[str]]
 ) -> Union[DebianPackage, List[DebianPackage]]:
-    """Removes a package from the system.
+    """Remove package(s) from the system.
 
     Args:
         package_names: the name of a package
@@ -837,7 +836,7 @@ def remove_package(
 
 
 def update() -> None:
-    """Updates the apt cache via `apt-get update`."""
+    """Update the apt cache via `apt-get update`."""
     check_call(["apt-get", "update"], stderr=PIPE, stdout=PIPE)
 
 
@@ -966,7 +965,7 @@ class DebianRepository:
 
     @filename.setter
     def filename(self, fname: str) -> None:
-        """Sets the filename used when a repo is written back to diskself.
+        """Set the filename used when a repo is written back to disk.
 
         Args:
             fname: a filename to write the repository information to.
@@ -1148,7 +1147,7 @@ class DebianRepository:
 
     @staticmethod
     def _dearmor_gpg_key(key_asc: bytes) -> bytes:
-        """Converts a GPG key in the ASCII armor format to the binary format.
+        """Convert a GPG key in the ASCII armor format to the binary format.
 
         Args:
           key_asc: A GPG key in ASCII armor format.
@@ -1172,7 +1171,7 @@ class DebianRepository:
 
     @staticmethod
     def _write_apt_gpg_keyfile(key_name: str, key_material: bytes) -> None:
-        """Writes GPG key material into a file at a provided path.
+        """Write GPG key material into a file at a provided path.
 
         Args:
           key_name: A key name to use for a key file (could be a fingerprint)
@@ -1220,7 +1219,7 @@ class RepositoryMapping(Mapping):
         return len(self._repository_map)
 
     def __iter__(self) -> Iterable[DebianRepository]:
-        """Iterator magic method for RepositoryMapping."""
+        """Return iterator for RepositoryMapping."""
         return iter(self._repository_map.values())
 
     def __getitem__(self, repository_uri: str) -> DebianRepository:
