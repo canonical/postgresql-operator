@@ -35,13 +35,9 @@ RELATION_NAME = "db-admin"
 
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
-    config = {
-        "extra-packages": "python-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython.*"
-    }
     resources = {"patroni": "patroni.tar.gz"}
     await ops_test.model.deploy(
         charm,
-        config=config,
         resources=resources,
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
