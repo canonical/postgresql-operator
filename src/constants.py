@@ -16,7 +16,6 @@ REPLICATION_USER = "replication"
 REPLICATION_PASSWORD_KEY = "replication-password"
 REWIND_USER = "rewind"
 REWIND_PASSWORD_KEY = "rewind-password"
-SNAP_PACKAGES = [("charmed-postgresql", "14/edge/charm-fixes")]
 TLS_KEY_FILE = "key.pem"
 TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"
@@ -24,3 +23,7 @@ USER = "operator"
 USER_PASSWORD_KEY = "operator-password"
 # List of system usernames needed for correct work of the charm/workload.
 SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER]
+
+# Snap constants.
+PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
+SNAP_PACKAGES = [("charmed-postgresql", "14/edge/charm-fixes")]

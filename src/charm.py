@@ -9,7 +9,6 @@ import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
-from charms.operator_libs_linux.v0 import apt, passwd
 from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
@@ -30,11 +29,10 @@ from ops.charm import (
 )
 from ops.framework import EventBase
 from ops.main import main
-from ops.model import (  # ModelError,
+from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
-    ModelError,
     Relation,
     Unit,
     WaitingStatus,
@@ -537,56 +535,12 @@ class PostgresqlOperatorCharm(CharmBase):
         # Prevent the default cluster creation.
         self._inhibit_default_cluster_creation()
 
-        passwd.add_group(group_name="postgres")
-        passwd.add_user(username="postgres")
-
-        # try:
-        #     resource_path = self.model.resources.fetch("patroni")
-        # except ModelError as e:
-        #     logger.error(f"missing patroni resource {str(e)}")
-        #     self.unit.status = BlockedStatus("Missing 'patroni' resource")
-        #     return
-
-        # # Build Patroni package path with raft dependency and install it.
-        # try:
-        #     patroni_package_path = f"{str(resource_path)}[raft]"
-        #     self._install_pip_packages([patroni_package_path])
-        # except subprocess.SubprocessError:
-        #     self.unit.status = BlockedStatus("failed to install Patroni python package")
-        #     return
-        #
-        # Install the PostgreSQL and Patroni requirements packages.
+        # Install the charmed PostgreSQL snap.
         try:
-            # self._install_apt_packages(
-            #     event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
-            # )
             self._install_snap_packages(packages=SNAP_PACKAGES)
-            # except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            # self.unit.status = BlockedStatus("failed to install apt packages")
-            # return
         except snap.SnapError:
             self.unit.status = BlockedStatus("failed to install snap packages")
-
-        # try:
-        #     resource_path = self.model.resources.fetch("patroni")
-        # except ModelError as e:
-        #     logger.error(f"missing patroni resource {str(e)}")
-        #     self.unit.status = BlockedStatus("Missing 'patroni' resource")
-        #     return
-        #
-        # try:
-        #     self._install_pip_package("python-dateutil", user="postgres")
-        # except subprocess.SubprocessError:
-        #     self.unit.status = BlockedStatus("failed to install python-dateutil package")
-        #     return
-        #
-        # # Build Patroni package path with raft dependency and install it.
-        # try:
-        #     patroni_package_path = f"{str(resource_path)}[raft]"
-        #     self._install_pip_package(patroni_package_path)
-        # except subprocess.SubprocessError:
-        #     self.unit.status = BlockedStatus("failed to install Patroni python package")
-        #     return
+            return
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
@@ -865,54 +819,6 @@ class PostgresqlOperatorCharm(CharmBase):
             password has not yet been set by the leader.
         """
         return self.get_secret("app", REPLICATION_PASSWORD_KEY)
-
-    def _install_apt_packages(self, _, packages: List[str]) -> None:
-        """Simple wrapper around 'apt-get install -y.
-
-        Raises:
-            CalledProcessError if it fails to update the apt cache.
-            PackageNotFoundError if the package is not in the cache.
-            PackageError if the packages could not be installed.
-        """
-        try:
-            logger.debug("updating apt cache")
-            apt.update()
-        except subprocess.CalledProcessError as e:
-            logger.exception("failed to update apt cache, CalledProcessError", exc_info=e)
-            raise
-
-        for package in packages:
-            try:
-                apt.add_package(package)
-                logger.debug(f"installed package: {package}")
-            except apt.PackageNotFoundError:
-                logger.error(f"package not found: {package}")
-                raise
-            except apt.PackageError:
-                logger.error(f"package error: {package}")
-                raise
-
-    def _install_pip_package(self, package: str, user: Optional[str] = None) -> None:
-        """Simple wrapper around pip install.
-
-        Raises:
-            SubprocessError if the packages could not be installed.
-        """
-        try:
-            command = [
-                "pip3",
-                "install",
-                package,
-            ]
-            if user:
-                command.insert(0, "sudo")
-                command.insert(1, "-u")
-                command.insert(2, user)
-            logger.debug(f"installing python package: {package}")
-            subprocess.check_call(command)
-        except subprocess.SubprocessError:
-            logger.error("could not install pip package")
-            raise
 
     def _install_snap_packages(self, packages: List[str]) -> None:
         """Installs package(s) to container.

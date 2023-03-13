@@ -12,13 +12,6 @@ from typing import Set
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1 import snap
-from charms.operator_libs_linux.v1.systemd import (
-    daemon_reload,
-    service_restart,
-    service_resume,
-    service_running,
-    service_start,
-)
 from jinja2 import Template
 from tenacity import (
     AttemptManager,
@@ -121,10 +114,7 @@ class Patroni:
         # Avoid rendering the Patroni config file if it was already rendered.
         if not os.path.exists("/var/snap/charmed-postgresql/common/patroni/config.yaml"):
             self.render_patroni_yml_file()
-        self._render_patroni_service_file()
         self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o644)
-        # Reload systemd services before trying to start Patroni.
-        daemon_reload()
         self.render_postgresql_conf_file()
 
     def _change_owner(self, path: str) -> None:
@@ -133,8 +123,8 @@ class Patroni:
         Args:
             path: path to a file or directory.
         """
-        # Get the uid/gid for the postgres user.
-        user_database = pwd.getpwnam("postgres")
+        # Get the uid/gid for the snap_daemon user.
+        user_database = pwd.getpwnam("snap_daemon")
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
@@ -325,15 +315,6 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def _render_patroni_service_file(self) -> None:
-        """Render the Patroni configuration file."""
-        # Open the template patroni systemd unit file.
-        with open("templates/patroni.service.j2", "r") as file:
-            template = Template(file.read())
-        # Render the template file with the correct values.
-        rendered = template.render(conf_path=self.storage_path)
-        self.render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
-
     def render_patroni_yml_file(self, enable_tls: bool = False, stanza: str = None) -> None:
         """Render the Patroni configuration file.
 
@@ -361,7 +342,9 @@ class Patroni:
             stanza=stanza,
             version=self._get_postgresql_version(),
         )
-        self.render_file("/var/snap/charmed-postgresql/common/patroni/config.yaml", rendered, 0o644)
+        self.render_file(
+            "/var/snap/charmed-postgresql/common/patroni/config.yaml", rendered, 0o644
+        )
 
     def render_postgresql_conf_file(self) -> None:
         """Render the PostgreSQL configuration file."""
@@ -379,15 +362,11 @@ class Patroni:
         self.render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
     def start_patroni(self) -> bool:
-        """Start Patroni service using systemd.
+        """Start Patroni service using snap.
 
         Returns:
             Whether the service started successfully.
         """
-        # Start the service and enable it to start at boot.
-        # service_start(PATRONI_SERVICE)
-        # service_resume(PATRONI_SERVICE)
-        # return service_running(PATRONI_SERVICE)
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
@@ -457,15 +436,6 @@ class Patroni:
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         requests.post(f"{self._patroni_url}/reload", verify=self.verify)
-
-    def restart_patroni(self) -> bool:
-        """Restart Patroni.
-
-        Returns:
-            Whether the service restarted successfully.
-        """
-        service_restart(PATRONI_SERVICE)
-        return service_running(PATRONI_SERVICE)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:

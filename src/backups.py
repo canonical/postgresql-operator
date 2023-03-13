@@ -21,7 +21,7 @@ from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
-from constants import BACKUP_USER
+from constants import BACKUP_USER, PGBACKREST_EXECUTABLE
 
 logger = logging.getLogger(__name__)
 
@@ -99,7 +99,7 @@ class PostgreSQLBackups(Object):
         """Execute a command in the workload container."""
 
         def demote():
-            pw_record = pwd.getpwnam("postgres")
+            pw_record = pwd.getpwnam("snap_daemon")
 
             def result():
                 os.setgid(pw_record.pw_gid)
@@ -118,7 +118,7 @@ class PostgreSQLBackups(Object):
         """
         backup_ids = []
         _, output, _ = self._execute_command(
-            ["pgbackrest", "repo-ls", f"backup/{self.charm.cluster_name}"]
+            [PGBACKREST_EXECUTABLE, "repo-ls", f"backup/{self.charm.cluster_name}"]
         )
         if output:
             backup_ids = re.findall(r".*[F]$", output, re.MULTILINE)
@@ -146,7 +146,7 @@ class PostgreSQLBackups(Object):
 
         # Create the stanza.
         return_code, _, stderr = self._execute_command(
-            ["pgbackrest", f"--stanza={self.charm.cluster_name}", "stanza-create"]
+            [PGBACKREST_EXECUTABLE, f"--stanza={self.charm.cluster_name}", "stanza-create"]
         )
         if return_code != 0:
             logger.error(stderr)
@@ -165,7 +165,7 @@ class PostgreSQLBackups(Object):
                 with attempt:
                     self.charm._patroni.reload_patroni_configuration()
                     return_code, _, stderr = self._execute_command(
-                        ["pgbackrest", f"--stanza={self.charm.cluster_name}", "check"]
+                        [PGBACKREST_EXECUTABLE, f"--stanza={self.charm.cluster_name}", "check"]
                     )
                     if return_code != 0:
                         raise Exception(stderr)
@@ -232,7 +232,7 @@ class PostgreSQLBackups(Object):
 
         return_code, stdout, stderr = self._execute_command(
             [
-                "pgbackrest",
+                PGBACKREST_EXECUTABLE,
                 f"--stanza={self.charm.cluster_name}",
                 "--log-level-console=debug",
                 "--type=full",
