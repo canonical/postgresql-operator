@@ -753,7 +753,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
-        event.set_results({f"{username}-password": self.get_secret("app", f"{username}-password")})
+        event.set_results({"password": self.get_secret("app", f"{username}-password")})
 
     def _on_set_password(self, event: ActionEvent) -> None:
         """Set the password for the specified user."""
@@ -774,7 +774,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         if password == self.get_secret("app", f"{username}-password"):
             event.log("The old and new passwords are equal.")
-            event.set_results({f"{username}-password": password})
+            event.set_results({"password": password})
             return
 
         # Ensure all members are ready before trying to reload Patroni
@@ -803,7 +803,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
 
-        event.set_results({f"{username}-password": password})
+        event.set_results({"password": password})
 
     def _on_update_status(self, _) -> None:
         """Update users list in the database."""

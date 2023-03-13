@@ -254,7 +254,7 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
             break
     action = await ops_test.model.units.get(unit_name).run_action("get-password")
     action = await action.wait()
-    return action.results["operator-password"]
+    return action.results["password"]
 
 
 def is_replica(ops_test: OpsTest, unit_name: str) -> bool:

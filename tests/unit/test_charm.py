@@ -377,15 +377,13 @@ class TestCharm(unittest.TestCase):
         mock_event.reset_mock()
         del mock_event.params["username"]
         self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with({"operator-password": "test-password"})
+        mock_event.set_results.assert_called_once_with({"password": "test-password"})
 
         # Also test providing the username option.
         mock_event.reset_mock()
         mock_event.params["username"] = "replication"
         self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with(
-            {"replication-password": "replication-test-password"}
-        )
+        mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm.update_config")
