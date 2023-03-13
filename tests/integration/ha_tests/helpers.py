@@ -3,7 +3,7 @@
 import random
 import subprocess
 from pathlib import Path
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 import psycopg2
 import requests
@@ -73,6 +73,11 @@ async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> O
     return None
 
 
+def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
+    resp = requests.get(f"http://{unit_ip}:8008/cluster")
+    return resp.json()
+
+
 async def change_master_start_timeout(
     ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
 ) -> None:
@@ -128,29 +133,40 @@ async def change_wal_settings(
             )
 
 
+async def check_writes(ops_test) -> int:
+    """Gets the total writes from the test charm and compares to the writes from db."""
+    total_expected_writes = await stop_continuous_writes(ops_test)
+    actual_writes = await count_writes(ops_test)
+    assert total_expected_writes == actual_writes, "writes to the db were missed."
+    return total_expected_writes
+
+
 async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
     for unit in ops_test.model.applications[app].units:
         if unit.name != down_unit:
-            host = unit.public_address
+            cluster = get_patroni_cluster(unit.public_address)
             break
+    down_ip = None
+    if down_unit:
+        for unit in ops_test.model.applications[app].units:
+            if unit.name == down_unit:
+                down_ip = unit.public_address
+    for member in cluster["members"]:
+        if member["role"] != "replica" and member["host"] != down_ip:
+            host = member["host"]
+
     connection_string = (
         f"dbname='application' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
     )
-    try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                with psycopg2.connect(
-                    connection_string
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-                    count = cursor.fetchone()[0]
-                connection.close()
-    except RetryError:
-        return -1
+
+    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
+        count = cursor.fetchone()[0]
+    connection.close()
     return count
 
 
@@ -263,7 +279,7 @@ def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
 
                 # A member that restarted has the DB process stopped may
                 # take some time to know that a new primary was elected.
-                if role == "replica":
+                if role != "leader":
                     return True
                 else:
                     raise MemberNotUpdatedOnClusterError()
@@ -278,12 +294,13 @@ async def get_primary(ops_test: OpsTest, app) -> str:
         primary unit name.
     """
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        # Can retrieve from any unit running unit, so we pick the first.
-        unit_name = ops_test.model.applications[app].units[0].name
-        action = await ops_test.model.units.get(unit_name).run_action("get-primary")
-        action = await action.wait()
-        assert action.results["primary"] is not None
-        return action.results["primary"]
+        with attempt:
+            # Can retrieve from any unit running unit, so we pick the first.
+            unit_name = ops_test.model.applications[app].units[0].name
+            action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+            action = await action.wait()
+            assert action.results["primary"] is not None and action.results["primary"] != "None"
+            return action.results["primary"]
 
 
 async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
@@ -382,13 +399,15 @@ async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
     if not relations:
         await ops_test.model.relate(app, "application")
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
-    else:
-        action = (
-            await ops_test.model.applications["application"]
-            .units[0]
-            .run_action("start-continuous-writes")
-        )
-        await action.wait()
+    for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            action = (
+                await ops_test.model.applications["application"]
+                .units[0]
+                .run_action("start-continuous-writes")
+            )
+            await action.wait()
+            assert action.results["result"] == "True", "Unable to create continuous_writes table"
 
 
 async def stop_continuous_writes(ops_test: OpsTest) -> int:

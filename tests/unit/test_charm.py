@@ -3,9 +3,8 @@
 import os
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
-import ops.testing
 from charms.operator_libs_linux.v0 import apt
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
@@ -16,7 +15,7 @@ from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
 from tenacity import RetryError
 
-from charm import PostgresqlOperatorCharm
+from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from constants import PEER
 from tests.helpers import patch_network_get
 
@@ -28,9 +27,6 @@ class TestCharm(unittest.TestCase):
         self._peer_relation = PEER
         self._postgresql_container = "postgresql"
         self._postgresql_service = "postgresql"
-
-        ops.testing.SIMULATE_CAN_CONNECT = True
-        self.addCleanup(setattr, ops.testing, "SIMULATE_CAN_CONNECT", False)
 
         self.harness = Harness(PostgresqlOperatorCharm)
         self.addCleanup(self.harness.cleanup)
@@ -135,11 +131,7 @@ class TestCharm(unittest.TestCase):
             )
             # Check the write calls made to the file.
             handle = mock()
-            calls = [
-                call("create_main_cluster = false\n"),
-                call(f"include '{self.charm._storage_path}/conf.d/postgresql-operator.conf'"),
-            ]
-            handle.write.assert_has_calls(calls)
+            handle.write.assert_called_once_with("create_main_cluster = false\n")
 
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch(
@@ -501,7 +493,7 @@ class TestCharm(unittest.TestCase):
 
         _call.side_effect = [None, subprocess.SubprocessError]
 
-        # Then test for a succesful install.
+        # Then test for a successful install.
         self.charm._install_pip_package(package)
         # Check that check_call was invoked with the correct arguments.
         _call.assert_called_once_with(
@@ -650,3 +642,50 @@ class TestCharm(unittest.TestCase):
             self.assertEqual(
                 self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
             )
+
+    @patch("charm.PostgresqlOperatorCharm._update_certificate")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    def test_on_cluster_topology_change(self, _update_relation_endpoints, _update_certificate):
+        self.charm._on_cluster_topology_change(Mock())
+
+        _update_relation_endpoints.assert_called_once_with()
+        _update_certificate.assert_called_once_with()
+
+    @patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock,
+        return_value=None,
+    )
+    @patch("charm.PostgresqlOperatorCharm._update_certificate")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    def test_on_cluster_topology_change_keep_blocked(
+        self, _update_relation_endpoints, _update_certificate, _primary_endpoint
+    ):
+        self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+
+        self.charm._on_cluster_topology_change(Mock())
+
+        _update_relation_endpoints.assert_called_once_with()
+        _update_certificate.assert_called_once_with()
+        _primary_endpoint.assert_called_once_with()
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+        self.assertEqual(self.harness.model.unit.status.message, NO_PRIMARY_MESSAGE)
+
+    @patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock,
+        return_value="fake-unit",
+    )
+    @patch("charm.PostgresqlOperatorCharm._update_certificate")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    def test_on_cluster_topology_change_clear_blocked(
+        self, _update_relation_endpoints, _update_certificate, _primary_endpoint
+    ):
+        self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+
+        self.charm._on_cluster_topology_change(Mock())
+
+        _update_relation_endpoints.assert_called_once_with()
+        _update_certificate.assert_called_once_with()
+        _primary_endpoint.assert_called_once_with()
+        self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))

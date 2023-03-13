@@ -37,7 +37,7 @@ def mocked_requests_get(*args, **kwargs):
     raise requests.exceptions.Timeout()
 
 
-class TestCharm(unittest.TestCase):
+class TestCluster(unittest.TestCase):
     def setUp(self):
         # Setup a cluster.
         self.peers_ips = {"2.2.2.2", "3.3.3.3"}
@@ -216,6 +216,7 @@ class TestCharm(unittest.TestCase):
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
             version=self.patroni._get_postgresql_version(),
+            minority_count=self.patroni.planned_units // 2,
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
@@ -232,37 +233,6 @@ class TestCharm(unittest.TestCase):
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
             f"{STORAGE_PATH}/patroni.yml",
-            expected_content,
-            0o644,
-        )
-
-    @patch("charm.Patroni.render_file")
-    @patch("charm.Patroni._create_directory")
-    def test_render_postgresql_conf_file(self, _, _render_file):
-        # Get the expected content from a file.
-        with open("templates/postgresql.conf.j2") as file:
-            template = Template(file.read())
-        expected_content = template.render(
-            listen_addresses="*",
-            logging_collector="on",
-            synchronous_commit="off",
-            synchronous_standby_names="*",
-        )
-
-        # Setup a mock for the `open` method, set returned data to postgresql.conf template.
-        with open("templates/postgresql.conf.j2", "r") as f:
-            mock = mock_open(read_data=f.read())
-
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            # Call the method
-            self.patroni.render_postgresql_conf_file()
-
-        # Check the template is opened read-only in the call to open.
-        self.assertEqual(mock.call_args_list[0][0], ("templates/postgresql.conf.j2", "r"))
-        # Ensure the correct rendered template is sent to _render_file method.
-        _render_file.assert_called_once_with(
-            f"{STORAGE_PATH}/conf.d/postgresql-operator.conf",
             expected_content,
             0o644,
         )
@@ -311,4 +281,27 @@ class TestCharm(unittest.TestCase):
         self.patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
             f"http://{self.patroni.unit_ip}:8008/reinitialize", verify=True
+        )
+
+    @mock.patch("requests.post")
+    @patch("cluster.Patroni.get_primary", return_value="primary")
+    def test_switchover(self, _, _post):
+        response = _post.return_value
+        response.status_code = 200
+
+        self.patroni.switchover()
+
+        _post.assert_called_once_with(
+            "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
+        )
+
+    @mock.patch("requests.patch")
+    def test_update_synchronous_node_count(self, _patch):
+        response = _patch.return_value
+        response.status_code = 200
+
+        self.patroni.update_synchronous_node_count()
+
+        _patch.assert_called_once_with(
+            "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )

@@ -50,6 +50,10 @@ class SwitchoverFailedError(Exception):
     """Raised when a switchover failed for some reason."""
 
 
+class UpdateSyncNodeCountError(Exception):
+    """Raised when updating synchronous_node_count failed for some reason."""
+
+
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
@@ -75,8 +79,8 @@ class Patroni:
             storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
-            peers_ips: IP addresses of the peer units
             planned_units: number of units planned for the cluster
+            peers_ips: IP addresses of the peer units
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
@@ -341,25 +345,11 @@ class Patroni:
             enable_pgbackrest=stanza is not None,
             stanza=stanza,
             version=self._get_postgresql_version(),
+            minority_count=self.planned_units // 2,
         )
         self.render_file(
             "/var/snap/charmed-postgresql/common/patroni/config.yaml", rendered, 0o644
         )
-
-    def render_postgresql_conf_file(self) -> None:
-        """Render the PostgreSQL configuration file."""
-        # Open the template postgresql.conf file.
-        with open("templates/postgresql.conf.j2", "r") as file:
-            template = Template(file.read())
-        # Render the template file with the correct values.
-        # TODO: add extra configurations here later.
-        rendered = template.render(
-            listen_addresses="*",
-            synchronous_commit="on" if self.planned_units > 1 else "off",
-            synchronous_standby_names="*",
-        )
-        self._create_directory(f"{self.storage_path}/conf.d", mode=0o644)
-        self.render_file(f"{self.storage_path}/conf.d/postgresql-operator.conf", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
@@ -446,3 +436,20 @@ class Patroni:
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
         requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
+
+    def update_synchronous_node_count(self, units: int = None) -> None:
+        """Update synchronous_node_count to the minority of the planned cluster."""
+        if units is None:
+            units = self.planned_units
+        # Try to update synchronous_node_count.
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                r = requests.patch(
+                    f"{self._patroni_url}/config",
+                    json={"synchronous_node_count": units // 2},
+                    verify=self.verify,
+                )
+
+                # Check whether the update was unsuccessful.
+                if r.status_code != 200:
+                    raise UpdateSyncNodeCountError(f"received {r.status_code}")

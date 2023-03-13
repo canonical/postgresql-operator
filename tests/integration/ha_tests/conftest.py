@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.helpers import (
     ORIGINAL_RESTART_DELAY,
@@ -13,7 +14,7 @@ from tests.integration.ha_tests.helpers import (
     get_postgresql_parameter,
     update_restart_delay,
 )
-from tests.integration.helpers import CHARM_SERIES, run_command_on_unit
+from tests.integration.helpers import run_command_on_unit
 
 APPLICATION_NAME = "application"
 
@@ -21,25 +22,20 @@ APPLICATION_NAME = "application"
 @pytest.fixture()
 async def continuous_writes(ops_test: OpsTest) -> None:
     """Deploy the charm that makes continuous writes to PostgreSQL."""
-    # Deploy the continuous writes application charm if it wasn't already deployed.
-    async with ops_test.fast_forward():
-        if await app_name(ops_test, APPLICATION_NAME) is None:
-            charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
-            await ops_test.model.deploy(
-                charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
-            )
-            await ops_test.model.wait_for_idle(status="active", timeout=1000)
     yield
     # Clear the written data at the end.
-    action = (
-        await ops_test.model.applications[APPLICATION_NAME]
-        .units[0]
-        .run_action("clear-continuous-writes")
-    )
-    await action.wait()
+    for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            action = (
+                await ops_test.model.applications[APPLICATION_NAME]
+                .units[0]
+                .run_action("clear-continuous-writes")
+            )
+            await action.wait()
+            assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 async def master_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the master start timeout configuration."""
     # Change the parameter that makes the primary reelection faster.
