@@ -10,7 +10,6 @@ import subprocess
 from typing import Set
 
 import requests
-from charms.operator_libs_linux.v0.apt import DebianPackage
 from charms.operator_libs_linux.v1 import snap
 from jinja2 import Template
 from tenacity import (
@@ -159,9 +158,8 @@ class Patroni:
 
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
-        package = DebianPackage.from_system("postgresql")
-        # Remove the Ubuntu revision from the version.
-        return str(package.version).split("+")[0]
+        # TODO use a real version
+        return "14"
 
     def get_member_ip(self, member_name: str) -> str:
         """Get cluster member IP address.

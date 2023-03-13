@@ -5,7 +5,7 @@ import subprocess
 import unittest
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
-from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLUpdateUserPasswordError,
@@ -35,8 +35,7 @@ class TestCharm(unittest.TestCase):
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._install_pip_package")
-    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
+    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
     @patch(
@@ -48,8 +47,7 @@ class TestCharm(unittest.TestCase):
         _is_storage_attached,
         _reboot_on_detached_storage,
         _inhibit_default_cluster_creation,
-        _install_apt_packages,
-        _install_pip_package,
+        _install_snap_packages,
     ):
         # Test without storage.
         self.charm.on.install.emit()
@@ -59,64 +57,28 @@ class TestCharm(unittest.TestCase):
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
         _inhibit_default_cluster_creation.assert_called_once()
-        _install_apt_packages.assert_called_once()
-        # Assert that the needed calls were made.
-        _install_pip_package.assert_not_called()
-        # Assert the status set by the event handler.
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+        _install_snap_packages.assert_called_once()
 
-        # Add an empty file as Patroni resource just to check that the correct calls were made.
-        self.harness.add_resource("patroni", "")
-        self.charm.on.install.emit()
-        self.assertEqual(_install_pip_package.call_count, 2)
         # Assert the status set by the event handler.
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._install_pip_package")
-    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
+    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
-    def test_on_install_apt_failure(
+    def test_on_install_snap_failure(
         self,
         _is_storage_attached,
         _inhibit_default_cluster_creation,
-        _install_apt_packages,
-        _install_pip_package,
+        _install_snap_packages,
     ):
         # Mock the result of the call.
-        _install_apt_packages.side_effect = apt.PackageNotFoundError
+        _install_snap_packages.side_effect = snap.SnapError
         # Trigger the hook.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
         _inhibit_default_cluster_creation.assert_called_once()
-        _install_apt_packages.assert_called_once()
-        _install_pip_package.assert_not_called()
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._install_pip_package")
-    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
-    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
-    def test_on_install_pip_failure(
-        self,
-        _is_storage_attached,
-        _inhibit_default_cluster_creation,
-        _install_apt_packages,
-        _install_pip_package,
-    ):
-        # Mock the result of the call.
-        _install_pip_package.side_effect = subprocess.CalledProcessError(
-            cmd="pip3 install patroni", returncode=1
-        )
-        # Add an empty file as Patroni resource just to check that the correct calls were made.
-        self.harness.add_resource("patroni", "")
-        self.charm.on.install.emit()
-        # Assert that the needed calls were made.
-        _inhibit_default_cluster_creation.assert_called_once()
-        _install_apt_packages.assert_called_once()
-        _install_pip_package.assert_called_once()
+        _install_snap_packages.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch("os.makedirs")
@@ -454,65 +416,9 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
-    @patch("charms.operator_libs_linux.v0.apt.add_package")
-    @patch("charms.operator_libs_linux.v0.apt.update")
-    def test_install_apt_packages(self, _update, _add_package):
-        mock_event = Mock()
-
-        # Mock the returns of apt-get update calls.
-        _update.side_effect = [
-            subprocess.CalledProcessError(returncode=1, cmd="apt-get update"),
-            None,
-            None,
-        ]
-
-        # Test for problem with apt update.
-        with self.assertRaises(subprocess.CalledProcessError):
-            self.charm._install_apt_packages(mock_event, ["postgresql"])
-            _update.assert_called_once()
-
-        # Test with a not found package.
-        _add_package.side_effect = apt.PackageNotFoundError
-        with self.assertRaises(apt.PackageNotFoundError):
-            self.charm._install_apt_packages(mock_event, ["postgresql"])
-            _update.assert_called()
-            _add_package.assert_called_with("postgresql")
-
-        # Then test a valid one.
-        _update.reset_mock()
-        _add_package.reset_mock()
-        _add_package.side_effect = None
-        self.charm._install_apt_packages(mock_event, ["postgresql"])
-        _update.assert_called_once()
-        _add_package.assert_called_with("postgresql")
-
-    @patch("subprocess.call")
-    def test_install_pip_package(self, _call):
-        # Fake pip packages.
-        package = "package1"
-
-        _call.side_effect = [None, subprocess.SubprocessError]
-
-        # Then test for a successful install.
-        self.charm._install_pip_package(package)
-        # Check that check_call was invoked with the correct arguments.
-        _call.assert_called_once_with(
-            [
-                "pip3",
-                "install",
-                package,
-            ]
-        )
-        # Assert the status set by the event handler.
-        self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-        # Then, test for an error.
-        with self.assertRaises(subprocess.SubprocessError):
-            self.charm._install_pip_package(package)
-
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def testget_secret(self, _):
+    def test_get_secret(self, _):
         self.harness.set_leader()
 
         # Test application scope.
