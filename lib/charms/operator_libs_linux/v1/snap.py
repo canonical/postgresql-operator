@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -113,7 +113,7 @@ class SnapService:
         enabled: bool = False,
         active: bool = False,
         activators: List[str] = [],
-        **kwargs
+        **kwargs,
     ):
         self.daemon = daemon
         self.daemon_scope = kwargs.get("daemon-scope", None) or daemon_scope
@@ -122,7 +122,7 @@ class SnapService:
         self.activators = activators
 
     def as_dict(self) -> Dict:
-        """Returns instance representation as dict."""
+        """Return instance representation as dict."""
         return {
             "daemon": self.daemon,
             "daemon_scope": self.daemon_scope,
@@ -158,7 +158,7 @@ class Error(Exception):
     """Base class of most errors raised by this library."""
 
     def __repr__(self):
-        """String representation of the Error class."""
+        """Represent the Error class."""
         return "<{}.{} {}>".format(type(self).__module__, type(self).__name__, self.args)
 
     @property
@@ -176,7 +176,6 @@ class SnapAPIError(Error):
     """Raised when an HTTP API error occurs talking to the Snapd server."""
 
     def __init__(self, body: Dict, code: int, status: str, message: str):
-        """This shouldn't be instantiated directly."""
         super().__init__(message)  # Makes str(e) return message
         self.body = body
         self.code = code
@@ -184,7 +183,7 @@ class SnapAPIError(Error):
         self._message = message
 
     def __repr__(self):
-        """String representation of the SnapAPIError class."""
+        """Represent the SnapAPIError class."""
         return "APIError({!r}, {!r}, {!r}, {!r})".format(
             self.body, self.code, self.status, self._message
         )
@@ -245,15 +244,15 @@ class Snap(object):
         ) == (other._name, other._revision)
 
     def __hash__(self):
-        """A basic hash so this class can be used in Mappings and dicts."""
+        """Calculate a hash for this snap."""
         return hash((self._name, self._revision))
 
     def __repr__(self):
-        """A representation of the snap."""
+        """Represent the object such that it can be reconstructed."""
         return "<{}.{}: {}>".format(self.__module__, self.__class__.__name__, self.__dict__)
 
     def __str__(self):
-        """A human-readable representation of the snap."""
+        """Represent the snap object as a string."""
         return "<{}: {}-{}.{} -- {}>".format(
             self.__class__.__name__,
             self._name,
@@ -312,7 +311,7 @@ class Snap(object):
             raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
 
     def get(self, key) -> str:
-        """Gets a snap configuration value.
+        """Fetch a snap configuration value.
 
         Args:
             key: the key to retrieve
@@ -320,7 +319,7 @@ class Snap(object):
         return self._snap("get", [key]).strip()
 
     def set(self, config: Dict) -> str:
-        """Sets a snap configuration value.
+        """Set a snap configuration value.
 
         Args:
            config: a dictionary containing keys and values specifying the config to set.
@@ -330,7 +329,7 @@ class Snap(object):
         return self._snap("set", [*args])
 
     def unset(self, key) -> str:
-        """Unsets a snap configuration value.
+        """Unset a snap configuration value.
 
         Args:
             key: the key to unset
@@ -338,7 +337,7 @@ class Snap(object):
         return self._snap("unset", [key])
 
     def start(self, services: Optional[List[str]] = None, enable: Optional[bool] = False) -> None:
-        """Starts a snap's services.
+        """Start a snap's services.
 
         Args:
             services (list): (optional) list of individual snap services to start (otherwise all)
@@ -348,7 +347,7 @@ class Snap(object):
         self._snap_daemons(args, services)
 
     def stop(self, services: Optional[List[str]] = None, disable: Optional[bool] = False) -> None:
-        """Stops a snap's services.
+        """Stop a snap's services.
 
         Args:
             services (list): (optional) list of individual snap services to stop (otherwise all)
@@ -358,7 +357,7 @@ class Snap(object):
         self._snap_daemons(args, services)
 
     def logs(self, services: Optional[List[str]] = None, num_lines: Optional[int] = 10) -> str:
-        """Shows a snap services' logs.
+        """Fetch a snap services' logs.
 
         Args:
             services (list): (optional) list of individual snap services to show logs from
@@ -371,7 +370,7 @@ class Snap(object):
     def connect(
         self, plug: str, service: Optional[str] = None, slot: Optional[str] = None
     ) -> None:
-        """Connects a plug to a slot.
+        """Connect a plug to a slot.
 
         Args:
             plug (str): the plug to connect
@@ -455,7 +454,7 @@ class Snap(object):
         self._snap("refresh", args)
 
     def _remove(self) -> str:
-        """Removes a snap from the system."""
+        """Remove a snap from the system."""
         return self._snap("remove")
 
     @property
@@ -470,7 +469,7 @@ class Snap(object):
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
     ):
-        """Ensures that a snap is in a given state.
+        """Ensure that a snap is in a given state.
 
         Args:
           state: a `SnapState` to reconcile to.
@@ -504,7 +503,7 @@ class Snap(object):
         self._state = state
 
     def _update_snap_apps(self) -> None:
-        """Updates a snap's apps after snap changes state."""
+        """Update a snap's apps after snap changes state."""
         try:
             self._apps = self._snap_client.get_installed_snap_apps(self._name)
         except SnapAPIError:
@@ -513,22 +512,22 @@ class Snap(object):
 
     @property
     def present(self) -> bool:
-        """Returns whether or not a snap is present."""
+        """Report whether or not a snap is present."""
         return self._state in (SnapState.Present, SnapState.Latest)
 
     @property
     def latest(self) -> bool:
-        """Returns whether the snap is the most recent version."""
+        """Report whether the snap is the most recent version."""
         return self._state is SnapState.Latest
 
     @property
     def state(self) -> SnapState:
-        """Returns the current snap state."""
+        """Report the current snap state."""
         return self._state
 
     @state.setter
     def state(self, state: SnapState) -> None:
-        """Sets the snap state to a given value.
+        """Set the snap state to a given value.
 
         Args:
           state: a `SnapState` to reconcile the snap to.
@@ -734,15 +733,15 @@ class SnapCache(Mapping):
             self._load_installed_snaps()
 
     def __contains__(self, key: str) -> bool:
-        """Magic method to ease checking if a given snap is in the cache."""
+        """Check if a given snap is in the cache."""
         return key in self._snap_map
 
     def __len__(self) -> int:
-        """Returns number of items in the snap cache."""
+        """Report number of items in the snap cache."""
         return len(self._snap_map)
 
     def __iter__(self) -> Iterable["Snap"]:
-        """Magic method to provide an iterator for the snap cache."""
+        """Provide iterator for the snap cache."""
         return iter(self._snap_map.values())
 
     def __getitem__(self, snap_name: str) -> Snap:
@@ -829,6 +828,7 @@ def add(
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
+        cohort: an (Optional) string specifying the snap cohort to use
 
     Raises:
         SnapError if some snaps failed to install or were not found.
@@ -845,7 +845,7 @@ def add(
 
 @_cache_init
 def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
-    """Removes a snap from the system.
+    """Remove specified snap(s) from the system.
 
     Args:
         snap_names: the name or names of the snaps to install
@@ -868,14 +868,15 @@ def ensure(
     classic: Optional[bool] = False,
     cohort: Optional[str] = "",
 ) -> Union[Snap, List[Snap]]:
-    """Ensures a snap is in a given state to the system.
+    """Ensure specified snaps are in a given state on the system.
 
     Args:
-        name: the name(s) of the snaps to operate on
+        snap_names: the name(s) of the snaps to operate on
         state: a string representation of the desired state, from `SnapState`
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
+        cohort: an (Optional) string specifying the snap cohort to use
 
     Raises:
         SnapError if the snap is not in the cache.
@@ -915,9 +916,7 @@ def _wrap_snap_operations(
 
     if len(snaps["failed"]):
         raise SnapError(
-            "Failed to install or refresh snap(s): {}".format(
-                ", ".join([s for s in snaps["failed"]])
-            )
+            "Failed to install or refresh snap(s): {}".format(", ".join(list(snaps["failed"])))
         )
 
     return snaps["success"] if len(snaps["success"]) > 1 else snaps["success"][0]
@@ -945,7 +944,6 @@ def install_local(
         _cmd.append("--classic")
     if dangerous:
         _cmd.append("--dangerous")
-    _cmd.append("--devmode")
     try:
         result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
@@ -965,7 +963,7 @@ def install_local(
 
 
 def _system_set(config_item: str, value: str) -> None:
-    """Helper for setting snap system config values.
+    """Set system snapd config values.
 
     Args:
         config_item: name of snap system setting. E.g. 'refresh.hold'
