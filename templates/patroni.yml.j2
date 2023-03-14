@@ -62,12 +62,22 @@ bootstrap:
         {% else %}
         archive_command: /bin/true
         {%- endif %}
-        archive_mode: on
+        archive_mode: {{ archive_mode }}
+        log_filename: 'postgresql.log'
+        log_directory: '/var/log/postgresql'
+        logging_collector: 'on'
         wal_level: logical
-
+  {%- if restoring_backup %}
+  method: pgbackrest
+  pgbackrest:
+    command: pgbackrest --stanza={{ stanza }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    no_params: True
+    keep_existing_recovery_conf: True
+  {% else %}
   initdb:
   - encoding: UTF8
   - data-checksums
+  {%- endif %}
 
 postgresql:
   listen: '{{ self_ip }}:5432'

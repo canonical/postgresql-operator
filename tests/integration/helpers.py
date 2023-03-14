@@ -10,6 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
 
+import botocore
 import psycopg2
 import requests
 import yaml
@@ -205,6 +206,23 @@ async def check_cluster_members(ops_test: OpsTest, application_name: str) -> Non
             r = requests.get(f"http://{address}:8008/cluster")
             assert [member["name"] for member in r.json()["members"]] == expected_members
             assert [member["host"] for member in r.json()["members"]] == expected_members_ips
+
+
+def construct_endpoint(endpoint: str, region: str) -> str:
+    """Construct the S3 service endpoint using the region.
+
+    This is needed when the provided endpoint is from AWS, and it doesn't contain the region.
+    """
+    # Load endpoints data.
+    loader = botocore.loaders.create_loader()
+    data = loader.load_data("endpoints")
+    # Construct the endpoint using the region.
+    resolver = botocore.regions.EndpointResolver(data)
+    endpoint_data = resolver.construct_endpoint("s3", region)
+
+    # Use the built endpoint if it is an AWS endpoint.
+    if endpoint_data and endpoint.endswith(endpoint_data["dnsSuffix"]):
+        endpoint = f'{endpoint.split("://")[0]}://{endpoint_data["hostname"]}'
 
 
 def convert_records_to_dict(records: List[tuple]) -> dict:

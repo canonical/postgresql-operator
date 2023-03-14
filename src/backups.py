@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 """Backups implementation."""
-
+import json
 import logging
 import os
 import pwd
@@ -16,6 +16,7 @@ import boto3 as boto3
 import botocore
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
 from jinja2 import Template
+from ops.charm import ActionEvent
 from ops.framework import Object
 from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
@@ -42,11 +43,15 @@ class PostgreSQLBackups(Object):
         )
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
+        self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
 
     def _are_backup_settings_ok(self) -> Tuple[bool, Optional[str]]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
-            return False, "Relation with s3-integrator charm missing, cannot create backup."
+            return (
+                False,
+                "Relation with s3-integrator charm missing, cannot create/restore backup.",
+            )
 
         s3_parameters, missing_parameters = self._retrieve_s3_parameters()
         if missing_parameters:
@@ -95,7 +100,20 @@ class PostgreSQLBackups(Object):
 
         return endpoint
 
-    def _execute_command(self, command: List[str]) -> Tuple[int, str, str]:
+    def _empty_data_files(self) -> bool:
+        """Empty the PostgreSQL data directory in preparation of backup restore."""
+        return_code, _, stderr = self._execute_command(
+            "rm -r /var/lib/postgresql/data/pgdata".split()
+        )
+        if return_code != 0:
+            logger.warning(f"Failed to remove contents of the data directory with error: {stderr}")
+            return False
+
+        return True
+
+    def _execute_command(
+        self, command: List[str], command_input: bytes = None
+    ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
         def demote():
@@ -107,29 +125,48 @@ class PostgreSQLBackups(Object):
 
             return result
 
-        process = run(command, stdout=PIPE, stderr=PIPE, preexec_fn=demote())
+        process = run(command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote())
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
-    def _get_backup_ids(self, format_ids: bool = False) -> List[str]:
-        """Return the list of backup ids.
+    def _format_backup_list(self, backup_list) -> str:
+        """Formats provided list of backups as a table."""
+        backups = ["{:<21s} | {:<12s} | {:s}".format("backup-id", "backup-type", "backup-status")]
+        backups.append("-" * len(backups[0]))
+        for backup_id, backup_type, backup_status in backup_list:
+            backups.append(
+                "{:<21s} | {:<12s} | {:s}".format(backup_id, backup_type, backup_status)
+            )
+        return "\n".join(backups)
 
-        Args:
-            format_ids: whether to format the ids as (default is False).
+    def _generate_backup_list_output(self) -> str:
+        """Generates a list of backups in a formatted table.
+
+        List contains successful and failed backups in order of ascending time.
         """
-        backup_ids = []
-        _, output, _ = self._execute_command(
-            ["pgbackrest", "repo-ls", f"backup/{self.charm.cluster_name}"]
-        )
-        if output:
-            backup_ids = re.findall(r".*[F]$", output, re.MULTILINE)
-            if format_ids:
-                backup_ids = [
-                    datetime.strftime(
-                        datetime.strptime(backup_id[:-1], "%Y%m%d-%H%M%S"), "%Y-%m-%dT%H:%M:%SZ"
-                    )
-                    for backup_id in backup_ids
-                ]
-        return backup_ids
+        backup_list = []
+        _, output, _ = self._execute_command(["pgbackrest", "info", "--output=json"])
+        backups = json.loads(output)[0]["backup"]
+        for backup in backups:
+            backup_id = datetime.strftime(
+                datetime.strptime(backup["label"][:-1], "%Y%m%d-%H%M%S"), "%Y-%m-%dT%H:%M:%SZ"
+            )
+            error = backup["error"]
+            backup_status = "finished"
+            if error:
+                backup_status = f"failed: {error}"
+            backup_list.append((backup_id, "physical", backup_status))
+        return self._format_backup_list(backup_list)
+
+    def _list_backups_ids(self) -> List[str]:
+        """Retrieve the list of backup ids."""
+        _, output, _ = self._execute_command(["pgbackrest", "info", "--output=json"])
+        backups = json.loads(output)[0]["backup"]
+        return [
+            datetime.strftime(
+                datetime.strptime(backup["label"][:-1], "%Y%m%d-%H%M%S"), "%Y-%m-%dT%H:%M:%SZ"
+            )
+            for backup in backups
+        ]
 
     def _initialise_stanza(self) -> None:
         """Initialize the stanza.
@@ -217,7 +254,7 @@ class PostgreSQLBackups(Object):
             metadata,
             os.path.join(
                 s3_parameters["path"],
-                f"backup/{self.charm.cluster_name}/.metadata",
+                f"backup/{self.charm.cluster_name}/latest",
             ),
             s3_parameters,
         ):
@@ -269,8 +306,7 @@ Stderr:
             )
             event.fail("Failed to backup PostgreSQL")
         else:
-            backup_ids = self._get_backup_ids()
-            backup_id = backup_ids[-1]
+            backup_id = self._list_backups_ids()[-1]
             # Upload the logs to S3 and fail the action if it doesn't succeed.
             logs = f"""Stdout:
 {stdout}
@@ -300,10 +336,107 @@ Stderr:
             return
 
         try:
-            event.set_results({"backup-list": self._get_backup_ids()})
+            formatted_list = self._generate_backup_list_output()
+            event.set_results({"backups": formatted_list})
         except CalledProcessError as e:
             logger.exception(e)
             event.fail(f"Failed to list PostgreSQL backups with error: {str(e)}")
+
+    def _on_restore_action(self, event):
+        """Request that pgBackRest restores a backup."""
+        if not self._pre_restore_checks(event):
+            return
+
+        backup_id = event.params.get("backup-id")
+        logger.info(f"A restore with backup-id {backup_id} has been requested on unit")
+
+        # Validate the provided backup id.
+        logger.info("Validating provided backup-id")
+        if backup_id not in self._list_backups_ids():
+            event.fail(f"Invalid backup-id: {backup_id}")
+            return
+
+        self.charm.unit.status = MaintenanceStatus("restoring backup")
+        error_message = "Failed to restore backup"
+
+        # Stop the database service before performing the restore.
+        logger.info("Stopping database service")
+        if not self.charm._patroni.stop_patroni():
+            logger.warning("Failed to stop database service")
+            event.fail(error_message)
+            return
+
+        logger.info("Removing the contents of the data directory")
+        if not self._empty_data_files():
+            event.fail(error_message)
+            self._restart_database()
+            return
+
+        # Mark the cluster as in a restoring backup state and update the Patroni configuration.
+        logger.info("Configuring Patroni to restore the backup")
+        self.charm.app_peer_data.update(
+            {
+                "archive-mode": "off",
+                "restoring-backup": f'{datetime.strftime(datetime.strptime(backup_id, "%Y-%m-%dT%H:%M:%SZ"), "%Y%m%d-%H%M%S")}F',
+            }
+        )
+        self.charm.update_config()
+
+        # Start the database to start the restore process.
+        logger.info("Configuring Patroni to restore the backup")
+        self.charm._patroni.start_patroni()
+
+        # Remove previous cluster information to make it possible to initialise a new cluster.
+        logger.info("Removing previous cluster information")
+        # my_env = os.environ.copy()
+        return_code, stdout, stderr = self._execute_command(
+            [
+                "patronictl",
+                "-c",
+                f"{self.charm._storage_path}/patroni.yml",
+                "remove",
+                self.charm.cluster_name,
+            ],
+            # environment=my_env,
+            command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
+        )
+        logger.error(f"stdout: {stdout}")
+        logger.error(f"stderr: {stderr}")
+        if return_code != 0:
+            logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
+            event.fail(error_message)
+            self._restart_database()
+            return
+
+        event.set_results({"restore-status": "restore started"})
+
+    def _pre_restore_checks(self, event: ActionEvent) -> bool:
+        """Run some checks before starting the restore.
+
+        Returns:
+            a boolean indicating whether restore should be run.
+        """
+        if not event.params.get("backup-id"):
+            event.fail("Missing backup-id to restore")
+            return False
+
+        logger.info("Checking if cluster is in blocked state")
+        if self.charm.is_blocked:
+            error_message = "Cluster or unit is in a blocking state"
+            logger.warning(error_message)
+            event.fail(error_message)
+            return False
+
+        logger.info("Checking that the cluster does not have more than one unit")
+        if self.charm.app.planned_units() > 1:
+            error_message = (
+                "Unit cannot restore backup as there are more than one unit in the cluster"
+            )
+            logger.warning(error_message)
+            event.fail(error_message)
+            return False
+
+        return True
 
     def _render_pgbackrest_conf_file(self, s3_parameters: Dict) -> None:
         """Render the pgBackRest configuration file."""
@@ -325,6 +458,12 @@ Stderr:
         # Render pgBackRest config file.
         filename = "/etc/pgbackrest.conf"
         self.charm._patroni.render_file(filename, rendered, 0o640)
+
+    def _restart_database(self) -> None:
+        """Removes the restoring backup flag and restart the database."""
+        self.charm.app_peer_data.update({"archive-mode": "", "restoring-backup": ""})
+        self.charm.update_config()
+        self.charm._patroni.start_patroni()
 
     def _retrieve_s3_parameters(self) -> Tuple[Dict, List[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""

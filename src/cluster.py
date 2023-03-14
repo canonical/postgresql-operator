@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Set
+from typing import Optional, Set
 
 import requests
 from charms.operator_libs_linux.v0.apt import DebianPackage
@@ -17,6 +17,7 @@ from charms.operator_libs_linux.v1.systemd import (
     service_resume,
     service_running,
     service_start,
+    service_stop,
 )
 from jinja2 import Template
 from tenacity import (
@@ -335,18 +336,27 @@ class Patroni:
         rendered = template.render(conf_path=self.storage_path)
         self.render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
 
-    def render_patroni_yml_file(self, enable_tls: bool = False, stanza: str = None) -> None:
+    def render_patroni_yml_file(
+        self,
+        archive_mode: str,
+        enable_tls: bool = False,
+        stanza: str = None,
+        backup_id: Optional[str] = None,
+    ) -> None:
         """Render the Patroni configuration file.
 
         Args:
+            archive_mode: PostgreSQL archive mode.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
+            backup_id: id of the backup that is being restored.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
+            archive_mode=archive_mode,
             conf_path=self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
@@ -359,6 +369,8 @@ class Patroni:
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             enable_pgbackrest=stanza is not None,
+            restoring_backup=backup_id is not None,
+            backup_id=backup_id,
             stanza=stanza,
             version=self._get_postgresql_version(),
             minority_count=self.planned_units // 2,
@@ -375,6 +387,16 @@ class Patroni:
         service_start(PATRONI_SERVICE)
         service_resume(PATRONI_SERVICE)
         return service_running(PATRONI_SERVICE)
+
+    def stop_patroni(self) -> bool:
+        """Stop Patroni service using systemd.
+
+        Returns:
+            Whether the service stopped successfully.
+        """
+        # Start the service and enable it to start at boot.
+        service_stop(PATRONI_SERVICE)
+        return not service_running(PATRONI_SERVICE)
 
     def switchover(self) -> None:
         """Trigger a switchover."""
