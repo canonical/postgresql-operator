@@ -50,10 +50,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         wait_for_apps = True
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
-            await ops_test.model.deploy(
-                charm, resources={"patroni": "patroni.tar.gz"}, num_units=3, series=CHARM_SERIES
-            )
-            await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
+            await ops_test.model.deploy(charm, num_units=3, series=CHARM_SERIES)
     # Deploy the continuous writes application charm if it wasn't already deployed.
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True

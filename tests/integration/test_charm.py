@@ -40,16 +40,12 @@ async def test_deploy(ops_test: OpsTest, charm: str):
     Assert on the unit status before any relations/configurations take place.
     """
     # Deploy the charm with Patroni resource.
-    resources = {"patroni": "patroni.tar.gz"}
     await ops_test.model.deploy(
         charm,
-        resources=resources,
         application_name=DATABASE_APP_NAME,
         num_units=3,
         series=CHARM_SERIES,
     )
-    # Attach the resource to the controller.
-    await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")
 
     # Reducing the update status frequency to speed up the triggering of deferred events.
     await ops_test.model.set_config({"update-status-hook-interval": "10s"})
