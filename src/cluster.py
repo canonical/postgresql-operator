@@ -35,6 +35,7 @@ from constants import (
 logger = logging.getLogger(__name__)
 
 PATRONI_SERVICE = "patroni"
+CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
 
 
 class NotReadyError(Exception):
@@ -111,6 +112,12 @@ class Patroni:
         self.configure_patroni_on_unit()
         return self.start_patroni()
 
+    def _inhibit_default_cluster_creation(self) -> None:
+        """Stop the PostgreSQL packages from creating the default cluster."""
+        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
+        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
+            file.write("\n")
+
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
@@ -118,7 +125,6 @@ class Patroni:
         if not os.path.exists("/var/snap/charmed-postgresql/common/patroni/config.yaml"):
             self.render_patroni_yml_file()
         self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o644)
-        self.render_postgresql_conf_file()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -329,7 +335,7 @@ class Patroni:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            conf_path="/var/snap/charmed-postgresql/common/postgresql/",  # self.storage_path,
+            conf_path="/var/snap/charmed-postgresql/common/postgresql",  # self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
@@ -346,7 +352,7 @@ class Patroni:
             minority_count=self.planned_units // 2,
         )
         self.render_file(
-            "/var/snap/charmed-postgresql/common/patroni/config.yaml", rendered, 0o644
+            "/var/snap/charmed-postgresql/current/patroni/config.yaml", rendered, 0o644
         )
 
     def start_patroni(self) -> bool:
@@ -355,6 +361,9 @@ class Patroni:
         Returns:
             Whether the service started successfully.
         """
+        # Prevent the default cluster creation.
+        self._inhibit_default_cluster_creation()
+
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]

@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import os
 import unittest
 from unittest import mock
 from unittest.mock import Mock, PropertyMock, mock_open, patch
@@ -15,6 +16,7 @@ from constants import REWIND_USER
 from tests.helpers import STORAGE_PATH
 
 PATRONI_SERVICE = "patroni"
+CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
 
 
 # This method will be used by the mock to replace requests.get
@@ -175,7 +177,7 @@ class TestCluster(unittest.TestCase):
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
-            conf_path="/var/snap/charmed-postgresql/common/postgresql/",
+            conf_path="/var/snap/charmed-postgresql/common/postgresql",
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
@@ -202,20 +204,24 @@ class TestCluster(unittest.TestCase):
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/patroni/config.yaml",
+            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
             expected_content,
             0o644,
         )
 
+    @patch("charm.Patroni._inhibit_default_cluster_creation")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni._create_directory")
-    def test_start_patroni(self, _create_directory, _snap_cache):
+    def test_start_patroni(
+        self, _create_directory, _snap_cache, _inhibit_default_cluster_creation
+    ):
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
 
         # Test a success scenario.
         success = self.patroni.start_patroni()
+        _inhibit_default_cluster_creation.assert_called_once()
         _cache.__getitem__.assert_called_once_with("charmed-postgresql")
         _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
         assert success
@@ -272,3 +278,17 @@ class TestCluster(unittest.TestCase):
         _patch.assert_called_once_with(
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
+
+    @patch("os.makedirs")
+    def test_inhibit_default_cluster_creation(self, _makedirs):
+        # Setup a mock for the `open` method.
+        mock = mock_open()
+        # Patch the `open` method with our mock.
+        with patch("builtins.open", mock, create=True):
+            self.patroni._inhibit_default_cluster_creation()
+            _makedirs.assert_called_once_with(
+                os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
+            )
+            # Check the write calls made to the file.
+            handle = mock()
+            handle.write.assert_called_once_with("\n")

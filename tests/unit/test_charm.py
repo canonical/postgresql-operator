@@ -1,9 +1,8 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-import os
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -36,7 +35,6 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
-    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
     @patch(
         "charm.PostgresqlOperatorCharm._is_storage_attached",
@@ -46,7 +44,6 @@ class TestCharm(unittest.TestCase):
         self,
         _is_storage_attached,
         _reboot_on_detached_storage,
-        _inhibit_default_cluster_creation,
         _install_snap_packages,
     ):
         # Test without storage.
@@ -56,7 +53,6 @@ class TestCharm(unittest.TestCase):
         # Test without adding Patroni resource.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
-        _inhibit_default_cluster_creation.assert_called_once()
         _install_snap_packages.assert_called_once()
 
         # Assert the status set by the event handler.
@@ -64,12 +60,10 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
-    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
     @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_install_snap_failure(
         self,
         _is_storage_attached,
-        _inhibit_default_cluster_creation,
         _install_snap_packages,
     ):
         # Mock the result of the call.
@@ -77,23 +71,8 @@ class TestCharm(unittest.TestCase):
         # Trigger the hook.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
-        _inhibit_default_cluster_creation.assert_called_once()
         _install_snap_packages.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    @patch("os.makedirs")
-    def test_inhibit_default_cluster_creation(self, _makedirs):
-        # Setup a mock for the `open` method.
-        mock = mock_open()
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            self.charm._inhibit_default_cluster_creation()
-            _makedirs.assert_called_once_with(
-                os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
-            )
-            # Check the write calls made to the file.
-            handle = mock()
-            handle.write.assert_called_once_with("create_main_cluster = false\n")
 
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch(

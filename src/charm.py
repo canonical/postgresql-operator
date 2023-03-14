@@ -5,7 +5,6 @@
 """Charmed Machine Operator for the PostgreSQL database."""
 import json
 import logging
-import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
@@ -69,7 +68,6 @@ from utils import new_password
 logger = logging.getLogger(__name__)
 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
-CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
 class PostgresqlOperatorCharm(CharmBase):
@@ -546,9 +544,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
 
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
-
         # Install the charmed PostgreSQL snap.
         try:
             self._install_snap_packages(packages=SNAP_PACKAGES)
@@ -557,12 +552,6 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
-
-    def _inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("create_main_cluster = false\n")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
@@ -829,24 +818,24 @@ class PostgresqlOperatorCharm(CharmBase):
             packages: list of packages to install.
         """
         for snap_name, snap_channel in packages:
-            result = subprocess.check_output(
-                ["snap", "download", snap_name, f"--channel={snap_channel}"],
+            # TODO remove once snap can be directly installed
+            subprocess.check_output(
+                ["snap", "install", snap_name, f"--channel={snap_channel}"],
                 universal_newlines=True,
             )
-            logger.error(f"install snap output: {result}")
-            snap.install_local("./charmed-postgresql_11.snap")
-            # try:
-            #     snap_cache = snap.SnapCache()
-            #     snap_package = snap_cache[snap_name]
-            #
-            #     if not snap_package.present:
-            #         snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
-            #
-            # except snap.SnapError as e:
-            #     logger.error(
-            #         "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
-            #     )
-            #     raise
+            # TODO remove once snap can be directly installed
+            try:
+                snap_cache = snap.SnapCache()
+                snap_package = snap_cache[snap_name]
+
+                if not snap_package.present:
+                    snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+
+            except snap.SnapError as e:
+                logger.error(
+                    "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
+                )
+                raise
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
