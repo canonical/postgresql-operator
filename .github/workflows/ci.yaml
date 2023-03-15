@@ -114,4 +114,8 @@ jobs:
       - name: Run integration tests
         run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
         env:
+          AWS_ACCESS_KEY: "${{ secrets.AWS_ACCESS_KEY }}"
+          AWS_SECRET_KEY: "${{ secrets.AWS_SECRET_KEY }}"
+          GCP_ACCESS_KEY: "${{ secrets.GCP_ACCESS_KEY }}"
+          GCP_SECRET_KEY: "${{ secrets.GCP_SECRET_KEY }}"
           CI_PACKED_CHARMS: ${{ needs.build.outputs.charms }}
