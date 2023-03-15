@@ -9,7 +9,7 @@ import pwd
 import re
 import tempfile
 from datetime import datetime
-from subprocess import PIPE, CalledProcessError, run
+from subprocess import PIPE, run
 from typing import Dict, List, Optional, Tuple
 
 import boto3 as boto3
@@ -22,9 +22,13 @@ from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
-from constants import BACKUP_USER
+from constants import BACKUP_ID_FORMAT, BACKUP_USER, PGBACKREST_BACKUP_ID_FORMAT
 
 logger = logging.getLogger(__name__)
+
+
+class ListBackupsError(Exception):
+    """Raised when pgBackRest fails to list backups."""
 
 
 class PostgreSQLBackups(Object):
@@ -144,11 +148,17 @@ class PostgreSQLBackups(Object):
         List contains successful and failed backups in order of ascending time.
         """
         backup_list = []
-        _, output, _ = self._execute_command(["pgbackrest", "info", "--output=json"])
+        return_code, output, stderr = self._execute_command(
+            ["pgbackrest", "info", "--output=json"]
+        )
+        if return_code != 0:
+            raise ListBackupsError(f"Failed to list backups with error: {stderr}")
+
         backups = json.loads(output)[0]["backup"]
         for backup in backups:
             backup_id = datetime.strftime(
-                datetime.strptime(backup["label"][:-1], "%Y%m%d-%H%M%S"), "%Y-%m-%dT%H:%M:%SZ"
+                datetime.strptime(backup["label"][:-1], PGBACKREST_BACKUP_ID_FORMAT),
+                BACKUP_ID_FORMAT,
             )
             error = backup["error"]
             backup_status = "finished"
@@ -158,12 +168,22 @@ class PostgreSQLBackups(Object):
         return self._format_backup_list(backup_list)
 
     def _list_backups_ids(self) -> List[str]:
-        """Retrieve the list of backup ids."""
-        _, output, _ = self._execute_command(["pgbackrest", "info", "--output=json"])
+        """Retrieve the list of backup ids.
+
+        Return the list of previously created backups or an empty list if there is no backups
+        in the S3 bucket.
+        """
+        return_code, output, stderr = self._execute_command(
+            ["pgbackrest", "info", "--output=json"]
+        )
+        if return_code != 0:
+            raise ListBackupsError(f"Failed to list backups with error: {stderr}")
+
         backups = json.loads(output)[0]["backup"]
         return [
             datetime.strftime(
-                datetime.strptime(backup["label"][:-1], "%Y%m%d-%H%M%S"), "%Y-%m-%dT%H:%M:%SZ"
+                datetime.strptime(backup["label"][:-1], PGBACKREST_BACKUP_ID_FORMAT),
+                BACKUP_ID_FORMAT,
             )
             for backup in backups
         ]
@@ -306,7 +326,13 @@ Stderr:
             )
             event.fail("Failed to backup PostgreSQL")
         else:
-            backup_id = self._list_backups_ids()[-1]
+            try:
+                backup_id = self._list_backups_ids()[-1]
+            except ListBackupsError as e:
+                logger.exception(e)
+                event.fail("Failed to check backup id")
+                return
+
             # Upload the logs to S3 and fail the action if it doesn't succeed.
             logs = f"""Stdout:
 {stdout}
@@ -338,7 +364,7 @@ Stderr:
         try:
             formatted_list = self._generate_backup_list_output()
             event.set_results({"backups": formatted_list})
-        except CalledProcessError as e:
+        except ListBackupsError as e:
             logger.exception(e)
             event.fail(f"Failed to list PostgreSQL backups with error: {str(e)}")
 
@@ -352,8 +378,13 @@ Stderr:
 
         # Validate the provided backup id.
         logger.info("Validating provided backup-id")
-        if backup_id not in self._list_backups_ids():
-            event.fail(f"Invalid backup-id: {backup_id}")
+        try:
+            if backup_id not in self._list_backups_ids():
+                event.fail(f"Invalid backup-id: {backup_id}")
+                return
+        except ListBackupsError as e:
+            logger.exception(e)
+            event.fail("Failed to check backup id")
             return
 
         self.charm.unit.status = MaintenanceStatus("restoring backup")
@@ -377,7 +408,7 @@ Stderr:
         self.charm.app_peer_data.update(
             {
                 "archive-mode": "off",
-                "restoring-backup": f'{datetime.strftime(datetime.strptime(backup_id, "%Y-%m-%dT%H:%M:%SZ"), "%Y%m%d-%H%M%S")}F',
+                "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
             }
         )
         self.charm.update_config()
@@ -388,8 +419,7 @@ Stderr:
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
-        # my_env = os.environ.copy()
-        return_code, stdout, stderr = self._execute_command(
+        return_code, _, stderr = self._execute_command(
             [
                 "patronictl",
                 "-c",
@@ -397,11 +427,8 @@ Stderr:
                 "remove",
                 self.charm.cluster_name,
             ],
-            # environment=my_env,
             command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
         )
-        logger.error(f"stdout: {stdout}")
-        logger.error(f"stderr: {stderr}")
         if return_code != 0:
             logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
             event.fail(error_message)
