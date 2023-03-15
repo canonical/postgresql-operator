@@ -421,7 +421,6 @@ class Patroni:
         Returns:
             Whether the service stopped successfully.
         """
-        # Start the service and enable it to start at boot.
         service_stop(PATRONI_SERVICE)
         return not service_running(PATRONI_SERVICE)
 
