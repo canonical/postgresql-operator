@@ -432,7 +432,6 @@ Stderr:
         if return_code != 0:
             logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
             event.fail(error_message)
-            self._restart_database()
             return
 
         event.set_results({"restore-status": "restore started"})
