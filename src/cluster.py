@@ -203,7 +203,8 @@ class Patroni:
             member_name: cluster member name.
 
         Returns:
-            status of the cluster member or an empty string if the status couldn't be retrieved yet.
+            status of the cluster member or an empty string if the status
+                couldn't be retrieved yet.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
