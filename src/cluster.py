@@ -126,6 +126,8 @@ class Patroni:
             self.render_patroni_yml_file()
         # Logs error out if execution permission is not set
         self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o755)
+        # Replicas refuse to start with the default permissions
+        os.chmod(self.storage_path, 0o750)
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.

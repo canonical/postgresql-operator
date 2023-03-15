@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
 
 set -Eeuo pipefail
-rm -rf /var/lib/postgresql/data/pgdata/*
+rm -rf /var/snap/charmed-postgresql/common/postgresql/pgdata/*
