@@ -24,7 +24,7 @@ async def cloud_configs(ops_test: OpsTest) -> None:
             "endpoint": "https://s3.amazonaws.com",
             "bucket": "data-charms-testing",
             "path": f"/{uuid.uuid1()}",
-            "region": "us-east-2",
+            "region": "us-east-1",
         },
         GCP: {
             "endpoint": "https://storage.googleapis.com",
