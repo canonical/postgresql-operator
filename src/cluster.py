@@ -418,7 +418,12 @@ class Patroni:
         """
         # Get the status of the raft cluster.
         raft_status = subprocess.check_output(
-            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-status"]
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-status",
+            ]
         ).decode("UTF-8")
 
         # Check whether the member is still part of the raft cluster.
@@ -427,7 +432,13 @@ class Patroni:
 
         # Remove the member from the raft cluster.
         result = subprocess.check_output(
-            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-remove", f"{member_ip}:2222"]
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-remove",
+                f"{member_ip}:2222",
+            ]
         ).decode("UTF-8")
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()
