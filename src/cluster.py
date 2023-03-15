@@ -122,9 +122,10 @@ class Patroni:
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
         # Avoid rendering the Patroni config file if it was already rendered.
-        if not os.path.exists("/var/snap/charmed-postgresql/common/patroni/config.yaml"):
+        if not os.path.exists("/var/snap/charmed-postgresql/current/patroni/config.yaml"):
             self.render_patroni_yml_file()
-        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o644)
+        # Logs error out if execution permission is not set
+        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o755)
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
