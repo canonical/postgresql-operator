@@ -216,6 +216,7 @@ def construct_endpoint(endpoint: str, region: str) -> str:
     # Load endpoints data.
     loader = botocore.loaders.create_loader()
     data = loader.load_data("endpoints")
+
     # Construct the endpoint using the region.
     resolver = botocore.regions.EndpointResolver(data)
     endpoint_data = resolver.construct_endpoint("s3", region)
@@ -223,6 +224,8 @@ def construct_endpoint(endpoint: str, region: str) -> str:
     # Use the built endpoint if it is an AWS endpoint.
     if endpoint_data and endpoint.endswith(endpoint_data["dnsSuffix"]):
         endpoint = f'{endpoint.split("://")[0]}://{endpoint_data["hostname"]}'
+
+    return endpoint
 
 
 def convert_records_to_dict(records: List[tuple]) -> dict:
