@@ -68,6 +68,7 @@ class Patroni:
 
     def __init__(
         self,
+        archive_mode,
         unit_ip: str,
         storage_path: str,
         cluster_name: str,
@@ -82,6 +83,7 @@ class Patroni:
         """Initialize the Patroni class.
 
         Args:
+            archive_mode: PostgreSQL archive mode
             unit_ip: IP address of the current unit
             storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
@@ -93,6 +95,7 @@ class Patroni:
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
+        self.archive_mode = archive_mode
         self.unit_ip = unit_ip
         self.storage_path = storage_path
         self.cluster_name = cluster_name
@@ -124,7 +127,7 @@ class Patroni:
         self._change_owner(self.storage_path)
         # Avoid rendering the Patroni config file if it was already rendered.
         if not os.path.exists(f"{self.storage_path}/patroni.yml"):
-            self.render_patroni_yml_file()
+            self.render_patroni_yml_file(self.archive_mode)
         self._render_patroni_service_file()
         # Reload systemd services before trying to start Patroni.
         daemon_reload()

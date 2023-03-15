@@ -43,6 +43,7 @@ class TestCluster(unittest.TestCase):
         self.peers_ips = {"2.2.2.2", "3.3.3.3"}
 
         self.patroni = Patroni(
+            "on",
             "1.1.1.1",
             STORAGE_PATH,
             "postgresql",

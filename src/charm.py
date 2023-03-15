@@ -430,6 +430,7 @@ class PostgresqlOperatorCharm(CharmBase):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
+            self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
             self._storage_path,
             self.cluster_name,
