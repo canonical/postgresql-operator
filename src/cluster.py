@@ -196,6 +196,29 @@ class Patroni:
                     if member["name"] == member_name:
                         return member["host"]
 
+    def get_member_status(self, member_name: str) -> str:
+        """Get cluster member status.
+
+        Args:
+            member_name: cluster member name.
+
+        Returns:
+            status of the cluster member or an empty string if the status couldn't be retrieved yet.
+        """
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_patroni_url(attempt)
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+                for member in cluster_status.json()["members"]:
+                    if member["name"] == member_name:
+                        return member["state"]
+        return ""
+
     def get_primary(self, unit_name_pattern=False) -> str:
         """Get primary instance.
 

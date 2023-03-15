@@ -811,6 +811,10 @@ class PostgresqlOperatorCharm(CharmBase):
         if "cluster_initialised" not in self._peers.data[self.app]:
             return
 
+        if self.is_blocked:
+            logger.debug("on_update_status early exit: Unit is in Blocked status")
+            return
+
         self.postgresql_client_relation.oversee_users()
         self._update_relation_endpoints()
 
@@ -824,9 +828,9 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         if "restoring-backup" in self.app_peer_data:
-            # if services[0].current != ServiceStatus.ACTIVE:
-            #     self.unit.status = BlockedStatus("Failed to restore backup")
-            #     return
+            if "failed" in self._patroni.get_member_status(self._member_name):
+                self.unit.status = BlockedStatus("Failed to restore backup")
+                return
 
             if not self._patroni.member_started:
                 logger.debug("on_update_status early exit: Patroni has not started yet")
