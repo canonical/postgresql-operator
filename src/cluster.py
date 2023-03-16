@@ -415,41 +415,29 @@ class Patroni:
                 is not part of the raft cluster.
         """
         # Get the status of the raft cluster.
-        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1), reraise=True):
-            with attempt:
-                try:
-                    raft_status = subprocess.check_output(
-                        [
-                            "charmed-postgresql.syncobj-admin",
-                            "-conn",
-                            "127.0.0.1:2222",
-                            "-status",
-                        ]
-                    ).decode("UTF-8")
-                except subprocess.CalledProcessError as e:
-                    logger.exception(f"syncobj-admin status failed: {e.output}", exc_info=e)
-                    raise e
+        raft_status = subprocess.check_output(
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-status",
+            ]
+        ).decode("UTF-8")
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or member_ip not in raft_status:
             return
 
         # Remove the member from the raft cluster.
-        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(1), reraise=True):
-            with attempt:
-                try:
-                    result = subprocess.check_output(
-                        [
-                            "charmed-postgresql.syncobj-admin",
-                            "-conn",
-                            "127.0.0.1:2222",
-                            "-remove",
-                            f"{member_ip}:2222",
-                        ]
-                    ).decode("UTF-8")
-                except subprocess.CalledProcessError as e:
-                    logger.exception(f"syncobj-admin remove failed: {e.output}", exc_info=e)
-                    raise e
+        result = subprocess.check_output(
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-remove",
+                f"{member_ip}:2222",
+            ]
+        ).decode("UTF-8")
 
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()
