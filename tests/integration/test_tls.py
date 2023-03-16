@@ -12,7 +12,7 @@ from tests.helpers import METADATA
 from tests.integration.helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
-    change_master_start_timeout,
+    change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
     db_connect,
@@ -77,7 +77,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Enable additional logs on the PostgreSQL instance to check TLS
         # being used in a later step and make the fail-over to happens faster.
         enable_connections_logging(ops_test, primary)
-        change_master_start_timeout(ops_test, primary, 0)
+        change_primary_start_timeout(ops_test, primary, 0)
 
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -87,7 +87,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
                 await run_command_on_unit(
                     ops_test,
                     replica,
-                    "su -c '/usr/lib/postgresql/14/bin/pg_ctl -D /var/lib/postgresql/data/pgdata promote' postgres",
+                    "su -c 'charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/postgresql/pgdata/ promote' snap_daemon",
                 )
 
                 # Check that the replica was promoted.
@@ -115,13 +115,19 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Stop the initial primary by killing both Patroni and PostgreSQL OS processes.
         await run_command_on_unit(
-            ops_test, primary, "pkill --signal SIGKILL -f /usr/local/bin/patroni"
+            ops_test,
+            primary,
+            "pkill --signal SIGKILL -f /snap/charmed-postgresql/17/usr/bin/patroni",
         )
-        await run_command_on_unit(ops_test, primary, "pkill --signal SIGKILL -f postgres")
+        await run_command_on_unit(
+            ops_test,
+            primary,
+            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
+        )
 
         # Check that the primary changed.
         assert await primary_changed(ops_test, primary), "primary not changed"
-        change_master_start_timeout(ops_test, primary, 300)
+        change_primary_start_timeout(ops_test, primary, 300)
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
