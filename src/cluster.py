@@ -371,9 +371,6 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
-            logger.error(
-                f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}'
-            )
             return selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
             error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
@@ -417,29 +414,38 @@ class Patroni:
                 is not part of the raft cluster.
         """
         # Get the status of the raft cluster.
-        raft_status = subprocess.check_output(
-            [
-                "charmed-postgresql.syncobj-admin",
-                "-conn",
-                "127.0.0.1:2222",
-                "-status",
-            ]
-        ).decode("UTF-8")
+        try:
+            raft_status = subprocess.check_output(
+                [
+                    "charmed-postgresql.syncobj-admin",
+                    "-conn",
+                    "127.0.0.1:2222",
+                    "-status",
+                ]
+            ).decode("UTF-8")
+        except subprocess.CalledProcessError as e:
+            logger.exception(f"syncobj-admin status failed: {e.output}", exc_info=e)
+            raise e
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or member_ip not in raft_status:
             return
 
         # Remove the member from the raft cluster.
-        result = subprocess.check_output(
-            [
-                "charmed-postgresql.syncobj-admin",
-                "-conn",
-                "127.0.0.1:2222",
-                "-remove",
-                f"{member_ip}:2222",
-            ]
-        ).decode("UTF-8")
+        try:
+            result = subprocess.check_output(
+                [
+                    "charmed-postgresql.syncobj-admin",
+                    "-conn",
+                    "127.0.0.1:2222",
+                    "-remove",
+                    f"{member_ip}:2222",
+                ]
+            ).decode("UTF-8")
+        except subprocess.CalledProcessError as e:
+            logger.exception(f"syncobj-admin remove failed: {e.output}", exc_info=e)
+            raise e
+
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()
 
