@@ -167,11 +167,15 @@ class PostgreSQLBackups(Object):
             backup_list.append((backup_id, "physical", backup_status))
         return self._format_backup_list(backup_list)
 
-    def _list_backups_ids(self) -> List[str]:
+    def _list_backups_ids(self, show_failed: bool) -> List[str]:
         """Retrieve the list of backup ids.
 
-        Return the list of previously created backups or an empty list if there is no backups
-        in the S3 bucket.
+        Args:
+            show_failed: whether to also return the failed backups.
+
+        Returns:
+            the list of previously created backups or an empty list if there is no backups
+                in the S3 bucket.
         """
         return_code, output, stderr = self._execute_command(
             ["pgbackrest", "info", "--output=json"]
@@ -186,6 +190,7 @@ class PostgreSQLBackups(Object):
                 BACKUP_ID_FORMAT,
             )
             for backup in backups
+            if show_failed or not backup["error"]
         ]
 
     def _initialise_stanza(self) -> None:
@@ -327,7 +332,7 @@ Stderr:
             event.fail("Failed to backup PostgreSQL")
         else:
             try:
-                backup_id = self._list_backups_ids()[-1]
+                backup_id = self._list_backups_ids(show_failed=True)[-1]
             except ListBackupsError as e:
                 logger.exception(e)
                 event.fail("Failed to check backup id")
@@ -379,7 +384,7 @@ Stderr:
         # Validate the provided backup id.
         logger.info("Validating provided backup-id")
         try:
-            if backup_id not in self._list_backups_ids():
+            if backup_id not in self._list_backups_ids(show_failed=False):
                 event.fail(f"Invalid backup-id: {backup_id}")
                 return
         except ListBackupsError as e:
