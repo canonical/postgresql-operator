@@ -121,9 +121,12 @@ class Patroni:
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
-        # Avoid rendering the Patroni config file if it was already rendered.
-        if not os.path.exists("/var/snap/charmed-postgresql/current/patroni/config.yaml"):
-            self.render_patroni_yml_file()
+        # Symlink Patroni config to current
+        os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
+        os.symlink(
+            f"{self.storage_path}/patroni.yaml",
+            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+        )
         # Logs error out if execution permission is not set
         self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o755)
         # Replicas refuse to start with the default permissions
@@ -338,7 +341,7 @@ class Patroni:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            conf_path="/var/snap/charmed-postgresql/common/postgresql",  # self.storage_path,
+            conf_path=self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
@@ -354,9 +357,7 @@ class Patroni:
             version=self._get_postgresql_version(),
             minority_count=self.planned_units // 2,
         )
-        self.render_file(
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml", rendered, 0o644
-        )
+        self.render_file(f"{self.storage_path}/patroni.yaml", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.

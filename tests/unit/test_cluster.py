@@ -204,7 +204,7 @@ class TestCluster(unittest.TestCase):
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+            "/var/snap/charmed-postgresql/common/postgresql/patroni.yaml",
             expected_content,
             0o644,
         )
