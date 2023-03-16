@@ -140,6 +140,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
                     "username": user,
                     "password": "test-password",
                     "version": POSTGRESQL_VERSION,
+                    "database": f"{DATABASE}",
                 },
             )
 
