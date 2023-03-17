@@ -87,7 +87,22 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
                 await run_command_on_unit(
                     ops_test,
                     replica,
-                    "su -c 'charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/postgresql/pgdata/ promote' snap_daemon",
+                    "usermod -d /home/snap_daemon snap_daemon",
+                )
+                await run_command_on_unit(
+                    ops_test,
+                    replica,
+                    "mkdir /home/snap_daemon",
+                )
+                await run_command_on_unit(
+                    ops_test,
+                    replica,
+                    "chown -R snap_daemon:snap_daemon /home/snap_daemon",
+                )
+                await run_command_on_unit(
+                    ops_test,
+                    replica,
+                    "sudo -u snap_daemon charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/postgresql/pgdata/ promote",
                 )
 
                 # Check that the replica was promoted.
@@ -117,7 +132,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await run_command_on_unit(
             ops_test,
             primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/17/usr/bin/patroni",
+            "pkill --signal SIGKILL -f /usr/bin/patroni",
         )
         await run_command_on_unit(
             ops_test,
