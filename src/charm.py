@@ -828,8 +828,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                if not snap_package.present:
-                    snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+                snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
 
             except snap.SnapError as e:
                 logger.error(
