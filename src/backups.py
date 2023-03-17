@@ -7,8 +7,10 @@ import logging
 import os
 import pwd
 import re
+import shutil
 import tempfile
 from datetime import datetime
+from pathlib import Path
 from subprocess import PIPE, run
 from typing import Dict, List, Optional, Tuple
 
@@ -106,11 +108,12 @@ class PostgreSQLBackups(Object):
 
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
-        return_code, _, stderr = self._execute_command(
-            "rm -r /var/lib/postgresql/data/pgdata".split()
-        )
-        if return_code != 0:
-            logger.warning(f"Failed to remove contents of the data directory with error: {stderr}")
+        try:
+            path = Path("/var/lib/postgresql/data/pgdata")
+            if path.exists() and path.is_dir():
+                shutil.rmtree(path)
+        except OSError as e:
+            logger.warning(f"Failed to remove contents of the data directory with error: {str(e)}")
             return False
 
         return True
