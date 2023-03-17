@@ -3,6 +3,8 @@
 
 """File containing constants to be used in the charm."""
 
+BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
+PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
 DATABASE = "database"
 DATABASE_PORT = "5432"
 LEGACY_DB = "db"

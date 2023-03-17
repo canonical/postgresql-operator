@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Set
+from typing import Optional, Set
 
 import requests
 from charms.operator_libs_linux.v1 import snap
@@ -61,6 +61,7 @@ class Patroni:
 
     def __init__(
         self,
+        archive_mode,
         unit_ip: str,
         storage_path: str,
         cluster_name: str,
@@ -75,6 +76,7 @@ class Patroni:
         """Initialize the Patroni class.
 
         Args:
+            archive_mode: PostgreSQL archive mode
             unit_ip: IP address of the current unit
             storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
@@ -86,6 +88,7 @@ class Patroni:
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
+        self.archive_mode = archive_mode
         self.unit_ip = unit_ip
         self.storage_path = storage_path
         self.cluster_name = cluster_name
@@ -191,6 +194,30 @@ class Patroni:
                 for member in cluster_status.json()["members"]:
                     if member["name"] == member_name:
                         return member["host"]
+
+    def get_member_status(self, member_name: str) -> str:
+        """Get cluster member status.
+
+        Args:
+            member_name: cluster member name.
+
+        Returns:
+            status of the cluster member or an empty string if the status
+                couldn't be retrieved yet.
+        """
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_patroni_url(attempt)
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+                for member in cluster_status.json()["members"]:
+                    if member["name"] == member_name:
+                        return member["state"]
+        return ""
 
     def get_primary(self, unit_name_pattern=False) -> str:
         """Get primary instance.
@@ -326,18 +353,27 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def render_patroni_yml_file(self, enable_tls: bool = False, stanza: str = None) -> None:
+    def render_patroni_yml_file(
+        self,
+        archive_mode: str,
+        enable_tls: bool = False,
+        stanza: str = None,
+        backup_id: Optional[str] = None,
+    ) -> None:
         """Render the Patroni configuration file.
 
         Args:
+            archive_mode: PostgreSQL archive mode.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
+            backup_id: id of the backup that is being restored.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
+            archive_mode=archive_mode,
             conf_path="/var/snap/charmed-postgresql/common/postgresql",  # self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
@@ -350,6 +386,8 @@ class Patroni:
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             enable_pgbackrest=stanza is not None,
+            restoring_backup=backup_id is not None,
+            backup_id=backup_id,
             stanza=stanza,
             version=self._get_postgresql_version(),
             minority_count=self.planned_units // 2,
@@ -378,6 +416,26 @@ class Patroni:
         except snap.SnapError as e:
             error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
             logger.exception(error_message, exc_info=e)
+            return False
+
+    def stop_patroni(self) -> bool:
+        """Stop Patroni service using systemd.
+
+        Returns:
+            Whether the service stopped successfully.
+        """
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.stop(services=["patroni"])
+            logger.error(
+                f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}'
+            )
+            return not selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
+            logger.exception(error_message, exc_info=e)
+            return False
 
     def switchover(self) -> None:
         """Trigger a switchover."""
