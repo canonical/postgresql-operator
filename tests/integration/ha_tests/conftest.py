@@ -40,6 +40,7 @@ async def primary_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the primary start timeout configuration."""
     # Change the parameter that makes the primary reelection faster.
     initial_primary_start_timeout = await get_primary_start_timeout(ops_test)
+    await change_primary_start_timeout(ops_test, 0)
     yield
     # Rollback to the initial configuration.
     await change_primary_start_timeout(
