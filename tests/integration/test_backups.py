@@ -35,7 +35,6 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         database_app_name = f"{DATABASE_APP_NAME}-{cloud.lower()}"
         await ops_test.model.deploy(
             charm,
-            resources={"patroni": "patroni.tar.gz"},
             application_name=database_app_name,
             series=CHARM_SERIES,
         )
