@@ -63,12 +63,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
         self.harness.update_relation_data(
             self.rel_id,
             self.app,
-            {
-                "data": "",
-                "username": "",
-                "password": "",
-                "version": "",
-            },
+            {"data": "", "username": "", "password": "", "version": "", "database": ""},
         )
 
         # Simulate the request of a new database plus extra user roles.
@@ -140,6 +135,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
                     "username": user,
                     "password": "test-password",
                     "version": POSTGRESQL_VERSION,
+                    "database": f"{DATABASE}",
                 },
             )
 
