@@ -28,4 +28,5 @@ SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
+PGBACKREST_CONF = "--config=/var/snap/charmed-postgresql/current/etc/pgbackrest.conf"
 SNAP_PACKAGES = [("charmed-postgresql", "14/edge/charm-fixes")]

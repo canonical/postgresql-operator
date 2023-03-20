@@ -7,6 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
+from pathlib import Path
 from typing import Optional, Set
 
 import requests
@@ -27,6 +28,8 @@ from tenacity import (
 from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PGBACKREST_CONF,
+    PGBACKREST_EXECUTABLE,
     REWIND_USER,
     TLS_CA_FILE,
     USER,
@@ -126,9 +129,11 @@ class Patroni:
         self._change_owner(self.storage_path)
         # Avoid rendering the Patroni config file if it was already rendered.
         if not os.path.exists("/var/snap/charmed-postgresql/current/patroni/config.yaml"):
-            self.render_patroni_yml_file()
+            self.render_patroni_yml_file(
+                archive_mode=self.archive_mode, connectivity=True, enable_tls=self.tls_enabled
+            )
         # Logs error out if execution permission is not set
-        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o755)
+        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o777)
         # Replicas refuse to start with the default permissions
         os.chmod(self.storage_path, 0o750)
 
@@ -356,6 +361,7 @@ class Patroni:
     def render_patroni_yml_file(
         self,
         archive_mode: str,
+        connectivity: bool = False,
         enable_tls: bool = False,
         stanza: str = None,
         backup_id: Optional[str] = None,
@@ -364,20 +370,28 @@ class Patroni:
 
         Args:
             archive_mode: PostgreSQL archive mode.
+            connectivity: whether to allow external connections to the database.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             backup_id: id of the backup that is being restored.
         """
+        my_file = Path("/var/snap/charmed-postgresql/current/patroni/config.yaml")
+        if not my_file.is_file():
+            return
+
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
             archive_mode=archive_mode,
+            connectivity=connectivity,
             conf_path="/var/snap/charmed-postgresql/common/postgresql",  # self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
+            pgbackrest_executable=PGBACKREST_EXECUTABLE,
+            pgbackrest_configuration_file=PGBACKREST_CONF,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
             superuser=USER,

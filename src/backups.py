@@ -12,11 +12,12 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, run
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import boto3 as boto3
 import botocore
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
+from charms.operator_libs_linux.v1 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent
 from ops.framework import Object
@@ -28,6 +29,7 @@ from constants import (
     BACKUP_ID_FORMAT,
     BACKUP_USER,
     PGBACKREST_BACKUP_ID_FORMAT,
+    PGBACKREST_CONF,
     PGBACKREST_EXECUTABLE,
 )
 
@@ -87,7 +89,44 @@ class PostgreSQLBackups(Object):
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
 
+        if "stanza" not in self.charm.app_peer_data:
+            return False, "Stanza was not initialised"
+
         return self._are_backup_settings_ok()
+
+    def configure_pgbackrest(self, tls_enabled: bool) -> None:
+        """Configures pgBackRest in this unit."""
+        is_replica = not self.charm.is_primary
+
+        peer_endpoints = self.charm.members_ips - set([self.charm._unit_ip])
+        self.charm._patroni._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)
+        self._render_pgbackrest_conf_file(is_replica, tls_enabled, peer_endpoints)
+        command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
+        return_code, stdout, stderr = self._execute_command(command)
+        if return_code != 0:
+            logger.error(return_code)
+            logger.error(stderr)
+            return
+        logger.error(stdout)
+
+        if not self._are_backup_settings_ok():
+            return
+
+        if not is_replica:
+            self._initialise_stanza()
+
+        snap_cache = snap.SnapCache()
+        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
+        if not charmed_postgresql_snap.present:
+            logger.error("Cannot start/stop service, snap is not yet installed.")
+            # event.defer()
+            return
+
+        if not tls_enabled or len(peer_endpoints) == 0:
+            charmed_postgresql_snap.stop(services=[self.charm.pgbackrest_server_service])
+            return
+
+        charmed_postgresql_snap.restart(services=[self.charm.pgbackrest_server_service])
 
     def _construct_endpoint(self, s3_parameters: Dict) -> str:
         """Construct the S3 service endpoint using the region.
@@ -123,6 +162,33 @@ class PostgreSQLBackups(Object):
 
         return True
 
+    def _change_connectivity_to_database(self, connectivity: bool) -> bool:
+        """Enable or disable the connectivity to the database."""
+        self.charm.unit_peer_data.update({"connectivity": "on" if connectivity else "off"})
+        self.charm.update_config()
+        try:
+            # Check that the connectivity to this unit's database is turned on or off
+            # based on the connectivity parameter.
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+                with attempt:
+                    # Force an update of the Patroni and PostgreSQL configuration files.
+                    if self.charm._patroni.member_started:
+                        self.charm._patroni.reload_patroni_configuration()
+
+                    # # Check the connectivity to this unit's database.
+                    # try:
+                    #     self.charm.postgresql.list_users()
+                    #     if not connectivity:
+                    #         raise Exception()
+                    # except PostgreSQLListUsersError:
+                    #     if connectivity:
+                    #         raise
+        except RetryError as e:
+            logger.exception(e)
+            return False
+
+        return True
+
     def _execute_command(
         self, command: List[str], command_input: bytes = None
     ) -> Tuple[int, str, str]:
@@ -137,7 +203,18 @@ class PostgreSQLBackups(Object):
 
             return result
 
-        process = run(command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote())
+        # homedir = pwd.getpwnam("root").pw_dir
+        # env = os.environ.copy()
+        # env.update({"HOME": "/home/ubuntu"})
+        # process = run(
+        #     command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote(), env=env
+        # )
+        process = run(
+            command,
+            input=command_input,
+            stdout=PIPE,
+            stderr=PIPE,
+        )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
     def _format_backup_list(self, backup_list) -> str:
@@ -157,7 +234,7 @@ class PostgreSQLBackups(Object):
         """
         backup_list = []
         return_code, output, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, "info", "--output=json"]
+            [PGBACKREST_EXECUTABLE, PGBACKREST_CONF, "info", "--output=json"]
         )
         if return_code != 0:
             raise ListBackupsError(f"Failed to list backups with error: {stderr}")
@@ -186,7 +263,7 @@ class PostgreSQLBackups(Object):
                 in the S3 bucket.
         """
         return_code, output, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, "info", "--output=json"]
+            [PGBACKREST_EXECUTABLE, PGBACKREST_CONF, "info", "--output=json"]
         )
         if return_code != 0:
             raise ListBackupsError(f"Failed to list backups with error: {stderr}")
@@ -216,7 +293,15 @@ class PostgreSQLBackups(Object):
 
         # Create the stanza.
         return_code, _, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, f"--stanza={self.charm.cluster_name}", "stanza-create"]
+            [
+                # "sudo",
+                # "-u",
+                # "snap_daemon",
+                PGBACKREST_EXECUTABLE,
+                PGBACKREST_CONF,
+                f"--stanza={self.charm.cluster_name}",
+                "stanza-create",
+            ]
         )
         if return_code != 0:
             logger.error(stderr)
@@ -224,7 +309,9 @@ class PostgreSQLBackups(Object):
             return
 
         # Store the stanza name to be used in configurations updates.
-        self.charm._peers.data[self.charm.unit].update({"stanza": self.charm.cluster_name})
+        self.charm.unit_peer_data.update({"stanza": self.charm.cluster_name})
+        if self.charm.unit.is_leader():
+            self.charm.app_peer_data.update({"stanza": self.charm.cluster_name})
 
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
@@ -233,9 +320,15 @@ class PostgreSQLBackups(Object):
             # Check that the stanza is correctly configured.
             for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
                 with attempt:
-                    self.charm._patroni.reload_patroni_configuration()
+                    if self.charm._patroni.member_started:
+                        self.charm._patroni.reload_patroni_configuration()
                     return_code, _, stderr = self._execute_command(
-                        [PGBACKREST_EXECUTABLE, f"--stanza={self.charm.cluster_name}", "check"]
+                        [
+                            PGBACKREST_EXECUTABLE,
+                            PGBACKREST_CONF,
+                            f"--stanza={self.charm.cluster_name}",
+                            "check",
+                        ]
                     )
                     if return_code != 0:
                         raise Exception(stderr)
@@ -253,15 +346,8 @@ class PostgreSQLBackups(Object):
             event.defer()
             return
 
-        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
-        if missing_parameters:
-            logger.warning(
-                f"Cannot set pgBackRest configurations due to missing S3 parameters: {missing_parameters}"
-            )
-            return
-
-        self._render_pgbackrest_conf_file(s3_parameters)
-        self._initialise_stanza()
+        tls_enabled = all(self.charm.tls.get_tls_files())
+        self.configure_pgbackrest(tls_enabled)
 
     def _on_create_backup_action(self, event) -> None:
         """Request that pgBackRest creates a backup."""
@@ -294,7 +380,20 @@ class PostgreSQLBackups(Object):
             event.fail("Failed to upload metadata to provided S3")
             return
 
+        # Mark the cluster as in a creating backup state and update the Patroni configuration.
+        if not self._change_connectivity_to_database(connectivity=False):
+            event.fail("Failed to disable connections to the database")
+            return
+
         self.charm.unit.status = MaintenanceStatus("creating backup")
+
+        command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
+        return_code, stdout, stderr = self._execute_command(command)
+        if return_code != 0:
+            logger.error(return_code)
+            logger.error(stderr)
+            return
+        logger.error(stdout)
 
         # Remove the unit endpoint from the replicas endpoints list in the relation data.
         if self.charm.app.planned_units() > 1:
@@ -303,6 +402,7 @@ class PostgreSQLBackups(Object):
         return_code, stdout, stderr = self._execute_command(
             [
                 PGBACKREST_EXECUTABLE,
+                PGBACKREST_CONF,
                 f"--stanza={self.charm.cluster_name}",
                 "--log-level-console=debug",
                 "--type=full",
@@ -363,6 +463,15 @@ Stderr:
                 event.fail("Error uploading logs to S3")
             else:
                 event.set_results({"backup-status": "backup created"})
+
+        # Remove the flag the marks the cluster as in a creating backup state
+        # and update the Patroni configuration.
+        if not self._change_connectivity_to_database(connectivity=True):
+            event.fail("Failed to re-enable connectivity to the database")
+            self.charm.unit.status = BlockedStatus(
+                "failed to turn on connectivity to the database"
+            )
+            return
 
         self.charm.unit.status = ActiveStatus()
 
@@ -475,15 +584,33 @@ Stderr:
             event.fail(error_message)
             return False
 
+        logger.info("Checking that this unit was already elected the leader unit")
+        if not self.charm.unit.is_leader():
+            error_message = "Unit cannot restore backup as it was not elected the leader unit yet"
+            logger.warning(error_message)
+            event.fail(error_message)
+            return False
+
         return True
 
-    def _render_pgbackrest_conf_file(self, s3_parameters: Dict) -> None:
-        """Render the pgBackRest configuration file."""
+    def _render_pgbackrest_conf_file(
+        self, is_replica: bool, tls_enabled: bool, peer_endpoints: Set[str]
+    ) -> None:
         # Open the template pgbackrest.conf file.
+        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
+        if missing_parameters:
+            logger.warning(
+                f"Cannot set pgBackRest configurations due to missing S3 parameters: {missing_parameters}"
+            )
+            return
+
         with open("templates/pgbackrest.conf.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
+            enable_tls=tls_enabled and len(peer_endpoints) > 0,
+            is_replica=is_replica,
+            peer_endpoints=peer_endpoints,
             path=s3_parameters["path"],
             region=s3_parameters.get("region"),
             endpoint=s3_parameters["endpoint"],
@@ -492,11 +619,12 @@ Stderr:
             access_key=s3_parameters["access-key"],
             secret_key=s3_parameters["secret-key"],
             stanza=self.charm.cluster_name,
+            storage_path=self.charm._storage_path,
             user=BACKUP_USER,
         )
         # Render pgBackRest config file.
-        filename = "/etc/pgbackrest.conf"
-        self.charm._patroni.render_file(filename, rendered, 0o640)
+        filename = "/var/snap/charmed-postgresql/current/etc/pgbackrest.conf"
+        self.charm._patroni.render_file(filename, rendered, 0o644)
 
     def _restart_database(self) -> None:
         """Removes the restoring backup flag and restart the database."""

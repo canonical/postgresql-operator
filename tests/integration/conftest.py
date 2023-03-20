@@ -22,28 +22,29 @@ async def cloud_configs(ops_test: OpsTest) -> None:
     configs = {
         AWS: {
             "endpoint": "https://s3.amazonaws.com",
-            "bucket": "data-charms-testing",
+            "bucket": "canonical-postgres",
             "path": f"/postgresql-vm/{uuid.uuid1()}",
-            "region": "us-east-1",
+            "region": "us-east-2",
         },
-        GCP: {
-            "endpoint": "https://storage.googleapis.com",
-            "bucket": "data-charms-testing",
-            "path": f"/postgresql-vm/{uuid.uuid1()}",
-            "region": "",
-        },
+        # GCP: {
+        #     "endpoint": "https://storage.googleapis.com",
+        #     "bucket": "data-charms-testing",
+        #     "path": f"/postgresql-vm/{uuid.uuid1()}",
+        #     "region": "",
+        # },
     }
     credentials = {
         AWS: {
             "access-key": os.environ.get("AWS_ACCESS_KEY"),
             "secret-key": os.environ.get("AWS_SECRET_KEY"),
         },
-        GCP: {
-            "access-key": os.environ.get("GCP_ACCESS_KEY"),
-            "secret-key": os.environ.get("GCP_SECRET_KEY"),
-        },
+        # GCP: {
+        #     "access-key": os.environ.get("GCP_ACCESS_KEY"),
+        #     "secret-key": os.environ.get("GCP_SECRET_KEY"),
+        # },
     }
     yield configs, credentials
+    return
     # Delete the previously created objects.
     for cloud, config in configs.items():
         session = boto3.session.Session(

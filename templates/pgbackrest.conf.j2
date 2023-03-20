@@ -1,4 +1,9 @@
 [global]
+{%- if is_replica %}
+backup-standby=y
+{%- endif %}
+lock-path=/var/snap/charmed-postgresql/common/locks
+log-path=/var/snap/charmed-postgresql/common/logs
 repo1-retention-full=9999999
 repo1-type=s3
 repo1-path={{ path }}
@@ -9,8 +14,30 @@ repo1-s3-uri-style={{ s3_uri_style }}
 repo1-s3-key={{ access_key }}
 repo1-s3-key-secret={{ secret_key }}
 start-fast=y
+{%- if enable_tls %}
+tls-server-address=*
+{%- for peer_endpoint in peer_endpoints %}
+tls-server-auth={{ peer_endpoint }}={{ stanza }}
+{%- endfor %}
+tls-server-ca-file={{ storage_path }}/ca.pem
+tls-server-cert-file={{ storage_path }}/cert.pem
+tls-server-key-file={{ storage_path }}/key.pem
+{%- endif %}
 
 [{{ stanza }}]
 pg1-path=/var/snap/charmed-postgresql/common/postgresql/pgdata
 pg1-socket-path=/var/snap/charmed-postgresql/common/postgresql
 pg1-user={{ user }}
+{%- if enable_tls %}
+{% set ns = namespace(count=2) %}
+{%- for peer_endpoint in peer_endpoints %}
+pg{{ ns.count }}-host-type=tls
+pg{{ ns.count }}-host-ca-file={{ storage_path }}/ca.pem
+pg{{ ns.count }}-host-cert-file={{ storage_path }}/cert.pem
+pg{{ ns.count }}-host-key-file={{ storage_path }}/key.pem
+pg{{ ns.count }}-host={{ peer_endpoint }}
+pg{{ ns.count }}-path={{ storage_path }}/pgdata
+pg{{ ns.count }}-user={{ user }}
+{% set ns.count = ns.count + 1 %}
+{%- endfor %}
+{%- endif %}
