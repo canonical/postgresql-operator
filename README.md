@@ -3,7 +3,7 @@
 ## Description
 
 This repository contains a [Juju Charm](https://charmhub.io/postgresql) for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines ([LXD](https://ubuntu.com/lxd)).
-To deploy on Kubernetes, please use [Charmed PostgreSQL K8s Operator](https://charmhub.io/mysql-k8s).
+To deploy on Kubernetes, please use [Charmed PostgreSQL K8s Operator](https://charmhub.io/postgresql-k8s).
 
 This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions shipped by the Ubuntu jammy series, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
 
