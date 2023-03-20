@@ -5,11 +5,11 @@
 This repository contains a [Juju Charm](https://charmhub.io/postgresql) for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines ([LXD](https://ubuntu.com/lxd)).
 To deploy on Kubernetes, please use [Charmed PostgreSQL K8s Operator](https://charmhub.io/postgresql-k8s).
 
-This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions shipped by the Ubuntu jammy series, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
+This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions distributed by Ubuntu Jammy series and adding [Patroni](https://github.com/zalando/patroni) on top of it, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
 
 ## Usage
 
-Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) to juju and create a model:
+Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) and create a new Juju model:
 
 ```shell
 juju add-model postgresql
@@ -33,8 +33,13 @@ To retrieve primary replica one can use the action `get-primary` on any of the u
 juju run-action postgresql/leader get-primary --wait
 ```
 
+Similarly, the primary replica is displayed as a status message in `juju status`, however one
+should note that this hook gets called on regular time intervals and the primary may be outdated if
+the status hook has not been called recently.
+
 ### Replication
 #### Adding Replicas
+
 To add more replicas one can use the `juju add-unit` functionality i.e.
 ```shell
 juju add-unit postgresql -n <number_of_units_to_add>
@@ -42,6 +47,7 @@ juju add-unit postgresql -n <number_of_units_to_add>
 The implementation of `add-unit` allows the operator to add more than one unit, but functions internally by adding one replica at a time, avoiding multiple replicas syncing from the primary at the same time.
 
 #### Removing Replicas
+
 Similarly to scale down the number of replicas the `juju remove-unit` functionality may be used i.e.
 ```shell
 juju remove-unit postgresql <name_of_unit1> <name_of_unit2>
@@ -49,27 +55,51 @@ juju remove-unit postgresql <name_of_unit1> <name_of_unit2>
 The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
 
 ### Password rotation
+
 #### Charm users
+
 For users used internally by the Charmed PostgreSQL Operator an action can be used to rotate their passwords.
 ```shell
 juju run-action postgresql/leader set-password username=<username> password=<password> --wait
 ```
-Currently, the users used by the operator are `operator` and `replication`. Those users should not be used outside the operator.
+Note: currently, the users used by the operator are `operator` and `replication`. Those users should not be used outside the operator.
 
 #### Related applications users
 
 To rotate the passwords of users created for related applications the relation should be removed and the application should be related again to the Charmed PostgreSQL Operator. That process will generate a new user and password for the application (removing the old user).
 
-## Relations
+## Integrations (Relations)
 
 Supported [relations](https://juju.is/docs/olm/relations):
 
 #### New `postgresql_client` interface:
 
-Relations to new applications are supported via the [postgresql_client](https://github.com/canonical/charm-relation-interfaces) interface. To create a relation: 
+Current charm relies on [Data Platform libraries](https://charmhub.io/data-platform-libs). Your
+application should define an interface in `metadata.yaml`:
+
+```yaml
+requires:
+  database:
+    interface: postgresql_client
+```
+
+Please read usage documentation about
+[data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces) library for
+more information about how to enable PostgreSQL interface in your application.
+
+Relations to new applications are supported via the `postgresql_client` interface. To create a
+relation:
+
+juju v2.x:
 
 ```shell
 juju relate postgresql application
+```
+
+juju v3.x
+
+```shell
+juju integrate postgresql application
 ```
 
 To remove a relation:

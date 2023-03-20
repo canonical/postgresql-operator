@@ -42,7 +42,7 @@ multipass shell my-vm
 ```
 *Note: if at any point you'd like to leave Multipass VM, enter `Ctrl+d` or type `exit`*.
 
-All the parts have been pre-installed inside VM already, like LXD and Juju (the files '/var/log/cloud-init.log' and '/var/log/cloud-init-output.log' contain all low-level installation details). Let's bootstrap Juju tp use local LXD:
+All the parts have been pre-installed inside VM already, like LXD and Juju (the files '/var/log/cloud-init.log' and '/var/log/cloud-init-output.log' contain all low-level installation details). Let's bootstrap Juju to use local LXD:
 ```shell
 juju bootstrap localhost overlord
 ```

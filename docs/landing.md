@@ -3,7 +3,7 @@ The Charmed PostgreSQL Operator delivers automated operations management from da
 
 PostgreSQL is a powerful, open source object-relational database system that uses and extends the SQL language combined with many features that safely store and scale the most complicated data workloads.
 
-The Charmed PostgreSQL operator comes in two flavours to deploy and operate PostgreSQL on [physical/virtual machines](https://github.com/canonical/postgresql-operator) and [Kubernetes](https://github.com/canonical/postgresql-k8s-operator). Both offer features such as replication, TLS, password rotation, and easy to use integration with applications. The Charmed PostgreSQL Operator meets the need of deploying PostgreSQL in a structured and consistent manner while allowing the user flexibility in configuration. It simplifies deployment, scaling, configuration and management of MySQL in production at scale in a reliable way.
+The Charmed PostgreSQL operator comes in two flavours to deploy and operate PostgreSQL on [physical/virtual machines](https://github.com/canonical/postgresql-operator) and [Kubernetes](https://github.com/canonical/postgresql-k8s-operator). Both offer features such as replication, TLS, password rotation, and easy to use integration with applications. The Charmed PostgreSQL Operator meets the need of deploying PostgreSQL in a structured and consistent manner while allowing the user flexibility in configuration. It simplifies deployment, scaling, configuration and management of PostgreSQL in production at scale in a reliable way.
 
 ## Project and community
 
