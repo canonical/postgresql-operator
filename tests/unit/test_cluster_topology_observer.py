@@ -62,13 +62,11 @@ class TestClusterTopologyChange(unittest.TestCase):
         self.harness.begin()
         self.charm = self.harness.charm
 
-    @patch("subprocess.run")
     @patch("builtins.open")
     @patch("subprocess.Popen")
     @patch.object(MockCharm, "_peers", new_callable=PropertyMock)
-    def test_start_observer(self, _peers, _popen, _open, _run):
+    def test_start_observer(self, _peers, _popen, _open):
         # Test that nothing is done if there is already a running process.
-        _run.return_value.returncode = 0
         _peers.return_value = Mock(data={self.charm.unit: {"observer-pid": "1"}})
         self.charm.observer.start_observer()
         _popen.assert_not_called()
