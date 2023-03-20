@@ -98,16 +98,43 @@ class PostgreSQLBackups(Object):
         """Configures pgBackRest in this unit."""
         is_replica = not self.charm.is_primary
 
-        peer_endpoints = self.charm.members_ips - set([self.charm._unit_ip])
-        self.charm._patroni._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)
-        self._render_pgbackrest_conf_file(is_replica, tls_enabled, peer_endpoints)
-        command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
-        return_code, stdout, stderr = self._execute_command(command)
+        return_code, stdout, stderr = self._execute_command(
+            "mkdir /home/snap_daemon".split(), use_root=True
+        )
         if return_code != 0:
             logger.error(return_code)
             logger.error(stderr)
             return
         logger.error(stdout)
+
+        return_code, stdout, stderr = self._execute_command(
+            "chown snap_daemon:snap_daemon /home/snap_daemon".split(), use_root=True
+        )
+        if return_code != 0:
+            logger.error(return_code)
+            logger.error(stderr)
+            return
+        logger.error(stdout)
+
+        return_code, stdout, stderr = self._execute_command(
+            "sudo usermod -d /home/snap_daemon snap_daemon".split(), use_root=True
+        )
+        if return_code != 0:
+            logger.error(return_code)
+            logger.error(stderr)
+            return
+        logger.error(stdout)
+
+        peer_endpoints = self.charm.members_ips - set([self.charm._unit_ip])
+        self.charm._patroni._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)
+        self._render_pgbackrest_conf_file(is_replica, tls_enabled, peer_endpoints)
+        # command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
+        # return_code, stdout, stderr = self._execute_command(command)
+        # if return_code != 0:
+        #     logger.error(return_code)
+        #     logger.error(stderr)
+        #     return
+        # logger.error(stdout)
 
         if not self._are_backup_settings_ok():
             return
@@ -190,7 +217,7 @@ class PostgreSQLBackups(Object):
         return True
 
     def _execute_command(
-        self, command: List[str], command_input: bytes = None
+        self, command: List[str], command_input: bytes = None, use_root: bool = False
     ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
@@ -206,15 +233,17 @@ class PostgreSQLBackups(Object):
         # homedir = pwd.getpwnam("root").pw_dir
         # env = os.environ.copy()
         # env.update({"HOME": "/home/ubuntu"})
-        # process = run(
-        #     command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote(), env=env
-        # )
-        process = run(
-            command,
-            input=command_input,
-            stdout=PIPE,
-            stderr=PIPE,
-        )
+        if not use_root:
+            process = run(
+                command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote()
+            )
+        else:
+            process = run(
+                command,
+                input=command_input,
+                stdout=PIPE,
+                stderr=PIPE,
+            )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
     def _format_backup_list(self, backup_list) -> str:
@@ -387,13 +416,13 @@ class PostgreSQLBackups(Object):
 
         self.charm.unit.status = MaintenanceStatus("creating backup")
 
-        command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
-        return_code, stdout, stderr = self._execute_command(command)
-        if return_code != 0:
-            logger.error(return_code)
-            logger.error(stderr)
-            return
-        logger.error(stdout)
+        # command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
+        # return_code, stdout, stderr = self._execute_command(command)
+        # if return_code != 0:
+        #     logger.error(return_code)
+        #     logger.error(stderr)
+        #     return
+        # logger.error(stdout)
 
         # Remove the unit endpoint from the replicas endpoints list in the relation data.
         if self.charm.app.planned_units() > 1:
@@ -543,9 +572,9 @@ Stderr:
         logger.info("Removing previous cluster information")
         return_code, _, stderr = self._execute_command(
             [
-                "patronictl",
+                "charmed-postgresql.patronictl",
                 "-c",
-                f"{self.charm._storage_path}/patroni.yml",
+                "/var/snap/charmed-postgresql/current/patroni/config.yaml",
                 "remove",
                 self.charm.cluster_name,
             ],

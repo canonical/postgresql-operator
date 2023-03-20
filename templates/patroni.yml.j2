@@ -63,9 +63,9 @@ bootstrap:
         archive_command: /bin/true
         {%- endif %}
         archive_mode: {{ archive_mode }}
-        #log_filename: 'postgresql.log'
-        #log_directory: '/var/snap/charmed-postgresql/common/logs'
-        #logging_collector: 'on'
+        log_filename: 'postgresql.log'
+        log_directory: '/var/snap/charmed-postgresql/common/logs'
+        logging_collector: 'on'
         unix_socket_directories: /var/snap/charmed-postgresql/common/postgresql
         wal_level: logical
   {%- if restoring_backup %}
@@ -104,7 +104,7 @@ postgresql:
     - local all backup peer map=operator
     {%- if not connectivity %}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
-    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ endpoint }}.{{ namespace }}.svc.cluster.local md5
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} md5
     {% else %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
     {%- endif %}
@@ -114,7 +114,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
     {% endfor %}
   pg_ident:
-  - operator root backup
+  - operator snap_daemon backup
   authentication:
     replication:
       username: replication
