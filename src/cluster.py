@@ -34,7 +34,6 @@ from constants import (
 
 logger = logging.getLogger(__name__)
 
-PATRONI_SERVICE = "patroni"
 CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
 
 
@@ -124,6 +123,10 @@ class Patroni:
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
+
+        # Prevent the default cluster creation.
+        self._inhibit_default_cluster_creation()
+
         # Symlink Patroni config to current
         os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
         os.symlink(
@@ -403,9 +406,6 @@ class Patroni:
         Returns:
             Whether the service started successfully.
         """
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
-
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]

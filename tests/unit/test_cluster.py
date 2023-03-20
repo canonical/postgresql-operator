@@ -211,19 +211,15 @@ class TestCluster(unittest.TestCase):
             0o644,
         )
 
-    @patch("charm.Patroni._inhibit_default_cluster_creation")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni._create_directory")
-    def test_start_patroni(
-        self, _create_directory, _snap_cache, _inhibit_default_cluster_creation
-    ):
+    def test_start_patroni(self, _create_directory, _snap_cache):
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
 
         # Test a success scenario.
         success = self.patroni.start_patroni()
-        _inhibit_default_cluster_creation.assert_called_once()
         _cache.__getitem__.assert_called_once_with("charmed-postgresql")
         _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
         assert success
