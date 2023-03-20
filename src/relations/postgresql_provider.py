@@ -92,6 +92,9 @@ class PostgreSQLProvider(Object):
             self.database_provides.set_version(
                 event.relation.id, self.charm.postgresql.get_postgresql_version()
             )
+
+            # Set the database name
+            self.database_provides.set_database(event.relation.id, database)
         except (
             PostgreSQLCreateDatabaseError,
             PostgreSQLCreateUserError,
