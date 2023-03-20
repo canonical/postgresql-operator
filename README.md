@@ -2,9 +2,10 @@
 
 ## Description
 
-The Charmed PostgreSQL Operator deploys and operates the [PostgreSQL](https://www.postgresql.org/about/) database on machine clusters.
+This repository contains a [Juju Charm](https://charmhub.io/postgresql) for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines ([LXD](https://ubuntu.com/lxd)).
+To deploy on Kubernetes, please use [Charmed PostgreSQL K8s Operator](https://charmhub.io/mysql-k8s).
 
-This operator provides a Postgres database with replication enabled (one master instance and one or more hot standby replicas). The Operator in this repository is a Python script which wraps Postgres versions shipped by the Ubuntu focal series, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
+This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions shipped by the Ubuntu jammy series, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
 
 ## Usage
 
@@ -29,7 +30,7 @@ juju deploy postgresql --channel edge -n <number_of_units>
 
 To retrieve primary replica one can use the action `get-primary` on any of the units running PostgreSQL.
 ```shell
-juju run-action postgresql/<unit_number> get-primary --wait
+juju run-action postgresql/leader get-primary --wait
 ```
 
 ### Replication
@@ -51,7 +52,7 @@ The implementation of `remove-unit` allows the operator to remove more than one 
 #### Charm users
 For users used internally by the Charmed PostgreSQL Operator an action can be used to rotate their passwords.
 ```shell
-juju run-action postgresql/0 set-password username=<username> password=<password> --wait
+juju run-action postgresql/leader set-password username=<username> password=<password> --wait
 ```
 Currently, the users used by the operator are `operator` and `replication`. Those users should not be used outside the operator.
 
@@ -65,7 +66,7 @@ Supported [relations](https://juju.is/docs/olm/relations):
 
 #### New `postgresql_client` interface:
 
-Relations to new applications are supported via the `postgresql_client` interface. To create a relation: 
+Relations to new applications are supported via the [postgresql_client](https://github.com/canonical/charm-relation-interfaces) interface. To create a relation: 
 
 ```shell
 juju relate postgresql application
@@ -104,8 +105,10 @@ Note: The TLS settings shown here are for self-signed-certificates, which are no
 Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not file GitHub issues about security issues.
 
 ## Contributing
-
 Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/postgresql-operator/blob/main/CONTRIBUTING.md) for developer guidance.
 
 ## License
-The Charmed PostgreSQL Operator is free software, distributed under the Apache Software License, version 2.0. See [LICENSE](https://github.com/canonical/postgresql-operator/blob/main/LICENSE) for more information.
+The Charmed PostgreSQL Operator [is distributed](https://github.com/canonical/postgresql-operator/blob/main/LICENSE) under the Apache Software License, version 2.0. It installs/operates/depends on [PostgreSQL](https://www.postgresql.org/ftp/source/), which [is licensed](https://www.postgresql.org/about/licence/) under PostgreSQL License, a liberal Open Source license, similar to the BSD or MIT licenses.
+
+## Trademark Notice
+PostgreSQL is a trademark or registered trademark of PostgreSQL Global Development Group. Other trademarks are property of their respective owners.
