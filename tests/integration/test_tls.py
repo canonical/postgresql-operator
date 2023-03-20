@@ -132,12 +132,12 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await run_command_on_unit(
             ops_test,
             primary,
-            "pkill --signal SIGKILL -f /usr/bin/patroni",
+            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
         )
         await run_command_on_unit(
             ops_test,
             primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
+            "pkill --signal SIGKILL -f /usr/bin/patroni",
         )
 
         # Check that the primary changed.
@@ -146,7 +146,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        logs = await run_command_on_unit(ops_test, primary, "journalctl -u patroni.service")
+        logs = await run_command_on_unit(
+            ops_test, primary, "journalctl -u snap.charmed-postgresql.patroni.service"
+        )
         assert (
             "connection authorized: user=rewind database=postgres SSL enabled" in logs
         ), "TLS is not being used on pg_rewind connections"
