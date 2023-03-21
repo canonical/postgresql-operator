@@ -68,7 +68,7 @@ async def wal_settings(ops_test: OpsTest) -> None:
     app = await app_name(ops_test)
     for unit in ops_test.model.applications[app].units:
         # Start Patroni if it was previously stopped.
-        await run_command_on_unit(ops_test, unit.name, "systemctl start patroni")
+        await run_command_on_unit(ops_test, unit.name, "snap start charmed-postgresql.patroni")
 
         # Rollback to the initial settings.
         await change_wal_settings(

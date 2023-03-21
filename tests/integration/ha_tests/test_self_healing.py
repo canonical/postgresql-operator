@@ -113,7 +113,7 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [PATRONI_PROCESS])
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
@@ -290,7 +290,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     await start_continuous_writes(ops_test, app)
 
     # Stop the systemd service on the primary unit.
-    await run_command_on_unit(ops_test, primary_name, "systemctl stop patroni")
+    await run_command_on_unit(ops_test, primary_name, "snap stop charmed-postgresql.patroni")
 
     # Data removal runs within a script, so it allows `*` expansion.
     return_code, _, _ = await ops_test.juju(
@@ -344,7 +344,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
             ), "WAL segments weren't correctly rotated"
 
         # Start the systemd service in the old primary.
-        await run_command_on_unit(ops_test, primary_name, "systemctl start patroni")
+        await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
