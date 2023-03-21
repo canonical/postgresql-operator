@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -976,19 +976,27 @@ def _system_set(config_item: str, value: str) -> None:
         raise SnapError("Failed setting system config '{}' to '{}'".format(config_item, value))
 
 
-def hold_refresh(days: int = 90) -> bool:
+def hold_refresh(days: int = 90, forever: bool = False) -> bool:
     """Set the system-wide snap refresh hold.
 
     Args:
         days: number of days to hold system refreshes for. Maximum 90. Set to zero to remove hold.
+        forever: if True, will set a hold forever.
     """
-    # Currently the snap daemon can only hold for a maximum of 90 days
-    if not isinstance(days, int) or days > 90:
-        raise ValueError("days must be an int between 1 and 90")
+    if not isinstance(forever, bool):
+        raise TypeError("forever must be a bool")
+    if not isinstance(days, int):
+        raise TypeError("days must be an int")
+    if forever:
+        _system_set("refresh.hold", "forever")
+        logger.info("Set system-wide snap refresh hold to: forever")
     elif days == 0:
         _system_set("refresh.hold", "")
         logger.info("Removed system-wide snap refresh hold")
     else:
+        # Currently the snap daemon can only hold for a maximum of 90 days
+        if not 1 <= days <= 90:
+            raise ValueError("days must be between 1 and 90")
         # Add the number of days to current time
         target_date = datetime.now(timezone.utc).astimezone() + timedelta(days=days)
         # Format for the correct datetime format
