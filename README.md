@@ -62,7 +62,7 @@ For users used internally by the Charmed PostgreSQL Operator an action can be us
 ```shell
 juju run-action postgresql/leader set-password username=<username> password=<password> --wait
 ```
-Note: currently, the users used by the operator are `operator` and `replication`. Those users should not be used outside the operator.
+Note: currently, the users used by the operator are `operator`, `replication`, `backup` and `rewind`. Those users should not be used outside the operator.
 
 #### Related applications users
 
