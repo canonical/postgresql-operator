@@ -172,6 +172,11 @@ async def test_freeze_db_process(
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
+    # Set signal based on the process
+    if process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+    else:
+        signal = "SIGINT"
     # Locate primary unit.
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
@@ -180,7 +185,7 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGINT")
+    await send_signal_to_process(ops_test, primary_name, process, kill_code=signal)
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
@@ -226,6 +231,11 @@ async def test_full_cluster_restart(
     The test can be called a full cluster crash when the signal sent to the OS process
     is SIGKILL.
     """
+    # Set signal based on the process
+    if signal == "SIGINT" and process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+
+    # Locate primary unit.
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
