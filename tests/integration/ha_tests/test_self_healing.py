@@ -180,7 +180,7 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
+    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGINT")
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
@@ -217,7 +217,7 @@ async def test_restart_db_process(
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
-@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
+@pytest.mark.parametrize("signal", ["SIGINT", "SIGKILL"])
 async def test_full_cluster_restart(
     ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_delay
 ) -> None:
