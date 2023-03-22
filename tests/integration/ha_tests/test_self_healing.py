@@ -35,8 +35,8 @@ from tests.integration.helpers import (
 )
 
 APP_NAME = METADATA["name"]
-PATRONI_PROCESS = "/usr/local/bin/patroni"
-POSTGRESQL_PROCESS = "postgres"
+PATRONI_PROCESS = "/usr/bin/patroni"
+POSTGRESQL_PROCESS = "/snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
@@ -67,7 +67,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -82,7 +82,7 @@ async def test_kill_db_process(
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after primary_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
@@ -115,7 +115,7 @@ async def test_kill_db_process(
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -130,7 +130,7 @@ async def test_freeze_db_process(
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed, and also
+        # considered to trigger a fail-over after primary_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
         try:
             writes = await count_writes(ops_test, primary_name)
@@ -170,7 +170,7 @@ async def test_freeze_db_process(
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -185,7 +185,7 @@ async def test_restart_db_process(
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after primary_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
@@ -274,7 +274,7 @@ async def test_full_cluster_restart(
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
-    master_start_timeout,
+    primary_start_timeout,
     wal_settings,
 ) -> None:
     """A forceful restart with deleted data and without transaction logs (forced clone)."""
@@ -311,7 +311,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after primary_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:

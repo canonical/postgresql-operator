@@ -865,10 +865,9 @@ class PostgresqlOperatorCharm(CharmBase):
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                if not snap_package.present:
-                    snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+                snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
 
-            except snap.SnapError as e:
+            except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
                     "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
                 )

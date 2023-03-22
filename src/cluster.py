@@ -37,7 +37,6 @@ from constants import (
 
 logger = logging.getLogger(__name__)
 
-PATRONI_SERVICE = "patroni"
 CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
 
 
@@ -127,11 +126,16 @@ class Patroni:
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
-        # Avoid rendering the Patroni config file if it was already rendered.
-        if not os.path.exists("/var/snap/charmed-postgresql/current/patroni/config.yaml"):
-            self.render_patroni_yml_file(
-                archive_mode=self.archive_mode, connectivity=True, enable_tls=self.tls_enabled
-            )
+
+        # Prevent the default cluster creation.
+        self._inhibit_default_cluster_creation()
+
+        # Symlink Patroni config to current
+        os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
+        os.symlink(
+            f"{self.storage_path}/patroni.yaml",
+            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+        )
         # Logs error out if execution permission is not set
         self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o777)
         # Replicas refuse to start with the default permissions
@@ -386,7 +390,7 @@ class Patroni:
         rendered = template.render(
             archive_mode=archive_mode,
             connectivity=connectivity,
-            conf_path="/var/snap/charmed-postgresql/common/postgresql",  # self.storage_path,
+            conf_path=self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
@@ -406,9 +410,7 @@ class Patroni:
             version=self._get_postgresql_version(),
             minority_count=self.planned_units // 2,
         )
-        self.render_file(
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml", rendered, 0o644
-        )
+        self.render_file(f"{self.storage_path}/patroni.yaml", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
@@ -416,16 +418,10 @@ class Patroni:
         Returns:
             Whether the service started successfully.
         """
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
-
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
-            logger.error(
-                f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}'
-            )
             return selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
             error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
@@ -442,14 +438,11 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.stop(services=["patroni"])
-            logger.error(
-                f'selected_snap.services["patroni"]["active"]: {selected_snap.services["patroni"]["active"]}'
-            )
-            return not selected_snap.services["patroni"]["active"]
+            running = not selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
             error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
             logger.exception(error_message, exc_info=e)
-            return False
+        return running
 
     def switchover(self) -> None:
         """Trigger a switchover."""
@@ -490,7 +483,12 @@ class Patroni:
         """
         # Get the status of the raft cluster.
         raft_status = subprocess.check_output(
-            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-status"]
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-status",
+            ]
         ).decode("UTF-8")
 
         # Check whether the member is still part of the raft cluster.
@@ -499,8 +497,15 @@ class Patroni:
 
         # Remove the member from the raft cluster.
         result = subprocess.check_output(
-            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-remove", f"{member_ip}:2222"]
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-remove",
+                f"{member_ip}:2222",
+            ]
         ).decode("UTF-8")
+
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()
 

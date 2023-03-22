@@ -16,7 +16,7 @@ from tests.integration.helpers import get_unit_address
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
-PATRONI_SERVICE_DEFAULT_PATH = "/etc/systemd/system/patroni.service"
+PATRONI_SERVICE_DEFAULT_PATH = "/etc/systemd/system/snap.charmed-postgresql.patroni.service"
 TMP_SERVICE_PATH = "tests/integration/ha_tests/tmp.service"
 RESTART_DELAY = 60 * 3
 ORIGINAL_RESTART_DELAY = 30
@@ -78,14 +78,14 @@ def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
     return resp.json()
 
 
-async def change_master_start_timeout(
+async def change_primary_start_timeout(
     ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
 ) -> None:
-    """Change master start timeout configuration.
+    """Change primary start timeout configuration.
 
     Args:
         ops_test: ops_test instance.
-        seconds: number of seconds to set in master_start_timeout configuration.
+        seconds: number of seconds to set in primary_start_timeout configuration.
         use_random_unit: whether to use a random unit (default is False,
             so it uses the primary)
     """
@@ -100,7 +100,7 @@ async def change_master_start_timeout(
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
-                json={"master_start_timeout": seconds},
+                json={"primary_start_timeout": seconds},
             )
 
 
@@ -191,14 +191,14 @@ async def fetch_cluster_members(ops_test: OpsTest):
     return member_ips
 
 
-async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
-    """Get the master start timeout configuration.
+async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
+    """Get the primary start timeout configuration.
 
     Args:
         ops_test: ops_test instance.
 
     Returns:
-        master start timeout in seconds or None if it's using the default value.
+        primary start timeout in seconds or None if it's using the default value.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -206,8 +206,8 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
-            master_start_timeout = configuration_info.json().get("master_start_timeout")
-            return int(master_start_timeout) if master_start_timeout is not None else None
+            primary_start_timeout = configuration_info.json().get("primary_start_timeout")
+            return int(primary_start_timeout) if primary_start_timeout is not None else None
 
 
 async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
@@ -306,7 +306,7 @@ async def get_primary(ops_test: OpsTest, app) -> str:
 async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
     """Returns the list of WAL segment files in each unit."""
     units = [unit.name for unit in ops_test.model.applications[app].units]
-    command = "ls -1 /var/lib/postgresql/data/pgdata/pg_wal/"
+    command = "ls -1 /var/snap/charmed-postgresql/common/postgresql/pgdata/pg_wal/"
     files = {}
     for unit in units:
         complete_command = f"run --unit {unit} -- {command}"

@@ -179,7 +179,7 @@ class TestCluster(unittest.TestCase):
             template = Template(file.read())
         expected_content = template.render(
             archive_mode="on",
-            conf_path="/var/snap/charmed-postgresql/common/postgresql",
+            conf_path=STORAGE_PATH,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
@@ -206,24 +206,20 @@ class TestCluster(unittest.TestCase):
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+            "/var/snap/charmed-postgresql/common/postgresql/patroni.yaml",
             expected_content,
             0o644,
         )
 
-    @patch("charm.Patroni._inhibit_default_cluster_creation")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni._create_directory")
-    def test_start_patroni(
-        self, _create_directory, _snap_cache, _inhibit_default_cluster_creation
-    ):
+    def test_start_patroni(self, _create_directory, _snap_cache):
         _cache = _snap_cache.return_value
         _selected_snap = _cache.__getitem__.return_value
         _selected_snap.start.side_effect = [None, snap.SnapError]
 
         # Test a success scenario.
         success = self.patroni.start_patroni()
-        _inhibit_default_cluster_creation.assert_called_once()
         _cache.__getitem__.assert_called_once_with("charmed-postgresql")
         _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
         assert success
