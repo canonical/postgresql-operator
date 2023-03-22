@@ -332,6 +332,8 @@ class PostgreSQLBackups(Object):
         if self.charm.is_primary:
             self._initialise_stanza()
 
+        self.start_stop_pgbackrest_service()
+
     def _on_create_backup_action(self, event) -> None:
         """Request that pgBackRest creates a backup."""
         can_unit_perform_backup, validation_message = self._can_unit_perform_backup()

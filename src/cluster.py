@@ -130,10 +130,12 @@ class Patroni:
         self._inhibit_default_cluster_creation()
 
         # Symlink Patroni config to current
-        os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
+        config_path = "/var/snap/charmed-postgresql/current/patroni/config.yaml"
+        if os.path.isfile(config_path):
+            os.remove(config_path)
         os.symlink(
             f"{self.storage_path}/patroni.yaml",
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+            config_path,
         )
         # Create the pgBackRest locks directory.
         self._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)

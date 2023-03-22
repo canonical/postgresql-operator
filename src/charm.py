@@ -941,6 +941,10 @@ class PostgresqlOperatorCharm(CharmBase):
             error_message = "failed to restart PostgreSQL"
             logger.exception(error_message)
             self.unit.status = BlockedStatus(error_message)
+            return
+
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        self.backup.start_stop_pgbackrest_service()
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""

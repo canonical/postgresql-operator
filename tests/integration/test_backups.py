@@ -15,7 +15,6 @@ from tests.integration.helpers import (
     get_password,
     get_primary,
     get_unit_address,
-    scale_application,
 )
 
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
@@ -57,16 +56,14 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             **cloud_configs[1][cloud],
         )
         await action.wait()
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
-        )
+        async with ops_test.fast_forward():
+            await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
         primary = await get_primary(ops_test, f"{database_app_name}/0")
         for unit in ops_test.model.applications[database_app_name].units:
             if unit.name != primary:
                 replica = unit.name
                 break
-        # replica = primary
 
         # Write some data.
         password = await get_password(ops_test, primary)
@@ -105,7 +102,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         connection.close()
 
         # Scale down to be able to restore.
-        await scale_application(ops_test, database_app_name, 1)
+        await ops_test.model.units.get(replica).remove()
 
         # Run the "restore backup" action.
         for attempt in Retrying(
