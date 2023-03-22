@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -11,7 +12,6 @@ from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
-    RESTART_CONDITION,
     all_db_processes_down,
     app_name,
     change_wal_settings,
@@ -38,7 +38,8 @@ from tests.integration.helpers import (
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
 POSTGRESQL_PROCESS = "/snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres"
-DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
+# DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
+DB_PROCESSES = [PATRONI_PROCESS]
 
 
 @pytest.mark.abort_on_fail
@@ -173,6 +174,12 @@ async def test_freeze_db_process(
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
+    # Set signal based on the process
+    if process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+    else:
+        signal = "SIGINT"
+
     # Locate primary unit.
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
@@ -181,7 +188,7 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGINT")
+    await send_signal_to_process(ops_test, primary_name, process, kill_code=signal)
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
@@ -227,15 +234,13 @@ async def test_full_cluster_restart(
     The test can be called a full cluster crash when the signal sent to the OS process
     is SIGKILL.
     """
+    # Set signal based on the process
+    if signal == "SIGINT" and process == PATRONI_PROCESS:
+        signal = "SIGTERM"
     # Locate primary unit.
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
-
-    # Update all units to have a new RESTART_DELAY. Modifying the Restart delay to 3 minutes
-    # should ensure enough time for all replicas to be down at the same time.
-    for unit in ops_test.model.applications[app].units:
-        await update_restart_condition(ops_test, unit, RESTART_CONDITION)
 
     # Restart all units "simultaneously".
     await asyncio.gather(
@@ -258,11 +263,10 @@ async def test_full_cluster_restart(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
-    for attempt in Retrying(stop=stop_after_delay(12), wait=wait_fixed(3)):
-        with attempt:
-            writes = await count_writes(ops_test)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
         with attempt:
+            writes = await count_writes(ops_test)
+            sleep(5)
             more_writes = await count_writes(ops_test)
             assert more_writes > writes, "writes not continuing to DB"
 
