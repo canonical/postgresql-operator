@@ -128,7 +128,10 @@ class Patroni:
         self._inhibit_default_cluster_creation()
 
         # Symlink Patroni config to current
-        os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
+        try:
+            os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
+        except FileNotFoundError:
+            pass
         os.symlink(
             f"{self.storage_path}/patroni.yaml",
             "/var/snap/charmed-postgresql/current/patroni/config.yaml",
