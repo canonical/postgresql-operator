@@ -45,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 5
+LIBPATCH = 6
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -193,7 +193,9 @@ class PostgreSQLTLS(Object):
 
         # Separate IP addresses and DNS names.
         sans_ip = [san for san in sans if is_ip_address(san)]
-        sans_dns = [san for san in sans if not is_ip_address(san)]
+        # IP address need to be part of the DNS SANs list due to
+        # https://github.com/pgbackrest/pgbackrest/issues/1977.
+        sans_dns = sans
 
         return {
             "sans_ip": sans_ip,
