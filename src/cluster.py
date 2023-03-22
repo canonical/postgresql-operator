@@ -136,10 +136,14 @@ class Patroni:
             f"{self.storage_path}/patroni.yaml",
             "/var/snap/charmed-postgresql/current/patroni/config.yaml",
         )
+        # Create the pgBackRest locks directory.
+        self._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)
         # Logs error out if execution permission is not set
         self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o777)
         # Replicas refuse to start with the default permissions
         os.chmod(self.storage_path, 0o750)
+
+        self._create_user_home_directory()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -176,6 +180,11 @@ class Patroni:
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
+
+    def _create_user_home_directory(self) -> None:
+        subprocess.run("mkdir -p /home/snap_daemon".split())
+        subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
+        subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
 
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""

@@ -32,8 +32,8 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME, channel="edge")
-    # config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-    # await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, channel="beta", config=config)
+    config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
+    await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, channel="beta", config=config)
 
     for cloud, config in cloud_configs[0].items():
         # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
@@ -43,11 +43,11 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         await ops_test.model.deploy(
             charm,
             application_name=database_app_name,
-            # num_units=2,
+            num_units=2,
             series=CHARM_SERIES,
         )
         await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
-        # await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
+        await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
 
         # Configure and set access and secret keys.
         logger.info(f"configuring S3 integrator for {cloud}")
@@ -62,11 +62,11 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         )
 
         primary = await get_primary(ops_test, f"{database_app_name}/0")
-        # for unit in ops_test.model.applications[database_app_name].units:
-        #     if unit.name != primary:
-        #         replica = unit.name
-        #         break
-        replica = primary
+        for unit in ops_test.model.applications[database_app_name].units:
+            if unit.name != primary:
+                replica = unit.name
+                break
+        # replica = primary
 
         # Write some data.
         password = await get_password(ops_test, primary)

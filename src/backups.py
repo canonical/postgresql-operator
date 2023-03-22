@@ -12,7 +12,7 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, run
-from typing import Dict, List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import boto3 as boto3
 import botocore
@@ -70,7 +70,7 @@ class PostgreSQLBackups(Object):
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
-        if "stanza" not in self.charm._peers.data[self.charm.unit]:
+        if "stanza" not in self.charm.app_peer_data:
             return False, "Stanza was not initialised"
 
         return True, None
@@ -93,67 +93,6 @@ class PostgreSQLBackups(Object):
             return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
-
-    def configure_pgbackrest(self, tls_enabled: bool) -> None:
-        """Configures pgBackRest in this unit."""
-        is_replica = not self.charm.is_primary
-
-        return_code, stdout, stderr = self._execute_command(
-            "mkdir /home/snap_daemon".split(), use_root=True
-        )
-        if return_code != 0:
-            logger.error(return_code)
-            logger.error(stderr)
-            return
-        logger.error(stdout)
-
-        return_code, stdout, stderr = self._execute_command(
-            "chown snap_daemon:snap_daemon /home/snap_daemon".split(), use_root=True
-        )
-        if return_code != 0:
-            logger.error(return_code)
-            logger.error(stderr)
-            return
-        logger.error(stdout)
-
-        return_code, stdout, stderr = self._execute_command(
-            "sudo usermod -d /home/snap_daemon snap_daemon".split(), use_root=True
-        )
-        if return_code != 0:
-            logger.error(return_code)
-            logger.error(stderr)
-            return
-        logger.error(stdout)
-
-        peer_endpoints = self.charm.members_ips - set([self.charm._unit_ip])
-        self.charm._patroni._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)
-        self._render_pgbackrest_conf_file(is_replica, tls_enabled, peer_endpoints)
-        # command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
-        # return_code, stdout, stderr = self._execute_command(command)
-        # if return_code != 0:
-        #     logger.error(return_code)
-        #     logger.error(stderr)
-        #     return
-        # logger.error(stdout)
-
-        if not self._are_backup_settings_ok():
-            return
-
-        if not is_replica:
-            self._initialise_stanza()
-
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            logger.error("Cannot start/stop service, snap is not yet installed.")
-            # event.defer()
-            return
-
-        if not tls_enabled or len(peer_endpoints) == 0:
-            charmed_postgresql_snap.stop(services=[self.charm.pgbackrest_server_service])
-            return
-
-        charmed_postgresql_snap.restart(services=[self.charm.pgbackrest_server_service])
 
     def _construct_endpoint(self, s3_parameters: Dict) -> str:
         """Construct the S3 service endpoint using the region.
@@ -217,7 +156,11 @@ class PostgreSQLBackups(Object):
         return True
 
     def _execute_command(
-        self, command: List[str], command_input: bytes = None, use_root: bool = False
+        self,
+        command: List[str],
+        command_input: bytes = None,
+        timeout: int = None,
+        use_root: bool = False,
     ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
@@ -235,15 +178,15 @@ class PostgreSQLBackups(Object):
         # env.update({"HOME": "/home/ubuntu"})
         if not use_root:
             process = run(
-                command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote()
-            )
-        else:
-            process = run(
                 command,
                 input=command_input,
                 stdout=PIPE,
                 stderr=PIPE,
+                preexec_fn=demote(),
+                timeout=timeout,
             )
+        else:
+            process = run(command, input=command_input, stdout=PIPE, stderr=PIPE, timeout=timeout)
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
     def _format_backup_list(self, backup_list) -> str:
@@ -323,9 +266,6 @@ class PostgreSQLBackups(Object):
         # Create the stanza.
         return_code, _, stderr = self._execute_command(
             [
-                # "sudo",
-                # "-u",
-                # "snap_daemon",
                 PGBACKREST_EXECUTABLE,
                 PGBACKREST_CONF,
                 f"--stanza={self.charm.cluster_name}",
@@ -368,6 +308,16 @@ class PostgreSQLBackups(Object):
                 f"failed to initialize stanza with error {str(e)}"
             )
 
+    @property
+    def _is_primary_pgbackrest_service_running(self) -> bool:
+        return_code, stdout, stderr = self._execute_command(
+            [PGBACKREST_EXECUTABLE, "server-ping", self.charm.primary_endpoint]
+        )
+        logger.error(f"return_code: {return_code}")
+        logger.error(f"stdout: {stdout}")
+        logger.error(f"stderr: {stderr}")
+        return return_code == 0
+
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Call the stanza initialization when the credentials or the connection info change."""
         if "cluster_initialised" not in self.charm.app_peer_data:
@@ -375,8 +325,12 @@ class PostgreSQLBackups(Object):
             event.defer()
             return
 
-        tls_enabled = all(self.charm.tls.get_tls_files())
-        self.configure_pgbackrest(tls_enabled)
+        if not self._render_pgbackrest_conf_file():
+            logger.debug("Cannot set pgBackRest configurations, missing configurations.")
+            return
+
+        if self.charm.is_primary:
+            self._initialise_stanza()
 
     def _on_create_backup_action(self, event) -> None:
         """Request that pgBackRest creates a backup."""
@@ -415,14 +369,6 @@ class PostgreSQLBackups(Object):
             return
 
         self.charm.unit.status = MaintenanceStatus("creating backup")
-
-        # command = "chmod -R 707 /var/snap/charmed-postgresql/common/postgresql/pgdata".split()
-        # return_code, stdout, stderr = self._execute_command(command)
-        # if return_code != 0:
-        #     logger.error(return_code)
-        #     logger.error(stderr)
-        #     return
-        # logger.error(stdout)
 
         # Remove the unit endpoint from the replicas endpoints list in the relation data.
         if self.charm.app.planned_units() > 1:
@@ -570,16 +516,20 @@ Stderr:
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
-        return_code, _, stderr = self._execute_command(
-            [
-                "charmed-postgresql.patronictl",
-                "-c",
-                "/var/snap/charmed-postgresql/current/patroni/config.yaml",
-                "remove",
-                self.charm.cluster_name,
-            ],
-            command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
-        )
+        for i in range(10):
+            return_code, _, stderr = self._execute_command(
+                [
+                    "charmed-postgresql.patronictl",
+                    "-c",
+                    "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+                    "remove",
+                    self.charm.cluster_name,
+                ],
+                command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
+                timeout=10,
+            )
+            if return_code == 0:
+                break
         if return_code != 0:
             logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
             event.fail(error_message)
@@ -622,24 +572,22 @@ Stderr:
 
         return True
 
-    def _render_pgbackrest_conf_file(
-        self, is_replica: bool, tls_enabled: bool, peer_endpoints: Set[str]
-    ) -> None:
+    def _render_pgbackrest_conf_file(self) -> bool:
         # Open the template pgbackrest.conf file.
         s3_parameters, missing_parameters = self._retrieve_s3_parameters()
         if missing_parameters:
             logger.warning(
                 f"Cannot set pgBackRest configurations due to missing S3 parameters: {missing_parameters}"
             )
-            return
+            return False
 
         with open("templates/pgbackrest.conf.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            enable_tls=tls_enabled and len(peer_endpoints) > 0,
-            is_replica=is_replica,
-            peer_endpoints=peer_endpoints,
+            enable_tls=self.charm.is_tls_enabled and len(self.charm._peer_members_ips) > 0,
+            is_replica=not self.charm.is_primary,
+            peer_endpoints=self.charm._peer_members_ips,
             path=s3_parameters["path"],
             region=s3_parameters.get("region"),
             endpoint=s3_parameters["endpoint"],
@@ -652,8 +600,11 @@ Stderr:
             user=BACKUP_USER,
         )
         # Render pgBackRest config file.
-        filename = "/var/snap/charmed-postgresql/current/etc/pgbackrest.conf"
-        self.charm._patroni.render_file(filename, rendered, 0o644)
+        self.charm._patroni.render_file(
+            "/var/snap/charmed-postgresql/current/etc/pgbackrest.conf", rendered, 0o644
+        )
+
+        return True
 
     def _restart_database(self) -> None:
         """Removes the restoring backup flag and restart the database."""
@@ -685,6 +636,35 @@ Stderr:
         s3_parameters.setdefault("s3-uri-style", "host")
 
         return s3_parameters, []
+
+    def start_stop_pgbackrest_service(self) -> bool:
+        """Start or stop the pgBackRest TLS server service.
+
+        Returns:
+            a boolean indicating whether the operation succeeded.
+        """
+        # Update pgBackRest configuration (to update the TLS settings).
+        if not self._render_pgbackrest_conf_file():
+            return False
+
+        snap_cache = snap.SnapCache()
+        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
+        if not charmed_postgresql_snap.present:
+            logger.error("Cannot start/stop service, snap is not yet installed.")
+            return False
+
+        # Stop the service if TLS is not enabled or there are no replicas.
+        if not self.charm.is_tls_enabled or len(self.charm._peer_members_ips) == 0:
+            charmed_postgresql_snap.stop(services=[self.charm.pgbackrest_server_service])
+            return True
+
+        # Don't start the service if the service hasn't started yet in the primary.
+        if not self.charm.is_primary and not self._is_primary_pgbackrest_service_running:
+            return False
+
+        # Start the service.
+        charmed_postgresql_snap.restart(services=[self.charm.pgbackrest_server_service])
+        return True
 
     def _upload_content_to_s3(
         self: str,
