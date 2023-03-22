@@ -36,7 +36,7 @@ from tests.integration.helpers import (
 )
 
 APP_NAME = METADATA["name"]
-PATRONI_PROCESS = "/usr/bin/patroni"
+PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
 POSTGRESQL_PROCESS = "/snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
@@ -64,14 +64,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if wait_for_apps:
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
-
-
-# TODO remove once snap gets updated
-@pytest.mark.abort_on_fail
-async def test_set_restart_condition(ops_test: OpsTest) -> None:
-    app = await app_name(ops_test)
-    for unit in ops_test.model.applications[app].units:
-        await update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION)
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
