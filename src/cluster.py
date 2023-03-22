@@ -7,7 +7,6 @@ import logging
 import os
 import pwd
 import subprocess
-from pathlib import Path
 from typing import Optional, Set
 
 import requests
@@ -388,10 +387,6 @@ class Patroni:
             stanza: name of the stanza created by pgBackRest.
             backup_id: id of the backup that is being restored.
         """
-        my_file = Path("/var/snap/charmed-postgresql/current/patroni/config.yaml")
-        if not my_file.is_file():
-            return
-
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
