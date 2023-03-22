@@ -16,10 +16,11 @@ from tests.integration.helpers import get_unit_address
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
-PATRONI_SERVICE_DEFAULT_PATH = "/etc/systemd/system/snap.charmed-postgresql.patroni.service"
+SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
+PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{SERVICE_NAME}"
 TMP_SERVICE_PATH = "tests/integration/ha_tests/tmp.service"
-RESTART_DELAY = 60 * 3
-ORIGINAL_RESTART_DELAY = 30
+RESTART_CONDITION = "no"
+ORIGINAL_RESTART_CONDITION = "always"
 
 
 class MemberNotListedOnClusterError(Exception):
@@ -421,8 +422,8 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     return int(action.results["writes"])
 
 
-async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
-    """Updates the restart delay in the DB service file.
+async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
+    """Updates the restart condition in the DB service file.
 
     When the DB service fails it will now wait for `delay` number of seconds.
     """
@@ -432,8 +433,8 @@ async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
         patroni_service = patroni_service_file.readlines()
 
     for index, line in enumerate(patroni_service):
-        if "RestartSec" in line:
-            patroni_service[index] = f"RestartSec={delay}s\n"
+        if "Restart=" in line:
+            patroni_service[index] = f"Restart={condition}\n"
 
     with open(TMP_SERVICE_PATH, "w") as service_file:
         service_file.writelines(patroni_service)
@@ -457,3 +458,4 @@ async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
     return_code, _, _ = await ops_test.juju(*reload_cmd.split())
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
+    await ops_test.juju(["run", "--unit", unit.name, "systemctl", "start", SERVICE_NAME])
