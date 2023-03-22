@@ -28,13 +28,16 @@ from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     REWIND_USER,
+    SNAP_COMMON_PATH,
+    SNAP_CURRENT_PATH,
     TLS_CA_FILE,
     USER,
 )
 
 logger = logging.getLogger(__name__)
 
-CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
+PG_BASE_CONF_PATH = f"{SNAP_CURRENT_PATH}/postgresql/postgresql.conf"
+PATRONI_SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/patroni/config.yaml"
 
 
 class NotReadyError(Exception):
@@ -114,30 +117,22 @@ class Patroni:
         self.configure_patroni_on_unit()
         return self.start_patroni()
 
-    def _inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("\n")
-
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
 
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
+        # Create empty base config
+        os.makedirs(os.path.dirname(PG_BASE_CONF_PATH), mode=0o755, exist_ok=True)
+        open(PG_BASE_CONF_PATH, "a").close()
 
         # Symlink Patroni config to current
-        try:
-            os.remove("/var/snap/charmed-postgresql/current/patroni/config.yaml")
-        except FileNotFoundError:
-            pass
-        os.symlink(
-            f"{self.storage_path}/patroni.yaml",
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
-        )
+        if not os.path.isfile(PATRONI_SNAP_CONF_PATH):
+            os.symlink(
+                f"{self.storage_path}/patroni.yaml",
+                PATRONI_SNAP_CONF_PATH,
+            )
         # Logs error out if execution permission is not set
-        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o755)
+        self._create_directory(f"{SNAP_COMMON_PATH}/logs", 0o755)
         # Replicas refuse to start with the default permissions
         os.chmod(self.storage_path, 0o750)
 
