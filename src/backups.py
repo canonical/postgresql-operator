@@ -643,6 +643,11 @@ Stderr:
         Returns:
             a boolean indicating whether the operation succeeded.
         """
+        # Ignore this operation if backups settings aren't ok.
+        are_backup_settings_ok, _ = self._are_backup_settings_ok()
+        if not are_backup_settings_ok:
+            return True
+
         # Update pgBackRest configuration (to update the TLS settings).
         if not self._render_pgbackrest_conf_file():
             return False
