@@ -458,7 +458,9 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     return_code, _, _ = await ops_test.juju(*reload_cmd.split())
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
-    restart_cmd = f"run --unit {unit.name} systemctl restart {SERVICE_NAME}"
-    return_code, _, _ = await ops_test.juju(*restart_cmd.split())
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", restart_cmd, unit.name)
+    start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
+    await ops_test.juju(*start_cmd.split())
+
+    # wait for the primary to become available
+    app = await app_name(ops_test)
+    await get_primary(ops_test, app)
