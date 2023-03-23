@@ -70,9 +70,6 @@ class PostgreSQLBackups(Object):
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
-        if "stanza" not in self.charm.app_peer_data:
-            return False, "Stanza was not initialised"
-
         return True, None
 
     def _can_unit_perform_backup(self) -> Tuple[bool, Optional[str]]:
@@ -119,7 +116,7 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         try:
-            path = Path("/var/lib/postgresql/data/pgdata")
+            path = Path(f"{self.charm._storage_path}/pgdata")
             if path.exists() and path.is_dir():
                 shutil.rmtree(path)
         except OSError as e:
@@ -128,32 +125,10 @@ class PostgreSQLBackups(Object):
 
         return True
 
-    def _change_connectivity_to_database(self, connectivity: bool) -> bool:
+    def _change_connectivity_to_database(self, connectivity: bool) -> None:
         """Enable or disable the connectivity to the database."""
         self.charm.unit_peer_data.update({"connectivity": "on" if connectivity else "off"})
         self.charm.update_config()
-        try:
-            # Check that the connectivity to this unit's database is turned on or off
-            # based on the connectivity parameter.
-            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
-                with attempt:
-                    # Force an update of the Patroni and PostgreSQL configuration files.
-                    if self.charm._patroni.member_started:
-                        self.charm._patroni.reload_patroni_configuration()
-
-                    # # Check the connectivity to this unit's database.
-                    # try:
-                    #     self.charm.postgresql.list_users()
-                    #     if not connectivity:
-                    #         raise Exception()
-                    # except PostgreSQLListUsersError:
-                    #     if connectivity:
-                    #         raise
-        except RetryError as e:
-            logger.exception(e)
-            return False
-
-        return True
 
     def _execute_command(
         self,
@@ -257,6 +232,9 @@ class PostgreSQLBackups(Object):
         located, how it will be backed up, archiving options, etc. (more info in
         https://pgbackrest.org/user-guide.html#quickstart/configure-stanza).
         """
+        if not self.charm.unit.is_leader():
+            return
+
         if self.charm.is_blocked:
             logger.warning("couldn't initialize stanza due to a blocked status")
             return
@@ -278,9 +256,7 @@ class PostgreSQLBackups(Object):
             return
 
         # Store the stanza name to be used in configurations updates.
-        self.charm.unit_peer_data.update({"stanza": self.charm.cluster_name})
-        if self.charm.unit.is_leader():
-            self.charm.app_peer_data.update({"stanza": self.charm.cluster_name})
+        self.charm.app_peer_data.update({"stanza": self.charm.cluster_name})
 
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
@@ -310,12 +286,13 @@ class PostgreSQLBackups(Object):
 
     @property
     def _is_primary_pgbackrest_service_running(self) -> bool:
-        return_code, stdout, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, "server-ping", self.charm.primary_endpoint]
+        return_code, _, stderr = self._execute_command(
+            [PGBACKREST_EXECUTABLE, "server-ping", "--io-timeout=10", self.charm.primary_endpoint]
         )
-        logger.error(f"return_code: {return_code}")
-        logger.error(f"stdout: {stdout}")
-        logger.error(f"stderr: {stderr}")
+        if return_code != 0:
+            logger.warning(
+                f"Failed to contact pgBackRest TLS server on {self.charm.primary_endpoint} with error {stderr}"
+            )
         return return_code == 0
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
@@ -329,8 +306,7 @@ class PostgreSQLBackups(Object):
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
             return
 
-        if self.charm.is_primary:
-            self._initialise_stanza()
+        self._initialise_stanza()
 
         self.start_stop_pgbackrest_service()
 
@@ -365,10 +341,9 @@ class PostgreSQLBackups(Object):
             event.fail("Failed to upload metadata to provided S3")
             return
 
-        # Mark the cluster as in a creating backup state and update the Patroni configuration.
-        if not self._change_connectivity_to_database(connectivity=False):
-            event.fail("Failed to disable connections to the database")
-            return
+        # Create a rule to mark the cluster as in a creating backup state and update
+        # the Patroni configuration.
+        self._change_connectivity_to_database(connectivity=False)
 
         self.charm.unit.status = MaintenanceStatus("creating backup")
 
@@ -441,14 +416,9 @@ Stderr:
             else:
                 event.set_results({"backup-status": "backup created"})
 
-        # Remove the flag the marks the cluster as in a creating backup state
+        # Remove the rule the marks the cluster as in a creating backup state
         # and update the Patroni configuration.
-        if not self._change_connectivity_to_database(connectivity=True):
-            event.fail("Failed to re-enable connectivity to the database")
-            self.charm.unit.status = BlockedStatus(
-                "failed to turn on connectivity to the database"
-            )
-            return
+        self._change_connectivity_to_database(connectivity=True)
 
         self.charm.unit.status = ActiveStatus()
 
@@ -518,20 +488,17 @@ Stderr:
 
         # Remove previous cluster information to make it possible to initialise a new cluster.
         logger.info("Removing previous cluster information")
-        for i in range(10):
-            return_code, _, stderr = self._execute_command(
-                [
-                    "charmed-postgresql.patronictl",
-                    "-c",
-                    "/var/snap/charmed-postgresql/current/patroni/config.yaml",
-                    "remove",
-                    self.charm.cluster_name,
-                ],
-                command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
-                timeout=10,
-            )
-            if return_code == 0:
-                break
+        return_code, _, stderr = self._execute_command(
+            [
+                "charmed-postgresql.patronictl",
+                "-c",
+                "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+                "remove",
+                self.charm.cluster_name,
+            ],
+            command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
+            timeout=10,
+        )
         if return_code != 0:
             logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
             event.fail(error_message)

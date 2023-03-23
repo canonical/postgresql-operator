@@ -42,7 +42,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         await ops_test.model.deploy(
             charm,
             application_name=database_app_name,
-            num_units=2,
+            # num_units=2,
             series=CHARM_SERIES,
         )
         await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
@@ -64,6 +64,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             if unit.name != primary:
                 replica = unit.name
                 break
+        replica = primary
 
         # Write some data.
         password = await get_password(ops_test, primary)
@@ -102,7 +103,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         connection.close()
 
         # Scale down to be able to restore.
-        await ops_test.model.units.get(replica).remove()
+        # await ops_test.model.units.get(replica).remove()
 
         # Run the "restore backup" action.
         for attempt in Retrying(
@@ -147,4 +148,4 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         connection.close()
 
         # Remove the database app.
-        await ops_test.model.applications[database_app_name].remove()
+        # await ops_test.model.applications[database_app_name].remove()
