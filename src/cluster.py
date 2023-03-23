@@ -27,6 +27,7 @@ from tenacity import (
 from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
+    POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     SNAP_COMMON_PATH,
     SNAP_CURRENT_PATH,
@@ -175,7 +176,10 @@ class Patroni:
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
         # TODO use a real version
-        return "14"
+        client = snap.SnapClient()
+        for snp in client.get_installed_snaps():
+            if snp["name"] == POSTGRESQL_SNAP_NAME:
+                return snp["version"].split(".")[0]
 
     def get_member_ip(self, member_name: str) -> str:
         """Get cluster member IP address.
