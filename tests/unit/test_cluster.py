@@ -102,11 +102,19 @@ class TestCluster(unittest.TestCase):
         ip = self.patroni.get_member_ip("other-member-name")
         self.assertIsNone(ip)
 
-    def test_get_postgresql_version(self):
+    @patch("charm.snap.SnapClient")
+    def test_get_postgresql_version(self, _snap_client):
         # TODO test a real implementation
+        _get_installed_snaps = _snap_client.return_value.get_installed_snaps
+        _get_installed_snaps.return_value = [
+            {"name": "something"},
+            {"name": "charmed-postgresql", "version": "14.0"},
+        ]
         version = self.patroni._get_postgresql_version()
 
         self.assertEqual(version, "14")
+        _snap_client.assert_called_once_with()
+        _get_installed_snaps.assert_called_once_with()
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._get_alternative_patroni_url")

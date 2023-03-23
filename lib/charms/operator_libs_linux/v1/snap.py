@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -439,8 +439,9 @@ class Snap(object):
           cohort: optionally, specify a cohort.
           leave_cohort: leave the current cohort.
         """
-        channel = '--channel="{}"'.format(channel) if channel else ""
-        args = [channel]
+        args = []
+        if channel:
+            args.append('--channel="{}"'.format(channel))
 
         if not cohort:
             cohort = self._cohort
