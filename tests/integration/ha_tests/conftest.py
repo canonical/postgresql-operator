@@ -9,6 +9,7 @@ from tests.integration.ha_tests.helpers import (
     ORIGINAL_RESTART_CONDITION,
     RESTART_CONDITION,
     app_name,
+    change_loop_wait,
     change_primary_start_timeout,
     change_wal_settings,
     get_postgresql_parameter,
@@ -47,6 +48,14 @@ async def primary_start_timeout(ops_test: OpsTest) -> None:
     await change_primary_start_timeout(
         ops_test, initial_primary_start_timeout, use_random_unit=True
     )
+
+
+@pytest.fixture()
+async def loop_wait(ops_test: OpsTest) -> None:
+    """Temporary change the loop_wait configuration."""
+    await change_loop_wait(ops_test, 60)
+    yield
+    await change_loop_wait(ops_test, 10)
 
 
 @pytest.fixture()

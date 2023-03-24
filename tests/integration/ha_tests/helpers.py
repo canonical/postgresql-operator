@@ -105,6 +105,32 @@ async def change_primary_start_timeout(
             )
 
 
+async def change_loop_wait(
+    ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
+) -> None:
+    """Change change_loop_wait configuration.
+
+    Args:
+        ops_test: ops_test instance.
+        seconds: number of seconds to set in change_loop_wait configuration.
+        use_random_unit: whether to use a random unit (default is False,
+            so it uses the primary)
+    """
+    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
+        with attempt:
+            app = await app_name(ops_test)
+            if use_random_unit:
+                unit = get_random_unit(ops_test, app)
+                unit_ip = get_unit_address(ops_test, unit)
+            else:
+                primary_name = await get_primary(ops_test, app)
+                unit_ip = get_unit_address(ops_test, primary_name)
+            requests.patch(
+                f"http://{unit_ip}:8008/config",
+                json={"change_loop_wait": seconds},
+            )
+
+
 async def change_wal_settings(
     ops_test: OpsTest, unit_name: str, max_wal_size: int, min_wal_size, wal_keep_segments
 ) -> None:
