@@ -53,7 +53,7 @@ async def primary_start_timeout(ops_test: OpsTest) -> None:
 @pytest.fixture()
 async def loop_wait(ops_test: OpsTest) -> None:
     """Temporary change the loop_wait configuration."""
-    await change_loop_wait(ops_test, 60)
+    await change_loop_wait(ops_test, 30)
     yield
     await change_loop_wait(ops_test, 10)
 
