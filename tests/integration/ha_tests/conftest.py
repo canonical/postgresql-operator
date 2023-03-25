@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+from asyncio import gather
+
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -9,7 +11,6 @@ from tests.integration.ha_tests.helpers import (
     ORIGINAL_RESTART_CONDITION,
     RESTART_CONDITION,
     app_name,
-    change_loop_wait,
     change_primary_start_timeout,
     change_wal_settings,
     get_postgresql_parameter,
@@ -51,25 +52,21 @@ async def primary_start_timeout(ops_test: OpsTest) -> None:
 
 
 @pytest.fixture()
-async def loop_wait(ops_test: OpsTest) -> None:
-    """Temporary change the loop_wait configuration."""
-    await change_loop_wait(ops_test, 30)
-    yield
-    await change_loop_wait(ops_test, 10)
-
-
-@pytest.fixture()
 async def reset_restart_condition(ops_test: OpsTest):
     """Resets service file delay on all units."""
     app = await app_name(ops_test)
 
+    awaits = []
     for unit in ops_test.model.applications[app].units:
-        await update_restart_condition(ops_test, unit, RESTART_CONDITION)
+        awaits.append(update_restart_condition(ops_test, unit, RESTART_CONDITION))
+    await gather(*awaits)
 
     yield
 
+    awaits = []
     for unit in ops_test.model.applications[app].units:
-        await update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION)
+        awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+    await gather(*awaits)
 
 
 @pytest.fixture()

@@ -11,7 +11,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
-    ORIGINAL_RESTART_CONDITION,
+    SERVICE_NAME,
     all_db_processes_down,
     app_name,
     change_wal_settings,
@@ -25,7 +25,6 @@ from tests.integration.ha_tests.helpers import (
     secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
-    update_restart_condition,
 )
 from tests.integration.helpers import (
     CHARM_SERIES,
@@ -253,8 +252,12 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
+    awaits = []
     for unit in ops_test.model.applications[app].units:
-        await update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION)
+        awaits.append(
+            ops_test.juju(("run", "--unit", unit.name, "systemctl", "start", SERVICE_NAME))
+        )
+    await asyncio.gather(*awaits)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:

@@ -1,8 +1,9 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
 import random
-import subprocess
 from pathlib import Path
+from tempfile import mkstemp
 from typing import Dict, Optional, Set
 
 import psycopg2
@@ -18,7 +19,6 @@ PORT = 5432
 APP_NAME = METADATA["name"]
 SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{SERVICE_NAME}"
-TMP_SERVICE_PATH = "tests/integration/ha_tests/tmp.service"
 RESTART_CONDITION = "no"
 ORIGINAL_RESTART_CONDITION = "always"
 
@@ -102,32 +102,6 @@ async def change_primary_start_timeout(
             requests.patch(
                 f"http://{unit_ip}:8008/config",
                 json={"primary_start_timeout": seconds},
-            )
-
-
-async def change_loop_wait(
-    ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
-) -> None:
-    """Change change_loop_wait configuration.
-
-    Args:
-        ops_test: ops_test instance.
-        seconds: number of seconds to set in change_loop_wait configuration.
-        use_random_unit: whether to use a random unit (default is False,
-            so it uses the primary)
-    """
-    for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
-        with attempt:
-            app = await app_name(ops_test)
-            if use_random_unit:
-                unit = get_random_unit(ops_test, app)
-                unit_ip = get_unit_address(ops_test, unit)
-            else:
-                primary_name = await get_primary(ops_test, app)
-                unit_ip = get_unit_address(ops_test, primary_name)
-            requests.patch(
-                f"http://{unit_ip}:8008/config",
-                json={"change_loop_wait": seconds},
             )
 
 
@@ -454,21 +428,22 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     When the DB service fails it will now wait for `delay` number of seconds.
     """
     # Load the service file from the unit and update it with the new delay.
-    await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=TMP_SERVICE_PATH)
-    with open(TMP_SERVICE_PATH, "r") as patroni_service_file:
+    _, temp_path = mkstemp()
+    await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=temp_path)
+    with open(temp_path, "r") as patroni_service_file:
         patroni_service = patroni_service_file.readlines()
 
     for index, line in enumerate(patroni_service):
         if "Restart=" in line:
             patroni_service[index] = f"Restart={condition}\n"
 
-    with open(TMP_SERVICE_PATH, "w") as service_file:
+    with open(temp_path, "w") as service_file:
         service_file.writelines(patroni_service)
 
     # Upload the changed file back to the unit, we cannot scp this file directly to
     # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
-    await unit.scp_to(source=TMP_SERVICE_PATH, destination="patroni.service")
+    await unit.scp_to(source=temp_path, destination="patroni.service")
     mv_cmd = (
         f"run --unit {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
     )
@@ -477,7 +452,7 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
         raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
 
     # Remove temporary file from machine.
-    subprocess.call(["rm", TMP_SERVICE_PATH])
+    os.remove(temp_path)
 
     # Reload the daemon for systemd otherwise changes are not saved.
     reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
@@ -487,6 +462,4 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
     await ops_test.juju(*start_cmd.split())
 
-    # wait for the primary to become available
-    app = await app_name(ops_test)
-    await get_primary(ops_test, app)
+    await postgresql_ready(ops_test, unit.name)
