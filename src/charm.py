@@ -851,7 +851,7 @@ class PostgresqlOperatorCharm(CharmBase):
         for snap_name, snap_channel in packages:
             # TODO remove once snap can be directly installed
             subprocess.check_output(
-                ["snap", "install", snap_name, f"--channel={snap_channel}"],
+                ["snap", "install", snap_name, f"--channel={snap_channel}", "--devmode"],
                 universal_newlines=True,
             )
             # TODO remove once snap can be directly installed
