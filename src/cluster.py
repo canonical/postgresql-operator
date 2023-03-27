@@ -179,6 +179,10 @@ class Patroni:
         self._change_owner(path)
 
     def _create_user_home_directory(self) -> None:
+        """Creates the user home directory for the snap_daemon user.
+
+        This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
+        """
         subprocess.run("mkdir -p /home/snap_daemon".split())
         subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
         subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
