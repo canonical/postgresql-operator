@@ -129,7 +129,6 @@ class PostgreSQLBackups(Object):
         command: List[str],
         command_input: bytes = None,
         timeout: int = None,
-        use_root: bool = False,
     ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
@@ -142,17 +141,14 @@ class PostgreSQLBackups(Object):
 
             return result
 
-        if not use_root:
-            process = run(
-                command,
-                input=command_input,
-                stdout=PIPE,
-                stderr=PIPE,
-                preexec_fn=demote(),
-                timeout=timeout,
-            )
-        else:
-            process = run(command, input=command_input, stdout=PIPE, stderr=PIPE, timeout=timeout)
+        process = run(
+            command,
+            input=command_input,
+            stdout=PIPE,
+            stderr=PIPE,
+            preexec_fn=demote(),
+            timeout=timeout,
+        )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
     def _format_backup_list(self, backup_list) -> str:
