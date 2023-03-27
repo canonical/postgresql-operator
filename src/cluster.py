@@ -28,15 +28,18 @@ from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PGBACKREST_CONF,
-    PGBACKREST_EXECUTABLE,
+    POSTGRESQL_SNAP_NAME,
     REWIND_USER,
+    SNAP_COMMON_PATH,
+    SNAP_CURRENT_PATH,
     TLS_CA_FILE,
     USER,
 )
 
 logger = logging.getLogger(__name__)
 
-CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
+PG_BASE_CONF_PATH = f"{SNAP_CURRENT_PATH}/postgresql/postgresql.conf"
+PATRONI_SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/patroni/config.yaml"
 
 
 class NotReadyError(Exception):
@@ -116,31 +119,24 @@ class Patroni:
         self.configure_patroni_on_unit()
         return self.start_patroni()
 
-    def _inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("\n")
-
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
         self._change_owner(self.storage_path)
 
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
+        # Create empty base config
+        os.makedirs(os.path.dirname(PG_BASE_CONF_PATH), mode=0o755, exist_ok=True)
+        open(PG_BASE_CONF_PATH, "a").close()
 
         # Symlink Patroni config to current
-        config_path = "/var/snap/charmed-postgresql/current/patroni/config.yaml"
-        if os.path.isfile(config_path):
-            os.remove(config_path)
-        os.symlink(
-            f"{self.storage_path}/patroni.yaml",
-            config_path,
-        )
+        if not os.path.isfile(PATRONI_SNAP_CONF_PATH):
+            os.symlink(
+                f"{self.storage_path}/patroni.yaml",
+                PATRONI_SNAP_CONF_PATH,
+            )
         # Create the pgBackRest locks directory.
-        self._create_directory("/var/snap/charmed-postgresql/common/locks", 0o777)
+        self._create_directory(f"{SNAP_COMMON_PATH}/locks", 0o755)
         # Logs error out if execution permission is not set
-        self._create_directory("/var/snap/charmed-postgresql/common/logs", 0o777)
+        self._create_directory(f"{SNAP_COMMON_PATH}/logs", 0o755)
         # Replicas refuse to start with the default permissions
         os.chmod(self.storage_path, 0o750)
 
@@ -190,7 +186,10 @@ class Patroni:
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
         # TODO use a real version
-        return "14"
+        client = snap.SnapClient()
+        for snp in client.get_installed_snaps():
+            if snp["name"] == POSTGRESQL_SNAP_NAME:
+                return snp["version"].split(".")[0]
 
     def get_member_ip(self, member_name: str) -> str:
         """Get cluster member IP address.
@@ -350,7 +349,7 @@ class Patroni:
 
         for member in cluster_status.json()["members"]:
             if member["name"] == self.member_name:
-                return member["lag"]
+                return member.get("lag", "unknown")
 
         return "unknown"
 
@@ -400,7 +399,6 @@ class Patroni:
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
-            pgbackrest_executable=PGBACKREST_EXECUTABLE,
             pgbackrest_configuration_file=PGBACKREST_CONF,
             scope=self.cluster_name,
             self_ip=self.unit_ip,

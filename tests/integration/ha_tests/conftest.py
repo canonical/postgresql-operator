@@ -1,18 +1,21 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+from asyncio import gather
+
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.helpers import (
-    ORIGINAL_RESTART_DELAY,
+    ORIGINAL_RESTART_CONDITION,
+    RESTART_CONDITION,
     app_name,
     change_primary_start_timeout,
     change_wal_settings,
     get_postgresql_parameter,
     get_primary_start_timeout,
-    update_restart_delay,
+    update_restart_condition,
 )
 from tests.integration.helpers import run_command_on_unit
 
@@ -49,12 +52,21 @@ async def primary_start_timeout(ops_test: OpsTest) -> None:
 
 
 @pytest.fixture()
-async def reset_restart_delay(ops_test: OpsTest):
+async def reset_restart_condition(ops_test: OpsTest):
     """Resets service file delay on all units."""
-    yield
     app = await app_name(ops_test)
+
+    awaits = []
     for unit in ops_test.model.applications[app].units:
-        await update_restart_delay(ops_test, unit, ORIGINAL_RESTART_DELAY)
+        awaits.append(update_restart_condition(ops_test, unit, RESTART_CONDITION))
+    await gather(*awaits)
+
+    yield
+
+    awaits = []
+    for unit in ops_test.model.applications[app].units:
+        awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+    await gather(*awaits)
 
 
 @pytest.fixture()
@@ -68,7 +80,7 @@ async def wal_settings(ops_test: OpsTest) -> None:
     app = await app_name(ops_test)
     for unit in ops_test.model.applications[app].units:
         # Start Patroni if it was previously stopped.
-        await run_command_on_unit(ops_test, unit.name, "systemctl start patroni")
+        await run_command_on_unit(ops_test, unit.name, "snap start charmed-postgresql.patroni")
 
         # Rollback to the initial settings.
         await change_wal_settings(

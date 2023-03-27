@@ -1,7 +1,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import os
 import unittest
 from unittest import mock
 from unittest.mock import Mock, PropertyMock, mock_open, patch
@@ -103,11 +102,19 @@ class TestCluster(unittest.TestCase):
         ip = self.patroni.get_member_ip("other-member-name")
         self.assertIsNone(ip)
 
-    def test_get_postgresql_version(self):
+    @patch("charm.snap.SnapClient")
+    def test_get_postgresql_version(self, _snap_client):
         # TODO test a real implementation
+        _get_installed_snaps = _snap_client.return_value.get_installed_snaps
+        _get_installed_snaps.return_value = [
+            {"name": "something"},
+            {"name": "charmed-postgresql", "version": "14.0"},
+        ]
         version = self.patroni._get_postgresql_version()
 
         self.assertEqual(version, "14")
+        _snap_client.assert_called_once_with()
+        _get_installed_snaps.assert_called_once_with()
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._get_alternative_patroni_url")
@@ -276,17 +283,3 @@ class TestCluster(unittest.TestCase):
         _patch.assert_called_once_with(
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
-
-    @patch("os.makedirs")
-    def test_inhibit_default_cluster_creation(self, _makedirs):
-        # Setup a mock for the `open` method.
-        mock = mock_open()
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            self.patroni._inhibit_default_cluster_creation()
-            _makedirs.assert_called_once_with(
-                os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
-            )
-            # Check the write calls made to the file.
-            handle = mock()
-            handle.write.assert_called_once_with("\n")
