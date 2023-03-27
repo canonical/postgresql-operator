@@ -34,6 +34,7 @@ class TestCharm(unittest.TestCase):
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._patch_snap_seccomp_profile")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
     @patch(
@@ -45,6 +46,7 @@ class TestCharm(unittest.TestCase):
         _is_storage_attached,
         _reboot_on_detached_storage,
         _install_snap_packages,
+        _patch_snap_seccomp_profile,
     ):
         # Test without storage.
         self.charm.on.install.emit()

@@ -552,6 +552,13 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to install snap packages")
             return
 
+        try:
+            self._patch_snap_seccomp_profile()
+        except subprocess.CalledProcessError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
+            return
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
@@ -851,7 +858,7 @@ class PostgresqlOperatorCharm(CharmBase):
         for snap_name, snap_channel in packages:
             # TODO remove once snap can be directly installed
             subprocess.check_output(
-                ["snap", "install", snap_name, f"--channel={snap_channel}", "--devmode"],
+                ["snap", "install", snap_name, f"--channel={snap_channel}"],
                 universal_newlines=True,
             )
             # TODO remove once snap can be directly installed
@@ -866,6 +873,26 @@ class PostgresqlOperatorCharm(CharmBase):
                     "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
                 )
                 raise
+
+    def _patch_snap_seccomp_profile(self) -> None:
+        """Patch snap seccomp profile to allow chmod on pgBackRest restore code."""
+        subprocess.check_output(
+            [
+                "sed",
+                "-i",
+                "-e",
+                "$achown",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.pgbackrest.src",
+            ]
+        )
+        subprocess.check_output(
+            [
+                "/usr/lib/snapd/snap-seccomp",
+                "compile",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.pgbackrest.src",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.pgbackrest.bin",
+            ]
+        )
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
