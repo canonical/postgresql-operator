@@ -27,7 +27,7 @@ from tenacity import (
 from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
-    PGBACKREST_CONF,
+    PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     SNAP_COMMON_PATH,
@@ -374,7 +374,6 @@ class Patroni:
     def render_patroni_yml_file(
         self,
         archive_mode: str,
-        connectivity: bool = False,
         enable_tls: bool = False,
         stanza: str = None,
         backup_id: Optional[str] = None,
@@ -383,7 +382,6 @@ class Patroni:
 
         Args:
             archive_mode: PostgreSQL archive mode.
-            connectivity: whether to allow external connections to the database.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             backup_id: id of the backup that is being restored.
@@ -394,12 +392,11 @@ class Patroni:
         # Render the template file with the correct values.
         rendered = template.render(
             archive_mode=archive_mode,
-            connectivity=connectivity,
             conf_path=self.storage_path,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
-            pgbackrest_configuration_file=PGBACKREST_CONF,
+            pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
             superuser=USER,
