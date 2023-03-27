@@ -882,15 +882,15 @@ class PostgresqlOperatorCharm(CharmBase):
                 "-i",
                 "-e",
                 "$achown",
-                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.pgbackrest.src",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
             ]
         )
         subprocess.check_output(
             [
                 "/usr/lib/snapd/snap-seccomp",
                 "compile",
-                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.pgbackrest.src",
-                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.pgbackrest.bin",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
             ]
         )
 
