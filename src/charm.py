@@ -875,7 +875,10 @@ class PostgresqlOperatorCharm(CharmBase):
                 raise
 
     def _patch_snap_seccomp_profile(self) -> None:
-        """Patch snap seccomp profile to allow chmod on pgBackRest restore code."""
+        """Patch snap seccomp profile to allow chmod on pgBackRest restore code.
+
+        This is needed due to https://github.com/pgbackrest/pgbackrest/issues/2036.
+        """
         subprocess.check_output(
             [
                 "sed",
