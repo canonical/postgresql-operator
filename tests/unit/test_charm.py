@@ -34,6 +34,7 @@ class TestCharm(unittest.TestCase):
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._patch_snap_seccomp_profile")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
     @patch(
@@ -45,6 +46,7 @@ class TestCharm(unittest.TestCase):
         _is_storage_attached,
         _reboot_on_detached_storage,
         _install_snap_packages,
+        _patch_snap_seccomp_profile,
     ):
         # Test without storage.
         self.charm.on.install.emit()
@@ -57,6 +59,25 @@ class TestCharm(unittest.TestCase):
 
         # Assert the status set by the event handler.
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._patch_snap_seccomp_profile")
+    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
+    @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
+    def test_on_install_patch_failure(
+        self,
+        _is_storage_attached,
+        _install_snap_packages,
+        _patch_snap_seccomp_profile,
+    ):
+        # Mock the result of the call.
+        _patch_snap_seccomp_profile.side_effect = subprocess.CalledProcessError(1, "fake command")
+        # Trigger the hook.
+        self.charm.on.install.emit()
+        # Assert that the needed calls were made.
+        _install_snap_packages.assert_called_once()
+        _patch_snap_seccomp_profile.assert_called_once()
+        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")

@@ -58,7 +58,7 @@ bootstrap:
         synchronous_commit: on
         synchronous_standby_names: "*"
         {%- if enable_pgbackrest %}
-        archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
+        archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
         {% else %}
         archive_command: /bin/true
         {%- endif %}
@@ -68,7 +68,7 @@ bootstrap:
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
-    command: pgbackrest --stanza={{ stanza }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} --set={{ backup_id }} --type=immediate --target-action=promote restore
     no_params: True
     keep_existing_recovery_conf: True
   {% else %}
@@ -85,7 +85,7 @@ postgresql:
   data_dir: {{ conf_path }}/pgdata
   parameters:
     {%- if enable_pgbackrest %}
-    archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
+    archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
     archive_command: /bin/true
     {%- endif %}

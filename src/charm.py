@@ -552,6 +552,13 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to install snap packages")
             return
 
+        try:
+            self._patch_snap_seccomp_profile()
+        except subprocess.CalledProcessError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
+            return
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
@@ -867,6 +874,29 @@ class PostgresqlOperatorCharm(CharmBase):
                 )
                 raise
 
+    def _patch_snap_seccomp_profile(self) -> None:
+        """Patch snap seccomp profile to allow chmod on pgBackRest restore code.
+
+        This is needed due to https://github.com/pgbackrest/pgbackrest/issues/2036.
+        """
+        subprocess.check_output(
+            [
+                "sed",
+                "-i",
+                "-e",
+                "$achown",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
+            ]
+        )
+        subprocess.check_output(
+            [
+                "/usr/lib/snapd/snap-seccomp",
+                "compile",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
+            ]
+        )
+
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
         try:
@@ -931,7 +961,7 @@ class PostgresqlOperatorCharm(CharmBase):
             archive_mode=self.app_peer_data.get("archive-mode", "on"),
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
-            stanza=self.unit_peer_data.get("stanza"),
+            stanza=self.app_peer_data.get("stanza"),
         )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,

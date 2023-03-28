@@ -31,14 +31,13 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
     for cloud, config in cloud_configs[0].items():
         # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
-        # as archivo_mode is disabled after restoring the backup).
+        # as archive_mode is disabled after restoring the backup).
         database_app_name = f"{DATABASE_APP_NAME}-{cloud.lower()}"
         await ops_test.model.deploy(
             charm,
             application_name=database_app_name,
             series=CHARM_SERIES,
         )
-        await ops_test.juju("attach-resource", database_app_name, "patroni=patroni.tar.gz")
         await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
 
         # Configure and set access and secret keys.

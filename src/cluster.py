@@ -27,6 +27,7 @@ from tenacity import (
 from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     SNAP_COMMON_PATH,
@@ -132,10 +133,14 @@ class Patroni:
                 f"{self.storage_path}/patroni.yaml",
                 PATRONI_SNAP_CONF_PATH,
             )
+        # Create the pgBackRest locks directory.
+        self._create_directory(f"{SNAP_COMMON_PATH}/locks", 0o755)
         # Logs error out if execution permission is not set
         self._create_directory(f"{SNAP_COMMON_PATH}/logs", 0o755)
         # Replicas refuse to start with the default permissions
         os.chmod(self.storage_path, 0o750)
+
+        self._create_user_home_directory()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -172,6 +177,15 @@ class Patroni:
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
+
+    def _create_user_home_directory(self) -> None:
+        """Creates the user home directory for the snap_daemon user.
+
+        This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
+        """
+        subprocess.run("mkdir -p /home/snap_daemon".split())
+        subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
+        subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
 
     def _get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
@@ -386,6 +400,7 @@ class Patroni:
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
+            pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
             superuser=USER,
@@ -416,6 +431,7 @@ class Patroni:
         except snap.SnapError as e:
             error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
             logger.exception(error_message, exc_info=e)
+            return False
 
     def stop_patroni(self) -> bool:
         """Stop Patroni service using systemd.
