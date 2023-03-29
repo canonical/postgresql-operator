@@ -308,6 +308,13 @@ async def deploy_and_relate_bundle_with_postgresql(
             bundle_yaml = archive.read("bundle.yaml")
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
 
+            # Change landscape revision.
+            data["services"]["landscape-server"]["charm"] = application_name
+            # data["services"]["landscape-server"]["revision"] = 75
+            # data["services"]["landscape-server"]["channel"] = "latest/edge"
+            data["services"]["landscape-server"]["series"] = "jammy"
+            del data["services"]["landscape-server"]["options"]
+
             # Remove PostgreSQL and relations with it from the bundle.yaml file.
             del data["services"]["postgresql"]
             data["relations"] = [

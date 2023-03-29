@@ -29,7 +29,7 @@ HAPROXY_APP_NAME = "haproxy"
 LANDSCAPE_APP_NAME = "landscape-server"
 LANDSCAPE_SCALABLE_BUNDLE_NAME = "ch:landscape-scalable"
 RABBITMQ_APP_NAME = "rabbitmq-server"
-DATABASE_UNITS = 3
+DATABASE_UNITS = 1
 RELATION_NAME = "db-admin"
 
 

@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 import unittest
+from hashlib import md5
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from charms.postgresql_k8s.v0.postgresql import (
@@ -90,7 +91,12 @@ class TestDbProvides(unittest.TestCase):
     )
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     def test_on_relation_changed(
-        self, _member_started, _primary_endpoint, _defer, _new_password, _update_endpoints
+        self,
+        _member_started,
+        _primary_endpoint,
+        _defer,
+        _new_password,
+        _update_endpoints,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.
@@ -128,7 +134,8 @@ class TestDbProvides(unittest.TestCase):
 
             # Assert that the correct calls were made.
             user = f"relation-{self.rel_id}"
-            postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
+            hashed_password = f'md5{md5(("test-password" + user).encode()).hexdigest()}'
+            postgresql_mock.create_user.assert_called_once_with(user, hashed_password, False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
             postgresql_mock.get_postgresql_version.assert_called_once()
             _update_endpoints.assert_called_once()
