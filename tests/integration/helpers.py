@@ -284,23 +284,18 @@ async def deploy_and_relate_application_with_postgresql(
     return relation.id
 
 
-async def deploy_and_relate_bundle_with_postgresql(
+async def deploy_and_relate_landscape_bundle_with_postgresql(
     ops_test: OpsTest,
-    bundle: str,
-    application_name: str,
 ) -> str:
-    """Helper function to deploy and relate a bundle with PostgreSQL.
+    """Helper function to deploy and relate the Landscape bundle with PostgreSQL.
 
     Args:
         ops_test: The ops test framework.
-        bundle: Bundle identifier.
-        application_name: The name of the application to check for
-            an active state after the deployment.
     """
     # Deploy the bundle.
     with tempfile.NamedTemporaryFile() as original:
         # Download the original bundle.
-        await ops_test.juju("download", bundle, "--filepath", original.name)
+        await ops_test.juju("download", "ch:landscape-scalable", "--filepath", original.name)
 
         # Open the bundle compressed file and update the contents
         # of the bundle.yaml file to deploy it.
@@ -309,9 +304,7 @@ async def deploy_and_relate_bundle_with_postgresql(
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
 
             # Change landscape revision.
-            data["services"]["landscape-server"]["charm"] = application_name
-            # data["services"]["landscape-server"]["revision"] = 75
-            # data["services"]["landscape-server"]["channel"] = "latest/edge"
+            data["services"]["landscape-server"]["charm"] = "landscape-server"
             data["services"]["landscape-server"]["series"] = "jammy"
             del data["services"]["landscape-server"]["options"]
 
@@ -329,13 +322,20 @@ async def deploy_and_relate_bundle_with_postgresql(
                 patched.seek(0)
                 await ops_test.juju("deploy", patched.name)
 
+    # Create the admin user on Landscape through configs.
+    await ops_test.model.applications["landscape-server"].set_config(
+        {
+            "admin_email": "admin@canonical.com",
+            "admin_name": "Admin",
+            "admin_password": "test1234",
+        }
+    )
+
     # Relate application to PostgreSQL.
     async with ops_test.fast_forward(fast_interval="30s"):
-        relation = await ops_test.model.relate(
-            f"{application_name}", f"{DATABASE_APP_NAME}:db-admin"
-        )
+        relation = await ops_test.model.relate("landscape-server", f"{DATABASE_APP_NAME}:db-admin")
         await ops_test.model.wait_for_idle(
-            apps=[application_name, DATABASE_APP_NAME],
+            apps=["landscape-server", DATABASE_APP_NAME],
             status="active",
             timeout=1500,
         )
@@ -472,6 +472,27 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
         list of current unit IPs of the application
     """
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
+
+
+async def get_landscape_api_credentials(ops_test: OpsTest) -> List[str]:
+    """Returns the key and secret to be used in the Landscape API.
+
+    Args:
+        ops_test: The ops test framework
+    """
+    unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
+    password = await get_password(ops_test, unit.name)
+    unit_address = await unit.get_public_address()
+
+    output = await execute_query_on_unit(
+        unit_address,
+        password,
+        "SELECT encode(access_key_id,'escape'), encode(access_secret_key,'escape') FROM api_credentials;",
+        database="landscape-standalone-main",
+    )
+    print(f"output: {output}")
+
+    return output
 
 
 async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:

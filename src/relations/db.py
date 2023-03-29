@@ -105,7 +105,6 @@ class DbProvides(Object):
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
         unit_relation_databag = event.relation.data[self.charm.unit]
-        application_relation_databag = event.relation.data[self.charm.app]
 
         # Do not allow apps requesting extensions to be installed.
         if "extensions" in event.relation.data.get(
@@ -265,7 +264,6 @@ class DbProvides(Object):
         for relation in relations:
             # Retrieve some data from the relation.
             unit_relation_databag = relation.data[self.charm.unit]
-            application_relation_databag = relation.data[self.charm.app]
             user = f"relation-{relation.id}"
             password = self.charm.get_secret("app", user)
             database = self.charm.get_secret("app", f"{user}-database")
