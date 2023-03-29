@@ -322,15 +322,6 @@ async def deploy_and_relate_landscape_bundle_with_postgresql(
                 patched.seek(0)
                 await ops_test.juju("deploy", patched.name)
 
-    # Create the admin user on Landscape through configs.
-    await ops_test.model.applications["landscape-server"].set_config(
-        {
-            "admin_email": "admin@canonical.com",
-            "admin_name": "Admin",
-            "admin_password": "test1234",
-        }
-    )
-
     # Relate application to PostgreSQL.
     async with ops_test.fast_forward(fast_interval="30s"):
         relation = await ops_test.model.relate("landscape-server", f"{DATABASE_APP_NAME}:db-admin")
@@ -380,9 +371,13 @@ async def ensure_correct_relation_data(
                     read_only_endpoint=True,
                     remote_unit_name=unit_name,
                 )
+                print(f"primary_connection_string: {primary_connection_string}")
+                print(f"replica_connection_string: {replica_connection_string}")
+                print(f"unit_name: {unit_name}")
                 if unit_name == primary:
                     unit_ip = get_unit_address(ops_test, unit_name)
                     host_parameter = f"host={unit_ip} "
+                    print(f"primary host_parameter: {host_parameter}")
                     assert (
                         host_parameter in primary_connection_string
                     ), f"{unit_name} is not the host of the primary connection string"
@@ -390,6 +385,7 @@ async def ensure_correct_relation_data(
                         host_parameter not in replica_connection_string
                     ), f"{unit_name} is the host of the replica connection string"
                 else:
+                    print("replica")
                     assert (
                         not primary_connection_string
                     ), f"{unit_name} is sharing a primary connection string"
