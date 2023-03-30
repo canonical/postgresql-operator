@@ -79,6 +79,7 @@ class PostgresqlOperatorCharm(CharmBase):
         super().__init__(*args)
 
         self._postgresql_service = "postgresql"
+        self.pgbackrest_server_service = "pgbackrest-service"
 
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
@@ -335,6 +336,14 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        if not self.backup.start_stop_pgbackrest_service():
+            logger.debug(
+                "Deferring on_peer_relation_changed: awaiting for TLS server service to start on primary"
+            )
+            event.defer()
+            return
+
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
@@ -438,6 +447,16 @@ class PostgresqlOperatorCharm(CharmBase):
             self.get_secret("app", REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
+
+    @property
+    def is_primary(self) -> bool:
+        """Return whether this unit is the primary instance."""
+        return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
+
+    @property
+    def is_tls_enabled(self) -> bool:
+        """Return whether TLS is enabled."""
+        return all(self.tls.get_tls_files())
 
     @property
     def _peer_members_ips(self) -> Set[str]:
@@ -948,9 +967,14 @@ class PostgresqlOperatorCharm(CharmBase):
         try:
             self._patroni.restart_postgresql()
             self._peers.data[self.unit]["postgresql_restarted"] = "True"
-        except RetryError as e:
-            logger.error("failed to restart PostgreSQL")
-            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
+        except RetryError:
+            error_message = "failed to restart PostgreSQL"
+            logger.exception(error_message)
+            self.unit.status = BlockedStatus(error_message)
+            return
+
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        self.backup.start_stop_pgbackrest_service()
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
@@ -959,6 +983,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             archive_mode=self.app_peer_data.get("archive-mode", "on"),
+            connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
@@ -966,7 +991,8 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
-            # in a bundle together with the TLS certificates operator.
+            # in a bundle together with the TLS certificates operator. This flag is used to
+            # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
             logger.debug("Early exit update_config: Patroni not started yet")
             return

@@ -549,7 +549,7 @@ class TestCharm(unittest.TestCase):
             _get_tls_files.return_value = [None]
             self.charm.update_config()
             _render_patroni_yml_file.assert_called_once_with(
-                archive_mode="on", enable_tls=False, backup_id=None, stanza=None
+                archive_mode="on", connectivity=True, enable_tls=False, backup_id=None, stanza=None
             )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_not_called()
@@ -566,7 +566,7 @@ class TestCharm(unittest.TestCase):
             _reload_patroni_configuration.reset_mock()
             self.charm.update_config()
             _render_patroni_yml_file.assert_called_once_with(
-                archive_mode="on", enable_tls=True, backup_id=None, stanza=None
+                archive_mode="on", connectivity=True, enable_tls=True, backup_id=None, stanza=None
             )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_called_once()
