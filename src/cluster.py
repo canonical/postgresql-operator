@@ -429,7 +429,7 @@ class Patroni:
             selected_snap.start(services=["patroni"])
             return selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
-            error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
+            error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
             return False
 
@@ -443,11 +443,11 @@ class Patroni:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.stop(services=["patroni"])
-            running = not selected_snap.services["patroni"]["active"]
+            return not selected_snap.services["patroni"]["active"]
         except snap.SnapError as e:
-            error_message = "Failed to run snap service operation"  # , snap={snapname}, service={service}, operation={operation}"
+            error_message = "Failed to stop patroni snap service"
             logger.exception(error_message, exc_info=e)
-        return running
+            return False
 
     def switchover(self) -> None:
         """Trigger a switchover."""

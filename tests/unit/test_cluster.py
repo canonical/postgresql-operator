@@ -3,7 +3,7 @@
 
 import unittest
 from unittest import mock
-from unittest.mock import Mock, PropertyMock, mock_open, patch
+from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import requests as requests
 import tenacity as tenacity
@@ -226,14 +226,31 @@ class TestCluster(unittest.TestCase):
         _selected_snap.start.side_effect = [None, snap.SnapError]
 
         # Test a success scenario.
-        success = self.patroni.start_patroni()
+        assert self.patroni.start_patroni()
         _cache.__getitem__.assert_called_once_with("charmed-postgresql")
         _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
-        assert success
 
         # Test a fail scenario.
-        success = self.patroni.start_patroni()
-        assert not success
+        assert not self.patroni.start_patroni()
+
+    @patch("charm.snap.SnapCache")
+    @patch("charm.Patroni._create_directory")
+    def test_stop_patroni(self, _create_directory, _snap_cache):
+        _cache = _snap_cache.return_value
+        _selected_snap = _cache.__getitem__.return_value
+        _selected_snap.stop.side_effect = [None, snap.SnapError]
+        _selected_snap.services.__getitem__.return_value.__getitem__.return_value = False
+
+        # Test a success scenario.
+        assert self.patroni.stop_patroni()
+        _cache.__getitem__.assert_called_once_with("charmed-postgresql")
+        _selected_snap.stop.assert_called_once_with(services=[PATRONI_SERVICE])
+        _selected_snap.services.__getitem__.return_value.__getitem__.assert_called_once_with(
+            "active"
+        )
+
+        # Test a fail scenario.
+        assert not self.patroni.stop_patroni()
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
@@ -283,3 +300,64 @@ class TestCluster(unittest.TestCase):
         _patch.assert_called_once_with(
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
+
+    @patch("cluster.Patroni._create_user_home_directory")
+    @patch("os.chmod")
+    @patch("os.symlink")
+    @patch("builtins.open")
+    @patch("os.path.dirname")
+    @patch("os.makedirs")
+    @patch("os.chown")
+    @patch("pwd.getpwnam")
+    def test_configure_patroni_on_unit(
+        self,
+        _getpwnam,
+        _chown,
+        _makedirs,
+        _dirname,
+        _open,
+        _symlink,
+        _chmod,
+        _create_user_home_directory,
+    ):
+        _getpwnam.return_value.pw_uid = sentinel.uid
+        _getpwnam.return_value.pw_gid = sentinel.gid
+        _dirname.return_value = sentinel.dirname
+
+        self.patroni.configure_patroni_on_unit()
+
+        assert _getpwnam.call_count == 3
+        _getpwnam.assert_any_call("snap_daemon")
+
+        assert _chown.call_count == 3
+        _chown.assert_any_call(
+            "/var/snap/charmed-postgresql/common/postgresql", uid=sentinel.uid, gid=sentinel.gid
+        )
+        _chown.assert_any_call(
+            "/var/snap/charmed-postgresql/common/locks", uid=sentinel.uid, gid=sentinel.gid
+        )
+        _chown.assert_any_call(
+            "/var/snap/charmed-postgresql/common/logs", uid=sentinel.uid, gid=sentinel.gid
+        )
+
+        assert _makedirs.call_count == 3
+        _makedirs.assert_any_call(sentinel.dirname, mode=493, exist_ok=True)
+        _makedirs.assert_any_call(
+            "/var/snap/charmed-postgresql/common/locks", mode=493, exist_ok=True
+        )
+        _makedirs.assert_any_call(
+            "/var/snap/charmed-postgresql/common/logs", mode=493, exist_ok=True
+        )
+
+        _dirname.assert_called_once_with(CREATE_CLUSTER_CONF_PATH)
+        _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
+        _symlink.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/postgresql/patroni.yaml",
+            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+        )
+        assert _chmod.call_count == 3
+        _chmod.assert_any_call("/var/snap/charmed-postgresql/common/locks", 493)
+        _chmod.assert_any_call("/var/snap/charmed-postgresql/common/logs", 493)
+        _chmod.assert_any_call("/var/snap/charmed-postgresql/common/postgresql", 488)
+
+        _create_user_home_directory.assert_called_once_with()
