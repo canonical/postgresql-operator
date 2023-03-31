@@ -56,8 +56,9 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             **cloud_configs[1][cloud],
         )
         await action.wait()
-        async with ops_test.fast_forward():
-            await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(
+            apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
+        )
 
         primary = await get_primary(ops_test, f"{database_app_name}/0")
         for unit in ops_test.model.applications[database_app_name].units:
