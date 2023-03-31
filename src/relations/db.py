@@ -117,17 +117,14 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
             return
 
-        # Sometimes a relation changed event is triggered,
-        # and it doesn't have a database name in it.
+        # Sometimes a relation changed event is triggered, and it doesn't have
+        # a database name in it (like the relation with Landscape server charm),
+        # so create a database with the other application name.
         database = event.relation.data.get(event.app, {}).get(
             "database", event.relation.data.get(event.unit, {}).get("database")
         )
         if not database:
-            # logger.warning("No database name provided")
-            # event.defer()
-            # return
             database = event.relation.app.name
-            logger.error(f"database: {database}")
 
         try:
             # Creates the user and the database for this specific relation if it was not already
@@ -255,9 +252,6 @@ class DbProvides(Object):
         if len(relations) == 0:
             return
 
-        primary_unit = self.charm._patroni.get_primary(unit_name_pattern=True)
-        is_replica = self.charm.unit.name != primary_unit
-
         # List the replicas endpoints.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
 
@@ -311,17 +305,8 @@ class DbProvides(Object):
                 "state": self._get_state(),
             }
 
-            # Clear the unit data in the replica databag to keep the same behavior we have
-            # when the relation is created (only one unit has the databag filled).
-            if is_replica:
-                self.charm._peers.data[self.charm.unit].update({"replica": "True"})
-            # Set the data only in the primary unit databag.
-            else:
-                unit_relation_databag.update(data)
-                self.charm._peers.data[self.charm.unit].update({"replica": ""})
-
-            # if self.charm.unit.is_leader():
-            #     application_relation_databag.update(data)
+            # Set the data only in the unit databag.
+            unit_relation_databag.update(data)
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
         """Build the list of allowed subnets as in the legacy charm."""
