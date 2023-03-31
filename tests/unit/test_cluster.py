@@ -304,6 +304,8 @@ class TestCluster(unittest.TestCase):
     @patch("cluster.Patroni._create_user_home_directory")
     @patch("os.chmod")
     @patch("os.symlink")
+    @patch("os.remove")
+    @patch("os.path.isfile", return_value=True)
     @patch("builtins.open")
     @patch("os.path.dirname")
     @patch("os.makedirs")
@@ -316,6 +318,8 @@ class TestCluster(unittest.TestCase):
         _makedirs,
         _dirname,
         _open,
+        _isfile,
+        _remove,
         _symlink,
         _chmod,
         _create_user_home_directory,
@@ -351,9 +355,11 @@ class TestCluster(unittest.TestCase):
 
         _dirname.assert_called_once_with(CREATE_CLUSTER_CONF_PATH)
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
+        _isfile.assert_called_once_with("/var/snap/charmed-postgresql/current/etc/patroni.yaml")
+        _remove.assert_called_once_with("/var/snap/charmed-postgresql/current/etc/patroni.yaml")
         _symlink.assert_called_once_with(
             "/var/snap/charmed-postgresql/common/postgresql/patroni.yaml",
-            "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+            "/var/snap/charmed-postgresql/current/etc/patroni.yaml",
         )
         assert _chmod.call_count == 3
         _chmod.assert_any_call("/var/snap/charmed-postgresql/common/locks", 493)

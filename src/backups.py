@@ -458,7 +458,7 @@ Stderr:
             [
                 "charmed-postgresql.patronictl",
                 "-c",
-                "/var/snap/charmed-postgresql/current/patroni/config.yaml",
+                "/var/snap/charmed-postgresql/current/etc/patroni.yaml",
                 "remove",
                 self.charm.cluster_name,
             ],

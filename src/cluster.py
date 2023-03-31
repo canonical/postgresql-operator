@@ -39,7 +39,7 @@ from constants import (
 logger = logging.getLogger(__name__)
 
 PG_BASE_CONF_PATH = f"{SNAP_CURRENT_PATH}/postgresql/postgresql.conf"
-PATRONI_SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/patroni/config.yaml"
+PATRONI_SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/etc/patroni.yaml"
 
 
 class NotReadyError(Exception):
@@ -128,11 +128,12 @@ class Patroni:
         open(PG_BASE_CONF_PATH, "a").close()
 
         # Symlink Patroni config to current
-        if not os.path.isfile(PATRONI_SNAP_CONF_PATH):
-            os.symlink(
-                f"{self.storage_path}/patroni.yaml",
-                PATRONI_SNAP_CONF_PATH,
-            )
+        if os.path.isfile(PATRONI_SNAP_CONF_PATH):
+            os.remove(PATRONI_SNAP_CONF_PATH)
+        os.symlink(
+            f"{self.storage_path}/patroni.yaml",
+            PATRONI_SNAP_CONF_PATH,
+        )
         # Create the pgBackRest locks directory.
         self._create_directory(f"{SNAP_COMMON_PATH}/locks", 0o755)
         # Logs error out if execution permission is not set

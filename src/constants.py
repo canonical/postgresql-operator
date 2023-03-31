@@ -30,7 +30,7 @@ SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER]
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 PGBACKREST_CONFIGURATION_FILE = "--config=/var/snap/charmed-postgresql/current/etc/pgbackrest.conf"
 POSTGRESQL_SNAP_NAME = "charmed-postgresql"
-SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, "14/edge/charm-fixes")]
+SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, "14/edge/snap-dir")]
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
