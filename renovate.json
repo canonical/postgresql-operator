@@ -2,5 +2,45 @@
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": [
     "config:base"
-  ]
+  ],
+  "reviewers": ["dragomirp", "marceloneppel", "taurus-forever"],
+  "enabledManagers": ["poetry", "pip_requirements", "github-actions", "regex"],
+  "schedule": ["after 1am and before 2am every weekday"],
+  "timezone": "Etc/UTC",
+  "prHourlyLimit": 0,
+  "packageRules": [
+    {
+      "matchManagers": ["poetry", "pip_requirements", "regex"],
+      "matchDatasources": ["pypi"],
+      "groupName": "Python dependencies"
+    }, {
+      "matchManagers": ["github-actions"],
+      "groupName": "GitHub actions"
+    }, {
+      "matchPackageNames": ["juju/juju"],
+      "allowedVersions": "<3.0.0",
+      "extractVersion": "^juju-(?<version>.*)$",
+      "groupName": "Juju agent"
+    }, {
+      "matchPackageNames": ["juju"],
+      "allowedVersions": "<3.0.0"
+    }
+  ],
+  "regexManagers": [
+    {
+      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
+      "matchStrings": ["\"--agent-version[= ](?<currentValue>.*?)\" +# renovate: latest"],
+      "depNameTemplate": "juju/juju",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "Juju release"
+    }, {
+      "fileMatch": ["(^|/)([\\w-]*)charmcraft\\.ya?ml$"],
+      "matchStrings": ["- (?<depName>.*?)==(?<currentValue>.*?) +# renovate"],
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "loose"
+    }
+  ],
+  "ignorePaths": [],
+  "ignoreDeps": []
 }
