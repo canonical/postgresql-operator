@@ -23,7 +23,7 @@ from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
 from pgconnstr import ConnectionString
 
 from constants import DATABASE_PORT
-from utils import new_md5_hashed_password, new_password
+from utils import new_password
 
 logger = logging.getLogger(__name__)
 
@@ -131,14 +131,13 @@ class DbProvides(Object):
             # created in a previous relation changed event.
             user = f"relation-{event.relation.id}"
             password = unit_relation_databag.get("password", new_password())
-            hashed_password = new_md5_hashed_password(user, password)
 
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
             self.charm.set_secret("app", user, password)
             self.charm.set_secret("app", f"{user}-database", database)
 
-            self.charm.postgresql.create_user(user, hashed_password, self.admin)
+            self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
             postgresql_version = self.charm.postgresql.get_postgresql_version()
         except (
