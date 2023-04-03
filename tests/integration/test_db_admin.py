@@ -4,7 +4,7 @@
 import json
 import logging
 
-from landscape_api.base import run_query
+from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import (
@@ -130,12 +130,12 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
-    # # Create a role and list the available roles later to check that the new one is there.
-    # role_name = "User2"
-    # try:
-    #     run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
-    # except HTTPError as e:
-    #     assert False, f"error when trying to create role on Landscape: {e}"
+    # Create a role and list the available roles later to check that the new one is there.
+    role_name = "User2"
+    try:
+        run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
+    except HTTPError as e:
+        assert False, f"error when trying to create role on Landscape: {e}"
     #
     # # Remove the applications from the bundle.
     # await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
