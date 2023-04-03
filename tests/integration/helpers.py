@@ -349,6 +349,7 @@ async def ensure_correct_relation_data(
     ops_test: OpsTest, database_units: int, app_name: str, relation_name: str
 ) -> None:
     """Asserts that the correct database relation data is shared from the right unit to the app."""
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     for unit_number in range(database_units):
         for attempt in Retrying(
             stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -371,12 +372,13 @@ async def ensure_correct_relation_data(
                 unit_ip = get_unit_address(ops_test, unit_name)
                 host_parameter = f"host={unit_ip} "
                 print(f"primary host_parameter: {host_parameter}")
-                assert (
-                    host_parameter in primary_connection_string
-                ), f"{unit_name} is not the host of the primary connection string"
-                assert (
-                    host_parameter not in replica_connection_string
-                ), f"{unit_name} is the host of the replica connection string"
+                if unit_name == primary:
+                    assert (
+                        host_parameter in primary_connection_string
+                    ), f"{unit_name} is not the host of the primary connection string"
+                    assert (
+                        host_parameter not in replica_connection_string
+                    ), f"{unit_name} is the host of the replica connection string"
 
 
 async def execute_query_on_unit(
