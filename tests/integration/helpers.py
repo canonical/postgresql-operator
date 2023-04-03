@@ -303,13 +303,9 @@ async def deploy_and_relate_landscape_bundle_with_postgresql(
             bundle_yaml = archive.read("bundle.yaml")
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
 
-            # Change landscape revision.
-            data["services"]["landscape-server"]["charm"] = "landscape-server"
-            data["services"]["landscape-server"]["series"] = "jammy"
-            del data["services"]["landscape-server"]["options"]
-
-            # Remove PostgreSQL and relations with it from the bundle.yaml file.
-            del data["services"]["postgresql"]
+            # Remove PostgreSQL, machine and relations with it from the bundle.yaml file.
+            del data["applications"]["postgresql"]
+            del data["machines"]["2"]
             data["relations"] = [
                 relation
                 for relation in data["relations"]
@@ -352,9 +348,7 @@ def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
 async def ensure_correct_relation_data(
     ops_test: OpsTest, database_units: int, app_name: str, relation_name: str
 ) -> None:
-    return
     """Asserts that the correct database relation data is shared from the right unit to the app."""
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     for unit_number in range(database_units):
         for attempt in Retrying(
             stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -374,24 +368,15 @@ async def ensure_correct_relation_data(
                 print(f"primary_connection_string: {primary_connection_string}")
                 print(f"replica_connection_string: {replica_connection_string}")
                 print(f"unit_name: {unit_name}")
-                if unit_name == primary:
-                    unit_ip = get_unit_address(ops_test, unit_name)
-                    host_parameter = f"host={unit_ip} "
-                    print(f"primary host_parameter: {host_parameter}")
-                    assert (
-                        host_parameter in primary_connection_string
-                    ), f"{unit_name} is not the host of the primary connection string"
-                    assert (
-                        host_parameter not in replica_connection_string
-                    ), f"{unit_name} is the host of the replica connection string"
-                else:
-                    print("replica")
-                    assert (
-                        not primary_connection_string
-                    ), f"{unit_name} is sharing a primary connection string"
-                    assert (
-                        not replica_connection_string
-                    ), f"{unit_name} is sharing a replica connection string"
+                unit_ip = get_unit_address(ops_test, unit_name)
+                host_parameter = f"host={unit_ip} "
+                print(f"primary host_parameter: {host_parameter}")
+                assert (
+                    host_parameter in primary_connection_string
+                ), f"{unit_name} is not the host of the primary connection string"
+                assert (
+                    host_parameter not in replica_connection_string
+                ), f"{unit_name} is the host of the replica connection string"
 
 
 async def execute_query_on_unit(

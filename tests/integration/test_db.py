@@ -167,20 +167,10 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     )
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
     async with ops_test.fast_forward():
-        for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
             with attempt:
-                with psycopg2.connect(primary_connection_string) as connection:
-                    connection.autocommit = True
-                    with connection.cursor() as cursor:
-                        # Check that it's possible to write and read data from the database that
-                        # was created for the application.
-                        cursor.execute("DROP TABLE IF EXISTS test;")
-                        cursor.execute("CREATE TABLE test(data TEXT);")
-                        cursor.execute("INSERT INTO test(data) VALUES('some data');")
-                        cursor.execute("SELECT data FROM test;")
-                        data = cursor.fetchone()
-                        assert data[0] == "some data"
-                connection.close()
+                with pytest.raises(psycopg2.OperationalError):
+                    psycopg2.connect(primary_connection_string)
 
 
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
