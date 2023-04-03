@@ -83,7 +83,7 @@ LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 11
+LIBPATCH = 12
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -222,7 +222,7 @@ class Snap(object):
         name,
         state: SnapState,
         channel: str,
-        revision: str,
+        revision: int,
         confinement: str,
         apps: Optional[List[Dict[str, str]]] = None,
         cohort: Optional[str] = "",
@@ -423,12 +423,18 @@ class Snap(object):
         args = ["restart", "--reload"] if reload else ["restart"]
         self._snap_daemons(args, services)
 
-    def _install(self, channel: Optional[str] = "", cohort: Optional[str] = "") -> None:
+    def _install(
+        self,
+        channel: Optional[str] = "",
+        cohort: Optional[str] = "",
+        revision: Optional[int] = None,
+    ) -> None:
         """Add a snap to the system.
 
         Args:
           channel: the channel to install from
           cohort: optional, the key of a cohort that this snap belongs to
+          revision: optional, the revision of the snap to install
         """
         cohort = cohort or self._cohort
 
@@ -437,6 +443,8 @@ class Snap(object):
             args.append("--classic")
         if channel:
             args.append('--channel="{}"'.format(channel))
+        if revision:
+            args.append('--revision="{}"'.format(revision))
         if cohort:
             args.append('--cohort="{}"'.format(cohort))
 
@@ -446,6 +454,7 @@ class Snap(object):
         self,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
+        revision: Optional[int] = None,
         leave_cohort: Optional[bool] = False,
     ) -> None:
         """Refresh a snap.
@@ -453,11 +462,15 @@ class Snap(object):
         Args:
           channel: the channel to install from
           cohort: optionally, specify a cohort.
+          revision: optionally, specify the revision of the snap to refresh
           leave_cohort: leave the current cohort.
         """
         args = []
         if channel:
             args.append('--channel="{}"'.format(channel))
+
+        if revision:
+            args.append('--revision="{}"'.format(revision))
 
         if not cohort:
             cohort = self._cohort
@@ -485,6 +498,7 @@ class Snap(object):
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
+        revision: Optional[int] = None,
     ):
         """Ensure that a snap is in a given state.
 
@@ -493,6 +507,10 @@ class Snap(object):
           classic: an (Optional) boolean indicating whether classic confinement should be used
           channel: the channel to install from
           cohort: optional. Specify the key of a snap cohort.
+          revision: optional. the revision of the snap to install/refresh
+
+        While both channel and revision could be specified, the underlying snap install/refresh
+        command will determine which one takes precedence (revision at this time)
 
         Raises:
           SnapError if an error is encountered
@@ -511,10 +529,10 @@ class Snap(object):
             # We are installing or refreshing a snap.
             if self._state not in (SnapState.Present, SnapState.Latest):
                 # The snap is not installed, so we install it.
-                self._install(channel, cohort)
+                self._install(channel, cohort, revision)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
-                self._refresh(channel, cohort)
+                self._refresh(channel, cohort, revision)
 
         self._update_snap_apps()
         self._state = state
@@ -557,7 +575,7 @@ class Snap(object):
         self._state = state
 
     @property
-    def revision(self) -> str:
+    def revision(self) -> int:
         """Returns the revision for a snap."""
         return self._revision
 
@@ -810,7 +828,7 @@ class SnapCache(Mapping):
                 name=i["name"],
                 state=SnapState.Latest,
                 channel=i["channel"],
-                revision=i["revision"],
+                revision=int(i["revision"]),
                 confinement=i["confinement"],
                 apps=i.get("apps", None),
             )
@@ -828,7 +846,7 @@ class SnapCache(Mapping):
             name=info["name"],
             state=SnapState.Available,
             channel=info["channel"],
-            revision=info["revision"],
+            revision=int(info["revision"]),
             confinement=info["confinement"],
             apps=None,
         )
@@ -838,9 +856,10 @@ class SnapCache(Mapping):
 def add(
     snap_names: Union[str, List[str]],
     state: Union[str, SnapState] = SnapState.Latest,
-    channel: Optional[str] = "latest",
+    channel: Optional[str] = "",
     classic: Optional[bool] = False,
     cohort: Optional[str] = "",
+    revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
@@ -852,10 +871,14 @@ def add(
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
+        revision: an (Optional) integer specifying the snap revision to use
 
     Raises:
         SnapError if some snaps failed to install or were not found.
     """
+    if not channel and not revision:
+        channel = "latest"
+
     snap_names = [snap_names] if type(snap_names) is str else snap_names
     if not snap_names:
         raise TypeError("Expected at least one snap to add, received zero!")
@@ -863,7 +886,7 @@ def add(
     if type(state) is str:
         state = SnapState(state)
 
-    return _wrap_snap_operations(snap_names, state, channel, classic, cohort)
+    return _wrap_snap_operations(snap_names, state, channel, classic, cohort, revision)
 
 
 @_cache_init
@@ -887,9 +910,10 @@ def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
 def ensure(
     snap_names: Union[str, List[str]],
     state: str,
-    channel: Optional[str] = "latest",
+    channel: Optional[str] = "",
     classic: Optional[bool] = False,
     cohort: Optional[str] = "",
+    revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
     """Ensure specified snaps are in a given state on the system.
 
@@ -900,12 +924,19 @@ def ensure(
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
+        revision: an (Optional) integer specifying the snap revision to use
+
+    When both channel and revision are specified, the underlying snap install/refresh
+    command will determine the precedence (revision at the time of adding this)
 
     Raises:
         SnapError if the snap is not in the cache.
     """
-    if state in ("present", "latest"):
-        return add(snap_names, SnapState(state), channel, classic, cohort)
+    if not revision and not channel:
+        channel = "latest"
+
+    if state in ("present", "latest") or revision:
+        return add(snap_names, SnapState(state), channel, classic, cohort, revision)
     else:
         return remove(snap_names)
 
@@ -916,6 +947,7 @@ def _wrap_snap_operations(
     channel: str,
     classic: bool,
     cohort: Optional[str] = "",
+    revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
     """Wrap common operations for bare commands."""
     snaps = {"success": [], "failed": []}
@@ -928,7 +960,9 @@ def _wrap_snap_operations(
             if state is SnapState.Absent:
                 snap.ensure(state=SnapState.Absent)
             else:
-                snap.ensure(state=state, classic=classic, channel=channel, cohort=cohort)
+                snap.ensure(
+                    state=state, classic=classic, channel=channel, cohort=cohort, revision=revision
+                )
             snaps["success"].append(snap)
         except SnapError as e:
             logger.warning("Failed to {} snap {}: {}!".format(op, s, e.message))
