@@ -162,15 +162,15 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
 
     # Remove the relation and test that its user was deleted
     # (by checking that the connection string doesn't work anymore).
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{MAILMAN3_CORE_APP_NAME}:{RELATION_NAME}"
-    )
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
     async with ops_test.fast_forward():
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
-            with attempt:
-                with pytest.raises(psycopg2.OperationalError):
-                    psycopg2.connect(primary_connection_string)
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{MAILMAN3_CORE_APP_NAME}:{RELATION_NAME}"
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
+        with attempt:
+            with pytest.raises(psycopg2.OperationalError):
+                psycopg2.connect(primary_connection_string)
 
 
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
