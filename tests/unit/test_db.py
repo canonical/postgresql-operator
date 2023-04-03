@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from hashlib import md5
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
 from charms.postgresql_k8s.v0.postgresql import (
@@ -134,8 +133,7 @@ class TestDbProvides(unittest.TestCase):
 
             # Assert that the correct calls were made.
             user = f"relation-{self.rel_id}"
-            hashed_password = f'md5{md5(("test-password" + user).encode()).hexdigest()}'
-            postgresql_mock.create_user.assert_called_once_with(user, hashed_password, False)
+            postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
             postgresql_mock.get_postgresql_version.assert_called_once()
             _update_endpoints.assert_called_once()
@@ -342,12 +340,15 @@ class TestDbProvides(unittest.TestCase):
                 self.assertTrue if rel_id == self.rel_id else self.assertFalse
             )
 
-            # Check that the unit relation databag contains only the read/write (master) endpoints.
+            # Check that the unit relation databag contains the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
             assert_based_on_relation(
                 "master" in unit_relation_data and master + user == unit_relation_data["master"]
             )
-            self.assertTrue("standbys" not in unit_relation_data)
+            assert_based_on_relation(
+                "standbys" in unit_relation_data
+                and standbys + user == unit_relation_data["standbys"]
+            )
 
     @patch(
         "charm.DbProvides._get_state",
@@ -434,9 +435,12 @@ class TestDbProvides(unittest.TestCase):
             # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
 
-            # Check that the unit relation databag contains only the read/write (master) endpoints.
+            # Check that the unit relation databag contains the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
             self.assertTrue(
                 "master" in unit_relation_data and master + user == unit_relation_data["master"]
             )
-            self.assertTrue("standbys" not in unit_relation_data)
+            self.assertTrue(
+                "standbys" in unit_relation_data
+                and standbys + user == unit_relation_data["standbys"]
+            )
