@@ -416,10 +416,8 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
-    # TODO remove once snap is properly installable
-    @patch("charm.subprocess.check_output")
     @patch("charm.snap.SnapCache")
-    def test_install_snap_packages(self, _snap_cache, _):
+    def test_install_snap_packages(self, _snap_cache):
         _snap_package = _snap_cache.return_value.__getitem__.return_value
         _snap_package.ensure.side_effect = snap.SnapError
 

@@ -856,12 +856,6 @@ class PostgresqlOperatorCharm(CharmBase):
             packages: list of packages to install.
         """
         for snap_name, snap_channel in packages:
-            # TODO remove once snap can be directly installed
-            subprocess.check_output(
-                ["snap", "install", snap_name, f"--channel={snap_channel}"],
-                universal_newlines=True,
-            )
-            # TODO remove once snap can be directly installed
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
