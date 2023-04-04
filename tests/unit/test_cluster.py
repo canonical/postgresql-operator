@@ -1,15 +1,15 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import subprocess
 import unittest
 from unittest import mock
-from unittest.mock import Mock, PropertyMock, mock_open, patch
+from unittest.mock import Mock, PropertyMock, call, mock_open, patch
 
 import requests as requests
 import tenacity as tenacity
 from jinja2 import Template
 
-from cluster import Patroni
+from cluster import AddRaftMemberFailedError, Patroni
 from constants import REWIND_USER
 from lib.charms.operator_libs_linux.v0.apt import DebianPackage, PackageState
 from tests.helpers import STORAGE_PATH
@@ -55,6 +55,41 @@ class TestCluster(unittest.TestCase):
             "fake-rewind-password",
             False,
         )
+
+    @patch("subprocess.check_output")
+    def test_add_raft_member(self, _check_output):
+        # Define some variables that are used through the test.
+        member_ip = "1.1.1.1"
+        raft_status_call = call(["syncobj_admin", "-conn", "127.0.0.1:2222", "-status"])
+        raft_add_call = call(
+            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-add", f"{member_ip}:2222"], timeout=10
+        )
+
+        # Test with the member already being part of the raft cluster.
+        _check_output.side_effect = [member_ip.encode("UTF-8")]
+        self.patroni.add_raft_member(member_ip)
+        _check_output.assert_has_calls([raft_status_call])
+
+        # Test with the member not being part of the raft cluster.
+        _check_output.reset_mock()
+        _check_output.side_effect = [b"", f"SUCCESS ADD {member_ip}".encode("UTF-8")]
+        self.patroni.add_raft_member(member_ip)
+        _check_output.assert_has_calls([raft_status_call, raft_add_call])
+
+        # Test failures that can happen when adding the member to the raft cluster.
+        _check_output.reset_mock()
+        _check_output.side_effect = [
+            b"",
+            subprocess.TimeoutExpired(cmd="fake command", timeout=10),
+            b"",
+            f"FAIL ADD {member_ip}".encode("UTF-8"),
+        ]
+        with self.assertRaises(AddRaftMemberFailedError):
+            self.patroni.add_raft_member(member_ip)
+        _check_output.assert_has_calls([raft_status_call, raft_add_call])
+
+        with self.assertRaises(AddRaftMemberFailedError):
+            self.patroni.add_raft_member(member_ip)
 
     def test_get_alternative_patroni_url(self):
         # Mock tenacity attempt.
