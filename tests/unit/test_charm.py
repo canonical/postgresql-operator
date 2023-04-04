@@ -656,6 +656,90 @@ class TestCharm(unittest.TestCase):
         is_storage_attached = self.charm._is_storage_attached()
         self.assertFalse(is_storage_attached)
 
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
+    @patch("charm.Patroni.restart_patroni")
+    @patch("shutil.rmtree")
+    @patch("pathlib.Path.is_dir")
+    @patch("pathlib.Path.exists")
+    @patch("charm.Patroni.get_primary")
+    @patch("charm.Patroni.reinitialize_postgresql")
+    @patch("charm.Patroni.member_replication_lag", new_callable=PropertyMock)
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch("charm.PostgreSQLProvider.oversee_users")
+    def test_on_update_status(
+        self,
+        _oversee_users,
+        _update_relation_endpoints,
+        _member_started,
+        _member_replication_lag,
+        _reinitialize_postgresql,
+        _get_primary,
+        _exists,
+        _is_dir,
+        _rmtree,
+        _restart_patroni,
+        _set_primary_status_message,
+    ):
+        # Test before the cluster is initialised.
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
+        # Test after the cluster was initialised, but with the unit in a blocked state.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": "True"}
+            )
+        self.charm.unit.status = BlockedStatus("fake blocked status")
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
+        # Test with the unit in a status different that blocked.
+        self.charm.unit.status = ActiveStatus()
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_called_once()
+
+        # Test the reinitialisation of the replica when its lag is unknown
+        # after a restart.
+        _set_primary_status_message.reset_mock()
+        _member_started.return_value = False
+        _member_replication_lag.return_value = "unknown"
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"postgresql_restarted": "True"}
+            )
+        self.charm.on.update_status.emit()
+        _reinitialize_postgresql.assert_called_once()
+        _set_primary_status_message.assert_not_called()
+
+        # Test the reinitialisation of the replica when it was demoted.
+        _get_primary.return_value = "postgresql/1"
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"postgresql_restarted": ""}
+            )
+        self.charm.on.update_status.emit()
+        _exists.assert_called_once()
+        _is_dir.assert_called_once()
+        _rmtree.assert_called_once()
+        _restart_patroni.assert_called_once()
+        _set_primary_status_message.assert_not_called()
+
+        # Test that the primary is not reinitialised.
+        _get_primary.return_value = self.charm.unit.name
+        _exists.reset_mock()
+        _is_dir.reset_mock()
+        _rmtree.reset_mock()
+        _restart_patroni.reset_mock()
+        self.charm.on.update_status.emit()
+        _exists.assert_not_called()
+        _is_dir.assert_not_called()
+        _rmtree.assert_not_called()
+        _restart_patroni.assert_not_called()
+        _set_primary_status_message.assert_called_once()
+
     @patch("subprocess.check_call")
     def test_reboot_on_detached_storage(self, _check_call):
         mock_event = MagicMock()
