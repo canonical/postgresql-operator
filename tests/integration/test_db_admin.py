@@ -126,9 +126,19 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     # Await for a new primary to be elected.
     assert await primary_changed(ops_test, primary)
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
+
+    # Trigger a config change to start the Landscape API service again.
+    # The Landscape API was stopped after a new primary (postgresql) was elected.
+    await ops_test.model.applications["landscape-server"].set_config(
+        {
+            "admin_name": "Admin 1",
+        }
+    )
+    await ops_test.model.wait_for_idle(
+        apps=["landscape-server", DATABASE_APP_NAME], status="active"
+    )
 
     # Create a role and list the available roles later to check that the new one is there.
     role_name = "User2"
@@ -136,11 +146,11 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         run_query(key, secret, "CreateRole", {"name": role_name}, api_uri, False)
     except HTTPError as e:
         assert False, f"error when trying to create role on Landscape: {e}"
-    #
-    # # Remove the applications from the bundle.
-    # await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
-    # await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
-    # await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
-    #
-    # # Remove the PostgreSQL application.
-    # await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+
+    # Remove the applications from the bundle.
+    await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
+
+    # Remove the PostgreSQL application.
+    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)

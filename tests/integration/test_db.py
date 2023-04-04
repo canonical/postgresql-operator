@@ -118,7 +118,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     # Get the updated connection data and assert it can be used
     # to write and read some data properly.
     database_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    print(f"database_unit_name: {database_unit_name}")
     primary_connection_string = await build_connection_string(
         ops_test, MAILMAN3_CORE_APP_NAME, RELATION_NAME, remote_unit_name=database_unit_name
     )
@@ -129,9 +128,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         read_only_endpoint=True,
         remote_unit_name=database_unit_name,
     )
-
-    print(f"primary_connection_string: {primary_connection_string}")
-    print(f"replica_connection_string: {replica_connection_string}")
 
     # Connect to the database using the primary connection string.
     with psycopg2.connect(primary_connection_string) as connection:

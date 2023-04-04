@@ -811,7 +811,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.postgresql_client_relation.oversee_users()
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (

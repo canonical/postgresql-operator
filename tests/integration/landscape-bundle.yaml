@@ -1,0 +1,41 @@
+applications:
+  haproxy:
+    channel: stable
+    charm: ch:haproxy
+    expose: true
+    num_units: 1
+    options:
+      default_timeouts: queue 60000, connect 5000, client 120000, server 120000
+      global_default_bind_options: no-tlsv10
+      services: ''
+      source: backports
+      ssl_cert: SELFSIGNED
+    revision: 66
+    to:
+    - '0'
+  landscape-server:
+    channel: stable
+    charm: ch:landscape-server
+    constraints: mem=4096
+    num_units: 1
+    revision: 79
+  rabbitmq-server:
+    channel: stable
+    charm: ch:rabbitmq-server
+    num_units: 1
+    revision: 123
+    to:
+    - '3'
+description: Landscape Scalable
+machines:
+  '0':
+    constraints: null
+  '3':
+    constraints: null
+name: landscape-scalable
+relations:
+- - landscape-server:amqp
+  - rabbitmq-server:amqp
+- - landscape-server:website
+  - haproxy:reverseproxy
+series: focal

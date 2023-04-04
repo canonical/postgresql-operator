@@ -5,7 +5,6 @@ import itertools
 import json
 import subprocess
 import tempfile
-import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -314,30 +313,7 @@ async def deploy_and_relate_landscape_bundle_with_postgresql(
         ops_test: The ops test framework.
     """
     # Deploy the bundle.
-    with tempfile.NamedTemporaryFile() as original:
-        # Download the original bundle.
-        await ops_test.juju("download", "ch:landscape-scalable", "--filepath", original.name)
-
-        # Open the bundle compressed file and update the contents
-        # of the bundle.yaml file to deploy it.
-        with zipfile.ZipFile(original.name, "r") as archive:
-            bundle_yaml = archive.read("bundle.yaml")
-            data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
-
-            # Remove PostgreSQL, machine and relations with it from the bundle.yaml file.
-            del data["applications"]["postgresql"]
-            del data["machines"]["2"]
-            data["relations"] = [
-                relation
-                for relation in data["relations"]
-                if "postgresql:db" not in relation and "postgresql:db-admin" not in relation
-            ]
-
-            # Write the new bundle content to a temporary file and deploy it.
-            with tempfile.NamedTemporaryFile() as patched:
-                patched.write(yaml.dump(data).encode("utf_8"))
-                patched.seek(0)
-                await ops_test.juju("deploy", patched.name)
+    await ops_test.juju("deploy", "./tests/integration/landscape-bundle.yaml")
 
     # Relate application to PostgreSQL.
     async with ops_test.fast_forward(fast_interval="30s"):
@@ -387,12 +363,8 @@ async def ensure_correct_relation_data(
                     read_only_endpoint=True,
                     remote_unit_name=unit_name,
                 )
-                print(f"primary_connection_string: {primary_connection_string}")
-                print(f"replica_connection_string: {replica_connection_string}")
-                print(f"unit_name: {unit_name}")
                 unit_ip = get_unit_address(ops_test, unit_name)
                 host_parameter = f"host={unit_ip} "
-                print(f"primary host_parameter: {host_parameter}")
                 if unit_name == primary:
                     assert (
                         host_parameter in primary_connection_string
