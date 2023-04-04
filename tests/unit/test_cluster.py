@@ -43,6 +43,7 @@ class TestCluster(unittest.TestCase):
         self.peers_ips = {"2.2.2.2", "3.3.3.3"}
 
         self.patroni = Patroni(
+            "on",
             "1.1.1.1",
             STORAGE_PATH,
             "postgresql",
@@ -205,6 +206,7 @@ class TestCluster(unittest.TestCase):
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
+            archive_mode="on",
             conf_path=STORAGE_PATH,
             member_name=member_name,
             peers_ips=self.peers_ips,
@@ -226,7 +228,7 @@ class TestCluster(unittest.TestCase):
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):
             # Call the method.
-            self.patroni.render_patroni_yml_file()
+            self.patroni.render_patroni_yml_file(archive_mode="on")
 
         # Check the template is opened read-only in the call to open.
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))

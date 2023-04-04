@@ -609,7 +609,9 @@ class TestCharm(unittest.TestCase):
             )  # Mock some data in the relation to test that it change.
             _get_tls_files.return_value = [None]
             self.charm.update_config()
-            _render_patroni_yml_file.assert_called_once_with(enable_tls=False, stanza=None)
+            _render_patroni_yml_file.assert_called_once_with(
+                archive_mode="on", enable_tls=False, backup_id=None, stanza=None
+            )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_not_called()
             self.assertNotIn(
@@ -624,7 +626,9 @@ class TestCharm(unittest.TestCase):
             _render_patroni_yml_file.reset_mock()
             _reload_patroni_configuration.reset_mock()
             self.charm.update_config()
-            _render_patroni_yml_file.assert_called_once_with(enable_tls=True, stanza=None)
+            _render_patroni_yml_file.assert_called_once_with(
+                archive_mode="on", enable_tls=True, backup_id=None, stanza=None
+            )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_called_once()
             self.assertEqual(

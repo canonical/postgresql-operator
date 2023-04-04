@@ -428,6 +428,7 @@ class PostgresqlOperatorCharm(CharmBase):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
+            self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
             self._storage_path,
             self.cluster_name,
@@ -801,8 +802,12 @@ class PostgresqlOperatorCharm(CharmBase):
         event.set_results({f"{username}-password": password})
 
     def _on_update_status(self, _) -> None:
-        """Update users list in the database."""
+        """Update the unit status message and users list in the database."""
         if "cluster_initialised" not in self._peers.data[self.app]:
+            return
+
+        if self.is_blocked:
+            logger.debug("on_update_status early exit: Unit is in Blocked status")
             return
 
         self.postgresql_client_relation.oversee_users()
@@ -815,6 +820,32 @@ class PostgresqlOperatorCharm(CharmBase):
             and self._patroni.member_replication_lag == "unknown"
         ):
             self._patroni.reinitialize_postgresql()
+            return
+
+        if "restoring-backup" in self.app_peer_data:
+            if "failed" in self._patroni.get_member_status(self._member_name):
+                self.unit.status = BlockedStatus("Failed to restore backup")
+                return
+
+            if not self._patroni.member_started:
+                logger.debug("on_update_status early exit: Patroni has not started yet")
+                return
+
+            # Remove the restoring backup flag.
+            self.app_peer_data.update({"restoring-backup": ""})
+            self.update_config()
+
+        self._set_primary_status_message()
+
+    def _set_primary_status_message(self) -> None:
+        """Display 'Primary' in the unit status message if the current unit is the primary."""
+        try:
+            if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
+                self.unit.status = ActiveStatus("Primary")
+            elif self._patroni.member_started:
+                self.unit.status = ActiveStatus()
+        except (RetryError, ConnectionError) as e:
+            logger.error(f"failed to get primary with error {e}")
 
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
@@ -962,8 +993,10 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
+            archive_mode=self.app_peer_data.get("archive-mode", "on"),
             enable_tls=enable_tls,
-            stanza=self._peers.data[self.unit].get("stanza"),
+            backup_id=self.app_peer_data.get("restoring-backup"),
+            stanza=self.unit_peer_data.get("stanza"),
         )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
