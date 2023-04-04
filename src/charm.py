@@ -6,7 +6,9 @@
 import json
 import logging
 import os
+import shutil
 import subprocess
+from pathlib import Path
 from typing import Dict, List, Optional, Set
 
 from charms.operator_libs_linux.v0 import apt
@@ -827,14 +829,26 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation.oversee_users()
         self._update_relation_endpoints()
 
-        # Restart the workload if it's stuck on the starting state after a restart.
-        if (
-            not self._patroni.member_started
-            and "postgresql_restarted" in self._peers.data[self.unit]
-            and self._patroni.member_replication_lag == "unknown"
-        ):
-            self._patroni.reinitialize_postgresql()
-            return
+        if not self._patroni.member_started and self._patroni.member_replication_lag == "unknown":
+            # Restart the workload if it's stuck on the starting state after a restart.
+            if "postgresql_restarted" in self._peers.data[self.unit]:
+                logger.debug("reinitialising replica due to lag after restart")
+                self._patroni.reinitialize_postgresql()
+                return
+
+            # Restart the workload if it's stuck on the starting state after the
+            # first unit being demoted (it's now a replica). Patroni REST API is
+            # offline in this situation.
+            if (
+                self.unit.is_leader()
+                and self._patroni.get_primary(unit_name_pattern=True) != self.unit.name
+            ):
+                logger.debug("reinitialising replica due to it being demoted")
+                path = Path(f"{self._storage_path}/pgdata")
+                if path.exists() and path.is_dir():
+                    shutil.rmtree(path)
+                self._patroni.restart_patroni()
+                return
 
         if "restoring-backup" in self.app_peer_data:
             if "failed" in self._patroni.get_member_status(self._member_name):
