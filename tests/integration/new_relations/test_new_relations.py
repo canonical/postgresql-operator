@@ -303,7 +303,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     # Retrieve the list of current database unit names.
     units_to_remove = [unit.name for unit in ops_test.model.applications[DATABASE_APP_NAME].units]
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval="60s"):
         # Add two more units.
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
