@@ -352,6 +352,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
                     cursor.execute("DROP TABLE test;")
         connection.close()
 
+    async with ops_test.fast_forward():
         # Remove the relation and test that its user was deleted
         # (by checking that the connection string doesn't work anymore).
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
