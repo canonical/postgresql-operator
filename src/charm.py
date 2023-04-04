@@ -78,9 +78,6 @@ class PostgresqlOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._postgresql_service = "postgresql"
-        self.pgbackrest_server_service = "pgbackrest-service"
-
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -652,6 +649,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
 
+        self.unit.set_workload_version(self._patroni.get_postgresql_version())
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
@@ -875,12 +874,6 @@ class PostgresqlOperatorCharm(CharmBase):
             packages: list of packages to install.
         """
         for snap_name, snap_channel in packages:
-            # TODO remove once snap can be directly installed
-            subprocess.check_output(
-                ["snap", "install", snap_name, f"--channel={snap_channel}"],
-                universal_newlines=True,
-            )
-            # TODO remove once snap can be directly installed
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]

@@ -188,13 +188,12 @@ class Patroni:
         subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
         subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
 
-    def _get_postgresql_version(self) -> str:
+    def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
-        # TODO use a real version
         client = snap.SnapClient()
         for snp in client.get_installed_snaps():
             if snp["name"] == POSTGRESQL_SNAP_NAME:
-                return snp["version"].split(".")[0]
+                return snp["version"]
 
     def get_member_ip(self, member_name: str) -> str:
         """Get cluster member IP address.
@@ -416,7 +415,7 @@ class Patroni:
             restoring_backup=backup_id is not None,
             backup_id=backup_id,
             stanza=stanza,
-            version=self._get_postgresql_version(),
+            version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
         )
         self.render_file(f"{self.storage_path}/patroni.yaml", rendered, 0o644)

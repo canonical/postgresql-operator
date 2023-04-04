@@ -624,7 +624,7 @@ Stderr:
 
         # Stop the service if TLS is not enabled or there are no replicas.
         if not self.charm.is_tls_enabled or len(self.charm._peer_members_ips) == 0:
-            charmed_postgresql_snap.stop(services=[self.charm.pgbackrest_server_service])
+            charmed_postgresql_snap.stop(services=["pgbackrest-service"])
             return True
 
         # Don't start the service if the service hasn't started yet in the primary.
@@ -632,7 +632,7 @@ Stderr:
             return False
 
         # Start the service.
-        charmed_postgresql_snap.restart(services=[self.charm.pgbackrest_server_service])
+        charmed_postgresql_snap.restart(services=["pgbackrest-service"])
         return True
 
     def _upload_content_to_s3(
