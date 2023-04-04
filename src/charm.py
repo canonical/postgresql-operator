@@ -829,6 +829,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation.oversee_users()
         self._update_relation_endpoints()
 
+        # Reinitialise stuck replicas.
         if not self._patroni.member_started and self._patroni.member_replication_lag == "unknown":
             # Restart the workload if it's stuck on the starting state after a restart.
             if "postgresql_restarted" in self._peers.data[self.unit]:
