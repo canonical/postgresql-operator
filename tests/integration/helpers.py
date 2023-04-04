@@ -5,6 +5,7 @@ import itertools
 import json
 import subprocess
 import tempfile
+import zipfile
 from datetime import datetime
 from pathlib import Path
 from typing import List, Optional
@@ -313,7 +314,29 @@ async def deploy_and_relate_landscape_bundle_with_postgresql(
         ops_test: The ops test framework.
     """
     # Deploy the bundle.
-    await ops_test.juju("deploy", "./tests/integration/landscape-bundle.yaml")
+    with tempfile.NamedTemporaryFile() as original:
+        # Download the original bundle.
+        await ops_test.juju("download", "ch:landscape-scalable", "--filepath", original.name)
+
+        # Open the bundle compressed file and update the contents
+        # of the bundle.yaml file to deploy it.
+        with zipfile.ZipFile(original.name, "r") as archive:
+            bundle_yaml = archive.read("bundle.yaml")
+            data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
+
+            # Remove PostgreSQL and relations with it from the bundle.yaml file.
+            del data["applications"]["postgresql"]
+            data["relations"] = [
+                relation
+                for relation in data["relations"]
+                if "postgresql:db" not in relation and "postgresql:db-admin" not in relation
+            ]
+
+            # Write the new bundle content to a temporary file and deploy it.
+            with tempfile.NamedTemporaryFile() as patched:
+                patched.write(yaml.dump(data).encode("utf_8"))
+                patched.seek(0)
+                await ops_test.juju("deploy", patched.name)
 
     # Relate application to PostgreSQL.
     async with ops_test.fast_forward(fast_interval="30s"):
