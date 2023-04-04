@@ -673,6 +673,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
 
+        self.unit.set_workload_version(self._patroni.get_postgresql_version())
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():

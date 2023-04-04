@@ -107,7 +107,7 @@ class TestCluster(unittest.TestCase):
         _from_system.return_value = DebianPackage(
             "postgresql", "12+214ubuntu0.1", "", "all", PackageState.Present
         )
-        version = self.patroni._get_postgresql_version()
+        version = self.patroni.get_postgresql_version()
         _from_system.assert_called_once_with("postgresql")
         self.assertEqual(version, "12")
 
@@ -191,7 +191,7 @@ class TestCluster(unittest.TestCase):
             0o644,
         )
 
-    @patch("charm.Patroni._get_postgresql_version")
+    @patch("charm.Patroni.get_postgresql_version")
     @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
     def test_render_patroni_yml_file(self, _, _render_file, __):
@@ -217,7 +217,7 @@ class TestCluster(unittest.TestCase):
             replication_password=replication_password,
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
-            version=self.patroni._get_postgresql_version(),
+            version=self.patroni.get_postgresql_version(),
             minority_count=self.patroni.planned_units // 2,
         )
 
