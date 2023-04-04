@@ -45,6 +45,10 @@ logger = logging.getLogger(__name__)
 PATRONI_SERVICE = "patroni"
 
 
+class AddRaftMemberFailedError(Exception):
+    """Raised when a add raft member failed for some reason."""
+
+
 class NotReadyError(Exception):
     """Raised when not all cluster members healthy or finished initial sync."""
 
@@ -115,6 +119,37 @@ class Patroni:
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
+
+    def add_raft_member(self, member_ip: str) -> None:
+        """Add a member from to raft cluster.
+
+        The raft cluster is a different cluster from the Patroni cluster.
+        It is responsible for defining which Patroni member can update
+        the primary member in the DCS.
+
+        Raises:
+            AddRaftMemberFailedError: if it wasn't possible to add the
+                member to the raft cluster.
+        """
+        raft_status = subprocess.check_output(
+            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-status"]
+        ).decode("UTF-8")
+
+        # Check whether the member is already part of the raft cluster.
+        if member_ip in raft_status:
+            return
+
+        # Add the member to the raft cluster.
+        try:
+            result = subprocess.check_output(
+                ["syncobj_admin", "-conn", "127.0.0.1:2222", "-add", f"{member_ip}:2222"],
+                timeout=10,
+            ).decode("UTF-8")
+        except subprocess.TimeoutExpired:
+            raise AddRaftMemberFailedError()
+        logger.debug(f"result from trying to add {member_ip}:2222 to the raft cluster: {result}")
+        if "SUCCESS" not in result:
+            raise AddRaftMemberFailedError()
 
     def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""

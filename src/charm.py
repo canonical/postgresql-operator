@@ -42,6 +42,7 @@ from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
 
 from backups import PostgreSQLBackups
 from cluster import (
+    AddRaftMemberFailedError,
     NotReadyError,
     Patroni,
     RemoveRaftMemberFailedError,
@@ -381,7 +382,8 @@ class PostgresqlOperatorCharm(CharmBase):
         """Add member to the cluster if all members are already up and running.
 
         Raises:
-            NotReadyError if either the new member or the current members are not ready.
+            NotReadyError if either the new member or the current members are not ready,
+                or if it wasn't possible to add the new member to the raft cluster.
         """
         unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
         member_ip = self._get_unit_ip(unit)
@@ -389,6 +391,13 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.are_all_members_ready():
             logger.info("not all members are ready")
             raise NotReadyError("not all members are ready")
+
+        # Try to add the new member to the raft cluster.
+        if len(self.members_ips) > 1:
+            try:
+                self._patroni.add_raft_member(member_ip)
+            except AddRaftMemberFailedError:
+                raise NotReadyError("failed to add the new member to the raft cluster")
 
         # Add the member to the list that should be updated in each other member.
         self._add_to_members_ips(member_ip)
