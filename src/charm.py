@@ -840,10 +840,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # Restart the workload if it's stuck on the starting state after the
             # first unit being demoted (it's now a replica). Patroni REST API is
             # offline in this situation.
-            if (
-                self.unit.is_leader()
-                and self._patroni.get_primary(unit_name_pattern=True) != self.unit.name
-            ):
+            if self._patroni.get_primary(unit_name_pattern=True) != self.unit.name:
                 logger.debug("reinitialising replica due to it being demoted")
                 path = Path(f"{self._storage_path}/pgdata")
                 if path.exists() and path.is_dir():
