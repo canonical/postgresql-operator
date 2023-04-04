@@ -395,11 +395,10 @@ class PostgresqlOperatorCharm(CharmBase):
             raise NotReadyError("not all members are ready")
 
         # Try to add the new member to the raft cluster.
-        if len(self.members_ips) > 1:
-            try:
-                self._patroni.add_raft_member(member_ip)
-            except AddRaftMemberFailedError:
-                raise NotReadyError("failed to add the new member to the raft cluster")
+        try:
+            self._patroni.add_raft_member(member_ip)
+        except AddRaftMemberFailedError:
+            raise NotReadyError("failed to add the new member to the raft cluster")
 
         # Add the member to the list that should be updated in each other member.
         self._add_to_members_ips(member_ip)
@@ -840,13 +839,13 @@ class PostgresqlOperatorCharm(CharmBase):
             # Restart the workload if it's stuck on the starting state after the
             # first unit being demoted (it's now a replica). Patroni REST API is
             # offline in this situation.
-            if self._patroni.get_primary(unit_name_pattern=True) != self.unit.name:
-                logger.debug("reinitialising replica due to it being demoted")
-                path = Path(f"{self._storage_path}/pgdata")
-                if path.exists() and path.is_dir():
-                    shutil.rmtree(path)
-                self._patroni.restart_patroni()
-                return
+            # if self._patroni.get_primary(unit_name_pattern=True) != self.unit.name:
+            #     logger.debug("reinitialising replica due to it being demoted")
+            #     path = Path(f"{self._storage_path}/pgdata")
+            #     if path.exists() and path.is_dir():
+            #         shutil.rmtree(path)
+            #     self._patroni.restart_patroni()
+            #     return
 
         if "restoring-backup" in self.app_peer_data:
             if "failed" in self._patroni.get_member_status(self._member_name):
