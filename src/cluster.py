@@ -367,7 +367,7 @@ class Patroni:
 
         for member in cluster_status.json()["members"]:
             if member["name"] == self.member_name:
-                return member["lag"]
+                return member.get("lag", "")
 
         return "unknown"
 
