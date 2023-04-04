@@ -78,8 +78,6 @@ class PostgresqlOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._postgresql_service = "postgresql"
-
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -632,6 +630,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
+        self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.

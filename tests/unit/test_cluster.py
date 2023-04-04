@@ -110,9 +110,9 @@ class TestCluster(unittest.TestCase):
             {"name": "something"},
             {"name": "charmed-postgresql", "version": "14.0"},
         ]
-        version = self.patroni._get_postgresql_version()
+        version = self.patroni.get_postgresql_version()
 
-        self.assertEqual(version, "14")
+        self.assertEqual(version, "14.0")
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
@@ -170,16 +170,19 @@ class TestCluster(unittest.TestCase):
         # Ensure the file is chown'd correctly.
         _chown.assert_called_with(filename, uid=35, gid=35)
 
-    @patch("charm.Patroni._get_postgresql_version")
+    @patch("charm.Patroni.get_postgresql_version")
     @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
-    def test_render_patroni_yml_file(self, _, _render_file, __):
+    def test_render_patroni_yml_file(self, _, _render_file, _get_postgresql_version):
+        _get_postgresql_version.return_value = "14.7"
+
         # Define variables to render in the template.
         member_name = "postgresql-0"
         scope = "postgresql"
         superuser_password = "fake-superuser-password"
         replication_password = "fake-replication-password"
         rewind_password = "fake-rewind-password"
+        postgresql_version = "14"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
@@ -196,7 +199,7 @@ class TestCluster(unittest.TestCase):
             replication_password=replication_password,
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
-            version=self.patroni._get_postgresql_version(),
+            version=postgresql_version,
             minority_count=self.patroni.planned_units // 2,
         )
 

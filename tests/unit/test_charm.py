@@ -25,7 +25,6 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         self._peer_relation = PEER
         self._postgresql_container = "postgresql"
-        self._postgresql_service = "postgresql"
 
         self.harness = Harness(PostgresqlOperatorCharm)
         self.addCleanup(self.harness.cleanup)
@@ -136,6 +135,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgreSQLProvider.oversee_users")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
@@ -167,7 +167,10 @@ class TestCharm(unittest.TestCase):
         _postgresql,
         _update_relation_endpoints,
         _oversee_users,
+        _get_postgresql_version,
     ):
+        _get_postgresql_version.return_value = "14.0"
+
         # Test without storage.
         self.charm.on.start.emit()
         _reboot_on_detached_storage.assert_called_once()
@@ -217,6 +220,7 @@ class TestCharm(unittest.TestCase):
         _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
+    @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.configure_patroni_on_unit")
     @patch(
@@ -240,7 +244,10 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints,
         _member_started,
         _configure_patroni_on_unit,
+        _get_postgresql_version,
     ):
+        _get_postgresql_version.return_value = "14.0"
+
         # Set the current unit to be a replica (non leader unit).
         self.harness.set_leader(False)
 
@@ -290,6 +297,8 @@ class TestCharm(unittest.TestCase):
         _get_password.return_value = "fake-operator-password"
         bootstrap_cluster = patroni.return_value.bootstrap_cluster
         bootstrap_cluster.return_value = True
+
+        patroni.return_value.get_postgresql_version.return_value = "14.0"
 
         self.harness.set_leader()
         self.charm.on.start.emit()
