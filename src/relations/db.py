@@ -151,19 +151,18 @@ class DbProvides(Object):
             )
             return
 
-        # Set the data in both application and unit data bag.
-        # It's needed to run this logic on every relation changed event
-        # setting the data again in the databag, otherwise the application charm that
-        # is connecting to this database will receive a "database gone" event from the
-        # old PostgreSQL library (ops-lib-pgsql) and the connection between the
-        # application and this charm will not work.
-        for databag in [unit_relation_databag]:
-            updates = {
+        # Set the data in the unit data bag. It's needed to run this logic on every
+        # relation changed event setting the data again in the databag, otherwise the
+        # application charm that is connecting to this database will receive a
+        # "database gone" event from the old PostgreSQL library (ops-lib-pgsql)
+        # and the connection between the application and this charm will not work.
+        unit_relation_databag.update(
+            {
                 "version": postgresql_version,
                 "password": password,
                 "database": database,
             }
-            databag.update(updates)
+        )
         self.update_endpoints(event)
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
