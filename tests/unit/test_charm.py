@@ -16,7 +16,6 @@ from ops.testing import Harness
 from tenacity import RetryError
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
-from cluster import AddRaftMemberFailedError, NotReadyError
 from constants import PEER
 from tests.helpers import patch_network_get
 
@@ -34,79 +33,6 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.charm = self.harness.charm
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm.update_config")
-    @patch("charm.Patroni.add_raft_member")
-    @patch("charm.Patroni.are_all_members_ready")
-    def test_add_cluster_member(self, _are_all_members_ready, _add_raft_member, _update_config):
-        # Define some variables that are used through the test.
-        member = "postgresql/0"
-        member_ip = "1.1.1.1"
-
-        # Test without all members ready.
-        _are_all_members_ready.return_value = False
-        with self.assertRaises(NotReadyError):
-            self.charm.add_cluster_member(member)
-        _are_all_members_ready.assert_called_once()
-
-        # Test with all members ready.
-        _are_all_members_ready.return_value = True
-        with self.harness.hooks_disabled():
-            self.harness.set_leader()
-        with self.harness.hooks_disabled():
-            self.harness.update_relation_data(
-                self.rel_id, self.harness.charm.app.name, {"members_ips": '["2.2.2.2", "3.3.3.3"]'}
-            )
-        self.assertNotIn(
-            member_ip,
-            self.harness.get_relation_data(self.rel_id, self.harness.charm.app.name).get(
-                "members_ips", []
-            ),
-        )
-        self.charm.add_cluster_member(member)
-        _add_raft_member.assert_called_once_with("1.1.1.1")
-        self.assertIn(
-            member_ip,
-            self.harness.get_relation_data(self.rel_id, self.harness.charm.app).get(
-                "members_ips", []
-            ),
-        )
-        _update_config.assert_called_once()
-
-        # Test when the charm fails to add the member to the raft cluster.
-        _add_raft_member.reset_mock()
-        _add_raft_member.side_effect = AddRaftMemberFailedError
-        _update_config.reset_mock()
-        with self.harness.hooks_disabled():
-            self.harness.update_relation_data(
-                self.rel_id, self.harness.charm.app.name, {"members_ips": '["2.2.2.2", "3.3.3.3"]'}
-            )
-        self.assertNotIn(
-            member_ip,
-            self.harness.get_relation_data(self.rel_id, self.harness.charm.app.name).get(
-                "members_ips", []
-            ),
-        )
-        with self.assertRaises(NotReadyError):
-            self.charm.add_cluster_member(member)
-        _add_raft_member.assert_called_once_with("1.1.1.1")
-        self.assertNotIn(
-            member_ip,
-            self.harness.get_relation_data(self.rel_id, self.harness.charm.app).get(
-                "members_ips", []
-            ),
-        )
-        _update_config.assert_not_called()
-
-        # Test when the charm fails to update the Patroni configuration.
-        _add_raft_member.side_effect = None
-        _update_config.reset_mock()
-        _update_config.side_effect = RetryError(last_attempt=3)
-        self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
-        self.charm.add_cluster_member(member)
-        _update_config.assert_called_once()
-        self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._install_pip_package")
