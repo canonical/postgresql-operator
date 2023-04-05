@@ -142,11 +142,8 @@ class TestDbProvides(unittest.TestCase):
             self.assertEqual(
                 self.harness.get_relation_data(self.rel_id, self.unit),
                 {
-                    "allowed-units": "application/0",
                     "database": DATABASE,
                     "password": "test-password",
-                    "port": DATABASE_PORT,
-                    "user": user,
                     "version": POSTGRESQL_VERSION,
                 },
             )

@@ -157,15 +157,9 @@ class DbProvides(Object):
         # is connecting to this database will receive a "database gone" event from the
         # old PostgreSQL library (ops-lib-pgsql) and the connection between the
         # application and this charm will not work.
-        allowed_subnets = self._get_allowed_subnets(event.relation)
-        allowed_units = self._get_allowed_units(event.relation)
         for databag in [unit_relation_databag]:
             updates = {
-                "allowed-subnets": allowed_subnets,
-                "allowed-units": allowed_units,
-                "port": DATABASE_PORT,
                 "version": postgresql_version,
-                "user": user,
                 "password": password,
                 "database": database,
             }
@@ -297,8 +291,14 @@ class DbProvides(Object):
             )
 
             # Set the read/write endpoint.
+            allowed_subnets = self._get_allowed_subnets(relation)
+            allowed_units = self._get_allowed_units(relation)
             data = {
+                "allowed-subnets": allowed_subnets,
+                "allowed-units": allowed_units,
                 "host": self.charm.primary_endpoint,
+                "port": DATABASE_PORT,
+                "user": user,
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
