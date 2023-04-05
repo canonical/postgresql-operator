@@ -340,7 +340,7 @@ class Patroni:
     def is_member_isolated(self) -> bool:
         """Returns whether the unit is isolated from the cluster."""
         try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
                     cluster_status = requests.get(
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
