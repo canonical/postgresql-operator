@@ -370,13 +370,24 @@ class PostgresqlOperatorCharm(CharmBase):
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
-            self._patroni.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
+            return
         except RetryError:
             logger.info("Deferring reconfigure: couldn't retrieve current cluster members")
             event.defer()
+            return
+
+        # Try to add the new member to the raft cluster.
+        try:
+            self._patroni.add_raft_members()
+        except AddRaftMemberFailedError:
+            # raise NotReadyError("failed to add the new member to the raft cluster")
+            event.defer()
+            return
+
+        self._patroni.update_synchronous_node_count()
 
     def add_cluster_member(self, member: str) -> None:
         """Add member to the cluster if all members are already up and running.
@@ -391,12 +402,6 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.are_all_members_ready():
             logger.info("not all members are ready")
             raise NotReadyError("not all members are ready")
-
-        # Try to add the new member to the raft cluster.
-        try:
-            self._patroni.add_raft_member(member_ip)
-        except AddRaftMemberFailedError:
-            raise NotReadyError("failed to add the new member to the raft cluster")
 
         # Add the member to the list that should be updated in each other member.
         self._add_to_members_ips(member_ip)

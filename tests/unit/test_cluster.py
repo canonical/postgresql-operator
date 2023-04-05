@@ -67,13 +67,13 @@ class TestCluster(unittest.TestCase):
 
         # Test with the member already being part of the raft cluster.
         _check_output.side_effect = [member_ip.encode("UTF-8")]
-        self.patroni.add_raft_member(member_ip)
+        self.patroni.add_raft_members(member_ip)
         _check_output.assert_has_calls([raft_status_call])
 
         # Test with the member not being part of the raft cluster.
         _check_output.reset_mock()
         _check_output.side_effect = [b"", f"SUCCESS ADD {member_ip}".encode("UTF-8")]
-        self.patroni.add_raft_member(member_ip)
+        self.patroni.add_raft_members(member_ip)
         _check_output.assert_has_calls([raft_status_call, raft_add_call])
 
         # Test failures that can happen when adding the member to the raft cluster.
@@ -85,11 +85,11 @@ class TestCluster(unittest.TestCase):
             f"FAIL ADD {member_ip}".encode("UTF-8"),
         ]
         with self.assertRaises(AddRaftMemberFailedError):
-            self.patroni.add_raft_member(member_ip)
+            self.patroni.add_raft_members(member_ip)
         _check_output.assert_has_calls([raft_status_call, raft_add_call])
 
         with self.assertRaises(AddRaftMemberFailedError):
-            self.patroni.add_raft_member(member_ip)
+            self.patroni.add_raft_members(member_ip)
 
     def test_get_alternative_patroni_url(self):
         # Mock tenacity attempt.
