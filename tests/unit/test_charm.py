@@ -684,6 +684,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_not_called()
         _update_certificate.assert_called_once_with()
         self.assertEqual(_primary_endpoint.call_count, 2)
+        _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
         self.assertEqual(self.harness.model.unit.status.message, NO_PRIMARY_MESSAGE)
 
