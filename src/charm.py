@@ -529,7 +529,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
         self._update_certificate()
         if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
@@ -690,9 +691,6 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # Clear unit data if this unit is still replica.
-        self._update_relation_endpoints()
-
         # Member already started, so we can set an ActiveStatus.
         # This can happen after a reboot.
         if self._patroni.member_started:
@@ -776,7 +774,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.postgresql_client_relation.oversee_users()
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
@@ -785,6 +784,12 @@ class PostgresqlOperatorCharm(CharmBase):
             and self._patroni.member_replication_lag == "unknown"
         ):
             self._patroni.reinitialize_postgresql()
+            return
+
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
             return
 
         if "restoring-backup" in self.app_peer_data:

@@ -105,7 +105,6 @@ class DbProvides(Object):
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
         unit_relation_databag = event.relation.data[self.charm.unit]
-        application_relation_databag = event.relation.data[self.charm.app]
 
         # Do not allow apps requesting extensions to be installed.
         if "extensions" in event.relation.data.get(
@@ -118,15 +117,14 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
             return
 
-        # Sometimes a relation changed event is triggered,
-        # and it doesn't have a database name in it.
+        # Sometimes a relation changed event is triggered, and it doesn't have
+        # a database name in it (like the relation with Landscape server charm),
+        # so create a database with the other application name.
         database = event.relation.data.get(event.app, {}).get(
             "database", event.relation.data.get(event.unit, {}).get("database")
         )
         if not database:
-            logger.warning("No database name provided")
-            event.defer()
-            return
+            database = event.relation.app.name
 
         try:
             # Creates the user and the database for this specific relation if it was not already
@@ -153,25 +151,18 @@ class DbProvides(Object):
             )
             return
 
-        # Set the data in both application and unit data bag.
-        # It's needed to run this logic on every relation changed event
-        # setting the data again in the databag, otherwise the application charm that
-        # is connecting to this database will receive a "database gone" event from the
-        # old PostgreSQL library (ops-lib-pgsql) and the connection between the
-        # application and this charm will not work.
-        allowed_subnets = self._get_allowed_subnets(event.relation)
-        allowed_units = self._get_allowed_units(event.relation)
-        for databag in [application_relation_databag, unit_relation_databag]:
-            updates = {
-                "allowed-subnets": allowed_subnets,
-                "allowed-units": allowed_units,
-                "port": DATABASE_PORT,
+        # Set the data in the unit data bag. It's needed to run this logic on every
+        # relation changed event setting the data again in the databag, otherwise the
+        # application charm that is connecting to this database will receive a
+        # "database gone" event from the old PostgreSQL library (ops-lib-pgsql)
+        # and the connection between the application and this charm will not work.
+        unit_relation_databag.update(
+            {
                 "version": postgresql_version,
-                "user": user,
                 "password": password,
                 "database": database,
             }
-            databag.update(updates)
+        )
         self.update_endpoints(event)
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
@@ -253,16 +244,12 @@ class DbProvides(Object):
         if len(relations) == 0:
             return
 
-        primary_unit = self.charm._patroni.get_primary(unit_name_pattern=True)
-        is_replica = self.charm.unit.name != primary_unit
-
         # List the replicas endpoints.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
 
         for relation in relations:
             # Retrieve some data from the relation.
             unit_relation_databag = relation.data[self.charm.unit]
-            application_relation_databag = relation.data[self.charm.app]
             user = f"relation-{relation.id}"
             password = self.charm.get_secret("app", user)
             database = self.charm.get_secret("app", f"{user}-database")
@@ -303,25 +290,21 @@ class DbProvides(Object):
             )
 
             # Set the read/write endpoint.
+            allowed_subnets = self._get_allowed_subnets(relation)
+            allowed_units = self._get_allowed_units(relation)
             data = {
+                "allowed-subnets": allowed_subnets,
+                "allowed-units": allowed_units,
                 "host": self.charm.primary_endpoint,
+                "port": DATABASE_PORT,
+                "user": user,
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
             }
 
-            # Clear the unit data in the replica databag to keep the same behavior we have
-            # when the relation is created (only one unit has the databag filled).
-            if is_replica:
-                unit_relation_databag.clear()
-                self.charm._peers.data[self.charm.unit].update({"replica": "True"})
-            # Set the data only in the primary unit databag.
-            else:
-                unit_relation_databag.update(data)
-                self.charm._peers.data[self.charm.unit].update({"replica": ""})
-
-            if self.charm.unit.is_leader():
-                application_relation_databag.update(data)
+            # Set the data only in the unit databag.
+            unit_relation_databag.update(data)
 
     def _get_allowed_subnets(self, relation: Relation) -> str:
         """Build the list of allowed subnets as in the legacy charm."""

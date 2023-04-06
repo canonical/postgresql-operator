@@ -425,6 +425,68 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
+    @patch("charm.Patroni.restart_patroni")
+    @patch("charm.Patroni.is_member_isolated")
+    @patch("charm.Patroni.reinitialize_postgresql")
+    @patch("charm.Patroni.member_replication_lag", new_callable=PropertyMock)
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch("charm.PostgreSQLProvider.oversee_users")
+    def test_on_update_status(
+        self,
+        _oversee_users,
+        _update_relation_endpoints,
+        _member_started,
+        _member_replication_lag,
+        _reinitialize_postgresql,
+        _is_member_isolated,
+        _restart_patroni,
+        _set_primary_status_message,
+    ):
+        # Test before the cluster is initialised.
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
+        # Test after the cluster was initialised, but with the unit in a blocked state.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": "True"}
+            )
+        self.charm.unit.status = BlockedStatus("fake blocked status")
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
+        # Test with the unit in a status different that blocked.
+        self.charm.unit.status = ActiveStatus()
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_called_once()
+
+        # Test the reinitialisation of the replica when its lag is unknown
+        # after a restart.
+        _set_primary_status_message.reset_mock()
+        _member_started.return_value = False
+        _is_member_isolated.return_value = False
+        _member_replication_lag.return_value = "unknown"
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"postgresql_restarted": "True"}
+            )
+        self.charm.on.update_status.emit()
+        _reinitialize_postgresql.assert_called_once()
+        _restart_patroni.assert_not_called()
+        _set_primary_status_message.assert_not_called()
+
+        # Test call to restart when the member is isolated from the cluster.
+        _is_member_isolated.return_value = True
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"postgresql_restarted": ""}
+            )
+        self.charm.on.update_status.emit()
+        _restart_patroni.assert_called_once()
+
     @patch("charm.snap.SnapCache")
     def test_install_snap_packages(self, _snap_cache):
         _snap_package = _snap_cache.return_value.__getitem__.return_value
@@ -595,11 +657,23 @@ class TestCharm(unittest.TestCase):
 
     @patch("charm.PostgresqlOperatorCharm._update_certificate")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
-    def test_on_cluster_topology_change(self, _update_relation_endpoints, _update_certificate):
-        self.charm._on_cluster_topology_change(Mock())
+    @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    def test_on_cluster_topology_change(
+        self, _primary_endpoint, _update_relation_endpoints, _update_certificate
+    ):
+        # Mock the property value.
+        _primary_endpoint.side_effect = [None, "1.1.1.1"]
 
-        _update_relation_endpoints.assert_called_once_with()
-        _update_certificate.assert_called_once_with()
+        # Test without an elected primary.
+        self.charm._on_cluster_topology_change(Mock())
+        _update_relation_endpoints.assert_not_called()
+        _update_certificate.assert_called_once()
+        _update_certificate.reset_mock()
+
+        # Test with an elected primary.
+        self.charm._on_cluster_topology_change(Mock())
+        _update_relation_endpoints.assert_called_once()
+        _update_certificate.assert_called_once()
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -615,9 +689,10 @@ class TestCharm(unittest.TestCase):
 
         self.charm._on_cluster_topology_change(Mock())
 
-        _update_relation_endpoints.assert_called_once_with()
+        _update_relation_endpoints.assert_not_called()
         _update_certificate.assert_called_once_with()
-        _primary_endpoint.assert_called_once_with()
+        self.assertEqual(_primary_endpoint.call_count, 2)
+        _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
         self.assertEqual(self.harness.model.unit.status.message, NO_PRIMARY_MESSAGE)
 
@@ -637,5 +712,6 @@ class TestCharm(unittest.TestCase):
 
         _update_relation_endpoints.assert_called_once_with()
         _update_certificate.assert_called_once_with()
-        _primary_endpoint.assert_called_once_with()
+        self.assertEqual(_primary_endpoint.call_count, 2)
+        _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
