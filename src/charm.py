@@ -20,7 +20,6 @@ from charms.rolling_ops.v0.rollingops import RollingOpsManager
 from ops.charm import (
     ActionEvent,
     CharmBase,
-    ConfigChangedEvent,
     InstallEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
@@ -86,7 +85,6 @@ class PostgresqlOperatorCharm(CharmBase):
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
@@ -535,7 +533,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
         self._update_certificate()
         if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
@@ -555,7 +554,17 @@ class PostgresqlOperatorCharm(CharmBase):
         # Install the PostgreSQL and Patroni requirements packages.
         try:
             self._install_apt_packages(
-                event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
+                event,
+                [
+                    "pgbackrest",
+                    "postgresql",
+                    "postgresql-contrib",
+                    "postgresql-*-debversion",
+                    "postgresql-plpython*",
+                    "python-apt-dev",
+                    "python3-pip",
+                    "python3-psycopg2",
+                ],
             )
         except (subprocess.CalledProcessError, apt.PackageNotFoundError):
             self.unit.status = BlockedStatus("failed to install apt packages")
@@ -625,17 +634,6 @@ class PostgresqlOperatorCharm(CharmBase):
             self._update_relation_endpoints()
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
-
-    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
-        """Install additional packages through APT."""
-        try:
-            extra_packages = self.config.get("extra-packages")
-            if extra_packages:
-                self._install_apt_packages(event, extra_packages.split(" "))
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            logger.warning("failed to install apts packages")
-
-        self._update_certificate()
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
@@ -730,9 +728,6 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # Clear unit data if this unit is still replica.
-        self._update_relation_endpoints()
-
         # Member already started, so we can set an ActiveStatus.
         # This can happen after a reboot.
         if self._patroni.member_started:
@@ -816,7 +811,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.postgresql_client_relation.oversee_users()
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
@@ -825,6 +821,12 @@ class PostgresqlOperatorCharm(CharmBase):
             and self._patroni.member_replication_lag == "unknown"
         ):
             self._patroni.reinitialize_postgresql()
+            return
+
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
             return
 
         if "restoring-backup" in self.app_peer_data:

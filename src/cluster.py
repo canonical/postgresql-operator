@@ -336,6 +336,23 @@ class Patroni:
 
         return "unknown"
 
+    @property
+    def is_member_isolated(self) -> bool:
+        """Returns whether the unit is isolated from the cluster."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
+        except RetryError:
+            # Return False if it was not possible to get the cluster info. Try again later.
+            return False
+
+        return len(cluster_status.json()["members"]) == 0
+
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
