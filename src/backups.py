@@ -119,7 +119,7 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         try:
-            path = Path(f"{self.charm._storage_path}/pgdata")
+            path = Path(POSTGRESQL_DATA_PATH)
             if path.exists() and path.is_dir():
                 shutil.rmtree(path)
         except OSError as e:
