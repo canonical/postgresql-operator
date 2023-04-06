@@ -454,6 +454,68 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
+    @patch("charm.Patroni.restart_patroni")
+    @patch("charm.Patroni.is_member_isolated")
+    @patch("charm.Patroni.reinitialize_postgresql")
+    @patch("charm.Patroni.member_replication_lag", new_callable=PropertyMock)
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch("charm.PostgreSQLProvider.oversee_users")
+    def test_on_update_status(
+        self,
+        _oversee_users,
+        _update_relation_endpoints,
+        _member_started,
+        _member_replication_lag,
+        _reinitialize_postgresql,
+        _is_member_isolated,
+        _restart_patroni,
+        _set_primary_status_message,
+    ):
+        # Test before the cluster is initialised.
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
+        # Test after the cluster was initialised, but with the unit in a blocked state.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": "True"}
+            )
+        self.charm.unit.status = BlockedStatus("fake blocked status")
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
+        # Test with the unit in a status different that blocked.
+        self.charm.unit.status = ActiveStatus()
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_called_once()
+
+        # Test the reinitialisation of the replica when its lag is unknown
+        # after a restart.
+        _set_primary_status_message.reset_mock()
+        _member_started.return_value = False
+        _is_member_isolated.return_value = False
+        _member_replication_lag.return_value = "unknown"
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"postgresql_restarted": "True"}
+            )
+        self.charm.on.update_status.emit()
+        _reinitialize_postgresql.assert_called_once()
+        _restart_patroni.assert_not_called()
+        _set_primary_status_message.assert_not_called()
+
+        # Test call to restart when the member is isolated from the cluster.
+        _is_member_isolated.return_value = True
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"postgresql_restarted": ""}
+            )
+        self.charm.on.update_status.emit()
+        _restart_patroni.assert_called_once()
+
     @patch("charms.operator_libs_linux.v0.apt.add_package")
     @patch("charms.operator_libs_linux.v0.apt.update")
     def test_install_apt_packages(self, _update, _add_package):

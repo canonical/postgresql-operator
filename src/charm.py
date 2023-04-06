@@ -823,6 +823,12 @@ class PostgresqlOperatorCharm(CharmBase):
             self._patroni.reinitialize_postgresql()
             return
 
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
+            return
+
         if "restoring-backup" in self.app_peer_data:
             if "failed" in self._patroni.get_member_status(self._member_name):
                 self.unit.status = BlockedStatus("Failed to restore backup")
