@@ -29,7 +29,8 @@ def mocked_requests_get(*args, **kwargs):
     data = {
         "http://server1/cluster": {
             "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
-        }
+        },
+        "http://server4/cluster": {"members": []},
     }
     if args[0] in data:
         return MockResponse(data[args[0]])
@@ -137,6 +138,21 @@ class TestCluster(unittest.TestCase):
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = self.patroni.get_primary(unit_name_pattern=True)
         self.assertEqual(primary, "postgresql/0")
+
+    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
+    def test_is_member_isolated(self, _patroni_url, _get):
+        # Test when it wasn't possible to connect to the Patroni API.
+        _patroni_url.return_value = "http://server3"
+        self.assertFalse(self.patroni.is_member_isolated)
+
+        # Test when the member isn't isolated from the cluster.
+        _patroni_url.return_value = "http://server1"
+        self.assertFalse(self.patroni.is_member_isolated)
+
+        # Test when the member is isolated from the cluster.
+        _patroni_url.return_value = "http://server4"
+        self.assertTrue(self.patroni.is_member_isolated)
 
     @patch("os.chmod")
     @patch("os.chown")
