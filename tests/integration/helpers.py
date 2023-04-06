@@ -79,20 +79,22 @@ async def build_connection_string(
         return data.get("master")
 
 
-def change_master_start_timeout(ops_test: OpsTest, unit_name: str, seconds: Optional[int]) -> None:
-    """Change master start timeout configuration.
+def change_primary_start_timeout(
+    ops_test: OpsTest, unit_name: str, seconds: Optional[int]
+) -> None:
+    """Change primary start timeout configuration.
 
     Args:
         ops_test: ops_test instance.
         unit_name: the unit used to set the configuration.
-        seconds: number of seconds to set in master_start_timeout configuration.
+        seconds: number of seconds to set in primary_start_timeout configuration.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             unit_ip = get_unit_address(ops_test, unit_name)
             requests.patch(
                 f"https://{unit_ip}:8008/config",
-                json={"master_start_timeout": seconds},
+                json={"primary_start_timeout": seconds},
                 verify=False,
             )
 

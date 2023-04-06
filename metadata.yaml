@@ -7,6 +7,9 @@ description: |
 summary: |
   Charm to operate the PostgreSQL database on machines
 
+series:
+  - jammy
+
 peers:
   database-peers:
     interface: postgresql_peers
@@ -29,13 +32,7 @@ requires:
     interface: s3
     limit: 1
 
-resources:
-  patroni:
-    type: file
-    filename: patroni.tar.gz
-    description: Patroni python package.
-
 storage:
   pgdata:
     type: filesystem
-    location: /var/lib/postgresql/data
+    location: /var/snap/charmed-postgresql/common

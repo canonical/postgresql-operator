@@ -31,16 +31,12 @@ RELATION_NAME = "db"
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
     async with ops_test.fast_forward():
-        resources = {"patroni": "patroni.tar.gz"}
         await ops_test.model.deploy(
             charm,
-            resources=resources,
             application_name=DATABASE_APP_NAME,
             num_units=DATABASE_UNITS,
             series=CHARM_SERIES,
         )
-        # Attach the resource to the controller.
-        await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")
 
         # Wait until the PostgreSQL charm is successfully deployed.
         await ops_test.model.wait_for_idle(

@@ -1,8 +1,9 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import os
 import random
-import subprocess
 from pathlib import Path
+from tempfile import mkstemp
 from typing import Dict, Optional, Set
 
 import psycopg2
@@ -16,10 +17,10 @@ from tests.integration.helpers import get_unit_address
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
-PATRONI_SERVICE_DEFAULT_PATH = "/etc/systemd/system/patroni.service"
-TMP_SERVICE_PATH = "tests/integration/ha_tests/tmp.service"
-RESTART_DELAY = 60 * 3
-ORIGINAL_RESTART_DELAY = 30
+SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
+PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{SERVICE_NAME}"
+RESTART_CONDITION = "no"
+ORIGINAL_RESTART_CONDITION = "always"
 
 
 class MemberNotListedOnClusterError(Exception):
@@ -78,14 +79,14 @@ def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
     return resp.json()
 
 
-async def change_master_start_timeout(
+async def change_primary_start_timeout(
     ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
 ) -> None:
-    """Change master start timeout configuration.
+    """Change primary start timeout configuration.
 
     Args:
         ops_test: ops_test instance.
-        seconds: number of seconds to set in master_start_timeout configuration.
+        seconds: number of seconds to set in primary_start_timeout configuration.
         use_random_unit: whether to use a random unit (default is False,
             so it uses the primary)
     """
@@ -100,7 +101,7 @@ async def change_master_start_timeout(
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
-                json={"master_start_timeout": seconds},
+                json={"primary_start_timeout": seconds},
             )
 
 
@@ -191,14 +192,14 @@ async def fetch_cluster_members(ops_test: OpsTest):
     return member_ips
 
 
-async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
-    """Get the master start timeout configuration.
+async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
+    """Get the primary start timeout configuration.
 
     Args:
         ops_test: ops_test instance.
 
     Returns:
-        master start timeout in seconds or None if it's using the default value.
+        primary start timeout in seconds or None if it's using the default value.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -206,8 +207,8 @@ async def get_master_start_timeout(ops_test: OpsTest) -> Optional[int]:
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
-            master_start_timeout = configuration_info.json().get("master_start_timeout")
-            return int(master_start_timeout) if master_start_timeout is not None else None
+            primary_start_timeout = configuration_info.json().get("primary_start_timeout")
+            return int(primary_start_timeout) if primary_start_timeout is not None else None
 
 
 async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
@@ -306,7 +307,7 @@ async def get_primary(ops_test: OpsTest, app) -> str:
 async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
     """Returns the list of WAL segment files in each unit."""
     units = [unit.name for unit in ops_test.model.applications[app].units]
-    command = "ls -1 /var/lib/postgresql/data/pgdata/pg_wal/"
+    command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
     files = {}
     for unit in units:
         complete_command = f"run --unit {unit} -- {command}"
@@ -421,27 +422,28 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     return int(action.results["writes"])
 
 
-async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
-    """Updates the restart delay in the DB service file.
+async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
+    """Updates the restart condition in the DB service file.
 
     When the DB service fails it will now wait for `delay` number of seconds.
     """
     # Load the service file from the unit and update it with the new delay.
-    await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=TMP_SERVICE_PATH)
-    with open(TMP_SERVICE_PATH, "r") as patroni_service_file:
+    _, temp_path = mkstemp()
+    await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=temp_path)
+    with open(temp_path, "r") as patroni_service_file:
         patroni_service = patroni_service_file.readlines()
 
     for index, line in enumerate(patroni_service):
-        if "RestartSec" in line:
-            patroni_service[index] = f"RestartSec={delay}s\n"
+        if "Restart=" in line:
+            patroni_service[index] = f"Restart={condition}\n"
 
-    with open(TMP_SERVICE_PATH, "w") as service_file:
+    with open(temp_path, "w") as service_file:
         service_file.writelines(patroni_service)
 
     # Upload the changed file back to the unit, we cannot scp this file directly to
     # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
-    await unit.scp_to(source=TMP_SERVICE_PATH, destination="patroni.service")
+    await unit.scp_to(source=temp_path, destination="patroni.service")
     mv_cmd = (
         f"run --unit {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
     )
@@ -450,10 +452,14 @@ async def update_restart_delay(ops_test: OpsTest, unit, delay: int):
         raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
 
     # Remove temporary file from machine.
-    subprocess.call(["rm", TMP_SERVICE_PATH])
+    os.remove(temp_path)
 
     # Reload the daemon for systemd otherwise changes are not saved.
     reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
     return_code, _, _ = await ops_test.juju(*reload_cmd.split())
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
+    start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
+    await ops_test.juju(*start_cmd.split())
+
+    await postgresql_ready(ops_test, unit.name)

@@ -3,18 +3,23 @@
 
 import unittest
 from unittest import mock
-from unittest.mock import Mock, PropertyMock, mock_open, patch
+from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import requests as requests
 import tenacity as tenacity
+from charms.operator_libs_linux.v1 import snap
 from jinja2 import Template
 
 from cluster import Patroni
-from constants import REWIND_USER
-from lib.charms.operator_libs_linux.v0.apt import DebianPackage, PackageState
-from tests.helpers import STORAGE_PATH
+from constants import (
+    PATRONI_CONF_PATH,
+    PATRONI_LOGS_PATH,
+    POSTGRESQL_DATA_PATH,
+    REWIND_USER,
+)
 
 PATRONI_SERVICE = "patroni"
+CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/etc/postgresql/postgresql.conf"
 
 
 # This method will be used by the mock to replace requests.get
@@ -46,7 +51,6 @@ class TestCluster(unittest.TestCase):
         self.patroni = Patroni(
             "on",
             "1.1.1.1",
-            STORAGE_PATH,
             "postgresql",
             "postgresql-0",
             1,
@@ -102,15 +106,19 @@ class TestCluster(unittest.TestCase):
         ip = self.patroni.get_member_ip("other-member-name")
         self.assertIsNone(ip)
 
-    @patch("charms.operator_libs_linux.v0.apt.DebianPackage.from_system")
-    def test_get_postgresql_version(self, _from_system):
-        # Mock the package returned by from_system call.
-        _from_system.return_value = DebianPackage(
-            "postgresql", "12+214ubuntu0.1", "", "all", PackageState.Present
-        )
-        version = self.patroni._get_postgresql_version()
-        _from_system.assert_called_once_with("postgresql")
-        self.assertEqual(version, "12")
+    @patch("charm.snap.SnapClient")
+    def test_get_postgresql_version(self, _snap_client):
+        # TODO test a real implementation
+        _get_installed_snaps = _snap_client.return_value.get_installed_snaps
+        _get_installed_snaps.return_value = [
+            {"name": "something"},
+            {"name": "charmed-postgresql", "version": "14.0"},
+        ]
+        version = self.patroni.get_postgresql_version()
+
+        self.assertEqual(version, "14.0")
+        _snap_client.assert_called_once_with()
+        _get_installed_snaps.assert_called_once_with()
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._get_alternative_patroni_url")
@@ -175,55 +183,34 @@ class TestCluster(unittest.TestCase):
         # Check the rendered file is opened with "w+" mode.
         self.assertEqual(mock.call_args_list[0][0], (filename, "w+"))
         # Ensure that the correct user is lookup up.
-        _pwnam.assert_called_with("postgres")
+        _pwnam.assert_called_with("snap_daemon")
         # Ensure the file is chmod'd correctly.
         _chmod.assert_called_with(filename, 0o640)
         # Ensure the file is chown'd correctly.
         _chown.assert_called_with(filename, uid=35, gid=35)
 
+    @patch("charm.Patroni.get_postgresql_version")
     @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
-    def test_render_patroni_service_file(self, _, _render_file):
-        # Get the expected content from a file.
-        with open("templates/patroni.service.j2") as file:
-            template = Template(file.read())
-        expected_content = template.render(conf_path=STORAGE_PATH)
+    def test_render_patroni_yml_file(self, _, _render_file, _get_postgresql_version):
+        _get_postgresql_version.return_value = "14.7"
 
-        # Setup a mock for the `open` method, set returned data to patroni.service template.
-        with open("templates/patroni.service.j2", "r") as f:
-            mock = mock_open(read_data=f.read())
-
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            # Call the method
-            self.patroni._render_patroni_service_file()
-
-        # Check the template is opened read-only in the call to open.
-        self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.service.j2", "r"))
-        # Ensure the correct rendered template is sent to _render_file method.
-        _render_file.assert_called_once_with(
-            "/etc/systemd/system/patroni.service",
-            expected_content,
-            0o644,
-        )
-
-    @patch("charm.Patroni._get_postgresql_version")
-    @patch("charm.Patroni.render_file")
-    @patch("charm.Patroni._create_directory")
-    def test_render_patroni_yml_file(self, _, _render_file, __):
         # Define variables to render in the template.
         member_name = "postgresql-0"
         scope = "postgresql"
         superuser_password = "fake-superuser-password"
         replication_password = "fake-replication-password"
         rewind_password = "fake-rewind-password"
+        postgresql_version = "14"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
             archive_mode="on",
-            conf_path=STORAGE_PATH,
+            conf_path=PATRONI_CONF_PATH,
+            data_path=POSTGRESQL_DATA_PATH,
+            log_path=PATRONI_LOGS_PATH,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
@@ -233,7 +220,7 @@ class TestCluster(unittest.TestCase):
             replication_password=replication_password,
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
-            version=self.patroni._get_postgresql_version(),
+            version=postgresql_version,
             minority_count=self.patroni.planned_units // 2,
         )
 
@@ -250,30 +237,44 @@ class TestCluster(unittest.TestCase):
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
-            f"{STORAGE_PATH}/patroni.yml",
+            "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
             0o644,
         )
 
-    @patch("cluster.service_start")
-    @patch("cluster.service_running")
-    @patch("cluster.service_resume")
+    @patch("charm.snap.SnapCache")
     @patch("charm.Patroni._create_directory")
-    def test_start_patroni(
-        self, _create_directory, _service_resume, _service_running, _service_start
-    ):
-        _service_running.side_effect = [True, False]
+    def test_start_patroni(self, _create_directory, _snap_cache):
+        _cache = _snap_cache.return_value
+        _selected_snap = _cache.__getitem__.return_value
+        _selected_snap.start.side_effect = [None, snap.SnapError]
 
         # Test a success scenario.
-        success = self.patroni.start_patroni()
-        _service_start.assert_called_with(PATRONI_SERVICE)
-        _service_resume.assert_called_with(PATRONI_SERVICE)
-        _service_running.assert_called_with(PATRONI_SERVICE)
-        assert success
+        assert self.patroni.start_patroni()
+        _cache.__getitem__.assert_called_once_with("charmed-postgresql")
+        _selected_snap.start.assert_called_once_with(services=[PATRONI_SERVICE])
 
         # Test a fail scenario.
-        success = self.patroni.start_patroni()
-        assert not success
+        assert not self.patroni.start_patroni()
+
+    @patch("charm.snap.SnapCache")
+    @patch("charm.Patroni._create_directory")
+    def test_stop_patroni(self, _create_directory, _snap_cache):
+        _cache = _snap_cache.return_value
+        _selected_snap = _cache.__getitem__.return_value
+        _selected_snap.stop.side_effect = [None, snap.SnapError]
+        _selected_snap.services.__getitem__.return_value.__getitem__.return_value = False
+
+        # Test a success scenario.
+        assert self.patroni.stop_patroni()
+        _cache.__getitem__.assert_called_once_with("charmed-postgresql")
+        _selected_snap.stop.assert_called_once_with(services=[PATRONI_SERVICE])
+        _selected_snap.services.__getitem__.return_value.__getitem__.assert_called_once_with(
+            "active"
+        )
+
+        # Test a fail scenario.
+        assert not self.patroni.stop_patroni()
 
     @mock.patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
@@ -323,3 +324,36 @@ class TestCluster(unittest.TestCase):
         _patch.assert_called_once_with(
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
+
+    @patch("cluster.Patroni._create_user_home_directory")
+    @patch("os.chmod")
+    @patch("builtins.open")
+    @patch("os.chown")
+    @patch("pwd.getpwnam")
+    def test_configure_patroni_on_unit(
+        self,
+        _getpwnam,
+        _chown,
+        _open,
+        _chmod,
+        _create_user_home_directory,
+    ):
+        _getpwnam.return_value.pw_uid = sentinel.uid
+        _getpwnam.return_value.pw_gid = sentinel.gid
+
+        self.patroni.configure_patroni_on_unit()
+
+        _getpwnam.assert_called_once_with("snap_daemon")
+
+        _chown.assert_any_call(
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            uid=sentinel.uid,
+            gid=sentinel.gid,
+        )
+
+        _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
+        _chmod.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
+        )
+
+        _create_user_home_directory.assert_called_once_with()

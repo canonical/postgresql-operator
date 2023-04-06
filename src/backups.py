@@ -24,7 +24,17 @@ from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
-from constants import BACKUP_ID_FORMAT, BACKUP_USER, PGBACKREST_BACKUP_ID_FORMAT
+from constants import (
+    BACKUP_ID_FORMAT,
+    BACKUP_USER,
+    PATRONI_CONF_PATH,
+    PGBACKREST_BACKUP_ID_FORMAT,
+    PGBACKREST_CONF_PATH,
+    PGBACKREST_CONFIGURATION_FILE,
+    PGBACKREST_EXECUTABLE,
+    PGBACKREST_LOGS_PATH,
+    POSTGRESQL_DATA_PATH,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -63,9 +73,6 @@ class PostgreSQLBackups(Object):
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
-        if "stanza" not in self.charm._peers.data[self.charm.unit]:
-            return False, "Stanza was not initialised"
-
         return True, None
 
     def _can_unit_perform_backup(self) -> Tuple[bool, Optional[str]]:
@@ -81,6 +88,9 @@ class PostgreSQLBackups(Object):
 
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
+
+        if "stanza" not in self.charm.app_peer_data:
+            return False, "Stanza was not initialised"
 
         return self._are_backup_settings_ok()
 
@@ -109,7 +119,7 @@ class PostgreSQLBackups(Object):
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
         try:
-            path = Path("/var/lib/postgresql/data/pgdata")
+            path = Path(POSTGRESQL_DATA_PATH)
             if path.exists() and path.is_dir():
                 shutil.rmtree(path)
         except OSError as e:
@@ -119,12 +129,15 @@ class PostgreSQLBackups(Object):
         return True
 
     def _execute_command(
-        self, command: List[str], command_input: bytes = None
+        self,
+        command: List[str],
+        command_input: bytes = None,
+        timeout: int = None,
     ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
         def demote():
-            pw_record = pwd.getpwnam("postgres")
+            pw_record = pwd.getpwnam("snap_daemon")
 
             def result():
                 os.setgid(pw_record.pw_gid)
@@ -132,7 +145,14 @@ class PostgreSQLBackups(Object):
 
             return result
 
-        process = run(command, input=command_input, stdout=PIPE, stderr=PIPE, preexec_fn=demote())
+        process = run(
+            command,
+            input=command_input,
+            stdout=PIPE,
+            stderr=PIPE,
+            preexec_fn=demote(),
+            timeout=timeout,
+        )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
 
     def _format_backup_list(self, backup_list) -> str:
@@ -152,7 +172,7 @@ class PostgreSQLBackups(Object):
         """
         backup_list = []
         return_code, output, stderr = self._execute_command(
-            ["pgbackrest", "info", "--output=json"]
+            [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"]
         )
         if return_code != 0:
             raise ListBackupsError(f"Failed to list backups with error: {stderr}")
@@ -181,7 +201,7 @@ class PostgreSQLBackups(Object):
                 in the S3 bucket.
         """
         return_code, output, stderr = self._execute_command(
-            ["pgbackrest", "info", "--output=json"]
+            [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"]
         )
         if return_code != 0:
             raise ListBackupsError(f"Failed to list backups with error: {stderr}")
@@ -203,6 +223,9 @@ class PostgreSQLBackups(Object):
         located, how it will be backed up, archiving options, etc. (more info in
         https://pgbackrest.org/user-guide.html#quickstart/configure-stanza).
         """
+        if not self.charm.unit.is_leader():
+            return
+
         if self.charm.is_blocked:
             logger.warning("couldn't initialize stanza due to a blocked status")
             return
@@ -211,7 +234,12 @@ class PostgreSQLBackups(Object):
 
         # Create the stanza.
         return_code, _, stderr = self._execute_command(
-            ["pgbackrest", f"--stanza={self.charm.cluster_name}", "stanza-create"]
+            [
+                PGBACKREST_EXECUTABLE,
+                PGBACKREST_CONFIGURATION_FILE,
+                f"--stanza={self.charm.cluster_name}",
+                "stanza-create",
+            ]
         )
         if return_code != 0:
             logger.error(stderr)
@@ -219,7 +247,7 @@ class PostgreSQLBackups(Object):
             return
 
         # Store the stanza name to be used in configurations updates.
-        self.charm._peers.data[self.charm.unit].update({"stanza": self.charm.cluster_name})
+        self.charm.app_peer_data.update({"stanza": self.charm.cluster_name})
 
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
@@ -228,9 +256,15 @@ class PostgreSQLBackups(Object):
             # Check that the stanza is correctly configured.
             for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
                 with attempt:
-                    self.charm._patroni.reload_patroni_configuration()
+                    if self.charm._patroni.member_started:
+                        self.charm._patroni.reload_patroni_configuration()
                     return_code, _, stderr = self._execute_command(
-                        ["pgbackrest", f"--stanza={self.charm.cluster_name}", "check"]
+                        [
+                            PGBACKREST_EXECUTABLE,
+                            PGBACKREST_CONFIGURATION_FILE,
+                            f"--stanza={self.charm.cluster_name}",
+                            "check",
+                        ]
                     )
                     if return_code != 0:
                         raise Exception(stderr)
@@ -248,14 +282,10 @@ class PostgreSQLBackups(Object):
             event.defer()
             return
 
-        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
-        if missing_parameters:
-            logger.warning(
-                f"Cannot set pgBackRest configurations due to missing S3 parameters: {missing_parameters}"
-            )
+        if not self._render_pgbackrest_conf_file():
+            logger.debug("Cannot set pgBackRest configurations, missing configurations.")
             return
 
-        self._render_pgbackrest_conf_file(s3_parameters)
         self._initialise_stanza()
 
     def _on_create_backup_action(self, event) -> None:
@@ -297,7 +327,8 @@ class PostgreSQLBackups(Object):
 
         return_code, stdout, stderr = self._execute_command(
             [
-                "pgbackrest",
+                PGBACKREST_EXECUTABLE,
+                PGBACKREST_CONFIGURATION_FILE,
                 f"--stanza={self.charm.cluster_name}",
                 "--log-level-console=debug",
                 "--type=full",
@@ -429,13 +460,14 @@ Stderr:
         logger.info("Removing previous cluster information")
         return_code, _, stderr = self._execute_command(
             [
-                "patronictl",
+                "charmed-postgresql.patronictl",
                 "-c",
-                f"{self.charm._storage_path}/patroni.yml",
+                f"{PATRONI_CONF_PATH}/patroni.yaml",
                 "remove",
                 self.charm.cluster_name,
             ],
             command_input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
+            timeout=10,
         )
         if return_code != 0:
             logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
@@ -470,16 +502,31 @@ Stderr:
             event.fail(error_message)
             return False
 
+        logger.info("Checking that this unit was already elected the leader unit")
+        if not self.charm.unit.is_leader():
+            error_message = "Unit cannot restore backup as it was not elected the leader unit yet"
+            logger.warning(error_message)
+            event.fail(error_message)
+            return False
+
         return True
 
-    def _render_pgbackrest_conf_file(self, s3_parameters: Dict) -> None:
-        """Render the pgBackRest configuration file."""
+    def _render_pgbackrest_conf_file(self) -> bool:
         # Open the template pgbackrest.conf file.
+        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
+        if missing_parameters:
+            logger.warning(
+                f"Cannot set pgBackRest configurations due to missing S3 parameters: {missing_parameters}"
+            )
+            return False
+
         with open("templates/pgbackrest.conf.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
             path=s3_parameters["path"],
+            data_path=f"{POSTGRESQL_DATA_PATH}",
+            log_path=f"{PGBACKREST_LOGS_PATH}",
             region=s3_parameters.get("region"),
             endpoint=s3_parameters["endpoint"],
             bucket=s3_parameters["bucket"],
@@ -487,11 +534,13 @@ Stderr:
             access_key=s3_parameters["access-key"],
             secret_key=s3_parameters["secret-key"],
             stanza=self.charm.cluster_name,
+            storage_path=self.charm._storage_path,
             user=BACKUP_USER,
         )
         # Render pgBackRest config file.
-        filename = "/etc/pgbackrest.conf"
-        self.charm._patroni.render_file(filename, rendered, 0o640)
+        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
+
+        return True
 
     def _restart_database(self) -> None:
         """Removes the restoring backup flag and restart the database."""
