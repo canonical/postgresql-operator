@@ -90,7 +90,12 @@ class TestDbProvides(unittest.TestCase):
     )
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     def test_on_relation_changed(
-        self, _member_started, _primary_endpoint, _defer, _new_password, _update_endpoints
+        self,
+        _member_started,
+        _primary_endpoint,
+        _defer,
+        _new_password,
+        _update_endpoints,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.
@@ -135,13 +140,10 @@ class TestDbProvides(unittest.TestCase):
 
             # Assert that the relation data was updated correctly.
             self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, self.app),
+                self.harness.get_relation_data(self.rel_id, self.unit),
                 {
-                    "allowed-units": "application/0",
                     "database": DATABASE,
                     "password": "test-password",
-                    "port": DATABASE_PORT,
-                    "user": user,
                     "version": POSTGRESQL_VERSION,
                 },
             )
@@ -306,21 +308,12 @@ class TestDbProvides(unittest.TestCase):
         # the right relation databags (the app and unit databags from the event).
         self.legacy_db_relation.update_endpoints(mock_event)
         for rel_id in [self.rel_id, self.another_rel_id]:
-            # Get the relation data and set the expected username based on the relation id.
-            relation_data = self.harness.get_relation_data(rel_id, self.app)
+            # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
 
             # Set the assert function based on each relation (whether it should have data).
             assert_based_on_relation = (
                 self.assertTrue if rel_id == self.rel_id else self.assertFalse
-            )
-
-            # Check that the application relation databag contains (or not) the endpoints.
-            assert_based_on_relation(
-                "master" in relation_data and master + user == relation_data["master"]
-            )
-            assert_based_on_relation(
-                "standbys" in relation_data and standbys + user == relation_data["standbys"]
             )
 
             # Check that the unit relation databag contains (or not) the endpoints.
@@ -336,8 +329,7 @@ class TestDbProvides(unittest.TestCase):
         # Also test with only a primary instance.
         self.legacy_db_relation.update_endpoints(mock_event)
         for rel_id in [self.rel_id, self.another_rel_id]:
-            # Get the relation data and set the expected username based on the relation id.
-            relation_data = self.harness.get_relation_data(rel_id, self.app)
+            # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
 
             # Set the assert function based on each relation (whether it should have data).
@@ -345,18 +337,15 @@ class TestDbProvides(unittest.TestCase):
                 self.assertTrue if rel_id == self.rel_id else self.assertFalse
             )
 
-            # Check that the application relation databag contains (or not) the endpoints.
-            assert_based_on_relation(
-                "master" in relation_data and master + user == relation_data["master"]
-            )
-            self.assertTrue("standbys" not in relation_data)
-
-            # Check that the unit relation databag contains only the read/write (master) endpoints.
+            # Check that the unit relation databag contains the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
             assert_based_on_relation(
                 "master" in unit_relation_data and master + user == unit_relation_data["master"]
             )
-            self.assertTrue("standbys" not in unit_relation_data)
+            assert_based_on_relation(
+                "standbys" in unit_relation_data
+                and standbys + user == unit_relation_data["standbys"]
+            )
 
     @patch(
         "charm.DbProvides._get_state",
@@ -424,15 +413,8 @@ class TestDbProvides(unittest.TestCase):
         # Update the endpoints and check that all relations' databags are updated.
         self.legacy_db_relation.update_endpoints()
         for rel_id in [self.rel_id, self.another_rel_id]:
-            # Get the relation data and set the expected username based on the relation id.
-            relation_data = self.harness.get_relation_data(rel_id, self.app)
+            # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
-
-            # Check that the application relation databag contains the endpoints.
-            self.assertTrue("master" in relation_data and master + user == relation_data["master"])
-            self.assertTrue(
-                "standbys" in relation_data and standbys + user == relation_data["standbys"]
-            )
 
             # Check that the unit relation databag contains the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
@@ -447,17 +429,15 @@ class TestDbProvides(unittest.TestCase):
         # Also test with only a primary instance.
         self.legacy_db_relation.update_endpoints()
         for rel_id in [self.rel_id, self.another_rel_id]:
-            # Get the relation data and set the expected username based on the relation id.
-            relation_data = self.harness.get_relation_data(rel_id, self.app)
+            # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
 
-            # Check that the application relation databag contains the endpoints.
-            self.assertTrue("master" in relation_data and master + user == relation_data["master"])
-            self.assertTrue("standbys" not in relation_data)
-
-            # Check that the unit relation databag contains only the read/write (master) endpoints.
+            # Check that the unit relation databag contains the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
             self.assertTrue(
                 "master" in unit_relation_data and master + user == unit_relation_data["master"]
             )
-            self.assertTrue("standbys" not in unit_relation_data)
+            self.assertTrue(
+                "standbys" in unit_relation_data
+                and standbys + user == unit_relation_data["standbys"]
+            )
