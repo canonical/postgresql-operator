@@ -519,6 +519,22 @@ class Patroni:
         """Reload Patroni configuration after it was changed."""
         requests.post(f"{self._patroni_url}/reload", verify=self.verify)
 
+    def restart_patroni(self) -> bool:
+        """Restart Patroni.
+
+        Returns:
+            Whether the service restarted successfully.
+        """
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.restart(services=["patroni"])
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = "Failed to start patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return False
+
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
