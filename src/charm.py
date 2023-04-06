@@ -50,6 +50,7 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    PATRONI_CONF_PATH,
     PEER,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
@@ -426,7 +427,6 @@ class PostgresqlOperatorCharm(CharmBase):
         return Patroni(
             self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
-            self._storage_path,
             self.cluster_name,
             self._member_name,
             self.app.planned_units(),
@@ -913,11 +913,11 @@ class PostgresqlOperatorCharm(CharmBase):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CA_FILE}", ca, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         self.update_config()
 

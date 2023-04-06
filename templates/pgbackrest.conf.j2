@@ -1,6 +1,5 @@
 [global]
-lock-path=/var/snap/charmed-postgresql/common/locks
-log-path=/var/snap/charmed-postgresql/common/logs
+log-path={{ log_path }}
 repo1-retention-full=9999999
 repo1-type=s3
 repo1-path={{ path }}
@@ -13,6 +12,6 @@ repo1-s3-key-secret={{ secret_key }}
 start-fast=y
 
 [{{ stanza }}]
-pg1-path=/var/snap/charmed-postgresql/common/postgresql/pgdata
-pg1-socket-path=/var/snap/charmed-postgresql/common/postgresql
+pg1-path={{ data_path }}
+pg1-socket-path=/tmp
 pg1-user={{ user }}

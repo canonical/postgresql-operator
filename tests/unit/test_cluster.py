@@ -11,11 +11,15 @@ from charms.operator_libs_linux.v1 import snap
 from jinja2 import Template
 
 from cluster import Patroni
-from constants import REWIND_USER
-from tests.helpers import STORAGE_PATH
+from constants import (
+    PATRONI_CONF_PATH,
+    PATRONI_LOGS_PATH,
+    POSTGRESQL_DATA_PATH,
+    REWIND_USER,
+)
 
 PATRONI_SERVICE = "patroni"
-CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/postgresql/postgresql.conf"
+CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/etc/postgresql/postgresql.conf"
 
 
 # This method will be used by the mock to replace requests.get
@@ -46,7 +50,6 @@ class TestCluster(unittest.TestCase):
         self.patroni = Patroni(
             "on",
             "1.1.1.1",
-            STORAGE_PATH,
             "postgresql",
             "postgresql-0",
             1,
@@ -189,7 +192,9 @@ class TestCluster(unittest.TestCase):
             template = Template(file.read())
         expected_content = template.render(
             archive_mode="on",
-            conf_path=STORAGE_PATH,
+            conf_path=PATRONI_CONF_PATH,
+            data_path=POSTGRESQL_DATA_PATH,
+            log_path=PATRONI_LOGS_PATH,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
@@ -216,7 +221,7 @@ class TestCluster(unittest.TestCase):
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/postgresql/patroni.yaml",
+            "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
             0o644,
         )
@@ -306,67 +311,33 @@ class TestCluster(unittest.TestCase):
 
     @patch("cluster.Patroni._create_user_home_directory")
     @patch("os.chmod")
-    @patch("os.symlink")
-    @patch("os.remove")
-    @patch("os.path.isfile", return_value=True)
     @patch("builtins.open")
-    @patch("os.path.dirname")
-    @patch("os.makedirs")
     @patch("os.chown")
     @patch("pwd.getpwnam")
     def test_configure_patroni_on_unit(
         self,
         _getpwnam,
         _chown,
-        _makedirs,
-        _dirname,
         _open,
-        _isfile,
-        _remove,
-        _symlink,
         _chmod,
         _create_user_home_directory,
     ):
         _getpwnam.return_value.pw_uid = sentinel.uid
         _getpwnam.return_value.pw_gid = sentinel.gid
-        _dirname.return_value = sentinel.dirname
 
         self.patroni.configure_patroni_on_unit()
 
-        assert _getpwnam.call_count == 3
-        _getpwnam.assert_any_call("snap_daemon")
+        _getpwnam.assert_called_once_with("snap_daemon")
 
-        assert _chown.call_count == 3
         _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/postgresql", uid=sentinel.uid, gid=sentinel.gid
-        )
-        _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/locks", uid=sentinel.uid, gid=sentinel.gid
-        )
-        _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/logs", uid=sentinel.uid, gid=sentinel.gid
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            uid=sentinel.uid,
+            gid=sentinel.gid,
         )
 
-        assert _makedirs.call_count == 3
-        _makedirs.assert_any_call(sentinel.dirname, mode=493, exist_ok=True)
-        _makedirs.assert_any_call(
-            "/var/snap/charmed-postgresql/common/locks", mode=493, exist_ok=True
-        )
-        _makedirs.assert_any_call(
-            "/var/snap/charmed-postgresql/common/logs", mode=493, exist_ok=True
-        )
-
-        _dirname.assert_called_once_with(CREATE_CLUSTER_CONF_PATH)
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
-        _isfile.assert_called_once_with("/var/snap/charmed-postgresql/current/etc/patroni.yaml")
-        _remove.assert_called_once_with("/var/snap/charmed-postgresql/current/etc/patroni.yaml")
-        _symlink.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/postgresql/patroni.yaml",
-            "/var/snap/charmed-postgresql/current/etc/patroni.yaml",
+        _chmod.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
         )
-        assert _chmod.call_count == 3
-        _chmod.assert_any_call("/var/snap/charmed-postgresql/common/locks", 493)
-        _chmod.assert_any_call("/var/snap/charmed-postgresql/common/logs", 493)
-        _chmod.assert_any_call("/var/snap/charmed-postgresql/common/postgresql", 488)
 
         _create_user_home_directory.assert_called_once_with()

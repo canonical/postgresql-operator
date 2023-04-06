@@ -27,9 +27,13 @@ from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from constants import (
     BACKUP_ID_FORMAT,
     BACKUP_USER,
+    PATRONI_CONF_PATH,
     PGBACKREST_BACKUP_ID_FORMAT,
+    PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     PGBACKREST_EXECUTABLE,
+    PGBACKREST_LOGS_PATH,
+    POSTGRESQL_DATA_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -458,7 +462,7 @@ Stderr:
             [
                 "charmed-postgresql.patronictl",
                 "-c",
-                "/var/snap/charmed-postgresql/current/etc/patroni.yaml",
+                f"{PATRONI_CONF_PATH}/patroni.yaml",
                 "remove",
                 self.charm.cluster_name,
             ],
@@ -521,6 +525,8 @@ Stderr:
         # Render the template file with the correct values.
         rendered = template.render(
             path=s3_parameters["path"],
+            data_path=f"{POSTGRESQL_DATA_PATH}",
+            log_path=f"{PGBACKREST_LOGS_PATH}",
             region=s3_parameters.get("region"),
             endpoint=s3_parameters["endpoint"],
             bucket=s3_parameters["bucket"],
@@ -532,9 +538,7 @@ Stderr:
             user=BACKUP_USER,
         )
         # Render pgBackRest config file.
-        self.charm._patroni.render_file(
-            "/var/snap/charmed-postgresql/current/etc/pgbackrest.conf", rendered, 0o644
-        )
+        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
 
         return True
 
