@@ -12,7 +12,7 @@ namespace: /db/
 name: {{ member_name }}
 
 log:
-  dir: /var/log/postgresql
+  dir: {{ log_path }}
 
 restapi:
   listen: '{{ self_ip }}:8008'
@@ -58,16 +58,17 @@ bootstrap:
         synchronous_commit: on
         synchronous_standby_names: "*"
         {%- if enable_pgbackrest %}
-        archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
+        archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
         {% else %}
         archive_command: /bin/true
         {%- endif %}
         archive_mode: {{ archive_mode }}
         wal_level: logical
+
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
-    command: pgbackrest --stanza={{ stanza }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} --set={{ backup_id }} --type=immediate --target-action=promote restore
     no_params: True
     keep_existing_recovery_conf: True
   {% else %}
@@ -80,11 +81,11 @@ postgresql:
   listen: '{{ self_ip }}:5432'
   connect_address: '{{ self_ip }}:5432'
   # Path to PostgreSQL binaries used in the database bootstrap process.
-  bin_dir: /usr/lib/postgresql/{{ version }}/bin/
-  data_dir: {{ conf_path }}/pgdata
+  bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
+  data_dir: {{ data_path }}
   parameters:
     {%- if enable_pgbackrest %}
-    archive_command: 'pgbackrest --stanza={{ stanza }} archive-push %p'
+    archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
     archive_command: /bin/true
     {%- endif %}
@@ -94,6 +95,7 @@ postgresql:
     ssl_cert_file: {{ conf_path }}/cert.pem
     ssl_key_file: {{ conf_path }}/key.pem
     {%- endif %}
+    unix_socket_directories: /tmp
   pgpass: /tmp/pgpass
   pg_hba:
     - local all backup peer map=operator
@@ -104,7 +106,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
     {% endfor %}
   pg_ident:
-  - operator postgres backup
+  - operator snap_daemon backup
   authentication:
     replication:
       username: replication
