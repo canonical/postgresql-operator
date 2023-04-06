@@ -22,4 +22,3 @@ Here’s an overview of the steps required with links to our separate tutorials 
 * [Relate your PostgreSQL to other applications](/t/charmed-postgresql-tutorial-integrations/9701?channel=edge)
 * [Enable security](/t/charmed-postgresql-tutorial-enable-security/9699?channel=edge)
 * [Cleanup your environment](/t/charmed-postgresql-tutorial-cleanup-environment/9695?channel=edge)
-

@@ -1,6 +1,6 @@
 # Get a Charmed PostgreSQL up and running
 
-This is part of the [Charmed PostgreSQL Tutorial](TODO). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
 
 ## Deploy Charmed PostgreSQL
 

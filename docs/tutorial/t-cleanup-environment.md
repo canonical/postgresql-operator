@@ -1,6 +1,6 @@
 # Cleanup and extra info
 
-This is part of the [Charmed PostgreSQL Tutorial](TODO). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
 
 ## Remove Multipass VM
 If you're done with testing and would like to free up resources on your machine, just remove Multipass VM.
@@ -18,4 +18,3 @@ In this tutorial we've successfully deployed PostgreSQL, added/removed cluster m
 - [Report](https://github.com/canonical/postgresql-operator/issues) any problems you encountered.
 - [Give us your feedback](https://chat.charmhub.io/charmhub/channels/data-platform).
 - [Contribute to the code base](https://github.com/canonical/postgresql-operator)
-
