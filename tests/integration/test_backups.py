@@ -159,7 +159,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, cloud_configs: Tuple[Di
         )
 
         # Run the "list backups" action.
-        unit_name = f"{database_app_name}/0"
+        unit_name = f"{database_app_name}/1"
         logger.info("listing the available backups")
         action = await ops_test.model.units.get(unit_name).run_action("list-backups")
         await action.wait()
