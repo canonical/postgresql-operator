@@ -126,7 +126,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         connection.close()
 
         # Remove the database app.
-        await ops_test.model.applications[database_app_name].remove()
+        await ops_test.model.remove_application(database_app_name, block_until_done=True)
 
 
 async def test_restore_on_new_cluster(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
