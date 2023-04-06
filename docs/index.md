@@ -21,32 +21,29 @@ Charmed PostgreSQL is an official distribution of PostgreSQL. It’s an open-sou
 
 # Navigation
 
-| Level | Path                          | Navlink                                                       |
-|-------|-------------------------------|---------------------------------------------------------------|
-| 1     | tutorial                      | [Tutorial]()                                                  |
-| 2     | t-overview                    | [1. Introduction](TODO)                                       |
-| 2     | t-setup-environment           | [2. Set up the environment](TODO)                             |
-| 2     | t-deploy-postgresql           | [3. Deploy PostgreSQL](TODO)                                  |
-| 2     | t-managing-units              | [4. Manage your units](TODO)                                  |
-| 2     | t-manage-passwords            | [5. Manage passwords](TODO)                                   |
-| 2     | t-integrations                | [6. Relate your PostgreSQL to other applications](TODO)       |
-| 2     | t-enable-security             | [7. Enable security](TODO)                                    |
-| 2     | t-cleanup-environment         | [8. Cleanup your environment](TODO)                           |
-| 1     | how-to                        | [How To]()                                                    |
-| 2     | h-manage-units                | [Manage units](TODO)                                          |
-| 2     | h-enable-encryption           | [Enable encryption](TODO)                                     |
-| 2     | h-manage-app                  | [Manage applications](TODO)                                   |
-| 2     | h-configure-s3                | [Configure S3](TODO)                                          |
-| 2     | h-create-and-list-backups     | [Create and List Backups](TODO)                               |
-| 2     | h-restore-backup              | [Restore a Backup](TODO)                                      |
-| 2     | h-migrate-cluster-via-restore | [Cluster Migration with Restore](TODO)                        |
-| 1     | reference                     | [Reference]()                                                 |
-| 2     | r-requirements                | [Requirements](TODO)                                          |
-| 2     | r-charm                       | [Charm API](TODO)                                             |
-| 2     | r-peers                       | [Peer Relation](TODO)                                         |
-| 2     | r-actions                     | [Actions](https://charmhub.io/postgresql/actions)             |
-| 2     | r-configurations              | [Configurations](https://charmhub.io/postgresql/configure)    |
-| 2     | r-libraries                   | [Libraries](https://charmhub.io/postgresql/libraries/helpers) |
+| Level | Path                          | Navlink                                                                                             |
+|-------|-------------------------------|-----------------------------------------------------------------------------------------------------|
+| 1     | tutorial                      | [Tutorial]()                                                                                        |
+| 2     | t-overview                    | [1. Introduction](/t/charmed-postgresql-tutorial-overview/9707)                                     |
+| 2     | t-setup-environment           | [2. Set up the environment](/t/charmed-postgresql-tutorial-setup-environment/9709)                  |
+| 2     | t-deploy-postgresql           | [3. Deploy PostgreSQL](/t/charmed-postgresql-tutorial-deploy-postgresql/9697)                       |
+| 2     | t-managing-units              | [4. Manage your units](/t/charmed-postgresql-tutorial-managing-units/9705)                          |
+| 2     | t-manage-passwords            | [5. Manage passwords](/t/charmed-postgresql-tutorial-manage-passwords/9703)                         |
+| 2     | t-integrations                | [6. Relate your PostgreSQL to other applications](/t/charmed-postgresql-tutorial-integrations/9701) |
+| 2     | t-enable-security             | [7. Enable security](/t/charmed-postgresql-tutorial-enable-security/9699)                           |
+| 2     | t-cleanup-environment         | [8. Cleanup your environment](/t/charmed-postgresql-tutorial-cleanup-environment/9695)              |
+| 1     | how-to                        | [How To]()                                                                                          |
+| 2     | h-manage-units                | [Manage units](/t/charmed-postgresql-how-to-manage-units/9689)                                      |
+| 2     | h-enable-encryption           | [Enable encryption](/t/charmed-postgresql-how-to-enable-encryption/9685)                            |
+| 2     | h-manage-app                  | [Manage applications](/t/charmed-postgresql-how-to-manage-app/9687)                                 |
+| 2     | h-configure-s3                | [Configure S3](/t/charmed-postgresql-how-to-configure-s3/9681)                                      |
+| 2     | h-create-and-list-backups     | [Create and List Backups](/t/charmed-postgresql-how-to-create-and-list-backups/9683)                |
+| 2     | h-restore-backup              | [Restore a Backup](/t/charmed-postgresql-how-to-restore-backup/9693)                                |
+| 2     | h-migrate-cluster-via-restore | [Cluster Migration with Restore](/t/charmed-postgresql-how-to-migrate-cluster-via-restore/9691)     |
+| 1     | reference                     | [Reference]()                                                                                       |
+| 2     | r-actions                     | [Actions](https://charmhub.io/postgresql/actions)                                                   |
+| 2     | r-configurations              | [Configurations](https://charmhub.io/postgresql/configure)                                          |
+| 2     | r-libraries                   | [Libraries](https://charmhub.io/postgresql/libraries/helpers)                                       |
 
 # Redirects
 
