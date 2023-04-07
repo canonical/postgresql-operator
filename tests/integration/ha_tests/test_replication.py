@@ -6,8 +6,15 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.ha_tests.conftest import APPLICATION_NAME
-from tests.integration.ha_tests.helpers import METADATA, app_name
-from tests.integration.helpers import CHARM_SERIES, get_primary
+from tests.integration.ha_tests.helpers import (
+    METADATA,
+    app_name,
+    check_writes,
+    fetch_cluster_members,
+    secondary_up_to_date,
+    start_continuous_writes,
+)
+from tests.integration.helpers import CHARM_SERIES, get_primary, scale_application
 
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
@@ -44,8 +51,10 @@ async def test_reelection(ops_test: OpsTest, continuous_writes) -> None:
     """Kill primary unit, check reelection."""
     app = await app_name(ops_test)
     if len(ops_test.model.applications[app].units) < 3:
-        await ops_test.model.applications[app].add_unit(count=1)
-        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
+        await scale_application(ops_test, app, 3)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
 
     unit_name = [unit.name for unit in ops_test.model.applications[app].units][0]
     primary_name = await get_primary(ops_test, unit_name)
@@ -55,9 +64,27 @@ async def test_reelection(ops_test: OpsTest, continuous_writes) -> None:
     new_primary_name = await get_primary(ops_test, unit_name)
     assert new_primary_name != primary_name, "primary reelection haven't happened"
 
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await check_writes(ops_test)
+
+    # Verify that old primary is up-to-date.
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != new_primary_name:
+            assert await secondary_up_to_date(
+                ops_test, unit_name, total_expected_writes
+            ), "secondary not up to date with the cluster after restarting."
+
 
 async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     """Write to primary, read data from secondaries (check consistency)."""
+    app = await app_name(ops_test)
+    if len(ops_test.model.applications[app].units) < 3:
+        await scale_application(ops_test, app, 3)
 
 
 async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous_writes) -> None:
