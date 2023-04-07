@@ -114,7 +114,7 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
+@pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
@@ -374,3 +374,11 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     assert await secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
+
+
+async def test_delete_and_recreate_cluster(ops_test: OpsTest, continuous_writes) -> None:
+    pass
+
+
+async def test_network_cut(ops_test: OpsTest, continuous_writes) -> None:
+    pass
