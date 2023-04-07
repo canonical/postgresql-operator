@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import os
 import random
+import subprocess
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Dict, Optional, Set
@@ -10,7 +11,14 @@ import psycopg2
 import requests
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
+from tenacity import (
+    RetryError,
+    Retrying,
+    retry,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
 
 from tests.integration.helpers import get_unit_address
 
@@ -171,6 +179,17 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     return count
 
 
+def cut_network_from_unit(machine_name: str) -> None:
+    """Cut network from a lxc container.
+
+    Args:
+        machine_name: lxc container hostname
+    """
+    # apply a mask (device type `none`)
+    cut_network_command = f"lxc config device add {machine_name} eth0 none"
+    subprocess.check_call(cut_network_command.split())
+
+
 async def fetch_cluster_members(ops_test: OpsTest):
     """Fetches the IPs listed by Patroni as cluster members.
 
@@ -190,6 +209,25 @@ async def fetch_cluster_members(ops_test: OpsTest):
         else:
             member_ips = {member["host"] for member in cluster_info.json()["members"]}
     return member_ips
+
+
+async def get_controller_machine(ops_test: OpsTest) -> str:
+    """Return controller machine hostname.
+
+    Args:
+        ops_test: The ops test framework instance
+
+    Returns:
+        Controller hostname (str)
+    """
+    _, raw_controller, _ = await ops_test.juju("show-controller")
+
+    controller = yaml.safe_load(raw_controller.strip())
+
+    return [
+        machine.get("instance-id")
+        for machine in controller[ops_test.controller_name]["controller-machines"].values()
+    ][0]
 
 
 async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
@@ -258,6 +296,20 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
     return action.results["operator-password"]
 
 
+def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:
+    """Test network reachability between hosts.
+
+    Args:
+        origin_machine: hostname of the machine to test connection from
+        target_machine: hostname of the machine to test connection to
+    """
+    try:
+        subprocess.check_call(f"lxc exec {origin_machine} -- ping -c 3 {target_machine}".split())
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
 def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
     """Returns whether the unit a replica in the cluster."""
     unit_ip = get_unit_address(ops_test, unit_name)
@@ -286,6 +338,23 @@ def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
                     raise MemberNotUpdatedOnClusterError()
     except RetryError:
         return False
+
+
+def instance_ip(model: str, instance: str) -> str:
+    """Translate juju instance name to IP.
+
+    Args:
+        model: The name of the model
+        instance: The name of the instance
+
+    Returns:
+        The (str) IP address of the instance
+    """
+    output = subprocess.check_output(f"juju machines --model {model}".split())
+
+    for line in output.decode("utf8").splitlines():
+        if instance in line:
+            return line.split()[2]
 
 
 async def get_primary(ops_test: OpsTest, app) -> str:
@@ -350,6 +419,17 @@ async def postgresql_ready(ops_test, unit_name: str) -> bool:
         return False
 
     return True
+
+
+def restore_network_for_unit(machine_name: str) -> None:
+    """Restore network from a lxc container.
+
+    Args:
+        machine_name: lxc container hostname
+    """
+    # remove mask from eth0
+    restore_network_command = f"lxc config device remove {machine_name} eth0"
+    subprocess.check_call(restore_network_command.split())
 
 
 async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
@@ -422,6 +502,20 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     return int(action.results["writes"])
 
 
+async def unit_hostname(ops_test: OpsTest, unit_name: str) -> str:
+    """Get hostname for a unit.
+
+    Args:
+        ops_test: The ops test object passed into every test case
+        unit_name: The name of the unit to be tested
+
+    Returns:
+        The machine/container hostname
+    """
+    _, raw_hostname, _ = await ops_test.juju("ssh", unit_name, "hostname")
+    return raw_hostname.strip()
+
+
 async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     """Updates the restart condition in the DB service file.
 
@@ -463,3 +557,16 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     await ops_test.juju(*start_cmd.split())
 
     await postgresql_ready(ops_test, unit.name)
+
+
+@retry(stop=stop_after_attempt(20), wait=wait_fixed(15))
+def wait_network_restore(model_name: str, hostname: str, old_ip: str) -> None:
+    """Wait until network is restored.
+
+    Args:
+        model_name: The name of the model
+        hostname: The name of the instance
+        old_ip: old registered IP address
+    """
+    if instance_ip(model_name, hostname) == old_ip:
+        raise Exception
