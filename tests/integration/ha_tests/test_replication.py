@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import secrets
+import string
 from time import sleep
 
 import pytest
@@ -105,6 +107,37 @@ async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
 
 async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous_writes) -> None:
     """Check that writes in one cluster not replicated to another cluster."""
+    app = await app_name(ops_test)
+    if len(ops_test.model.applications[app].units) < 3:
+        await scale_application(ops_test, app, 3)
+
+    # Deploy another cluster.
+    new_cluster_app = (
+        f"{app}-{''.join([secrets.choice(string.ascii_lowercase) for _ in range(4)])}"
+    )
+    charm = await ops_test.build_charm(".")
+    async with ops_test.fast_forward():
+        await ops_test.model.deploy(
+            charm, application_name=new_cluster_app, num_units=3, series=CHARM_SERIES
+        )
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # Verify that no writes to the database were missed.
+    total_expected_writes = await check_writes(ops_test)
+
+    # Verify that all the units from the first cluster are up-to-date.
+    for unit in ops_test.model.applications[app].units:
+        assert await secondary_up_to_date(
+            ops_test, unit.name, total_expected_writes
+        ), f"unit {unit.name} not up to date."
+
+    # Verify that all the units from the second cluster are not up-to-date with the first cluster.
+    for unit in ops_test.model.applications[app].units:
+        assert not await secondary_up_to_date(
+            ops_test, unit.name, total_expected_writes
+        ), f"unit {unit.name} is up to date with the first cluster."
 
 
 async def test_preserve_data_on_delete(ops_test: OpsTest, continuous_writes) -> None:
