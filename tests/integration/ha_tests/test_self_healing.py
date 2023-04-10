@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -10,7 +11,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
-    RESTART_DELAY,
+    ORIGINAL_RESTART_CONDITION,
     all_db_processes_down,
     app_name,
     change_wal_settings,
@@ -24,7 +25,7 @@ from tests.integration.ha_tests.helpers import (
     secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
-    update_restart_delay,
+    update_restart_condition,
 )
 from tests.integration.helpers import (
     CHARM_SERIES,
@@ -35,8 +36,8 @@ from tests.integration.helpers import (
 )
 
 APP_NAME = METADATA["name"]
-PATRONI_PROCESS = "/usr/local/bin/patroni"
-POSTGRESQL_PROCESS = "postgres"
+PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
+POSTGRESQL_PROCESS = "/snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
@@ -50,10 +51,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         wait_for_apps = True
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
-            await ops_test.model.deploy(
-                charm, resources={"patroni": "patroni.tar.gz"}, num_units=3, series=CHARM_SERIES
-            )
-            await ops_test.juju("attach-resource", APP_NAME, "patroni=patroni.tar.gz")
+            await ops_test.model.deploy(charm, num_units=3, series=CHARM_SERIES)
     # Deploy the continuous writes application charm if it wasn't already deployed.
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
@@ -70,7 +68,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -85,7 +83,7 @@ async def test_kill_db_process(
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 60 seconds wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after primary_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
@@ -116,9 +114,9 @@ async def test_kill_db_process(
     ), "secondary not up to date with the cluster after restarting."
 
 
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [PATRONI_PROCESS])
 async def test_freeze_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -133,7 +131,7 @@ async def test_freeze_db_process(
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed, and also
+        # considered to trigger a fail-over after primary_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
         try:
             writes = await count_writes(ops_test, primary_name)
@@ -173,8 +171,14 @@ async def test_freeze_db_process(
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, master_start_timeout
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
+    # Set signal based on the process
+    if process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+    else:
+        signal = "SIGINT"
+
     # Locate primary unit.
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
@@ -183,12 +187,12 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
+    await send_signal_to_process(ops_test, primary_name, process, kill_code=signal)
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after primary_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
@@ -220,23 +224,22 @@ async def test_restart_db_process(
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
-@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
+@pytest.mark.parametrize("signal", ["SIGINT", "SIGKILL"])
 async def test_full_cluster_restart(
-    ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_delay
+    ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_condition
 ) -> None:
     """This tests checks that a cluster recovers from a full cluster restart.
 
     The test can be called a full cluster crash when the signal sent to the OS process
     is SIGKILL.
     """
+    # Set signal based on the process
+    if signal == "SIGINT" and process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+    # Locate primary unit.
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
-
-    # Update all units to have a new RESTART_DELAY. Modifying the Restart delay to 3 minutes
-    # should ensure enough time for all replicas to be down at the same time.
-    for unit in ops_test.model.applications[app].units:
-        await update_restart_delay(ops_test, unit, RESTART_DELAY)
 
     # Restart all units "simultaneously".
     await asyncio.gather(
@@ -250,6 +253,11 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
+    if process == PATRONI_PROCESS:
+        awaits = []
+        for unit in ops_test.model.applications[app].units:
+            awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+        await asyncio.gather(*awaits)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
@@ -257,11 +265,10 @@ async def test_full_cluster_restart(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
-    for attempt in Retrying(stop=stop_after_delay(12), wait=wait_fixed(3)):
+    for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
         with attempt:
             writes = await count_writes(ops_test)
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
+            sleep(5)
             more_writes = await count_writes(ops_test)
             assert more_writes > writes, "writes not continuing to DB"
 
@@ -277,7 +284,7 @@ async def test_full_cluster_restart(
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
-    master_start_timeout,
+    primary_start_timeout,
     wal_settings,
 ) -> None:
     """A forceful restart with deleted data and without transaction logs (forced clone)."""
@@ -293,7 +300,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     await start_continuous_writes(ops_test, app)
 
     # Stop the systemd service on the primary unit.
-    await run_command_on_unit(ops_test, primary_name, "systemctl stop patroni")
+    await run_command_on_unit(ops_test, primary_name, "snap stop charmed-postgresql.patroni")
 
     # Data removal runs within a script, so it allows `*` expansion.
     return_code, _, _ = await ops_test.juju(
@@ -314,7 +321,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
         # Verify new writes are continuing by counting the number of writes before and after a
         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after master_start_timeout is changed).
+        # considered to trigger a fail-over after primary_start_timeout is changed).
         writes = await count_writes(ops_test, primary_name)
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
@@ -347,7 +354,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
             ), "WAL segments weren't correctly rotated"
 
         # Start the systemd service in the old primary.
-        await run_command_on_unit(ops_test, primary_name, "systemctl start patroni")
+        await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)

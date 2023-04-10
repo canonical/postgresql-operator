@@ -46,23 +46,17 @@ async def test_deploy_charms(ops_test: OpsTest, application_charm, database_char
             ),
             ops_test.model.deploy(
                 database_charm,
-                resources={"patroni": "patroni.tar.gz"},
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
                 series=CHARM_SERIES,
             ),
             ops_test.model.deploy(
                 database_charm,
-                resources={"patroni": "patroni.tar.gz"},
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
                 series=CHARM_SERIES,
             ),
         )
-
-        # Attach the Patroni resource to the databases.
-        await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")
-        await ops_test.juju("attach-resource", ANOTHER_DATABASE_APP_NAME, "patroni=patroni.tar.gz")
 
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
 

@@ -5,11 +5,10 @@
 """Charmed Machine Operator for the PostgreSQL database."""
 import json
 import logging
-import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
-from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
@@ -32,7 +31,6 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
-    ModelError,
     Relation,
     Unit,
     WaitingStatus,
@@ -52,9 +50,11 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    PATRONI_CONF_PATH,
     PEER,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
+    SNAP_PACKAGES,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -69,7 +69,6 @@ from utils import new_password
 logger = logging.getLogger(__name__)
 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
-CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
 class PostgresqlOperatorCharm(CharmBase):
@@ -79,8 +78,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def __init__(self, *args):
         super().__init__(*args)
-
-        self._postgresql_service = "postgresql"
 
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
@@ -430,7 +427,6 @@ class PostgresqlOperatorCharm(CharmBase):
         return Patroni(
             self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
-            self._storage_path,
             self.cluster_name,
             self._member_name,
             self.app.planned_units(),
@@ -548,56 +544,21 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
 
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
-
-        # Install the PostgreSQL and Patroni requirements packages.
+        # Install the charmed PostgreSQL snap.
         try:
-            self._install_apt_packages(
-                event,
-                [
-                    "pgbackrest",
-                    "postgresql",
-                    "postgresql-contrib",
-                    "postgresql-*-debversion",
-                    "postgresql-plpython*",
-                    "python-apt-dev",
-                    "python3-pip",
-                    "python3-psycopg2",
-                ],
-            )
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            self.unit.status = BlockedStatus("failed to install apt packages")
+            self._install_snap_packages(packages=SNAP_PACKAGES)
+        except snap.SnapError:
+            self.unit.status = BlockedStatus("failed to install snap packages")
             return
 
         try:
-            resource_path = self.model.resources.fetch("patroni")
-        except ModelError as e:
-            logger.error(f"missing patroni resource {str(e)}")
-            self.unit.status = BlockedStatus("Missing 'patroni' resource")
-            return
-
-        try:
-            self._install_pip_package("python-dateutil", user="postgres")
-        except subprocess.SubprocessError:
-            self.unit.status = BlockedStatus("failed to install python-dateutil package")
-            return
-
-        # Build Patroni package path with raft dependency and install it.
-        try:
-            patroni_package_path = f"{str(resource_path)}[raft]"
-            self._install_pip_package(patroni_package_path)
-        except subprocess.SubprocessError:
-            self.unit.status = BlockedStatus("failed to install Patroni python package")
+            self._patch_snap_seccomp_profile()
+        except subprocess.CalledProcessError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
             return
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
-
-    def _inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("create_main_cluster = false\n")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
@@ -670,6 +631,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
+        self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
@@ -891,53 +854,47 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.get_secret("app", REPLICATION_PASSWORD_KEY)
 
-    def _install_apt_packages(self, _, packages: List[str]) -> None:
-        """Simple wrapper around 'apt-get install -y.
+    def _install_snap_packages(self, packages: List[str]) -> None:
+        """Installs package(s) to container.
 
-        Raises:
-            CalledProcessError if it fails to update the apt cache.
-            PackageNotFoundError if the package is not in the cache.
-            PackageError if the packages could not be installed.
+        Args:
+            packages: list of packages to install.
         """
-        try:
-            logger.debug("updating apt cache")
-            apt.update()
-        except subprocess.CalledProcessError as e:
-            logger.exception("failed to update apt cache, CalledProcessError", exc_info=e)
-            raise
-
-        for package in packages:
+        for snap_name, snap_channel in packages:
             try:
-                apt.add_package(package)
-                logger.debug(f"installed package: {package}")
-            except apt.PackageNotFoundError:
-                logger.error(f"package not found: {package}")
-                raise
-            except apt.PackageError:
-                logger.error(f"package error: {package}")
+                snap_cache = snap.SnapCache()
+                snap_package = snap_cache[snap_name]
+
+                snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+
+            except (snap.SnapError, snap.SnapNotFoundError) as e:
+                logger.error(
+                    "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
+                )
                 raise
 
-    def _install_pip_package(self, package: str, user: Optional[str] = None) -> None:
-        """Simple wrapper around pip install.
+    def _patch_snap_seccomp_profile(self) -> None:
+        """Patch snap seccomp profile to allow chmod on pgBackRest restore code.
 
-        Raises:
-            SubprocessError if the packages could not be installed.
+        This is needed due to https://github.com/pgbackrest/pgbackrest/issues/2036.
         """
-        try:
-            command = [
-                "pip3",
-                "install",
-                package,
+        subprocess.check_output(
+            [
+                "sed",
+                "-i",
+                "-e",
+                "$achown",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
             ]
-            if user:
-                command.insert(0, "sudo")
-                command.insert(1, "-u")
-                command.insert(2, user)
-            logger.debug(f"installing python package: {package}")
-            subprocess.check_call(command)
-        except subprocess.SubprocessError:
-            logger.error("could not install pip package")
-            raise
+        )
+        subprocess.check_output(
+            [
+                "/usr/lib/snapd/snap-seccomp",
+                "compile",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
+            ]
+        )
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
@@ -961,11 +918,11 @@ class PostgresqlOperatorCharm(CharmBase):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CA_FILE}", ca, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         self.update_config()
 
@@ -1003,7 +960,7 @@ class PostgresqlOperatorCharm(CharmBase):
             archive_mode=self.app_peer_data.get("archive-mode", "on"),
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
-            stanza=self.unit_peer_data.get("stanza"),
+            stanza=self.app_peer_data.get("stanza"),
         )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
