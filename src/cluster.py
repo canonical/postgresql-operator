@@ -27,19 +27,20 @@ from tenacity import (
 from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PATRONI_CONF_PATH,
+    PATRONI_LOGS_PATH,
     PGBACKREST_CONFIGURATION_FILE,
+    POSTGRESQL_CONF_PATH,
+    POSTGRESQL_DATA_PATH,
     POSTGRESQL_SNAP_NAME,
     REWIND_USER,
-    SNAP_COMMON_PATH,
-    SNAP_CURRENT_PATH,
     TLS_CA_FILE,
     USER,
 )
 
 logger = logging.getLogger(__name__)
 
-PG_BASE_CONF_PATH = f"{SNAP_CURRENT_PATH}/postgresql/postgresql.conf"
-PATRONI_SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/etc/patroni.yaml"
+PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
 
 class NotReadyError(Exception):
@@ -67,7 +68,6 @@ class Patroni:
         self,
         archive_mode,
         unit_ip: str,
-        storage_path: str,
         cluster_name: str,
         member_name: str,
         planned_units: int,
@@ -82,7 +82,6 @@ class Patroni:
         Args:
             archive_mode: PostgreSQL archive mode
             unit_ip: IP address of the current unit
-            storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
             planned_units: number of units planned for the cluster
@@ -94,7 +93,6 @@ class Patroni:
         """
         self.archive_mode = archive_mode
         self.unit_ip = unit_ip
-        self.storage_path = storage_path
         self.cluster_name = cluster_name
         self.member_name = member_name
         self.planned_units = planned_units
@@ -106,7 +104,7 @@ class Patroni:
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
-        self.verify = f"{self.storage_path}/{TLS_CA_FILE}" if tls_enabled else True
+        self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
 
     @property
     def _patroni_url(self) -> str:
@@ -121,25 +119,13 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        self._change_owner(self.storage_path)
+        self._change_owner(POSTGRESQL_DATA_PATH)
 
         # Create empty base config
-        os.makedirs(os.path.dirname(PG_BASE_CONF_PATH), mode=0o755, exist_ok=True)
         open(PG_BASE_CONF_PATH, "a").close()
 
-        # Symlink Patroni config to current
-        if os.path.isfile(PATRONI_SNAP_CONF_PATH):
-            os.remove(PATRONI_SNAP_CONF_PATH)
-        os.symlink(
-            f"{self.storage_path}/patroni.yaml",
-            PATRONI_SNAP_CONF_PATH,
-        )
-        # Create the pgBackRest locks directory.
-        self._create_directory(f"{SNAP_COMMON_PATH}/locks", 0o755)
-        # Logs error out if execution permission is not set
-        self._create_directory(f"{SNAP_COMMON_PATH}/logs", 0o755)
         # Replicas refuse to start with the default permissions
-        os.chmod(self.storage_path, 0o750)
+        os.chmod(POSTGRESQL_DATA_PATH, 0o750)
 
         self._create_user_home_directory()
 
@@ -357,6 +343,23 @@ class Patroni:
 
         return "unknown"
 
+    @property
+    def is_member_isolated(self) -> bool:
+        """Returns whether the unit is isolated from the cluster."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
+        except RetryError:
+            # Return False if it was not possible to get the cluster info. Try again later.
+            return False
+
+        return len(cluster_status.json()["members"]) == 0
+
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
@@ -398,8 +401,10 @@ class Patroni:
         # Render the template file with the correct values.
         rendered = template.render(
             archive_mode=archive_mode,
+            conf_path=PATRONI_CONF_PATH,
             connectivity=connectivity,
-            conf_path=self.storage_path,
+            log_path=PATRONI_LOGS_PATH,
+            data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
@@ -418,7 +423,7 @@ class Patroni:
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
         )
-        self.render_file(f"{self.storage_path}/patroni.yaml", rendered, 0o644)
+        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
@@ -521,6 +526,22 @@ class Patroni:
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         requests.post(f"{self._patroni_url}/reload", verify=self.verify)
+
+    def restart_patroni(self) -> bool:
+        """Restart Patroni.
+
+        Returns:
+            Whether the service restarted successfully.
+        """
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.restart(services=["patroni"])
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = "Failed to start patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return False
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:

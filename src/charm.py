@@ -50,6 +50,7 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    PATRONI_CONF_PATH,
     PEER,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
@@ -434,7 +435,6 @@ class PostgresqlOperatorCharm(CharmBase):
         return Patroni(
             self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
-            self._storage_path,
             self.cluster_name,
             self._member_name,
             self.app.planned_units(),
@@ -547,7 +547,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
         self._update_certificate()
         if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
@@ -708,9 +709,6 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # Clear unit data if this unit is still replica.
-        self._update_relation_endpoints()
-
         # Member already started, so we can set an ActiveStatus.
         # This can happen after a reboot.
         if self._patroni.member_started:
@@ -794,7 +792,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.postgresql_client_relation.oversee_users()
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
@@ -803,6 +802,12 @@ class PostgresqlOperatorCharm(CharmBase):
             and self._patroni.member_replication_lag == "unknown"
         ):
             self._patroni.reinitialize_postgresql()
+            return
+
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
             return
 
         if "restoring-backup" in self.app_peer_data:
@@ -931,11 +936,11 @@ class PostgresqlOperatorCharm(CharmBase):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CA_FILE}", ca, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         self.update_config()
 
