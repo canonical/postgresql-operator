@@ -12,7 +12,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from tenacity import RetryError
+from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from constants import PEER
@@ -425,6 +425,8 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
+    @patch("charm.wait_fixed", return_vaule=wait_fixed(0))
+    @patch("charm.stop_after_delay", return_value=stop_after_delay(0))
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.Patroni.restart_patroni")
@@ -444,6 +446,8 @@ class TestCharm(unittest.TestCase):
         _is_member_isolated,
         _restart_patroni,
         _set_primary_status_message,
+        _,
+        __,
     ):
         # Test before the cluster is initialised.
         self.charm.on.update_status.emit()

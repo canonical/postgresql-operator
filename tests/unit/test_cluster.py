@@ -146,9 +146,11 @@ class TestCluster(unittest.TestCase):
         primary = self.patroni.get_primary(unit_name_pattern=True)
         self.assertEqual(primary, "postgresql/0")
 
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
     @patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
-    def test_is_member_isolated(self, _patroni_url, _get):
+    def test_is_member_isolated(self, _patroni_url, _get, _, __):
         # Test when it wasn't possible to connect to the Patroni API.
         _patroni_url.return_value = "http://server3"
         self.assertFalse(self.patroni.is_member_isolated)
