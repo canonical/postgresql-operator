@@ -860,12 +860,19 @@ class PostgresqlOperatorCharm(CharmBase):
         Args:
             packages: list of packages to install.
         """
-        for snap_name, snap_channel in packages:
+        for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+                if not snap_package.present:
+                    if snap_version.get("revision"):
+                        snap_package.ensure(
+                            snap.SnapState.Latest, revision=snap_version["revision"]
+                        )
+                        snap_package.hold()
+                    else:
+                        snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
 
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
