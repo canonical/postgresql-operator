@@ -12,7 +12,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from tenacity import RetryError
+from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from constants import PEER
@@ -423,6 +423,8 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
+    @patch("charm.wait_fixed", return_vaule=wait_fixed(0))
+    @patch("charm.stop_after_delay", return_value=stop_after_delay(0))
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.Patroni.restart_patroni")
@@ -442,6 +444,8 @@ class TestCharm(unittest.TestCase):
         _is_member_isolated,
         _restart_patroni,
         _set_primary_status_message,
+        _,
+        __,
     ):
         # Test before the cluster is initialised.
         self.charm.on.update_status.emit()
@@ -489,10 +493,11 @@ class TestCharm(unittest.TestCase):
     def test_install_snap_packages(self, _snap_cache):
         _snap_package = _snap_cache.return_value.__getitem__.return_value
         _snap_package.ensure.side_effect = snap.SnapError
+        _snap_package.present = False
 
         # Test for problem with snap update.
         with self.assertRaises(snap.SnapError):
-            self.charm._install_snap_packages([("postgresql", "14/edge")])
+            self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_cache.assert_called_once_with()
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
@@ -502,7 +507,7 @@ class TestCharm(unittest.TestCase):
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = snap.SnapNotFoundError
         with self.assertRaises(snap.SnapNotFoundError):
-            self.charm._install_snap_packages([("postgresql", "14/edge")])
+            self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_cache.assert_called_once_with()
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
@@ -511,10 +516,21 @@ class TestCharm(unittest.TestCase):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        self.charm._install_snap_packages([("postgresql", "14/edge")])
+        self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
+        _snap_package.hold.assert_not_called()
+
+        # Test revision
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = None
+        self.charm._install_snap_packages([("postgresql", {"revision": 42})])
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
+        _snap_package.hold.assert_called_once_with()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
