@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest import mock
 from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import requests as requests
@@ -79,7 +78,7 @@ class TestCluster(unittest.TestCase):
             url = self.patroni._get_alternative_patroni_url(attempt)
             self.assertIn(url.split("http://")[1].split(":8008")[0], self.peers_ips)
 
-    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._get_alternative_patroni_url")
     def test_get_member_ip(self, _get_alternative_patroni_url, _get):
         # Test error on trying to get the member IP.
@@ -120,7 +119,7 @@ class TestCluster(unittest.TestCase):
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
-    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._get_alternative_patroni_url")
     def test_get_primary(self, _get_alternative_patroni_url, _get):
         # Test error on trying to get the member IP.
@@ -147,9 +146,11 @@ class TestCluster(unittest.TestCase):
         primary = self.patroni.get_primary(unit_name_pattern=True)
         self.assertEqual(primary, "postgresql/0")
 
-    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    @patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
-    def test_is_member_isolated(self, _patroni_url, _get):
+    def test_is_member_isolated(self, _patroni_url, _get, _, __):
         # Test when it wasn't possible to connect to the Patroni API.
         _patroni_url.return_value = "http://server3"
         self.assertFalse(self.patroni.is_member_isolated)
@@ -276,7 +277,7 @@ class TestCluster(unittest.TestCase):
         # Test a fail scenario.
         assert not self.patroni.stop_patroni()
 
-    @mock.patch("requests.get", side_effect=mocked_requests_get)
+    @patch("requests.get", side_effect=mocked_requests_get)
     @patch("charm.Patroni._patroni_url", new_callable=PropertyMock)
     def test_member_replication_lag(self, _patroni_url, _get):
         # Test when the cluster member has a value for the lag field.
@@ -302,7 +303,7 @@ class TestCluster(unittest.TestCase):
             f"http://{self.patroni.unit_ip}:8008/reinitialize", verify=True
         )
 
-    @mock.patch("requests.post")
+    @patch("requests.post")
     @patch("cluster.Patroni.get_primary", return_value="primary")
     def test_switchover(self, _, _post):
         response = _post.return_value
@@ -314,7 +315,7 @@ class TestCluster(unittest.TestCase):
             "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
         )
 
-    @mock.patch("requests.patch")
+    @patch("requests.patch")
     def test_update_synchronous_node_count(self, _patch):
         response = _patch.return_value
         response.status_code = 200
