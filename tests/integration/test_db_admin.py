@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import ast
 import json
 import logging
 
@@ -13,8 +12,9 @@ from tests.integration.helpers import (
     DATABASE_APP_NAME,
     check_database_users_existence,
     check_databases_creation,
-    deploy_and_relate_bundle_with_postgresql,
+    deploy_and_relate_landscape_bundle_with_postgresql,
     ensure_correct_relation_data,
+    get_landscape_api_credentials,
     get_machine_from_unit,
     get_primary,
     primary_changed,
@@ -27,7 +27,6 @@ logger = logging.getLogger(__name__)
 
 HAPROXY_APP_NAME = "haproxy"
 LANDSCAPE_APP_NAME = "landscape-server"
-LANDSCAPE_SCALABLE_BUNDLE_NAME = "ch:landscape-scalable"
 RABBITMQ_APP_NAME = "rabbitmq-server"
 DATABASE_UNITS = 3
 RELATION_NAME = "db-admin"
@@ -35,36 +34,24 @@ RELATION_NAME = "db-admin"
 
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
-    config = {
-        "extra-packages": "python-apt postgresql-contrib postgresql-.*-debversion postgresql-plpython.*"
-    }
-    resources = {"patroni": "patroni.tar.gz"}
     await ops_test.model.deploy(
         charm,
-        config=config,
-        resources=resources,
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
         series=CHARM_SERIES,
     )
-    # Attach the resource to the controller.
-    await ops_test.juju("attach-resource", DATABASE_APP_NAME, "patroni=patroni.tar.gz")
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
-    relation_id = await deploy_and_relate_bundle_with_postgresql(
-        ops_test,
-        LANDSCAPE_SCALABLE_BUNDLE_NAME,
-        LANDSCAPE_APP_NAME,
-    )
+    relation_id = await deploy_and_relate_landscape_bundle_with_postgresql(ops_test)
     await check_databases_creation(
         ops_test,
         [
-            "landscape-account-1",
-            "landscape-knowledge",
-            "landscape-main",
-            "landscape-package",
-            "landscape-resource-1",
-            "landscape-session",
+            "landscape-standalone-account-1",
+            "landscape-standalone-knowledge",
+            "landscape-standalone-main",
+            "landscape-standalone-package",
+            "landscape-standalone-resource-1",
+            "landscape-standalone-session",
         ],
     )
 
@@ -72,22 +59,20 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     await check_database_users_existence(ops_test, landscape_users, [])
 
-    # Configure and admin user in Landscape and get its API credentials.
-    unit = ops_test.model.applications[LANDSCAPE_APP_NAME].units[0]
-    action = await unit.run_action(
-        "bootstrap",
-        **{
-            "admin-email": "admin@canonical.com",
-            "admin-name": "Admin",
-            "admin-password": "test1234",
-        },
+    # Create the admin user on Landscape through configs.
+    await ops_test.model.applications["landscape-server"].set_config(
+        {
+            "admin_email": "admin@canonical.com",
+            "admin_name": "Admin",
+            "admin_password": "test1234",
+        }
     )
-    result = await action.wait()
-    credentials = ast.literal_eval(result.results["api-credentials"])
-    key = credentials["key"]
-    secret = credentials["secret"]
+    await ops_test.model.wait_for_idle(
+        apps=["landscape-server", DATABASE_APP_NAME], status="active"
+    )
 
     # Connect to the Landscape API through HAProxy and do some CRUD calls (without the update).
+    key, secret = await get_landscape_api_credentials(ops_test)
     haproxy_unit = ops_test.model.applications[HAPROXY_APP_NAME].units[0]
     api_uri = f"https://{haproxy_unit.public_address}/api/"
 
@@ -137,9 +122,19 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     # Await for a new primary to be elected.
     assert await primary_changed(ops_test, primary)
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
+
+    # Trigger a config change to start the Landscape API service again.
+    # The Landscape API was stopped after a new primary (postgresql) was elected.
+    await ops_test.model.applications["landscape-server"].set_config(
+        {
+            "admin_name": "Admin 1",
+        }
+    )
+    await ops_test.model.wait_for_idle(
+        apps=["landscape-server", DATABASE_APP_NAME], status="active"
+    )
 
     # Create a role and list the available roles later to check that the new one is there.
     role_name = "User2"

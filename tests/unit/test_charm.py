@@ -1,11 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
-import os
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLUpdateUserPasswordError,
@@ -13,7 +12,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from tenacity import RetryError
+from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from constants import PEER
@@ -26,7 +25,6 @@ class TestCharm(unittest.TestCase):
     def setUp(self):
         self._peer_relation = PEER
         self._postgresql_container = "postgresql"
-        self._postgresql_service = "postgresql"
 
         self.harness = Harness(PostgresqlOperatorCharm)
         self.addCleanup(self.harness.cleanup)
@@ -35,9 +33,8 @@ class TestCharm(unittest.TestCase):
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._install_pip_package")
-    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._patch_snap_seccomp_profile")
+    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
     @patch(
         "charm.PostgresqlOperatorCharm._is_storage_attached",
@@ -47,9 +44,8 @@ class TestCharm(unittest.TestCase):
         self,
         _is_storage_attached,
         _reboot_on_detached_storage,
-        _inhibit_default_cluster_creation,
-        _install_apt_packages,
-        _install_pip_package,
+        _install_snap_packages,
+        _patch_snap_seccomp_profile,
     ):
         # Test without storage.
         self.charm.on.install.emit()
@@ -58,80 +54,45 @@ class TestCharm(unittest.TestCase):
         # Test without adding Patroni resource.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
-        _inhibit_default_cluster_creation.assert_called_once()
-        _install_apt_packages.assert_called_once()
-        # Assert that the needed calls were made.
-        _install_pip_package.assert_not_called()
-        # Assert the status set by the event handler.
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+        _install_snap_packages.assert_called_once()
 
-        # Add an empty file as Patroni resource just to check that the correct calls were made.
-        self.harness.add_resource("patroni", "")
-        self.charm.on.install.emit()
-        self.assertEqual(_install_pip_package.call_count, 2)
         # Assert the status set by the event handler.
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._install_pip_package")
-    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._patch_snap_seccomp_profile")
+    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
-    def test_on_install_apt_failure(
+    def test_on_install_patch_failure(
         self,
         _is_storage_attached,
-        _inhibit_default_cluster_creation,
-        _install_apt_packages,
-        _install_pip_package,
+        _install_snap_packages,
+        _patch_snap_seccomp_profile,
     ):
         # Mock the result of the call.
-        _install_apt_packages.side_effect = apt.PackageNotFoundError
+        _patch_snap_seccomp_profile.side_effect = subprocess.CalledProcessError(1, "fake command")
         # Trigger the hook.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
-        _inhibit_default_cluster_creation.assert_called_once()
-        _install_apt_packages.assert_called_once()
-        _install_pip_package.assert_not_called()
+        _install_snap_packages.assert_called_once()
+        _patch_snap_seccomp_profile.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._install_pip_package")
-    @patch("charm.PostgresqlOperatorCharm._install_apt_packages")
-    @patch("charm.PostgresqlOperatorCharm._inhibit_default_cluster_creation")
+    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
-    def test_on_install_pip_failure(
+    def test_on_install_snap_failure(
         self,
         _is_storage_attached,
-        _inhibit_default_cluster_creation,
-        _install_apt_packages,
-        _install_pip_package,
+        _install_snap_packages,
     ):
         # Mock the result of the call.
-        _install_pip_package.side_effect = subprocess.CalledProcessError(
-            cmd="pip3 install patroni", returncode=1
-        )
-        # Add an empty file as Patroni resource just to check that the correct calls were made.
-        self.harness.add_resource("patroni", "")
+        _install_snap_packages.side_effect = snap.SnapError
+        # Trigger the hook.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
-        _inhibit_default_cluster_creation.assert_called_once()
-        _install_apt_packages.assert_called_once()
-        _install_pip_package.assert_called_once()
+        _install_snap_packages.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    @patch("os.makedirs")
-    def test_inhibit_default_cluster_creation(self, _makedirs):
-        # Setup a mock for the `open` method.
-        mock = mock_open()
-        # Patch the `open` method with our mock.
-        with patch("builtins.open", mock, create=True):
-            self.charm._inhibit_default_cluster_creation()
-            _makedirs.assert_called_once_with(
-                os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True
-            )
-            # Check the write calls made to the file.
-            handle = mock()
-            handle.write.assert_called_once_with("create_main_cluster = false\n")
 
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch(
@@ -174,6 +135,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgreSQLProvider.oversee_users")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
@@ -205,7 +167,10 @@ class TestCharm(unittest.TestCase):
         _postgresql,
         _update_relation_endpoints,
         _oversee_users,
+        _get_postgresql_version,
     ):
+        _get_postgresql_version.return_value = "14.0"
+
         # Test without storage.
         self.charm.on.start.emit()
         _reboot_on_detached_storage.assert_called_once()
@@ -255,6 +220,7 @@ class TestCharm(unittest.TestCase):
         _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
+    @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.configure_patroni_on_unit")
     @patch(
@@ -278,7 +244,10 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints,
         _member_started,
         _configure_patroni_on_unit,
+        _get_postgresql_version,
     ):
+        _get_postgresql_version.return_value = "14.0"
+
         # Set the current unit to be a replica (non leader unit).
         self.harness.set_leader(False)
 
@@ -329,6 +298,8 @@ class TestCharm(unittest.TestCase):
         bootstrap_cluster = patroni.return_value.bootstrap_cluster
         bootstrap_cluster.return_value = True
 
+        patroni.return_value.get_postgresql_version.return_value = "14.0"
+
         self.harness.set_leader()
         self.charm.on.start.emit()
         bootstrap_cluster.assert_called_once()
@@ -377,15 +348,13 @@ class TestCharm(unittest.TestCase):
         mock_event.reset_mock()
         del mock_event.params["username"]
         self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with({"operator-password": "test-password"})
+        mock_event.set_results.assert_called_once_with({"password": "test-password"})
 
         # Also test providing the username option.
         mock_event.reset_mock()
         mock_event.params["username"] = "replication"
         self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with(
-            {"replication-password": "replication-test-password"}
-        )
+        mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm.update_config")
@@ -454,6 +423,8 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
+    @patch("charm.wait_fixed", return_vaule=wait_fixed(0))
+    @patch("charm.stop_after_delay", return_value=stop_after_delay(0))
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.Patroni.restart_patroni")
@@ -473,6 +444,8 @@ class TestCharm(unittest.TestCase):
         _is_member_isolated,
         _restart_patroni,
         _set_primary_status_message,
+        _,
+        __,
     ):
         # Test before the cluster is initialised.
         self.charm.on.update_status.emit()
@@ -516,65 +489,52 @@ class TestCharm(unittest.TestCase):
         self.charm.on.update_status.emit()
         _restart_patroni.assert_called_once()
 
-    @patch("charms.operator_libs_linux.v0.apt.add_package")
-    @patch("charms.operator_libs_linux.v0.apt.update")
-    def test_install_apt_packages(self, _update, _add_package):
-        mock_event = Mock()
+    @patch("charm.snap.SnapCache")
+    def test_install_snap_packages(self, _snap_cache):
+        _snap_package = _snap_cache.return_value.__getitem__.return_value
+        _snap_package.ensure.side_effect = snap.SnapError
+        _snap_package.present = False
 
-        # Mock the returns of apt-get update calls.
-        _update.side_effect = [
-            subprocess.CalledProcessError(returncode=1, cmd="apt-get update"),
-            None,
-            None,
-        ]
-
-        # Test for problem with apt update.
-        with self.assertRaises(subprocess.CalledProcessError):
-            self.charm._install_apt_packages(mock_event, ["postgresql"])
-            _update.assert_called_once()
+        # Test for problem with snap update.
+        with self.assertRaises(snap.SnapError):
+            self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_cache.assert_called_once_with()
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
 
         # Test with a not found package.
-        _add_package.side_effect = apt.PackageNotFoundError
-        with self.assertRaises(apt.PackageNotFoundError):
-            self.charm._install_apt_packages(mock_event, ["postgresql"])
-            _update.assert_called()
-            _add_package.assert_called_with("postgresql")
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = snap.SnapNotFoundError
+        with self.assertRaises(snap.SnapNotFoundError):
+            self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_cache.assert_called_once_with()
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
 
         # Then test a valid one.
-        _update.reset_mock()
-        _add_package.reset_mock()
-        _add_package.side_effect = None
-        self.charm._install_apt_packages(mock_event, ["postgresql"])
-        _update.assert_called_once()
-        _add_package.assert_called_with("postgresql")
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = None
+        self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
+        _snap_package.hold.assert_not_called()
 
-    @patch("subprocess.call")
-    def test_install_pip_package(self, _call):
-        # Fake pip packages.
-        package = "package1"
-
-        _call.side_effect = [None, subprocess.SubprocessError]
-
-        # Then test for a successful install.
-        self.charm._install_pip_package(package)
-        # Check that check_call was invoked with the correct arguments.
-        _call.assert_called_once_with(
-            [
-                "pip3",
-                "install",
-                package,
-            ]
-        )
-        # Assert the status set by the event handler.
-        self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-        # Then, test for an error.
-        with self.assertRaises(subprocess.SubprocessError):
-            self.charm._install_pip_package(package)
+        # Test revision
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = None
+        self.charm._install_snap_packages([("postgresql", {"revision": 42})])
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
+        _snap_package.hold.assert_called_once_with()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def testget_secret(self, _):
+    def test_get_secret(self, _):
         self.harness.set_leader()
 
         # Test application scope.
@@ -711,11 +671,23 @@ class TestCharm(unittest.TestCase):
 
     @patch("charm.PostgresqlOperatorCharm._update_certificate")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
-    def test_on_cluster_topology_change(self, _update_relation_endpoints, _update_certificate):
-        self.charm._on_cluster_topology_change(Mock())
+    @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    def test_on_cluster_topology_change(
+        self, _primary_endpoint, _update_relation_endpoints, _update_certificate
+    ):
+        # Mock the property value.
+        _primary_endpoint.side_effect = [None, "1.1.1.1"]
 
-        _update_relation_endpoints.assert_called_once_with()
-        _update_certificate.assert_called_once_with()
+        # Test without an elected primary.
+        self.charm._on_cluster_topology_change(Mock())
+        _update_relation_endpoints.assert_not_called()
+        _update_certificate.assert_called_once()
+        _update_certificate.reset_mock()
+
+        # Test with an elected primary.
+        self.charm._on_cluster_topology_change(Mock())
+        _update_relation_endpoints.assert_called_once()
+        _update_certificate.assert_called_once()
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -731,9 +703,10 @@ class TestCharm(unittest.TestCase):
 
         self.charm._on_cluster_topology_change(Mock())
 
-        _update_relation_endpoints.assert_called_once_with()
+        _update_relation_endpoints.assert_not_called()
         _update_certificate.assert_called_once_with()
-        _primary_endpoint.assert_called_once_with()
+        self.assertEqual(_primary_endpoint.call_count, 2)
+        _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
         self.assertEqual(self.harness.model.unit.status.message, NO_PRIMARY_MESSAGE)
 
@@ -753,5 +726,6 @@ class TestCharm(unittest.TestCase):
 
         _update_relation_endpoints.assert_called_once_with()
         _update_certificate.assert_called_once_with()
-        _primary_endpoint.assert_called_once_with()
+        self.assertEqual(_primary_endpoint.call_count, 2)
+        _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
