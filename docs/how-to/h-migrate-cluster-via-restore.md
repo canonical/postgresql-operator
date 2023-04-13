@@ -1,9 +1,9 @@
-This is a How-To for restoring a backup that was made from the a *different* cluster, (i.e. cluster migration via restore). To perform a basic restore please reference the [Restore How-To](/t/cluster-migration-via-restore/TODO)
+This is a How-To for restoring a backup that was made from the a *different* cluster, (i.e. cluster migration via restore). To perform a basic restore please reference the [Restore How-To](/t/charmed-postgresql-how-to-restore-backup/9693?channel=edge)
 
 Restoring a backup from a previous cluster to a current cluster requires that you:
 - Have a single unit Charmed PostgreSQL deployed and running
 - Access to S3 storage
-- [Have configured settings for S3 storage](/t/configuring-settings-for-s3/TODO)
+- [Have configured settings for S3 storage](/t/charmed-postgresql-how-to-configure-s3/9681?channel=edge)
 - Have the backups from the previous cluster in your S3-storage
 - Have the passwords from your previous cluster
 
