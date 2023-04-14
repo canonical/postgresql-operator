@@ -16,6 +16,7 @@ from tests.integration.ha_tests.helpers import (
     all_db_processes_down,
     app_name,
     change_wal_settings,
+    check_cluster_is_updated,
     check_writes,
     count_writes,
     cut_network_from_unit,
@@ -25,11 +26,9 @@ from tests.integration.ha_tests.helpers import (
     get_unit_ip,
     is_connection_possible,
     is_machine_reachable_from,
-    is_replica,
     list_wal_files,
     postgresql_ready,
     restore_network_for_unit,
-    secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
     unit_hostname,
@@ -77,314 +76,258 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
-# @pytest.mark.parametrize("process", DB_PROCESSES)
-# async def test_kill_db_process(
-#     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
-# ) -> None:
-#     # Locate primary unit.
-#     app = await app_name(ops_test)
-#     primary_name = await get_primary(ops_test, app)
-#
-#     # Start an application that continuously writes data to the database.
-#     await start_continuous_writes(ops_test, app)
-#
-#     # Kill the database process.
-#     await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
-#
-#     async with ops_test.fast_forward():
-#         # Verify new writes are continuing by counting the number of writes before and after a
-#         # 60 seconds wait (this is a little more than the loop wait configuration, that is
-#         # considered to trigger a fail-over after primary_start_timeout is changed).
-#         writes = await count_writes(ops_test, primary_name)
-#         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-#             with attempt:
-#                 more_writes = await count_writes(ops_test, primary_name)
-#                 assert more_writes > writes, "writes not continuing to DB"
-#
-#         # Verify that the database service got restarted and is ready in the old primary.
-#         assert await postgresql_ready(ops_test, primary_name)
-#
-#     # Verify that a new primary gets elected (ie old primary is secondary).
-#     new_primary_name = await get_primary(ops_test, app)
-#     assert new_primary_name != primary_name
-#
-#     # Verify that the old primary is now a replica.
-#     assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
-#
-#     # Verify that all units are part of the same cluster.
-#     member_ips = await fetch_cluster_members(ops_test)
-#     ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-#     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-#
-#     # Verify that no writes to the database were missed after stopping the writes.
-#     total_expected_writes = await check_writes(ops_test)
-#
-#     # Verify that old primary is up-to-date.
-#     assert await secondary_up_to_date(
-#         ops_test, primary_name, total_expected_writes
-#     ), "secondary not up to date with the cluster after restarting."
-#
-#
-# @pytest.mark.parametrize("process", DB_PROCESSES)
-# async def test_freeze_db_process(
-#     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
-# ) -> None:
-#     # Locate primary unit.
-#     app = await app_name(ops_test)
-#     primary_name = await get_primary(ops_test, app)
-#
-#     # Start an application that continuously writes data to the database.
-#     await start_continuous_writes(ops_test, app)
-#
-#     # Freeze the database process.
-#     await send_signal_to_process(ops_test, primary_name, process, "SIGSTOP")
-#
-#     async with ops_test.fast_forward():
-#         # Verify new writes are continuing by counting the number of writes before and after a
-#         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-#         # considered to trigger a fail-over after primary_start_timeout is changed, and also
-#         # when freezing the DB process it take some more time to trigger the fail-over).
-#         try:
-#             writes = await count_writes(ops_test, primary_name)
-#             for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-#                 with attempt:
-#                     more_writes = await count_writes(ops_test, primary_name)
-#                     assert more_writes > writes, "writes not continuing to DB"
-#
-#             # Verify that a new primary gets elected (ie old primary is secondary).
-#             for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-#                 with attempt:
-#                     new_primary_name = await get_primary(ops_test, app)
-#                     assert new_primary_name != primary_name
-#         finally:
-#             # Un-freeze the old primary.
-#             await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
-#
-#         # Verify that the database service got restarted and is ready in the old primary.
-#         assert await postgresql_ready(ops_test, primary_name)
-#
-#     # Verify that the old primary is now a replica.
-#     assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
-#
-#     # Verify that all units are part of the same cluster.
-#     member_ips = await fetch_cluster_members(ops_test)
-#     ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-#     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-#
-#     # Verify that no writes to the database were missed after stopping the writes.
-#     total_expected_writes = await check_writes(ops_test)
-#
-#     # Verify that old primary is up-to-date.
-#     assert await secondary_up_to_date(
-#         ops_test, primary_name, total_expected_writes
-#     ), "secondary not up to date with the cluster after restarting."
-#
-#
-# @pytest.mark.parametrize("process", DB_PROCESSES)
-# async def test_restart_db_process(
-#     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
-# ) -> None:
-#     # Set signal based on the process
-#     if process == PATRONI_PROCESS:
-#         signal = "SIGTERM"
-#     else:
-#         signal = "SIGINT"
-#
-#     # Locate primary unit.
-#     app = await app_name(ops_test)
-#     primary_name = await get_primary(ops_test, app)
-#
-#     # Start an application that continuously writes data to the database.
-#     await start_continuous_writes(ops_test, app)
-#
-#     # Restart the database process.
-#     await send_signal_to_process(ops_test, primary_name, process, kill_code=signal)
-#
-#     async with ops_test.fast_forward():
-#         # Verify new writes are continuing by counting the number of writes before and after a
-#         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-#         # considered to trigger a fail-over after primary_start_timeout is changed).
-#         writes = await count_writes(ops_test, primary_name)
-#         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-#             with attempt:
-#                 more_writes = await count_writes(ops_test, primary_name)
-#                 assert more_writes > writes, "writes not continuing to DB"
-#
-#         # Verify that the database service got restarted and is ready in the old primary.
-#         assert await postgresql_ready(ops_test, primary_name)
-#
-#     # Verify that a new primary gets elected (ie old primary is secondary).
-#     new_primary_name = await get_primary(ops_test, app)
-#     assert new_primary_name != primary_name
-#
-#     # Verify that the old primary is now a replica.
-#     assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
-#
-#     # Verify that all units are part of the same cluster.
-#     member_ips = await fetch_cluster_members(ops_test)
-#     ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-#     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-#
-#     # Verify that no writes to the database were missed after stopping the writes.
-#     total_expected_writes = await check_writes(ops_test)
-#
-#     # Verify that old primary is up-to-date.
-#     assert await secondary_up_to_date(
-#         ops_test, primary_name, total_expected_writes
-#     ), "secondary not up to date with the cluster after restarting."
-#
-#
-# @pytest.mark.parametrize("process", DB_PROCESSES)
-# @pytest.mark.parametrize("signal", ["SIGINT", "SIGKILL"])
-# async def test_full_cluster_restart(
-#     ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_condition
-# ) -> None:
-#     """This tests checks that a cluster recovers from a full cluster restart.
-#
-#     The test can be called a full cluster crash when the signal sent to the OS process
-#     is SIGKILL.
-#     """
-#     # Set signal based on the process
-#     if signal == "SIGINT" and process == PATRONI_PROCESS:
-#         signal = "SIGTERM"
-#     # Locate primary unit.
-#     # Start an application that continuously writes data to the database.
-#     app = await app_name(ops_test)
-#     await start_continuous_writes(ops_test, app)
-#
-#     # Restart all units "simultaneously".
-#     await asyncio.gather(
-#         *[
-#             send_signal_to_process(ops_test, unit.name, process, kill_code=signal)
-#             for unit in ops_test.model.applications[app].units
-#         ]
-#     )
-#
-#     # This test serves to verify behavior when all replicas are down at the same time that when
-#     # they come back online they operate as expected. This check verifies that we meet the criteria
-#     # of all replicas being down at the same time.
-#     assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-#     if process == PATRONI_PROCESS:
-#         awaits = []
-#         for unit in ops_test.model.applications[app].units:
-#             awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
-#         await asyncio.gather(*awaits)
-#
-#     # Verify all units are up and running.
-#     for unit in ops_test.model.applications[app].units:
-#         assert await postgresql_ready(
-#             ops_test, unit.name
-#         ), f"unit {unit.name} not restarted after cluster restart."
-#
-#     for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
-#         with attempt:
-#             writes = await count_writes(ops_test)
-#             sleep(5)
-#             more_writes = await count_writes(ops_test)
-#             assert more_writes > writes, "writes not continuing to DB"
-#
-#     # Verify that all units are part of the same cluster.
-#     member_ips = await fetch_cluster_members(ops_test)
-#     ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-#     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-#
-#     # Verify that no writes to the database were missed after stopping the writes.
-#     await check_writes(ops_test)
-#
-#
-# async def test_forceful_restart_without_data_and_transaction_logs(
-#     ops_test: OpsTest,
-#     continuous_writes,
-#     primary_start_timeout,
-#     wal_settings,
-# ) -> None:
-#     """A forceful restart with deleted data and without transaction logs (forced clone)."""
-#     app = await app_name(ops_test)
-#     primary_name = await get_primary(ops_test, app)
-#
-#     # Copy data dir content removal script.
-#     await ops_test.juju(
-#         "scp", "tests/integration/ha_tests/clean-data-dir.sh", f"{primary_name}:/tmp"
-#     )
-#
-#     # Start an application that continuously writes data to the database.
-#     await start_continuous_writes(ops_test, app)
-#
-#     # Stop the systemd service on the primary unit.
-#     await run_command_on_unit(ops_test, primary_name, "snap stop charmed-postgresql.patroni")
-#
-#     # Data removal runs within a script, so it allows `*` expansion.
-#     return_code, _, _ = await ops_test.juju(
-#         "ssh",
-#         primary_name,
-#         "sudo",
-#         "/tmp/clean-data-dir.sh",
-#     )
-#     assert return_code == 0, "Failed to remove data directory"
-#
-#     async with ops_test.fast_forward():
-#         # Verify that a new primary gets elected (ie old primary is secondary).
-#         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-#             with attempt:
-#                 new_primary_name = await get_primary(ops_test, app)
-#                 assert new_primary_name is not None
-#                 assert new_primary_name != primary_name
-#
-#         # Verify new writes are continuing by counting the number of writes before and after a
-#         # 3 minutes wait (this is a little more than the loop wait configuration, that is
-#         # considered to trigger a fail-over after primary_start_timeout is changed).
-#         writes = await count_writes(ops_test, primary_name)
-#         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-#             with attempt:
-#                 more_writes = await count_writes(ops_test, primary_name)
-#                 assert more_writes > writes, "writes not continuing to DB"
-#
-#         # Change some settings to enable WAL rotation.
-#         for unit in ops_test.model.applications[app].units:
-#             if unit.name == primary_name:
-#                 continue
-#             await change_wal_settings(ops_test, unit.name, 32, 32, 1)
-#
-#         # Rotate the WAL segments.
-#         files = await list_wal_files(ops_test, app)
-#         host = get_unit_address(ops_test, new_primary_name)
-#         password = await get_password(ops_test, new_primary_name)
-#         with db_connect(host, password) as connection:
-#             connection.autocommit = True
-#             with connection.cursor() as cursor:
-#                 # Run some commands to make PostgreSQL do WAL rotation.
-#                 cursor.execute("SELECT pg_switch_wal();")
-#                 cursor.execute("CHECKPOINT;")
-#                 cursor.execute("SELECT pg_switch_wal();")
-#         connection.close()
-#         new_files = await list_wal_files(ops_test, app)
-#         # Check that the WAL was correctly rotated.
-#         for unit_name in files:
-#             assert not files[unit_name].intersection(
-#                 new_files
-#             ), "WAL segments weren't correctly rotated"
-#
-#         # Start the systemd service in the old primary.
-#         await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
-#
-#         # Verify that the database service got restarted and is ready in the old primary.
-#         assert await postgresql_ready(ops_test, primary_name)
-#
-#     # Verify that the old primary is now a replica.
-#     assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
-#
-#     # Verify that all units are part of the same cluster.
-#     member_ips = await fetch_cluster_members(ops_test)
-#     ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-#     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-#
-#     # Verify that no writes to the database were missed after stopping the writes.
-#     total_expected_writes = await check_writes(ops_test)
-#
-#     # Verify that old primary is up-to-date.
-#     assert await secondary_up_to_date(
-#         ops_test, primary_name, total_expected_writes
-#     ), "secondary not up to date with the cluster after restarting."
+@pytest.mark.parametrize("process", DB_PROCESSES)
+async def test_kill_db_process(
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
+) -> None:
+    # Locate primary unit.
+    app = await app_name(ops_test)
+    primary_name = await get_primary(ops_test, app)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # Kill the database process.
+    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
+
+    async with ops_test.fast_forward():
+        # Verify new writes are continuing by counting the number of writes before and after a
+        # 60 seconds wait (this is a little more than the loop wait configuration, that is
+        # considered to trigger a fail-over after primary_start_timeout is changed).
+        writes = await count_writes(ops_test, primary_name)
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                more_writes = await count_writes(ops_test, primary_name)
+                assert more_writes > writes, "writes not continuing to DB"
+
+        # Verify that the database service got restarted and is ready in the old primary.
+        assert await postgresql_ready(ops_test, primary_name)
+
+    # Verify that a new primary gets elected (ie old primary is secondary).
+    new_primary_name = await get_primary(ops_test, app)
+    assert new_primary_name != primary_name
+
+    await check_cluster_is_updated(ops_test, primary_name)
+
+
+@pytest.mark.parametrize("process", DB_PROCESSES)
+async def test_freeze_db_process(
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
+) -> None:
+    # Locate primary unit.
+    app = await app_name(ops_test)
+    primary_name = await get_primary(ops_test, app)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # Freeze the database process.
+    await send_signal_to_process(ops_test, primary_name, process, "SIGSTOP")
+
+    async with ops_test.fast_forward():
+        # Verify new writes are continuing by counting the number of writes before and after a
+        # 3 minutes wait (this is a little more than the loop wait configuration, that is
+        # considered to trigger a fail-over after primary_start_timeout is changed, and also
+        # when freezing the DB process it take some more time to trigger the fail-over).
+        try:
+            writes = await count_writes(ops_test, primary_name)
+            for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+                with attempt:
+                    more_writes = await count_writes(ops_test, primary_name)
+                    assert more_writes > writes, "writes not continuing to DB"
+
+            # Verify that a new primary gets elected (ie old primary is secondary).
+            for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+                with attempt:
+                    new_primary_name = await get_primary(ops_test, app)
+                    assert new_primary_name != primary_name
+        finally:
+            # Un-freeze the old primary.
+            await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
+
+        # Verify that the database service got restarted and is ready in the old primary.
+        assert await postgresql_ready(ops_test, primary_name)
+
+    await check_cluster_is_updated(ops_test, primary_name)
+
+
+@pytest.mark.parametrize("process", DB_PROCESSES)
+async def test_restart_db_process(
+    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
+) -> None:
+    # Set signal based on the process
+    if process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+    else:
+        signal = "SIGINT"
+
+    # Locate primary unit.
+    app = await app_name(ops_test)
+    primary_name = await get_primary(ops_test, app)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # Restart the database process.
+    await send_signal_to_process(ops_test, primary_name, process, kill_code=signal)
+
+    async with ops_test.fast_forward():
+        # Verify new writes are continuing by counting the number of writes before and after a
+        # 3 minutes wait (this is a little more than the loop wait configuration, that is
+        # considered to trigger a fail-over after primary_start_timeout is changed).
+        writes = await count_writes(ops_test, primary_name)
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                more_writes = await count_writes(ops_test, primary_name)
+                assert more_writes > writes, "writes not continuing to DB"
+
+        # Verify that the database service got restarted and is ready in the old primary.
+        assert await postgresql_ready(ops_test, primary_name)
+
+    # Verify that a new primary gets elected (ie old primary is secondary).
+    new_primary_name = await get_primary(ops_test, app)
+    assert new_primary_name != primary_name
+
+    await check_cluster_is_updated(ops_test, primary_name)
+
+
+@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("signal", ["SIGINT", "SIGKILL"])
+async def test_full_cluster_restart(
+    ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_condition
+) -> None:
+    """This tests checks that a cluster recovers from a full cluster restart.
+
+    The test can be called a full cluster crash when the signal sent to the OS process
+    is SIGKILL.
+    """
+    # Set signal based on the process
+    if signal == "SIGINT" and process == PATRONI_PROCESS:
+        signal = "SIGTERM"
+    # Locate primary unit.
+    # Start an application that continuously writes data to the database.
+    app = await app_name(ops_test)
+    await start_continuous_writes(ops_test, app)
+
+    # Restart all units "simultaneously".
+    await asyncio.gather(
+        *[
+            send_signal_to_process(ops_test, unit.name, process, kill_code=signal)
+            for unit in ops_test.model.applications[app].units
+        ]
+    )
+
+    # This test serves to verify behavior when all replicas are down at the same time that when
+    # they come back online they operate as expected. This check verifies that we meet the criteria
+    # of all replicas being down at the same time.
+    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
+    if process == PATRONI_PROCESS:
+        awaits = []
+        for unit in ops_test.model.applications[app].units:
+            awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+        await asyncio.gather(*awaits)
+
+    # Verify all units are up and running.
+    for unit in ops_test.model.applications[app].units:
+        assert await postgresql_ready(
+            ops_test, unit.name
+        ), f"unit {unit.name} not restarted after cluster restart."
+
+    for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
+        with attempt:
+            writes = await count_writes(ops_test)
+            sleep(5)
+            more_writes = await count_writes(ops_test)
+            assert more_writes > writes, "writes not continuing to DB"
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    await check_writes(ops_test)
+
+
+async def test_forceful_restart_without_data_and_transaction_logs(
+    ops_test: OpsTest,
+    continuous_writes,
+    primary_start_timeout,
+    wal_settings,
+) -> None:
+    """A forceful restart with deleted data and without transaction logs (forced clone)."""
+    app = await app_name(ops_test)
+    primary_name = await get_primary(ops_test, app)
+
+    # Copy data dir content removal script.
+    await ops_test.juju(
+        "scp", "tests/integration/ha_tests/clean-data-dir.sh", f"{primary_name}:/tmp"
+    )
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # Stop the systemd service on the primary unit.
+    await run_command_on_unit(ops_test, primary_name, "snap stop charmed-postgresql.patroni")
+
+    # Data removal runs within a script, so it allows `*` expansion.
+    return_code, _, _ = await ops_test.juju(
+        "ssh",
+        primary_name,
+        "sudo",
+        "/tmp/clean-data-dir.sh",
+    )
+    assert return_code == 0, "Failed to remove data directory"
+
+    async with ops_test.fast_forward():
+        # Verify that a new primary gets elected (ie old primary is secondary).
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                new_primary_name = await get_primary(ops_test, app)
+                assert new_primary_name is not None
+                assert new_primary_name != primary_name
+
+        # Verify new writes are continuing by counting the number of writes before and after a
+        # 3 minutes wait (this is a little more than the loop wait configuration, that is
+        # considered to trigger a fail-over after primary_start_timeout is changed).
+        writes = await count_writes(ops_test, primary_name)
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                more_writes = await count_writes(ops_test, primary_name)
+                assert more_writes > writes, "writes not continuing to DB"
+
+        # Change some settings to enable WAL rotation.
+        for unit in ops_test.model.applications[app].units:
+            if unit.name == primary_name:
+                continue
+            await change_wal_settings(ops_test, unit.name, 32, 32, 1)
+
+        # Rotate the WAL segments.
+        files = await list_wal_files(ops_test, app)
+        host = get_unit_address(ops_test, new_primary_name)
+        password = await get_password(ops_test, new_primary_name)
+        with db_connect(host, password) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                # Run some commands to make PostgreSQL do WAL rotation.
+                cursor.execute("SELECT pg_switch_wal();")
+                cursor.execute("CHECKPOINT;")
+                cursor.execute("SELECT pg_switch_wal();")
+        connection.close()
+        new_files = await list_wal_files(ops_test, app)
+        # Check that the WAL was correctly rotated.
+        for unit_name in files:
+            assert not files[unit_name].intersection(
+                new_files
+            ), "WAL segments weren't correctly rotated"
+
+        # Start the systemd service in the old primary.
+        await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
+
+        # Verify that the database service got restarted and is ready in the old primary.
+        assert await postgresql_ready(ops_test, primary_name)
+
+    await check_cluster_is_updated(ops_test, primary_name)
 
 
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
@@ -427,6 +370,22 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
         ops_test, primary_name
     ), "Connection is possible after network cut"
 
+    # Verify new writes are continuing by counting the number of writes before and after a
+    # 3 minutes wait (this is a little more than the loop wait configuration, that is
+    # considered to trigger a fail-over after primary_start_timeout is changed).
+    writes = await count_writes(ops_test, primary_name)
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+        with attempt:
+            more_writes = await count_writes(ops_test, primary_name)
+            assert more_writes > writes, "writes not continuing to DB"
+
+    async with ops_test.fast_forward():
+        # Verify that a new primary gets elected (ie old primary is secondary).
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                new_primary_name = await get_primary(ops_test, app)
+                assert new_primary_name != primary_name
+
     logger.info(f"Restoring network for {primary_name}")
     restore_network_for_unit(primary_hostname)
 
@@ -437,3 +396,5 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     assert await is_connection_possible(
         ops_test, primary_name
     ), "Connection is not possible after network restore"
+
+    await check_cluster_is_updated(ops_test, primary_name)

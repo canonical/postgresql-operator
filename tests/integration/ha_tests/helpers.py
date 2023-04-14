@@ -142,6 +142,25 @@ async def change_wal_settings(
             )
 
 
+async def check_cluster_is_updated(ops_test: OpsTest, primary_name: str) -> None:
+    # Verify that the old primary is now a replica.
+    assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    app = primary_name.split("/")[0]
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await check_writes(ops_test)
+
+    # Verify that old primary is up-to-date.
+    assert await secondary_up_to_date(
+        ops_test, primary_name, total_expected_writes
+    ), "secondary not up to date with the cluster after restarting."
+
+
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
