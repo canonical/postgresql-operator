@@ -311,8 +311,9 @@ async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
 async def is_connection_possible(ops_test: OpsTest, unit_name: str) -> bool:
     """Test a connection to a PostgreSQL server."""
-    password = await get_password(ops_test, unit_name)
-    address = instance_ip(ops_test.model.info.name, unit_name)
+    app = unit_name.split("/")[0]
+    password = await get_password(ops_test, app, unit_name)
+    address = await get_unit_ip(ops_test, unit_name)
     try:
         with db_connect(
             host=address, password=password
@@ -323,7 +324,8 @@ async def is_connection_possible(ops_test: OpsTest, unit_name: str) -> bool:
         # Error raised when the connection is not possible.
         return False
     finally:
-        connection.close()
+        # connection.close()
+        pass
 
 
 def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:
