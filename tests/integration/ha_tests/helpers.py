@@ -20,7 +20,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from tests.integration.helpers import get_unit_address
+from tests.integration.helpers import db_connect, get_unit_address
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -294,6 +294,36 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
     action = await ops_test.model.units.get(unit_name).run_action("get-password")
     action = await action.wait()
     return action.results["operator-password"]
+
+
+async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
+    """Wrapper for getting unit ip.
+
+    Args:
+        ops_test: The ops test object passed into every test case
+        unit_name: The name of the unit to get the address
+    Returns:
+        The (str) ip of the unit
+    """
+    return instance_ip(ops_test.model.info.name, await unit_hostname(ops_test, unit_name))
+
+
+@retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
+async def is_connection_possible(ops_test: OpsTest, unit_name: str) -> bool:
+    """Test a connection to a PostgreSQL server."""
+    password = await get_password(ops_test, unit_name)
+    address = instance_ip(ops_test.model.info.name, unit_name)
+    try:
+        with db_connect(
+            host=address, password=password
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            return cursor.fetchone()[0] == 1
+    except psycopg2.Error:
+        # Error raised when the connection is not possible.
+        return False
+    finally:
+        connection.close()
 
 
 def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:

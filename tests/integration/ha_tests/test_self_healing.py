@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
+import logging
 from time import sleep
 
 import pytest
@@ -17,15 +18,23 @@ from tests.integration.ha_tests.helpers import (
     change_wal_settings,
     check_writes,
     count_writes,
+    cut_network_from_unit,
     fetch_cluster_members,
+    get_controller_machine,
     get_primary,
+    get_unit_ip,
+    is_connection_possible,
+    is_machine_reachable_from,
     is_replica,
     list_wal_files,
     postgresql_ready,
+    restore_network_for_unit,
     secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
+    unit_hostname,
     update_restart_condition,
+    wait_network_restore,
 )
 from tests.integration.helpers import (
     CHARM_SERIES,
@@ -34,6 +43,8 @@ from tests.integration.helpers import (
     get_unit_address,
     run_command_on_unit,
 )
+
+logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
@@ -376,9 +387,53 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     ), "secondary not up to date with the cluster after restarting."
 
 
-async def test_delete_and_recreate_cluster(ops_test: OpsTest, continuous_writes) -> None:
-    pass
+async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
+    """Completely cut and restore network."""
+    # Locate primary unit.
+    app = await app_name(ops_test)
+    primary_name = await get_primary(ops_test, app)
 
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
 
-async def test_network_cut(ops_test: OpsTest, continuous_writes) -> None:
-    pass
+    # Get unit hostname and IP.
+    primary_hostname = await unit_hostname(ops_test, primary_name)
+    primary_ip = await get_unit_ip(ops_test, primary_name)
+
+    # Verify that connection is possible.
+    assert await is_connection_possible(
+        ops_test, primary_name
+    ), f"Connection to host {primary_ip} is not possible"
+
+    logger.info(f"Cutting network for {primary_hostname}")
+    cut_network_from_unit(primary_hostname)
+
+    # Verify machine is not reachable from peer units.
+    all_units_names = [unit.name for unit in ops_test.model.applications[app].units]
+    for unit_name in set(all_units_names) - {primary_name}:
+        hostname = await unit_hostname(ops_test, unit_name)
+        assert not is_machine_reachable_from(
+            hostname, primary_hostname
+        ), "unit is reachable from peer"
+
+    # Verify machine is not reachable from controller.
+    controller = await get_controller_machine(ops_test)
+    assert not is_machine_reachable_from(
+        controller, primary_hostname
+    ), "unit is reachable from controller"
+
+    # Verify that connection is not possible.
+    assert not await is_connection_possible(
+        ops_test, primary_name
+    ), "Connection is possible after network cut"
+
+    logger.info(f"Restoring network for {primary_name}")
+    restore_network_for_unit(primary_hostname)
+
+    # Wait until network is reestablished for the unit.
+    wait_network_restore(ops_test.model.info.name, primary_hostname, primary_ip)
+
+    # Verify that connection is possible.
+    assert await is_connection_possible(
+        ops_test, primary_name
+    ), "Connection is not possible after network restore"
