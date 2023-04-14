@@ -405,7 +405,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
         ops_test, primary_name
     ), f"Connection to host {primary_ip} is not possible"
 
-    logger.info(f"Cutting network for {primary_hostname}")
+    logger.info(f"Cutting network for {primary_name}")
     cut_network_from_unit(primary_hostname)
 
     # Verify machine is not reachable from peer units.
