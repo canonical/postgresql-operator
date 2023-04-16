@@ -596,15 +596,27 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.restart_postgresql")
-    def test_restart(self, _restart_postgresql):
+    @patch("charm.Patroni.are_all_members_ready")
+    def test_restart(self, _are_all_members_ready, _restart_postgresql):
+        _are_all_members_ready.side_effect = [False, True, True]
+
+        # Test when not all members are ready.
+        mock_event = MagicMock()
+        self.charm._restart(mock_event)
+        mock_event.defer.assert_called_once()
+        _restart_postgresql.assert_not_called()
+
         # Test a successful restart.
-        self.charm._restart(None)
+        mock_event.defer.reset_mock()
+        self.charm._restart(mock_event)
         self.assertFalse(isinstance(self.charm.unit.status, BlockedStatus))
+        mock_event.defer.assert_not_called()
 
         # Test a failed restart.
         _restart_postgresql.side_effect = RetryError(last_attempt=1)
-        self.charm._restart(None)
+        self.charm._restart(mock_event)
         self.assertTrue(isinstance(self.charm.unit.status, BlockedStatus))
+        mock_event.defer.assert_not_called()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
