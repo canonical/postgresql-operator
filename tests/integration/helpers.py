@@ -526,7 +526,7 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
     unit = ops_test.model.units.get(unit_name)
     action = await unit.run_action("get-password", **{"username": username})
     result = await action.wait()
-    return result.results[f"{username}-password"]
+    return result.results["password"]
 
 
 @retry(
