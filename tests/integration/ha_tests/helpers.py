@@ -179,7 +179,7 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     password = await get_password(ops_test, app, down_unit)
     for unit in ops_test.model.applications[app].units:
         if unit.name != down_unit:
-            cluster = get_patroni_cluster(unit.public_address)
+            cluster = get_patroni_cluster(await get_unit_ip(ops_test, unit.name))
             break
     down_ips = []
     if down_unit:
