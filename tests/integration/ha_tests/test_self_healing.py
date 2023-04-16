@@ -344,9 +344,10 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     primary_ip = await get_unit_ip(ops_test, primary_name)
 
     # Verify that connection is possible.
+    logger.info("checking whether the connectivity to the database is working")
     assert await is_connection_possible(
         ops_test, primary_name
-    ), f"Connection to host {primary_ip} is not possible"
+    ), f"Connection {primary_name} is not possible"
 
     logger.info(f"Cutting network for {primary_name}")
     cut_network_from_unit(primary_hostname)
@@ -354,18 +355,21 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     # Verify machine is not reachable from peer units.
     all_units_names = [unit.name for unit in ops_test.model.applications[app].units]
     for unit_name in set(all_units_names) - {primary_name}:
+        logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
         hostname = await unit_hostname(ops_test, unit_name)
         assert not is_machine_reachable_from(
             hostname, primary_hostname
         ), "unit is reachable from peer"
 
     # Verify machine is not reachable from controller.
+    logger.info(f"checking for no connectivity between {primary_name} and the controller")
     controller = await get_controller_machine(ops_test)
     assert not is_machine_reachable_from(
         controller, primary_hostname
     ), "unit is reachable from controller"
 
     # Verify that connection is not possible.
+    logger.info("checking whether the connectivity to the database is not working")
     assert not await is_connection_possible(
         ops_test, primary_name
     ), "Connection is possible after network cut"
@@ -373,26 +377,42 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     # Verify new writes are continuing by counting the number of writes before and after a
     # 3 minutes wait (this is a little more than the loop wait configuration, that is
     # considered to trigger a fail-over after primary_start_timeout is changed).
+    logger.info("checking whether writes are increasing")
     writes = await count_writes(ops_test, primary_name)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
         with attempt:
             more_writes = await count_writes(ops_test, primary_name)
             assert more_writes > writes, "writes not continuing to DB"
 
+    logger.info("checking whether a new primary was elected")
     async with ops_test.fast_forward():
         # Verify that a new primary gets elected (ie old primary is secondary).
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
-                new_primary_name = await get_primary(ops_test, app)
+                new_primary_name = await get_primary(ops_test, app, down_unit=primary_name)
                 assert new_primary_name != primary_name
 
     logger.info(f"Restoring network for {primary_name}")
     restore_network_for_unit(primary_hostname)
 
-    # Wait until network is reestablished for the unit.
+    # Wait until the cluster becomes idle (some operations like updating the member
+    # IP are made).
+    logger.info("waiting for cluster to become idle after updating member IP")
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(
+            apps=[app],
+            status="active",
+            raise_on_blocked=True,
+            timeout=1000,
+            idle_period=30,
+        )
+
+    # Wait the LXD unit has its IP updated.
+    logger.info("waiting for unit IP to be updated on Juju unit")
     wait_network_restore(ops_test.model.info.name, primary_hostname, primary_ip)
 
     # Verify that connection is possible.
+    logger.info("checking whether the connectivity to the database is working")
     assert await is_connection_possible(
         ops_test, primary_name
     ), "Connection is not possible after network restore"

@@ -144,12 +144,16 @@ async def change_wal_settings(
 
 async def check_cluster_is_updated(ops_test: OpsTest, primary_name: str) -> None:
     # Verify that the old primary is now a replica.
-    assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
+    assert await is_replica(
+        ops_test, primary_name
+    ), "there are more than one primary in the cluster."
 
     # Verify that all units are part of the same cluster.
     member_ips = await fetch_cluster_members(ops_test)
     app = primary_name.split("/")[0]
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    ip_addresses = [
+        await get_unit_ip(ops_test, unit.name) for unit in ops_test.model.applications[app].units
+    ]
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
@@ -177,13 +181,14 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
         if unit.name != down_unit:
             cluster = get_patroni_cluster(unit.public_address)
             break
-    down_ip = None
+    down_ips = []
     if down_unit:
         for unit in ops_test.model.applications[app].units:
             if unit.name == down_unit:
-                down_ip = unit.public_address
+                down_ips.append(unit.public_address)
+                down_ips.append(await get_unit_ip(ops_test, unit.name))
     for member in cluster["members"]:
-        if member["role"] != "replica" and member["host"] != down_ip:
+        if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
 
     connection_string = (
@@ -218,7 +223,8 @@ async def fetch_cluster_members(ops_test: OpsTest):
     app = await app_name(ops_test)
     member_ips = {}
     for unit in ops_test.model.applications[app].units:
-        cluster_info = requests.get(f"http://{unit.public_address}:8008/cluster")
+        unit_ip = await get_unit_ip(ops_test, unit.name)
+        cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
         if len(member_ips) > 0:
             # If the list of members IPs was already fetched, also compare the
             # list provided by other members.
@@ -338,13 +344,12 @@ async def is_connection_possible(ops_test: OpsTest, unit_name: str) -> bool:
             host=address, password=password
         ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT 1;")
-            return cursor.fetchone()[0] == 1
+            success = cursor.fetchone()[0] == 1
+        connection.close()
+        return success
     except psycopg2.Error:
         # Error raised when the connection is not possible.
         return False
-    finally:
-        # connection.close()
-        pass
 
 
 def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:
@@ -361,9 +366,9 @@ def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:
         return False
 
 
-def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
+async def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
     """Returns whether the unit a replica in the cluster."""
-    unit_ip = get_unit_address(ops_test, unit_name)
+    unit_ip = await get_unit_ip(ops_test, unit_name)
     member_name = unit_name.replace("/", "-")
 
     try:
@@ -408,17 +413,25 @@ def instance_ip(model: str, instance: str) -> str:
             return line.split()[2]
 
 
-async def get_primary(ops_test: OpsTest, app) -> str:
+async def get_primary(ops_test: OpsTest, app, down_unit: str = None) -> str:
     """Use the charm action to retrieve the primary from provided application.
+
+    Args:
+        ops_test: OpsTest instance.
+        app: database application name.
+        down_unit: unit that is offline and the action won't run on.
 
     Returns:
         primary unit name.
     """
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            break
+
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
             # Can retrieve from any unit running unit, so we pick the first.
-            unit_name = ops_test.model.applications[app].units[0].name
-            action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+            action = await unit.run_action("get-primary")
             action = await action.wait()
             assert action.results["primary"] is not None and action.results["primary"] != "None"
             return action.results["primary"]
@@ -491,7 +504,7 @@ async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_write
     app = await app_name(ops_test)
     password = await get_password(ops_test, app)
     host = [
-        unit.public_address
+        await get_unit_ip(ops_test, unit.name)
         for unit in ops_test.model.applications[app].units
         if unit.name == unit_name
     ][0]
@@ -610,7 +623,7 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     await postgresql_ready(ops_test, unit.name)
 
 
-@retry(stop=stop_after_attempt(20), wait=wait_fixed(15))
+@retry(stop=stop_after_attempt(20), wait=wait_fixed(30))
 def wait_network_restore(model_name: str, hostname: str, old_ip: str) -> None:
     """Wait until network is restored.
 
@@ -619,5 +632,7 @@ def wait_network_restore(model_name: str, hostname: str, old_ip: str) -> None:
         hostname: The name of the instance
         old_ip: old registered IP address
     """
-    if instance_ip(model_name, hostname) == old_ip:
+    new_ip = instance_ip(model_name, hostname)
+    print(f"new: {new_ip} - old: {old_ip}")
+    if new_ip == old_ip:
         raise Exception

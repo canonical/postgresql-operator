@@ -655,42 +655,34 @@ class TestCharm(unittest.TestCase):
                 self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
             )
 
-    @patch("charm.PostgresqlOperatorCharm._update_certificate")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
-    def test_on_cluster_topology_change(
-        self, _primary_endpoint, _update_relation_endpoints, _update_certificate
-    ):
+    def test_on_cluster_topology_change(self, _primary_endpoint, _update_relation_endpoints):
         # Mock the property value.
         _primary_endpoint.side_effect = [None, "1.1.1.1"]
 
         # Test without an elected primary.
         self.charm._on_cluster_topology_change(Mock())
         _update_relation_endpoints.assert_not_called()
-        _update_certificate.assert_called_once()
-        _update_certificate.reset_mock()
 
         # Test with an elected primary.
         self.charm._on_cluster_topology_change(Mock())
         _update_relation_endpoints.assert_called_once()
-        _update_certificate.assert_called_once()
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
         return_value=None,
     )
-    @patch("charm.PostgresqlOperatorCharm._update_certificate")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     def test_on_cluster_topology_change_keep_blocked(
-        self, _update_relation_endpoints, _update_certificate, _primary_endpoint
+        self, _update_relation_endpoints, _primary_endpoint
     ):
         self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
         self.charm._on_cluster_topology_change(Mock())
 
         _update_relation_endpoints.assert_not_called()
-        _update_certificate.assert_called_once_with()
         self.assertEqual(_primary_endpoint.call_count, 2)
         _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
@@ -701,17 +693,15 @@ class TestCharm(unittest.TestCase):
         new_callable=PropertyMock,
         return_value="fake-unit",
     )
-    @patch("charm.PostgresqlOperatorCharm._update_certificate")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     def test_on_cluster_topology_change_clear_blocked(
-        self, _update_relation_endpoints, _update_certificate, _primary_endpoint
+        self, _update_relation_endpoints, _primary_endpoint
     ):
         self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
         self.charm._on_cluster_topology_change(Mock())
 
         _update_relation_endpoints.assert_called_once_with()
-        _update_certificate.assert_called_once_with()
         self.assertEqual(_primary_endpoint.call_count, 2)
         _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
