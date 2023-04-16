@@ -416,7 +416,7 @@ Stderr:
             else:
                 event.set_results({"backup-status": "backup created"})
 
-        # Remove the rule the marks the cluster as in a creating backup state
+        # Remove the rule that marks the cluster as in a creating backup state
         # and update the Patroni configuration.
         self._change_connectivity_to_database(connectivity=True)
 
