@@ -109,6 +109,10 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
                 lambda: len(ops_test.model.applications[database_app_name].units) == 1
             )
 
+        for unit in ops_test.model.applications[database_app_name].units:
+            remaining_unit = unit
+            break
+
         # Run the "restore backup" action.
         for attempt in Retrying(
             stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -117,9 +121,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
                 logger.info("restoring the backup")
                 most_recent_backup = backups.split("\n")[-1]
                 backup_id = most_recent_backup.split()[0]
-                action = await ops_test.model.units.get(f"{database_app_name}/0").run_action(
-                    "restore", **{"backup-id": backup_id}
-                )
+                action = await remaining_unit.run_action("restore", **{"backup-id": backup_id})
                 await action.wait()
                 restore_status = action.results.get("restore-status")
                 assert restore_status, "restore hasn't succeeded"
@@ -129,7 +131,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
         # Check that the backup was correctly restored by having only the first created table.
-        primary = await get_primary(ops_test, f"{database_app_name}/0")
+        primary = await get_primary(ops_test, remaining_unit.name)
         address = get_unit_address(ops_test, primary)
         logger.info("checking that the backup was correctly restored")
         with db_connect(

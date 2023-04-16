@@ -17,9 +17,9 @@ tls-server-address=*
 {%- for peer_endpoint in peer_endpoints %}
 tls-server-auth={{ peer_endpoint }}={{ stanza }}
 {%- endfor %}
-tls-server-ca-file={{ storage_path }}/ca.pem
-tls-server-cert-file={{ storage_path }}/cert.pem
-tls-server-key-file={{ storage_path }}/key.pem
+tls-server-ca-file=/var/snap/charmed-postgresql/current/etc/patroni/ca.pem
+tls-server-cert-file=/var/snap/charmed-postgresql/current/etc/patroni/cert.pem
+tls-server-key-file=/var/snap/charmed-postgresql/current/etc/patroni/key.pem
 {%- endif %}
 
 [{{ stanza }}]
@@ -30,12 +30,12 @@ pg1-user={{ user }}
 {% set ns = namespace(count=2) %}
 {%- for peer_endpoint in peer_endpoints %}
 pg{{ ns.count }}-host-type=tls
-pg{{ ns.count }}-host-ca-file={{ storage_path }}/ca.pem
-pg{{ ns.count }}-host-cert-file={{ storage_path }}/cert.pem
-pg{{ ns.count }}-host-key-file={{ storage_path }}/key.pem
+pg{{ ns.count }}-host-ca-file=/var/snap/charmed-postgresql/current/etc/patroni/ca.pem
+pg{{ ns.count }}-host-cert-file=/var/snap/charmed-postgresql/current/etc/patroni/cert.pem
+pg{{ ns.count }}-host-key-file=/var/snap/charmed-postgresql/current/etc/patroni/key.pem
 pg{{ ns.count }}-host={{ peer_endpoint }}
-pg{{ ns.count }}-socket-path=/var/snap/charmed-postgresql/common/postgresql
-pg{{ ns.count }}-path={{ storage_path }}/pgdata
+pg{{ ns.count }}-socket-path=/tmp
+pg{{ ns.count }}-path={{ data_path }}
 pg{{ ns.count }}-user={{ user }}
 {% set ns.count = ns.count + 1 %}
 {%- endfor %}

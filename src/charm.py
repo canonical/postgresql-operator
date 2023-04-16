@@ -15,7 +15,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
-from charms.rolling_ops.v0.rollingops import RollingOpsManager
+from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -960,8 +960,13 @@ class PostgresqlOperatorCharm(CharmBase):
         except subprocess.CalledProcessError:
             pass
 
-    def _restart(self, _) -> None:
+    def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
+        if not self._patroni.are_all_members_ready():
+            logger.debug("Early exit _restart: not all members ready yet")
+            event.defer()
+            return
+
         try:
             self._patroni.restart_postgresql()
             self._peers.data[self.unit]["postgresql_restarted"] = "True"
