@@ -87,14 +87,15 @@ def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
     return resp.json()
 
 
-async def change_primary_start_timeout(
-    ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
+async def change_patroni_setting(
+    ops_test: OpsTest, setting: str, value: int, use_random_unit: bool = False
 ) -> None:
-    """Change primary start timeout configuration.
+    """Change the value of one of the Patroni settings.
 
     Args:
         ops_test: ops_test instance.
-        seconds: number of seconds to set in primary_start_timeout configuration.
+        setting: the name of the setting.
+        value: the value to assign to the setting.
         use_random_unit: whether to use a random unit (default is False,
             so it uses the primary)
     """
@@ -109,7 +110,7 @@ async def change_primary_start_timeout(
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
-                json={"primary_start_timeout": seconds},
+                json={setting: value},
             )
 
 
@@ -255,14 +256,15 @@ async def get_controller_machine(ops_test: OpsTest) -> str:
     ][0]
 
 
-async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
-    """Get the primary start timeout configuration.
+async def get_patroni_setting(ops_test: OpsTest, setting: str) -> Optional[int]:
+    """Get the value of one of the integer Patroni settings.
 
     Args:
         ops_test: ops_test instance.
+        setting: the name of the setting.
 
     Returns:
-        primary start timeout in seconds or None if it's using the default value.
+        the value of the configuration or None if it's using the default value.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -270,8 +272,8 @@ async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
-            primary_start_timeout = configuration_info.json().get("primary_start_timeout")
-            return int(primary_start_timeout) if primary_start_timeout is not None else None
+            value = configuration_info.json().get(setting)
+            return int(value) if value is not None else None
 
 
 async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:

@@ -15,6 +15,7 @@ from tests.integration.ha_tests.helpers import (
     ORIGINAL_RESTART_CONDITION,
     all_db_processes_down,
     app_name,
+    change_patroni_setting,
     change_wal_settings,
     check_cluster_is_updated,
     check_writes,
@@ -22,6 +23,7 @@ from tests.integration.ha_tests.helpers import (
     cut_network_from_unit,
     fetch_cluster_members,
     get_controller_machine,
+    get_patroni_setting,
     get_primary,
     get_unit_ip,
     is_connection_possible,
@@ -194,7 +196,12 @@ async def test_restart_db_process(
 @pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGINT", "SIGKILL"])
 async def test_full_cluster_restart(
-    ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_condition
+    ops_test: OpsTest,
+    process: str,
+    signal: str,
+    continuous_writes,
+    reset_restart_condition,
+    loop_wait,
 ) -> None:
     """This tests checks that a cluster recovers from a full cluster restart.
 
@@ -205,8 +212,13 @@ async def test_full_cluster_restart(
     if signal == "SIGINT" and process == PATRONI_PROCESS:
         signal = "SIGTERM"
     # Locate primary unit.
-    # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
+    # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
+
+    initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
+    await change_patroni_setting(ops_test, "loop_wait", 300)
+
+    # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
     # Restart all units "simultaneously".
@@ -220,12 +232,17 @@ async def test_full_cluster_restart(
     # This test serves to verify behavior when all replicas are down at the same time that when
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
-    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-    if process == PATRONI_PROCESS:
-        awaits = []
-        for unit in ops_test.model.applications[app].units:
-            awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
-        await asyncio.gather(*awaits)
+    try:
+        assert await all_db_processes_down(
+            ops_test, process
+        ), "Not all units down at the same time."
+    finally:
+        if process == PATRONI_PROCESS:
+            awaits = []
+            for unit in ops_test.model.applications[app].units:
+                awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+            await asyncio.gather(*awaits)
+        await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
@@ -408,7 +425,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
         )
 
     # Wait the LXD unit has its IP updated.
-    logger.info("waiting for unit IP to be updated on Juju unit")
+    logger.info("waiting for IP address to be updated on Juju unit")
     wait_network_restore(ops_test.model.info.name, primary_hostname, primary_ip)
 
     # Verify that connection is possible.
