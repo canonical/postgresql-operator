@@ -1,4 +1,6 @@
 [global]
+backup-standby=y
+lock-path=/tmp
 log-path={{ log_path }}
 repo1-retention-full=9999999
 repo1-type=s3
@@ -10,8 +12,31 @@ repo1-s3-uri-style={{ s3_uri_style }}
 repo1-s3-key={{ access_key }}
 repo1-s3-key-secret={{ secret_key }}
 start-fast=y
+{%- if enable_tls %}
+tls-server-address=*
+{%- for peer_endpoint in peer_endpoints %}
+tls-server-auth={{ peer_endpoint }}={{ stanza }}
+{%- endfor %}
+tls-server-ca-file=/var/snap/charmed-postgresql/current/etc/patroni/ca.pem
+tls-server-cert-file=/var/snap/charmed-postgresql/current/etc/patroni/cert.pem
+tls-server-key-file=/var/snap/charmed-postgresql/current/etc/patroni/key.pem
+{%- endif %}
 
 [{{ stanza }}]
 pg1-path={{ data_path }}
 pg1-socket-path=/tmp
 pg1-user={{ user }}
+{%- if enable_tls %}
+{% set ns = namespace(count=2) %}
+{%- for peer_endpoint in peer_endpoints %}
+pg{{ ns.count }}-host-type=tls
+pg{{ ns.count }}-host-ca-file=/var/snap/charmed-postgresql/current/etc/patroni/ca.pem
+pg{{ ns.count }}-host-cert-file=/var/snap/charmed-postgresql/current/etc/patroni/cert.pem
+pg{{ ns.count }}-host-key-file=/var/snap/charmed-postgresql/current/etc/patroni/key.pem
+pg{{ ns.count }}-host={{ peer_endpoint }}
+pg{{ ns.count }}-socket-path=/tmp
+pg{{ ns.count }}-path={{ data_path }}
+pg{{ ns.count }}-user={{ user }}
+{% set ns.count = ns.count + 1 %}
+{%- endfor %}
+{%- endif %}
