@@ -722,6 +722,95 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.Patroni.start_patroni")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.PostgresqlOperatorCharm._update_member_ip")
+    @patch("charm.PostgresqlOperatorCharm._reconfigure_cluster")
+    def test_on_peer_relation_changed(
+        self,
+        _reconfigure_cluster,
+        _update_member_ip,
+        _update_config,
+        _start_patroni,
+        _member_started,
+        _primary_endpoint,
+        _update_relation_endpoints,
+    ):
+        # Test an uninitialized cluster.
+        mock_event = Mock()
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": ""}
+            )
+        self.charm._on_peer_relation_changed(mock_event)
+        mock_event.defer.assert_called_once()
+        _reconfigure_cluster.assert_not_called()
+
+        # Test an initialized cluster and this is the leader unit
+        # (but it fails to reconfigure the cluster).
+        mock_event.defer.reset_mock()
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.app.name,
+                {"cluster_initialised": "True", "members_ips": '["1.1.1.1"]'},
+            )
+            self.harness.set_leader()
+        _reconfigure_cluster.return_value = False
+        self.charm._on_peer_relation_changed(mock_event)
+        _reconfigure_cluster.assert_called_once_with(mock_event)
+        mock_event.defer.assert_called_once()
+
+        # Test when the leader can reconfigure the cluster.
+        mock_event.defer.reset_mock()
+        _reconfigure_cluster.reset_mock()
+        _reconfigure_cluster.return_value = True
+        _update_member_ip.return_value = False
+        _member_started.return_value = True
+        _primary_endpoint.return_value = "1.1.1.1"
+        self.harness.model.unit.status = WaitingStatus("awaiting for cluster to start")
+        self.charm._on_peer_relation_changed(mock_event)
+        mock_event.defer.assert_not_called()
+        _reconfigure_cluster.assert_called_once_with(mock_event)
+        _update_member_ip.assert_called_once()
+        _update_config.assert_called_once()
+        _start_patroni.assert_called_once()
+        _update_relation_endpoints.assert_called_once()
+        self.assertIsInstance(self.harness.model.unit.status, ActiveStatus)
+
+        # Test when the cluster member updates its IP.
+        _update_member_ip.reset_mock()
+        _update_config.reset_mock()
+        _start_patroni.reset_mock()
+        _update_relation_endpoints.reset_mock()
+        _update_member_ip.return_value = True
+        self.charm._on_peer_relation_changed(mock_event)
+        _update_member_ip.assert_called_once()
+        _update_config.assert_not_called()
+        _start_patroni.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+
+        # Test when the unit fails to update the Patroni configuration.
+        _update_member_ip.return_value = False
+        _update_config.side_effect = RetryError(last_attempt=1)
+        self.charm._on_peer_relation_changed(mock_event)
+        _update_config.assert_called_once()
+        _start_patroni.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
+
+        # Test when Patroni hasn't started yet in the unit.
+        _update_config.side_effect = None
+        _member_started.return_value = False
+        self.charm._on_peer_relation_changed(mock_event)
+        _start_patroni.assert_called_once()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.harness.model.unit.status, WaitingStatus)
+
+    @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._add_members")
     @patch("charm.PostgresqlOperatorCharm._remove_from_members_ips")
     @patch("charm.Patroni.remove_raft_member")
