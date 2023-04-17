@@ -15,6 +15,7 @@ from ops.testing import Harness
 from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
+from cluster import RemoveRaftMemberFailedError
 from constants import PEER
 from tests.helpers import patch_network_get
 
@@ -719,3 +720,98 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(_primary_endpoint.call_count, 2)
         _primary_endpoint.assert_called_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._add_members")
+    @patch("charm.PostgresqlOperatorCharm._remove_from_members_ips")
+    @patch("charm.Patroni.remove_raft_member")
+    def test_reconfigure_cluster(
+        self, _remove_raft_member, _remove_from_members_ips, _add_members
+    ):
+        # Test when no change is needed in the member IP.
+        mock_event = Mock()
+        mock_event.unit = self.charm.unit
+        mock_event.relation.data = {mock_event.unit: {}}
+        self.assertTrue(self.charm._reconfigure_cluster(mock_event))
+        _remove_raft_member.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _add_members.assert_called_once_with(mock_event)
+
+        # Test when a change is needed in the member IP, but it fails.
+        _remove_raft_member.side_effect = RemoveRaftMemberFailedError
+        _add_members.reset_mock()
+        mock_event.relation.data = {mock_event.unit: {"ip-to-remove": "1.1.1.1"}}
+        self.assertFalse(self.charm._reconfigure_cluster(mock_event))
+        _remove_raft_member.assert_called_once()
+        _remove_from_members_ips.assert_not_called()
+        _add_members.assert_not_called()
+
+        # Test when a change is needed in the member IP and it succeeds.
+        _remove_raft_member.reset_mock()
+        _remove_raft_member.side_effect = None
+        _add_members.reset_mock()
+        mock_event.relation.data = {mock_event.unit: {"ip-to-remove": "1.1.1.1"}}
+        self.assertTrue(self.charm._reconfigure_cluster(mock_event))
+        _remove_raft_member.assert_called_once()
+        _remove_from_members_ips.assert_called_once()
+        _add_members.assert_called_once_with(mock_event)
+
+    @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
+    def test_update_certificate(self, _request_certificate):
+        # If there is no current TLS files, _request_certificate should be called
+        # only when the certificates relation is established.
+        self.charm._update_certificate()
+        _request_certificate.assert_not_called()
+
+        # Test with already present TLS files (when they will be replaced by new ones).
+        ca = "fake CA"
+        cert = "fake certificate"
+        key = private_key = "fake private key"
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.unit.name,
+                {
+                    "ca": ca,
+                    "cert": cert,
+                    "key": key,
+                    "private-key": private_key,
+                },
+            )
+        self.charm._update_certificate()
+        _request_certificate.assert_called_once_with(private_key)
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._update_certificate")
+    @patch("charm.Patroni.stop_patroni")
+    def test_update_member_ip(self, _stop_patroni, _update_certificate):
+        # Test when the IP address of the unit hasn't changed.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.unit.name,
+                {
+                    "ip": "1.1.1.1",
+                },
+            )
+        self.assertFalse(self.charm._update_member_ip())
+        relation_data = self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+        self.assertEqual(relation_data.get("ip-to-remove"), None)
+        _stop_patroni.assert_not_called()
+        _update_certificate.assert_not_called()
+
+        # Test when the IP address of the unit has changed.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.unit.name,
+                {
+                    "ip": "2.2.2.2",
+                },
+            )
+        self.assertTrue(self.charm._update_member_ip())
+        relation_data = self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+        self.assertEqual(relation_data.get("ip"), "1.1.1.1")
+        self.assertEqual(relation_data.get("ip-to-remove"), "2.2.2.2")
+        _stop_patroni.assert_called_once()
+        _update_certificate.assert_called_once()
