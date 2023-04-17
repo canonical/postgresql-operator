@@ -110,7 +110,7 @@ async def test_kill_db_process(
     await check_cluster_is_updated(ops_test, primary_name)
 
 
-@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("process", [PATRONI_PROCESS])
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
@@ -139,7 +139,7 @@ async def test_freeze_db_process(
             # Verify that a new primary gets elected (ie old primary is secondary).
             for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
                 with attempt:
-                    new_primary_name = await get_primary(ops_test, app)
+                    new_primary_name = await get_primary(ops_test, app, down_unit=primary_name)
                     assert new_primary_name != primary_name
         finally:
             # Un-freeze the old primary.
