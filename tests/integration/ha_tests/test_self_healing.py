@@ -14,7 +14,7 @@ from tests.integration.ha_tests.helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
     app_name,
-    are_db_processes_down,
+    are_all_db_processes_down,
     change_patroni_setting,
     change_wal_settings,
     check_writes,
@@ -28,8 +28,8 @@ from tests.integration.ha_tests.helpers import (
     is_cluster_updated,
     is_connection_possible,
     is_machine_reachable_from,
+    is_postgresql_ready,
     list_wal_files,
-    postgresql_ready,
     restore_network_for_unit,
     send_signal_to_process,
     start_continuous_writes,
@@ -103,7 +103,7 @@ async def test_kill_db_process(
                 assert more_writes > writes, "writes not continuing to DB"
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
@@ -148,7 +148,7 @@ async def test_freeze_db_process(
             await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)
 
@@ -184,7 +184,7 @@ async def test_restart_db_process(
                 assert more_writes > writes, "writes not continuing to DB"
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
@@ -233,7 +233,7 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     try:
-        assert await are_db_processes_down(
+        assert await are_all_db_processes_down(
             ops_test, process
         ), "Not all units down at the same time."
     finally:
@@ -246,7 +246,7 @@ async def test_full_cluster_restart(
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
-        assert await postgresql_ready(
+        assert await is_postgresql_ready(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
@@ -342,7 +342,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)
 

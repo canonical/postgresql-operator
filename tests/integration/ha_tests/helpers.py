@@ -47,7 +47,7 @@ class ProcessRunningError(Exception):
     """Raised when a process is running when it is not expected to be."""
 
 
-async def are_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
 
@@ -161,7 +161,7 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
     total_expected_writes = await check_writes(ops_test)
 
     # Verify that old primary is up-to-date.
-    assert await secondary_up_to_date(
+    assert await is_secondary_up_to_date(
         ops_test, primary_name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
 
@@ -473,7 +473,7 @@ async def send_signal_to_process(
         )
 
 
-async def postgresql_ready(ops_test, unit_name: str) -> bool:
+async def is_postgresql_ready(ops_test, unit_name: str) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
     unit_ip = get_unit_address(ops_test, unit_name)
     try:
@@ -498,7 +498,7 @@ def restore_network_for_unit(machine_name: str) -> None:
     subprocess.check_call(restore_network_command.split())
 
 
-async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
+async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
     """Checks if secondary is up-to-date with the cluster.
 
     Retries over the period of one minute to give secondary adequate time to copy over data.
@@ -622,7 +622,7 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
     await ops_test.juju(*start_cmd.split())
 
-    await postgresql_ready(ops_test, unit.name)
+    await is_postgresql_ready(ops_test, unit.name)
 
 
 @retry(stop=stop_after_attempt(20), wait=wait_fixed(30))
