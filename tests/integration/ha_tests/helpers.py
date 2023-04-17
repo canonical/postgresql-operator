@@ -47,7 +47,7 @@ class ProcessRunningError(Exception):
     """Raised when a process is running when it is not expected to be."""
 
 
-async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+async def are_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
 
@@ -143,7 +143,7 @@ async def change_wal_settings(
             )
 
 
-async def check_cluster_is_updated(ops_test: OpsTest, primary_name: str) -> None:
+async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
     # Verify that the old primary is now a replica.
     assert await is_replica(
         ops_test, primary_name
@@ -634,7 +634,5 @@ def wait_network_restore(model_name: str, hostname: str, old_ip: str) -> None:
         hostname: The name of the instance
         old_ip: old registered IP address
     """
-    new_ip = instance_ip(model_name, hostname)
-    print(f"new: {new_ip} - old: {old_ip}")
-    if new_ip == old_ip:
+    if instance_ip(model_name, hostname) == old_ip:
         raise Exception

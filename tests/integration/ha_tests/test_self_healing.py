@@ -13,11 +13,10 @@ from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
-    all_db_processes_down,
     app_name,
+    are_db_processes_down,
     change_patroni_setting,
     change_wal_settings,
-    check_cluster_is_updated,
     check_writes,
     count_writes,
     cut_network_from_unit,
@@ -26,6 +25,7 @@ from tests.integration.ha_tests.helpers import (
     get_patroni_setting,
     get_primary,
     get_unit_ip,
+    is_cluster_updated,
     is_connection_possible,
     is_machine_reachable_from,
     list_wal_files,
@@ -109,7 +109,7 @@ async def test_kill_db_process(
     new_primary_name = await get_primary(ops_test, app)
     assert new_primary_name != primary_name
 
-    await check_cluster_is_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name)
 
 
 @pytest.mark.parametrize("process", [PATRONI_PROCESS])
@@ -150,7 +150,7 @@ async def test_freeze_db_process(
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
 
-    await check_cluster_is_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name)
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
@@ -190,7 +190,7 @@ async def test_restart_db_process(
     new_primary_name = await get_primary(ops_test, app)
     assert new_primary_name != primary_name
 
-    await check_cluster_is_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name)
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
@@ -233,7 +233,7 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     try:
-        assert await all_db_processes_down(
+        assert await are_db_processes_down(
             ops_test, process
         ), "Not all units down at the same time."
     finally:
@@ -344,7 +344,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         # Verify that the database service got restarted and is ready in the old primary.
         assert await postgresql_ready(ops_test, primary_name)
 
-    await check_cluster_is_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name)
 
 
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
@@ -434,4 +434,4 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
         ops_test, primary_name
     ), "Connection is not possible after network restore"
 
-    await check_cluster_is_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name)
