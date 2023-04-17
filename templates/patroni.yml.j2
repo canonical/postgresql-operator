@@ -99,7 +99,12 @@ postgresql:
   pgpass: /tmp/pgpass
   pg_hba:
     - local all backup peer map=operator
+    {%- if not connectivity %}
+    - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} md5
+    {% else %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
+    {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 md5
     # Allow replications connections from other cluster members.
     {%- for peer_ip in peers_ips %}
