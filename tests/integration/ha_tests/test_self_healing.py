@@ -213,8 +213,8 @@ async def test_full_cluster_restart(
         signal = "SIGTERM"
     # Locate primary unit.
     app = await app_name(ops_test)
-    # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
 
+    # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
     initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
     await change_patroni_setting(ops_test, "loop_wait", 300)
 

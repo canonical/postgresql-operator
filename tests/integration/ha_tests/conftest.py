@@ -52,7 +52,7 @@ async def loop_wait(ops_test: OpsTest) -> None:
 async def primary_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the primary start timeout configuration."""
     # Change the parameter that makes the primary reelection faster.
-    initial_primary_start_timeout = await get_patroni_setting(ops_test)
+    initial_primary_start_timeout = await get_patroni_setting(ops_test, "primary_start_timeout")
     await change_patroni_setting(ops_test, "primary_start_timeout", 0)
     yield
     # Rollback to the initial configuration.
