@@ -134,6 +134,25 @@ async def change_wal_settings(
             )
 
 
+async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
+    # Verify that the old primary is now a replica.
+    assert is_replica(ops_test, primary_name), "there are more than one primary in the cluster."
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    app = primary_name.split("/")[0]
+    ip_addresses = [await unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await check_writes(ops_test)
+
+    # Verify that old primary is up-to-date.
+    assert await is_secondary_up_to_date(
+        ops_test, primary_name, total_expected_writes
+    ), "secondary not up to date with the cluster after restarting."
+
+
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
@@ -329,7 +348,7 @@ async def send_signal_to_process(
         await ops_test.model.applications[app].add_unit(count=1)
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
 
-    kill_cmd = f"run --unit {unit_name} -- pkill --signal {kill_code} -f {process}"
+    kill_cmd = f"run --unit {unit_name} -- pkill --signal {kill_code} -x {process}"
     return_code, _, _ = await ops_test.juju(*kill_cmd.split())
 
     if return_code != 0:
@@ -352,7 +371,7 @@ async def postgresql_ready(ops_test, unit_name: str) -> bool:
     return True
 
 
-async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
+async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
     """Checks if secondary is up-to-date with the cluster.
 
     Retries over the period of one minute to give secondary adequate time to copy over data.

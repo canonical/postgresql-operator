@@ -1,28 +1,26 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import secrets
-import string
-from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
-    METADATA,
     app_name,
     check_writes,
-    fetch_cluster_members,
-    secondary_up_to_date,
+    count_writes,
+    get_password,
+    is_cluster_updated,
     start_continuous_writes,
 )
-from tests.integration.helpers import CHARM_SERIES, get_primary, scale_application
-
-APP_NAME = METADATA["name"]
-PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
-POSTGRESQL_PROCESS = "/snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres"
-DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
+from tests.integration.helpers import (
+    CHARM_SERIES,
+    db_connect,
+    get_primary,
+    scale_application,
+)
 
 
 @pytest.mark.abort_on_fail
@@ -50,94 +48,106 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
 
-async def test_reelection(ops_test: OpsTest, continuous_writes) -> None:
+async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_timeout) -> None:
     """Kill primary unit, check reelection."""
     app = await app_name(ops_test)
-    if len(ops_test.model.applications[app].units) < 3:
-        await scale_application(ops_test, app, 3)
+    if len(ops_test.model.applications[app].units) < 2:
+        await scale_application(ops_test, app, 2)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    unit_name = [unit.name for unit in ops_test.model.applications[app].units][0]
-    primary_name = await get_primary(ops_test, unit_name)
+    # Remove the primary unit.
+    primary_name = await get_primary(ops_test, app)
     await ops_test.model.applications[app].remove_unit(primary_name)
 
-    unit_name = [unit.name for unit in ops_test.model.applications[app].units][0]
-    new_primary_name = await get_primary(ops_test, unit_name)
-    assert new_primary_name != primary_name, "primary reelection haven't happened"
+    # Wait and get the primary again (which can be any unit, including the previous primary).
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(apps=[app], status="active")
 
-    # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+    # Check whether writes are increasing.
+    writes = await count_writes(ops_test, primary_name)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            more_writes = await count_writes(ops_test, primary_name)
+            assert more_writes > writes, "writes not continuing to DB"
 
-    # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await check_writes(ops_test)
+    # Verify that a new primary gets elected (ie old primary is secondary).
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            new_primary_name = await get_primary(ops_test, app, down_unit=primary_name)
+            assert new_primary_name != primary_name, "primary reelection hasn't happened"
 
-    # Verify that old primary is up-to-date.
-    for unit in ops_test.model.applications[app].units:
-        if unit.name != new_primary_name:
-            assert await secondary_up_to_date(
-                ops_test, unit.name, total_expected_writes
-            ), f"secondary {unit.name} not up to date with the cluster after reelection."
+    # Verify that all the units are up-to-date.
+    await is_cluster_updated(ops_test, primary_name)
 
 
 async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     """Write to primary, read data from secondaries (check consistency)."""
+    # Locate primary unit.
     app = await app_name(ops_test)
-    if len(ops_test.model.applications[app].units) < 3:
-        await scale_application(ops_test, app, 3)
+    primary_name = await get_primary(ops_test, app)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Wait some time.
-    sleep(5)
+    # Check whether writes are increasing.
+    writes = await count_writes(ops_test, primary_name)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            more_writes = await count_writes(ops_test, primary_name)
+            assert more_writes > writes, "writes not continuing to DB"
 
-    # Verify that no writes to the database were missed.
-    total_expected_writes = await check_writes(ops_test)
-
-    # Verify that all the units are up-to-date.
-    for unit in ops_test.model.applications[app].units:
-        assert await secondary_up_to_date(
-            ops_test, unit.name, total_expected_writes
-        ), f"unit {unit.name} not up to date."
+    # Verify that no writes to the database were missed after stopping the writes
+    # (check that all the units have all the writes).
+    await check_writes(ops_test)
 
 
 async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous_writes) -> None:
-    """Check that writes in one cluster not replicated to another cluster."""
+    """Check that writes in one cluster are not replicated to another cluster."""
+    # Locate primary unit.
     app = await app_name(ops_test)
-    if len(ops_test.model.applications[app].units) < 3:
-        await scale_application(ops_test, app, 3)
+    primary_name = await get_primary(ops_test, app)
 
     # Deploy another cluster.
-    new_cluster_app = (
-        f"{app}-{''.join([secrets.choice(string.ascii_lowercase) for _ in range(4)])}"
-    )
-    charm = await ops_test.build_charm(".")
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(
-            charm, application_name=new_cluster_app, num_units=3, series=CHARM_SERIES
-        )
+    new_cluster_app = f"second-{app}"
+    if not await app_name(ops_test):
+        charm = await ops_test.build_charm(".")
+        async with ops_test.fast_forward():
+            await ops_test.model.deploy(
+                charm, application_name=new_cluster_app, num_units=2, series=CHARM_SERIES
+            )
+            await ops_test.model.wait_for_idle(apps=[app], status="active")
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Verify that no writes to the database were missed.
-    total_expected_writes = await check_writes(ops_test)
+    # Check whether writes are increasing.
+    writes = await count_writes(ops_test, primary_name)
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            more_writes = await count_writes(ops_test, primary_name)
+            assert more_writes > writes, "writes not continuing to DB"
 
-    # Verify that all the units from the first cluster are up-to-date.
-    for unit in ops_test.model.applications[app].units:
-        assert await secondary_up_to_date(
-            ops_test, unit.name, total_expected_writes
-        ), f"unit {unit.name} not up to date."
+    # Verify that no writes to the first cluster were missed after stopping the writes.
+    await check_writes(ops_test)
 
-    # Verify that all the units from the second cluster are not up-to-date with the first cluster.
-    for unit in ops_test.model.applications[app].units:
-        assert not await secondary_up_to_date(
-            ops_test, unit.name, total_expected_writes
-        ), f"unit {unit.name} is up to date with the first cluster."
+    # Verify that the data from the first cluster wasn't replicated to the second cluster.
+    password = await get_password(ops_test, app=new_cluster_app)
+    for unit in ops_test.model.applications[new_cluster_app].units:
+        try:
+            with db_connect(
+                host=unit.public_address, password=password
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT EXISTS (SELECT FROM information_schema.tables"
+                    " WHERE table_schema = 'public' AND table_name = 'continuous_writes');"
+                )
+                assert not cursor.fetchone()[
+                    0
+                ], "table 'continuous_writes' was replicated to the second cluster"
+        finally:
+            connection.close()
 
 
 async def test_preserve_data_on_delete(ops_test: OpsTest, continuous_writes) -> None:
