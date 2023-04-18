@@ -15,7 +15,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
-from charms.rolling_ops.v0.rollingops import RollingOpsManager
+from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -334,6 +334,14 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        if not self.backup.start_stop_pgbackrest_service():
+            logger.debug(
+                "Deferring on_peer_relation_changed: awaiting for TLS server service to start on primary"
+            )
+            event.defer()
+            return
+
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
@@ -436,6 +444,16 @@ class PostgresqlOperatorCharm(CharmBase):
             self.get_secret("app", REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
+
+    @property
+    def is_primary(self) -> bool:
+        """Return whether this unit is the primary instance."""
+        return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
+
+    @property
+    def is_tls_enabled(self) -> bool:
+        """Return whether TLS is enabled."""
+        return all(self.tls.get_tls_files())
 
     @property
     def _peer_members_ips(self) -> Set[str]:
@@ -712,7 +730,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
-        event.set_results({f"{username}-password": self.get_secret("app", f"{username}-password")})
+        event.set_results({"password": self.get_secret("app", f"{username}-password")})
 
     def _on_set_password(self, event: ActionEvent) -> None:
         """Set the password for the specified user."""
@@ -733,7 +751,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         if password == self.get_secret("app", f"{username}-password"):
             event.log("The old and new passwords are equal.")
-            event.set_results({f"{username}-password": password})
+            event.set_results({"password": password})
             return
 
         # Ensure all members are ready before trying to reload Patroni
@@ -762,7 +780,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
 
-        event.set_results({f"{username}-password": password})
+        event.set_results({"password": password})
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
@@ -860,12 +878,19 @@ class PostgresqlOperatorCharm(CharmBase):
         Args:
             packages: list of packages to install.
         """
-        for snap_name, snap_channel in packages:
+        for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                snap_package.ensure(snap.SnapState.Latest, channel=snap_channel)
+                if not snap_package.present:
+                    if snap_version.get("revision"):
+                        snap_package.ensure(
+                            snap.SnapState.Latest, revision=snap_version["revision"]
+                        )
+                        snap_package.hold()
+                    else:
+                        snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
 
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
@@ -942,14 +967,24 @@ class PostgresqlOperatorCharm(CharmBase):
         except subprocess.CalledProcessError:
             pass
 
-    def _restart(self, _) -> None:
+    def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
+        if not self._patroni.are_all_members_ready():
+            logger.debug("Early exit _restart: not all members ready yet")
+            event.defer()
+            return
+
         try:
             self._patroni.restart_postgresql()
             self._peers.data[self.unit]["postgresql_restarted"] = "True"
-        except RetryError as e:
-            logger.error("failed to restart PostgreSQL")
-            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
+        except RetryError:
+            error_message = "failed to restart PostgreSQL"
+            logger.exception(error_message)
+            self.unit.status = BlockedStatus(error_message)
+            return
+
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        self.backup.start_stop_pgbackrest_service()
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
@@ -958,6 +993,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             archive_mode=self.app_peer_data.get("archive-mode", "on"),
+            connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
@@ -965,7 +1001,8 @@ class PostgresqlOperatorCharm(CharmBase):
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
-            # in a bundle together with the TLS certificates operator.
+            # in a bundle together with the TLS certificates operator. This flag is used to
+            # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
             logger.debug("Early exit update_config: Patroni not started yet")
             return

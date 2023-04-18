@@ -12,7 +12,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from tenacity import RetryError
+from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from constants import PEER
@@ -348,15 +348,13 @@ class TestCharm(unittest.TestCase):
         mock_event.reset_mock()
         del mock_event.params["username"]
         self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with({"operator-password": "test-password"})
+        mock_event.set_results.assert_called_once_with({"password": "test-password"})
 
         # Also test providing the username option.
         mock_event.reset_mock()
         mock_event.params["username"] = "replication"
         self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with(
-            {"replication-password": "replication-test-password"}
-        )
+        mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm.update_config")
@@ -425,6 +423,8 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
+    @patch("charm.wait_fixed", return_vaule=wait_fixed(0))
+    @patch("charm.stop_after_delay", return_value=stop_after_delay(0))
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.Patroni.restart_patroni")
@@ -444,6 +444,8 @@ class TestCharm(unittest.TestCase):
         _is_member_isolated,
         _restart_patroni,
         _set_primary_status_message,
+        _,
+        __,
     ):
         # Test before the cluster is initialised.
         self.charm.on.update_status.emit()
@@ -491,10 +493,11 @@ class TestCharm(unittest.TestCase):
     def test_install_snap_packages(self, _snap_cache):
         _snap_package = _snap_cache.return_value.__getitem__.return_value
         _snap_package.ensure.side_effect = snap.SnapError
+        _snap_package.present = False
 
         # Test for problem with snap update.
         with self.assertRaises(snap.SnapError):
-            self.charm._install_snap_packages([("postgresql", "14/edge")])
+            self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_cache.assert_called_once_with()
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
@@ -504,7 +507,7 @@ class TestCharm(unittest.TestCase):
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = snap.SnapNotFoundError
         with self.assertRaises(snap.SnapNotFoundError):
-            self.charm._install_snap_packages([("postgresql", "14/edge")])
+            self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_cache.assert_called_once_with()
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
@@ -513,10 +516,21 @@ class TestCharm(unittest.TestCase):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        self.charm._install_snap_packages([("postgresql", "14/edge")])
+        self.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
+        _snap_package.hold.assert_not_called()
+
+        # Test revision
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.ensure.side_effect = None
+        self.charm._install_snap_packages([("postgresql", {"revision": 42})])
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
+        _snap_package.hold.assert_called_once_with()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
@@ -582,15 +596,27 @@ class TestCharm(unittest.TestCase):
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.restart_postgresql")
-    def test_restart(self, _restart_postgresql):
+    @patch("charm.Patroni.are_all_members_ready")
+    def test_restart(self, _are_all_members_ready, _restart_postgresql):
+        _are_all_members_ready.side_effect = [False, True, True]
+
+        # Test when not all members are ready.
+        mock_event = MagicMock()
+        self.charm._restart(mock_event)
+        mock_event.defer.assert_called_once()
+        _restart_postgresql.assert_not_called()
+
         # Test a successful restart.
-        self.charm._restart(None)
+        mock_event.defer.reset_mock()
+        self.charm._restart(mock_event)
         self.assertFalse(isinstance(self.charm.unit.status, BlockedStatus))
+        mock_event.defer.assert_not_called()
 
         # Test a failed restart.
         _restart_postgresql.side_effect = RetryError(last_attempt=1)
-        self.charm._restart(None)
+        self.charm._restart(mock_event)
         self.assertTrue(isinstance(self.charm.unit.status, BlockedStatus))
+        mock_event.defer.assert_not_called()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
@@ -618,7 +644,7 @@ class TestCharm(unittest.TestCase):
             _get_tls_files.return_value = [None]
             self.charm.update_config()
             _render_patroni_yml_file.assert_called_once_with(
-                archive_mode="on", enable_tls=False, backup_id=None, stanza=None
+                archive_mode="on", connectivity=True, enable_tls=False, backup_id=None, stanza=None
             )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_not_called()
@@ -635,7 +661,7 @@ class TestCharm(unittest.TestCase):
             _reload_patroni_configuration.reset_mock()
             self.charm.update_config()
             _render_patroni_yml_file.assert_called_once_with(
-                archive_mode="on", enable_tls=True, backup_id=None, stanza=None
+                archive_mode="on", connectivity=True, enable_tls=True, backup_id=None, stanza=None
             )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_called_once()
