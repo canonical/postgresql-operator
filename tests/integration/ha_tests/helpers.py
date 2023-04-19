@@ -319,6 +319,7 @@ async def get_primary(ops_test: OpsTest, app) -> str:
             unit_name = ops_test.model.applications[app].units[0].name
             action = await ops_test.model.units.get(unit_name).run_action("get-primary")
             action = await action.wait()
+            print(f"action.results: {str(action.results)}")
             assert action.results["primary"] is not None and action.results["primary"] != "None"
             return action.results["primary"]
 
