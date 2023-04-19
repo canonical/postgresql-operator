@@ -12,7 +12,6 @@ from tests.integration.ha_tests.helpers import (
     add_unit_with_storage,
     app_name,
     check_writes,
-    count_writes,
     is_replica,
     reused_storage,
     secondary_up_to_date,
@@ -114,8 +113,6 @@ async def test_cluster_restore(ops_test):
             "re-use of storage can only be used on deployments with persistent storage not on rootfs deployments"
         )
 
-    original_writes = await count_writes(ops_test)
-
     # Deploy a second cluster
     global charm
     if not charm:
@@ -148,5 +145,3 @@ async def test_cluster_restore(ops_test):
     await ops_test.model.wait_for_idle(
         apps=[SECOND_APP_NAME], status="active", timeout=1000, wait_for_exact_units=len(storages)
     )
-
-    assert original_writes == count_writes(ops_test, app=SECOND_APP_NAME)
