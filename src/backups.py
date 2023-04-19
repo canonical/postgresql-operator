@@ -342,7 +342,8 @@ class PostgreSQLBackups(Object):
 
         # Prevent creating backups and storing in another cluster repository.
         return_code, stdout, stderr = self._execute_command(
-            ["pgbackrest", "info", "--output=json"], timeout=30
+            [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"],
+            timeout=30,
         )
         if return_code != 0:
             # Block the charm.
