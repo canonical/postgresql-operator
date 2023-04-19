@@ -68,7 +68,7 @@ bootstrap:
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
-    command: pgbackrest {{ pgbackrest_configuration_file }} --repo=2 --stanza={{ restore_stanza }} --pg1-path={{ storage_path }}/pgdata --set={{ backup_id }} --type=immediate --target-action=promote restore
+    command: pgbackrest {{ pgbackrest_configuration_file }} --repo=2 --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --type=immediate --target-action=promote restore
     no_params: True
     keep_existing_recovery_conf: True
   {% else %}
