@@ -98,7 +98,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
-        self.backup = PostgreSQLBackups(self, "s3-parameters")
+        self.backup = PostgreSQLBackups(self, "backup-s3-parameters", "restore-s3-parameters")
         self.tls = PostgreSQLTLS(self, PEER)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -819,8 +819,8 @@ class PostgresqlOperatorCharm(CharmBase):
                 logger.debug("on_update_status early exit: Patroni has not started yet")
                 return
 
-            # Remove the restoring backup flag.
-            self.app_peer_data.update({"restoring-backup": ""})
+            # Remove the restoring backup flag and the restore stanza name.
+            self.app_peer_data.update({"restoring-backup": "", "restore-stanza": ""})
             self.update_config()
 
         self._set_primary_status_message()
@@ -992,11 +992,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
-            archive_mode=self.app_peer_data.get("archive-mode", "on"),
             connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
+            restore_stanza=self.app_peer_data.get("restore-stanza"),
         )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,

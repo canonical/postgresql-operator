@@ -2,6 +2,7 @@
 backup-standby=y
 lock-path=/tmp
 log-path={{ log_path }}
+{%- if backup %}
 repo1-retention-full=9999999
 repo1-type=s3
 repo1-path={{ path }}
@@ -11,6 +12,18 @@ repo1-s3-bucket={{ bucket }}
 repo1-s3-uri-style={{ s3_uri_style }}
 repo1-s3-key={{ access_key }}
 repo1-s3-key-secret={{ secret_key }}
+{%- endif %}
+{%- if restore %}
+repo2-retention-full=9999999
+repo2-type=s3
+repo2-path={{ restore_path }}
+repo2-s3-region={{ restore_region }}
+repo2-s3-endpoint={{ restore_endpoint }}
+repo2-s3-bucket={{ restore_bucket }}
+repo2-s3-uri-style={{ restore_s3_uri_style }}
+repo2-s3-key={{ restore_access_key }}
+repo2-s3-key-secret={{ restore_secret_key }}
+{%- endif %}
 start-fast=y
 {%- if enable_tls %}
 tls-server-address=*

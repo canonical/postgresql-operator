@@ -1,13 +1,16 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 import logging
+import uuid
 from typing import Dict, Tuple
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
+from tests.integration.conftest import AWS
 from tests.integration.helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -25,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 @pytest.mark.abort_on_fail
 async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
-    """Build and deploy one unit of PostgreSQL and then test the backup and restore actions."""
+    """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
     # Build the PostgreSQL charm.
     charm = await ops_test.build_charm(".")
 
@@ -45,7 +48,12 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             num_units=2,
             series=CHARM_SERIES,
         )
-        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
+        await ops_test.model.relate(
+            f"{database_app_name}:backup-s3-parameters", S3_INTEGRATOR_APP_NAME
+        )
+        await ops_test.model.relate(
+            f"{database_app_name}:restore-s3-parameters", S3_INTEGRATOR_APP_NAME
+        )
         await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
 
         # Configure and set access and secret keys.
@@ -155,89 +163,147 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
         # Remove the database app.
         await ops_test.model.remove_application(database_app_name, block_until_done=True)
+    # Remove the TLS operator.
+    await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
 
-async def test_restore_on_new_cluster(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
+async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
+    """Test that is possible to restore a backup to another PostgreSQL cluster."""
     # Build the PostgreSQL charm.
     charm = await ops_test.build_charm(".")
+    # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
+    # as archivo_mode is disabled after restoring the backup).
+    database_app_name = f"new-{DATABASE_APP_NAME}"
+    await ops_test.model.deploy(
+        charm,
+        resources={"patroni": "patroni.tar.gz"},
+        application_name=database_app_name,
+        series=CHARM_SERIES,
+    )
+    await ops_test.juju("attach-resource", database_app_name, "patroni=patroni.tar.gz")
+    await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
 
-    for cloud, config in cloud_configs[0].items():
-        # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
-        # as archivo_mode is disabled after restoring the backup).
-        database_app_name = f"{DATABASE_APP_NAME}-{cloud.lower()}"
-        await ops_test.model.deploy(
-            charm,
-            resources={"patroni": "patroni.tar.gz"},
-            application_name=database_app_name,
-            series=CHARM_SERIES,
-        )
-        await ops_test.juju("attach-resource", database_app_name, "patroni=patroni.tar.gz")
-        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
+    # Run the "list backups" action.
+    unit_name = f"{database_app_name}/1"
+    logger.info("listing the available backups")
+    action = await ops_test.model.units.get(unit_name).run_action("list-backups")
+    await action.wait()
+    backups = action.results["backups"]
+    assert backups, "backups not outputted"
+    await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
-        # Configure and set access and secret keys.
-        logger.info(f"configuring S3 integrator for {cloud}")
-        await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(config)
-        action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
-            "sync-s3-credentials",
-            **cloud_configs[1][cloud],
-        )
-        await action.wait()
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
-        )
+    # Write some data.
+    address = get_unit_address(ops_test, unit_name)
+    password = await get_password(ops_test, unit_name)
+    logger.info("creating a second table in the database")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("CREATE TABLE backup_table_2 (test_collumn INT );")
+    connection.close()
 
-        # Run the "list backups" action.
-        unit_name = f"{database_app_name}/1"
-        logger.info("listing the available backups")
-        action = await ops_test.model.units.get(unit_name).run_action("list-backups")
-        await action.wait()
-        backups = action.results["backups"]
-        assert backups, "backups not outputted"
+    # Run the "restore backup" action.
+    logger.info("restoring the backup")
+    most_recent_backup = backups.split("\n")[-1]
+    backup_id = most_recent_backup.split()[0]
+    action = await ops_test.model.units.get(unit_name).run_action(
+        "restore", **{"backup-id": backup_id}
+    )
+    await action.wait()
+    logger.info(f"restore results: {action.results}")
+
+    # Wait for the backup to complete.
+    async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
-        # Write some data.
-        address = get_unit_address(ops_test, unit_name)
-        password = await get_password(ops_test, unit_name)
-        logger.info("creating a second table in the database")
-        with db_connect(host=address, password=password) as connection:
-            connection.autocommit = True
-            connection.cursor().execute("CREATE TABLE backup_table_2 (test_collumn INT );")
-        connection.close()
-
-        # Run the "restore backup" action.
-        logger.info("restoring the backup")
-        most_recent_backup = backups.split("\n")[-1]
-        backup_id = most_recent_backup.split()[0]
-        action = await ops_test.model.units.get(unit_name).run_action(
-            "restore", **{"backup-id": backup_id}
+    # Check that the backup was correctly restored by having only the first created table.
+    logger.info("checking that the backup was correctly restored")
+    with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_1');"
         )
-        await action.wait()
-        logger.info(f"restore results: {action.results}")
+        assert cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
+        )
+        assert not cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_2' exists"
+    connection.close()
 
-        # Wait for the backup to complete.
-        async with ops_test.fast_forward():
-            await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
-        # Check that the backup was correctly restored by having only the first created table.
-        logger.info("checking that the backup was correctly restored")
-        with db_connect(
-            host=address, password=password
-        ) as connection, connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT EXISTS (SELECT FROM information_schema.tables"
-                " WHERE table_schema = 'public' AND table_name = 'backup_table_1');"
-            )
-            assert cursor.fetchone()[
-                0
-            ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
-            cursor.execute(
-                "SELECT EXISTS (SELECT FROM information_schema.tables"
-                " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
-            )
-            assert not cursor.fetchone()[
-                0
-            ], "backup wasn't correctly restored: table 'backup_table_2' exists"
-        connection.close()
+async def test_invalid_config_and_recovery_after_fixing_it(
+    ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
+) -> None:
+    """Test that the charm can handle invalid and valid backup configurations."""
+    database_app_name = f"new-{DATABASE_APP_NAME}"
 
-        # Remove the database app.
-        # await ops_test.model.applications[database_app_name].remove()
+    # Provide invalid backup configurations.
+    logger.info("configuring S3 integrator for an invalid cloud")
+    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(
+        {
+            "endpoint": "endpoint",
+            "bucket": "bucket",
+            "path": "path",
+            "region": "region",
+        }
+    )
+    action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
+        "sync-s3-credentials",
+        **{
+            "access-key": "access-key",
+            "secret-key": "secret-key",
+        },
+    )
+    await action.wait()
+    # Relate the backup endpoint.
+    await ops_test.model.relate(
+        f"{database_app_name}:backup-s3-parameters", S3_INTEGRATOR_APP_NAME
+    )
+    logger.info("waiting for the database charm to become blocked")
+    unit = ops_test.model.units.get(f"{database_app_name}/0")
+    await asyncio.gather(
+        ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_APP_NAME], status="active"),
+        ops_test.model.wait_for_idle(
+            apps=[database_app_name], status="blocked", raise_on_blocked=False
+        ),
+        ops_test.model.block_until(
+            lambda: unit.workload_status_message
+            == "failed to initialize stanza, check your S3 settings"
+        ),
+    )
+
+    # Provide valid backup configurations, but from another cluster repository.
+    logger.info(
+        "configuring S3 integrator for a valid cloud, but with the path of another cluster repository"
+    )
+    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(cloud_configs[0][AWS])
+    action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
+        "sync-s3-credentials",
+        **cloud_configs[1][AWS],
+    )
+    await action.wait()
+    logger.info("waiting for the database charm to become blocked")
+    await asyncio.gather(
+        ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_APP_NAME], status="active"),
+        ops_test.model.wait_for_idle(
+            apps=[database_app_name], status="blocked", raise_on_blocked=False
+        ),
+        ops_test.model.block_until(
+            lambda: unit.workload_status_message
+            == "the S3 repository has backups from another cluster"
+        ),
+    )
+
+    # Provide valid backup configurations, with another path in the S3 bucket.
+    logger.info("configuring S3 integrator for a valid cloud")
+    config = cloud_configs[0][AWS].copy()
+    config["path"] = f"/postgresql-k8s/{uuid.uuid1()}"
+    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(config)
+    logger.info("waiting for the database charm to become active")
+    await ops_test.model.wait_for_idle(
+        apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active"
+    )
