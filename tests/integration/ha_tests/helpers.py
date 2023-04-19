@@ -141,7 +141,7 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
     # Verify that all units are part of the same cluster.
     member_ips = await fetch_cluster_members(ops_test)
     app = primary_name.split("/")[0]
-    ip_addresses = [await unit.public_address for unit in ops_test.model.applications[app].units]
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.

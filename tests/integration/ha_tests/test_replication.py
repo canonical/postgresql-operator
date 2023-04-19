@@ -11,16 +11,12 @@ from tests.integration.ha_tests.helpers import (
     app_name,
     check_writes,
     count_writes,
+    fetch_cluster_members,
     get_password,
-    is_cluster_updated,
+    get_primary,
     start_continuous_writes,
 )
-from tests.integration.helpers import (
-    CHARM_SERIES,
-    db_connect,
-    get_primary,
-    scale_application,
-)
+from tests.integration.helpers import CHARM_SERIES, db_connect, scale_application
 
 
 @pytest.mark.abort_on_fail
@@ -59,7 +55,9 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
 
     # Remove the primary unit.
     primary_name = await get_primary(ops_test, app)
-    await ops_test.model.applications[app].remove_unit(primary_name)
+    await ops_test.model.destroy_units(
+        primary_name,
+    )
 
     # Wait and get the primary again (which can be any unit, including the previous primary).
     async with ops_test.fast_forward():
@@ -75,11 +73,17 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     # Verify that a new primary gets elected (ie old primary is secondary).
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
-            new_primary_name = await get_primary(ops_test, app, down_unit=primary_name)
+            new_primary_name = await get_primary(ops_test, app)
             assert new_primary_name != primary_name, "primary reelection hasn't happened"
 
-    # Verify that all the units are up-to-date.
-    await is_cluster_updated(ops_test, primary_name)
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    app = primary_name.split("/")[0]
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    await check_writes(ops_test)
 
 
 async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
@@ -111,13 +115,13 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
 
     # Deploy another cluster.
     new_cluster_app = f"second-{app}"
-    if not await app_name(ops_test):
+    if not await app_name(ops_test, new_cluster_app):
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm, application_name=new_cluster_app, num_units=2, series=CHARM_SERIES
             )
-            await ops_test.model.wait_for_idle(apps=[app], status="active")
+            await ops_test.model.wait_for_idle(apps=[new_cluster_app], status="active")
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
@@ -148,7 +152,3 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
                 ], "table 'continuous_writes' was replicated to the second cluster"
         finally:
             connection.close()
-
-
-async def test_preserve_data_on_delete(ops_test: OpsTest, continuous_writes) -> None:
-    """Scale-up, read data from new member, scale down, check that member gone without data."""
