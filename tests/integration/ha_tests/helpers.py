@@ -47,7 +47,7 @@ async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    _, raw_pid, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-f", process)
+                    _, raw_pid, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-x", process)
 
                     # If something was returned, there is a running process.
                     if len(raw_pid) > 0:
