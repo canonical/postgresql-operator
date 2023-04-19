@@ -13,6 +13,7 @@ on:
       - '.jujuignore'
       - 'LICENSE'
       - '**.md'
+      - 'renovate.json'
   schedule:
     - cron: '53 0 * * *' # Daily at 00:53 UTC
   # Triggered on push to branch "main" by .github/workflows/release.yaml
@@ -57,7 +58,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check libs
-        uses: canonical/charming-actions/check-libraries@2.2.2
+        uses: canonical/charming-actions/check-libraries@2.2.5
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -75,7 +76,7 @@ jobs:
           - charm-integration
           - database-relation-integration
           - db-relation-integration
-#          - db-admin-relation-integration
+          - db-admin-relation-integration
           - ha-self-healing-integration
           - password-rotation-integration
           - tls-integration
@@ -95,7 +96,7 @@ jobs:
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: lxd
-          bootstrap-options: "--agent-version 2.9.42"
+          bootstrap-options: "--agent-version 2.9.42"  # renovate: latest
       - name: Download packed charm(s)
         uses: actions/download-artifact@v3
         with:

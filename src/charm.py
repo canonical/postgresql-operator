@@ -5,22 +5,20 @@
 """Charmed Machine Operator for the PostgreSQL database."""
 import json
 import logging
-import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
-from charms.operator_libs_linux.v0 import apt
+from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
-from charms.rolling_ops.v0.rollingops import RollingOpsManager
+from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from ops.charm import (
     ActionEvent,
     CharmBase,
-    ConfigChangedEvent,
     InstallEvent,
     LeaderElectedEvent,
     RelationChangedEvent,
@@ -33,7 +31,6 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
-    ModelError,
     Relation,
     Unit,
     WaitingStatus,
@@ -53,9 +50,11 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    PATRONI_CONF_PATH,
     PEER,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
+    SNAP_PACKAGES,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -70,7 +69,6 @@ from utils import new_password
 logger = logging.getLogger(__name__)
 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
-CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
 class PostgresqlOperatorCharm(CharmBase):
@@ -81,12 +79,9 @@ class PostgresqlOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self._postgresql_service = "postgresql"
-
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
-        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
@@ -339,6 +334,14 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        if not self.backup.start_stop_pgbackrest_service():
+            logger.debug(
+                "Deferring on_peer_relation_changed: awaiting for TLS server service to start on primary"
+            )
+            event.defer()
+            return
+
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
@@ -432,7 +435,6 @@ class PostgresqlOperatorCharm(CharmBase):
         return Patroni(
             self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
-            self._storage_path,
             self.cluster_name,
             self._member_name,
             self.app.planned_units(),
@@ -442,6 +444,16 @@ class PostgresqlOperatorCharm(CharmBase):
             self.get_secret("app", REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
+
+    @property
+    def is_primary(self) -> bool:
+        """Return whether this unit is the primary instance."""
+        return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
+
+    @property
+    def is_tls_enabled(self) -> bool:
+        """Return whether TLS is enabled."""
+        return all(self.tls.get_tls_files())
 
     @property
     def _peer_members_ips(self) -> Set[str]:
@@ -535,7 +547,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
         self._update_certificate()
         if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
@@ -549,46 +562,21 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.status = MaintenanceStatus("installing PostgreSQL")
 
-        # Prevent the default cluster creation.
-        self._inhibit_default_cluster_creation()
-
-        # Install the PostgreSQL and Patroni requirements packages.
+        # Install the charmed PostgreSQL snap.
         try:
-            self._install_apt_packages(
-                event, ["pgbackrest", "postgresql", "python3-pip", "python3-psycopg2"]
-            )
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            self.unit.status = BlockedStatus("failed to install apt packages")
+            self._install_snap_packages(packages=SNAP_PACKAGES)
+        except snap.SnapError:
+            self.unit.status = BlockedStatus("failed to install snap packages")
             return
 
         try:
-            resource_path = self.model.resources.fetch("patroni")
-        except ModelError as e:
-            logger.error(f"missing patroni resource {str(e)}")
-            self.unit.status = BlockedStatus("Missing 'patroni' resource")
-            return
-
-        try:
-            self._install_pip_package("python-dateutil", user="postgres")
-        except subprocess.SubprocessError:
-            self.unit.status = BlockedStatus("failed to install python-dateutil package")
-            return
-
-        # Build Patroni package path with raft dependency and install it.
-        try:
-            patroni_package_path = f"{str(resource_path)}[raft]"
-            self._install_pip_package(patroni_package_path)
-        except subprocess.SubprocessError:
-            self.unit.status = BlockedStatus("failed to install Patroni python package")
+            self._patch_snap_seccomp_profile()
+        except subprocess.CalledProcessError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
             return
 
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
-
-    def _inhibit_default_cluster_creation(self) -> None:
-        """Stop the PostgreSQL packages from creating the default cluster."""
-        os.makedirs(os.path.dirname(CREATE_CLUSTER_CONF_PATH), mode=0o755, exist_ok=True)
-        with open(CREATE_CLUSTER_CONF_PATH, mode="w") as file:
-            file.write("create_main_cluster = false\n")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
@@ -626,17 +614,6 @@ class PostgresqlOperatorCharm(CharmBase):
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
-    def _on_config_changed(self, event: ConfigChangedEvent) -> None:
-        """Install additional packages through APT."""
-        try:
-            extra_packages = self.config.get("extra-packages")
-            if extra_packages:
-                self._install_apt_packages(event, extra_packages.split(" "))
-        except (subprocess.CalledProcessError, apt.PackageNotFoundError):
-            logger.warning("failed to install apts packages")
-
-        self._update_certificate()
-
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
@@ -672,6 +649,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+
+        self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
@@ -730,9 +709,6 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
-        # Clear unit data if this unit is still replica.
-        self._update_relation_endpoints()
-
         # Member already started, so we can set an ActiveStatus.
         # This can happen after a reboot.
         if self._patroni.member_started:
@@ -754,7 +730,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
-        event.set_results({f"{username}-password": self.get_secret("app", f"{username}-password")})
+        event.set_results({"password": self.get_secret("app", f"{username}-password")})
 
     def _on_set_password(self, event: ActionEvent) -> None:
         """Set the password for the specified user."""
@@ -775,7 +751,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         if password == self.get_secret("app", f"{username}-password"):
             event.log("The old and new passwords are equal.")
-            event.set_results({f"{username}-password": password})
+            event.set_results({"password": password})
             return
 
         # Ensure all members are ready before trying to reload Patroni
@@ -804,7 +780,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
 
-        event.set_results({f"{username}-password": password})
+        event.set_results({"password": password})
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
@@ -816,7 +792,8 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self.postgresql_client_relation.oversee_users()
-        self._update_relation_endpoints()
+        if self.primary_endpoint:
+            self._update_relation_endpoints()
 
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
@@ -825,6 +802,12 @@ class PostgresqlOperatorCharm(CharmBase):
             and self._patroni.member_replication_lag == "unknown"
         ):
             self._patroni.reinitialize_postgresql()
+            return
+
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
             return
 
         if "restoring-backup" in self.app_peer_data:
@@ -889,53 +872,54 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.get_secret("app", REPLICATION_PASSWORD_KEY)
 
-    def _install_apt_packages(self, _, packages: List[str]) -> None:
-        """Simple wrapper around 'apt-get install -y.
+    def _install_snap_packages(self, packages: List[str]) -> None:
+        """Installs package(s) to container.
 
-        Raises:
-            CalledProcessError if it fails to update the apt cache.
-            PackageNotFoundError if the package is not in the cache.
-            PackageError if the packages could not be installed.
+        Args:
+            packages: list of packages to install.
         """
-        try:
-            logger.debug("updating apt cache")
-            apt.update()
-        except subprocess.CalledProcessError as e:
-            logger.exception("failed to update apt cache, CalledProcessError", exc_info=e)
-            raise
-
-        for package in packages:
+        for snap_name, snap_version in packages:
             try:
-                apt.add_package(package)
-                logger.debug(f"installed package: {package}")
-            except apt.PackageNotFoundError:
-                logger.error(f"package not found: {package}")
-                raise
-            except apt.PackageError:
-                logger.error(f"package error: {package}")
+                snap_cache = snap.SnapCache()
+                snap_package = snap_cache[snap_name]
+
+                if not snap_package.present:
+                    if snap_version.get("revision"):
+                        snap_package.ensure(
+                            snap.SnapState.Latest, revision=snap_version["revision"]
+                        )
+                        snap_package.hold()
+                    else:
+                        snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
+
+            except (snap.SnapError, snap.SnapNotFoundError) as e:
+                logger.error(
+                    "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
+                )
                 raise
 
-    def _install_pip_package(self, package: str, user: Optional[str] = None) -> None:
-        """Simple wrapper around pip install.
+    def _patch_snap_seccomp_profile(self) -> None:
+        """Patch snap seccomp profile to allow chmod on pgBackRest restore code.
 
-        Raises:
-            SubprocessError if the packages could not be installed.
+        This is needed due to https://github.com/pgbackrest/pgbackrest/issues/2036.
         """
-        try:
-            command = [
-                "pip3",
-                "install",
-                package,
+        subprocess.check_output(
+            [
+                "sed",
+                "-i",
+                "-e",
+                "$achown",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
             ]
-            if user:
-                command.insert(0, "sudo")
-                command.insert(1, "-u")
-                command.insert(2, user)
-            logger.debug(f"installing python package: {package}")
-            subprocess.check_call(command)
-        except subprocess.SubprocessError:
-            logger.error("could not install pip package")
-            raise
+        )
+        subprocess.check_output(
+            [
+                "/usr/lib/snapd/snap-seccomp",
+                "compile",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
+                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
+            ]
+        )
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
@@ -959,11 +943,11 @@ class PostgresqlOperatorCharm(CharmBase):
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_KEY_FILE}", key, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CA_FILE}", ca, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
-            self._patroni.render_file(f"{self._storage_path}/{TLS_CERT_FILE}", cert, 0o600)
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
         self.update_config()
 
@@ -983,14 +967,24 @@ class PostgresqlOperatorCharm(CharmBase):
         except subprocess.CalledProcessError:
             pass
 
-    def _restart(self, _) -> None:
+    def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
+        if not self._patroni.are_all_members_ready():
+            logger.debug("Early exit _restart: not all members ready yet")
+            event.defer()
+            return
+
         try:
             self._patroni.restart_postgresql()
             self._peers.data[self.unit]["postgresql_restarted"] = "True"
-        except RetryError as e:
-            logger.error("failed to restart PostgreSQL")
-            self.unit.status = BlockedStatus(f"failed to restart PostgreSQL with error {e}")
+        except RetryError:
+            error_message = "failed to restart PostgreSQL"
+            logger.exception(error_message)
+            self.unit.status = BlockedStatus(error_message)
+            return
+
+        # Start or stop the pgBackRest TLS server service when TLS certificate change.
+        self.backup.start_stop_pgbackrest_service()
 
     def update_config(self) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
@@ -999,14 +993,16 @@ class PostgresqlOperatorCharm(CharmBase):
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             archive_mode=self.app_peer_data.get("archive-mode", "on"),
+            connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
-            stanza=self.unit_peer_data.get("stanza"),
+            stanza=self.app_peer_data.get("stanza"),
         )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
-            # in a bundle together with the TLS certificates operator.
+            # in a bundle together with the TLS certificates operator. This flag is used to
+            # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
             logger.debug("Early exit update_config: Patroni not started yet")
             return

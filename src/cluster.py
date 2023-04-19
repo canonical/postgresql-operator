@@ -10,15 +10,7 @@ import subprocess
 from typing import Optional, Set
 
 import requests
-from charms.operator_libs_linux.v0.apt import DebianPackage
-from charms.operator_libs_linux.v1.systemd import (
-    daemon_reload,
-    service_restart,
-    service_resume,
-    service_running,
-    service_start,
-    service_stop,
-)
+from charms.operator_libs_linux.v1 import snap
 from jinja2 import Template
 from tenacity import (
     AttemptManager,
@@ -35,6 +27,12 @@ from tenacity import (
 from constants import (
     API_REQUEST_TIMEOUT,
     PATRONI_CLUSTER_STATUS_ENDPOINT,
+    PATRONI_CONF_PATH,
+    PATRONI_LOGS_PATH,
+    PGBACKREST_CONFIGURATION_FILE,
+    POSTGRESQL_CONF_PATH,
+    POSTGRESQL_DATA_PATH,
+    POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     TLS_CA_FILE,
     USER,
@@ -42,7 +40,7 @@ from constants import (
 
 logger = logging.getLogger(__name__)
 
-PATRONI_SERVICE = "patroni"
+PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
 
 class NotReadyError(Exception):
@@ -70,7 +68,6 @@ class Patroni:
         self,
         archive_mode,
         unit_ip: str,
-        storage_path: str,
         cluster_name: str,
         member_name: str,
         planned_units: int,
@@ -85,7 +82,6 @@ class Patroni:
         Args:
             archive_mode: PostgreSQL archive mode
             unit_ip: IP address of the current unit
-            storage_path: path to the storage mounted on this unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
             planned_units: number of units planned for the cluster
@@ -97,7 +93,6 @@ class Patroni:
         """
         self.archive_mode = archive_mode
         self.unit_ip = unit_ip
-        self.storage_path = storage_path
         self.cluster_name = cluster_name
         self.member_name = member_name
         self.planned_units = planned_units
@@ -109,7 +104,7 @@ class Patroni:
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
-        self.verify = f"{self.storage_path}/{TLS_CA_FILE}" if tls_enabled else True
+        self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
 
     @property
     def _patroni_url(self) -> str:
@@ -124,13 +119,15 @@ class Patroni:
 
     def configure_patroni_on_unit(self):
         """Configure Patroni (configuration files and service) on the unit."""
-        self._change_owner(self.storage_path)
-        # Avoid rendering the Patroni config file if it was already rendered.
-        if not os.path.exists(f"{self.storage_path}/patroni.yml"):
-            self.render_patroni_yml_file(self.archive_mode)
-        self._render_patroni_service_file()
-        # Reload systemd services before trying to start Patroni.
-        daemon_reload()
+        self._change_owner(POSTGRESQL_DATA_PATH)
+
+        # Create empty base config
+        open(PG_BASE_CONF_PATH, "a").close()
+
+        # Replicas refuse to start with the default permissions
+        os.chmod(POSTGRESQL_DATA_PATH, 0o750)
+
+        self._create_user_home_directory()
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -138,8 +135,8 @@ class Patroni:
         Args:
             path: path to a file or directory.
         """
-        # Get the uid/gid for the postgres user.
-        user_database = pwd.getpwnam("postgres")
+        # Get the uid/gid for the snap_daemon user.
+        user_database = pwd.getpwnam("snap_daemon")
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
@@ -168,11 +165,21 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def _get_postgresql_version(self) -> str:
+    def _create_user_home_directory(self) -> None:
+        """Creates the user home directory for the snap_daemon user.
+
+        This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
+        """
+        subprocess.run("mkdir -p /home/snap_daemon".split())
+        subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
+        subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
+
+    def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
-        package = DebianPackage.from_system("postgresql")
-        # Remove the Ubuntu revision from the version.
-        return str(package.version).split("+")[0]
+        client = snap.SnapClient()
+        for snp in client.get_installed_snaps():
+            if snp["name"] == POSTGRESQL_SNAP_NAME:
+                return snp["version"]
 
     def get_member_ip(self, member_name: str) -> str:
         """Get cluster member IP address.
@@ -332,9 +339,26 @@ class Patroni:
 
         for member in cluster_status.json()["members"]:
             if member["name"] == self.member_name:
-                return member["lag"]
+                return member.get("lag", "unknown")
 
         return "unknown"
+
+    @property
+    def is_member_isolated(self) -> bool:
+        """Returns whether the unit is isolated from the cluster."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    cluster_status = requests.get(
+                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
+        except RetryError:
+            # Return False if it was not possible to get the cluster info. Try again later.
+            return False
+
+        return len(cluster_status.json()["members"]) == 0
 
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
@@ -354,18 +378,10 @@ class Patroni:
         os.chmod(path, mode)
         self._change_owner(path)
 
-    def _render_patroni_service_file(self) -> None:
-        """Render the Patroni configuration file."""
-        # Open the template patroni systemd unit file.
-        with open("templates/patroni.service.j2", "r") as file:
-            template = Template(file.read())
-        # Render the template file with the correct values.
-        rendered = template.render(conf_path=self.storage_path)
-        self.render_file("/etc/systemd/system/patroni.service", rendered, 0o644)
-
     def render_patroni_yml_file(
         self,
         archive_mode: str,
+        connectivity: bool = False,
         enable_tls: bool = False,
         stanza: str = None,
         backup_id: Optional[str] = None,
@@ -374,6 +390,7 @@ class Patroni:
 
         Args:
             archive_mode: PostgreSQL archive mode.
+            connectivity: whether to allow external connections to the database.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             backup_id: id of the backup that is being restored.
@@ -384,10 +401,14 @@ class Patroni:
         # Render the template file with the correct values.
         rendered = template.render(
             archive_mode=archive_mode,
-            conf_path=self.storage_path,
+            conf_path=PATRONI_CONF_PATH,
+            connectivity=connectivity,
+            log_path=PATRONI_LOGS_PATH,
+            data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,
             member_name=self.member_name,
             peers_ips=self.peers_ips,
+            pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
             superuser=USER,
@@ -399,21 +420,26 @@ class Patroni:
             restoring_backup=backup_id is not None,
             backup_id=backup_id,
             stanza=stanza,
-            version=self._get_postgresql_version(),
+            version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
         )
-        self.render_file(f"{self.storage_path}/patroni.yml", rendered, 0o644)
+        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o644)
 
     def start_patroni(self) -> bool:
-        """Start Patroni service using systemd.
+        """Start Patroni service using snap.
 
         Returns:
             Whether the service started successfully.
         """
-        # Start the service and enable it to start at boot.
-        service_start(PATRONI_SERVICE)
-        service_resume(PATRONI_SERVICE)
-        return service_running(PATRONI_SERVICE)
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.start(services=["patroni"])
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = "Failed to start patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return False
 
     def stop_patroni(self) -> bool:
         """Stop Patroni service using systemd.
@@ -421,8 +447,15 @@ class Patroni:
         Returns:
             Whether the service stopped successfully.
         """
-        service_stop(PATRONI_SERVICE)
-        return not service_running(PATRONI_SERVICE)
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.stop(services=["patroni"])
+            return not selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = "Failed to stop patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return False
 
     def switchover(self) -> None:
         """Trigger a switchover."""
@@ -463,7 +496,12 @@ class Patroni:
         """
         # Get the status of the raft cluster.
         raft_status = subprocess.check_output(
-            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-status"]
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-status",
+            ]
         ).decode("UTF-8")
 
         # Check whether the member is still part of the raft cluster.
@@ -472,8 +510,15 @@ class Patroni:
 
         # Remove the member from the raft cluster.
         result = subprocess.check_output(
-            ["syncobj_admin", "-conn", "127.0.0.1:2222", "-remove", f"{member_ip}:2222"]
+            [
+                "charmed-postgresql.syncobj-admin",
+                "-conn",
+                "127.0.0.1:2222",
+                "-remove",
+                f"{member_ip}:2222",
+            ]
         ).decode("UTF-8")
+
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()
 
@@ -488,8 +533,15 @@ class Patroni:
         Returns:
             Whether the service restarted successfully.
         """
-        service_restart(PATRONI_SERVICE)
-        return service_running(PATRONI_SERVICE)
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            selected_snap.restart(services=["patroni"])
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            error_message = "Failed to start patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return False
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
