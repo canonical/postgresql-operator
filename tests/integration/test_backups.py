@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import asyncio
 import logging
 import uuid
 from typing import Dict, Tuple
@@ -18,8 +17,11 @@ from tests.integration.helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    wait_for_idle_on_blocked,
 )
 
+ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
+FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
 
@@ -48,12 +50,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             num_units=2,
             series=CHARM_SERIES,
         )
-        await ops_test.model.relate(
-            f"{database_app_name}:backup-s3-parameters", S3_INTEGRATOR_APP_NAME
-        )
-        await ops_test.model.relate(
-            f"{database_app_name}:restore-s3-parameters", S3_INTEGRATOR_APP_NAME
-        )
+        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
         await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
 
         # Configure and set access and secret keys.
@@ -179,12 +176,17 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
         application_name=database_app_name,
         series=CHARM_SERIES,
     )
-    await ops_test.model.relate(
-        f"{database_app_name}:restore-s3-parameters", S3_INTEGRATOR_APP_NAME
-    )
+    await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
+        logger.info(
+            "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
+        )
+        await wait_for_idle_on_blocked(
+            ops_test,
+            database_app_name,
+            0,
+            S3_INTEGRATOR_APP_NAME,
+            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
         )
 
     # Run the "list backups" action.
@@ -194,7 +196,13 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     await action.wait()
     backups = action.results["backups"]
     assert backups, "backups not outputted"
-    await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    await wait_for_idle_on_blocked(
+        ops_test,
+        database_app_name,
+        0,
+        S3_INTEGRATOR_APP_NAME,
+        ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+    )
 
     # Run the "restore backup" action.
     for attempt in Retrying(
@@ -211,9 +219,15 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
             restore_status = action.results.get("restore-status")
             assert restore_status, "restore hasn't succeeded"
 
-    # Wait for the backup to complete.
+    # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await wait_for_idle_on_blocked(
+            ops_test,
+            database_app_name,
+            0,
+            S3_INTEGRATOR_APP_NAME,
+            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+        )
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
@@ -254,21 +268,13 @@ async def test_invalid_config_and_recovery_after_fixing_it(
         },
     )
     await action.wait()
-    # Relate the backup endpoint.
-    await ops_test.model.relate(
-        f"{database_app_name}:backup-s3-parameters", S3_INTEGRATOR_APP_NAME
-    )
     logger.info("waiting for the database charm to become blocked")
-    unit = ops_test.model.units.get(f"{database_app_name}/0")
-    await asyncio.gather(
-        ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_APP_NAME], status="active"),
-        ops_test.model.wait_for_idle(
-            apps=[database_app_name], status="blocked", raise_on_blocked=False
-        ),
-        ops_test.model.block_until(
-            lambda: unit.workload_status_message
-            == "failed to initialize stanza, check your S3 settings"
-        ),
+    await wait_for_idle_on_blocked(
+        ops_test,
+        database_app_name,
+        0,
+        S3_INTEGRATOR_APP_NAME,
+        FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
     )
 
     # Provide valid backup configurations, but from another cluster repository.
@@ -282,15 +288,12 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     )
     await action.wait()
     logger.info("waiting for the database charm to become blocked")
-    await asyncio.gather(
-        ops_test.model.wait_for_idle(apps=[S3_INTEGRATOR_APP_NAME], status="active"),
-        ops_test.model.wait_for_idle(
-            apps=[database_app_name], status="blocked", raise_on_blocked=False
-        ),
-        ops_test.model.block_until(
-            lambda: unit.workload_status_message
-            == "the S3 repository has backups from another cluster"
-        ),
+    await wait_for_idle_on_blocked(
+        ops_test,
+        database_app_name,
+        0,
+        S3_INTEGRATOR_APP_NAME,
+        ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
     )
 
     # Provide valid backup configurations, with another path in the S3 bucket.
