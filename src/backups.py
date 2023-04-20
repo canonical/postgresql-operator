@@ -11,7 +11,7 @@ import shutil
 import tempfile
 from datetime import datetime
 from pathlib import Path
-from subprocess import PIPE, run
+from subprocess import PIPE, TimeoutExpired, run
 from typing import Dict, List, Optional, Tuple
 
 import boto3 as boto3
@@ -341,37 +341,41 @@ class PostgreSQLBackups(Object):
             return
 
         # Prevent creating backups and storing in another cluster repository.
-        return_code, stdout, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"],
-            timeout=30,
-        )
-        if return_code != 0:
+        try:
+            return_code, stdout, stderr = self._execute_command(
+                [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"],
+                timeout=30,
+            )
+        except TimeoutExpired as e:
             # Block the charm.
-            logger.error(stderr)
+            logger.error(str(e))
             self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
-            return
+        else:
+            if return_code != 0:
+                # Block the charm.
+                logger.error(stderr)
+                self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+                return
 
-        logger.error(f"stdout: {stdout} - type: {type(stdout)}")
+            if self.charm.unit.is_leader():
+                for stanza in json.loads(stdout):
+                    if stanza.get("name") != self.charm.app_peer_data.get(
+                        "stanza", self.charm.cluster_name
+                    ):
+                        # Prevent archiving of WAL files.
+                        self.charm.app_peer_data.update({"stanza": ""})
+                        self.charm.update_config()
+                        if self.charm._patroni.member_started:
+                            self.charm._patroni.reload_patroni_configuration()
+                        # Block the charm.
+                        self.charm.unit.status = BlockedStatus(
+                            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+                        )
+                        return
 
-        if self.charm.unit.is_leader():
-            for stanza in json.loads(stdout):
-                if stanza.get("name") != self.charm.app_peer_data.get(
-                    "stanza", self.charm.cluster_name
-                ):
-                    # Prevent archiving of WAL files.
-                    self.charm.app_peer_data.update({"stanza": ""})
-                    self.charm.update_config()
-                    if self.charm._patroni.member_started:
-                        self.charm._patroni.reload_patroni_configuration()
-                    # Block the charm.
-                    self.charm.unit.status = BlockedStatus(
-                        ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
-                    )
-                    return
+            self._initialise_stanza()
 
-        self._initialise_stanza()
-
-        self.start_stop_pgbackrest_service()
+            self.start_stop_pgbackrest_service()
 
     def _on_restore_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Call the stanza initialization when the credentials or the connection info change."""

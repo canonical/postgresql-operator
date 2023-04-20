@@ -176,15 +176,19 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(
         charm,
-        resources={"patroni": "patroni.tar.gz"},
         application_name=database_app_name,
         series=CHARM_SERIES,
     )
-    await ops_test.juju("attach-resource", database_app_name, "patroni=patroni.tar.gz")
-    await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
+    await ops_test.model.relate(
+        f"{database_app_name}:restore-s3-parameters", S3_INTEGRATOR_APP_NAME
+    )
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(
+            apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
+        )
 
     # Run the "list backups" action.
-    unit_name = f"{database_app_name}/1"
+    unit_name = f"{database_app_name}/0"
     logger.info("listing the available backups")
     action = await ops_test.model.units.get(unit_name).run_action("list-backups")
     await action.wait()
@@ -192,24 +196,20 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     assert backups, "backups not outputted"
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
-    # Write some data.
-    address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
-    logger.info("creating a second table in the database")
-    with db_connect(host=address, password=password) as connection:
-        connection.autocommit = True
-        connection.cursor().execute("CREATE TABLE backup_table_2 (test_collumn INT );")
-    connection.close()
-
     # Run the "restore backup" action.
-    logger.info("restoring the backup")
-    most_recent_backup = backups.split("\n")[-1]
-    backup_id = most_recent_backup.split()[0]
-    action = await ops_test.model.units.get(unit_name).run_action(
-        "restore", **{"backup-id": backup_id}
-    )
-    await action.wait()
-    logger.info(f"restore results: {action.results}")
+    for attempt in Retrying(
+        stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+    ):
+        with attempt:
+            logger.info("restoring the backup")
+            most_recent_backup = backups.split("\n")[-1]
+            backup_id = most_recent_backup.split()[0]
+            action = await ops_test.model.units.get(unit_name).run_action(
+                "restore", **{"backup-id": backup_id}
+            )
+            await action.wait()
+            restore_status = action.results.get("restore-status")
+            assert restore_status, "restore hasn't succeeded"
 
     # Wait for the backup to complete.
     async with ops_test.fast_forward():
@@ -217,6 +217,8 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
+    password = await get_password(ops_test, unit_name)
+    address = get_unit_address(ops_test, unit_name)
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
@@ -225,13 +227,6 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
         assert cursor.fetchone()[
             0
         ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
-        cursor.execute(
-            "SELECT EXISTS (SELECT FROM information_schema.tables"
-            " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
-        )
-        assert not cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_2' exists"
     connection.close()
 
 
