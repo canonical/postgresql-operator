@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 from time import time
 
 import pytest
@@ -22,7 +23,9 @@ from tests.integration.ha_tests.helpers import (
 from tests.integration.helpers import CHARM_SERIES
 
 APP_NAME = METADATA["name"]
-SECOND_APP_NAME = "another-cluster"
+SECOND_APPLICATION = "second-cluster"
+
+logger = logging.getLogger(__name__)
 
 charm = None
 
@@ -48,9 +51,9 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
         async with ops_test.fast_forward():
-            charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
+            app_charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
             await ops_test.model.deploy(
-                charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
+                app_charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
             )
 
     if wait_for_apps:
@@ -118,30 +121,24 @@ async def test_cluster_restore(ops_test):
     if not charm:
         charm = await ops_test.build_charm(".")
     await ops_test.model.deploy(
-        charm, application_name=SECOND_APP_NAME, num_units=None, series=CHARM_SERIES
+        charm, application_name=SECOND_APPLICATION, num_units=None, series=CHARM_SERIES
     )
 
+    logger.info("Downscaling the existing cluster")
     storages = []
     removal_times = []
     for unit in ops_test.model.applications[app].units:
         storages.append(storage_id(ops_test, unit.name))
         removal_times.append(time())
         await ops_test.model.destroy_unit(unit.name)
-    await ops_test.model.wait_for_idle(
-        apps=[app], status="active", timeout=1000, wait_for_exact_units=0
-    )
+
+    await ops_test.model.remove_application(app, block_until_done=True)
 
     # Recreate cluster
-    for storage in storages:
-        await add_unit_with_storage(ops_test, SECOND_APP_NAME, storage)
-
-    for i in len(ops_test.model.applications[SECOND_APP_NAME].units):
-        unit = ops_test.model.applications[SECOND_APP_NAME].units[i]
+    logger.info("Upscaling the second cluster with the old data")
+    for i in range(len(storages)):
+        unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i])
         removal_time = removal_times[i]
         assert await reused_storage(
             ops_test, unit.public_address, removal_time
         ), "attached storage not properly re-used by Postgresql."
-
-    await ops_test.model.wait_for_idle(
-        apps=[SECOND_APP_NAME], status="active", timeout=1000, wait_for_exact_units=len(storages)
-    )

@@ -143,10 +143,9 @@ async def check_writes(ops_test) -> int:
     return total_expected_writes
 
 
-async def count_writes(ops_test: OpsTest, down_unit: str = None, app: str = None) -> int:
+async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     """Count the number of writes in the database."""
-    if not app:
-        app = await app_name(ops_test)
+    app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
     for unit in ops_test.model.applications[app].units:
         if unit.name != down_unit:
@@ -525,7 +524,8 @@ async def add_unit_with_storage(ops_test, app, storage):
     prev_units = [unit.name for unit in ops_test.model.applications[app].units]
     model_name = ops_test.model.info.name
     add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
-    await ops_test.juju(*add_unit_cmd)
+    return_code, _, _ = await ops_test.juju(*add_unit_cmd)
+    assert return_code == 0, "Failed to add unit with storage"
     await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
     assert (
         len(ops_test.model.applications[app].units) == expected_units
