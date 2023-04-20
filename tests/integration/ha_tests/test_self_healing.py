@@ -266,6 +266,7 @@ async def test_full_cluster_restart(
     await check_writes(ops_test)
 
 
+@pytest.mark.unstable
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
