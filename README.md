@@ -1,4 +1,4 @@
-# Charmed PostgreSQL Operator
+# Charmed PostgreSQL VM Operator
 
 ## Description
 
