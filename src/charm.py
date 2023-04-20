@@ -823,6 +823,11 @@ class PostgresqlOperatorCharm(CharmBase):
             self.app_peer_data.update({"restoring-backup": "", "restore-stanza": ""})
             self.update_config()
 
+            can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
+            if not can_use_s3_repository:
+                self.unit.status = BlockedStatus(validation_message)
+                return
+
         self._set_primary_status_message()
 
     def _set_primary_status_message(self) -> None:
