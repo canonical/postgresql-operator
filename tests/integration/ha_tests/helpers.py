@@ -2,7 +2,9 @@
 # See LICENSE file for licensing details.
 import os
 import random
+import re
 import subprocess
+from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Dict, Optional, Set
@@ -13,7 +15,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.helpers import get_unit_address
+from tests.integration.helpers import get_unit_address, run_command_on_unit
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -22,6 +24,10 @@ SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{SERVICE_NAME}"
 RESTART_CONDITION = "no"
 ORIGINAL_RESTART_CONDITION = "always"
+
+reuse_vol_regex = re.compile(
+    "database system was interrupted while in recovery at log time ([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}) UTC"
+)
 
 
 class MemberNotListedOnClusterError(Exception):
@@ -543,4 +549,15 @@ async def add_unit_with_storage(ops_test, app, storage):
 
 
 async def reused_storage(ops_test: OpsTest, unit_name, removal_time) -> bool:
-    return True
+    """Returns True if storage provided to Postgresql has been reused.
+
+    Checks Patroni logs for when the database was stopped.
+    """
+    logs = await run_command_on_unit(
+        ops_test, unit_name, "journalctl -u snap.charmed-postgresql.patroni.service"
+    )
+    if match := reuse_vol_regex.search(logs):
+        logs_date = datetime.fromisoformat("T".join(match.groups()))
+        # Log time is within 15 minuntes of the recorded removal time
+        return logs_date + timedelta(minutes=15) >= removal_time
+    return False

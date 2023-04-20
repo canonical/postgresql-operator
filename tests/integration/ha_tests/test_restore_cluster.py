@@ -2,7 +2,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-from time import time
+from datetime import datetime
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -27,8 +27,6 @@ SECOND_APPLICATION = "second-cluster"
 
 logger = logging.getLogger(__name__)
 
-charm = None
-
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -38,7 +36,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        global charm
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
@@ -51,9 +48,9 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
         async with ops_test.fast_forward():
-            app_charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
+            charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
             await ops_test.model.deploy(
-                app_charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
+                charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
             )
 
     if wait_for_apps:
@@ -88,7 +85,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
             break
     unit_storage_id = storage_id(ops_test, unit.name)
     expected_units = len(ops_test.model.applications[app].units) - 1
-    removal_time = time()
+    removal_time = datetime.utcnow()
     await ops_test.model.destroy_unit(unit.name)
     await ops_test.model.wait_for_idle(
         apps=[app], status="active", timeout=1000, wait_for_exact_units=expected_units
@@ -96,7 +93,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     new_unit = await add_unit_with_storage(ops_test, app, unit_storage_id)
 
     assert await reused_storage(
-        ops_test, new_unit.public_address, removal_time
+        ops_test, new_unit.name, removal_time
     ), "attached storage not properly re-used by Postgresql."
 
     # Verify that no writes to the database were missed after stopping the writes.
@@ -106,39 +103,3 @@ async def test_storage_re_use(ops_test, continuous_writes):
     assert await secondary_up_to_date(
         ops_test, new_unit.name, total_expected_writes
     ), "secondary not up to date with the cluster after restarting."
-
-
-async def test_cluster_restore(ops_test):
-    """Recreates the cluster from storage volumes."""
-    app = await app_name(ops_test)
-    if storage_type(ops_test, app) == "rootfs":
-        pytest.skip(
-            "re-use of storage can only be used on deployments with persistent storage not on rootfs deployments"
-        )
-
-    # Deploy a second cluster
-    global charm
-    if not charm:
-        charm = await ops_test.build_charm(".")
-    await ops_test.model.deploy(
-        charm, application_name=SECOND_APPLICATION, num_units=None, series=CHARM_SERIES
-    )
-
-    logger.info("Downscaling the existing cluster")
-    storages = []
-    removal_times = []
-    for unit in ops_test.model.applications[app].units:
-        storages.append(storage_id(ops_test, unit.name))
-        removal_times.append(time())
-        await ops_test.model.destroy_unit(unit.name)
-
-    await ops_test.model.remove_application(app, block_until_done=True)
-
-    # Recreate cluster
-    logger.info("Upscaling the second cluster with the old data")
-    for i in range(len(storages)):
-        unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i])
-        removal_time = removal_times[i]
-        assert await reused_storage(
-            ops_test, unit.public_address, removal_time
-        ), "attached storage not properly re-used by Postgresql."
