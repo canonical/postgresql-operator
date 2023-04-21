@@ -1,15 +1,19 @@
-# Copyright 2021 Canonical Ltd.
+# Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 name: postgresql
+display-name: Charmed PostgreSQL VM
+summary: Charmed PostgreSQL VM operator
 description: |
-  Charm to operate the PostgreSQL database on machines
+  Charm to operate the PostgreSQL database on machines.
 docs: https://discourse.charmhub.io/t/charmed-postgresql-documentation/9710
-summary: |
-  Charm to operate the PostgreSQL database on machines
-
-series:
-  - jammy
+source: https://github.com/canonical/postgresql-operator
+issues: https://github.com/canonical/postgresql-operator/issues
+website:
+  - https://ubuntu.com/data/postgresql
+  - https://charmhub.io/postgresql
+  - https://github.com/canonical/postgresql-operator
+  - https://chat.charmhub.io/charmhub/channels/data-platform
 
 peers:
   database-peers:
@@ -29,11 +33,16 @@ requires:
   certificates:
     interface: tls-certificates
     limit: 1
+    optional: true
   s3-parameters:
     interface: s3
     limit: 1
+    optional: true
 
 storage:
   pgdata:
     type: filesystem
     location: /var/snap/charmed-postgresql/common
+
+assumes:
+  - juju
