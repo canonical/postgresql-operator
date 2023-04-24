@@ -2,7 +2,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-from datetime import datetime
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -79,10 +78,8 @@ async def test_cluster_restore(ops_test):
 
     logger.info("Downscaling the existing cluster")
     storages = []
-    removal_times = []
     for unit in ops_test.model.applications[app].units:
         storages.append(storage_id(ops_test, unit.name))
-        removal_times.append(datetime.utcnow())
         await ops_test.model.destroy_unit(unit.name)
 
     await ops_test.model.remove_application(app, block_until_done=True)
@@ -96,10 +93,9 @@ async def test_cluster_restore(ops_test):
             password_set = True
         else:
             unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i])
-        # removal_time = removal_times[i]
-        # assert await reused_storage(
-        #    ops_test, unit.name, removal_time
-        # ), "attached storage not properly re-used by Postgresql."
+        assert await reused_storage(
+            ops_test, unit.name
+        ), "attached storage not properly re-used by Postgresql."
 
     primary = await get_primary(ops_test, f"{SECOND_APPLICATION}/0")
     address = get_unit_address(ops_test, primary)
