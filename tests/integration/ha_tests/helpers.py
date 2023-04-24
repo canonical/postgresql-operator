@@ -4,7 +4,7 @@ import os
 import random
 from pathlib import Path
 from tempfile import mkstemp
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Tuple
 
 import psycopg2
 import requests
@@ -39,7 +39,7 @@ class ProcessRunningError(Exception):
     """Raised when a process is running when it is not expected to be."""
 
 
-async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
 
@@ -56,6 +56,16 @@ async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         return False
 
     return True
+
+
+async def are_writes_increasing(ops_test, down_unit: str = None) -> None:
+    """Verify new writes are continuing by counting the number of writes."""
+    writes, _ = await count_writes(ops_test, down_unit=down_unit)
+    for member, count in writes.items():
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                more_writes, _ = await count_writes(ops_test, down_unit=down_unit)
+                assert more_writes[member] > count, f"{member}: writes not continuing to DB"
 
 
 async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
@@ -79,14 +89,15 @@ def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
     return resp.json()
 
 
-async def change_primary_start_timeout(
-    ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
+async def change_patroni_setting(
+    ops_test: OpsTest, setting: str, value: int, use_random_unit: bool = False
 ) -> None:
     """Change primary start timeout configuration.
 
     Args:
         ops_test: ops_test instance.
-        seconds: number of seconds to set in primary_start_timeout configuration.
+        setting: the name of the setting.
+        value: the value to assign to the setting.
         use_random_unit: whether to use a random unit (default is False,
             so it uses the primary)
     """
@@ -101,7 +112,7 @@ async def change_primary_start_timeout(
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
-                json={"primary_start_timeout": seconds},
+                json={setting: value},
             )
 
 
@@ -156,12 +167,18 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes = await count_writes(ops_test)
-    assert total_expected_writes == actual_writes, "writes to the db were missed."
+    actual_writes, max_number_written = await count_writes(ops_test)
+    for member, count in actual_writes.items():
+        assert (
+            count == max_number_written[member]
+        ), f"{member}: writes to the db were missed: count of actual writes different from the max number written."
+        assert total_expected_writes == count, f"{member}: writes to the db were missed."
     return total_expected_writes
 
 
-async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
+async def count_writes(
+    ops_test: OpsTest, down_unit: str = None
+) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
@@ -174,20 +191,24 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
         for unit in ops_test.model.applications[app].units:
             if unit.name == down_unit:
                 down_ip = unit.public_address
+    count = {}
+    max = {}
     for member in cluster["members"]:
         if member["role"] != "replica" and member["host"] != down_ip:
             host = member["host"]
 
-    connection_string = (
-        f"dbname='application' user='operator'"
-        f" host='{host}' password='{password}' connect_timeout=10"
-    )
+            connection_string = (
+                f"dbname='application' user='operator'"
+                f" host='{host}' password='{password}' connect_timeout=10"
+            )
 
-    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-        cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-        count = cursor.fetchone()[0]
-    connection.close()
-    return count
+            with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                results = cursor.fetchone()
+                count[member["name"]] = results[0]
+                max[member["name"]] = results[1]
+            connection.close()
+    return count, max
 
 
 async def fetch_cluster_members(ops_test: OpsTest):
@@ -211,14 +232,15 @@ async def fetch_cluster_members(ops_test: OpsTest):
     return member_ips
 
 
-async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
-    """Get the primary start timeout configuration.
+async def get_patroni_setting(ops_test: OpsTest, setting: str) -> Optional[int]:
+    """Get the value of one of the integer Patroni settings.
 
     Args:
         ops_test: ops_test instance.
+        setting: the name of the setting.
 
     Returns:
-        primary start timeout in seconds or None if it's using the default value.
+        the value of the configuration or None if it's using the default value.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -226,8 +248,8 @@ async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
-            primary_start_timeout = configuration_info.json().get("primary_start_timeout")
-            return int(primary_start_timeout) if primary_start_timeout is not None else None
+            value = configuration_info.json().get(setting)
+            return int(value) if value is not None else None
 
 
 async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
@@ -307,19 +329,26 @@ def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
         return False
 
 
-async def get_primary(ops_test: OpsTest, app) -> str:
+async def get_primary(ops_test: OpsTest, app, down_unit: str = None) -> str:
     """Use the charm action to retrieve the primary from provided application.
+
+    Args:
+        ops_test: OpsTest instance.
+        app: database application name.
+        down_unit: unit that is offline and the action won't run on.
 
     Returns:
         primary unit name.
     """
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            break
+
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
         with attempt:
             # Can retrieve from any unit running unit, so we pick the first.
-            unit_name = ops_test.model.applications[app].units[0].name
-            action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+            action = await unit.run_action("get-primary")
             action = await action.wait()
-            print(f"action.results: {str(action.results)}")
             assert action.results["primary"] is not None and action.results["primary"] != "None"
             return action.results["primary"]
 
@@ -358,7 +387,7 @@ async def send_signal_to_process(
         )
 
 
-async def postgresql_ready(ops_test, unit_name: str) -> bool:
+async def is_postgresql_ready(ops_test, unit_name: str) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
     unit_ip = get_unit_address(ops_test, unit_name)
     try:
@@ -395,9 +424,9 @@ async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_wr
                 with psycopg2.connect(
                     connection_string
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-                    secondary_writes = cursor.fetchone()[0]
-                    assert secondary_writes == expected_writes
+                    cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                    results = cursor.fetchone()
+                    assert results[0] == expected_writes and results[1] == expected_writes
     except RetryError:
         return False
     finally:
@@ -482,4 +511,4 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
     await ops_test.juju(*start_cmd.split())
 
-    await postgresql_ready(ops_test, unit.name)
+    await is_postgresql_ready(ops_test, unit.name)

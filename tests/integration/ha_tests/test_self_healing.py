@@ -2,7 +2,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
-from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -12,16 +11,18 @@ from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
-    all_db_processes_down,
     app_name,
+    are_all_db_processes_down,
+    are_writes_increasing,
+    change_patroni_setting,
     change_wal_settings,
     check_writes,
-    count_writes,
     fetch_cluster_members,
+    get_patroni_setting,
     get_primary,
     is_cluster_updated,
+    is_postgresql_ready,
     list_wal_files,
-    postgresql_ready,
     send_signal_to_process,
     start_continuous_writes,
     update_restart_condition,
@@ -80,17 +81,10 @@ async def test_kill_db_process(
     await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 60 seconds wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
@@ -119,11 +113,7 @@ async def test_freeze_db_process(
         # considered to trigger a fail-over after primary_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
         try:
-            writes = await count_writes(ops_test, primary_name)
-            for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-                with attempt:
-                    more_writes = await count_writes(ops_test, primary_name)
-                    assert more_writes > writes, "writes not continuing to DB"
+            await are_writes_increasing(ops_test, primary_name)
 
             # Verify that a new primary gets elected (ie old primary is secondary).
             for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
@@ -135,7 +125,7 @@ async def test_freeze_db_process(
             await send_signal_to_process(ops_test, primary_name, process, "SIGCONT")
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)
 
@@ -155,17 +145,10 @@ async def test_restart_db_process(
     await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     new_primary_name = await get_primary(ops_test, app)
@@ -185,8 +168,13 @@ async def test_full_cluster_restart(
     is SIGKILL.
     """
     # Locate primary unit.
-    # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
+
+    # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
+    initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
+    await change_patroni_setting(ops_test, "loop_wait", 300)
+
+    # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
     # Restart all units "simultaneously".
@@ -200,25 +188,25 @@ async def test_full_cluster_restart(
     # This test serves to verify behavior when all replicas are down at the same time that when
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
-    assert await all_db_processes_down(ops_test, process), "Not all units down at the same time."
-    if process == PATRONI_PROCESS:
-        awaits = []
-        for unit in ops_test.model.applications[app].units:
-            awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
-        await asyncio.gather(*awaits)
+    try:
+        assert await are_all_db_processes_down(
+            ops_test, process
+        ), "Not all units down at the same time."
+    finally:
+        if process == PATRONI_PROCESS:
+            awaits = []
+            for unit in ops_test.model.applications[app].units:
+                awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+            await asyncio.gather(*awaits)
+        await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait)
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
-        assert await postgresql_ready(
+        assert await is_postgresql_ready(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
-    for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
-        with attempt:
-            writes = await count_writes(ops_test)
-            sleep(5)
-            more_writes = await count_writes(ops_test)
-            assert more_writes > writes, "writes not continuing to DB"
+    await are_writes_increasing(ops_test)
 
     # Verify that all units are part of the same cluster.
     member_ips = await fetch_cluster_members(ops_test)
@@ -268,14 +256,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
                 assert new_primary_name is not None
                 assert new_primary_name != primary_name
 
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         # Change some settings to enable WAL rotation.
         for unit in ops_test.model.applications[app].units:
@@ -306,6 +287,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)

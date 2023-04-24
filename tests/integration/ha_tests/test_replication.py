@@ -9,8 +9,8 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     app_name,
+    are_writes_increasing,
     check_writes,
-    count_writes,
     fetch_cluster_members,
     get_password,
     get_primary,
@@ -63,12 +63,7 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active")
 
-    # Check whether writes are increasing.
-    writes = await count_writes(ops_test, primary_name)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test, primary_name)
-            assert more_writes > writes, "writes not continuing to DB"
+    await are_writes_increasing(ops_test, primary_name)
 
     # Verify that a new primary gets elected (ie old primary is secondary).
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
@@ -95,12 +90,7 @@ async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Check whether writes are increasing.
-    writes = await count_writes(ops_test, primary_name)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test, primary_name)
-            assert more_writes > writes, "writes not continuing to DB"
+    await are_writes_increasing(ops_test, primary_name)
 
     # Verify that no writes to the database were missed after stopping the writes
     # (check that all the units have all the writes).
@@ -126,12 +116,7 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Check whether writes are increasing.
-    writes = await count_writes(ops_test, primary_name)
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            more_writes = await count_writes(ops_test, primary_name)
-            assert more_writes > writes, "writes not continuing to DB"
+    await are_writes_increasing(ops_test, primary_name)
 
     # Verify that no writes to the first cluster were missed after stopping the writes.
     await check_writes(ops_test)
