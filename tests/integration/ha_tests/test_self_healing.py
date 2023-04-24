@@ -117,10 +117,10 @@ async def test_storage_re_use(ops_test, continuous_writes):
     # Verify that no writes to the database were missed after stopping the writes.
     total_expected_writes = await check_writes(ops_test)
 
-    # Verify that old primary is up-to-date.
+    # Verify that new instance is up-to-date.
     assert await secondary_up_to_date(
         ops_test, new_unit.name, total_expected_writes
-    ), "secondary not up to date with the cluster after restarting." @ pytest.mark.parametrize(
+    ), "new instance not up to date." @ pytest.mark.parametrize(
         "process", DB_PROCESSES
     )
 
