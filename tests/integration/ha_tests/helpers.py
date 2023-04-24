@@ -532,7 +532,6 @@ async def add_unit_with_storage(ops_test, app, storage, password=None):
     assert return_code == 0, "Failed to add unit with storage"
     if password:
         unit = ops_test.model.applications[app].units[0]
-        print(password)
         await ops_test.model.block_until(
             lambda: unit.workload_status_message == "awaiting for member to start", timeout=600
         )

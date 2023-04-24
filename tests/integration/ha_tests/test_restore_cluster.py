@@ -121,4 +121,10 @@ async def test_cluster_restore(ops_test):
         ops_test.model.applications[SECOND_APPLICATION].units[0].public_address
     )
     primaries = [member for member in cluster["members"] if member["role"] == "primary"]
-    assert len(primaries) == 1
+    assert len(primaries) == 1, "There isn't just a single primary"
+
+    # check that all units are member of the new cluster
+    members = [member["name"] for member in cluster["members"]]
+    for unit in ops_test.model.applications[SECOND_APPLICATION].units:
+        assert unit.name.replace("/", "-") in members, "Unit missing from cluster"
+    assert len(members) == len(storages), "Number of restored units and reused storages diverge"
