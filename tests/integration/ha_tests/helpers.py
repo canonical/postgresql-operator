@@ -369,7 +369,7 @@ async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
 
 
 async def send_signal_to_process(
-    ops_test: OpsTest, unit_name: str, process: str, kill_code: str
+    ops_test: OpsTest, unit_name: str, process: str, signal: str
 ) -> None:
     """Kills process on the unit according to the provided kill code."""
     # Killing the only instance can be disastrous.
@@ -378,13 +378,24 @@ async def send_signal_to_process(
         await ops_test.model.applications[app].add_unit(count=1)
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
 
-    kill_cmd = f"run --unit {unit_name} -- pkill --signal {kill_code} -x {process}"
-    return_code, _, _ = await ops_test.juju(*kill_cmd.split())
+    command = f"run --unit {unit_name} -- pkill --signal {signal} -x {process}"
 
-    if return_code != 0:
-        raise ProcessError(
-            "Expected kill command %s to succeed instead it failed: %s", kill_cmd, return_code
-        )
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            # Send the signal.
+            return_code, _, _ = await ops_test.juju(*command.split())
+            if signal not in ["SIGSTOP", "SIGCONT"]:
+                _, raw_pid, _ = await ops_test.juju(
+                    "run", "--unit", unit_name, "--", "pgrep", "-x", process
+                )
+
+                # If something was returned, there is a running process.
+                if len(raw_pid) > 0:
+                    raise ProcessRunningError
+            elif return_code != 0:
+                raise ProcessError(
+                    "Expected command %s to succeed instead it failed: %s", command, return_code
+                )
 
 
 async def is_postgresql_ready(ops_test, unit_name: str) -> bool:

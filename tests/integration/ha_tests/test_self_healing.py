@@ -78,7 +78,7 @@ async def test_kill_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Kill the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
+    await send_signal_to_process(ops_test, primary_name, process, "SIGKILL")
 
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test, primary_name)
@@ -142,7 +142,7 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGTERM")
+    await send_signal_to_process(ops_test, primary_name, process, "SIGTERM")
 
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test, primary_name)
@@ -180,7 +180,7 @@ async def test_full_cluster_restart(
     # Restart all units "simultaneously".
     await asyncio.gather(
         *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code=signal)
+            send_signal_to_process(ops_test, unit.name, process, signal)
             for unit in ops_test.model.applications[app].units
         ]
     )
