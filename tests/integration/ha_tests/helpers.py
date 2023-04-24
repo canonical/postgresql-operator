@@ -2,9 +2,7 @@
 # See LICENSE file for licensing details.
 import os
 import random
-import re
 import subprocess
-from datetime import datetime, timedelta
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Dict, Optional, Set
@@ -24,10 +22,6 @@ SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{SERVICE_NAME}"
 RESTART_CONDITION = "no"
 ORIGINAL_RESTART_CONDITION = "always"
-
-reuse_vol_regex = re.compile(
-    "database system was interrupted while in recovery at log time ([0-9]{4}-[0-9]{2}-[0-9]{2}) ([0-9]{2}:[0-9]{2}:[0-9]{2}) UTC"
-)
 
 
 class MemberNotListedOnClusterError(Exception):
@@ -532,7 +526,8 @@ async def add_unit_with_storage(ops_test, app, storage):
     add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
-    await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
     assert (
         len(ops_test.model.applications[app].units) == expected_units
     ), "New unit not added to model"
@@ -548,16 +543,15 @@ async def add_unit_with_storage(ops_test, app, storage):
             return unit
 
 
-async def reused_storage(ops_test: OpsTest, unit_name, removal_time) -> bool:
+async def reused_storage(ops_test: OpsTest, unit_name) -> bool:
     """Returns True if storage provided to Postgresql has been reused.
 
     Checks Patroni logs for when the database was stopped.
     """
-    logs = await run_command_on_unit(
-        ops_test, unit_name, "journalctl -u snap.charmed-postgresql.patroni.service"
+    return bool(
+        await run_command_on_unit(
+            ops_test,
+            unit_name,
+            "grep 'Database cluster state: in archive recovery' /var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
+        )
     )
-    if match := reuse_vol_regex.search(logs):
-        logs_date = datetime.fromisoformat("T".join(match.groups()))
-        # Log time is within 15 minuntes of the recorded removal time
-        return logs_date + timedelta(minutes=15) >= removal_time
-    return False

@@ -2,7 +2,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
-from datetime import datetime
 from time import sleep
 
 import pytest
@@ -103,7 +102,6 @@ async def test_storage_re_use(ops_test, continuous_writes):
             break
     unit_storage_id = storage_id(ops_test, unit.name)
     expected_units = len(ops_test.model.applications[app].units) - 1
-    removal_time = datetime.utcnow()
     await ops_test.model.destroy_unit(unit.name)
     await ops_test.model.wait_for_idle(
         apps=[app], status="active", timeout=1000, wait_for_exact_units=expected_units
@@ -111,7 +109,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     new_unit = await add_unit_with_storage(ops_test, app, unit_storage_id)
 
     assert await reused_storage(
-        ops_test, new_unit.name, removal_time
+        ops_test, new_unit.name
     ), "attached storage not properly re-used by Postgresql."
 
     # Verify that no writes to the database were missed after stopping the writes.
