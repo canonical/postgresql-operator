@@ -13,7 +13,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.helpers import get_unit_address, run_command_on_unit
+from tests.integration.helpers import get_unit_address, run_command_on_unit, set_password
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -514,7 +514,7 @@ def storage_id(ops_test, unit_name):
             return line.split()[1]
 
 
-async def add_unit_with_storage(ops_test, app, storage):
+async def add_unit_with_storage(ops_test, app, storage, password=None):
     """Adds unit with storage.
 
     Note: this function exists as a temporary solution until this issue is resolved:
@@ -526,6 +526,13 @@ async def add_unit_with_storage(ops_test, app, storage):
     add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
+    if password:
+        unit = ops_test.model.applications[app].units[0]
+        print(password)
+        await ops_test.model.block_until(
+            lambda: unit.workload_status_message == "awaiting for member to start", timeout=600
+        )
+        await set_password(ops_test, unit.name, password=password)
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
     assert (

@@ -754,13 +754,18 @@ class PostgresqlOperatorCharm(CharmBase):
             event.set_results({"password": password})
             return
 
-        # Update the password in the secret store.
-        self.set_secret("app", f"{username}-password", password)
-
         # Ensure all members are ready before trying to reload Patroni
         # configuration to avoid errors (like the API not responding in
         # one instance because PostgreSQL and/or Patroni are not ready).
         if not self._patroni.are_all_members_ready():
+            # Allow if cluster is still initialising
+            if not isinstance(self.unit.status, ActiveStatus) and len(self._hosts) < 2:
+                self.set_secret("app", f"{username}-password", password)
+                self.update_config()
+                self._patroni.restart_patroni()
+                event.set_results({"password": password})
+                return
+
             event.fail(
                 "Failed changing the password: Not all members healthy or finished initial sync."
             )
@@ -775,6 +780,9 @@ class PostgresqlOperatorCharm(CharmBase):
                 "Failed changing the password: Not all members healthy or finished initial sync."
             )
             return
+
+        # Update the password in the secret store.
+        self.set_secret("app", f"{username}-password", password)
 
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
