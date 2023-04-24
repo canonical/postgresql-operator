@@ -561,6 +561,7 @@ async def reused_storage(ops_test: OpsTest, unit_name) -> bool:
     await run_command_on_unit(
         ops_test,
         unit_name,
-        "grep 'Database cluster state: in archive recovery' /var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
+        "grep -E 'Database cluster state: in archive recovery|Database cluster state: shut down' "
+        "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
     )
     return True
