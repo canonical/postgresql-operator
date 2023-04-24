@@ -10,11 +10,18 @@ from tests.integration.ha_tests.helpers import (
     METADATA,
     add_unit_with_storage,
     app_name,
+    get_patroni_cluster,
     reused_storage,
     storage_id,
     storage_type,
 )
-from tests.integration.helpers import CHARM_SERIES, get_password, get_primary, get_unit_address, db_connect
+from tests.integration.helpers import (
+    CHARM_SERIES,
+    db_connect,
+    get_password,
+    get_primary,
+    get_unit_address,
+)
 
 APP_NAME = METADATA["name"]
 SECOND_APPLICATION = "second-cluster"
@@ -37,8 +44,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
-                # num_units=3,
-                num_units=1,
+                num_units=3,
                 series=CHARM_SERIES,
                 storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
             )
@@ -100,9 +106,7 @@ async def test_cluster_restore(ops_test):
     primary = await get_primary(ops_test, f"{SECOND_APPLICATION}/0")
     address = get_unit_address(ops_test, primary)
     logger.info("checking that data was persisted")
-    with db_connect(
-        host=address, password=password
-    ) as connection, connection.cursor() as cursor:
+    with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'restore_table_1');"
@@ -111,3 +115,10 @@ async def test_cluster_restore(ops_test):
             0
         ], "data wasn't correctly restored: table 'restore_table_1' doesn't exist"
     connection.close()
+
+    # check that there is only one primary
+    cluster = get_patroni_cluster(
+        ops_test.model.applications[SECOND_APPLICATION].units[0].public_address
+    )
+    primaries = [member for member in cluster["members"] if member["role"] == "primary"]
+    assert len(primaries) == 1

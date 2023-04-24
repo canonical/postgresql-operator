@@ -13,7 +13,11 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.helpers import get_unit_address, run_command_on_unit, set_password
+from tests.integration.helpers import (
+    get_unit_address,
+    run_command_on_unit,
+    set_password,
+)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
