@@ -382,7 +382,10 @@ class PostgresqlOperatorCharm(CharmBase):
             Whether the IP was updated.
         """
         # Stop Patroni (and update the member IP) if it was previously isolated
-        # from the cluster network.
+        # from the cluster network. Patroni will start back when its IP address is
+        # updated in all the units through the peer relation changed event (in that
+        # hook, the configuration is updated and the service is started - or only
+        # reloaded in the other units).
         stored_ip = self.unit_peer_data.get("ip")
         current_ip = self.get_hostname_by_unit(None)
         if current_ip != stored_ip:
