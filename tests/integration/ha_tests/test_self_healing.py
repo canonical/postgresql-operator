@@ -120,9 +120,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     # Verify that new instance is up-to-date.
     assert await secondary_up_to_date(
         ops_test, new_unit.name, total_expected_writes
-    ), "new instance not up to date." @ pytest.mark.parametrize(
-        "process", DB_PROCESSES
-    )
+    ), "new instance not up to date."
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
