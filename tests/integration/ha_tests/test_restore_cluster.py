@@ -120,7 +120,7 @@ async def test_cluster_restore(ops_test):
     cluster = get_patroni_cluster(
         ops_test.model.applications[SECOND_APPLICATION].units[0].public_address
     )
-    primaries = [member for member in cluster["members"] if member["role"] == "primary"]
+    primaries = [member for member in cluster["members"] if member["role"] == "leader"]
     assert len(primaries) == 1, "There isn't just a single primary"
 
     # check that all units are member of the new cluster
