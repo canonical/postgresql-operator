@@ -207,7 +207,6 @@ async def test_full_cluster_restart(
             ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
         )
 
-
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
         assert await is_postgresql_ready(
