@@ -382,7 +382,7 @@ async def send_signal_to_process(
         await ops_test.model.applications[app].add_unit(count=1)
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
 
-    command = f"run --unit {unit_name} -- pkill --signal {signal} -x {process}"
+    command = f"ssh {unit_name} pkill --signal {signal} -x {process}"
 
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
