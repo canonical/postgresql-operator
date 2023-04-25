@@ -160,7 +160,12 @@ async def test_restart_db_process(
 @pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
-    ops_test: OpsTest, process: str, signal: str, continuous_writes, reset_restart_condition
+    ops_test: OpsTest,
+    process: str,
+    signal: str,
+    continuous_writes,
+    reset_restart_condition,
+    loop_wait,
 ) -> None:
     """This tests checks that a cluster recovers from a full cluster restart.
 
@@ -198,7 +203,10 @@ async def test_full_cluster_restart(
             for unit in ops_test.model.applications[app].units:
                 awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
             await asyncio.gather(*awaits)
-        await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait)
+        await change_patroni_setting(
+            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
+        )
+
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
@@ -206,7 +214,8 @@ async def test_full_cluster_restart(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
-    await are_writes_increasing(ops_test)
+    async with ops_test.fast_forward():
+        await are_writes_increasing(ops_test)
 
     # Verify that all units are part of the same cluster.
     member_ips = await fetch_cluster_members(ops_test)

@@ -38,6 +38,16 @@ async def continuous_writes(ops_test: OpsTest) -> None:
             assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
 
 
+@pytest.fixture()
+async def loop_wait(ops_test: OpsTest) -> None:
+    """Temporary change the loop wait configuration."""
+    # Change the parameter that makes Patroni wait for some more time before restarting PostgreSQL.
+    initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
+    yield
+    # Rollback to the initial configuration.
+    await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait, use_random_unit=True)
+
+
 @pytest.fixture(scope="module")
 async def primary_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the primary start timeout configuration."""
