@@ -114,7 +114,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
 
     # remove a unit and attach it's storage to a new unit
     for unit in ops_test.model.applications[app].units:
-        if is_replica(ops_test, unit.name):
+        if await is_replica(ops_test, unit.name):
             break
     unit_storage_id = storage_id(ops_test, unit.name)
     expected_units = len(ops_test.model.applications[app].units) - 1
