@@ -47,10 +47,14 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    _, raw_pid, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-x", process)
+                    _, processes, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-x", process)
+
+                    # Splitting processes by "\n" results in one or more empty lines, hence we
+                    # need to process these lines accordingly.
+                    processes = [proc for proc in processes.split("\n") if len(proc) > 0]
 
                     # If something was returned, there is a running process.
-                    if len(raw_pid) > 0:
+                    if len(processes) > 0:
                         raise ProcessRunningError
     except RetryError:
         return False
@@ -385,12 +389,14 @@ async def send_signal_to_process(
             # Send the signal.
             return_code, _, _ = await ops_test.juju(*command.split())
             if signal not in ["SIGSTOP", "SIGCONT"]:
-                _, raw_pid, _ = await ops_test.juju(
-                    "run", "--unit", unit_name, "--", "pgrep", "-x", process
-                )
+                _, processes, _ = await ops_test.juju("ssh", unit_name, "pgrep", "-x", process)
+
+                # Splitting processes by "\n" results in one or more empty lines, hence we
+                # need to process these lines accordingly.
+                processes = [proc for proc in processes.split("\n") if len(proc) > 0]
 
                 # If something was returned, there is a running process.
-                if len(raw_pid) > 0:
+                if len(processes) > 0:
                     raise ProcessRunningError
             elif return_code != 0:
                 raise ProcessError(
