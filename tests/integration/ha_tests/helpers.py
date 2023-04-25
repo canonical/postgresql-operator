@@ -388,7 +388,14 @@ async def send_signal_to_process(
         with attempt:
             # Send the signal.
             return_code, _, _ = await ops_test.juju(*command.split())
-            if signal not in ["SIGSTOP", "SIGCONT"]:
+            if signal == "SIGSTOP":
+                if return_code != 0:
+                    raise ProcessError(
+                        "Expected command %s to succeed instead it failed: %s",
+                        command,
+                        return_code,
+                    )
+            elif signal != "SIGCONT":
                 _, processes, _ = await ops_test.juju("ssh", unit_name, "pgrep", "-x", process)
 
                 # Splitting processes by "\n" results in one or more empty lines, hence we
@@ -398,10 +405,6 @@ async def send_signal_to_process(
                 # If something was returned, there is a running process.
                 if len(processes) > 0:
                     raise ProcessRunningError
-            elif return_code != 0:
-                raise ProcessError(
-                    "Expected command %s to succeed instead it failed: %s", command, return_code
-                )
 
 
 async def is_postgresql_ready(ops_test, unit_name: str) -> bool:
