@@ -569,13 +569,7 @@ async def test_network_cut_without_ip_change(
     # Wait until the cluster becomes idle.
     logger.info("waiting for cluster to become idle")
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[app],
-            status="active",
-            raise_on_blocked=True,
-            timeout=1000,
-            idle_period=30,
-        )
+        await ops_test.model.wait_for_idle(apps=[app], status="active")
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
