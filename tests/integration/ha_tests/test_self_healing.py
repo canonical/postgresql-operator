@@ -12,6 +12,7 @@ from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
+    add_unit_with_storage,
     all_db_processes_down,
     app_name,
     change_wal_settings,
@@ -22,9 +23,12 @@ from tests.integration.ha_tests.helpers import (
     is_replica,
     list_wal_files,
     postgresql_ready,
+    reused_storage,
     secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
+    storage_id,
+    storage_type,
     update_restart_condition,
 )
 from tests.integration.helpers import (
@@ -51,7 +55,12 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         wait_for_apps = True
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
-            await ops_test.model.deploy(charm, num_units=3, series=CHARM_SERIES)
+            await ops_test.model.deploy(
+                charm,
+                num_units=3,
+                series=CHARM_SERIES,
+                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+            )
     # Deploy the continuous writes application charm if it wasn't already deployed.
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
@@ -64,6 +73,52 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if wait_for_apps:
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
+
+
+async def test_storage_re_use(ops_test, continuous_writes):
+    """Verifies that database units with attached storage correctly repurpose storage.
+
+    It is not enough to verify that Juju attaches the storage. Hence test checks that the
+    postgresql properly uses the storage that was provided. (ie. doesn't just re-sync everything
+    from primary, but instead computes a diff between current storage and primary storage.)
+    """
+    app = await app_name(ops_test)
+    if storage_type(ops_test, app) == "rootfs":
+        pytest.skip(
+            "re-use of storage can only be used on deployments with persistent storage not on rootfs deployments"
+        )
+
+    # removing the only replica can be disastrous
+    if len(ops_test.model.applications[app].units) < 2:
+        await ops_test.model.applications[app].add_unit(count=1)
+        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # remove a unit and attach it's storage to a new unit
+    for unit in ops_test.model.applications[app].units:
+        if is_replica(ops_test, unit.name):
+            break
+    unit_storage_id = storage_id(ops_test, unit.name)
+    expected_units = len(ops_test.model.applications[app].units) - 1
+    await ops_test.model.destroy_unit(unit.name)
+    await ops_test.model.wait_for_idle(
+        apps=[app], status="active", timeout=1000, wait_for_exact_units=expected_units
+    )
+    new_unit = await add_unit_with_storage(ops_test, app, unit_storage_id)
+
+    assert await reused_storage(
+        ops_test, new_unit.name
+    ), "attached storage not properly re-used by Postgresql."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await check_writes(ops_test)
+
+    # Verify that new instance is up-to-date.
+    assert await secondary_up_to_date(
+        ops_test, new_unit.name, total_expected_writes
+    ), "new instance not up to date."
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
