@@ -45,7 +45,7 @@ async def loop_wait(ops_test: OpsTest) -> None:
     initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
     yield
     # Rollback to the initial configuration.
-    await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait)
+    await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait, use_random_unit=True)
 
 
 @pytest.fixture(scope="module")

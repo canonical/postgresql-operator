@@ -216,7 +216,7 @@ async def test_full_cluster_restart(
 
     # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
     initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
-    await change_patroni_setting(ops_test, "loop_wait", 300)
+    await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
@@ -242,7 +242,9 @@ async def test_full_cluster_restart(
             for unit in ops_test.model.applications[app].units:
                 awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
             await asyncio.gather(*awaits)
-        await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait)
+        await change_patroni_setting(
+            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
+        )
 
     # Verify all units are up and running.
     for unit in ops_test.model.applications[app].units:
@@ -250,12 +252,13 @@ async def test_full_cluster_restart(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
 
-    for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
-        with attempt:
-            writes = await count_writes(ops_test)
-            sleep(5)
-            more_writes = await count_writes(ops_test)
-            assert more_writes > writes, "writes not continuing to DB"
+    async with ops_test.fast_forward():
+        for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
+            with attempt:
+                writes = await count_writes(ops_test)
+                sleep(5)
+                more_writes = await count_writes(ops_test)
+                assert more_writes > writes, "writes not continuing to DB"
 
     # Verify that all units are part of the same cluster.
     member_ips = await fetch_cluster_members(ops_test)
@@ -263,7 +266,8 @@ async def test_full_cluster_restart(
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    await check_writes(ops_test)
+    async with ops_test.fast_forward():
+        await check_writes(ops_test)
 
 
 @pytest.mark.unstable
