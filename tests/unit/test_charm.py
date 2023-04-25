@@ -394,7 +394,6 @@ class TestCharm(unittest.TestCase):
 
         # Test without providing the username option but without all cluster members ready.
         mock_event.reset_mock()
-        self.harness.model.unit.status = ActiveStatus()
         del mock_event.params["username"]
         self.charm._on_set_password(mock_event)
         mock_event.fail.assert_called_once()

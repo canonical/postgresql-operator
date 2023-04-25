@@ -7,13 +7,11 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.ha_tests.helpers import (
-    METADATA,
     add_unit_with_storage,
-    app_name,
     get_patroni_cluster,
-    reused_storage,
+    reused_primary_storage,
+    reused_replica_storage,
     storage_id,
-    storage_type,
 )
 from tests.integration.helpers import (
     CHARM_SERIES,
@@ -21,9 +19,10 @@ from tests.integration.helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    set_password,
 )
 
-APP_NAME = METADATA["name"]
+FIRST_APPLICATION = "first-cluster"
 SECOND_APPLICATION = "second-cluster"
 
 logger = logging.getLogger(__name__)
@@ -33,45 +32,42 @@ charm = None
 
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
-    """Build and deploy three unit of PostgreSQL."""
-    wait_for_apps = False
-    # It is possible for users to provide their own cluster for HA testing. Hence, check if there
-    # is a pre-existing cluster.
-    if not await app_name(ops_test):
-        wait_for_apps = True
-        global charm
-        charm = await ops_test.build_charm(".")
-        async with ops_test.fast_forward():
-            await ops_test.model.deploy(
-                charm,
-                num_units=3,
-                series=CHARM_SERIES,
-                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
-            )
+    """Build and deploy two PostgreSQL clusters."""
+    # This is a potentially destructive test, so it shouldn't be run against existing clusters
+    charm = await ops_test.build_charm(".")
+    async with ops_test.fast_forward():
+        # Deploy the first cluster with reusable storage
+        await ops_test.model.deploy(
+            charm,
+            application_name=FIRST_APPLICATION,
+            num_units=3,
+            series=CHARM_SERIES,
+            storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+        )
 
-    if wait_for_apps:
-        async with ops_test.fast_forward():
-            await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        # Deploy the second cluster
+        await ops_test.model.deploy(
+            charm, application_name=SECOND_APPLICATION, num_units=1, series=CHARM_SERIES
+        )
+
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+
+        # TODO have a better way to bootstrap clusters with existing storage
+        primary = await get_primary(
+            ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
+        )
+        password = await get_password(ops_test, primary)
+        second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
+        await set_password(ops_test, second_primary, password=password)
+        await ops_test.model.destroy_unit(second_primary)
 
 
 async def test_cluster_restore(ops_test):
     """Recreates the cluster from storage volumes."""
-    app = await app_name(ops_test)
-    if storage_type(ops_test, app) == "rootfs":
-        pytest.skip(
-            "re-use of storage can only be used on deployments with persistent storage not on rootfs deployments"
-        )
-
-    # Deploy a second cluster
-    global charm
-    if not charm:
-        charm = await ops_test.build_charm(".")
-    await ops_test.model.deploy(
-        charm, application_name=SECOND_APPLICATION, num_units=None, series=CHARM_SERIES
-    )
-
     # Write some data.
-    primary = await get_primary(ops_test, f"{app}/0")
+    primary = await get_primary(
+        ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
+    )
     password = await get_password(ops_test, primary)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
@@ -84,26 +80,30 @@ async def test_cluster_restore(ops_test):
 
     logger.info("Downscaling the existing cluster")
     storages = []
-    for unit in ops_test.model.applications[app].units:
+    was_primary = []
+    for unit in ops_test.model.applications[FIRST_APPLICATION].units:
+        was_primary.append(unit.name == primary)
         storages.append(storage_id(ops_test, unit.name))
         await ops_test.model.destroy_unit(unit.name)
 
-    await ops_test.model.remove_application(app, block_until_done=True)
+    await ops_test.model.remove_application(FIRST_APPLICATION, block_until_done=True)
 
     # Recreate cluster
     logger.info("Upscaling the second cluster with the old data")
-    password_set = False
     for i in range(len(storages)):
-        if not password_set:
-            unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i], password)
-            password_set = True
+        unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i])
+        if was_primary[i]:
+            assert await reused_primary_storage(
+                ops_test, unit.name
+            ), "attached primary storage not properly re-used by Postgresql."
         else:
-            unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i])
-        assert await reused_storage(
-            ops_test, unit.name
-        ), "attached storage not properly re-used by Postgresql."
+            assert await reused_replica_storage(
+                ops_test, unit.name
+            ), "attached replica storage not properly re-used by Postgresql."
 
-    primary = await get_primary(ops_test, f"{SECOND_APPLICATION}/0")
+    primary = await get_primary(
+        ops_test, ops_test.model.applications[SECOND_APPLICATION].units[0].name
+    )
     address = get_unit_address(ops_test, primary)
     logger.info("checking that data was persisted")
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:

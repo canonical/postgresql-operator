@@ -13,11 +13,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.helpers import (
-    get_unit_address,
-    run_command_on_unit,
-    set_password,
-)
+from tests.integration.helpers import get_unit_address, run_command_on_unit
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -518,7 +514,7 @@ def storage_id(ops_test, unit_name):
             return line.split()[1]
 
 
-async def add_unit_with_storage(ops_test, app, storage, password=None):
+async def add_unit_with_storage(ops_test, app, storage):
     """Adds unit with storage.
 
     Note: this function exists as a temporary solution until this issue is resolved:
@@ -530,12 +526,6 @@ async def add_unit_with_storage(ops_test, app, storage, password=None):
     add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
-    if password:
-        unit = ops_test.model.applications[app].units[0]
-        await ops_test.model.block_until(
-            lambda: unit.workload_status_message == "awaiting for member to start", timeout=600
-        )
-        await set_password(ops_test, unit.name, password=password)
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
     assert (
@@ -553,7 +543,7 @@ async def add_unit_with_storage(ops_test, app, storage, password=None):
             return unit
 
 
-async def reused_storage(ops_test: OpsTest, unit_name) -> bool:
+async def reused_replica_storage(ops_test: OpsTest, unit_name) -> bool:
     """Returns True if storage provided to Postgresql has been reused.
 
     Checks Patroni logs for when the database was stopped.
@@ -561,7 +551,21 @@ async def reused_storage(ops_test: OpsTest, unit_name) -> bool:
     await run_command_on_unit(
         ops_test,
         unit_name,
-        "grep -E 'Database cluster state: in archive recovery|Database cluster state: shut down' "
+        "grep 'Database cluster state: in archive recovery' "
+        "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
+    )
+    return True
+
+
+async def reused_primary_storage(ops_test: OpsTest, unit_name) -> bool:
+    """Returns True if storage provided to Postgresql has been reused.
+
+    Checks Patroni logs for when the database was stopped.
+    """
+    await run_command_on_unit(
+        ops_test,
+        unit_name,
+        "grep 'Database cluster state: shut down' "
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
     )
     return True

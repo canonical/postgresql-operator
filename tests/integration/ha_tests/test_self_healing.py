@@ -23,7 +23,7 @@ from tests.integration.ha_tests.helpers import (
     is_replica,
     list_wal_files,
     postgresql_ready,
-    reused_storage,
+    reused_replica_storage,
     secondary_up_to_date,
     send_signal_to_process,
     start_continuous_writes,
@@ -108,7 +108,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     )
     new_unit = await add_unit_with_storage(ops_test, app, unit_storage_id)
 
-    assert await reused_storage(
+    assert await reused_replica_storage(
         ops_test, new_unit.name
     ), "attached storage not properly re-used by Postgresql."
 
