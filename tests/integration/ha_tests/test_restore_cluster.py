@@ -82,9 +82,14 @@ async def test_cluster_restore(ops_test):
     storages = []
     was_primary = []
     for unit in ops_test.model.applications[FIRST_APPLICATION].units:
-        was_primary.append(unit.name == primary)
+        if unit.name == primary:
+            continue
+        was_primary.append(False)
         storages.append(storage_id(ops_test, unit.name))
         await ops_test.model.destroy_unit(unit.name)
+    was_primary.append(True)
+    storages.append(storage_id(ops_test, primary))
+    await ops_test.model.destroy_unit(primary)
 
     await ops_test.model.remove_application(FIRST_APPLICATION, block_until_done=True)
 
