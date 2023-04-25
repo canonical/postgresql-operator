@@ -9,8 +9,7 @@ from pytest_operator.plugin import OpsTest
 from tests.integration.ha_tests.helpers import (
     add_unit_with_storage,
     get_patroni_cluster,
-    reused_primary_storage,
-    reused_replica_storage,
+    reused_full_cluster_recovery_storage,
     storage_id,
 )
 from tests.integration.helpers import (
@@ -80,31 +79,19 @@ async def test_cluster_restore(ops_test):
 
     logger.info("Downscaling the existing cluster")
     storages = []
-    was_primary = []
     for unit in ops_test.model.applications[FIRST_APPLICATION].units:
-        if unit.name == primary:
-            continue
-        was_primary.append(False)
         storages.append(storage_id(ops_test, unit.name))
         await ops_test.model.destroy_unit(unit.name)
-    was_primary.append(True)
-    storages.append(storage_id(ops_test, primary))
-    await ops_test.model.destroy_unit(primary)
 
     await ops_test.model.remove_application(FIRST_APPLICATION, block_until_done=True)
 
     # Recreate cluster
     logger.info("Upscaling the second cluster with the old data")
-    for i in range(len(storages)):
-        unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storages[i])
-        if was_primary[i]:
-            assert await reused_primary_storage(
-                ops_test, unit.name
-            ), "attached primary storage not properly re-used by Postgresql."
-        else:
-            assert await reused_replica_storage(
-                ops_test, unit.name
-            ), "attached replica storage not properly re-used by Postgresql."
+    for storage in storages:
+        unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storage)
+        assert await reused_full_cluster_recovery_storage(
+            ops_test, unit.name
+        ), "attached storage not properly re-used by Postgresql."
 
     primary = await get_primary(
         ops_test, ops_test.model.applications[SECOND_APPLICATION].units[0].name

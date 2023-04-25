@@ -546,7 +546,7 @@ async def add_unit_with_storage(ops_test, app, storage):
 async def reused_replica_storage(ops_test: OpsTest, unit_name) -> bool:
     """Returns True if storage provided to Postgresql has been reused.
 
-    Checks Patroni logs for when the database was stopped.
+    Checks Patroni logs for when the database was in archive mode.
     """
     await run_command_on_unit(
         ops_test,
@@ -557,15 +557,15 @@ async def reused_replica_storage(ops_test: OpsTest, unit_name) -> bool:
     return True
 
 
-async def reused_primary_storage(ops_test: OpsTest, unit_name) -> bool:
+async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> bool:
     """Returns True if storage provided to Postgresql has been reused.
 
-    Checks Patroni logs for when the database was stopped.
+    Checks Patroni logs for when the database was in archive mode or shut down.
     """
     await run_command_on_unit(
         ops_test,
         unit_name,
-        "grep 'Database cluster state: shut down' "
+        "grep -E 'Database cluster state: in archive recovery|Database cluster state: shut down' "
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
     )
     return True
