@@ -388,7 +388,10 @@ class PostgresqlOperatorCharm(CharmBase):
         # reloaded in the other units).
         stored_ip = self.unit_peer_data.get("ip")
         current_ip = self.get_hostname_by_unit(None)
-        if current_ip != stored_ip:
+        if stored_ip is None:
+            self.unit_peer_data.update({"ip": current_ip})
+            return False
+        elif current_ip != stored_ip:
             logger.info(f"ip changed from {stored_ip} to {current_ip}")
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
