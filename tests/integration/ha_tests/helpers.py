@@ -530,8 +530,6 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config set {machine_name} limits.network.priority="
     subprocess.check_call(limit_set_command.split())
-    override_command = f"lxc config device remove {machine_name} eth0"
-    subprocess.check_call(override_command.split())
 
 
 async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
