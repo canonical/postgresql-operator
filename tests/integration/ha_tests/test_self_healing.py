@@ -477,7 +477,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     # Wait until the cluster becomes idle (some operations like updating the member
     # IP are made).
     logger.info("waiting for cluster to become idle after updating member IP")
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[app],
             status="active",
