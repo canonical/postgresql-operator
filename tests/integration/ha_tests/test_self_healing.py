@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import asyncio
 import logging
-from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -16,10 +15,10 @@ from tests.integration.ha_tests.helpers import (
     add_unit_with_storage,
     app_name,
     are_all_db_processes_down,
+    are_writes_increasing,
     change_patroni_setting,
     change_wal_settings,
     check_writes,
-    count_writes,
     cut_network_from_unit,
     cut_network_from_unit_without_ip_change,
     fetch_cluster_members,
@@ -56,8 +55,8 @@ from tests.integration.helpers import (
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
-POSTGRESQL_PROCESS = "/snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres"
+PATRONI_PROCESS = "patroni"
+POSTGRESQL_PROCESS = "postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
@@ -149,17 +148,10 @@ async def test_kill_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Kill the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code="SIGKILL")
+    await send_signal_to_process(ops_test, primary_name, process, "SIGKILL")
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 60 seconds wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await is_postgresql_ready(ops_test, primary_name)
@@ -171,7 +163,7 @@ async def test_kill_db_process(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.parametrize("process", [PATRONI_PROCESS])
+@pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
@@ -191,11 +183,7 @@ async def test_freeze_db_process(
         # considered to trigger a fail-over after primary_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
         try:
-            writes = await count_writes(ops_test, primary_name)
-            for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-                with attempt:
-                    more_writes = await count_writes(ops_test, primary_name)
-                    assert more_writes > writes, "writes not continuing to DB"
+            await are_writes_increasing(ops_test, primary_name)
 
             # Verify that a new primary gets elected (ie old primary is secondary).
             for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
@@ -216,12 +204,6 @@ async def test_freeze_db_process(
 async def test_restart_db_process(
     ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
 ) -> None:
-    # Set signal based on the process
-    if process == PATRONI_PROCESS:
-        signal = "SIGTERM"
-    else:
-        signal = "SIGINT"
-
     # Locate primary unit.
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
@@ -230,17 +212,10 @@ async def test_restart_db_process(
     await start_continuous_writes(ops_test, app)
 
     # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, kill_code=signal)
+    await send_signal_to_process(ops_test, primary_name, process, "SIGTERM")
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await is_postgresql_ready(ops_test, primary_name)
@@ -253,7 +228,7 @@ async def test_restart_db_process(
 
 
 @pytest.mark.parametrize("process", DB_PROCESSES)
-@pytest.mark.parametrize("signal", ["SIGINT", "SIGKILL"])
+@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_full_cluster_restart(
     ops_test: OpsTest,
     process: str,
@@ -267,9 +242,6 @@ async def test_full_cluster_restart(
     The test can be called a full cluster crash when the signal sent to the OS process
     is SIGKILL.
     """
-    # Set signal based on the process
-    if signal == "SIGINT" and process == PATRONI_PROCESS:
-        signal = "SIGTERM"
     # Locate primary unit.
     app = await app_name(ops_test)
 
@@ -283,7 +255,7 @@ async def test_full_cluster_restart(
     # Restart all units "simultaneously".
     await asyncio.gather(
         *[
-            send_signal_to_process(ops_test, unit.name, process, kill_code=signal)
+            send_signal_to_process(ops_test, unit.name, process, signal)
             for unit in ops_test.model.applications[app].units
         ]
     )
@@ -312,12 +284,7 @@ async def test_full_cluster_restart(
         ), f"unit {unit.name} not restarted after cluster restart."
 
     async with ops_test.fast_forward():
-        for attempt in Retrying(stop=stop_after_delay(60 * 6), wait=wait_fixed(3)):
-            with attempt:
-                writes = await count_writes(ops_test)
-                sleep(5)
-                more_writes = await count_writes(ops_test)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test)
 
     # Verify that all units are part of the same cluster.
     member_ips = await fetch_cluster_members(ops_test)
@@ -368,14 +335,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
                 assert new_primary_name is not None
                 assert new_primary_name != primary_name
 
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         # Change some settings to enable WAL rotation.
         for unit in ops_test.model.applications[app].units:
@@ -456,15 +416,8 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     ), "Connection is possible after network cut"
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
         logger.info("checking whether writes are increasing")
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
@@ -547,15 +500,8 @@ async def test_network_cut_without_ip_change(
     ), "Connection is possible after network cut"
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
         logger.info("checking whether writes are increasing")
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).

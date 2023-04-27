@@ -841,6 +841,22 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.debug("on_update_status early exit: Unit is in Blocked status")
             return
 
+        if "restoring-backup" in self.app_peer_data:
+            if "failed" in self._patroni.get_member_status(self._member_name):
+                self.unit.status = BlockedStatus("Failed to restore backup")
+                return
+
+            if not self._patroni.member_started:
+                logger.debug("on_update_status early exit: Patroni has not started yet")
+                return
+
+            # Remove the restoring backup flag.
+            self.app_peer_data.update({"restoring-backup": ""})
+            self.update_config()
+
+        if self._handle_processes_failures():
+            return
+
         self.postgresql_client_relation.oversee_users()
         if self.primary_endpoint:
             self._update_relation_endpoints()
@@ -860,20 +876,26 @@ class PostgresqlOperatorCharm(CharmBase):
             self._patroni.restart_patroni()
             return
 
-        if "restoring-backup" in self.app_peer_data:
-            if "failed" in self._patroni.get_member_status(self._member_name):
-                self.unit.status = BlockedStatus("Failed to restore backup")
-                return
-
-            if not self._patroni.member_started:
-                logger.debug("on_update_status early exit: Patroni has not started yet")
-                return
-
-            # Remove the restoring backup flag.
-            self.app_peer_data.update({"restoring-backup": ""})
-            self.update_config()
-
         self._set_primary_status_message()
+
+    def _handle_processes_failures(self) -> bool:
+        """Handle Patroni and PostgreSQL OS processes failures.
+
+        Returns:
+            a bool indicating whether the charm performed any action.
+        """
+        # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
+        # process is running by the PostgreSQL process not).
+        if self._unit_ip in self.members_ips and not self._patroni.member_started:
+            try:
+                self._patroni.restart_patroni()
+                logger.info("restarted PostgreSQL because it was not running")
+                return True
+            except RetryError:
+                logger.error("failed to restart PostgreSQL after checking that it was not running")
+                return False
+
+        return False
 
     def _set_primary_status_message(self) -> None:
         """Display 'Primary' in the unit status message if the current unit is the primary."""
