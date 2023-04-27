@@ -19,7 +19,6 @@ from tests.integration.ha_tests.helpers import (
     change_patroni_setting,
     change_wal_settings,
     check_writes,
-    count_writes,
     cut_network_from_unit,
     cut_network_from_unit_without_ip_change,
     fetch_cluster_members,
@@ -417,15 +416,8 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     ), "Connection is possible after network cut"
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
         logger.info("checking whether writes are increasing")
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
@@ -508,15 +500,8 @@ async def test_network_cut_without_ip_change(
     ), "Connection is possible after network cut"
 
     async with ops_test.fast_forward():
-        # Verify new writes are continuing by counting the number of writes before and after a
-        # 3 minutes wait (this is a little more than the loop wait configuration, that is
-        # considered to trigger a fail-over after primary_start_timeout is changed).
         logger.info("checking whether writes are increasing")
-        writes = await count_writes(ops_test, primary_name)
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes = await count_writes(ops_test, primary_name)
-                assert more_writes > writes, "writes not continuing to DB"
+        await are_writes_increasing(ops_test, primary_name)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
