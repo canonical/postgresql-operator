@@ -5,7 +5,7 @@ import random
 import subprocess
 from pathlib import Path
 from tempfile import mkstemp
-from typing import Dict, Optional, Set
+from typing import Dict, Optional, Set, Tuple
 
 import psycopg2
 import requests
@@ -55,15 +55,29 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    _, raw_pid, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-f", process)
+                    _, processes, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-x", process)
+
+                    # Splitting processes by "\n" results in one or more empty lines, hence we
+                    # need to process these lines accordingly.
+                    processes = [proc for proc in processes.split("\n") if len(proc) > 0]
 
                     # If something was returned, there is a running process.
-                    if len(raw_pid) > 0:
+                    if len(processes) > 0:
                         raise ProcessRunningError
     except RetryError:
         return False
 
     return True
+
+
+async def are_writes_increasing(ops_test, down_unit: str = None) -> None:
+    """Verify new writes are continuing by counting the number of writes."""
+    writes, _ = await count_writes(ops_test, down_unit=down_unit)
+    for member, count in writes.items():
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                more_writes, _ = await count_writes(ops_test, down_unit=down_unit)
+                assert more_writes[member] > count, f"{member}: writes not continuing to DB"
 
 
 async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
@@ -169,12 +183,18 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes = await count_writes(ops_test)
-    assert total_expected_writes == actual_writes, "writes to the db were missed."
+    actual_writes, max_number_written = await count_writes(ops_test)
+    for member, count in actual_writes.items():
+        assert (
+            count == max_number_written[member]
+        ), f"{member}: writes to the db were missed: count of actual writes different from the max number written."
+        assert total_expected_writes == count, f"{member}: writes to the db were missed."
     return total_expected_writes
 
 
-async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
+async def count_writes(
+    ops_test: OpsTest, down_unit: str = None
+) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
@@ -188,20 +208,24 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
             if unit.name == down_unit:
                 down_ips.append(unit.public_address)
                 down_ips.append(await get_unit_ip(ops_test, unit.name))
+    count = {}
+    max = {}
     for member in cluster["members"]:
         if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
 
-    connection_string = (
-        f"dbname='application' user='operator'"
-        f" host='{host}' password='{password}' connect_timeout=10"
-    )
+            connection_string = (
+                f"dbname='application' user='operator'"
+                f" host='{host}' password='{password}' connect_timeout=10"
+            )
 
-    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-        cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-        count = cursor.fetchone()[0]
-    connection.close()
-    return count
+            with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                results = cursor.fetchone()
+                count[member["name"]] = results[0]
+                max[member["name"]] = results[1]
+            connection.close()
+    return count, max
 
 
 def cut_network_from_unit(machine_name: str) -> None:
@@ -450,7 +474,7 @@ async def get_primary(ops_test: OpsTest, app, down_unit: str = None) -> str:
         if unit.name != down_unit:
             break
 
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
         with attempt:
             # Can retrieve from any unit running unit, so we pick the first.
             action = await unit.run_action("get-primary")
@@ -475,7 +499,7 @@ async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
 
 
 async def send_signal_to_process(
-    ops_test: OpsTest, unit_name: str, process: str, kill_code: str
+    ops_test: OpsTest, unit_name: str, process: str, signal: str
 ) -> None:
     """Kills process on the unit according to the provided kill code."""
     # Killing the only instance can be disastrous.
@@ -484,12 +508,15 @@ async def send_signal_to_process(
         await ops_test.model.applications[app].add_unit(count=1)
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
 
-    kill_cmd = f"run --unit {unit_name} -- pkill --signal {kill_code} -f {process}"
-    return_code, _, _ = await ops_test.juju(*kill_cmd.split())
+    command = f"run --unit {unit_name} -- pkill --signal {signal} -x {process}"
 
-    if return_code != 0:
+    # Send the signal.
+    return_code, _, _ = await ops_test.juju(*command.split())
+    if signal != "SIGCONT" and return_code != 0:
         raise ProcessError(
-            "Expected kill command %s to succeed instead it failed: %s", kill_cmd, return_code
+            "Expected command %s to succeed instead it failed: %s",
+            command,
+            return_code,
         )
 
 
@@ -555,9 +582,9 @@ async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_wr
                 with psycopg2.connect(
                     connection_string
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute("SELECT COUNT(number) FROM continuous_writes;")
-                    secondary_writes = cursor.fetchone()[0]
-                    assert secondary_writes == expected_writes
+                    cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                    results = cursor.fetchone()
+                    assert results[0] == expected_writes and results[1] == expected_writes
     except RetryError:
         return False
     finally:
