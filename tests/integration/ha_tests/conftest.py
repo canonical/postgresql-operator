@@ -11,10 +11,10 @@ from tests.integration.ha_tests.helpers import (
     ORIGINAL_RESTART_CONDITION,
     RESTART_CONDITION,
     app_name,
-    change_primary_start_timeout,
+    change_patroni_setting,
     change_wal_settings,
+    get_patroni_setting,
     get_postgresql_parameter,
-    get_primary_start_timeout,
     update_restart_condition,
 )
 from tests.integration.helpers import run_command_on_unit
@@ -38,16 +38,26 @@ async def continuous_writes(ops_test: OpsTest) -> None:
             assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
 
 
+@pytest.fixture()
+async def loop_wait(ops_test: OpsTest) -> None:
+    """Temporary change the loop wait configuration."""
+    # Change the parameter that makes Patroni wait for some more time before restarting PostgreSQL.
+    initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
+    yield
+    # Rollback to the initial configuration.
+    await change_patroni_setting(ops_test, "loop_wait", initial_loop_wait, use_random_unit=True)
+
+
 @pytest.fixture(scope="module")
 async def primary_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the primary start timeout configuration."""
     # Change the parameter that makes the primary reelection faster.
-    initial_primary_start_timeout = await get_primary_start_timeout(ops_test)
-    await change_primary_start_timeout(ops_test, 0)
+    initial_primary_start_timeout = await get_patroni_setting(ops_test, "primary_start_timeout")
+    await change_patroni_setting(ops_test, "primary_start_timeout", 0)
     yield
     # Rollback to the initial configuration.
-    await change_primary_start_timeout(
-        ops_test, initial_primary_start_timeout, use_random_unit=True
+    await change_patroni_setting(
+        ops_test, "primary_start_timeout", initial_primary_start_timeout, use_random_unit=True
     )
 
 
