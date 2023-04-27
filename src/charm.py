@@ -306,8 +306,12 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # If the unit is the leader, it can reconfigure the cluster.
-        if self.unit.is_leader():
-            self._add_members(event)
+        if self.unit.is_leader() and not self._reconfigure_cluster(event):
+            event.defer()
+            return
+
+        if self._update_member_ip():
+            return
 
         # Don't update this member before it's part of the members list.
         if self._unit_ip not in self.members_ips:
@@ -350,6 +354,53 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+
+    def _reconfigure_cluster(self, event: RelationChangedEvent):
+        """Reconfigure the cluster by adding and removing members IPs to it.
+
+        Returns:
+            Whether it was possible to reconfigure the cluster.
+        """
+        if (
+            event.unit is not None
+            and event.relation.data[event.unit].get("ip-to-remove") is not None
+        ):
+            ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
+            try:
+                self._patroni.remove_raft_member(ip_to_remove)
+            except RemoveRaftMemberFailedError:
+                logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
+                return False
+            self._remove_from_members_ips(ip_to_remove)
+        self._add_members(event)
+        return True
+
+    def _update_member_ip(self) -> bool:
+        """Update the member IP in the unit databag.
+
+        Returns:
+            Whether the IP was updated.
+        """
+        # Stop Patroni (and update the member IP) if it was previously isolated
+        # from the cluster network. Patroni will start back when its IP address is
+        # updated in all the units through the peer relation changed event (in that
+        # hook, the configuration is updated and the service is started - or only
+        # reloaded in the other units).
+        stored_ip = self.unit_peer_data.get("ip")
+        current_ip = self.get_hostname_by_unit(None)
+        if stored_ip is None:
+            self.unit_peer_data.update({"ip": current_ip})
+            return False
+        elif current_ip != stored_ip:
+            logger.info(f"ip changed from {stored_ip} to {current_ip}")
+            self.unit_peer_data.update({"ip-to-remove": stored_ip})
+            self.unit_peer_data.update({"ip": current_ip})
+            self._patroni.stop_patroni()
+            self._update_certificate()
+            return True
+        else:
+            self.unit_peer_data.update({"ip-to-remove": ""})
+            return False
 
     def _add_members(self, event):
         """Add new cluster members.
@@ -549,7 +600,6 @@ class PostgresqlOperatorCharm(CharmBase):
         logger.info("Cluster topology changed")
         if self.primary_endpoint:
             self._update_relation_endpoints()
-        self._update_certificate()
         if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
             if self.primary_endpoint:
                 self.unit.status = ActiveStatus()
@@ -837,16 +887,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
-        # Update the certificate if the IP changes because the IP
-        # is used as the hostname in the certificate subject field.
-        if self.get_hostname_by_unit(None) != self.unit_peer_data.get("ip"):
-            self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
-
-            # Request the certificate only if there is already one. If there isn't,
-            # the certificate will be generated in the relation joined event when
-            # relating to the TLS Certificates Operator.
-            if all(self.tls.get_tls_files()):
-                self.tls._request_certificate(self.get_secret("unit", "private-key"))
+        # Request the certificate only if there is already one. If there isn't,
+        # the certificate will be generated in the relation joined event when
+        # relating to the TLS Certificates Operator.
+        if all(self.tls.get_tls_files()):
+            self.tls._request_certificate(self.get_secret("unit", "private-key"))
 
     @property
     def is_blocked(self) -> bool:

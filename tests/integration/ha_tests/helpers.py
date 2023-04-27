@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 import os
 import random
+import subprocess
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Dict, Optional, Set
@@ -10,9 +11,16 @@ import psycopg2
 import requests
 import yaml
 from pytest_operator.plugin import OpsTest
-from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
+from tenacity import (
+    RetryError,
+    Retrying,
+    retry,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_fixed,
+)
 
-from tests.integration.helpers import get_unit_address
+from tests.integration.helpers import db_connect, get_unit_address, run_command_on_unit
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -39,7 +47,7 @@ class ProcessRunningError(Exception):
     """Raised when a process is running when it is not expected to be."""
 
 
-async def all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
 
@@ -79,14 +87,15 @@ def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
     return resp.json()
 
 
-async def change_primary_start_timeout(
-    ops_test: OpsTest, seconds: Optional[int], use_random_unit: bool = False
+async def change_patroni_setting(
+    ops_test: OpsTest, setting: str, value: int, use_random_unit: bool = False
 ) -> None:
-    """Change primary start timeout configuration.
+    """Change the value of one of the Patroni settings.
 
     Args:
         ops_test: ops_test instance.
-        seconds: number of seconds to set in primary_start_timeout configuration.
+        setting: the name of the setting.
+        value: the value to assign to the setting.
         use_random_unit: whether to use a random unit (default is False,
             so it uses the primary)
     """
@@ -101,7 +110,7 @@ async def change_primary_start_timeout(
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
-                json={"primary_start_timeout": seconds},
+                json={setting: value},
             )
 
 
@@ -134,6 +143,29 @@ async def change_wal_settings(
             )
 
 
+async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
+    # Verify that the old primary is now a replica.
+    assert await is_replica(
+        ops_test, primary_name
+    ), "there are more than one primary in the cluster."
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    app = primary_name.split("/")[0]
+    ip_addresses = [
+        await get_unit_ip(ops_test, unit.name) for unit in ops_test.model.applications[app].units
+    ]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    total_expected_writes = await check_writes(ops_test)
+
+    # Verify that old primary is up-to-date.
+    assert await is_secondary_up_to_date(
+        ops_test, primary_name, total_expected_writes
+    ), "secondary not up to date with the cluster after restarting."
+
+
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
@@ -148,15 +180,16 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     password = await get_password(ops_test, app, down_unit)
     for unit in ops_test.model.applications[app].units:
         if unit.name != down_unit:
-            cluster = get_patroni_cluster(unit.public_address)
+            cluster = get_patroni_cluster(await get_unit_ip(ops_test, unit.name))
             break
-    down_ip = None
+    down_ips = []
     if down_unit:
         for unit in ops_test.model.applications[app].units:
             if unit.name == down_unit:
-                down_ip = unit.public_address
+                down_ips.append(unit.public_address)
+                down_ips.append(await get_unit_ip(ops_test, unit.name))
     for member in cluster["members"]:
-        if member["role"] != "replica" and member["host"] != down_ip:
+        if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
 
     connection_string = (
@@ -171,6 +204,37 @@ async def count_writes(ops_test: OpsTest, down_unit: str = None) -> int:
     return count
 
 
+def cut_network_from_unit(machine_name: str) -> None:
+    """Cut network from a lxc container.
+
+    Args:
+        machine_name: lxc container hostname
+    """
+    # apply a mask (device type `none`)
+    cut_network_command = f"lxc config device add {machine_name} eth0 none"
+    subprocess.check_call(cut_network_command.split())
+
+
+def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
+    """Cut network from a lxc container (without causing the change of the unit IP address).
+
+    Args:
+        machine_name: lxc container hostname
+    """
+    override_command = f"lxc config device override {machine_name} eth0"
+    try:
+        subprocess.check_call(override_command.split())
+    except subprocess.CalledProcessError:
+        # Ignore if the interface was already overridden.
+        pass
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.egress=0kbit"
+    subprocess.check_call(limit_set_command.split())
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
+    subprocess.check_call(limit_set_command.split())
+    limit_set_command = f"lxc config set {machine_name} limits.network.priority=10"
+    subprocess.check_call(limit_set_command.split())
+
+
 async def fetch_cluster_members(ops_test: OpsTest):
     """Fetches the IPs listed by Patroni as cluster members.
 
@@ -180,7 +244,8 @@ async def fetch_cluster_members(ops_test: OpsTest):
     app = await app_name(ops_test)
     member_ips = {}
     for unit in ops_test.model.applications[app].units:
-        cluster_info = requests.get(f"http://{unit.public_address}:8008/cluster")
+        unit_ip = await get_unit_ip(ops_test, unit.name)
+        cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
         if len(member_ips) > 0:
             # If the list of members IPs was already fetched, also compare the
             # list provided by other members.
@@ -192,14 +257,34 @@ async def fetch_cluster_members(ops_test: OpsTest):
     return member_ips
 
 
-async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
-    """Get the primary start timeout configuration.
+async def get_controller_machine(ops_test: OpsTest) -> str:
+    """Return controller machine hostname.
+
+    Args:
+        ops_test: The ops test framework instance
+
+    Returns:
+        Controller hostname (str)
+    """
+    _, raw_controller, _ = await ops_test.juju("show-controller")
+
+    controller = yaml.safe_load(raw_controller.strip())
+
+    return [
+        machine.get("instance-id")
+        for machine in controller[ops_test.controller_name]["controller-machines"].values()
+    ][0]
+
+
+async def get_patroni_setting(ops_test: OpsTest, setting: str) -> Optional[int]:
+    """Get the value of one of the integer Patroni settings.
 
     Args:
         ops_test: ops_test instance.
+        setting: the name of the setting.
 
     Returns:
-        primary start timeout in seconds or None if it's using the default value.
+        the value of the configuration or None if it's using the default value.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -207,8 +292,8 @@ async def get_primary_start_timeout(ops_test: OpsTest) -> Optional[int]:
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
-            primary_start_timeout = configuration_info.json().get("primary_start_timeout")
-            return int(primary_start_timeout) if primary_start_timeout is not None else None
+            value = configuration_info.json().get(setting)
+            return int(value) if value is not None else None
 
 
 async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
@@ -258,9 +343,54 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
     return action.results["password"]
 
 
-def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
+async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
+    """Wrapper for getting unit ip.
+
+    Args:
+        ops_test: The ops test object passed into every test case
+        unit_name: The name of the unit to get the address
+    Returns:
+        The (str) ip of the unit
+    """
+    return instance_ip(ops_test.model.info.name, await unit_hostname(ops_test, unit_name))
+
+
+@retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
+async def is_connection_possible(ops_test: OpsTest, unit_name: str) -> bool:
+    """Test a connection to a PostgreSQL server."""
+    app = unit_name.split("/")[0]
+    password = await get_password(ops_test, app, unit_name)
+    address = await get_unit_ip(ops_test, unit_name)
+    try:
+        with db_connect(
+            host=address, password=password
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT 1;")
+            success = cursor.fetchone()[0] == 1
+        connection.close()
+        return success
+    except psycopg2.Error:
+        # Error raised when the connection is not possible.
+        return False
+
+
+def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:
+    """Test network reachability between hosts.
+
+    Args:
+        origin_machine: hostname of the machine to test connection from
+        target_machine: hostname of the machine to test connection to
+    """
+    try:
+        subprocess.check_call(f"lxc exec {origin_machine} -- ping -c 3 {target_machine}".split())
+        return True
+    except subprocess.CalledProcessError:
+        return False
+
+
+async def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
     """Returns whether the unit a replica in the cluster."""
-    unit_ip = get_unit_address(ops_test, unit_name)
+    unit_ip = await get_unit_ip(ops_test, unit_name)
     member_name = unit_name.replace("/", "-")
 
     try:
@@ -288,17 +418,42 @@ def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
         return False
 
 
-async def get_primary(ops_test: OpsTest, app) -> str:
+def instance_ip(model: str, instance: str) -> str:
+    """Translate juju instance name to IP.
+
+    Args:
+        model: The name of the model
+        instance: The name of the instance
+
+    Returns:
+        The (str) IP address of the instance
+    """
+    output = subprocess.check_output(f"juju machines --model {model}".split())
+
+    for line in output.decode("utf8").splitlines():
+        if instance in line:
+            return line.split()[2]
+
+
+async def get_primary(ops_test: OpsTest, app, down_unit: str = None) -> str:
     """Use the charm action to retrieve the primary from provided application.
+
+    Args:
+        ops_test: OpsTest instance.
+        app: database application name.
+        down_unit: unit that is offline and the action won't run on.
 
     Returns:
         primary unit name.
     """
+    for unit in ops_test.model.applications[app].units:
+        if unit.name != down_unit:
+            break
+
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
         with attempt:
             # Can retrieve from any unit running unit, so we pick the first.
-            unit_name = ops_test.model.applications[app].units[0].name
-            action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+            action = await unit.run_action("get-primary")
             action = await action.wait()
             assert action.results["primary"] is not None and action.results["primary"] != "None"
             return action.results["primary"]
@@ -338,7 +493,7 @@ async def send_signal_to_process(
         )
 
 
-async def postgresql_ready(ops_test, unit_name: str) -> bool:
+async def is_postgresql_ready(ops_test, unit_name: str) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
     unit_ip = get_unit_address(ops_test, unit_name)
     try:
@@ -352,7 +507,32 @@ async def postgresql_ready(ops_test, unit_name: str) -> bool:
     return True
 
 
-async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
+def restore_network_for_unit(machine_name: str) -> None:
+    """Restore network from a lxc container.
+
+    Args:
+        machine_name: lxc container hostname
+    """
+    # remove mask from eth0
+    restore_network_command = f"lxc config device remove {machine_name} eth0"
+    subprocess.check_call(restore_network_command.split())
+
+
+def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
+    """Restore network from a lxc container (without causing the change of the unit IP address).
+
+    Args:
+        machine_name: lxc container hostname
+    """
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.egress="
+    subprocess.check_call(limit_set_command.split())
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress="
+    subprocess.check_call(limit_set_command.split())
+    limit_set_command = f"lxc config set {machine_name} limits.network.priority="
+    subprocess.check_call(limit_set_command.split())
+
+
+async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
     """Checks if secondary is up-to-date with the cluster.
 
     Retries over the period of one minute to give secondary adequate time to copy over data.
@@ -360,7 +540,7 @@ async def secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_write
     app = await app_name(ops_test)
     password = await get_password(ops_test, app)
     host = [
-        unit.public_address
+        await get_unit_ip(ops_test, unit.name)
         for unit in ops_test.model.applications[app].units
         if unit.name == unit_name
     ][0]
@@ -422,6 +602,20 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     return int(action.results["writes"])
 
 
+async def unit_hostname(ops_test: OpsTest, unit_name: str) -> str:
+    """Get hostname for a unit.
+
+    Args:
+        ops_test: The ops test object passed into every test case
+        unit_name: The name of the unit to be tested
+
+    Returns:
+        The machine/container hostname
+    """
+    _, raw_hostname, _ = await ops_test.juju("ssh", unit_name, "hostname")
+    return raw_hostname.strip()
+
+
 async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     """Updates the restart condition in the DB service file.
 
@@ -462,4 +656,122 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
     await ops_test.juju(*start_cmd.split())
 
-    await postgresql_ready(ops_test, unit.name)
+    await is_postgresql_ready(ops_test, unit.name)
+
+
+@retry(stop=stop_after_attempt(20), wait=wait_fixed(30))
+def wait_network_restore(model_name: str, hostname: str, old_ip: str) -> None:
+    """Wait until network is restored.
+
+    Args:
+        model_name: The name of the model
+        hostname: The name of the instance
+        old_ip: old registered IP address
+    """
+    if instance_ip(model_name, hostname) == old_ip:
+        raise Exception
+
+
+def storage_type(ops_test, app):
+    """Retrieves type of storage associated with an application.
+
+    Note: this function exists as a temporary solution until this issue is ported to libjuju 2:
+    https://github.com/juju/python-libjuju/issues/694
+    """
+    model_name = ops_test.model.info.name
+    proc = subprocess.check_output(f"juju storage --model={model_name}".split())
+    proc = proc.decode("utf-8")
+    for line in proc.splitlines():
+        if "Storage" in line:
+            continue
+
+        if len(line) == 0:
+            continue
+
+        if "detached" in line:
+            continue
+
+        unit_name = line.split()[0]
+        app_name = unit_name.split("/")[0]
+        if app_name == app:
+            return line.split()[3]
+
+
+def storage_id(ops_test, unit_name):
+    """Retrieves  storage id associated with provided unit.
+
+    Note: this function exists as a temporary solution until this issue is ported to libjuju 2:
+    https://github.com/juju/python-libjuju/issues/694
+    """
+    model_name = ops_test.model.info.name
+    proc = subprocess.check_output(f"juju storage --model={model_name}".split())
+    proc = proc.decode("utf-8")
+    for line in proc.splitlines():
+        if "Storage" in line:
+            continue
+
+        if len(line) == 0:
+            continue
+
+        if "detached" in line:
+            continue
+
+        if line.split()[0] == unit_name:
+            return line.split()[1]
+
+
+async def add_unit_with_storage(ops_test, app, storage):
+    """Adds unit with storage.
+
+    Note: this function exists as a temporary solution until this issue is resolved:
+    https://github.com/juju/python-libjuju/issues/695
+    """
+    expected_units = len(ops_test.model.applications[app].units) + 1
+    prev_units = [unit.name for unit in ops_test.model.applications[app].units]
+    model_name = ops_test.model.info.name
+    add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
+    return_code, _, _ = await ops_test.juju(*add_unit_cmd)
+    assert return_code == 0, "Failed to add unit with storage"
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
+    assert (
+        len(ops_test.model.applications[app].units) == expected_units
+    ), "New unit not added to model"
+
+    # verify storage attached
+    curr_units = [unit.name for unit in ops_test.model.applications[app].units]
+    new_unit = list(set(curr_units) - set(prev_units))[0]
+    assert storage_id(ops_test, new_unit) == storage, "unit added with incorrect storage"
+
+    # return a reference to newly added unit
+    for unit in ops_test.model.applications[app].units:
+        if unit.name == new_unit:
+            return unit
+
+
+async def reused_replica_storage(ops_test: OpsTest, unit_name) -> bool:
+    """Returns True if storage provided to Postgresql has been reused.
+
+    Checks Patroni logs for when the database was in archive mode.
+    """
+    await run_command_on_unit(
+        ops_test,
+        unit_name,
+        "grep 'Database cluster state: in archive recovery' "
+        "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
+    )
+    return True
+
+
+async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> bool:
+    """Returns True if storage provided to Postgresql has been reused.
+
+    Checks Patroni logs for when the database was in archive mode or shut down.
+    """
+    await run_command_on_unit(
+        ops_test,
+        unit_name,
+        "grep -E 'Database cluster state: in archive recovery|Database cluster state: shut down' "
+        "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log",
+    )
+    return True
