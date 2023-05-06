@@ -324,6 +324,27 @@ class Patroni:
         return r.json()["state"] == "running"
 
     @property
+    def member_inactive(self) -> bool:
+        """Are Patroni and PostgreSQL in inactive state.
+
+        Returns:
+            True if services is not running, starting or restarting. Retries over a period of 60
+            seconds times to allow server time to start up.
+        """
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(
+                        f"{self._patroni_url}/health",
+                        verify=self.verify,
+                        timeout=API_REQUEST_TIMEOUT,
+                    )
+        except RetryError:
+            return True
+
+        return r.json()["state"] not in ["running", "starting", "restarting"]
+
+    @property
     def member_replication_lag(self) -> str:
         """Member replication lag."""
         try:
