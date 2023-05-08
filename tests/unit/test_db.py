@@ -273,14 +273,8 @@ class TestDbProvides(unittest.TestCase):
 
         # Set some data to be used and compared in the relations.
         password = "test-password"
-        master = (
-            f"dbname={DATABASE} fallback_application_name=application host=1.1.1.1 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
-        standbys = (
-            f"dbname={DATABASE} fallback_application_name=application host=2.2.2.2 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
+        master = f"dbname={DATABASE} host=1.1.1.1 password={password} port={DATABASE_PORT} user="
+        standbys = f"dbname={DATABASE} host=2.2.2.2 password={password} port={DATABASE_PORT} user="
 
         # Set some required data before update_endpoints is called.
         for rel_id in [self.rel_id, self.another_rel_id]:
@@ -379,14 +373,8 @@ class TestDbProvides(unittest.TestCase):
 
         # Set some data to be used and compared in the relations.
         password = "test-password"
-        master = (
-            f"dbname={DATABASE} fallback_application_name=application host=1.1.1.1 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
-        standbys = (
-            f"dbname={DATABASE} fallback_application_name=application host=2.2.2.2 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
+        master = f"dbname={DATABASE} host=1.1.1.1 password={password} port={DATABASE_PORT} user="
+        standbys = f"dbname={DATABASE} host=2.2.2.2 password={password} port={DATABASE_PORT} user="
 
         # Set some required data before update_endpoints is called.
         for rel_id in [self.rel_id, self.another_rel_id]:

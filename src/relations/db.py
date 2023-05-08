@@ -266,7 +266,6 @@ class DbProvides(Object):
                     port=DATABASE_PORT,
                     user=user,
                     password=password,
-                    fallback_application_name=relation.app.name,
                 )
             )
 
@@ -280,7 +279,6 @@ class DbProvides(Object):
                             port=DATABASE_PORT,
                             user=user,
                             password=password,
-                            fallback_application_name=relation.app.name,
                         )
                     )
                     for replica_endpoint in replicas_endpoint
