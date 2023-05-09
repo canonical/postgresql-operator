@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 import itertools
 import json
 import subprocess
@@ -8,7 +9,7 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 import botocore
 import psycopg2
@@ -307,18 +308,34 @@ async def deploy_and_relate_application_with_postgresql(
     return relation.id
 
 
-async def deploy_and_relate_landscape_bundle_with_postgresql(
+async def deploy_and_relate_bundle_with_postgresql(
     ops_test: OpsTest,
+    bundle_name: str,
+    main_application_name: str,
+    relation_name: str = "db",
+    status: str = "active",
+    status_message: str = None,
+    overlay: Dict = None,
 ) -> str:
-    """Helper function to deploy and relate the Landscape bundle with PostgreSQL.
+    """Helper function to deploy and relate a bundle with PostgreSQL.
 
     Args:
         ops_test: The ops test framework.
+        bundle_name: The name of the bundle to deploy.
+        main_application_name: The name of the application that should be
+            related to PostgreSQL.
+        relation_name: The name of the relation to use in PostgreSQL
+            (db or db-admin).
+        status: Status to wait for in the application after relating
+            it to PostgreSQL.
+        status_message: Status message to wait for in the application after
+            relating it to PostgreSQL.
+        overlay: Optional overlay to be used when deploying the bundle.
     """
     # Deploy the bundle.
     with tempfile.NamedTemporaryFile() as original:
         # Download the original bundle.
-        await ops_test.juju("download", "ch:landscape-scalable", "--filepath", original.name)
+        await ops_test.juju("download", bundle_name, "--filepath", original.name)
 
         # Open the bundle compressed file and update the contents
         # of the bundle.yaml file to deploy it.
@@ -326,28 +343,62 @@ async def deploy_and_relate_landscape_bundle_with_postgresql(
             bundle_yaml = archive.read("bundle.yaml")
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
 
+            # Save the list of relations other than `db` and `db-admin`
+            # so we can add them later.
+            other_relations = [
+                relation for relation in data["relations"] if "postgresql" in relation
+            ]
+
             # Remove PostgreSQL and relations with it from the bundle.yaml file.
             del data["applications"]["postgresql"]
             data["relations"] = [
                 relation
                 for relation in data["relations"]
-                if "postgresql:db" not in relation and "postgresql:db-admin" not in relation
+                if "postgresql" not in relation
+                and "postgresql:db" not in relation
+                and "postgresql:db-admin" not in relation
             ]
 
             # Write the new bundle content to a temporary file and deploy it.
-            with tempfile.NamedTemporaryFile() as patched:
+            with tempfile.NamedTemporaryFile(delete=False) as patched:
                 patched.write(yaml.dump(data).encode("utf_8"))
                 patched.seek(0)
-                await ops_test.juju("deploy", patched.name)
+                if overlay is not None:
+                    with tempfile.NamedTemporaryFile(delete=False) as overlay_file:
+                        overlay_file.write(yaml.dump(overlay).encode("utf_8"))
+                        overlay_file.seek(0)
+                        await ops_test.juju("deploy", patched.name, "--overlay", overlay_file.name)
+                else:
+                    await ops_test.juju("deploy", patched.name)
 
     # Relate application to PostgreSQL.
     async with ops_test.fast_forward(fast_interval="30s"):
-        relation = await ops_test.model.relate("landscape-server", f"{DATABASE_APP_NAME}:db-admin")
-        await ops_test.model.wait_for_idle(
-            apps=["landscape-server", DATABASE_APP_NAME],
-            status="active",
-            timeout=1500,
+        relation = await ops_test.model.relate(
+            main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
         )
+        for other_relation in other_relations:
+            await ops_test.model.relate(other_relation[0], other_relation[1])
+        unit = ops_test.model.units.get(f"{main_application_name}/0")
+        awaits = [
+            ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME],
+                status="active",
+                timeout=1500,
+            ),
+            ops_test.model.wait_for_idle(
+                apps=[main_application_name],
+                raise_on_blocked=False,
+                status=status,
+                timeout=1500,
+            ),
+        ]
+        if status_message:
+            awaits.append(
+                ops_test.model.block_until(
+                    lambda: unit.workload_status_message == status_message, timeout=1500
+                )
+            )
+        await asyncio.gather(*awaits)
 
     return relation.id
 
