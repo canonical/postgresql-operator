@@ -15,7 +15,7 @@ this operator.
 - All enhancements require review before being merged. Code review typically examines
   - code quality
   - test coverage
-  - user experience for Juju administrators this charm.
+  - user experience for Juju administrators of this charm.
 - Please help us out in ensuring easy to review branches by rebasing your pull request branch onto
   the `main` branch. This also avoids merge commits and creates a linear Git commit history.
 
@@ -38,7 +38,6 @@ tox run -e integration   # integration tests
 tox                      # runs 'lint' and 'unit' environments
 ```
 
-
 ## Build charm
 
 Build the charm in this git repository using:
@@ -52,8 +51,16 @@ charmcraft pack
 ```bash
 # Create a model
 juju add-model dev
+
 # Enable DEBUG logging
 juju model-config logging-config="<root>=INFO;unit=DEBUG"
+
 # Deploy the charm
 juju deploy ./postgresql_ubuntu-22.04-amd64.charm
 ```
+
+## Canonical Contributor Agreement
+
+Canonical welcomes contributions to the PostgreSQL Operator. Please check out our
+[contributor agreement](https://ubuntu.com/legal/contributors)if you're
+interested in contributing to the solution.
