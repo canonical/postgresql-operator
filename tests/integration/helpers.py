@@ -343,8 +343,8 @@ async def deploy_and_relate_bundle_with_postgresql(
             bundle_yaml = archive.read("bundle.yaml")
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
 
-            # Save the list of relations other than `db` and `db-admin`
-            # so we can add them later.
+            # Save the list of relations other than `db` and `db-admin`,
+            # so we can add them back later.
             other_relations = [
                 relation for relation in data["relations"] if "postgresql" in relation
             ]
@@ -360,24 +360,28 @@ async def deploy_and_relate_bundle_with_postgresql(
             ]
 
             # Write the new bundle content to a temporary file and deploy it.
-            with tempfile.NamedTemporaryFile(delete=False) as patched:
+            with tempfile.NamedTemporaryFile() as patched:
                 patched.write(yaml.dump(data).encode("utf_8"))
                 patched.seek(0)
                 if overlay is not None:
-                    with tempfile.NamedTemporaryFile(delete=False) as overlay_file:
+                    with tempfile.NamedTemporaryFile() as overlay_file:
                         overlay_file.write(yaml.dump(overlay).encode("utf_8"))
                         overlay_file.seek(0)
                         await ops_test.juju("deploy", patched.name, "--overlay", overlay_file.name)
                 else:
                     await ops_test.juju("deploy", patched.name)
 
-    # Relate application to PostgreSQL.
     async with ops_test.fast_forward(fast_interval="30s"):
+        # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
             main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
         )
+
+        # Restore previous existing relations.
         for other_relation in other_relations:
             await ops_test.model.relate(other_relation[0], other_relation[1])
+
+        # Wait for the deployment to complete.
         unit = ops_test.model.units.get(f"{main_application_name}/0")
         awaits = [
             ops_test.model.wait_for_idle(
