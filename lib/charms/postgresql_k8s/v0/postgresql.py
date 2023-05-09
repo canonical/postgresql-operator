@@ -165,8 +165,8 @@ class PostgreSQL:
                 user_definition = (
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
-                if extra_user_roles:
-                    user_definition += f' {extra_user_roles.replace(",", " ")}'
+                #if extra_user_roles:
+                #    user_definition += f' {extra_user_roles.replace(",", " ")}'
                 if cursor.fetchone() is not None:
                     statement = "ALTER ROLE {}"
                 else:
@@ -174,6 +174,11 @@ class PostgreSQL:
                 cursor.execute(
                     sql.SQL(f"{statement} {user_definition};").format(sql.Identifier(user))
                 )
+                if extra_user_roles:
+                    for role in extra_user_roles.split(","):
+                        cursor.execute(
+                            sql.SQL("GRANT {} TO {};").format(sql.Identifier(role), sql.Identifier(user))
+                        )
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError()

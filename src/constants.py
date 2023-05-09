@@ -23,8 +23,11 @@ TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"
 USER = "operator"
 USER_PASSWORD_KEY = "operator-password"
+MONITORING_USER = "monitoring"
+MONITORING_PASSWORD_KEY = "monitoring-password"
+MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 # List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER]
+SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
@@ -48,3 +51,5 @@ POSTGRESQL_CONF_PATH = f"{SNAP_CONF_PATH}/postgresql"
 POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
+
+METRICS_PORT = "9187"
