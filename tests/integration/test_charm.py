@@ -64,6 +64,7 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     assert result.status_code == 200
 
 
+@pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
     # Query Patroni REST API and check the status that indicates
     # both Patroni and PostgreSQL are up and running.
