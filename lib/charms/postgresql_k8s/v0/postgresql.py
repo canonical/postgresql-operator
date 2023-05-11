@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 
 logger = logging.getLogger(__name__)
@@ -165,8 +165,6 @@ class PostgreSQL:
                 user_definition = (
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
-                #if extra_user_roles:
-                #    user_definition += f' {extra_user_roles.replace(",", " ")}'
                 if cursor.fetchone() is not None:
                     statement = "ALTER ROLE {}"
                 else:
