@@ -351,7 +351,8 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            self.unit.status = ActiveStatus()
+            if not self.is_blocked:
+                self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
@@ -484,7 +485,6 @@ class PostgresqlOperatorCharm(CharmBase):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
-            self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
             self.cluster_name,
             self._member_name,
@@ -859,32 +859,17 @@ class PostgresqlOperatorCharm(CharmBase):
                 self.unit.status = BlockedStatus(validation_message)
                 return
 
-        if self._handle_processes_failures():
+        if self._handle_workload_failures():
             return
 
         self.postgresql_client_relation.oversee_users()
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-        # Restart the workload if it's stuck on the starting state after a restart.
-        if (
-            not self._patroni.member_started
-            and "postgresql_restarted" in self._peers.data[self.unit]
-            and self._patroni.member_replication_lag == "unknown"
-        ):
-            self._patroni.reinitialize_postgresql()
-            return
-
-        # Restart the service if the current cluster member is isolated from the cluster
-        # (stuck with the "awaiting for member to start" message).
-        if not self._patroni.member_started and self._patroni.is_member_isolated:
-            self._patroni.restart_patroni()
-            return
-
         self._set_primary_status_message()
 
-    def _handle_processes_failures(self) -> bool:
-        """Handle Patroni and PostgreSQL OS processes failures.
+    def _handle_workload_failures(self) -> bool:
+        """Handle workload (Patroni or PostgreSQL) failures.
 
         Returns:
             a bool indicating whether the charm performed any action.
@@ -899,6 +884,21 @@ class PostgresqlOperatorCharm(CharmBase):
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
                 return False
+
+        # Restart the workload if it's stuck on the starting state after a restart.
+        if (
+            not self._patroni.member_started
+            and "postgresql_restarted" in self._peers.data[self.unit]
+            and self._patroni.member_replication_lag == "unknown"
+        ):
+            self._patroni.reinitialize_postgresql()
+            return True
+
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
+            return True
 
         return False
 

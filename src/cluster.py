@@ -66,7 +66,6 @@ class Patroni:
 
     def __init__(
         self,
-        archive_mode,
         unit_ip: str,
         cluster_name: str,
         member_name: str,
@@ -80,7 +79,6 @@ class Patroni:
         """Initialize the Patroni class.
 
         Args:
-            archive_mode: PostgreSQL archive mode
             unit_ip: IP address of the current unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
@@ -91,7 +89,6 @@ class Patroni:
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
-        self.archive_mode = archive_mode
         self.unit_ip = unit_ip
         self.cluster_name = cluster_name
         self.member_name = member_name

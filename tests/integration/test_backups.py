@@ -21,6 +21,9 @@ from tests.integration.helpers import (
 )
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
+FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
+    "failed to access/create the bucket, check your S3 settings"
+)
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
@@ -35,7 +38,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
     charm = await ops_test.build_charm(".")
 
     # Deploy S3 Integrator and TLS Certificates Operator.
-    await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME, channel="edge")
+    await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME)
     config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
     await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=config)
 
@@ -274,7 +277,7 @@ async def test_invalid_config_and_recovery_after_fixing_it(
         database_app_name,
         0,
         S3_INTEGRATOR_APP_NAME,
-        FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+        FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     )
 
     # Provide valid backup configurations, but from another cluster repository.

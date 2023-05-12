@@ -12,10 +12,11 @@ import tempfile
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, TimeoutExpired, run
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional, OrderedDict, Tuple
 
 import boto3 as boto3
 import botocore
+from botocore.exceptions import ClientError
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
 from charms.operator_libs_linux.v1 import snap
 from jinja2 import Template
@@ -40,6 +41,9 @@ from constants import (
 logger = logging.getLogger(__name__)
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
+FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
+    "failed to access/create the bucket, check your S3 settings"
+)
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 
 
@@ -64,6 +68,11 @@ class PostgreSQLBackups(Object):
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
         self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
+
+    @property
+    def stanza_name(self) -> str:
+        """Stanza name, composed by model and cluster name."""
+        return f"{self.model.name}.{self.charm.cluster_name}"
 
     def _are_backup_settings_ok(self) -> Tuple[bool, Optional[str]]:
         """Validates whether backup settings are OK."""
@@ -117,9 +126,7 @@ class PostgreSQLBackups(Object):
 
         if self.charm.unit.is_leader():
             for stanza in json.loads(stdout):
-                if stanza.get("name") != self.charm.app_peer_data.get(
-                    "stanza", self.charm.cluster_name
-                ):
+                if stanza.get("name") != self.charm.app_peer_data.get("stanza", self.stanza_name):
                     # Prevent archiving of WAL files.
                     self.charm.app_peer_data.update({"stanza": ""})
                     self.charm.update_config()
@@ -155,6 +162,44 @@ class PostgreSQLBackups(Object):
             endpoint = f'{endpoint.split("://")[0]}://{endpoint_data["hostname"]}'
 
         return endpoint
+
+    def _create_bucket_if_not_exists(self) -> None:
+        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
+        if missing_parameters:
+            return
+
+        bucket_name = s3_parameters["bucket"]
+        region = s3_parameters.get("region")
+        session = boto3.session.Session(
+            aws_access_key_id=s3_parameters["access-key"],
+            aws_secret_access_key=s3_parameters["secret-key"],
+            region_name=s3_parameters["region"],
+        )
+
+        try:
+            s3 = session.resource("s3", endpoint_url=self._construct_endpoint(s3_parameters))
+        except ValueError as e:
+            logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
+            raise e
+        bucket = s3.Bucket(bucket_name)
+        try:
+            bucket.meta.client.head_bucket(Bucket=bucket_name)
+            logger.info("Bucket %s exists.", bucket_name)
+            exists = True
+        except ClientError:
+            logger.warning("Bucket %s doesn't exist or you don't have access to it.", bucket_name)
+            exists = False
+        if not exists:
+            try:
+                bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+
+                bucket.wait_until_exists()
+                logger.info("Created bucket '%s' in region=%s", bucket_name, region)
+            except ClientError as error:
+                logger.exception(
+                    "Couldn't create bucket named '%s' in region=%s.", bucket_name, region
+                )
+                raise error
 
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
@@ -230,7 +275,9 @@ class PostgreSQLBackups(Object):
             backup_list.append((backup_id, "physical", backup_status))
         return self._format_backup_list(backup_list)
 
-    def _list_backups(self, show_failed: bool, restore_stanza: bool = False) -> Dict[str, str]:
+    def _list_backups(
+        self, show_failed: bool, restore_stanza: bool = False
+    ) -> OrderedDict[str, str]:
         """Retrieve the list of backups.
 
         Args:
@@ -250,18 +297,21 @@ class PostgreSQLBackups(Object):
 
         # If there are no backups, returns an empty dict.
         if repository_info is None:
-            return {}
+            return OrderedDict[str, str]()
 
         backups = repository_info["backup"]
         stanza_name = repository_info["name"]
-        return {
-            datetime.strftime(
-                datetime.strptime(backup["label"][:-1], PGBACKREST_BACKUP_ID_FORMAT),
-                BACKUP_ID_FORMAT,
-            ): stanza_name
+        return OrderedDict[str, str](
+            (
+                datetime.strftime(
+                    datetime.strptime(backup["label"][:-1], PGBACKREST_BACKUP_ID_FORMAT),
+                    BACKUP_ID_FORMAT,
+                ),
+                stanza_name,
+            )
             for backup in backups
             if show_failed or not backup["error"]
-        }
+        )
 
     def _initialise_stanza(self) -> None:
         """Initialize the stanza.
@@ -277,6 +327,7 @@ class PostgreSQLBackups(Object):
         # or pointing to a repository where there are backups from another cluster.
         if self.charm.is_blocked and self.charm.unit.status.message not in [
             ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+            FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
             FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
         ]:
             logger.warning("couldn't initialize stanza due to a blocked status")
@@ -289,7 +340,7 @@ class PostgreSQLBackups(Object):
             [
                 PGBACKREST_EXECUTABLE,
                 PGBACKREST_CONFIGURATION_FILE,
-                f"--stanza={self.charm.cluster_name}",
+                f"--stanza={self.stanza_name}",
                 "stanza-create",
             ]
         )
@@ -299,7 +350,7 @@ class PostgreSQLBackups(Object):
             return
 
         # Store the stanza name to be used in configurations updates.
-        self.charm.app_peer_data.update({"stanza": self.charm.cluster_name})
+        self.charm.app_peer_data.update({"stanza": self.stanza_name})
 
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
@@ -314,7 +365,7 @@ class PostgreSQLBackups(Object):
                         [
                             PGBACKREST_EXECUTABLE,
                             PGBACKREST_CONFIGURATION_FILE,
-                            f"--stanza={self.charm.cluster_name}",
+                            f"--stanza={self.stanza_name}",
                             "check",
                         ]
                     )
@@ -322,6 +373,11 @@ class PostgreSQLBackups(Object):
                         raise Exception(stderr)
             self.charm.unit.status = ActiveStatus()
         except RetryError as e:
+            # If the check command doesn't succeed, remove the stanza name
+            # and rollback the configuration.
+            self.charm.app_peer_data.update({"stanza": self.stanza_name})
+            self.charm.update_config()
+
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
 
@@ -345,6 +401,17 @@ class PostgreSQLBackups(Object):
 
         if not self._render_pgbackrest_conf_file():
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
+            return
+
+        try:
+            self._create_bucket_if_not_exists()
+        except (ClientError, ValueError):
+            self.charm.unit.status = BlockedStatus(FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE)
+            return
+
+        can_use_s3_repository, validation_message = self.can_use_s3_repository()
+        if not can_use_s3_repository:
+            self.charm.unit.status = BlockedStatus(validation_message)
             return
 
         self._initialise_stanza()
@@ -375,7 +442,7 @@ class PostgreSQLBackups(Object):
             metadata,
             os.path.join(
                 s3_parameters["path"],
-                f"backup/{self.charm.cluster_name}/latest",
+                f"backup/{self.stanza_name}/latest",
             ),
             s3_parameters,
         ):
@@ -395,7 +462,7 @@ class PostgreSQLBackups(Object):
         command = [
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
-            f"--stanza={self.charm.cluster_name}",
+            f"--stanza={self.stanza_name}",
             "--log-level-console=debug",
             "--type=full",
             "backup",
@@ -429,7 +496,7 @@ Stderr:
                 logs,
                 os.path.join(
                     s3_parameters["path"],
-                    f"backup/{self.charm.cluster_name}/{backup_id}/backup.log",
+                    f"backup/{self.stanza_name}/{backup_id}/backup.log",
                 ),
                 s3_parameters,
             )
@@ -452,7 +519,7 @@ Stderr:
                 logs,
                 os.path.join(
                     s3_parameters["path"],
-                    f"backup/{self.charm.cluster_name}/{backup_id}/backup.log",
+                    f"backup/{self.stanza_name}/{backup_id}/backup.log",
                 ),
                 s3_parameters,
             ):
@@ -568,7 +635,10 @@ Stderr:
             return False
 
         logger.info("Checking if cluster is in blocked state")
-        if self.charm.is_blocked:
+        if (
+            self.charm.is_blocked
+            and self.charm.unit.status.message != ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+        ):
             error_message = "Cluster or unit is in a blocking state"
             logger.warning(error_message)
             event.fail(error_message)
@@ -601,17 +671,13 @@ Stderr:
             )
             return False
 
-        # Retrieve the backup path (and add a "/" before the path if it doesn't contain that).
-        backup_path = s3_parameters.get("path", "")
-        backup_path = f"/{backup_path}" if not backup_path.startswith("/") else backup_path
-
         with open("templates/pgbackrest.conf.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
             enable_tls=self.charm.is_tls_enabled and len(self.charm._peer_members_ips) > 0,
             peer_endpoints=self.charm._peer_members_ips,
-            path=backup_path,
+            path=s3_parameters["path"],
             data_path=f"{POSTGRESQL_DATA_PATH}",
             log_path=f"{PGBACKREST_LOGS_PATH}",
             region=s3_parameters.get("region"),
@@ -620,7 +686,7 @@ Stderr:
             s3_uri_style=s3_parameters["s3-uri-style"],
             access_key=s3_parameters["access-key"],
             secret_key=s3_parameters["secret-key"],
-            stanza=self.charm.cluster_name,
+            stanza=self.stanza_name,
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
         )
@@ -651,6 +717,9 @@ Stderr:
                 f"Missing required S3 parameters in relation with S3 integrator: {missing_required_parameters}"
             )
             return {}, missing_required_parameters
+
+        # Retrieve the backup path, strip its slashes and add a "/" in the beginning of the path.
+        s3_parameters["path"] = f'/{s3_parameters["path"].strip("/")}'
 
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
