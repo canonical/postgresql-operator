@@ -346,6 +346,10 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self._update_new_unit_status()
+
+    def _update_new_unit_status(self) -> None:
+        """Update the status of a new unit that recently joined the cluster."""
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
