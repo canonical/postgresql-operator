@@ -50,12 +50,16 @@ class ProcessRunningError(Exception):
 async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
+    if "/" in process:
+        pgrep_cmd = ("pgrep", "-f", process)
+    else:
+        pgrep_cmd = ("pgrep", "-x", process)
 
     try:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    _, processes, _ = await ops_test.juju("ssh", unit.name, "pgrep", "-x", process)
+                    _, processes, _ = await ops_test.juju("ssh", unit.name, *pgrep_cmd)
 
                     # Splitting processes by "\n" results in one or more empty lines, hence we
                     # need to process these lines accordingly.
@@ -508,7 +512,12 @@ async def send_signal_to_process(
         await ops_test.model.applications[app].add_unit(count=1)
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
 
-    command = f"run --unit {unit_name} -- pkill --signal {signal} -x {process}"
+    if "/" in process:
+        opt = "-f"
+    else:
+        opt = "-x"
+
+    command = f"run --unit {unit_name} -- pkill --signal {signal} {opt} {process}"
 
     # Send the signal.
     return_code, _, _ = await ops_test.juju(*command.split())
