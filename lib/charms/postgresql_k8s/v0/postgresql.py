@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 
 logger = logging.getLogger(__name__)
@@ -48,6 +48,10 @@ class PostgreSQLCreateUserError(Exception):
 
 class PostgreSQLDeleteUserError(Exception):
     """Exception raised when deleting a user fails."""
+
+
+class PostgreSQLEnableDisableExtensionError(Exception):
+    """Exception raised when enabling/disabling an extension fails."""
 
 
 class PostgreSQLGetPostgreSQLVersionError(Exception):
@@ -157,23 +161,45 @@ class PostgreSQL:
             user: user to be created.
             password: password to be assigned to the user.
             admin: whether the user should have additional admin privileges.
-            extra_user_roles: additional roles to be assigned to the user.
+            extra_user_roles: additional privileges and/or roles to be assigned to the user.
         """
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
+                # Separate roles and privileges from the provided extra user roles.
+                roles = privileges = None
+                if extra_user_roles:
+                    extra_user_roles = tuple(extra_user_roles.lower().split(","))
+                    cursor.execute(
+                        "SELECT rolname FROM pg_roles WHERE rolname IN %s;", (extra_user_roles,)
+                    )
+                    roles = [role[0] for role in cursor.fetchall()]
+                    privileges = [
+                        extra_user_role
+                        for extra_user_role in extra_user_roles
+                        if extra_user_role not in roles
+                    ]
+
+                # Create or update the user.
                 cursor.execute(f"SELECT TRUE FROM pg_roles WHERE rolname='{user}';")
-                user_definition = (
+                if cursor.fetchone() is not None:
+                    user_definition = "ALTER ROLE {}"
+                else:
+                    user_definition = "CREATE ROLE {}"
+                user_definition += (
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
-                if extra_user_roles:
-                    user_definition += f' {extra_user_roles.replace(",", " ")}'
-                if cursor.fetchone() is not None:
-                    statement = "ALTER ROLE {}"
-                else:
-                    statement = "CREATE ROLE {}"
-                cursor.execute(
-                    sql.SQL(f"{statement} {user_definition};").format(sql.Identifier(user))
-                )
+                if privileges:
+                    user_definition += f' {" ".join(privileges)}'
+                cursor.execute(sql.SQL(f"{user_definition};").format(sql.Identifier(user)))
+
+                # Add extra user roles to the new user.
+                if roles:
+                    for role in roles:
+                        cursor.execute(
+                            sql.SQL("GRANT {} TO {};").format(
+                                sql.Identifier(role), sql.Identifier(user)
+                            )
+                        )
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError()
@@ -214,6 +240,31 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to delete user: {e}")
             raise PostgreSQLDeleteUserError()
+
+    def enable_disable_extension(self, extension: str, enable: bool) -> None:
+        """Enables or disables a PostgreSQL extension.
+
+        Args:
+            extension: the name of the extensions.
+            enable: whether the extension should be enabled or disabled.
+
+        Raises:
+            PostgreSQLEnableDisableExtensionError if the operation fails.
+        """
+        statement = (
+            f"CREATE EXTENSION IF NOT EXISTS {extension};"
+            if enable
+            else f"DROP EXTENSION IF EXISTS {extension};"
+        )
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(statement)
+        except psycopg2.Error as e:
+            logger.error(f"Failed to update user password: {e}")
+            raise PostgreSQLEnableDisableExtensionError()
+        finally:
+            if connection is not None:
+                connection.close()
 
     def get_postgresql_version(self) -> str:
         """Returns the PostgreSQL version.

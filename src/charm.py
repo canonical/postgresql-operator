@@ -12,6 +12,7 @@ from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
+    PostgreSQLEnableDisableExtensionError,
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
@@ -83,6 +84,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
+        self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
@@ -146,6 +148,11 @@ class PostgresqlOperatorCharm(CharmBase):
             self.app_peer_data.update({key: value})
         else:
             raise RuntimeError("Unknown secret scope.")
+
+    @property
+    def is_cluster_initialised(self) -> bool:
+        """Returns whether the cluster is already initialised."""
+        return "cluster_initialised" in self.app_peer_data
 
     @property
     def postgresql(self) -> PostgreSQL:
@@ -663,6 +670,28 @@ class PostgresqlOperatorCharm(CharmBase):
             self._update_relation_endpoints()
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+
+    def _on_config_changed(self, _) -> None:
+        """Handle configuration changes, like enabling plugins."""
+        if not self.is_cluster_initialised:
+            logger.debug("Early exit on_config_changed: cluster not initialised yet")
+            return
+
+        for config, enable in self.model.config.items():
+            # Filter config option not related to plugins.
+            if not config.startswith("plugin-"):
+                continue
+
+            # Enable or disable the plugin/extension.
+            extension = config.split("-")[1]
+            try:
+                self.postgresql.enable_disable_extension(extension, enable)
+            except PostgreSQLEnableDisableExtensionError as e:
+                logger.exception(e)
+                self.unit.status = BlockedStatus(
+                    f"failed to {'enable' if enable else 'disable'} {extension} plugin"
+                )
+                return
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
