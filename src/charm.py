@@ -717,8 +717,13 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
-        # Set up the postgresql_exporter options.
-        self._setup_exporter()
+        try:
+            # Set up the postgresql_exporter options.
+            self._setup_exporter()
+        except snap.SnapError:
+            logger.error("failed to set up postgresql_exporter options")
+            self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
+            return
 
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
@@ -734,17 +739,13 @@ class PostgresqlOperatorCharm(CharmBase):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        try:
-            postgres_snap.set(
-                {
-                    "exporter.user": MONITORING_USER,
-                    "exporter.password": self.get_secret("app", MONITORING_PASSWORD_KEY),
-                }
-            )
-            postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
-
-        except snap.SnapError:
-            logger.exception("failed to set up postgresql_exporter options")
+        postgres_snap.set(
+            {
+                "exporter.user": MONITORING_USER,
+                "exporter.password": self.get_secret("app", MONITORING_PASSWORD_KEY),
+            }
+        )
+        postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
