@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 import requests
 from charms.operator_libs_linux.v1 import snap
@@ -299,6 +299,18 @@ class Patroni:
             member["state"] == "running" for member in cluster_status.json()["members"]
         ) and any(member["role"] == "leader" for member in cluster_status.json()["members"])
 
+    def get_patroni_health(self) -> Dict[str, str]:
+        """Gets, retires and parses the Patroni health endpoint."""
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                r = requests.get(
+                    f"{self._patroni_url}/health",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+
+        return r.json()
+
     @property
     def member_started(self) -> bool:
         """Has the member started Patroni and PostgreSQL.
@@ -308,17 +320,26 @@ class Patroni:
             allow server time to start up.
         """
         try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-                with attempt:
-                    r = requests.get(
-                        f"{self._patroni_url}/health",
-                        verify=self.verify,
-                        timeout=API_REQUEST_TIMEOUT,
-                    )
+            response = self.get_patroni_health()
         except RetryError:
             return False
 
-        return r.json()["state"] == "running"
+        return response["state"] == "running"
+
+    @property
+    def member_inactive(self) -> bool:
+        """Are Patroni and PostgreSQL in inactive state.
+
+        Returns:
+            True if services is not running, starting or restarting. Retries over a period of 60
+            seconds times to allow server time to start up.
+        """
+        try:
+            response = self.get_patroni_health()
+        except RetryError:
+            return True
+
+        return response["state"] not in ["running", "starting", "restarting"]
 
     @property
     def member_replication_lag(self) -> str:

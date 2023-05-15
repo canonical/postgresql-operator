@@ -29,7 +29,7 @@ SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER]
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 POSTGRESQL_SNAP_NAME = "charmed-postgresql"
-SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, {"revision": 31})]
+SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, {"revision": 34})]
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
