@@ -169,10 +169,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
 async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
-    # Build the PostgreSQL charm.
     charm = await ops_test.build_charm(".")
-    # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
-    # as archivo_mode is disabled after restoring the backup).
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(
         charm,
@@ -197,7 +194,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     logger.info("listing the available backups")
     action = await ops_test.model.units.get(unit_name).run_action("list-backups")
     await action.wait()
-    backups = action.results["backups"]
+    backups = action.results.get("backups")
     assert backups, "backups not outputted"
     await wait_for_idle_on_blocked(
         ops_test,

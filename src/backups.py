@@ -275,9 +275,7 @@ class PostgreSQLBackups(Object):
             backup_list.append((backup_id, "physical", backup_status))
         return self._format_backup_list(backup_list)
 
-    def _list_backups(
-        self, show_failed: bool, restore_stanza: bool = False
-    ) -> OrderedDict[str, str]:
+    def _list_backups(self, show_failed: bool) -> OrderedDict[str, str]:
         """Retrieve the list of backups.
 
         Args:
@@ -375,7 +373,7 @@ class PostgreSQLBackups(Object):
         except RetryError as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
-            self.charm.app_peer_data.update({"stanza": self.stanza_name})
+            self.charm.app_peer_data.update({"stanza": ""})
             self.charm.update_config()
 
             logger.exception(e)
@@ -559,7 +557,7 @@ Stderr:
         # Validate the provided backup id.
         logger.info("Validating provided backup-id")
         try:
-            backups = self._list_backups(show_failed=False, restore_stanza=True)
+            backups = self._list_backups(show_failed=False)
             if backup_id not in backups.keys():
                 event.fail(f"Invalid backup-id: {backup_id}")
                 return
