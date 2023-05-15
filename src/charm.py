@@ -929,7 +929,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
-        if self._unit_ip in self.members_ips and not self._patroni.member_started:
+        if self._unit_ip in self.members_ips and self._patroni.member_inactive:
             try:
                 self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")
