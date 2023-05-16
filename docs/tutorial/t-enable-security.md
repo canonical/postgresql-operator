@@ -1,6 +1,6 @@
 # Enable Security in your PostgreSQL deployment 
 
-This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=14/stable). Please refer to this page for more information and the overview of the content.
 
 ## Transport Layer Security (TLS)
 [TLS](https://en.wikipedia.org/wiki/Transport_Layer_Security) is used to encrypt data exchanged between two applications; it secures data transmitted over the network. Typically, enabling TLS within a highly available database, and between a highly available database and client/server applications, requires domain-specific knowledge and a high level of expertise. Fortunately, the domain-specific knowledge has been encoded into Charmed PostgreSQL. This means (re-)configuring TLS on Charmed PostgreSQL is readily available and requires minimal effort on your end.
@@ -10,7 +10,7 @@ Again, relations come in handy here as TLS is enabled via relations; i.e. by rel
 ### Configure TLS
 Before enabling TLS on Charmed PostgreSQL we must first deploy the `tls-certificates-operator` charm:
 ```shell
-juju deploy tls-certificates-operator --channel=edge --config generate-self-signed-certificates="true" --config ca-common-name="Tutorial CA"
+juju deploy tls-certificates-operator --config generate-self-signed-certificates="true" --config ca-common-name="Tutorial CA"
 ```
 
 Wait until the `tls-certificates-operator` is up and active, use `juju status --watch 1s` to monitor the progress:
@@ -18,9 +18,9 @@ Wait until the `tls-certificates-operator` is up and active, use `juju status --
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  2.9.42   unsupported  10:31:40+01:00
 
-App                        Version  Status  Scale  Charm                      Channel  Rev  Exposed  Message
-postgresql                          active      2  postgresql                 edge     281  no       
-tls-certificates-operator           active      1  tls-certificates-operator  edge      22  no       
+App                        Version  Status  Scale  Charm                      Channel    Rev  Exposed  Message
+postgresql                          active      2  postgresql                 14/stable  281  no       
+tls-certificates-operator           active      1  tls-certificates-operator  stable     22   no       
 
 Unit                          Workload  Agent  Machine  Public address  Ports  Message
 postgresql/0*                 active    idle   0        10.89.49.129           Primary

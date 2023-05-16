@@ -1,6 +1,6 @@
 # Integrating your Charmed PostgreSQL
 
-This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=14/stable). Please refer to this page for more information and the overview of the content.
 
 ## Integrations (Relations for Juju 2.9)
 Relations, or what Juju 3.0+ documentation [describes as an Integration](https://juju.is/docs/sdk/integration), are the easiest way to create a user for PostgreSQL in Charmed PostgreSQL. Relations automatically create a username, password, and database for the desired user/application. As mentioned earlier in the [Access PostgreSQL section](#access-PostgreSQL) it is a better practice to connect to PostgreSQL via a specific user rather than the admin user.
@@ -22,9 +22,9 @@ Checking the deployment progress using `juju status` will show you the `blocked`
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  2.9.42   unsupported  10:22:13+01:00
 
-App              Version  Status   Scale  Charm            Channel  Rev  Exposed  Message
-data-integrator           blocked      1  data-integrator  edge       6  no       Please relate the data-integrator with the desired product
-postgresql                active       2  postgresql       edge     281  no       
+App              Version  Status   Scale  Charm            Channel    Rev  Exposed  Message
+data-integrator           blocked      1  data-integrator  edge       6    no       Please relate the data-integrator with the desired product
+postgresql                active       2  postgresql       14/stable  281  no       
 
 Unit                Workload  Agent  Machine  Public address  Ports  Message
 data-integrator/0*  blocked   idle   3        10.89.49.179           Please relate the data-integrator with the desired product
@@ -48,9 +48,9 @@ Wait for `juju status --watch 1s` to show all applications/units as `active`:
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  2.9.42   unsupported  10:22:31+01:00
 
-App              Version  Status  Scale  Charm            Channel  Rev  Exposed  Message
-data-integrator           active      1  data-integrator  edge       6  no       
-postgresql                active      2  postgresql       edge     281  no       
+App              Version  Status  Scale  Charm            Channel    Rev  Exposed  Message
+data-integrator           active      1  data-integrator  edge       6    no       
+postgresql                active      2  postgresql       14/stable  281  no       
 
 Unit                Workload  Agent  Machine  Public address  Ports  Message
 data-integrator/0*  active    idle   3        10.89.49.179           
