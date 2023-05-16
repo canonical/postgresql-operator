@@ -65,6 +65,18 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
 
 
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
+async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
+    # Query Patroni REST API and check the status that indicates
+    # both Patroni and PostgreSQL are up and running.
+    host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
+    result = requests.get(f"http://{host}:9187/metrics")
+    assert result.status_code == 200
+    assert "pg_exporter_last_scrape_error 0" in result.content.decode(
+        "utf8"
+    ), "Scrape error in postgresql_prometheus_exporter"
+
+
+@pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Connect to the PostgreSQL instance.
     # Retrieving the operator user password using the action.
