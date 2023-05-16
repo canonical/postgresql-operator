@@ -8,6 +8,7 @@ import logging
 import subprocess
 from typing import Dict, List, Optional, Set
 
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
@@ -50,8 +51,13 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    METRICS_PORT,
+    MONITORING_PASSWORD_KEY,
+    MONITORING_SNAP_SERVICE,
+    MONITORING_USER,
     PATRONI_CONF_PATH,
     PEER,
+    POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
     SNAP_PACKAGES,
@@ -104,6 +110,13 @@ class PostgresqlOperatorCharm(CharmBase):
             charm=self, relation="restart", callback=self._restart
         )
         self._observer.start_observer()
+        self._grafana_agent = COSAgentProvider(
+            self,
+            metrics_endpoints=[
+                {"path": "/metrics", "port": METRICS_PORT},
+            ],
+            log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
+        )
 
     @property
     def app_peer_data(self) -> Dict:
@@ -637,6 +650,8 @@ class PostgresqlOperatorCharm(CharmBase):
             self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
         if self.get_secret("app", REWIND_PASSWORD_KEY) is None:
             self.set_secret("app", REWIND_PASSWORD_KEY, new_password())
+        if self.get_secret("app", MONITORING_PASSWORD_KEY) is None:
+            self.set_secret("app", MONITORING_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -702,6 +717,14 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
+        try:
+            # Set up the postgresql_exporter options.
+            self._setup_exporter()
+        except snap.SnapError:
+            logger.error("failed to set up postgresql_exporter options")
+            self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
+            return
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
@@ -710,6 +733,19 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
+
+    def _setup_exporter(self) -> None:
+        """Set up postgresql_exporter options."""
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        postgres_snap.set(
+            {
+                "exporter.user": MONITORING_USER,
+                "exporter.password": self.get_secret("app", MONITORING_PASSWORD_KEY),
+            }
+        )
+        postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -736,6 +772,13 @@ class PostgresqlOperatorCharm(CharmBase):
                 # Create the backup user.
             if BACKUP_USER not in users:
                 self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
+            if MONITORING_USER not in users:
+                # Create the monitoring user.
+                self.postgresql.create_user(
+                    MONITORING_USER,
+                    self.get_secret("app", MONITORING_PASSWORD_KEY),
+                    extra_user_roles="pg_monitor",
+                )
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")

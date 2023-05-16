@@ -136,6 +136,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgreSQLProvider.oversee_users")
@@ -169,6 +170,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints,
         _oversee_users,
         _get_postgresql_version,
+        _snap_cache,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -190,7 +192,7 @@ class TestCharm(unittest.TestCase):
         # Mock cluster start and postgres user creation success values.
         _bootstrap_cluster.side_effect = [False, True, True]
         _postgresql.list_users.side_effect = [[], [], []]
-        _postgresql.create_user.side_effect = [PostgreSQLCreateUserError, None, None]
+        _postgresql.create_user.side_effect = [PostgreSQLCreateUserError, None, None, None]
 
         # Test for a failed cluster bootstrapping.
         # TODO: test replicas start (DPE-494).
@@ -199,7 +201,6 @@ class TestCharm(unittest.TestCase):
         _bootstrap_cluster.assert_called_once()
         _oversee_users.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
         # Set an initial waiting status (like after the install hook was triggered).
         self.harness.model.unit.status = WaitingStatus("fake message")
 
@@ -216,11 +217,12 @@ class TestCharm(unittest.TestCase):
         # Then test the event of a correct cluster bootstrapping.
         self.charm.on.start.emit()
         self.assertEqual(
-            _postgresql.create_user.call_count, 3
+            _postgresql.create_user.call_count, 4
         )  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
+    @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.configure_patroni_on_unit")
@@ -246,6 +248,7 @@ class TestCharm(unittest.TestCase):
         _member_started,
         _configure_patroni_on_unit,
         _get_postgresql_version,
+        _snap_cache,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -282,6 +285,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.Patroni")
     @patch("charm.PostgresqlOperatorCharm._get_password")
@@ -292,6 +296,7 @@ class TestCharm(unittest.TestCase):
         _get_password,
         patroni,
         _postgresql,
+        _snap_cache,
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
