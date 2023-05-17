@@ -368,7 +368,7 @@ class PostgresqlOperatorCharm(CharmBase):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            if not self.is_blocked:
+            if not self.is_blocked or self.unit.status.message == NO_PRIMARY_MESSAGE:
                 self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
