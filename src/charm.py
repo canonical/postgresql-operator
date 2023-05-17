@@ -677,6 +677,10 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.debug("Early exit on_config_changed: cluster not initialised yet")
             return
 
+        self._enable_disable_extensions()
+
+    def _enable_disable_extensions(self) -> None:
+        """Enable/disable PostgreSQL extensions set through config options."""
         for config, enable in self.model.config.items():
             # Filter config option not related to plugins.
             if not config.startswith("plugin-"):
@@ -687,11 +691,9 @@ class PostgresqlOperatorCharm(CharmBase):
             try:
                 self.postgresql.enable_disable_extension(extension, enable)
             except PostgreSQLEnableDisableExtensionError as e:
-                logger.exception(e)
-                self.unit.status = BlockedStatus(
-                    f"failed to {'enable' if enable else 'disable'} {extension} plugin"
+                logger.exception(
+                    f"failed to {'enable' if enable else 'disable'} {extension} plugin: %s", str(e)
                 )
-                return
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""
@@ -777,6 +779,10 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Clear unit data if this unit became a replica after a failover/switchover.
         self._update_relation_endpoints()
+
+        # Enable/disable PostgreSQL extensions if they were set before the cluster
+        # was fully initialised.
+        self._enable_disable_extensions()
 
         self.unit.status = ActiveStatus()
 
