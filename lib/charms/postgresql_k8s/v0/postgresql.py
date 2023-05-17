@@ -256,11 +256,11 @@ class PostgreSQL:
             if enable
             else f"DROP EXTENSION IF EXISTS {extension};"
         )
+        connection = None
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(statement)
         except psycopg2.Error as e:
-            logger.error(f"Failed to update user password: {e}")
             raise PostgreSQLEnableDisableExtensionError()
         finally:
             if connection is not None:
