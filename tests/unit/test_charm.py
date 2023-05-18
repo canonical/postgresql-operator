@@ -154,7 +154,7 @@ class TestCharm(unittest.TestCase):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Test when all extensions install/uninstall succeed.
             postgresql_mock.enable_disable_extension.side_effect = None
-            with self.assertNoLogs("charm", "ERROR") as logs:
+            with self.assertNoLogs("charm", "ERROR"):
                 self.charm._enable_disable_extensions()
                 self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
 
