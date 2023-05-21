@@ -906,17 +906,20 @@ class PostgresqlOperatorCharm(CharmBase):
                 self.unit.status = BlockedStatus(validation_message)
                 return
 
-        if self._handle_workload_failures():
+        if self._handle_processes_failures():
             return
 
         self.postgresql_client_relation.oversee_users()
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
+        if self._handle_workload_failures():
+            return
+
         self._set_primary_status_message()
 
-    def _handle_workload_failures(self) -> bool:
-        """Handle workload (Patroni or PostgreSQL) failures.
+    def _handle_processes_failures(self) -> bool:
+        """Handle Patroni and PostgreSQL OS processes failures.
 
         Returns:
             a bool indicating whether the charm performed any action.
@@ -932,6 +935,14 @@ class PostgresqlOperatorCharm(CharmBase):
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
                 return False
 
+        return False
+
+    def _handle_workload_failures(self) -> bool:
+        """Handle workload (Patroni or PostgreSQL) failures.
+
+        Returns:
+            a bool indicating whether the charm performed any action.
+        """
         # Restart the workload if it's stuck on the starting state after a restart.
         if (
             not self._patroni.member_started
