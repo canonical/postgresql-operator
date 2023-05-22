@@ -1,6 +1,6 @@
 # Scale your Charmed PostgreSQL
 
-This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=14/stable). Please refer to this page for more information and the overview of the content.
 
 ## Adding and Removing units
 
@@ -20,8 +20,8 @@ You can now watch the scaling process in live using: `juju status --watch 1s`. I
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  2.9.42   unsupported  10:16:44+01:00
 
-App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
-postgresql           active      3  postgresql  edge     281  no       
+App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
+postgresql           active      3  postgresql  14/stable  281  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports  Message
 postgresql/0*  active    idle   0        10.89.49.129           Primary
@@ -45,8 +45,8 @@ You’ll know that the replica was successfully removed when `juju status --watc
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  2.9.42   unsupported  10:17:14+01:00
 
-App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
-postgresql           active      2  postgresql  edge     281  no       
+App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
+postgresql           active      2  postgresql  14/stable  281  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports  Message
 postgresql/0*  active    idle   0        10.89.49.129           

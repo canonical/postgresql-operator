@@ -1,6 +1,6 @@
 # Environment Setup
 
-This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=14/stable). Please refer to this page for more information and the overview of the content.
 
 ## Minimum requirements
 Before we start, make sure your machine meets the following requirements:
