@@ -1,12 +1,12 @@
 # Get a Charmed PostgreSQL up and running
 
-This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=edge). Please refer to this page for more information and the overview of the content.
+This is part of the [Charmed PostgreSQL Tutorial](/t/charmed-postgresql-tutorial-overview/9707?channel=14/stable). Please refer to this page for more information and the overview of the content.
 
 ## Deploy Charmed PostgreSQL
 
-To deploy Charmed PostgreSQL, all you need to do is run the following command, which will fetch the charm from [Charmhub](https://charmhub.io/postgresql?channel=edge) and deploy it to your model:
+To deploy Charmed PostgreSQL, all you need to do is run the following command, which will fetch the charm from [Charmhub](https://charmhub.io/postgresql?channel=14/stable) and deploy it to your model:
 ```shell
-juju deploy postgresql --channel edge
+juju deploy postgresql --channel 14/stable
 ```
 
 Juju will now fetch Charmed PostgreSQL and begin deploying it to the LXD cloud. This process can take several minutes depending on how provisioned (RAM, CPU, etc) your machine is. You can track the progress by running:
@@ -19,8 +19,8 @@ This command is useful for checking the status of Charmed PostgreSQL and gatheri
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  2.9.42   unsupported  09:41:53+01:00
 
-App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
-postgresql           active      1  postgresql  edge     281  no       
+App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
+postgresql           active      1  postgresql  14/stable  281  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports  Message
 postgresql/0*  active    idle   0        10.89.49.129           
