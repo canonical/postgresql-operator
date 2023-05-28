@@ -62,13 +62,13 @@ bootstrap:
         {% else %}
         archive_command: /bin/true
         {%- endif %}
-        archive_mode: {{ archive_mode }}
+        archive_mode: on
         wal_level: logical
 
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
-    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --type=immediate --target-action=promote restore
     no_params: True
     keep_existing_recovery_conf: True
   {% else %}
