@@ -16,7 +16,7 @@ AWS = "AWS"
 GCP = "GCP"
 
 
-@pytest.fixture()
+@pytest.fixture(scope="module")
 async def cloud_configs(ops_test: OpsTest) -> None:
     # Define some configurations and credentials.
     configs = {
