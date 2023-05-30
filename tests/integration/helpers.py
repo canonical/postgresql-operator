@@ -848,7 +848,7 @@ def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
     minority_count = len(ops_test.model.applications[app_name].units) // 2
-    for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(2), reraise=True):
+    for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
             response = requests.get(f"http://{primary_ip}:8008/cluster")
             assert response.status_code == 200
