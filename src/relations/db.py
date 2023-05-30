@@ -27,7 +27,9 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
-EXTENSIONS_BLOCKING_MESSAGE = "extensions requested through relation"
+EXTENSIONS_BLOCKING_MESSAGE = (
+    "extensions requested through relation, enable them through config options"
+)
 
 
 class DbProvides(Object):
@@ -104,32 +106,49 @@ class DbProvides(Object):
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
-        unit_relation_databag = event.relation.data[self.charm.unit]
+        # Do not allow apps requesting extensions to be installed
+        # (let them now about config options).
+        extensions = set(event.relation.data.get(event.app, {}).get("extensions", "").split(","))
+        for unit in event.relation.units:
+            extensions.update(event.relation.data.get(unit, {}).get("extensions", "").split(","))
+        if extensions:
+            disabled_extensions = set()
+            for extension in extensions:
+                logger.error(f"extension: {extension}")
+                if not self.charm.model.config.get(f"plugin_{extension}_enable"):
+                    disabled_extensions.add(extension)
+            if disabled_extensions:
+                logger.error(
+                    f"ERROR - `extensions` ({', '.join(disabled_extensions)}) cannot be requested through relations"
+                    " - they should be enabled through a database charm config"
+                )
+                self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
+                return
 
-        # Do not allow apps requesting extensions to be installed.
-        if "extensions" in event.relation.data.get(
-            event.app, {}
-        ) or "extensions" in event.relation.data.get(event.unit, {}):
-            logger.error(
-                "ERROR - `extensions` cannot be requested through relations"
-                " - they should be installed through a database charm config in the future"
-            )
-            self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
-            return
+        self._set_up_relation(event.relation, extensions)
+
+    def _set_up_relation(self, relation: Relation, extensions) -> None:
+        """Set up the relation to be used by the application charm."""
+        database = relation.data.get(relation.app, {}).get("database")
+        if not database:
+            for unit in relation.units:
+                unit_database = relation.data.get(unit, {}).get("database")
+                if unit_database:
+                    database = unit_database
+                    break
 
         # Sometimes a relation changed event is triggered, and it doesn't have
         # a database name in it (like the relation with Landscape server charm),
         # so create a database with the other application name.
-        database = event.relation.data.get(event.app, {}).get(
-            "database", event.relation.data.get(event.unit, {}).get("database")
-        )
         if not database:
-            database = event.relation.app.name
+            database = relation.app.name
 
         try:
+            unit_relation_databag = relation.data[self.charm.unit]
+
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            user = f"relation-{event.relation.id}"
+            user = f"relation-{relation.id}"
             password = unit_relation_databag.get("password", new_password())
 
             # Store the user, password and database name in the secret store to be accessible by
@@ -139,6 +158,10 @@ class DbProvides(Object):
 
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
+
+            # Enable/disable extensions in the new database.
+            self.charm.enable_disable_extensions(database)
+
             postgresql_version = self.charm.postgresql.get_postgresql_version()
         except (
             PostgreSQLCreateDatabaseError,
@@ -160,10 +183,12 @@ class DbProvides(Object):
             {
                 "version": postgresql_version,
                 "password": password,
+                "schema_password": password,
                 "database": database,
+                "extensions": ",".join(extensions),
             }
         )
-        self.update_endpoints(event)
+        self.update_endpoints(relation)
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle the departure of legacy db and db-admin relations.
@@ -236,11 +261,11 @@ class DbProvides(Object):
             if not self._check_for_blocking_relations(event.relation.id):
                 self.charm.unit.status = ActiveStatus()
 
-    def update_endpoints(self, event: RelationChangedEvent = None) -> None:
+    def update_endpoints(self, relation: Relation = None) -> None:
         """Set the read/write and read-only endpoints."""
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
-        relations = [event.relation] if event else self.model.relations[self.relation_name]
+        relations = [relation] if relation else self.model.relations[self.relation_name]
         if len(relations) == 0:
             return
 
@@ -298,6 +323,7 @@ class DbProvides(Object):
                 "host": self.charm.primary_endpoint,
                 "port": DATABASE_PORT,
                 "user": user,
+                "schema_user": user,
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),

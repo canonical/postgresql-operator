@@ -75,12 +75,12 @@ async def test_plugins(ops_test: OpsTest) -> None:
     # Enable the plugins.
     logger.info("enabling the plugins")
     config = {
-        "plugin-citext-enable": "True",
-        "plugin-debversion-enable": "True",
-        "plugin-hstore-enable": "True",
-        "plugin-pg_trgm-enable": "True",
-        "plugin-plpython3u-enable": "True",
-        "plugin-unaccent-enable": "True",
+        "plugin_citext_enable": "True",
+        "plugin_debversion_enable": "True",
+        "plugin_hstore_enable": "True",
+        "plugin_pg_trgm_enable": "True",
+        "plugin_plpython3u_enable": "True",
+        "plugin_unaccent_enable": "True",
     }
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")

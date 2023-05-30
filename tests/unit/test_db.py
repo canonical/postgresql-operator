@@ -189,7 +189,9 @@ class TestDbProvides(unittest.TestCase):
             _member_started.return_value = True
             _primary_endpoint.return_value = {"1.1.1.1"}
             postgresql_mock.delete_user = PropertyMock(return_value=None)
-            self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
+            self.harness.model.unit.status = BlockedStatus(
+                "extensions requested through relation, enable them through config options"
+            )
             with self.harness.hooks_disabled():
                 self.harness.update_relation_data(
                     self.rel_id,
@@ -217,7 +219,9 @@ class TestDbProvides(unittest.TestCase):
             _member_started.return_value = True
             _primary_endpoint.return_value = {"1.1.1.1"}
             postgresql_mock.delete_user = PropertyMock(return_value=None)
-            self.harness.model.unit.status = BlockedStatus("extensions requested through relation")
+            self.harness.model.unit.status = BlockedStatus(
+                "extensions requested through relation, enable them through config options"
+            )
             with self.harness.hooks_disabled():
                 first_rel_id = self.harness.add_relation(RELATION_NAME, "application1")
                 self.harness.update_relation_data(

@@ -137,7 +137,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
-    @patch("charm.PostgresqlOperatorCharm._enable_disable_extensions")
+    @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
     def test_on_config_changed(self, _is_cluster_initialised, _enable_disable_extensions):
         # Test when the cluster was not initialised yet.
@@ -155,7 +155,7 @@ class TestCharm(unittest.TestCase):
             # Test when all extensions install/uninstall succeed.
             postgresql_mock.enable_disable_extension.side_effect = None
             with self.assertNoLogs("charm", "ERROR"):
-                self.charm._enable_disable_extensions()
+                self.charm.enable_disable_extensions()
                 self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
 
             # Test when one extension install/uninstall fails.
@@ -164,11 +164,11 @@ class TestCharm(unittest.TestCase):
                 PostgreSQLEnableDisableExtensionError
             )
             with self.assertLogs("charm", "ERROR") as logs:
-                self.charm._enable_disable_extensions()
+                self.charm.enable_disable_extensions()
                 self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
                 self.assertIn("failed to disable citext plugin", "".join(logs.output))
 
-    @patch("charm.PostgresqlOperatorCharm._enable_disable_extensions")
+    @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")

@@ -241,12 +241,13 @@ class PostgreSQL:
             logger.error(f"Failed to delete user: {e}")
             raise PostgreSQLDeleteUserError()
 
-    def enable_disable_extension(self, extension: str, enable: bool) -> None:
+    def enable_disable_extension(self, extension: str, enable: bool, database: str = None) -> None:
         """Enables or disables a PostgreSQL extension.
 
         Args:
             extension: the name of the extensions.
             enable: whether the extension should be enabled or disabled.
+            database: optional database where to enable/disable the extension.
 
         Raises:
             PostgreSQLEnableDisableExtensionError if the operation fails.
@@ -258,9 +259,21 @@ class PostgreSQL:
         )
         connection = None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute(statement)
-        except psycopg2.Error as e:
+            if database is not None:
+                databases = [database]
+            else:
+                # Retrieve all the databases.
+                with self._connect_to_database() as connection, connection.cursor() as cursor:
+                    cursor.execute("SELECT datname FROM pg_database WHERE NOT datistemplate;")
+                    databases = {database[0] for database in cursor.fetchall()}
+
+            # Enable/disabled the extension in each database.
+            for database in databases:
+                with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                    cursor.execute(statement)
+        except psycopg2.errors.UniqueViolation:
+            pass
+        except psycopg2.Error:
             raise PostgreSQLEnableDisableExtensionError()
         finally:
             if connection is not None:
