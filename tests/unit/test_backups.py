@@ -30,8 +30,8 @@ class TestPostgreSQLBackups(unittest.TestCase):
         self.addCleanup(self.harness.cleanup)
 
         # Set up the initial relation and hooks.
-        self.peer_rel_id = self.harness.add_relation(PEER, "postgresql-k8s")
-        self.harness.add_relation_unit(self.peer_rel_id, "postgresql-k8s/0")
+        self.peer_rel_id = self.harness.add_relation(PEER, "postgresql")
+        self.harness.add_relation_unit(self.peer_rel_id, "postgresql/0")
         self.harness.begin()
         self.charm = self.harness.charm
 
@@ -379,20 +379,21 @@ class TestPostgreSQLBackups(unittest.TestCase):
         )
         _update_config.assert_called_once()
 
+    @patch("pwd.getpwnam")
     @patch("backups.run")
-    def test_execute_command(self, _run):
+    def test_execute_command(self, _run, _getpwnam):
         # Test when the command fails.
         command = "rm -r /var/lib/postgresql/data/pgdata".split()
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
-        # _run.return_value.wait_output.return_value = ("fake stdout", "")
         self.assertEqual(self.charm.backup._execute_command(command), (1, "", "fake stderr"))
-        print(self.charm.backup._execute_command.__code__.co_consts)
         _run.assert_called_once_with(
             command, input=None, stdout=PIPE, stderr=PIPE, preexec_fn=ANY, timeout=None
         )
+        _getpwnam.assert_called_once_with("snap_daemon")
 
         # Test when the command runs successfully.
         _run.reset_mock()
+        _getpwnam.reset_mock()
         _run.side_effect = None
         _run.return_value = CompletedProcess(command, 0, b"fake stdout", b"")
         self.assertEqual(
@@ -402,6 +403,7 @@ class TestPostgreSQLBackups(unittest.TestCase):
         _run.assert_called_once_with(
             command, input=b"fake input", stdout=PIPE, stderr=PIPE, preexec_fn=ANY, timeout=5
         )
+        _getpwnam.assert_called_once_with("snap_daemon")
 
     def test_format_backup_list(self):
         # Test when there are no backups.

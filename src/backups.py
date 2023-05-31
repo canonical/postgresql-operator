@@ -244,7 +244,7 @@ class PostgreSQLBackups(Object):
             input=command_input,
             stdout=PIPE,
             stderr=PIPE,
-            preexec_fn=demote,
+            preexec_fn=demote(),
             timeout=timeout,
         )
         return process.returncode, process.stdout.decode(), process.stderr.decode()
