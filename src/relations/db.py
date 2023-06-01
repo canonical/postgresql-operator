@@ -160,6 +160,7 @@ class DbProvides(Object):
             {
                 "version": postgresql_version,
                 "password": password,
+                "schema_password": password,
                 "database": database,
             }
         )
@@ -290,12 +291,18 @@ class DbProvides(Object):
             # Set the read/write endpoint.
             allowed_subnets = self._get_allowed_subnets(relation)
             allowed_units = self._get_allowed_units(relation)
+            postgresql_version = self.charm.postgresql.get_postgresql_version()
             data = {
                 "allowed-subnets": allowed_subnets,
                 "allowed-units": allowed_units,
                 "host": self.charm.primary_endpoint,
                 "port": DATABASE_PORT,
                 "user": user,
+                "schema_user": user,
+                "version": postgresql_version,
+                "password": password,
+                "schema_password": password,
+                "database": database,
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
@@ -342,4 +349,4 @@ class DbProvides(Object):
         if self.charm._patroni.get_primary(unit_name_pattern=True) == self.charm.unit.name:
             return "master"
         else:
-            return "standby"
+            return "hot standby"
