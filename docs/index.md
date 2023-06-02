@@ -1,4 +1,3 @@
-## Charmed PostgreSQL Documentation
 The Charmed PostgreSQL Operator delivers automated operations management from day 0 to day 2 on the [PostgreSQL Database Management System](https://www.postgresql.org/). It is an open source, end-to-end, production-ready data platform on top of [Juju](https://juju.is/).
 
 PostgreSQL is a powerful, open source object-relational database system that uses and extends the SQL language combined with many features that safely store and scale the most complicated data workloads.
@@ -16,8 +15,8 @@ Charmed PostgreSQL is an official distribution of PostgreSQL. It’s an open-sou
 
 | | |
 |--|--|
-|  [Tutorials -- Coming Soon]()</br>  Get started - a hands-on introduction to using Charmed PostgreSQL operator for new users </br> |  [How-to guides -- Coming Soon]() </br> Step-by-step guides covering key operations and common tasks |
-| [Reference -- Coming Soon]() </br> Technical information - specifications, APIs, architecture | [Explanation -- Coming Soon]() </br> Concepts - discussion and clarification of key topics  |
+|  [Tutorials](/t/charmed-postgresql-tutorial-overview/9707?channel=14/stable)</br>  Get started - a hands-on introduction to using Charmed PostgreSQL operator for new users </br> |  [How-to guides](/t/charmed-postgresql-how-to-manage-units/9689?channel=14/stable) </br> Step-by-step guides covering key operations and common tasks |
+| [Reference](https://charmhub.io/postgresql/actions?channel=14/stable) </br> Technical information - specifications, APIs, architecture | [Explanation](/t/charmed-postgresql-explanations-interfaces-endpoints/10251?channel=14/stable) </br> Concepts - discussion and clarification of key topics  |
 
 # Navigation
 
@@ -36,14 +35,21 @@ Charmed PostgreSQL is an official distribution of PostgreSQL. It’s an open-sou
 | 2     | h-manage-units                | [Manage units](/t/charmed-postgresql-how-to-manage-units/9689)                                      |
 | 2     | h-enable-encryption           | [Enable encryption](/t/charmed-postgresql-how-to-enable-encryption/9685)                            |
 | 2     | h-manage-app                  | [Manage applications](/t/charmed-postgresql-how-to-manage-app/9687)                                 |
-| 2     | h-configure-s3                | [Configure S3](/t/charmed-postgresql-how-to-configure-s3/9681)                                      |
+| 2     | h-configure-s3-aws                | [Configure S3 AWS](/t/charmed-postgresql-how-to-configure-s3-for-aws/9681)                                      |
+| 2     | h-configure-s3-radosgw                | [Configure S3 RadosGW](/t/charmed-postgresql-how-to-configure-s3-for-radosgw/10313)                                     |
 | 2     | h-create-and-list-backups     | [Create and List Backups](/t/charmed-postgresql-how-to-create-and-list-backups/9683)                |
 | 2     | h-restore-backup              | [Restore a Backup](/t/charmed-postgresql-how-to-restore-backup/9693)                                |
 | 2     | h-migrate-cluster-via-restore | [Cluster Migration with Restore](/t/charmed-postgresql-how-to-migrate-cluster-via-restore/9691)     |
+| 2     | h-enable-monitoring | [Enable Monitoring](/t/charmed-postgresql-explanations-enable-monitoring/10600)     |
 | 1     | reference                     | [Reference]()                                                                                       |
 | 2     | r-actions                     | [Actions](https://charmhub.io/postgresql/actions)                                                   |
 | 2     | r-configurations              | [Configurations](https://charmhub.io/postgresql/configure)                                          |
-| 2     | r-libraries                   | [Libraries](https://charmhub.io/postgresql/libraries/helpers)                                       |
+| 2     | r-libraries                   | [Libraries](https://charmhub.io/postgresql/libraries)                                       |
+| 2     | r-integrations                   | [Integrations](https://charmhub.io/postgresql/integrations)                                       |
+| 1     | explanation                     | [Explanation]()                                                                                       |
+| 2     | e-interfaces                     | [Interfaces/endpoints](/t/charmed-postgresql-explanations-interfaces-endpoints/10251) |
+
+
 
 # Redirects
 

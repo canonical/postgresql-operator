@@ -4,12 +4,12 @@
 
 To deploy a single unit of PostgreSQL using its default configuration
 ```shell
-juju deploy postgresql --channel edge
+juju deploy postgresql --channel 14/stable
 ```
 
 It is customary to use PostgreSQL with replication. Hence usually more than one unit (preferably an odd number to prohibit a "split-brain" scenario) is deployed. To deploy PostgreSQL with multiple replicas, specify the number of desired units with the `-n` option.
 ```shell
-juju deploy postgresql --channel edge -n <number_of_replicas>
+juju deploy postgresql --channel 14/stable -n <number_of_replicas>
 ```
 
 To retrieve primary replica one can use the action `get-primary` on any of the units running postgresql:
