@@ -93,11 +93,20 @@ class PostgreSQLBackups(Object):
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
 
-        if (
-            self.charm.unit.name == self.charm._patroni.get_primary(unit_name_pattern=True)
-            and self.charm.app.planned_units() > 1
-        ):
+        tls_enabled = "tls" in self.charm.unit_peer_data
+
+        # Only enable backups on primary if there are replicas but TLS is not enabled.
+        is_primary = self.charm.unit.name == self.charm._patroni.get_primary(
+            unit_name_pattern=True
+        )
+        if is_primary and self.charm.app.planned_units() > 1 and tls_enabled:
             return False, "Unit cannot perform backups as it is the cluster primary"
+
+        # Can create backups on replicas only if TLS is enabled (it's needed to enable
+        # pgBackRest to communicate with the primary to request that missing WAL files
+        # are pushed to the S3 repo before the backup action is triggered).
+        if not is_primary and not tls_enabled:
+            return False, "Unit cannot perform backups as TLS is not enabled"
 
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
