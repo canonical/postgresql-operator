@@ -93,11 +93,20 @@ class PostgreSQLBackups(Object):
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
 
-        if (
-            self.charm.unit.name == self.charm._patroni.get_primary(unit_name_pattern=True)
-            and self.charm.app.planned_units() > 1
-        ):
+        tls_enabled = "tls" in self.charm.unit_peer_data
+
+        # Only enable backups on primary if there are replicas but TLS is not enabled.
+        is_primary = self.charm.unit.name == self.charm._patroni.get_primary(
+            unit_name_pattern=True
+        )
+        if is_primary and self.charm.app.planned_units() > 1 and tls_enabled:
             return False, "Unit cannot perform backups as it is the cluster primary"
+
+        # Can create backups on replicas only if TLS is enabled (it's needed to enable
+        # pgBackRest to communicate with the primary to request that missing WAL files
+        # are pushed to the S3 repo before the backup action is triggered).
+        if not is_primary and not tls_enabled:
+            return False, "Unit cannot perform backups as TLS is not enabled"
 
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
@@ -431,11 +440,11 @@ class PostgreSQLBackups(Object):
         datetime_backup_requested = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
         juju_version = JujuVersion.from_environ()
         metadata = f"""Date Backup Requested: {datetime_backup_requested}
-        Model Name: {self.model.name}
-        Application Name: {self.model.app.name}
-        Unit Name: {self.charm.unit.name}
-        Juju Version: {str(juju_version)}
-        """
+Model Name: {self.model.name}
+Application Name: {self.model.app.name}
+Unit Name: {self.charm.unit.name}
+Juju Version: {str(juju_version)}
+"""
         if not self._upload_content_to_s3(
             metadata,
             os.path.join(
@@ -447,16 +456,23 @@ class PostgreSQLBackups(Object):
             event.fail("Failed to upload metadata to provided S3")
             return
 
-        # Create a rule to mark the cluster as in a creating backup state and update
-        # the Patroni configuration.
-        self._change_connectivity_to_database(connectivity=False)
+        if not self.charm.is_primary:
+            # Create a rule to mark the cluster as in a creating backup state and update
+            # the Patroni configuration.
+            self._change_connectivity_to_database(connectivity=False)
 
         self.charm.unit.status = MaintenanceStatus("creating backup")
 
-        # Remove the unit endpoint from the replicas endpoints list in the relation data.
-        if self.charm.app.planned_units() > 1:
-            pass
+        self._run_backup(event, s3_parameters)
 
+        if not self.charm.is_primary:
+            # Remove the rule that marks the cluster as in a creating backup state
+            # and update the Patroni configuration.
+            self._change_connectivity_to_database(connectivity=True)
+
+        self.charm.unit.status = ActiveStatus()
+
+    def _run_backup(self, event: ActionEvent, s3_parameters: Dict) -> None:
         command = [
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
@@ -487,6 +503,7 @@ class PostgreSQLBackups(Object):
             # Upload the logs to S3.
             logs = f"""Stdout:
 {stdout}
+
 Stderr:
 {stderr}
 """
@@ -510,6 +527,7 @@ Stderr:
             # Upload the logs to S3 and fail the action if it doesn't succeed.
             logs = f"""Stdout:
 {stdout}
+
 Stderr:
 {stderr}
 """
@@ -524,12 +542,6 @@ Stderr:
                 event.fail("Error uploading logs to S3")
             else:
                 event.set_results({"backup-status": "backup created"})
-
-        # Remove the rule that marks the cluster as in a creating backup state
-        # and update the Patroni configuration.
-        self._change_connectivity_to_database(connectivity=True)
-
-        self.charm.unit.status = ActiveStatus()
 
     def _on_list_backups_action(self, event) -> None:
         """List the previously created backups."""
