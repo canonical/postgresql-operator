@@ -728,14 +728,24 @@ Stderr:
             )
             return {}, missing_required_parameters
 
-        # Retrieve the backup path, strip its slashes and add a "/" in the beginning of the path.
-        s3_parameters["path"] = f'/{s3_parameters["path"].strip("/")}'
-
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
         s3_parameters.setdefault("region")
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
+
+        # Strip whitespaces from all parameters.
+        for key, value in s3_parameters.items():
+            if isinstance(value, str):
+                s3_parameters[key] = value.strip()
+
+        # Clean up extra slash symbols to avoid issues on 3rd-party storages
+        # like Ceph Object Gateway (radosgw).
+        s3_parameters["endpoint"] = s3_parameters["endpoint"].rstrip("/")
+        s3_parameters[
+            "path"
+        ] = f'/{s3_parameters["path"].strip("/")}'  # The slash in the beginning is required by pgBackRest.
+        s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
         return s3_parameters, []
 
