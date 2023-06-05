@@ -18,12 +18,13 @@ from tests.integration.helpers import (
     check_databases_creation,
     deploy_and_relate_application_with_postgresql,
     find_unit,
+    get_primary,
 )
 
 logger = logging.getLogger(__name__)
 
 MAILMAN3_CORE_APP_NAME = "mailman3-core"
-APPLICATION_UNITS = 1
+APPLICATION_UNITS = 2
 DATABASE_UNITS = 1
 RELATION_NAME = "db"
 
@@ -166,27 +167,72 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 #                 psycopg2.connect(primary_connection_string)
 
 
-async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
+# async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
+#     async with ops_test.fast_forward():
+#         config = {"plugin_citext_enable": "True"}
+#         await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
+#         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+#
+#         # Deploy Nextcloud.
+#         await ops_test.model.deploy(
+#             "nextcloud",
+#             channel="edge",
+#             application_name="nextcloud",
+#             num_units=APPLICATION_UNITS,
+#         )
+#         await ops_test.model.wait_for_idle(
+#             apps=["nextcloud"],
+#             status="blocked",
+#             raise_on_blocked=False,
+#             timeout=1000,
+#         )
+#
+#         await ops_test.model.relate("nextcloud:db", f"{DATABASE_APP_NAME}:db")
+#
+#         # Only the leader will block
+#         leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)
+#
+#         try:
+#             await ops_test.model.wait_for_idle(
+#                 apps=[DATABASE_APP_NAME],
+#                 status="blocked",
+#                 raise_on_blocked=True,
+#                 timeout=1000,
+#             )
+#             assert False, "Leader didn't block"
+#         except JujuUnitError:
+#             pass
+#
+#         assert (
+#             leader_unit.workload_status_message
+#             == "extensions requested through relation, enable them through config options"
+#         )
+#
+#         # await ops_test.model.remove_application("nextcloud", block_until_done=True)
+
+
+async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         config = {"plugin_citext_enable": "True"}
         await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
-        # Deploy Nextcloud.
+        # Deploy Sentry and its dependencies.
         await ops_test.model.deploy(
-            "nextcloud",
-            channel="edge",
-            application_name="nextcloud",
-            num_units=APPLICATION_UNITS,
+            "omnivector-sentry", application_name="sentry", series="bionic"
         )
+        await ops_test.model.deploy("haproxy", series="focal")
+        await ops_test.model.deploy("omnivector-redis", application_name="redis", series="bionic")
         await ops_test.model.wait_for_idle(
-            apps=["nextcloud"],
+            apps=["sentry"],
             status="blocked",
             raise_on_blocked=False,
             timeout=1000,
         )
 
-        await ops_test.model.relate("nextcloud:db", f"{DATABASE_APP_NAME}:db")
+        await ops_test.model.relate("sentry", "redis")
+        await ops_test.model.relate("sentry", f"{DATABASE_APP_NAME}:db")
+        await ops_test.model.relate("sentry", "haproxy")
 
         # Only the leader will block
         leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)

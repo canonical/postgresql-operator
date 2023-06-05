@@ -5,7 +5,7 @@
 
 
 import logging
-from typing import Iterable
+from typing import Iterable, Set, Tuple
 
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
@@ -106,29 +106,39 @@ class DbProvides(Object):
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
+        self.set_up_relation(event.relation)
+
+    def _get_extensions(self, relation: Relation) -> Tuple[Set, Set]:
+        """Returns the list of requested and disabled extensions."""
+        requested_extensions = set(
+            relation.data.get(relation.app, {}).get("extensions", "").split(",")
+        )
+        for unit in relation.units:
+            requested_extensions.update(
+                relation.data.get(unit, {}).get("extensions", "").split(",")
+            )
+        requested_extensions = set(filter(len, requested_extensions))
+        disabled_extensions = set()
+        if requested_extensions:
+            for extension in requested_extensions:
+                extension_name = extension.split(":")[0]
+                if not self.charm.model.config.get(f"plugin_{extension_name}_enable"):
+                    disabled_extensions.add(extension_name)
+        return requested_extensions, disabled_extensions
+
+    def set_up_relation(self, relation: Relation) -> bool:
+        """Set up the relation to be used by the application charm."""
         # Do not allow apps requesting extensions to be installed
         # (let them now about config options).
-        extensions = set(event.relation.data.get(event.app, {}).get("extensions", "").split(","))
-        for unit in event.relation.units:
-            extensions.update(event.relation.data.get(unit, {}).get("extensions", "").split(","))
-        if extensions:
-            disabled_extensions = set()
-            for extension in extensions:
-                logger.error(f"extension: {extension}")
-                if not self.charm.model.config.get(f"plugin_{extension}_enable"):
-                    disabled_extensions.add(extension)
-            if disabled_extensions:
-                logger.error(
-                    f"ERROR - `extensions` ({', '.join(disabled_extensions)}) cannot be requested through relations"
-                    " - they should be enabled through a database charm config"
-                )
-                self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
-                return
+        requested_extensions, disabled_extensions = self._get_extensions(relation)
+        if disabled_extensions:
+            logger.error(
+                f"ERROR - `extensions` ({', '.join(disabled_extensions)}) cannot be requested through relations"
+                " - Please enable extensions through `juju config` and add the relation again."
+            )
+            self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
+            return False
 
-        self._set_up_relation(event.relation, extensions)
-
-    def _set_up_relation(self, relation: Relation, extensions) -> None:
-        """Set up the relation to be used by the application charm."""
         database = relation.data.get(relation.app, {}).get("database")
         if not database:
             for unit in relation.units:
@@ -172,7 +182,7 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(
                 f"Failed to initialize {self.relation_name} relation"
             )
-            return
+            return False
 
         # Set the data in the unit data bag. It's needed to run this logic on every
         # relation changed event setting the data again in the databag, otherwise the
@@ -183,12 +193,13 @@ class DbProvides(Object):
             {
                 "version": postgresql_version,
                 "password": password,
-                "schema_password": password,
                 "database": database,
-                "extensions": ",".join(extensions),
+                "extensions": ",".join(requested_extensions),
             }
         )
         self.update_endpoints(relation)
+
+        return True
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle the departure of legacy db and db-admin relations.
@@ -323,7 +334,6 @@ class DbProvides(Object):
                 "host": self.charm.primary_endpoint,
                 "port": DATABASE_PORT,
                 "user": user,
-                "schema_user": user,
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),

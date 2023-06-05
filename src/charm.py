@@ -69,7 +69,7 @@ from constants import (
     USER,
     USER_PASSWORD_KEY,
 )
-from relations.db import DbProvides
+from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from utils import new_password
 
@@ -696,7 +696,26 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.debug("Early exit on_config_changed: cluster not initialised yet")
             return
 
+        if not self.unit.is_leader():
+            return
+
+        # Enable and/or disable the extensions.
         self.enable_disable_extensions()
+
+        # Unblock the charm after extensions are enabled (only if it's blocked due to application
+        # charms requesting extensions).
+        if self.unit.status.message != EXTENSIONS_BLOCKING_MESSAGE:
+            return
+
+        for relation in [
+            *self.model.relations.get("db", []),
+            *self.model.relations.get("db-admin", []),
+        ]:
+            if not self.legacy_db_relation.set_up_relation(relation):
+                logger.debug(
+                    "Early exit on_config_changed: legacy relation requested extensions that are still disabled"
+                )
+                return
 
     def enable_disable_extensions(self, database: str = None) -> None:
         """Enable/disable PostgreSQL extensions set through config options.
