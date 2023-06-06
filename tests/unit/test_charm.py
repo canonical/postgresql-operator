@@ -13,7 +13,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
 from ops.testing import Harness
-from tenacity import RetryError, stop_after_delay, wait_fixed
+from tenacity import RetryError
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from cluster import RemoveRaftMemberFailedError
@@ -464,8 +464,6 @@ class TestCharm(unittest.TestCase):
             "app", "replication-password", "replication-test-password"
         )
 
-    @patch("charm.wait_fixed", return_vaule=wait_fixed(0))
-    @patch("charm.stop_after_delay", return_value=stop_after_delay(0))
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.Patroni.restart_patroni")
@@ -474,10 +472,15 @@ class TestCharm(unittest.TestCase):
     @patch("charm.Patroni.member_replication_lag", new_callable=PropertyMock)
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock(return_value=True),
+    )
     @patch("charm.PostgreSQLProvider.oversee_users")
     def test_on_update_status(
         self,
         _oversee_users,
+        _primary_endpoint,
         _update_relation_endpoints,
         _member_started,
         _member_replication_lag,
@@ -485,8 +488,6 @@ class TestCharm(unittest.TestCase):
         _is_member_isolated,
         _restart_patroni,
         _set_primary_status_message,
-        _,
-        __,
     ):
         # Test before the cluster is initialised.
         self.charm.on.update_status.emit()
@@ -529,6 +530,120 @@ class TestCharm(unittest.TestCase):
             )
         self.charm.on.update_status.emit()
         _restart_patroni.assert_called_once()
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
+    @patch("charm.PostgresqlOperatorCharm._handle_workload_failures")
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock(return_value=True),
+    )
+    @patch("charm.PostgreSQLProvider.oversee_users")
+    @patch("charm.PostgresqlOperatorCharm._handle_processes_failures")
+    @patch("charm.PostgreSQLBackups.can_use_s3_repository")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.Patroni.get_member_status")
+    def test_on_update_status_after_restore_operation(
+        self,
+        _get_member_status,
+        _member_started,
+        _update_config,
+        _can_use_s3_repository,
+        _handle_processes_failures,
+        _oversee_users,
+        _primary_endpoint,
+        _update_relation_endpoints,
+        _handle_workload_failures,
+        _set_primary_status_message,
+    ):
+        # Test when the restore operation fails.
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.app.name,
+                {"cluster_initialised": "True", "restoring-backup": "2023-01-01T09:00:00Z"},
+            )
+        _get_member_status.return_value = "failed"
+        self.charm.on.update_status.emit()
+        _update_config.assert_not_called()
+        _handle_processes_failures.assert_not_called()
+        _oversee_users.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        _handle_workload_failures.assert_not_called()
+        _set_primary_status_message.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, BlockedStatus)
+
+        # Test when the restore operation hasn't finished yet.
+        self.charm.unit.status = ActiveStatus()
+        _get_member_status.return_value = "running"
+        _member_started.return_value = False
+        self.charm.on.update_status.emit()
+        _update_config.assert_not_called()
+        _handle_processes_failures.assert_not_called()
+        _oversee_users.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        _handle_workload_failures.assert_not_called()
+        _set_primary_status_message.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Assert that the backup id is still in the application relation databag.
+        self.assertEqual(
+            self.harness.get_relation_data(self.rel_id, self.charm.app),
+            {"cluster_initialised": "True", "restoring-backup": "2023-01-01T09:00:00Z"},
+        )
+
+        # Test when the restore operation finished successfully.
+        _member_started.return_value = True
+        _can_use_s3_repository.return_value = (True, None)
+        _handle_processes_failures.return_value = False
+        _handle_workload_failures.return_value = False
+        self.charm.on.update_status.emit()
+        _update_config.assert_called_once()
+        _handle_processes_failures.assert_called_once()
+        _oversee_users.assert_called_once()
+        _update_relation_endpoints.assert_called_once()
+        _handle_workload_failures.assert_called_once()
+        _set_primary_status_message.assert_called_once()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Assert that the backup id is not in the application relation databag anymore.
+        self.assertEqual(
+            self.harness.get_relation_data(self.rel_id, self.charm.app),
+            {"cluster_initialised": "True"},
+        )
+
+        # Test when it's not possible to use the configured S3 repository.
+        _update_config.reset_mock()
+        _handle_processes_failures.reset_mock()
+        _oversee_users.reset_mock()
+        _update_relation_endpoints.reset_mock()
+        _handle_workload_failures.reset_mock()
+        _set_primary_status_message.reset_mock()
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.app.name,
+                {"restoring-backup": "2023-01-01T09:00:00Z"},
+            )
+        _can_use_s3_repository.return_value = (False, "fake validation message")
+        self.charm.on.update_status.emit()
+        _update_config.assert_called_once()
+        _handle_processes_failures.assert_not_called()
+        _oversee_users.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        _handle_workload_failures.assert_not_called()
+        _set_primary_status_message.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, BlockedStatus)
+        self.assertEqual(self.charm.unit.status.message, "fake validation message")
+
+        # Assert that the backup id is not in the application relation databag anymore.
+        self.assertEqual(
+            self.harness.get_relation_data(self.rel_id, self.charm.app),
+            {"cluster_initialised": "True"},
+        )
 
     @patch("charm.snap.SnapCache")
     def test_install_snap_packages(self, _snap_cache):
