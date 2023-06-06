@@ -173,6 +173,65 @@ class TestDbProvides(unittest.TestCase):
             self.request_database()
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    def test_get_extensions(self):
+        # Test when there are no extensions in the relation databags.
+        relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
+        self.assertEqual(
+            self.harness.charm.legacy_db_relation._get_extensions(relation), ([], set())
+        )
+
+        # Test when there are extensions in the application relation databag.
+        extensions = ["", "citext:public", "debversion"]
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                "application",
+                {"extensions": ",".join(extensions)},
+            )
+        self.assertEqual(
+            self.harness.charm.legacy_db_relation._get_extensions(relation),
+            ([extensions[1], extensions[2]], {extensions[1].split(":")[0], extensions[2]}),
+        )
+
+        # Test when there are extensions in the unit relation databag.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                "application",
+                {"extensions": ""},
+            )
+            self.harness.update_relation_data(
+                self.rel_id,
+                "application/0",
+                {"extensions": ",".join(extensions)},
+            )
+        self.assertEqual(
+            self.harness.charm.legacy_db_relation._get_extensions(relation),
+            ([extensions[1], extensions[2]], {extensions[1].split(":")[0], extensions[2]}),
+        )
+
+        # Test when one of the plugins/extensions is enabled.
+        config = """options:
+          plugin_citext_enable:
+            default: true
+            type: boolean
+          plugin_debversion_enable:
+            default: false
+            type: boolean"""
+        harness = Harness(PostgresqlOperatorCharm, config=config)
+        self.addCleanup(harness.cleanup)
+        harness.begin()
+        self.assertEqual(
+            harness.charm.legacy_db_relation._get_extensions(relation),
+            ([extensions[1], extensions[2]], {extensions[2]}),
+        )
+
+    def test_set_up_relation(self):
+        pass
+
+    def test_update_unit_status(self):
+        pass
+
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock,
