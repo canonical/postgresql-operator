@@ -5,7 +5,7 @@
 
 
 import logging
-from typing import Iterable, Set, Tuple
+from typing import Iterable, List, Set, Tuple
 
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
@@ -108,29 +108,30 @@ class DbProvides(Object):
 
         self.set_up_relation(event.relation)
 
-    def _get_extensions(self, relation: Relation) -> Tuple[Set, Set]:
-        """Returns the list of requested and disabled extensions."""
-        requested_extensions = set(
-            relation.data.get(relation.app, {}).get("extensions", "").split(",")
-        )
+    def _get_extensions(self, relation: Relation) -> Tuple[List, Set]:
+        """Returns the list of required and disabled extensions."""
+        requested_extensions = relation.data.get(relation.app, {}).get("extensions", "").split(",")
         for unit in relation.units:
-            requested_extensions.update(
+            requested_extensions.extend(
                 relation.data.get(unit, {}).get("extensions", "").split(",")
             )
-        requested_extensions = set(filter(len, requested_extensions))
+        required_extensions = []
+        for extension in requested_extensions:
+            if extension != "" and extension not in required_extensions:
+                required_extensions.append(extension)
         disabled_extensions = set()
-        if requested_extensions:
-            for extension in requested_extensions:
+        if required_extensions:
+            for extension in required_extensions:
                 extension_name = extension.split(":")[0]
                 if not self.charm.model.config.get(f"plugin_{extension_name}_enable"):
                     disabled_extensions.add(extension_name)
-        return requested_extensions, disabled_extensions
+        return required_extensions, disabled_extensions
 
     def set_up_relation(self, relation: Relation) -> bool:
         """Set up the relation to be used by the application charm."""
         # Do not allow apps requesting extensions to be installed
         # (let them now about config options).
-        requested_extensions, disabled_extensions = self._get_extensions(relation)
+        required_extensions, disabled_extensions = self._get_extensions(relation)
         if disabled_extensions:
             logger.error(
                 f"ERROR - `extensions` ({', '.join(disabled_extensions)}) cannot be requested through relations"
@@ -194,10 +195,12 @@ class DbProvides(Object):
                 "version": postgresql_version,
                 "password": password,
                 "database": database,
-                "extensions": ",".join(requested_extensions),
+                "extensions": ",".join(required_extensions),
             }
         )
         self.update_endpoints(relation)
+
+        self._update_unit_status(relation)
 
         return True
 
@@ -267,9 +270,12 @@ class DbProvides(Object):
             logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 
-        # Clean up Blocked status if caused by the departed relation
+        self._update_unit_status(event.relation)
+
+    def _update_unit_status(self, relation: Relation) -> None:
+        """# Clean up Blocked status if it's due to extensions request."""
         if self.charm.is_blocked and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE:
-            if not self._check_for_blocking_relations(event.relation.id):
+            if not self._check_for_blocking_relations(relation.id):
                 self.charm.unit.status = ActiveStatus()
 
     def update_endpoints(self, relation: Relation = None) -> None:

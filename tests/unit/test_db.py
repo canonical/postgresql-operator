@@ -322,6 +322,7 @@ class TestDbProvides(unittest.TestCase):
 
             # Check that the unit relation databag contains (or not) the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+            print(f"unit_relation_data: {unit_relation_data}")
             assert_based_on_relation(
                 "master" in unit_relation_data and master + user == unit_relation_data["master"]
             )

@@ -145,8 +145,14 @@ class TestCharm(unittest.TestCase):
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_not_called()
 
-        # Test after the cluster was initialised.
+        # Test when the unit is not the leader.
         _is_cluster_initialised.return_value = True
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_not_called()
+
+        # Test after the cluster was initialised.
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
 
