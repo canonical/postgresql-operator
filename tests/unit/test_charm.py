@@ -137,6 +137,17 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    def test_is_cluster_initialised(self):
+        # Test when the cluster was not initialised yet.
+        self.assertFalse(self.charm.is_cluster_initialised)
+
+        # Test when the cluster was already initialised.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": "True"}
+            )
+        self.assertTrue(self.charm.is_cluster_initialised)
+
     @patch("relations.db.DbProvides.set_up_relation")
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
@@ -147,6 +158,7 @@ class TestCharm(unittest.TestCase):
         _is_cluster_initialised.return_value = False
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
 
         # Test when the unit is not the leader.
         _is_cluster_initialised.return_value = True
@@ -174,6 +186,7 @@ class TestCharm(unittest.TestCase):
         # Test when the unit is in a blocked state due to extensions request,
         # but there are established legacy relations.
         _enable_disable_extensions.reset_mock()
+        _set_up_relation.return_value = False
         db_relation_id = self.harness.add_relation("db", "application")
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
@@ -182,11 +195,20 @@ class TestCharm(unittest.TestCase):
 
         _enable_disable_extensions.reset_mock()
         _set_up_relation.reset_mock()
-        db_admin_relation_id = self.harness.add_relation("db-admin", "application")
+        self.harness.add_relation("db-admin", "application")
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
         _set_up_relation.assert_called_once()
-        self.harness.remove_relation(db_admin_relation_id)
+
+        # Test when  there are established legacy relations,
+        # but the charm fails to set up one of them.
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.reset_mock()
+        _set_up_relation.return_value = False
+        self.harness.add_relation("db", "application")
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
 
     def test_enable_disable_extensions(self):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
@@ -205,6 +227,27 @@ class TestCharm(unittest.TestCase):
                 self.charm.enable_disable_extensions()
                 self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
                 self.assertIn("failed to disable citext plugin", "".join(logs.output))
+
+            # Test when one config option should be skipped (because it's not related
+            # to a plugin/extension).
+            postgresql_mock.reset_mock()
+            postgresql_mock.enable_disable_extension.side_effect = None
+            with self.assertNoLogs("charm", "ERROR"):
+                config = """options:
+  plugin_citext_enable:
+    default: false
+    type: boolean
+  other_config_option:
+    default: false
+    type: boolean
+  plugin_debversion_enable:
+    default: false
+    type: boolean"""
+                harness = Harness(PostgresqlOperatorCharm, config=config)
+                self.addCleanup(harness.cleanup)
+                harness.begin()
+                harness.charm.enable_disable_extensions()
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 2)
 
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
