@@ -137,9 +137,12 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    @patch("relations.db.DbProvides.set_up_relation")
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
-    def test_on_config_changed(self, _is_cluster_initialised, _enable_disable_extensions):
+    def test_on_config_changed(
+        self, _is_cluster_initialised, _enable_disable_extensions, _set_up_relation
+    ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
         self.charm.on.config_changed.emit()
@@ -149,12 +152,41 @@ class TestCharm(unittest.TestCase):
         _is_cluster_initialised.return_value = True
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
 
         # Test after the cluster was initialised.
         with self.harness.hooks_disabled():
             self.harness.set_leader()
         self.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_not_called()
+
+        # Test when the unit is in a blocked state due to extensions request,
+        # but there are no established legacy relations.
+        _enable_disable_extensions.reset_mock()
+        self.charm.unit.status = BlockedStatus(
+            "extensions requested through relation, enable them through config options"
+        )
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_not_called()
+
+        # Test when the unit is in a blocked state due to extensions request,
+        # but there are established legacy relations.
+        _enable_disable_extensions.reset_mock()
+        db_relation_id = self.harness.add_relation("db", "application")
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
+        self.harness.remove_relation(db_relation_id)
+
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.reset_mock()
+        db_admin_relation_id = self.harness.add_relation("db-admin", "application")
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
+        self.harness.remove_relation(db_admin_relation_id)
 
     def test_enable_disable_extensions(self):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
