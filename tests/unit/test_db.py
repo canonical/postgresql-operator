@@ -229,8 +229,38 @@ class TestDbProvides(unittest.TestCase):
     def test_set_up_relation(self):
         pass
 
-    def test_update_unit_status(self):
-        pass
+    @patch("relations.db.DbProvides._check_for_blocking_relations")
+    @patch("charm.PostgresqlOperatorCharm.is_blocked", new_callable=PropertyMock)
+    def test_update_unit_status(self, _is_blocked, _check_for_blocking_relations):
+        # Test when the charm is not blocked.
+        relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
+        _is_blocked.return_value = False
+        self.harness.charm.legacy_db_relation._update_unit_status(relation)
+        _check_for_blocking_relations.assert_not_called()
+        self.assertNotIsInstance(self.harness.charm.unit.status, ActiveStatus)
+
+        # Test when the charm is blocked but not due to extensions request.
+        _is_blocked.return_value = True
+        self.harness.charm.unit.status = BlockedStatus("fake message")
+        self.harness.charm.legacy_db_relation._update_unit_status(relation)
+        _check_for_blocking_relations.assert_not_called()
+        self.assertNotIsInstance(self.harness.charm.unit.status, ActiveStatus)
+
+        # Test when there are relations causing the blocked status.
+        self.harness.charm.unit.status = BlockedStatus(
+            "extensions requested through relation, enable them through config options"
+        )
+        _check_for_blocking_relations.return_value = True
+        self.harness.charm.legacy_db_relation._update_unit_status(relation)
+        _check_for_blocking_relations.assert_called_once_with(relation.id)
+        self.assertNotIsInstance(self.harness.charm.unit.status, ActiveStatus)
+
+        # Test when there are no relations causing the blocked status anymore.
+        _check_for_blocking_relations.reset_mock()
+        _check_for_blocking_relations.return_value = False
+        self.harness.charm.legacy_db_relation._update_unit_status(relation)
+        _check_for_blocking_relations.assert_called_once_with(relation.id)
+        self.assertIsInstance(self.harness.charm.unit.status, ActiveStatus)
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",

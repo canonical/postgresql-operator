@@ -273,7 +273,7 @@ class DbProvides(Object):
         self._update_unit_status(event.relation)
 
     def _update_unit_status(self, relation: Relation) -> None:
-        """# Clean up Blocked status if it's due to extensions request."""
+        """Clean up Blocked status if it's due to extensions request."""
         if self.charm.is_blocked and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE:
             if not self._check_for_blocking_relations(relation.id):
                 self.charm.unit.status = ActiveStatus()
