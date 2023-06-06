@@ -24,8 +24,8 @@ from tests.integration.helpers import (
 logger = logging.getLogger(__name__)
 
 MAILMAN3_CORE_APP_NAME = "mailman3-core"
-APPLICATION_UNITS = 2
-DATABASE_UNITS = 1
+APPLICATION_UNITS = 1
+DATABASE_UNITS = 2
 RELATION_NAME = "db"
 
 
@@ -168,10 +168,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
 
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
-        config = {"plugin_citext_enable": "True"}
-        await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-
         # Deploy Nextcloud.
         await ops_test.model.deploy(
             "nextcloud",
@@ -282,7 +278,11 @@ async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
             apps=[DATABASE_APP_NAME, "sentry2"], status="active", raise_on_blocked=False
         )
 
-        # await ops_test.model.remove_application("sentry2", block_until_done=True)
+        await asyncio.gather(
+            ops_test.model.remove_application("redis", block_until_done=True),
+            ops_test.model.remove_application("sentry2", block_until_done=True),
+            ops_test.model.remove_application("haproxy", block_until_done=True),
+        )
 
 
 async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:

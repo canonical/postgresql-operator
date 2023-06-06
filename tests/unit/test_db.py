@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import Mock, PropertyMock, patch
 
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
@@ -255,7 +255,7 @@ class TestDbProvides(unittest.TestCase):
         new_callable=PropertyMock,
     )
     @patch("charm.Patroni.get_primary", return_value="postgresql/0")
-    def test_update_endpoints_with_event(
+    def test_update_endpoints_with_relation(
         self, _get_primary, _members_ips, _primary_endpoint, _get_state
     ):
         # Mock the members_ips list to simulate different scenarios
@@ -271,9 +271,8 @@ class TestDbProvides(unittest.TestCase):
         self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
         self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
 
-        # Define a mock relation changed event to be used in the subsequent update endpoints calls.
-        mock_event = MagicMock()
-        mock_event.relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
+        # Get the relation to be used in the subsequent update endpoints calls.
+        relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
 
         # Set some data to be used and compared in the relations.
         password = "test-password"
@@ -310,7 +309,7 @@ class TestDbProvides(unittest.TestCase):
         # Test with both a primary and a replica.
         # Update the endpoints with the event and check that it updated only
         # the right relation databags (the app and unit databags from the event).
-        self.legacy_db_relation.update_endpoints(mock_event)
+        self.legacy_db_relation.update_endpoints(relation)
         for rel_id in [self.rel_id, self.another_rel_id]:
             # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
@@ -322,7 +321,6 @@ class TestDbProvides(unittest.TestCase):
 
             # Check that the unit relation databag contains (or not) the endpoints.
             unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
-            print(f"unit_relation_data: {unit_relation_data}")
             assert_based_on_relation(
                 "master" in unit_relation_data and master + user == unit_relation_data["master"]
             )
@@ -332,7 +330,7 @@ class TestDbProvides(unittest.TestCase):
             )
 
         # Also test with only a primary instance.
-        self.legacy_db_relation.update_endpoints(mock_event)
+        self.legacy_db_relation.update_endpoints(relation)
         for rel_id in [self.rel_id, self.another_rel_id]:
             # Set the expected username based on the relation id.
             user = f"relation-{rel_id}"
