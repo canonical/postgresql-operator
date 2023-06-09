@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Optional, Set
+from typing import Dict, Optional, Set
 
 import requests
 from charms.operator_libs_linux.v1 import snap
@@ -66,7 +66,6 @@ class Patroni:
 
     def __init__(
         self,
-        archive_mode,
         unit_ip: str,
         cluster_name: str,
         member_name: str,
@@ -80,7 +79,6 @@ class Patroni:
         """Initialize the Patroni class.
 
         Args:
-            archive_mode: PostgreSQL archive mode
             unit_ip: IP address of the current unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
@@ -91,7 +89,6 @@ class Patroni:
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
-        self.archive_mode = archive_mode
         self.unit_ip = unit_ip
         self.cluster_name = cluster_name
         self.member_name = member_name
@@ -302,6 +299,18 @@ class Patroni:
             member["state"] == "running" for member in cluster_status.json()["members"]
         ) and any(member["role"] == "leader" for member in cluster_status.json()["members"])
 
+    def get_patroni_health(self) -> Dict[str, str]:
+        """Gets, retires and parses the Patroni health endpoint."""
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                r = requests.get(
+                    f"{self._patroni_url}/health",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+
+        return r.json()
+
     @property
     def member_started(self) -> bool:
         """Has the member started Patroni and PostgreSQL.
@@ -311,17 +320,26 @@ class Patroni:
             allow server time to start up.
         """
         try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-                with attempt:
-                    r = requests.get(
-                        f"{self._patroni_url}/health",
-                        verify=self.verify,
-                        timeout=API_REQUEST_TIMEOUT,
-                    )
+            response = self.get_patroni_health()
         except RetryError:
             return False
 
-        return r.json()["state"] == "running"
+        return response["state"] == "running"
+
+    @property
+    def member_inactive(self) -> bool:
+        """Are Patroni and PostgreSQL in inactive state.
+
+        Returns:
+            True if services is not running, starting or restarting. Retries over a period of 60
+            seconds times to allow server time to start up.
+        """
+        try:
+            response = self.get_patroni_health()
+        except RetryError:
+            return True
+
+        return response["state"] not in ["running", "starting", "restarting"]
 
     @property
     def member_replication_lag(self) -> str:
@@ -380,19 +398,19 @@ class Patroni:
 
     def render_patroni_yml_file(
         self,
-        archive_mode: str,
         connectivity: bool = False,
         enable_tls: bool = False,
         stanza: str = None,
+        restore_stanza: Optional[str] = None,
         backup_id: Optional[str] = None,
     ) -> None:
         """Render the Patroni configuration file.
 
         Args:
-            archive_mode: PostgreSQL archive mode.
             connectivity: whether to allow external connections to the database.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
+            restore_stanza: name of the stanza used when restoring a backup.
             backup_id: id of the backup that is being restored.
         """
         # Open the template patroni.yml file.
@@ -400,7 +418,6 @@ class Patroni:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            archive_mode=archive_mode,
             conf_path=PATRONI_CONF_PATH,
             connectivity=connectivity,
             log_path=PATRONI_LOGS_PATH,
@@ -420,6 +437,7 @@ class Patroni:
             restoring_backup=backup_id is not None,
             backup_id=backup_id,
             stanza=stanza,
+            restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
         )

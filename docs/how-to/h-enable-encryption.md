@@ -6,9 +6,11 @@ Note: The TLS settings here are for self-signed-certificates which are not recom
 
 ```shell
 # deploy the TLS charm
-juju deploy tls-certificates-operator --channel=edge
+juju deploy tls-certificates-operator
+
 # add the necessary configurations for TLS
 juju config tls-certificates-operator generate-self-signed-certificates="true" ca-common-name="Test CA"
+
 # to enable TLS relate the two applications
 juju relate tls-certificates-operator postgresql
 ```

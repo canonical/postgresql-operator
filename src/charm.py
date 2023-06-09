@@ -8,6 +8,7 @@ import logging
 import subprocess
 from typing import Dict, List, Optional, Set
 
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
@@ -50,8 +51,13 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    METRICS_PORT,
+    MONITORING_PASSWORD_KEY,
+    MONITORING_SNAP_SERVICE,
+    MONITORING_USER,
     PATRONI_CONF_PATH,
     PEER,
+    POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
     SNAP_PACKAGES,
@@ -104,6 +110,13 @@ class PostgresqlOperatorCharm(CharmBase):
             charm=self, relation="restart", callback=self._restart
         )
         self._observer.start_observer()
+        self._grafana_agent = COSAgentProvider(
+            self,
+            metrics_endpoints=[
+                {"path": "/metrics", "port": METRICS_PORT},
+            ],
+            log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
+        )
 
     @property
     def app_peer_data(self) -> Dict:
@@ -346,12 +359,17 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self._update_new_unit_status()
+
+    def _update_new_unit_status(self) -> None:
+        """Update the status of a new unit that recently joined the cluster."""
         # Only update the connection endpoints if there is a primary.
         # A cluster can have all members as replicas for some time after
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            self.unit.status = ActiveStatus()
+            if not self.is_blocked or self.unit.status.message == NO_PRIMARY_MESSAGE:
+                self.unit.status = ActiveStatus()
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
@@ -484,7 +502,6 @@ class PostgresqlOperatorCharm(CharmBase):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
-            self.app_peer_data.get("archive-mode", "on"),
             self._unit_ip,
             self.cluster_name,
             self._member_name,
@@ -637,6 +654,8 @@ class PostgresqlOperatorCharm(CharmBase):
             self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
         if self.get_secret("app", REWIND_PASSWORD_KEY) is None:
             self.set_secret("app", REWIND_PASSWORD_KEY, new_password())
+        if self.get_secret("app", MONITORING_PASSWORD_KEY) is None:
+            self.set_secret("app", MONITORING_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -702,6 +721,14 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
+        try:
+            # Set up the postgresql_exporter options.
+            self._setup_exporter()
+        except snap.SnapError:
+            logger.error("failed to set up postgresql_exporter options")
+            self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
+            return
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
@@ -710,6 +737,19 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
+
+    def _setup_exporter(self) -> None:
+        """Set up postgresql_exporter options."""
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        postgres_snap.set(
+            {
+                "exporter.user": MONITORING_USER,
+                "exporter.password": self.get_secret("app", MONITORING_PASSWORD_KEY),
+            }
+        )
+        postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -736,6 +776,13 @@ class PostgresqlOperatorCharm(CharmBase):
                 # Create the backup user.
             if BACKUP_USER not in users:
                 self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
+            if MONITORING_USER not in users:
+                # Create the monitoring user.
+                self.postgresql.create_user(
+                    MONITORING_USER,
+                    self.get_secret("app", MONITORING_PASSWORD_KEY),
+                    extra_user_roles="pg_monitor",
+                )
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
@@ -850,9 +897,14 @@ class PostgresqlOperatorCharm(CharmBase):
                 logger.debug("on_update_status early exit: Patroni has not started yet")
                 return
 
-            # Remove the restoring backup flag.
-            self.app_peer_data.update({"restoring-backup": ""})
+            # Remove the restoring backup flag and the restore stanza name.
+            self.app_peer_data.update({"restoring-backup": "", "restore-stanza": ""})
             self.update_config()
+
+            can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
+            if not can_use_s3_repository:
+                self.unit.status = BlockedStatus(validation_message)
+                return
 
         if self._handle_processes_failures():
             return
@@ -861,19 +913,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-        # Restart the workload if it's stuck on the starting state after a restart.
-        if (
-            not self._patroni.member_started
-            and "postgresql_restarted" in self._peers.data[self.unit]
-            and self._patroni.member_replication_lag == "unknown"
-        ):
-            self._patroni.reinitialize_postgresql()
-            return
-
-        # Restart the service if the current cluster member is isolated from the cluster
-        # (stuck with the "awaiting for member to start" message).
-        if not self._patroni.member_started and self._patroni.is_member_isolated:
-            self._patroni.restart_patroni()
+        if self._handle_workload_failures():
             return
 
         self._set_primary_status_message()
@@ -886,7 +926,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
-        if self._unit_ip in self.members_ips and not self._patroni.member_started:
+        if self._unit_ip in self.members_ips and self._patroni.member_inactive:
             try:
                 self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")
@@ -894,6 +934,29 @@ class PostgresqlOperatorCharm(CharmBase):
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
                 return False
+
+        return False
+
+    def _handle_workload_failures(self) -> bool:
+        """Handle workload (Patroni or PostgreSQL) failures.
+
+        Returns:
+            a bool indicating whether the charm performed any action.
+        """
+        # Restart the workload if it's stuck on the starting state after a restart.
+        if (
+            not self._patroni.member_started
+            and "postgresql_restarted" in self._peers.data[self.unit]
+            and self._patroni.member_replication_lag == "unknown"
+        ):
+            self._patroni.reinitialize_postgresql()
+            return True
+
+        # Restart the service if the current cluster member is isolated from the cluster
+        # (stuck with the "awaiting for member to start" message).
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
+            return True
 
         return False
 
@@ -1059,11 +1122,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
-            archive_mode=self.app_peer_data.get("archive-mode", "on"),
             connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
+            restore_stanza=self.app_peer_data.get("restore-stanza"),
         )
         if not self._patroni.member_started:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,

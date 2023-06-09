@@ -48,7 +48,6 @@ class TestCluster(unittest.TestCase):
         self.peers_ips = {"2.2.2.2", "3.3.3.3"}
 
         self.patroni = Patroni(
-            "on",
             "1.1.1.1",
             "postgresql",
             "postgresql-0",
@@ -208,7 +207,6 @@ class TestCluster(unittest.TestCase):
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
-            archive_mode="on",
             conf_path=PATRONI_CONF_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             log_path=PATRONI_LOGS_PATH,
@@ -232,7 +230,7 @@ class TestCluster(unittest.TestCase):
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):
             # Call the method.
-            self.patroni.render_patroni_yml_file(archive_mode="on")
+            self.patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
         self.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
@@ -358,3 +356,63 @@ class TestCluster(unittest.TestCase):
         )
 
         _create_user_home_directory.assert_called_once_with()
+
+    @patch("cluster.requests.get")
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    def test_member_started_true(self, _, __, _get):
+        _get.return_value.json.return_value = {"state": "running"}
+
+        assert self.patroni.member_started
+
+        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+    @patch("cluster.requests.get")
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    def test_member_started_false(self, _, __, _get):
+        _get.return_value.json.return_value = {"state": "stopped"}
+
+        assert not self.patroni.member_started
+
+        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+    @patch("cluster.requests.get")
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    def test_member_started_error(self, _, __, _get):
+        _get.side_effect = Exception
+
+        assert not self.patroni.member_started
+
+        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+    @patch("cluster.requests.get")
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    def test_member_inactive_true(self, _, __, _get):
+        _get.return_value.json.return_value = {"state": "stopped"}
+
+        assert self.patroni.member_inactive
+
+        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+    @patch("cluster.requests.get")
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    def test_member_inactive_false(self, _, __, _get):
+        _get.return_value.json.return_value = {"state": "starting"}
+
+        assert not self.patroni.member_inactive
+
+        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+    @patch("cluster.requests.get")
+    @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
+    @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
+    def test_member_inactive_error(self, _, __, _get):
+        _get.side_effect = Exception
+
+        assert self.patroni.member_inactive
+
+        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)

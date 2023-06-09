@@ -15,10 +15,10 @@ While this tutorial intends to guide and teach you as you deploy Charmed Postgre
 ## Step-by-step guide
 
 Here’s an overview of the steps required with links to our separate tutorials that deal with each individual step:
-* [Set up the environment](/t/charmed-postgresql-tutorial-setup-environment/9709?channel=edge)
-* [Deploy PostgreSQL](/t/charmed-postgresql-tutorial-deploy-postgresql/9697?channel=edge)
-* [Managing your units](/t/charmed-postgresql-tutorial-managing-units/9705?channel=edge)
-* [Manage passwords](/t/charmed-postgresql-tutorial-manage-passwords/9703?channel=edge)
-* [Relate your PostgreSQL to other applications](/t/charmed-postgresql-tutorial-integrations/9701?channel=edge)
-* [Enable security](/t/charmed-postgresql-tutorial-enable-security/9699?channel=edge)
-* [Cleanup your environment](/t/charmed-postgresql-tutorial-cleanup-environment/9695?channel=edge)
+* [Set up the environment](/t/charmed-postgresql-tutorial-setup-environment/9709?channel=14/stable)
+* [Deploy PostgreSQL](/t/charmed-postgresql-tutorial-deploy-postgresql/9697?channel=14/stable)
+* [Managing your units](/t/charmed-postgresql-tutorial-managing-units/9705?channel=14/stable)
+* [Manage passwords](/t/charmed-postgresql-tutorial-manage-passwords/9703?channel=14/stable)
+* [Relate your PostgreSQL to other applications](/t/charmed-postgresql-tutorial-integrations/9701?channel=14/stable)
+* [Enable security](/t/charmed-postgresql-tutorial-enable-security/9699?channel=14/stable)
+* [Cleanup your environment](/t/charmed-postgresql-tutorial-cleanup-environment/9695?channel=14/stable)

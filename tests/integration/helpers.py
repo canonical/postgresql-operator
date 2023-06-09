@@ -902,7 +902,7 @@ def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
     minority_count = len(ops_test.model.applications[app_name].units) // 2
-    for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(2), reraise=True):
+    for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
             response = requests.get(f"http://{primary_ip}:8008/cluster")
             assert response.status_code == 200
@@ -914,3 +914,21 @@ def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -
                 ]
             )
             assert standbys >= minority_count
+
+
+async def wait_for_idle_on_blocked(
+    ops_test: OpsTest,
+    database_app_name: str,
+    unit_number: int,
+    other_app_name: str,
+    status_message: str,
+):
+    """Wait for specific applications becoming idle and blocked together."""
+    unit = ops_test.model.units.get(f"{database_app_name}/{unit_number}")
+    await asyncio.gather(
+        ops_test.model.wait_for_idle(apps=[other_app_name], status="active"),
+        ops_test.model.wait_for_idle(
+            apps=[database_app_name], status="blocked", raise_on_blocked=False
+        ),
+        ops_test.model.block_until(lambda: unit.workload_status_message == status_message),
+    )
