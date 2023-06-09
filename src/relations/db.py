@@ -139,31 +139,13 @@ class DbProvides(Object):
 
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
-            postgresql_version = self.charm.postgresql.get_postgresql_version()
-        except (
-            PostgreSQLCreateDatabaseError,
-            PostgreSQLCreateUserError,
-            PostgreSQLGetPostgreSQLVersionError,
-        ) as e:
+        except (PostgreSQLCreateDatabaseError, PostgreSQLCreateUserError) as e:
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(
                 f"Failed to initialize {self.relation_name} relation"
             )
             return
 
-        # Set the data in the unit data bag. It's needed to run this logic on every
-        # relation changed event setting the data again in the databag, otherwise the
-        # application charm that is connecting to this database will receive a
-        # "database gone" event from the old PostgreSQL library (ops-lib-pgsql)
-        # and the connection between the application and this charm will not work.
-        unit_relation_databag.update(
-            {
-                "version": postgresql_version,
-                "password": password,
-                "schema_password": password,
-                "database": database,
-            }
-        )
         self.update_endpoints(event)
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
@@ -245,6 +227,15 @@ class DbProvides(Object):
         if len(relations) == 0:
             return
 
+        try:
+            postgresql_version = self.charm.postgresql.get_postgresql_version()
+        except PostgreSQLGetPostgreSQLVersionError as e:
+            logger.exception(e)
+            self.charm.unit.status = BlockedStatus(
+                f"Failed to retrieve the PostgreSQL version to initialise/update {self.relation_name} relation"
+            )
+            return
+
         # List the replicas endpoints.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
 
@@ -291,7 +282,6 @@ class DbProvides(Object):
             # Set the read/write endpoint.
             allowed_subnets = self._get_allowed_subnets(relation)
             allowed_units = self._get_allowed_units(relation)
-            postgresql_version = self.charm.postgresql.get_postgresql_version()
             data = {
                 "allowed-subnets": allowed_subnets,
                 "allowed-units": allowed_units,
