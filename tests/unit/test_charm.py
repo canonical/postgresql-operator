@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, patch
 from charms.operator_libs_linux.v1 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
+    PostgreSQLEnableDisableExtensionError,
     PostgreSQLUpdateUserPasswordError,
 )
 from ops.framework import EventBase
@@ -136,6 +137,119 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    def test_is_cluster_initialised(self):
+        # Test when the cluster was not initialised yet.
+        self.assertFalse(self.charm.is_cluster_initialised)
+
+        # Test when the cluster was already initialised.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": "True"}
+            )
+        self.assertTrue(self.charm.is_cluster_initialised)
+
+    @patch("relations.db.DbProvides.set_up_relation")
+    @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
+    @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
+    def test_on_config_changed(
+        self, _is_cluster_initialised, _enable_disable_extensions, _set_up_relation
+    ):
+        # Test when the cluster was not initialised yet.
+        _is_cluster_initialised.return_value = False
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
+
+        # Test when the unit is not the leader.
+        _is_cluster_initialised.return_value = True
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
+
+        # Test after the cluster was initialised.
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_not_called()
+
+        # Test when the unit is in a blocked state due to extensions request,
+        # but there are no established legacy relations.
+        _enable_disable_extensions.reset_mock()
+        self.charm.unit.status = BlockedStatus(
+            "extensions requested through relation, enable them through config options"
+        )
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_not_called()
+
+        # Test when the unit is in a blocked state due to extensions request,
+        # but there are established legacy relations.
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.return_value = False
+        db_relation_id = self.harness.add_relation("db", "application")
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
+        self.harness.remove_relation(db_relation_id)
+
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.reset_mock()
+        self.harness.add_relation("db-admin", "application")
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
+
+        # Test when  there are established legacy relations,
+        # but the charm fails to set up one of them.
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.reset_mock()
+        _set_up_relation.return_value = False
+        self.harness.add_relation("db", "application")
+        self.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
+
+    def test_enable_disable_extensions(self):
+        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+            # Test when all extensions install/uninstall succeed.
+            postgresql_mock.enable_disable_extension.side_effect = None
+            with self.assertNoLogs("charm", "ERROR"):
+                self.charm.enable_disable_extensions()
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+
+            # Test when one extension install/uninstall fails.
+            postgresql_mock.reset_mock()
+            postgresql_mock.enable_disable_extension.side_effect = (
+                PostgreSQLEnableDisableExtensionError
+            )
+            with self.assertLogs("charm", "ERROR") as logs:
+                self.charm.enable_disable_extensions()
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+                self.assertIn("failed to disable citext plugin", "".join(logs.output))
+
+            # Test when one config option should be skipped (because it's not related
+            # to a plugin/extension).
+            postgresql_mock.reset_mock()
+            postgresql_mock.enable_disable_extension.side_effect = None
+            with self.assertNoLogs("charm", "ERROR"):
+                config = """options:
+  plugin_citext_enable:
+    default: false
+    type: boolean
+  other_config_option:
+    default: false
+    type: boolean
+  plugin_debversion_enable:
+    default: false
+    type: boolean"""
+                harness = Harness(PostgresqlOperatorCharm, config=config)
+                self.addCleanup(harness.cleanup)
+                harness.begin()
+                harness.charm.enable_disable_extensions()
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 2)
+
+    @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
@@ -171,6 +285,7 @@ class TestCharm(unittest.TestCase):
         _oversee_users,
         _get_postgresql_version,
         _snap_cache,
+        _enable_disable_extensions,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -220,6 +335,7 @@ class TestCharm(unittest.TestCase):
             _postgresql.create_user.call_count, 4
         )  # Considering the previous failed call.
         _oversee_users.assert_called_once()
+        _enable_disable_extensions.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch("charm.snap.SnapCache")
