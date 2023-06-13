@@ -97,6 +97,7 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.upgrade_charm, self._on_upgrade_charm)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
@@ -970,6 +971,10 @@ class PostgresqlOperatorCharm(CharmBase):
         except (RetryError, ConnectionError) as e:
             logger.error(f"failed to get primary with error {e}")
 
+    def _on_upgrade_charm(self, _) -> None:
+        # Refresh the charmed PostgreSQL snap.
+        self._install_snap_packages(packages=SNAP_PACKAGES, refresh=True)
+
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
         # Request the certificate only if there is already one. If there isn't,
@@ -1002,18 +1007,20 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.get_secret("app", REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: List[str]) -> None:
+    def _install_snap_packages(self, packages: List[str], refresh: bool = False) -> None:
         """Installs package(s) to container.
 
         Args:
             packages: list of packages to install.
+            refresh: whether to refresh the snap if it's
+                already present
         """
         for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                if not snap_package.present:
+                if not snap_package.present or refresh:
                     if snap_version.get("revision"):
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=snap_version["revision"]
