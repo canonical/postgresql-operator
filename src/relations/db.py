@@ -5,7 +5,7 @@
 
 
 import logging
-from typing import Iterable
+from typing import Iterable, List, Set, Tuple
 
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
@@ -27,7 +27,9 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
-EXTENSIONS_BLOCKING_MESSAGE = "extensions requested through relation"
+EXTENSIONS_BLOCKING_MESSAGE = (
+    "extensions requested through relation, enable them through config options"
+)
 
 
 class DbProvides(Object):
@@ -104,32 +106,60 @@ class DbProvides(Object):
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
-        unit_relation_databag = event.relation.data[self.charm.unit]
+        self.set_up_relation(event.relation)
 
-        # Do not allow apps requesting extensions to be installed.
-        if "extensions" in event.relation.data.get(
-            event.app, {}
-        ) or "extensions" in event.relation.data.get(event.unit, {}):
+    def _get_extensions(self, relation: Relation) -> Tuple[List, Set]:
+        """Returns the list of required and disabled extensions."""
+        requested_extensions = relation.data.get(relation.app, {}).get("extensions", "").split(",")
+        for unit in relation.units:
+            requested_extensions.extend(
+                relation.data.get(unit, {}).get("extensions", "").split(",")
+            )
+        required_extensions = []
+        for extension in requested_extensions:
+            if extension != "" and extension not in required_extensions:
+                required_extensions.append(extension)
+        disabled_extensions = set()
+        if required_extensions:
+            for extension in required_extensions:
+                extension_name = extension.split(":")[0]
+                if not self.charm.model.config.get(f"plugin_{extension_name}_enable"):
+                    disabled_extensions.add(extension_name)
+        return required_extensions, disabled_extensions
+
+    def set_up_relation(self, relation: Relation) -> bool:
+        """Set up the relation to be used by the application charm."""
+        # Do not allow apps requesting extensions to be installed
+        # (let them now about config options).
+        required_extensions, disabled_extensions = self._get_extensions(relation)
+        if disabled_extensions:
             logger.error(
-                "ERROR - `extensions` cannot be requested through relations"
-                " - they should be installed through a database charm config in the future"
+                f"ERROR - `extensions` ({', '.join(disabled_extensions)}) cannot be requested through relations"
+                " - Please enable extensions through `juju config` and add the relation again."
             )
             self.charm.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
-            return
+            return False
+
+        database = relation.data.get(relation.app, {}).get("database")
+        if not database:
+            for unit in relation.units:
+                unit_database = relation.data.get(unit, {}).get("database")
+                if unit_database:
+                    database = unit_database
+                    break
 
         # Sometimes a relation changed event is triggered, and it doesn't have
         # a database name in it (like the relation with Landscape server charm),
         # so create a database with the other application name.
-        database = event.relation.data.get(event.app, {}).get(
-            "database", event.relation.data.get(event.unit, {}).get("database")
-        )
         if not database:
-            database = event.relation.app.name
+            database = relation.app.name
 
         try:
+            unit_relation_databag = relation.data[self.charm.unit]
+
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            user = f"relation-{event.relation.id}"
+            user = f"relation-{relation.id}"
             password = unit_relation_databag.get("password", new_password())
 
             # Store the user, password and database name in the secret store to be accessible by
@@ -139,6 +169,10 @@ class DbProvides(Object):
 
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
+
+            # Enable/disable extensions in the new database.
+            self.charm.enable_disable_extensions(database)
+
             postgresql_version = self.charm.postgresql.get_postgresql_version()
         except (
             PostgreSQLCreateDatabaseError,
@@ -149,7 +183,7 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(
                 f"Failed to initialize {self.relation_name} relation"
             )
-            return
+            return False
 
         # Set the data in the unit data bag. It's needed to run this logic on every
         # relation changed event setting the data again in the databag, otherwise the
@@ -161,9 +195,14 @@ class DbProvides(Object):
                 "version": postgresql_version,
                 "password": password,
                 "database": database,
+                "extensions": ",".join(required_extensions),
             }
         )
-        self.update_endpoints(event)
+        self.update_endpoints(relation)
+
+        self._update_unit_status(relation)
+
+        return True
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Handle the departure of legacy db and db-admin relations.
@@ -231,16 +270,19 @@ class DbProvides(Object):
             logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 
-        # Clean up Blocked status if caused by the departed relation
+        self._update_unit_status(event.relation)
+
+    def _update_unit_status(self, relation: Relation) -> None:
+        """Clean up Blocked status if it's due to extensions request."""
         if self.charm.is_blocked and self.charm.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE:
-            if not self._check_for_blocking_relations(event.relation.id):
+            if not self._check_for_blocking_relations(relation.id):
                 self.charm.unit.status = ActiveStatus()
 
-    def update_endpoints(self, event: RelationChangedEvent = None) -> None:
+    def update_endpoints(self, relation: Relation = None) -> None:
         """Set the read/write and read-only endpoints."""
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
-        relations = [event.relation] if event else self.model.relations[self.relation_name]
+        relations = [relation] if relation else self.model.relations[self.relation_name]
         if len(relations) == 0:
             return
 

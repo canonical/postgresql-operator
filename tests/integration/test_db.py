@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 import logging
 
 import psycopg2 as psycopg2
@@ -197,9 +198,91 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
         except JujuUnitError:
             pass
 
-        assert leader_unit.workload_status_message == "extensions requested through relation"
+        assert (
+            leader_unit.workload_status_message
+            == "extensions requested through relation, enable them through config options"
+        )
 
         await ops_test.model.remove_application("nextcloud", block_until_done=True)
+
+
+async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
+    async with ops_test.fast_forward():
+        # Deploy Sentry and its dependencies.
+        await asyncio.gather(
+            ops_test.model.deploy(
+                "omnivector-sentry", application_name="sentry1", series="bionic"
+            ),
+            ops_test.model.deploy("haproxy", series="focal"),
+            ops_test.model.deploy("omnivector-redis", application_name="redis", series="bionic"),
+        )
+        await ops_test.model.wait_for_idle(
+            apps=["sentry1"],
+            status="blocked",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
+        await asyncio.gather(
+            ops_test.model.relate("sentry1", "redis"),
+            ops_test.model.relate("sentry1", f"{DATABASE_APP_NAME}:db"),
+            ops_test.model.relate("sentry1", "haproxy"),
+        )
+
+        # Only the leader will block
+        leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)
+
+        try:
+            await ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME],
+                status="blocked",
+                raise_on_blocked=True,
+                timeout=1000,
+            )
+            assert False, "Leader didn't block"
+        except JujuUnitError:
+            pass
+
+        assert (
+            leader_unit.workload_status_message
+            == "extensions requested through relation, enable them through config options"
+        )
+
+        # Verify that the charm unblocks when the extensions are enabled after being blocked
+        # due to disabled extensions.
+        logger.info("Verifying that the charm unblocks when the extensions are enabled")
+        config = {"plugin_citext_enable": "True"}
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, "sentry1"],
+            status="active",
+            raise_on_blocked=False,
+            idle_period=15,
+        )
+
+        # Verify that the charm doesn't block when the extensions are enabled
+        # (another sentry deployment is used because it doesn't request a database
+        # again after the relation with the PostgreSQL charm is destroyed and reestablished).
+        logger.info("Verifying that the charm doesn't block when the extensions are enabled")
+        await asyncio.gather(
+            ops_test.model.remove_application("sentry1", block_until_done=True),
+            ops_test.model.deploy(
+                "omnivector-sentry", application_name="sentry2", series="bionic"
+            ),
+        )
+        await asyncio.gather(
+            ops_test.model.relate("sentry2", "redis"),
+            ops_test.model.relate("sentry2", f"{DATABASE_APP_NAME}:db"),
+            ops_test.model.relate("sentry2", "haproxy"),
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, "sentry2"], status="active", raise_on_blocked=False
+        )
+
+        await asyncio.gather(
+            ops_test.model.remove_application("redis", block_until_done=True),
+            ops_test.model.remove_application("sentry2", block_until_done=True),
+            ops_test.model.remove_application("haproxy", block_until_done=True),
+        )
 
 
 async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
