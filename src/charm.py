@@ -25,6 +25,7 @@ from ops.charm import (
     RelationChangedEvent,
     RelationDepartedEvent,
     StartEvent,
+    UpgradeCharmEvent,
 )
 from ops.framework import EventBase
 from ops.main import main
@@ -36,7 +37,15 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
+from tenacity import (
+    RetryError,
+    Retrying,
+    retry,
+    stop_after_attempt,
+    stop_after_delay,
+    wait_exponential,
+    wait_fixed,
+)
 
 from backups import PostgreSQLBackups
 from cluster import (
@@ -971,9 +980,27 @@ class PostgresqlOperatorCharm(CharmBase):
         except (RetryError, ConnectionError) as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def _on_upgrade_charm(self, _) -> None:
-        # Refresh the charmed PostgreSQL snap.
+    def _on_upgrade_charm(self, event: UpgradeCharmEvent) -> None:
+        # Refresh the charmed PostgreSQL snap and restart the database.
+        self.unit.status = MaintenanceStatus("refreshing the snap")
         self._install_snap_packages(packages=SNAP_PACKAGES, refresh=True)
+        if not self._patroni.start_patroni():
+            raise Exception("failed to start the database")
+
+        # Wait until the database initialise.
+        self.unit.status = WaitingStatus("waiting for database initialisation")
+        try:
+            for attempt in Retrying(
+                stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+            ):
+                with attempt:
+                    if self._patroni.member_started:
+                        self.unit.status = ActiveStatus()
+                    else:
+                        raise Exception()
+        except RetryError:
+            logger.debug("Defer _on_upgrade_charm: member not ready yet")
+            event.defer()
 
     def _update_certificate(self) -> None:
         """Updates the TLS certificate if the unit IP changes."""
