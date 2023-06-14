@@ -986,6 +986,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self._install_snap_packages(packages=SNAP_PACKAGES, refresh=True)
         if not self._patroni.start_patroni():
             raise Exception("failed to start the database")
+        self._setup_exporter()
+        self.backup.start_stop_pgbackrest_service()
 
         # Wait until the database initialise.
         self.unit.status = WaitingStatus("waiting for database initialisation")
