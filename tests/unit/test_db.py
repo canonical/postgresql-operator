@@ -213,14 +213,6 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.create_database = PropertyMock(
                 side_effect=[None, None, None, PostgreSQLCreateDatabaseError, None]
             )
-            postgresql_mock.get_postgresql_version = PropertyMock(
-                side_effect=[
-                    POSTGRESQL_VERSION,
-                    POSTGRESQL_VERSION,
-                    POSTGRESQL_VERSION,
-                    PostgreSQLGetPostgreSQLVersionError,
-                ]
-            )
 
             # Assert no operation is done when at least one of the requested extensions
             # is disabled.
@@ -246,18 +238,8 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
             _enable_disable_extensions.assert_called_once()
-            postgresql_mock.get_postgresql_version.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
-            self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, self.unit),
-                {
-                    "database": DATABASE,
-                    "extensions": ",".join(extensions),
-                    "password": "test-password",
-                    "version": POSTGRESQL_VERSION,
-                },
-            )
             self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
 
             # Assert that the correct calls were made when the database name is not
@@ -283,18 +265,8 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
             _enable_disable_extensions.assert_called_once()
-            postgresql_mock.get_postgresql_version.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
-            self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, self.unit),
-                {
-                    "database": DATABASE,
-                    "extensions": ",".join(extensions),
-                    "password": "test-password",
-                    "version": POSTGRESQL_VERSION,
-                },
-            )
             self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
 
             # Assert that the correct calls were made when the database name is not provided.
@@ -314,18 +286,8 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with("application", user)
             _enable_disable_extensions.assert_called_once()
-            postgresql_mock.get_postgresql_version.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
-            self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, self.unit),
-                {
-                    "database": "application",
-                    "extensions": ",".join(extensions),
-                    "password": "test-password",
-                    "version": POSTGRESQL_VERSION,
-                },
-            )
             self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
 
             # BlockedStatus due to a PostgreSQLCreateUserError.
@@ -337,33 +299,14 @@ class TestDbProvides(unittest.TestCase):
             self.assertFalse(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             postgresql_mock.create_database.assert_not_called()
             _enable_disable_extensions.assert_not_called()
-            postgresql_mock.get_postgresql_version.assert_not_called()
             _update_endpoints.assert_not_called()
             _update_unit_status.assert_not_called()
             self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
-            # No data is set in the databag by the database.
-            self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, self.app),
-                {},
-            )
 
             # BlockedStatus due to a PostgreSQLCreateDatabaseError.
             self.harness.charm.unit.status = ActiveStatus()
             self.assertFalse(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             _enable_disable_extensions.assert_not_called()
-            postgresql_mock.get_postgresql_version.assert_not_called()
-            _update_endpoints.assert_not_called()
-            _update_unit_status.assert_not_called()
-            self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
-            # No data is set in the databag by the database.
-            self.assertEqual(
-                self.harness.get_relation_data(self.rel_id, self.app),
-                {},
-            )
-
-            # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
-            self.harness.charm.unit.status = ActiveStatus()
-            self.assertFalse(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             _update_endpoints.assert_not_called()
             _update_unit_status.assert_not_called()
             self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
@@ -486,97 +429,113 @@ class TestDbProvides(unittest.TestCase):
     def test_update_endpoints_with_relation(
         self, _get_primary, _members_ips, _primary_endpoint, _get_state
     ):
-        # Mock the members_ips list to simulate different scenarios
-        # (with and without a replica).
-        _members_ips.side_effect = [
-            {"1.1.1.1", "2.2.2.2"},
-            {"1.1.1.1", "2.2.2.2"},
-            {"1.1.1.1"},
-            {"1.1.1.1"},
-        ]
-
-        # Add two different relations.
-        self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-        self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
-
-        # Get the relation to be used in the subsequent update endpoints calls.
-        relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
-
-        # Set some data to be used and compared in the relations.
-        password = "test-password"
-        master = (
-            f"dbname={DATABASE} fallback_application_name=application host=1.1.1.1 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
-        standbys = (
-            f"dbname={DATABASE} fallback_application_name=application host=2.2.2.2 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
-
-        # Set some required data before update_endpoints is called.
-        for rel_id in [self.rel_id, self.another_rel_id]:
-            user = f"relation-{rel_id}"
-            self.harness.update_relation_data(
-                rel_id,
-                self.app,
-                {
-                    "user": user,
-                    "password": password,
-                    "database": DATABASE,
-                },
-            )
-            self.harness.update_relation_data(
-                self.peer_rel_id,
-                self.app,
-                {
-                    user: password,
-                    f"{user}-database": DATABASE,
-                },
+        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+            # Set some side effects to test multiple situations.
+            postgresql_mock.get_postgresql_version = PropertyMock(
+                side_effect=[
+                    PostgreSQLGetPostgreSQLVersionError,
+                    POSTGRESQL_VERSION,
+                    POSTGRESQL_VERSION,
+                ]
             )
 
-        # Test with both a primary and a replica.
-        # Update the endpoints with the event and check that it updated only
-        # the right relation databags (the app and unit databags from the event).
-        self.legacy_db_relation.update_endpoints(relation)
-        for rel_id in [self.rel_id, self.another_rel_id]:
-            # Set the expected username based on the relation id.
-            user = f"relation-{rel_id}"
+            # Mock the members_ips list to simulate different scenarios
+            # (with and without a replica).
+            _members_ips.side_effect = [
+                {"1.1.1.1", "2.2.2.2"},
+                {"1.1.1.1", "2.2.2.2"},
+                {"1.1.1.1"},
+                {"1.1.1.1"},
+            ]
 
-            # Set the assert function based on each relation (whether it should have data).
-            assert_based_on_relation = (
-                self.assertTrue if rel_id == self.rel_id else self.assertFalse
+            # Add two different relations.
+            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
+            self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
+
+            # Get the relation to be used in the subsequent update endpoints calls.
+            relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
+
+            # Set some data to be used and compared in the relations.
+            password = "test-password"
+            master = (
+                f"dbname={DATABASE} host=1.1.1.1 password={password} port={DATABASE_PORT} user="
             )
-
-            # Check that the unit relation databag contains (or not) the endpoints.
-            unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
-            assert_based_on_relation(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            assert_based_on_relation(
-                "standbys" in unit_relation_data
-                and standbys + user == unit_relation_data["standbys"]
-            )
-
-        # Also test with only a primary instance.
-        self.legacy_db_relation.update_endpoints(relation)
-        for rel_id in [self.rel_id, self.another_rel_id]:
-            # Set the expected username based on the relation id.
-            user = f"relation-{rel_id}"
-
-            # Set the assert function based on each relation (whether it should have data).
-            assert_based_on_relation = (
-                self.assertTrue if rel_id == self.rel_id else self.assertFalse
+            standbys = (
+                f"dbname={DATABASE} host=2.2.2.2 password={password} port={DATABASE_PORT} user="
             )
 
-            # Check that the unit relation databag contains the endpoints.
-            unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
-            assert_based_on_relation(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            assert_based_on_relation(
-                "standbys" in unit_relation_data
-                and standbys + user == unit_relation_data["standbys"]
-            )
+            # Set some required data before update_endpoints is called.
+            for rel_id in [self.rel_id, self.another_rel_id]:
+                user = f"relation-{rel_id}"
+                self.harness.update_relation_data(
+                    rel_id,
+                    self.app,
+                    {
+                        "user": user,
+                        "password": password,
+                        "database": DATABASE,
+                    },
+                )
+                self.harness.update_relation_data(
+                    self.peer_rel_id,
+                    self.app,
+                    {
+                        user: password,
+                        f"{user}-database": DATABASE,
+                    },
+                )
+
+            # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
+            self.legacy_db_relation.update_endpoints(relation)
+            self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
+            self.assertEqual(self.harness.get_relation_data(rel_id, self.unit), {})
+
+            # Test with both a primary and a replica.
+            # Update the endpoints with the event and check that it updated only
+            # the right relation databags (the app and unit databags from the event).
+            self.legacy_db_relation.update_endpoints(relation)
+            for rel_id in [self.rel_id, self.another_rel_id]:
+                # Set the expected username based on the relation id.
+                user = f"relation-{rel_id}"
+
+                # Set the assert function based on each relation (whether it should have data).
+                assert_based_on_relation = (
+                    self.assertTrue if rel_id == self.rel_id else self.assertFalse
+                )
+
+                # Check that the unit relation databag contains (or not) the endpoints.
+                unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+                print(f"unit_relation_data: {unit_relation_data}")
+                assert_based_on_relation(
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                assert_based_on_relation(
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
+
+            # Also test with only a primary instance.
+            self.legacy_db_relation.update_endpoints(relation)
+            for rel_id in [self.rel_id, self.another_rel_id]:
+                # Set the expected username based on the relation id.
+                user = f"relation-{rel_id}"
+
+                # Set the assert function based on each relation (whether it should have data).
+                assert_based_on_relation = (
+                    self.assertTrue if rel_id == self.rel_id else self.assertFalse
+                )
+
+                # Check that the unit relation databag contains the endpoints.
+                unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+                assert_based_on_relation(
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                assert_based_on_relation(
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
 
     @patch(
         "charm.DbProvides._get_state",
@@ -591,84 +550,98 @@ class TestDbProvides(unittest.TestCase):
         new_callable=PropertyMock,
     )
     @patch("charm.Patroni.get_primary")
-    def test_update_endpoints_without_event(
+    def test_update_endpoints_without_relation(
         self, _get_primary, _members_ips, _primary_endpoint, _get_state
     ):
-        _get_primary.return_value = self.unit
-        # Mock the members_ips list to simulate different scenarios
-        # (with and without a replica).
-        _members_ips.side_effect = [
-            {"1.1.1.1", "2.2.2.2"},
-            {"1.1.1.1", "2.2.2.2"},
-            {"1.1.1.1"},
-            {"1.1.1.1"},
-        ]
-
-        # Add two different relations.
-        self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
-        self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
-
-        # Set some data to be used and compared in the relations.
-        password = "test-password"
-        master = (
-            f"dbname={DATABASE} fallback_application_name=application host=1.1.1.1 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
-        standbys = (
-            f"dbname={DATABASE} fallback_application_name=application host=2.2.2.2 "
-            f"password={password} port={DATABASE_PORT} user="
-        )
-
-        # Set some required data before update_endpoints is called.
-        for rel_id in [self.rel_id, self.another_rel_id]:
-            user = f"relation-{rel_id}"
-            self.harness.update_relation_data(
-                rel_id,
-                self.app,
-                {
-                    "user": user,
-                    "password": password,
-                    "database": DATABASE,
-                },
+        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+            # Set some side effects to test multiple situations.
+            postgresql_mock.get_postgresql_version = PropertyMock(
+                side_effect=[
+                    PostgreSQLGetPostgreSQLVersionError,
+                    POSTGRESQL_VERSION,
+                    POSTGRESQL_VERSION,
+                ]
             )
-            self.harness.update_relation_data(
-                self.peer_rel_id,
-                self.app,
-                {
-                    user: password,
-                    f"{user}-database": DATABASE,
-                },
+            _get_primary.return_value = self.unit
+            # Mock the members_ips list to simulate different scenarios
+            # (with and without a replica).
+            _members_ips.side_effect = [
+                {"1.1.1.1", "2.2.2.2"},
+                {"1.1.1.1", "2.2.2.2"},
+                {"1.1.1.1"},
+                {"1.1.1.1"},
+            ]
+
+            # Add two different relations.
+            self.rel_id = self.harness.add_relation(RELATION_NAME, "application")
+            self.another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
+
+            # Set some data to be used and compared in the relations.
+            password = "test-password"
+            master = (
+                f"dbname={DATABASE} host=1.1.1.1 password={password} port={DATABASE_PORT} user="
+            )
+            standbys = (
+                f"dbname={DATABASE} host=2.2.2.2 password={password} port={DATABASE_PORT} user="
             )
 
-        # Test with both a primary and a replica.
-        # Update the endpoints and check that all relations' databags are updated.
-        self.legacy_db_relation.update_endpoints()
-        for rel_id in [self.rel_id, self.another_rel_id]:
-            # Set the expected username based on the relation id.
-            user = f"relation-{rel_id}"
+            # Set some required data before update_endpoints is called.
+            for rel_id in [self.rel_id, self.another_rel_id]:
+                user = f"relation-{rel_id}"
+                self.harness.update_relation_data(
+                    rel_id,
+                    self.app,
+                    {
+                        "user": user,
+                        "password": password,
+                        "database": DATABASE,
+                    },
+                )
+                self.harness.update_relation_data(
+                    self.peer_rel_id,
+                    self.app,
+                    {
+                        user: password,
+                        f"{user}-database": DATABASE,
+                    },
+                )
 
-            # Check that the unit relation databag contains the endpoints.
-            unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
-            self.assertTrue(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            self.assertTrue(
-                "standbys" in unit_relation_data
-                and standbys + user == unit_relation_data["standbys"]
-            )
+            # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
+            self.legacy_db_relation.update_endpoints()
+            self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
+            self.assertEqual(self.harness.get_relation_data(rel_id, self.unit), {})
 
-        # Also test with only a primary instance.
-        self.legacy_db_relation.update_endpoints()
-        for rel_id in [self.rel_id, self.another_rel_id]:
-            # Set the expected username based on the relation id.
-            user = f"relation-{rel_id}"
+            # Test with both a primary and a replica.
+            # Update the endpoints and check that all relations' databags are updated.
+            self.legacy_db_relation.update_endpoints()
+            for rel_id in [self.rel_id, self.another_rel_id]:
+                # Set the expected username based on the relation id.
+                user = f"relation-{rel_id}"
 
-            # Check that the unit relation databag contains the endpoints.
-            unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
-            self.assertTrue(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            self.assertTrue(
-                "standbys" in unit_relation_data
-                and standbys + user == unit_relation_data["standbys"]
-            )
+                # Check that the unit relation databag contains the endpoints.
+                unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+                self.assertTrue(
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                self.assertTrue(
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
+
+            # Also test with only a primary instance.
+            self.legacy_db_relation.update_endpoints()
+            for rel_id in [self.rel_id, self.another_rel_id]:
+                # Set the expected username based on the relation id.
+                user = f"relation-{rel_id}"
+
+                # Check that the unit relation databag contains the endpoints.
+                unit_relation_data = self.harness.get_relation_data(rel_id, self.unit)
+                self.assertTrue(
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                self.assertTrue(
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )

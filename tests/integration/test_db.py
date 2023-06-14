@@ -18,11 +18,13 @@ from tests.integration.helpers import (
     check_database_users_existence,
     check_databases_creation,
     deploy_and_relate_application_with_postgresql,
+    deploy_and_relate_bundle_with_postgresql,
     find_unit,
 )
 
 logger = logging.getLogger(__name__)
 
+LIVEPATCH_APP_NAME = "livepatch"
 MAILMAN3_CORE_APP_NAME = "mailman3-core"
 APPLICATION_UNITS = 1
 DATABASE_UNITS = 2
@@ -307,3 +309,29 @@ async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
             raise_on_blocked=False,
             timeout=1000,
         )
+
+        await ops_test.model.remove_application("weebl", block_until_done=True)
+
+
+async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
+    # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
+    # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).
+    # We intentionally wait for the `✘ sync_token not set` status message as we
+    # aren't providing an Ubuntu Pro token (as this is just a test to ensure
+    # the database works in the context of the relation with the Livepatch charm).
+    overlay = {
+        "applications": {"ubuntu-advantage": {"charm": "ubuntu-advantage", "series": CHARM_SERIES}}
+    }
+    await deploy_and_relate_bundle_with_postgresql(
+        ops_test,
+        "canonical-livepatch-onprem",
+        LIVEPATCH_APP_NAME,
+        "db",
+        "blocked",
+        "✘ sync_token not set",
+        overlay,
+    )
+
+    action = await ops_test.model.units.get(f"{LIVEPATCH_APP_NAME}/0").run_action("schema-upgrade")
+    await action.wait()
+    assert action.results.get("Code") == "0", "schema-upgrade action hasn't succeeded"

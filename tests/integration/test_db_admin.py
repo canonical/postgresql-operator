@@ -12,7 +12,7 @@ from tests.integration.helpers import (
     DATABASE_APP_NAME,
     check_database_users_existence,
     check_databases_creation,
-    deploy_and_relate_landscape_bundle_with_postgresql,
+    deploy_and_relate_bundle_with_postgresql,
     ensure_correct_relation_data,
     get_landscape_api_credentials,
     get_machine_from_unit,
@@ -42,7 +42,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     )
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
-    relation_id = await deploy_and_relate_landscape_bundle_with_postgresql(ops_test)
+    relation_id = await deploy_and_relate_bundle_with_postgresql(
+        ops_test, "ch:landscape-scalable", LANDSCAPE_APP_NAME, RELATION_NAME
+    )
     await check_databases_creation(
         ops_test,
         [
