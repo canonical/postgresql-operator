@@ -6,6 +6,7 @@ from subprocess import PIPE, CompletedProcess, TimeoutExpired
 from typing import OrderedDict
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
+import botocore as botocore
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
 from jinja2 import Template
@@ -167,10 +168,8 @@ class TestPostgreSQLBackups(unittest.TestCase):
 
         # Test when nothing is returned from the pgBackRest info command.
         _execute_command.side_effect = TimeoutExpired(cmd="fake command", timeout=30)
-        self.assertEqual(
-            self.charm.backup.can_use_s3_repository(),
-            (False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE),
-        )
+        with self.assertRaises(TimeoutError):
+            self.charm.backup.can_use_s3_repository()
 
         _execute_command.side_effect = None
         _execute_command.return_value = (1, "", "")
@@ -329,6 +328,18 @@ class TestPostgreSQLBackups(unittest.TestCase):
             self.charm.backup._create_bucket_if_not_exists()
         head_bucket.assert_called_once()
         create.assert_called_once()
+        wait_until_exists.assert_not_called()
+
+        # Test when the bucket creation fails due to a timeout error.
+        head_bucket.reset_mock()
+        create.reset_mock()
+        head_bucket.side_effect = botocore.exceptions.ConnectTimeoutError(
+            endpoint_url="fake endpoint URL"
+        )
+        with self.assertRaises(botocore.exceptions.ConnectTimeoutError):
+            self.charm.backup._create_bucket_if_not_exists()
+        head_bucket.assert_called_once()
+        create.assert_not_called()
         wait_until_exists.assert_not_called()
 
     @patch("shutil.rmtree")
@@ -532,6 +543,12 @@ class TestPostgreSQLBackups(unittest.TestCase):
 
             # Assert there is no stanza name in the application relation databag.
             self.assertEqual(self.harness.get_relation_data(self.peer_rel_id, self.charm.app), {})
+
+        # Test when the failure in the stanza creation is due to a timeout.
+        _execute_command.reset_mock()
+        _execute_command.return_value = (49, "", "fake stderr")
+        with self.assertRaises(TimeoutError):
+            self.charm.backup._initialise_stanza()
 
         # Test when the stanza creation succeeds, but the archiving is not working correctly
         # (pgBackRest check command fails).

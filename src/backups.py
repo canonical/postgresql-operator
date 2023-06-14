@@ -125,8 +125,13 @@ class PostgreSQLBackups(Object):
                 timeout=30,
             )
         except TimeoutExpired as e:
-            logger.error(str(e))
-            return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+            # Raise an error if the connection timeouts, so the user has the possibility to
+            # fix network issues and call juju resolve to re-trigger the hook that calls
+            # this method.
+            logger.error(
+                f"error: {str(e)} - please fix the error and call juju resolve on this unit"
+            )
+            raise TimeoutError
 
         else:
             if return_code != 0:
@@ -195,6 +200,14 @@ class PostgreSQLBackups(Object):
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
             exists = True
+        except botocore.exceptions.ConnectTimeoutError as e:
+            # Re-raise the error if the connection timeouts, so the user has the possibility to
+            # fix network issues and call juju resolve to re-trigger the hook that calls
+            # this method.
+            logger.error(
+                f"error: {str(e)} - please fix the error and call juju resolve on this unit"
+            )
+            raise e
         except ClientError:
             logger.warning("Bucket %s doesn't exist or you don't have access to it.", bucket_name)
             exists = False
@@ -351,6 +364,14 @@ class PostgreSQLBackups(Object):
                 "stanza-create",
             ]
         )
+        if return_code == 49:
+            # Raise an error if the connection timeouts, so the user has the possibility to
+            # fix network issues and call juju resolve to re-trigger the hook that calls
+            # this method.
+            logger.error(
+                f"error: {stderr} - please fix the error and call juju resolve on this unit"
+            )
+            raise TimeoutError
         if return_code != 0:
             logger.error(stderr)
             self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
