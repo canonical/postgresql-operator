@@ -172,32 +172,13 @@ class DbProvides(Object):
 
             # Enable/disable extensions in the new database.
             self.charm.enable_disable_extensions(database)
-
-            postgresql_version = self.charm.postgresql.get_postgresql_version()
-        except (
-            PostgreSQLCreateDatabaseError,
-            PostgreSQLCreateUserError,
-            PostgreSQLGetPostgreSQLVersionError,
-        ) as e:
+        except (PostgreSQLCreateDatabaseError, PostgreSQLCreateUserError) as e:
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(
                 f"Failed to initialize {self.relation_name} relation"
             )
             return False
 
-        # Set the data in the unit data bag. It's needed to run this logic on every
-        # relation changed event setting the data again in the databag, otherwise the
-        # application charm that is connecting to this database will receive a
-        # "database gone" event from the old PostgreSQL library (ops-lib-pgsql)
-        # and the connection between the application and this charm will not work.
-        unit_relation_databag.update(
-            {
-                "version": postgresql_version,
-                "password": password,
-                "database": database,
-                "extensions": ",".join(required_extensions),
-            }
-        )
         self.update_endpoints(relation)
 
         self._update_unit_status(relation)
@@ -286,6 +267,15 @@ class DbProvides(Object):
         if len(relations) == 0:
             return
 
+        try:
+            postgresql_version = self.charm.postgresql.get_postgresql_version()
+        except PostgreSQLGetPostgreSQLVersionError as e:
+            logger.exception(e)
+            self.charm.unit.status = BlockedStatus(
+                f"Failed to retrieve the PostgreSQL version to initialise/update {self.relation_name} relation"
+            )
+            return
+
         # List the replicas endpoints.
         replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
 
@@ -308,7 +298,6 @@ class DbProvides(Object):
                     port=DATABASE_PORT,
                     user=user,
                     password=password,
-                    fallback_application_name=relation.app.name,
                 )
             )
 
@@ -322,7 +311,6 @@ class DbProvides(Object):
                             port=DATABASE_PORT,
                             user=user,
                             password=password,
-                            fallback_application_name=relation.app.name,
                         )
                     )
                     for replica_endpoint in replicas_endpoint
@@ -340,6 +328,11 @@ class DbProvides(Object):
                 "host": self.charm.primary_endpoint,
                 "port": DATABASE_PORT,
                 "user": user,
+                "schema_user": user,
+                "version": postgresql_version,
+                "password": password,
+                "schema_password": password,
+                "database": database,
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
@@ -386,4 +379,4 @@ class DbProvides(Object):
         if self.charm._patroni.get_primary(unit_name_pattern=True) == self.charm.unit.name:
             return "master"
         else:
-            return "standby"
+            return "hot standby"
