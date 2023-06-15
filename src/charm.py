@@ -948,6 +948,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         if "restoring-backup" in self.app_peer_data:
             if "failed" in self._patroni.get_member_status(self._member_name):
+                logger.error("Restore failed: database service failed to start")
                 self.unit.status = BlockedStatus("Failed to restore backup")
                 return
 
@@ -958,6 +959,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # Remove the restoring backup flag and the restore stanza name.
             self.app_peer_data.update({"restoring-backup": "", "restore-stanza": ""})
             self.update_config()
+            logger.info("Restore succeeded")
 
             can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
             if not can_use_s3_repository:
