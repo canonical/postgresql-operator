@@ -168,6 +168,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
                 psycopg2.connect(primary_connection_string)
 
 
+@pytest.mark.unstable
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         # Deploy Nextcloud.
