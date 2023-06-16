@@ -450,7 +450,7 @@ class PostgreSQLBackups(Object):
         """Request that pgBackRest creates a backup."""
         can_unit_perform_backup, validation_message = self._can_unit_perform_backup()
         if not can_unit_perform_backup:
-            logger.warning(validation_message)
+            logger.error(f"Backup failed: {validation_message}")
             event.fail(validation_message)
             return
 
@@ -474,7 +474,9 @@ Juju Version: {str(juju_version)}
             ),
             s3_parameters,
         ):
-            event.fail("Failed to upload metadata to provided S3")
+            error_message = "Failed to upload metadata to provided S3"
+            logger.error(f"Backup failed: {error_message}")
+            event.fail(error_message)
             return
 
         if not self.charm.is_primary:
@@ -484,7 +486,7 @@ Juju Version: {str(juju_version)}
 
         self.charm.unit.status = MaintenanceStatus("creating backup")
 
-        self._run_backup(event, s3_parameters)
+        self._run_backup(event, s3_parameters, datetime_backup_requested)
 
         if not self.charm.is_primary:
             # Remove the rule that marks the cluster as in a creating backup state
@@ -493,7 +495,9 @@ Juju Version: {str(juju_version)}
 
         self.charm.unit.status = ActiveStatus()
 
-    def _run_backup(self, event: ActionEvent, s3_parameters: Dict) -> None:
+    def _run_backup(
+        self, event: ActionEvent, s3_parameters: Dict, datetime_backup_requested: str
+    ) -> None:
         command = [
             PGBACKREST_EXECUTABLE,
             PGBACKREST_CONFIGURATION_FILE,
@@ -536,13 +540,17 @@ Stderr:
                 ),
                 s3_parameters,
             )
-            event.fail("Failed to backup PostgreSQL")
+            error_message = f"Failed to backup PostgreSQL with error: {stderr}"
+            logger.error(f"Backup failed: {error_message}")
+            event.fail(error_message)
         else:
             try:
                 backup_id = list(self._list_backups(show_failed=True).keys())[-1]
             except ListBackupsError as e:
                 logger.exception(e)
-                event.fail("Failed to check backup id")
+                error_message = "Failed to retrieve backup id"
+                logger.error(f"Backup failed: {error_message}")
+                event.fail(error_message)
                 return
 
             # Upload the logs to S3 and fail the action if it doesn't succeed.
@@ -560,8 +568,11 @@ Stderr:
                 ),
                 s3_parameters,
             ):
-                event.fail("Error uploading logs to S3")
+                error_message = "Error uploading logs to S3"
+                logger.error(f"Backup failed: {error_message}")
+                event.fail(error_message)
             else:
+                logger.info(f"Backup succeeded: with backup-id {datetime_backup_requested}")
                 event.set_results({"backup-status": "backup created"})
 
     def _on_list_backups_action(self, event) -> None:
@@ -592,25 +603,31 @@ Stderr:
         try:
             backups = self._list_backups(show_failed=False)
             if backup_id not in backups.keys():
-                event.fail(f"Invalid backup-id: {backup_id}")
+                error_message = f"Invalid backup-id: {backup_id}"
+                logger.error(f"Restore failed: {error_message}")
+                event.fail(error_message)
                 return
         except ListBackupsError as e:
             logger.exception(e)
-            event.fail("Failed to check backup id")
+            error_message = "Failed to retrieve backup id"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
             return
 
         self.charm.unit.status = MaintenanceStatus("restoring backup")
-        error_message = "Failed to restore backup"
 
         # Stop the database service before performing the restore.
         logger.info("Stopping database service")
         if not self.charm._patroni.stop_patroni():
-            logger.warning("Failed to stop database service")
+            error_message = "Failed to stop database service"
+            logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
 
         logger.info("Removing the contents of the data directory")
         if not self._empty_data_files():
+            error_message = "Failed to remove contents of the data directory"
+            logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             self._restart_database()
             return
@@ -643,7 +660,8 @@ Stderr:
             timeout=10,
         )
         if return_code != 0:
-            logger.warning(f"Failed to remove previous cluster information with error: {stderr}")
+            error_message = f"Failed to remove previous cluster information with error: {stderr}"
+            logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
 
@@ -657,12 +675,14 @@ Stderr:
         """
         are_backup_settings_ok, validation_message = self._are_backup_settings_ok()
         if not are_backup_settings_ok:
-            logger.warning(validation_message)
+            logger.error(f"Restore failed: {validation_message}")
             event.fail(validation_message)
             return False
 
         if not event.params.get("backup-id"):
-            event.fail("Missing backup-id to restore")
+            error_message = "Missing backup-id to restore"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
             return False
 
         logger.info("Checking if cluster is in blocked state")
@@ -671,7 +691,7 @@ Stderr:
             and self.charm.unit.status.message != ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
         ):
             error_message = "Cluster or unit is in a blocking state"
-            logger.warning(error_message)
+            logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
 
@@ -680,14 +700,14 @@ Stderr:
             error_message = (
                 "Unit cannot restore backup as there are more than one unit in the cluster"
             )
-            logger.warning(error_message)
+            logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
 
         logger.info("Checking that this unit was already elected the leader unit")
         if not self.charm.unit.is_leader():
             error_message = "Unit cannot restore backup as it was not elected the leader unit yet"
-            logger.warning(error_message)
+            logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
 
