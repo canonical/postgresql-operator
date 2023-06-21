@@ -288,6 +288,7 @@ async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
         )
 
 
+@pytest.mark.unstable
 async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
