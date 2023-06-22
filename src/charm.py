@@ -650,6 +650,9 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
             return
 
+        self._create_alias("patronictl")
+        self._create_alias("psql")
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
@@ -1110,6 +1113,9 @@ class PostgresqlOperatorCharm(CharmBase):
                 "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
             ]
         )
+
+    def _create_alias(self, app: str) -> None:
+        subprocess.check_output(["snap", "alias", f"charmed-postgresql.{app}", app])
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
