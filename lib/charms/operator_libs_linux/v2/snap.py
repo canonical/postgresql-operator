@@ -79,11 +79,11 @@ logger = logging.getLogger(__name__)
 LIBID = "05394e5893f94f2d90feb7cbe6b633cd"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 1
+LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 0
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -222,7 +222,7 @@ class Snap(object):
         name,
         state: SnapState,
         channel: str,
-        revision: int,
+        revision: str,
         confinement: str,
         apps: Optional[List[Dict[str, str]]] = None,
         cohort: Optional[str] = "",
@@ -415,7 +415,7 @@ class Snap(object):
         """Restarts a snap's services.
 
         Args:
-            services (list): (optional) list of individual snap services to show logs from.
+            services (list): (optional) list of individual snap services to restart.
                 (otherwise all)
             reload (bool): (optional) flag to use the service reload command, if available.
                 Default `False`
@@ -427,7 +427,7 @@ class Snap(object):
         self,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
-        revision: Optional[int] = None,
+        revision: Optional[str] = None,
     ) -> None:
         """Add a snap to the system.
 
@@ -454,7 +454,7 @@ class Snap(object):
         self,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
-        revision: Optional[int] = None,
+        revision: Optional[str] = None,
         leave_cohort: Optional[bool] = False,
     ) -> None:
         """Refresh a snap.
@@ -498,7 +498,7 @@ class Snap(object):
         classic: Optional[bool] = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
-        revision: Optional[int] = None,
+        revision: Optional[str] = None,
     ):
         """Ensure that a snap is in a given state.
 
@@ -575,7 +575,7 @@ class Snap(object):
         self._state = state
 
     @property
-    def revision(self) -> int:
+    def revision(self) -> str:
         """Returns the revision for a snap."""
         return self._revision
 
@@ -828,7 +828,7 @@ class SnapCache(Mapping):
                 name=i["name"],
                 state=SnapState.Latest,
                 channel=i["channel"],
-                revision=int(i["revision"]),
+                revision=i["revision"],
                 confinement=i["confinement"],
                 apps=i.get("apps", None),
             )
@@ -846,7 +846,7 @@ class SnapCache(Mapping):
             name=info["name"],
             state=SnapState.Available,
             channel=info["channel"],
-            revision=int(info["revision"]),
+            revision=info["revision"],
             confinement=info["confinement"],
             apps=None,
         )
@@ -859,7 +859,7 @@ def add(
     channel: Optional[str] = "",
     classic: Optional[bool] = False,
     cohort: Optional[str] = "",
-    revision: Optional[int] = None,
+    revision: Optional[str] = None,
 ) -> Union[Snap, List[Snap]]:
     """Add a snap to the system.
 
@@ -871,7 +871,7 @@ def add(
         classic: an (Optional) boolean specifying whether it should be added with classic
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
-        revision: an (Optional) integer specifying the snap revision to use
+        revision: an (Optional) string specifying the snap revision to use
 
     Raises:
         SnapError if some snaps failed to install or were not found.
@@ -947,7 +947,7 @@ def _wrap_snap_operations(
     channel: str,
     classic: bool,
     cohort: Optional[str] = "",
-    revision: Optional[int] = None,
+    revision: Optional[str] = None,
 ) -> Union[Snap, List[Snap]]:
     """Wrap common operations for bare commands."""
     snaps = {"success": [], "failed": []}

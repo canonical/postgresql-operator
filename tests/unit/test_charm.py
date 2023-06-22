@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import MagicMock, Mock, PropertyMock, patch
 
-from charms.operator_libs_linux.v1 import snap
+from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
