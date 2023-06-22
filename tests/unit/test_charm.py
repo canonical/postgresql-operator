@@ -17,7 +17,7 @@ from tenacity import RetryError
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from cluster import RemoveRaftMemberFailedError
-from constants import PEER, SNAP_PACKAGES
+from constants import PEER, POSTGRESQL_SNAP_NAME, SNAP_PACKAGES
 from tests.helpers import patch_network_get
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -35,7 +35,7 @@ class TestCharm(unittest.TestCase):
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.subprocess.check_output")
+    @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm._patch_snap_seccomp_profile")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
@@ -49,21 +49,20 @@ class TestCharm(unittest.TestCase):
         _reboot_on_detached_storage,
         _install_snap_packages,
         _patch_snap_seccomp_profile,
-        _check_output,
+        _snap_cache,
     ):
         # Test without storage.
         self.charm.on.install.emit()
         _reboot_on_detached_storage.assert_called_once()
+        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
 
         # Test without adding Patroni resource.
         self.charm.on.install.emit()
         # Assert that the needed calls were made.
         _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES)
-        assert _check_output.call_count == 2
-        _check_output.assert_any_call(["snap", "alias", "charmed-postgresql.psql", "psql"])
-        _check_output.assert_any_call(
-            ["snap", "alias", "charmed-postgresql.patronictl", "patronictl"]
-        )
+        assert pg_snap.alias.call_count == 2
+        pg_snap.alias.assert_any_call("psql")
+        pg_snap.alias.assert_any_call("patronictl")
 
         # Assert the status set by the event handler.
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))

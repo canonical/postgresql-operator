@@ -83,7 +83,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -273,7 +273,10 @@ class Snap(object):
           SnapError if there is a problem encountered
         """
         optargs = optargs or []
-        _cmd = ["snap", command, self._name, *optargs]
+        if command == "alias":
+            _cmd = ["snap", command, *optargs]
+        else:
+            _cmd = ["snap", command, self._name, *optargs]
         try:
             return subprocess.check_output(_cmd, universal_newlines=True)
         except CalledProcessError as e:
@@ -408,6 +411,17 @@ class Snap(object):
     def unhold(self) -> None:
         """Remove the refresh hold of a snap."""
         self._snap("refresh", ["--unhold"])
+
+    def alias(self, application: str, alias: str = None) -> None:
+        """Create an alias for a given application.
+
+        Args:
+            application: application to get an alias.
+            alias: (optional) name of the alias
+        """
+        if not alias:
+            alias = application
+        self._snap("alias", [f"{self.name}.{application}", alias])
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False
