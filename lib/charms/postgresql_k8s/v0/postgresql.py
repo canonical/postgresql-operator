@@ -269,7 +269,9 @@ class PostgreSQL:
 
             # Enable/disabled the extension in each database.
             for database in databases:
-                with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(statement)
         except psycopg2.errors.UniqueViolation:
             pass

@@ -18,7 +18,7 @@ import boto3 as boto3
 import botocore
 from botocore.exceptions import ClientError
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
-from charms.operator_libs_linux.v1 import snap
+from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent
 from ops.framework import Object

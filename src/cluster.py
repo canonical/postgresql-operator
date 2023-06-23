@@ -10,7 +10,7 @@ import subprocess
 from typing import Dict, Optional, Set
 
 import requests
-from charms.operator_libs_linux.v1 import snap
+from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from tenacity import (
     AttemptManager,
