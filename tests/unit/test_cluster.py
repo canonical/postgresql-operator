@@ -6,7 +6,7 @@ from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
 
 import requests as requests
 import tenacity as tenacity
-from charms.operator_libs_linux.v1 import snap
+from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 
 from cluster import Patroni

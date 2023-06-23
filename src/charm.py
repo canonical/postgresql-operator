@@ -9,7 +9,7 @@ import subprocess
 from typing import Dict, List, Optional, Set
 
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
-from charms.operator_libs_linux.v1 import snap
+from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
@@ -650,6 +650,9 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
             return
 
+        self._create_alias("patronictl")
+        self._create_alias("psql")
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
@@ -1110,6 +1113,9 @@ class PostgresqlOperatorCharm(CharmBase):
                 "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
             ]
         )
+
+    def _create_alias(self, app: str) -> None:
+        subprocess.check_output(["snap", "alias", f"charmed-postgresql.{app}", app])
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
