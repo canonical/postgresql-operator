@@ -140,25 +140,53 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def get_secret(self, scope: str, key: str) -> Optional[str]:
         """Get secret from the secret storage."""
+        relation = self.model.get_relation(PEER)
+        if relation is None:
+            return
         if scope == "unit":
-            return self.unit_peer_data.get(key, None)
+            # return self.unit_peer_data.get(key, None)
+            secret_id = relation.data[self.unit].get(key)
+            if secret_id is None:
+                return None
+            secret = self.model.get_secret(id=secret_id)
+            content = secret.get_content()
+            return content[key]
         elif scope == "app":
-            return self.app_peer_data.get(key, None)
+            # return self.app_peer_data.get(key, None)
+            secret_id = relation.data[self.app].get(key)
+            if secret_id is None:
+                return None
+            secret = self.model.get_secret(id=secret_id)
+            content = secret.get_content()
+            return content[key]
         else:
             raise RuntimeError("Unknown secret scope.")
 
     def set_secret(self, scope: str, key: str, value: Optional[str]) -> None:
         """Get secret from the secret storage."""
+        relation = self.model.get_relation(PEER)
+        if relation is None:
+            return
         if scope == "unit":
             if not value:
-                del self.unit_peer_data[key]
+                # del self.unit_peer_data[key]
+                secret = self.model.get_secret(id=key)
+                secret.remove_all_revisions()
                 return
-            self.unit_peer_data.update({key: value})
+            # self.unit_peer_data.update({key: value})
+            secret = self.unit.add_secret({key: value})
+            # secret.grant(relation)
+            self._peers.data[self.unit][key] = secret.id
         elif scope == "app":
             if not value:
-                del self.app_peer_data[key]
+                # del self.app_peer_data[key]
+                secret = self.model.get_secret(id=key)
+                secret.remove_all_revisions()
                 return
-            self.app_peer_data.update({key: value})
+            # self.app_peer_data.update({key: value})
+            secret = self.app.add_secret({key: value})
+            # secret.grant(relation)
+            self._peers.data[self.app][key] = secret.id
         else:
             raise RuntimeError("Unknown secret scope.")
 

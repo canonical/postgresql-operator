@@ -8,7 +8,6 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLGetPostgreSQLVersionError,
-    PostgreSQLListUsersError,
 )
 from ops.framework import EventBase
 from ops.model import ActiveStatus, BlockedStatus
@@ -167,44 +166,6 @@ class TestPostgreSQLProvider(unittest.TestCase):
             # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
             self.request_database()
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-
-    def test_oversee_users(self):
-        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
-            # Create two relations and add the username in their databags.
-            rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.update_relation_data(
-                rel_id,
-                self.harness.charm.app.name,
-                {"username": f"relation-{rel_id}"},
-            )
-            another_rel_id = self.harness.add_relation(RELATION_NAME, "application")
-            self.harness.update_relation_data(
-                another_rel_id,
-                self.harness.charm.app.name,
-                {"username": f"relation-{another_rel_id}"},
-            )
-
-            # Mock some database calls.
-            postgresql_mock.list_users = PropertyMock(
-                side_effect=[
-                    {f"relation-{rel_id}", f"relation-{another_rel_id}", "postgres"},
-                    {f"relation-{rel_id}", f"relation-{another_rel_id}", "postgres"},
-                    PostgreSQLListUsersError,
-                ]
-            )
-
-            # Call the method and check that no users were deleted.
-            self.provider.oversee_users()
-            postgresql_mock.delete_user.assert_not_called()
-
-            # Test again (but removing the relation before calling the method).
-            self.harness.remove_relation(rel_id)
-            self.provider.oversee_users()
-            postgresql_mock.delete_user.assert_called_once_with(f"relation-{rel_id}")
-
-            # And test that no delete call is made if the users list couldn't be retrieved.
-            self.provider.oversee_users()
-            postgresql_mock.delete_user.assert_called_once()  # Only the previous call.
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",

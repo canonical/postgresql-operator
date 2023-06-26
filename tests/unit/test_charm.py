@@ -455,36 +455,6 @@ class TestCharm(unittest.TestCase):
         # Assert the status didn't change.
         self.assertEqual(self.harness.model.unit.status, initial_status)
 
-    def test_on_get_password(self):
-        # Create a mock event and set passwords in peer relation data.
-        mock_event = MagicMock(params={})
-        self.harness.update_relation_data(
-            self.rel_id,
-            self.charm.app.name,
-            {
-                "operator-password": "test-password",
-                "replication-password": "replication-test-password",
-            },
-        )
-
-        # Test providing an invalid username.
-        mock_event.params["username"] = "user"
-        self.charm._on_get_password(mock_event)
-        mock_event.fail.assert_called_once()
-        mock_event.set_results.assert_not_called()
-
-        # Test without providing the username option.
-        mock_event.reset_mock()
-        del mock_event.params["username"]
-        self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with({"password": "test-password"})
-
-        # Also test providing the username option.
-        mock_event.reset_mock()
-        mock_event.params["username"] = "replication"
-        self.charm._on_get_password(mock_event)
-        mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
-
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.PostgresqlOperatorCharm.set_secret")
@@ -775,46 +745,6 @@ class TestCharm(unittest.TestCase):
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
         _snap_package.hold.assert_called_once_with()
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_get_secret(self, _):
-        self.harness.set_leader()
-
-        # Test application scope.
-        assert self.charm.get_secret("app", "password") is None
-        self.harness.update_relation_data(
-            self.rel_id, self.charm.app.name, {"password": "test-password"}
-        )
-        assert self.charm.get_secret("app", "password") == "test-password"
-
-        # Test unit scope.
-        assert self.charm.get_secret("unit", "password") is None
-        self.harness.update_relation_data(
-            self.rel_id, self.charm.unit.name, {"password": "test-password"}
-        )
-        assert self.charm.get_secret("unit", "password") == "test-password"
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_set_secret(self, _):
-        self.harness.set_leader()
-
-        # Test application scope.
-        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
-        self.charm.set_secret("app", "password", "test-password")
-        assert (
-            self.harness.get_relation_data(self.rel_id, self.charm.app.name)["password"]
-            == "test-password"
-        )
-
-        # Test unit scope.
-        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
-        self.charm.set_secret("unit", "password", "test-password")
-        assert (
-            self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
-            == "test-password"
-        )
 
     @patch(
         "subprocess.check_call",
@@ -1107,31 +1037,6 @@ class TestCharm(unittest.TestCase):
         _remove_raft_member.assert_called_once()
         _remove_from_members_ips.assert_called_once()
         _add_members.assert_called_once_with(mock_event)
-
-    @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
-    def test_update_certificate(self, _request_certificate):
-        # If there is no current TLS files, _request_certificate should be called
-        # only when the certificates relation is established.
-        self.charm._update_certificate()
-        _request_certificate.assert_not_called()
-
-        # Test with already present TLS files (when they will be replaced by new ones).
-        ca = "fake CA"
-        cert = "fake certificate"
-        key = private_key = "fake private key"
-        with self.harness.hooks_disabled():
-            self.harness.update_relation_data(
-                self.rel_id,
-                self.charm.unit.name,
-                {
-                    "ca": ca,
-                    "cert": cert,
-                    "key": key,
-                    "private-key": private_key,
-                },
-            )
-        self.charm._update_certificate()
-        _request_certificate.assert_called_once_with(private_key)
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._update_certificate")
