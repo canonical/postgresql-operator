@@ -312,6 +312,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     ops_test: OpsTest,
     bundle_name: str,
     main_application_name: str,
+    main_application_num_units: int = None,
     relation_name: str = "db",
     status: str = "active",
     status_message: str = None,
@@ -324,6 +325,8 @@ async def deploy_and_relate_bundle_with_postgresql(
         bundle_name: The name of the bundle to deploy.
         main_application_name: The name of the application that should be
             related to PostgreSQL.
+        main_application_num_units: Optional number of units for the main
+            application.
         relation_name: The name of the relation to use in PostgreSQL
             (db or db-admin).
         status: Status to wait for in the application after relating
@@ -342,6 +345,11 @@ async def deploy_and_relate_bundle_with_postgresql(
         with zipfile.ZipFile(original.name, "r") as archive:
             bundle_yaml = archive.read("bundle.yaml")
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
+
+            if main_application_num_units is not None:
+                data["applications"][main_application_name][
+                    "num_units"
+                ] = main_application_num_units
 
             # Save the list of relations other than `db` and `db-admin`,
             # so we can add them back later.

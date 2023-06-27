@@ -328,10 +328,10 @@ async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
         ops_test,
         "canonical-livepatch-onprem",
         LIVEPATCH_APP_NAME,
-        "db",
-        "blocked",
-        "✘ sync_token not set",
-        overlay,
+        relation_name="db",
+        status="blocked",
+        status_message="✘ sync_token not set",
+        overlay=overlay,
     )
 
     action = await ops_test.model.units.get(f"{LIVEPATCH_APP_NAME}/0").run_action("schema-upgrade")

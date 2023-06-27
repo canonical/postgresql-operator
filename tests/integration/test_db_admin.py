@@ -43,7 +43,11 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
     relation_id = await deploy_and_relate_bundle_with_postgresql(
-        ops_test, "ch:landscape-scalable", LANDSCAPE_APP_NAME, RELATION_NAME
+        ops_test,
+        "ch:landscape-scalable",
+        LANDSCAPE_APP_NAME,
+        main_application_num_units=2,
+        relation_name=RELATION_NAME,
     )
     await check_databases_creation(
         ops_test,
