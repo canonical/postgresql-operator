@@ -19,7 +19,7 @@ The `postgresql` module provides methods for interacting with the PostgreSQL ins
 Any charm using this library should import the `psycopg2` or `psycopg2-binary` dependency.
 """
 import logging
-from typing import Set
+from typing import List, Set
 
 import psycopg2
 from psycopg2 import sql
@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 9
+LIBPATCH = 10
 
 
 logger = logging.getLogger(__name__)
@@ -44,6 +44,10 @@ class PostgreSQLCreateDatabaseError(Exception):
 
 class PostgreSQLCreateUserError(Exception):
     """Exception raised when creating a user fails."""
+
+
+class PostgreSQLDatabasesSetupError(Exception):
+    """Exception raised when the databases setup fails."""
 
 
 class PostgreSQLDeleteUserError(Exception):
@@ -76,12 +80,14 @@ class PostgreSQL:
         user: str,
         password: str,
         database: str,
+        system_users: List[str] = [],
     ):
         self.primary_host = primary_host
         self.current_host = current_host
         self.user = user
         self.password = password
         self.database = database
+        self.system_users = system_users
 
     def _connect_to_database(
         self, database: str = None, connect_to_current_host: bool = False
@@ -119,10 +125,16 @@ class PostgreSQL:
             if cursor.fetchone() is None:
                 cursor.execute(sql.SQL("CREATE DATABASE {};").format(sql.Identifier(database)))
             cursor.execute(
-                sql.SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
-                    sql.Identifier(database), sql.Identifier(user)
+                sql.SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
+                    sql.Identifier(database)
                 )
             )
+            for user_to_grant_access in [user] + self.system_users:
+                cursor.execute(
+                    sql.SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
+                        sql.Identifier(database), sql.Identifier(user_to_grant_access)
+                    )
+                )
             with self._connect_to_database(database=database) as conn:
                 with conn.cursor() as curs:
                     statements = []
@@ -330,6 +342,26 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to list PostgreSQL database users: {e}")
             raise PostgreSQLListUsersError()
+
+    def set_up_database(self) -> None:
+        """Set up postgres database with the right permissions."""
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                # Allow access to the postgres database only to the system users.
+                cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
+                for user in self.system_users:
+                    cursor.execute(
+                        sql.SQL("GRANT ALL PRIVILEGES ON DATABASE postgres TO {};").format(
+                            sql.Identifier(user)
+                        )
+                    )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to set up databases: {e}")
+            raise PostgreSQLDatabasesSetupError()
+        finally:
+            if connection is not None:
+                connection.close()
 
     def update_user_password(self, username: str, password: str) -> None:
         """Update a user password.
