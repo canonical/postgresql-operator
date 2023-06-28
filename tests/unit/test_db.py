@@ -645,3 +645,15 @@ class TestDbProvides(unittest.TestCase):
                     "standbys" in unit_relation_data
                     and standbys + user == unit_relation_data["standbys"]
                 )
+
+    def test_get_allowed_units(self):
+        # No allowed units from the current database application.
+        peer_relation = self.harness.model.get_relation(PEER, self.peer_rel_id)
+        self.assertEqual(self.legacy_db_relation._get_allowed_units(peer_relation), "")
+
+        # List of space separated allowed units from the other application.
+        self.harness.add_relation_unit(self.rel_id, "application/1")
+        db_relation = self.harness.model.get_relation(RELATION_NAME, self.rel_id)
+        self.assertEqual(
+            self.legacy_db_relation._get_allowed_units(db_relation), "application/0 application/1"
+        )

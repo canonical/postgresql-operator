@@ -360,7 +360,7 @@ class DbProvides(Object):
 
     def _get_allowed_units(self, relation: Relation) -> str:
         """Build the list of allowed units as in the legacy charm."""
-        return ",".join(
+        return " ".join(
             sorted(
                 unit.name
                 for unit in relation.data
