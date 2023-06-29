@@ -83,7 +83,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 1
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -273,13 +273,13 @@ class Snap(object):
           SnapError if there is a problem encountered
         """
         optargs = optargs or []
-        _cmd = ["snap", command, self._name, *optargs]
+        args = ["snap", command, self._name, *optargs]
         try:
-            return subprocess.check_output(_cmd, universal_newlines=True)
+            return subprocess.check_output(args, universal_newlines=True)
         except CalledProcessError as e:
             raise SnapError(
                 "Snap: {!r}; command {!r} failed with output = {!r}".format(
-                    self._name, _cmd, e.output
+                    self._name, args, e.output
                 )
             )
 
@@ -303,12 +303,12 @@ class Snap(object):
         else:
             services = [self._name]
 
-        _cmd = ["snap", *command, *services]
+        args = ["snap", *command, *services]
 
         try:
-            return subprocess.run(_cmd, universal_newlines=True, check=True, capture_output=True)
+            return subprocess.run(args, universal_newlines=True, check=True, capture_output=True)
         except CalledProcessError as e:
-            raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
+            raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
     def get(self, key) -> str:
         """Fetch a snap configuration value.
@@ -387,11 +387,11 @@ class Snap(object):
         elif slot:
             command = command + [slot]
 
-        _cmd = ["snap", *command]
+        args = ["snap", *command]
         try:
-            subprocess.run(_cmd, universal_newlines=True, check=True, capture_output=True)
+            subprocess.run(args, universal_newlines=True, check=True, capture_output=True)
         except CalledProcessError as e:
-            raise SnapError("Could not {} for snap [{}]: {}".format(_cmd, self._name, e.stderr))
+            raise SnapError("Could not {} for snap [{}]: {}".format(args, self._name, e.stderr))
 
     def hold(self, duration: Optional[timedelta] = None) -> None:
         """Add a refresh hold to a snap.
@@ -408,6 +408,25 @@ class Snap(object):
     def unhold(self) -> None:
         """Remove the refresh hold of a snap."""
         self._snap("refresh", ["--unhold"])
+
+    def alias(self, application: str, alias: Optional[str] = None) -> None:
+        """Create an alias for a given application.
+
+        Args:
+            application: application to get an alias.
+            alias: (optional) name of the alias; if not provided, the application name is used.
+        """
+        if alias is None:
+            alias = application
+        args = ["snap", "alias", f"{self.name}.{application}", alias]
+        try:
+            subprocess.check_output(args, universal_newlines=True)
+        except CalledProcessError as e:
+            raise SnapError(
+                "Snap: {!r}; command {!r} failed with output = {!r}".format(
+                    self._name, args, e.output
+                )
+            )
 
     def restart(
         self, services: Optional[List[str]] = None, reload: Optional[bool] = False
@@ -992,17 +1011,17 @@ def install_local(
     Raises:
         SnapError if there is a problem encountered
     """
-    _cmd = [
+    args = [
         "snap",
         "install",
         filename,
     ]
     if classic:
-        _cmd.append("--classic")
+        args.append("--classic")
     if dangerous:
-        _cmd.append("--dangerous")
+        args.append("--dangerous")
     try:
-        result = subprocess.check_output(_cmd, universal_newlines=True).splitlines()[-1]
+        result = subprocess.check_output(args, universal_newlines=True).splitlines()[-1]
         snap_name, _ = result.split(" ", 1)
         snap_name = ansi_filter.sub("", snap_name)
 
@@ -1026,9 +1045,9 @@ def _system_set(config_item: str, value: str) -> None:
         config_item: name of snap system setting. E.g. 'refresh.hold'
         value: value to assign
     """
-    _cmd = ["snap", "set", "system", "{}={}".format(config_item, value)]
+    args = ["snap", "set", "system", "{}={}".format(config_item, value)]
     try:
-        subprocess.check_call(_cmd, universal_newlines=True)
+        subprocess.check_call(args, universal_newlines=True)
     except CalledProcessError:
         raise SnapError("Failed setting system config '{}' to '{}'".format(config_item, value))
 
