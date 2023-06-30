@@ -204,6 +204,25 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
 
     assert application_connection_string != another_application_connection_string
 
+    # Check that the user cannot access other databases.
+    for application, other_application_database in [
+        (APPLICATION_APP_NAME, "another_application_first_database"),
+        (another_application_app_name, "application_first_database"),
+    ]:
+        connection_string = await build_connection_string(
+            ops_test, application, FIRST_DATABASE_RELATION_NAME, database="postgres"
+        )
+        with pytest.raises(psycopg2.Error):
+            psycopg2.connect(connection_string)
+        connection_string = await build_connection_string(
+            ops_test,
+            application,
+            FIRST_DATABASE_RELATION_NAME,
+            database=other_application_database,
+        )
+        with pytest.raises(psycopg2.Error):
+            psycopg2.connect(connection_string)
+
 
 async def test_an_application_can_connect_to_multiple_database_clusters(
     ops_test: OpsTest, database_charm
