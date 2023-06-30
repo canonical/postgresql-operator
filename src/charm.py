@@ -176,6 +176,7 @@ class PostgresqlOperatorCharm(CharmBase):
             user=USER,
             password=self.get_secret("app", f"{USER}-password"),
             database="postgres",
+            system_users=SYSTEM_USERS,
         )
 
     @property
@@ -846,6 +847,8 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
             return
+
+        self.postgresql.set_up_database()
 
         self.postgresql_client_relation.oversee_users()
 
