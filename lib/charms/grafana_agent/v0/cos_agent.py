@@ -185,13 +185,13 @@ if TYPE_CHECKING:
             port: int
 
     except ModuleNotFoundError:
-        _MetricsEndpointDict = dict
+        _MetricsEndpointDict = Dict  # pyright: ignore
 
 LIBID = "dc15fa84cef84ce58155fb84f6c6213a"
 LIBAPI = 0
-LIBPATCH = 3
+LIBPATCH = 5
 
-PYDEPS = ["cosl", "pydantic"]
+PYDEPS = ["cosl", "pydantic<2"]
 
 DEFAULT_RELATION_NAME = "cos-agent"
 DEFAULT_PEER_RELATION_NAME = "peers"
@@ -217,8 +217,12 @@ class GrafanaDashboard(str):
         return GrafanaDashboard(encoded)
 
     def _deserialize(self) -> Dict:
-        raw = lzma.decompress(base64.b64decode(self.encode("utf-8"))).decode()
-        return json.loads(raw)
+        try:
+            raw = lzma.decompress(base64.b64decode(self.encode("utf-8"))).decode()
+            return json.loads(raw)
+        except json.decoder.JSONDecodeError as e:
+            logger.error("Invalid Dashboard format: %s", e)
+            return {}
 
     def __repr__(self):
         """Return string representation of self."""
@@ -247,7 +251,7 @@ class CosAgentProviderUnitData(pydantic.BaseModel):
 
 
 class CosAgentPeersUnitData(pydantic.BaseModel):
-    """Unit databag model for `cluster` cos-agent machine charm peer relation."""
+    """Unit databag model for `peers` cos-agent machine charm peer relation."""
 
     # We need the principal unit name and relation metadata to be able to render identifiers
     # (e.g. topology) on the leader side, after all the data moves into peer data (the grafana
@@ -307,12 +311,11 @@ class COSAgentProvider(Object):
             refresh_events: List of events on which to refresh relation data.
         """
         super().__init__(charm, relation_name)
-        metrics_endpoints = metrics_endpoints or [DEFAULT_METRICS_ENDPOINT]
         dashboard_dirs = dashboard_dirs or ["./src/grafana_dashboards"]
 
         self._charm = charm
         self._relation_name = relation_name
-        self._metrics_endpoints = metrics_endpoints
+        self._metrics_endpoints = metrics_endpoints or [DEFAULT_METRICS_ENDPOINT]
         self._metrics_rules = metrics_rules_dir
         self._logs_rules = logs_rules_dir
         self._recursive = recurse_rules_dirs
@@ -339,14 +342,20 @@ class COSAgentProvider(Object):
             # Add a guard to make sure it doesn't happen.
             if relation.data and self._charm.unit in relation.data:
                 # Subordinate relations can communicate only over unit data.
-                data = CosAgentProviderUnitData(
-                    metrics_alert_rules=self._metrics_alert_rules,
-                    log_alert_rules=self._log_alert_rules,
-                    dashboards=self._dashboards,
-                    metrics_scrape_jobs=self._scrape_jobs,
-                    log_slots=self._log_slots,
-                )
-                relation.data[self._charm.unit][data.KEY] = data.json()
+                try:
+                    data = CosAgentProviderUnitData(
+                        metrics_alert_rules=self._metrics_alert_rules,
+                        log_alert_rules=self._log_alert_rules,
+                        dashboards=self._dashboards,
+                        metrics_scrape_jobs=self._scrape_jobs,
+                        log_slots=self._log_slots,
+                    )
+                    relation.data[self._charm.unit][data.KEY] = data.json()
+                except (
+                    pydantic.ValidationError,
+                    json.decoder.JSONDecodeError,
+                ) as e:
+                    logger.error("Invalid relation data provided: %s", e)
 
     @property
     def _scrape_jobs(self) -> List[Dict]:
@@ -387,16 +396,33 @@ class COSAgentDataChanged(EventBase):
     """Event emitted by `COSAgentRequirer` when relation data changes."""
 
 
+class COSAgentValidationError(EventBase):
+    """Event emitted by `COSAgentRequirer` when there is an error in the relation data."""
+
+    def __init__(self, handle, message: str = ""):
+        super().__init__(handle)
+        self.message = message
+
+    def snapshot(self) -> Dict:
+        """Save COSAgentValidationError source information."""
+        return {"message": self.message}
+
+    def restore(self, snapshot):
+        """Restore COSAgentValidationError source information."""
+        self.message = snapshot["message"]
+
+
 class COSAgentRequirerEvents(ObjectEvents):
     """`COSAgentRequirer` events."""
 
     data_changed = EventSource(COSAgentDataChanged)
+    validation_error = EventSource(COSAgentValidationError)
 
 
 class COSAgentRequirer(Object):
     """Integration endpoint wrapper for the Requirer side of the cos_agent interface."""
 
-    on = COSAgentRequirerEvents()
+    on = COSAgentRequirerEvents()  # pyright: ignore
 
     def __init__(
         self,
@@ -426,7 +452,7 @@ class COSAgentRequirer(Object):
         )  # TODO: do we need this?
         self.framework.observe(events.relation_changed, self._on_relation_data_changed)
         for event in self._refresh_events:
-            self.framework.observe(event, self.trigger_refresh)
+            self.framework.observe(event, self.trigger_refresh)  # pyright: ignore
 
         # Peer relation events
         # A peer relation is needed as it is the only mechanism for exchanging data across
@@ -450,7 +476,7 @@ class COSAgentRequirer(Object):
         # Peer data is used for forwarding data from principal units to the grafana agent
         # subordinate leader, for updating the app data of the outgoing o11y relations.
         if self._charm.unit.is_leader():
-            self.on.data_changed.emit()
+            self.on.data_changed.emit()  # pyright: ignore
 
     def _on_relation_data_changed(self, event: RelationChangedEvent):
         # Peer data is the only means of communication between subordinate units.
@@ -474,7 +500,9 @@ class COSAgentRequirer(Object):
 
         if not (raw := cos_agent_relation.data[principal_unit].get(CosAgentProviderUnitData.KEY)):
             return
-        provider_data = CosAgentProviderUnitData(**json.loads(raw))
+
+        if not (provider_data := self._validated_provider_data(raw)):
+            return
 
         # Copy data from the principal relation to the peer relation, so the leader could
         # follow up.
@@ -492,12 +520,19 @@ class COSAgentRequirer(Object):
         # We can't easily tell if the data that was changed is limited to only the data
         # that goes into peer relation (in which case, if this is not a leader unit, we wouldn't
         # need to emit `on.data_changed`), so we're emitting `on.data_changed` either way.
-        self.on.data_changed.emit()
+        self.on.data_changed.emit()  # pyright: ignore
+
+    def _validated_provider_data(self, raw) -> Optional[CosAgentProviderUnitData]:
+        try:
+            return CosAgentProviderUnitData(**json.loads(raw))
+        except (pydantic.ValidationError, json.decoder.JSONDecodeError) as e:
+            self.on.validation_error.emit(message=str(e))  # pyright: ignore
+            return None
 
     def trigger_refresh(self, _):
         """Trigger a refresh of relation data."""
         # FIXME: Figure out what we should do here
-        self.on.data_changed.emit()
+        self.on.data_changed.emit()  # pyright: ignore
 
     @property
     def _principal_unit(self) -> Optional[Unit]:
@@ -529,17 +564,24 @@ class COSAgentRequirer(Object):
         Relies on the fact that, for subordinate relations, the only remote unit visible to
         *this unit* is the principal unit that this unit is attached to.
         """
-        if relations := self._principal_relations:
-            # Technically it's a list, but for subordinates there can only be one relation
-            principal_relation = next(iter(relations))
-            if units := principal_relation.units:
-                # Technically it's a list, but for subordinates there can only be one
-                unit = next(iter(units))
-                raw = principal_relation.data[unit].get(CosAgentProviderUnitData.KEY)
-                if raw:
-                    return CosAgentProviderUnitData(**json.loads(raw))
+        if not (relations := self._principal_relations):
+            return None
 
-        return None
+        # Technically it's a list, but for subordinates there can only be one relation
+        principal_relation = next(iter(relations))
+
+        if not (units := principal_relation.units):
+            return None
+
+        # Technically it's a list, but for subordinates there can only be one
+        unit = next(iter(units))
+        if not (raw := principal_relation.data[unit].get(CosAgentProviderUnitData.KEY)):
+            return None
+
+        if not (provider_data := self._validated_provider_data(raw)):
+            return None
+
+        return provider_data
 
     def _gather_peer_data(self) -> List[CosAgentPeersUnitData]:
         """Collect data from the peers.
@@ -578,7 +620,7 @@ class COSAgentRequirer(Object):
         alert_rules = {}
 
         seen_apps: List[str] = []
-        for data in self._gather_peer_data():  # type: CosAgentPeersUnitData
+        for data in self._gather_peer_data():
             if rules := data.metrics_alert_rules:
                 app_name = data.app_name
                 if app_name in seen_apps:
@@ -649,7 +691,7 @@ class COSAgentRequirer(Object):
         alert_rules = {}
         seen_apps: List[str] = []
 
-        for data in self._gather_peer_data():  # type: CosAgentPeersUnitData
+        for data in self._gather_peer_data():
             if rules := data.log_alert_rules:
                 # This is only used for naming the file, so be as specific as we can be
                 app_name = data.app_name
@@ -678,10 +720,10 @@ class COSAgentRequirer(Object):
 
         Dashboards are assumed not to vary across units of the same primary.
         """
-        dashboards: List[Dict[str, str]] = []
+        dashboards: List[Dict[str, Any]] = []
 
         seen_apps: List[str] = []
-        for data in self._gather_peer_data():  # type: CosAgentPeersUnitData
+        for data in self._gather_peer_data():
             app_name = data.app_name
             if app_name in seen_apps:
                 continue  # dedup!
