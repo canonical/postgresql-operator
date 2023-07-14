@@ -1137,7 +1137,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.model.get_relation(PEER)
 
-    def push_tls_files_to_workload(self) -> None:
+    def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
@@ -1147,7 +1147,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
-        self.update_config()
+        return self.update_config()
 
     def _reboot_on_detached_storage(self, event: EventBase) -> None:
         """Reboot on detached storage.
@@ -1184,7 +1184,17 @@ class PostgresqlOperatorCharm(CharmBase):
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         self.backup.start_stop_pgbackrest_service()
 
-    def update_config(self) -> None:
+    @property
+    def _is_workload_running(self) -> bool:
+        """Returns whether the workload is running (in an active state)."""
+        snap_cache = snap.SnapCache()
+        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
+        if not charmed_postgresql_snap.present:
+            return False
+
+        return charmed_postgresql_snap.services["patroni"]["active"]
+
+    def update_config(self) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = all(self.tls.get_tls_files())
 
@@ -1196,14 +1206,18 @@ class PostgresqlOperatorCharm(CharmBase):
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
         )
-        if not self._patroni.member_started:
+        if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            logger.debug("Early exit update_config: Workload not started yet")
+            return True
+
+        if not self._patroni.member_started:
             logger.debug("Early exit update_config: Patroni not started yet")
-            return
+            return False
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
         self._patroni.reload_patroni_configuration()
@@ -1214,6 +1228,8 @@ class PostgresqlOperatorCharm(CharmBase):
         if restart_postgresql:
             self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
+
+        return True
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""

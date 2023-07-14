@@ -865,19 +865,22 @@ class TestCharm(unittest.TestCase):
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock)
     @patch("charm.Patroni.render_patroni_yml_file")
     @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files")
     def test_update_config(
         self,
         _get_tls_files,
         _render_patroni_yml_file,
+        _is_workload_running,
         _member_started,
         _reload_patroni_configuration,
         _restart,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.
-            postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False])
+            postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
+            _is_workload_running.side_effect = [True, True, False, True]
             _member_started.side_effect = [True, True, False]
 
             # Test without TLS files available.
@@ -920,7 +923,7 @@ class TestCharm(unittest.TestCase):
                 self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
             )
 
-            # Test with member not started yet.
+            # Test with workload not running yet.
             self.harness.update_relation_data(
                 self.rel_id, self.charm.unit.name, {"tls": ""}
             )  # Mock some data in the relation to test that it change.
@@ -930,6 +933,17 @@ class TestCharm(unittest.TestCase):
             _restart.assert_called_once()
             self.assertEqual(
                 self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
+            )
+
+            # Test with member not started yet.
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"tls": ""}
+            )  # Mock some data in the relation to test that it doesn't change.
+            self.charm.update_config()
+            _reload_patroni_configuration.assert_not_called()
+            _restart.assert_called_once()
+            self.assertNotIn(
+                "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
             )
 
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
