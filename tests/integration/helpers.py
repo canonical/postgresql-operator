@@ -4,6 +4,7 @@
 import asyncio
 import itertools
 import json
+import os
 import subprocess
 import tempfile
 import zipfile
@@ -336,7 +337,7 @@ async def deploy_and_relate_bundle_with_postgresql(
         overlay: Optional overlay to be used when deploying the bundle.
     """
     # Deploy the bundle.
-    with tempfile.NamedTemporaryFile() as original:
+    with tempfile.NamedTemporaryFile(dir=os.getcwd()) as original:
         # Download the original bundle.
         await ops_test.juju("download", bundle_name, "--filepath", original.name)
 
@@ -368,7 +369,7 @@ async def deploy_and_relate_bundle_with_postgresql(
             ]
 
             # Write the new bundle content to a temporary file and deploy it.
-            with tempfile.NamedTemporaryFile() as patched:
+            with tempfile.NamedTemporaryFile(dir=os.getcwd()) as patched:
                 patched.write(yaml.dump(data).encode("utf_8"))
                 patched.seek(0)
                 if overlay is not None:
