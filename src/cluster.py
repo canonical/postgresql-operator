@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import requests
 from charms.operator_libs_linux.v2 import snap
@@ -249,6 +249,19 @@ class Patroni:
                             # Change the last dash to / in order to match unit name pattern.
                             primary = "/".join(primary.rsplit("-", 1))
                         return primary
+
+    def get_sync_standby_names(self) -> List[str]:
+        """Get the list of sync standby unit names."""
+        sync_standbys = []
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_patroni_url(attempt)
+                r = requests.get(f"{url}/cluster", verify=self.verify)
+                for member in r.json()["members"]:
+                    if member["role"] == "sync_standby":
+                        sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
+        return sync_standbys
 
     def _get_alternative_patroni_url(self, attempt: AttemptManager) -> str:
         """Get an alternative REST API URL from another member each time.

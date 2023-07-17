@@ -52,6 +52,7 @@ from cluster_topology_observer import (
 )
 from constants import (
     BACKUP_USER,
+    DEPS,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -71,6 +72,7 @@ from constants import (
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
+from upgrade import PostgreSQLDependencyModel, PostgreSQLUpgrade
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -103,6 +105,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
 
+        model = PostgreSQLDependencyModel(**DEPS)
+        self.upgrade = PostgreSQLUpgrade(self, model)
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
@@ -1070,18 +1074,20 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.get_secret("app", REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: List[str]) -> None:
+    def _install_snap_packages(self, packages: List[str], refresh: bool = False) -> None:
         """Installs package(s) to container.
 
         Args:
             packages: list of packages to install.
+            refresh: whether to refresh the snap if it's
+                already present.
         """
         for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                if not snap_package.present:
+                if not snap_package.present or refresh:
                     if snap_version.get("revision"):
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=snap_version["revision"]
