@@ -59,7 +59,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    _, processes, _ = await ops_test.juju("ssh", unit.name, *pgrep_cmd)
+                    _, processes, _ = await run_command_on_unit(ops_test, unit.name, pgrep_cmd)
 
                     # Splitting processes by "\n" results in one or more empty lines, hence we
                     # need to process these lines accordingly.
@@ -493,8 +493,7 @@ async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
     command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
     files = {}
     for unit in units:
-        complete_command = f"ssh {unit} {command}"
-        return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
+        return_code, stdout, stderr = await run_command_on_unit(ops_test, unit, command)
         files[unit] = stdout.splitlines()
         files[unit] = {
             i for i in files[unit] if ".history" not in i and i != "" and i != "archive_status"
@@ -517,10 +516,10 @@ async def send_signal_to_process(
     else:
         opt = "-x"
 
-    command = f"ssh {unit_name} pkill --signal {signal} {opt} {process}"
+    command = f"pkill --signal {signal} {opt} {process}"
 
     # Send the signal.
-    return_code, _, _ = await ops_test.juju(*command.split())
+    return_code, _, _ = await run_command_on_unit(ops_test, unit_name, command)
     if signal != "SIGCONT" and return_code != 0:
         raise ProcessError(
             "Expected command %s to succeed instead it failed: %s",
@@ -648,7 +647,7 @@ async def unit_hostname(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The machine/container hostname
     """
-    _, raw_hostname, _ = await ops_test.juju("ssh", unit_name, "hostname")
+    _, raw_hostname, _ = await run_command_on_unit(ops_test, unit_name, "hostname")
     return raw_hostname.strip()
 
 
@@ -674,10 +673,8 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
     await unit.scp_to(source=temp_path, destination="patroni.service")
-    mv_cmd = (
-        f"ssh {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
-    )
-    return_code, _, _ = await ops_test.juju(*mv_cmd.split())
+    mv_cmd = f"mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
+    return_code, _, _ = await run_command_on_unit(ops_test, unit.name, mv_cmd)
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
 
@@ -685,12 +682,12 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     os.remove(temp_path)
 
     # Reload the daemon for systemd otherwise changes are not saved.
-    reload_cmd = f"ssh {unit.name} systemctl daemon-reload"
-    return_code, _, _ = await ops_test.juju(*reload_cmd.split())
+    reload_cmd = "systemctl daemon-reload"
+    return_code, _, _ = await run_command_on_unit(ops_test, unit.name, reload_cmd)
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
-    start_cmd = f"ssh {unit.name} systemctl start {SERVICE_NAME}"
-    await ops_test.juju(*start_cmd.split())
+    start_cmd = f"systemctl start {SERVICE_NAME}"
+    await run_command_on_unit(ops_test, unit.name, start_cmd)
 
     await is_postgresql_ready(ops_test, unit.name)
 
