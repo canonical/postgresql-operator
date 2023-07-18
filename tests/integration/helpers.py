@@ -569,7 +569,7 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The name of the machine.
     """
-    hostname_command = f"run --unit {unit_name} -- hostname"
+    hostname_command = f"ssh {unit_name} hostname"
     return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
     if return_code != 0:
         raise Exception("Failed to get the unit machine name: %s", return_code)
@@ -786,7 +786,7 @@ async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
         ops_test: The ops test framework instance
         unit_name: The name of the unit to restart the machine
     """
-    hostname_command = f"run --unit {unit_name} -- hostname"
+    hostname_command = f"ssh {unit_name} hostname"
     return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
     if return_code != 0:
         raise Exception("Failed to get the unit machine name: %s", return_code)

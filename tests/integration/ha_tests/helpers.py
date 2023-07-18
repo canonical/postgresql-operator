@@ -493,7 +493,7 @@ async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
     command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
     files = {}
     for unit in units:
-        complete_command = f"run --unit {unit} -- {command}"
+        complete_command = f"ssh {unit} {command}"
         return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
         files[unit] = stdout.splitlines()
         files[unit] = {
@@ -517,7 +517,7 @@ async def send_signal_to_process(
     else:
         opt = "-x"
 
-    command = f"run --unit {unit_name} -- pkill --signal {signal} {opt} {process}"
+    command = f"ssh {unit_name} pkill --signal {signal} {opt} {process}"
 
     # Send the signal.
     return_code, _, _ = await ops_test.juju(*command.split())
@@ -675,7 +675,7 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
     await unit.scp_to(source=temp_path, destination="patroni.service")
     mv_cmd = (
-        f"run --unit {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
+        f"ssh {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
     )
     return_code, _, _ = await ops_test.juju(*mv_cmd.split())
     if return_code != 0:
@@ -685,11 +685,11 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     os.remove(temp_path)
 
     # Reload the daemon for systemd otherwise changes are not saved.
-    reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
+    reload_cmd = f"ssh {unit.name} systemctl daemon-reload"
     return_code, _, _ = await ops_test.juju(*reload_cmd.split())
     if return_code != 0:
         raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
-    start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
+    start_cmd = f"ssh {unit.name} systemctl start {SERVICE_NAME}"
     await ops_test.juju(*start_cmd.split())
 
     await is_postgresql_ready(ops_test, unit.name)
