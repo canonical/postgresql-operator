@@ -20,7 +20,12 @@ from tenacity import (
     wait_fixed,
 )
 
-from tests.integration.helpers import db_connect, get_unit_address, run_command_on_unit
+from tests.integration.helpers import (
+    db_connect,
+    get_machine_from_unit,
+    get_unit_address,
+    run_command_on_unit,
+)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -59,7 +64,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    _, processes, _ = await run_command_on_unit(ops_test, unit.name, pgrep_cmd)
+                    processes = await run_command_on_unit(ops_test, unit.name, pgrep_cmd)
 
                     # Splitting processes by "\n" results in one or more empty lines, hence we
                     # need to process these lines accordingly.
@@ -380,7 +385,7 @@ async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The (str) ip of the unit
     """
-    return instance_ip(ops_test.model.info.name, await unit_hostname(ops_test, unit_name))
+    return instance_ip(ops_test.model.info.name, await get_machine_from_unit(ops_test, unit_name))
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
@@ -493,7 +498,7 @@ async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
     command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
     files = {}
     for unit in units:
-        return_code, stdout, stderr = await run_command_on_unit(ops_test, unit, command)
+        stdout = await run_command_on_unit(ops_test, unit, command)
         files[unit] = stdout.splitlines()
         files[unit] = {
             i for i in files[unit] if ".history" not in i and i != "" and i != "archive_status"
@@ -519,13 +524,7 @@ async def send_signal_to_process(
     command = f"pkill --signal {signal} {opt} {process}"
 
     # Send the signal.
-    return_code, _, _ = await run_command_on_unit(ops_test, unit_name, command)
-    if signal != "SIGCONT" and return_code != 0:
-        raise ProcessError(
-            "Expected command %s to succeed instead it failed: %s",
-            command,
-            return_code,
-        )
+    await run_command_on_unit(ops_test, unit_name, command)
 
 
 async def is_postgresql_ready(ops_test, unit_name: str) -> bool:
@@ -637,20 +636,6 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     return int(action.results["writes"])
 
 
-async def unit_hostname(ops_test: OpsTest, unit_name: str) -> str:
-    """Get hostname for a unit.
-
-    Args:
-        ops_test: The ops test object passed into every test case
-        unit_name: The name of the unit to be tested
-
-    Returns:
-        The machine/container hostname
-    """
-    _, raw_hostname, _ = await run_command_on_unit(ops_test, unit_name, "hostname")
-    return raw_hostname.strip()
-
-
 async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     """Updates the restart condition in the DB service file.
 
@@ -674,18 +659,14 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
     await unit.scp_to(source=temp_path, destination="patroni.service")
     mv_cmd = f"mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
-    return_code, _, _ = await run_command_on_unit(ops_test, unit.name, mv_cmd)
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
+    await run_command_on_unit(ops_test, unit.name, mv_cmd)
 
     # Remove temporary file from machine.
     os.remove(temp_path)
 
     # Reload the daemon for systemd otherwise changes are not saved.
     reload_cmd = "systemctl daemon-reload"
-    return_code, _, _ = await run_command_on_unit(ops_test, unit.name, reload_cmd)
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
+    await run_command_on_unit(ops_test, unit.name, reload_cmd)
     start_cmd = f"systemctl start {SERVICE_NAME}"
     await run_command_on_unit(ops_test, unit.name, start_cmd)
 

@@ -569,9 +569,7 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The name of the machine.
     """
-    return_code, raw_hostname, _ = await run_command_on_unit(ops_test, unit_name, "hostname")
-    if return_code != 0:
-        raise Exception("Failed to get the unit machine name: %s", return_code)
+    raw_hostname = await run_command_on_unit(ops_test, unit_name, "hostname")
     return raw_hostname.strip()
 
 
@@ -785,10 +783,8 @@ async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
         ops_test: The ops test framework instance
         unit_name: The name of the unit to restart the machine
     """
-    return_code, raw_hostname, _ = await run_command_on_unit(ops_test, unit_name, "hostname")
-    if return_code != 0:
-        raise Exception("Failed to get the unit machine name: %s", return_code)
-    restart_machine_command = f"lxc restart {raw_hostname.strip()}"
+    raw_hostname = await get_machine_from_unit(ops_test, unit_name)
+    restart_machine_command = f"lxc restart {raw_hostname}"
     subprocess.check_call(restart_machine_command.split())
 
 
