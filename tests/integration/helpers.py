@@ -799,7 +799,7 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
     Returns:
         the command output if it succeeds, otherwise raises an exception.
     """
-    complete_command = ["ssh", f"{unit_name}" f"{command}"]
+    complete_command = ["ssh", f"{unit_name}", *command.split()]
     return_code, stdout, _ = await ops_test.juju(complete_command)
     if return_code != 0:
         raise Exception(
