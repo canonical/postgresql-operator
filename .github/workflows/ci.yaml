@@ -127,7 +127,7 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }}-${{ env.libjuju }} -- -m '${{ steps.select-tests.outputs.mark_expression }}' 'not not${{ env.libjuju }}'
+        run: tox run -e ${{ matrix.tox-environments }}-${{ env.libjuju }} -- -m 'not not${{ env.libjuju }}' -m '${{ steps.select-tests.outputs.mark_expression }}'
         env:
           AWS_ACCESS_KEY: "${{ secrets.AWS_ACCESS_KEY }}"
           AWS_SECRET_KEY: "${{ secrets.AWS_SECRET_KEY }}"
