@@ -521,10 +521,16 @@ async def send_signal_to_process(
     else:
         opt = "-x"
 
-    command = f"pkill --signal {signal} {opt} {process}"
+    command = f"exec --unit {unit_name} -- pkill --signal {signal} {opt} {process}"
 
     # Send the signal.
-    await run_command_on_unit(ops_test, unit_name, command)
+    return_code, _, _ = await ops_test.juju(*command.split())
+    if signal != "SIGCONT" and return_code != 0:
+        raise ProcessError(
+            "Expected command %s to succeed instead it failed: %s",
+            command,
+            return_code,
+        )
 
 
 async def is_postgresql_ready(ops_test, unit_name: str) -> bool:

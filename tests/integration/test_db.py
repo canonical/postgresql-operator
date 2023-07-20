@@ -20,6 +20,7 @@ from tests.integration.helpers import (
     deploy_and_relate_application_with_postgresql,
     deploy_and_relate_bundle_with_postgresql,
     find_unit,
+    run_command_on_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -67,7 +68,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
         # Assert Mailman3 Core is configured to use PostgreSQL instead of SQLite.
         mailman_unit = ops_test.model.applications[MAILMAN3_CORE_APP_NAME].units[0]
-        result = await mailman_unit.ssh("mailman info")
+        result = await run_command_on_unit(ops_test, mailman_unit.name, "mailman info")
         assert "db url: postgres://" in result
 
         # Do some CRUD operations using Mailman3 Core client.
