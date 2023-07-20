@@ -64,7 +64,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
-                    processes = await run_command_on_unit(ops_test, unit.name, pgrep_cmd)
+                    _, processes, _ = await ops_test.juju("ssh", unit.name, *pgrep_cmd)
 
                     # Splitting processes by "\n" results in one or more empty lines, hence we
                     # need to process these lines accordingly.
