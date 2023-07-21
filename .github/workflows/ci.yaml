@@ -77,7 +77,6 @@ jobs:
           - charm-integration
           - database-relation-integration
           - db-relation-integration
-          - db-admin-relation-integration
           - ha-replication-integration
           - ha-self-healing-integration
           - ha-restore-cluster-integration
@@ -87,6 +86,9 @@ jobs:
         agent-versions:
           - "2.9.43"  # renovate: latest juju 2
           - "3.1.5"  # renovate: latest juju 3
+        include:
+          - tox-environments: db-admin-relation-integration
+            agent-versions: "2.9.43"  # renovate: latest juju 2
     name: ${{ matrix.tox-environments }} | ${{ matrix.agent-versions }}
     needs:
       - lib-check
