@@ -51,6 +51,7 @@ class TestUpgrade(unittest.TestCase):
         )
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.on_upgrade_changed")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_failed")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_completed")
     @patch("charm.Patroni.cluster_members", new_callable=PropertyMock)
@@ -71,6 +72,7 @@ class TestUpgrade(unittest.TestCase):
         _cluster_members,
         _set_unit_completed,
         _set_unit_failed,
+        _on_upgrade_changed,
     ):
         # Test when the charm fails to start Patroni.
         mock_event = MagicMock()
@@ -81,6 +83,7 @@ class TestUpgrade(unittest.TestCase):
         mock_event.defer.assert_not_called()
         _set_unit_completed.assert_not_called()
         _set_unit_failed.assert_called_once()
+        _on_upgrade_changed.assert_not_called()
 
         # Test when the member hasn't started yet.
         _set_unit_failed.reset_mock()
@@ -92,6 +95,7 @@ class TestUpgrade(unittest.TestCase):
         mock_event.defer.assert_called_once()
         _set_unit_completed.assert_not_called()
         _set_unit_failed.assert_not_called()
+        _on_upgrade_changed.assert_not_called()
 
         # Test when the member has already started but not joined the cluster yet.
         _member_started.reset_mock()
@@ -104,9 +108,11 @@ class TestUpgrade(unittest.TestCase):
         mock_event.defer.assert_called_once()
         _set_unit_completed.assert_not_called()
         _set_unit_failed.assert_not_called()
+        _on_upgrade_changed.assert_not_called()
 
         # Test when the member has already joined the cluster.
         _member_started.reset_mock()
+        _cluster_members.reset_mock()
         _set_unit_failed.reset_mock()
         mock_event.defer.reset_mock()
         _cluster_members.return_value = [
@@ -115,9 +121,26 @@ class TestUpgrade(unittest.TestCase):
         ]
         self.charm.upgrade._on_upgrade_granted(mock_event)
         _member_started.assert_called_once()
+        _cluster_members.assert_called_once()
         mock_event.defer.assert_not_called()
         _set_unit_completed.assert_called_once()
         _set_unit_failed.assert_not_called()
+        _on_upgrade_changed.assert_not_called()
+
+        # Test when the member is the leader.
+        _member_started.reset_mock()
+        _cluster_members.reset_mock()
+        _set_unit_completed.reset_mock()
+        _set_unit_failed.reset_mock()
+        with self.harness.hooks_disabled():
+            self.harness.set_leader(True)
+        self.charm.upgrade._on_upgrade_granted(mock_event)
+        _member_started.assert_called_once()
+        _cluster_members.assert_called_once()
+        mock_event.defer.assert_not_called()
+        _set_unit_completed.assert_called_once()
+        _set_unit_failed.assert_not_called()
+        _on_upgrade_changed.assert_called_once()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.Patroni.is_creating_backup", new_callable=PropertyMock)
