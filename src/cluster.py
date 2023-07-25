@@ -325,6 +325,24 @@ class Patroni:
         return r.json()
 
     @property
+    def is_creating_backup(self) -> bool:
+        """Returns whether a backup is being created."""
+        # Request info from cluster endpoint (which returns the list of tags from each
+        # cluster member; the "is_creating_backup" tag means that the member is creating
+        # a backup).
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
+        except RetryError:
+            return False
+
+        return any(
+            "tags" in member and member["tags"].get("is_creating_backup")
+            for member in r.json()["members"]
+        )
+
+    @property
     def member_started(self) -> bool:
         """Has the member started Patroni and PostgreSQL.
 
@@ -412,6 +430,7 @@ class Patroni:
     def render_patroni_yml_file(
         self,
         connectivity: bool = False,
+        is_creating_backup: bool = False,
         enable_tls: bool = False,
         stanza: str = None,
         restore_stanza: Optional[str] = None,
@@ -421,6 +440,7 @@ class Patroni:
 
         Args:
             connectivity: whether to allow external connections to the database.
+            is_creating_backup: whether this unit is creating a backup.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
@@ -433,6 +453,7 @@ class Patroni:
         rendered = template.render(
             conf_path=PATRONI_CONF_PATH,
             connectivity=connectivity,
+            is_creating_backup=is_creating_backup,
             log_path=PATRONI_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,

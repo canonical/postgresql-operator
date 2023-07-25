@@ -145,6 +145,24 @@ class TestCluster(unittest.TestCase):
         primary = self.patroni.get_primary(unit_name_pattern=True)
         self.assertEqual(primary, "postgresql/0")
 
+    @patch("requests.get")
+    def test_is_creating_backup(self, _get):
+        # Test when one member is creating a backup.
+        response = _get.return_value
+        response.json.return_value = {
+            "members": [
+                {"name": "postgresql-0"},
+                {"name": "postgresql-1", "tags": {"is_creating_backup": True}},
+            ]
+        }
+        self.assertTrue(self.patroni.is_creating_backup)
+
+        # Test when no member is creating a backup.
+        response.json.return_value = {
+            "members": [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
+        }
+        self.assertFalse(self.patroni.is_creating_backup)
+
     @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
     @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))
     @patch("requests.get", side_effect=mocked_requests_get)

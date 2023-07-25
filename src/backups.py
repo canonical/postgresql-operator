@@ -485,6 +485,9 @@ Juju Version: {str(juju_version)}
             self._change_connectivity_to_database(connectivity=False)
 
         self.charm.unit.status = MaintenanceStatus("creating backup")
+        # Set flag due to missing in progress backups on JSON output
+        # (reference: https://github.com/pgbackrest/pgbackrest/issues/2007)
+        self.charm.update_config(is_creating_backup=True)
 
         self._run_backup(event, s3_parameters, datetime_backup_requested)
 
@@ -493,6 +496,7 @@ Juju Version: {str(juju_version)}
             # and update the Patroni configuration.
             self._change_connectivity_to_database(connectivity=True)
 
+        self.charm.update_config(is_creating_backup=False)
         self.charm.unit.status = ActiveStatus()
 
     def _run_backup(
