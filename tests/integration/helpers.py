@@ -4,6 +4,7 @@
 import asyncio
 import itertools
 import json
+import os
 import subprocess
 import tempfile
 import zipfile
@@ -336,7 +337,7 @@ async def deploy_and_relate_bundle_with_postgresql(
         overlay: Optional overlay to be used when deploying the bundle.
     """
     # Deploy the bundle.
-    with tempfile.NamedTemporaryFile() as original:
+    with tempfile.NamedTemporaryFile(dir=os.getcwd()) as original:
         # Download the original bundle.
         await ops_test.juju("download", bundle_name, "--filepath", original.name)
 
@@ -368,7 +369,7 @@ async def deploy_and_relate_bundle_with_postgresql(
             ]
 
             # Write the new bundle content to a temporary file and deploy it.
-            with tempfile.NamedTemporaryFile() as patched:
+            with tempfile.NamedTemporaryFile(dir=os.getcwd()) as patched:
                 patched.write(yaml.dump(data).encode("utf_8"))
                 patched.seek(0)
                 if overlay is not None:
@@ -568,10 +569,7 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The name of the machine.
     """
-    hostname_command = f"run --unit {unit_name} -- hostname"
-    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
-    if return_code != 0:
-        raise Exception("Failed to get the unit machine name: %s", return_code)
+    raw_hostname = await run_command_on_unit(ops_test, unit_name, "hostname")
     return raw_hostname.strip()
 
 
@@ -785,11 +783,8 @@ async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
         ops_test: The ops test framework instance
         unit_name: The name of the unit to restart the machine
     """
-    hostname_command = f"run --unit {unit_name} -- hostname"
-    return_code, raw_hostname, _ = await ops_test.juju(*hostname_command.split())
-    if return_code != 0:
-        raise Exception("Failed to get the unit machine name: %s", return_code)
-    restart_machine_command = f"lxc restart {raw_hostname.strip()}"
+    raw_hostname = await get_machine_from_unit(ops_test, unit_name)
+    restart_machine_command = f"lxc restart {raw_hostname}"
     subprocess.check_call(restart_machine_command.split())
 
 
@@ -804,8 +799,8 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
     Returns:
         the command output if it succeeds, otherwise raises an exception.
     """
-    complete_command = f"run --unit {unit_name} -- {command}"
-    return_code, stdout, _ = await ops_test.juju(*complete_command.split())
+    complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
     if return_code != 0:
         raise Exception(
             "Expected command %s to succeed instead it failed: %s", command, return_code
