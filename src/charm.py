@@ -324,7 +324,7 @@ class PostgresqlOperatorCharm(CharmBase):
             primary_host=self.primary_endpoint,
             current_host=self._unit_ip,
             user=USER,
-            password=self.get_secret("app", f"{USER}-password"),
+            password=self.get_secret(APP_SCOPE, f"{USER}-password"),
             database="postgres",
             system_users=SYSTEM_USERS,
         )
@@ -668,7 +668,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
-            self.get_secret("app", REWIND_PASSWORD_KEY),
+            self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
 
@@ -812,14 +812,14 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
         # The leader sets the needed passwords if they weren't set before.
-        if self.get_secret("app", USER_PASSWORD_KEY) is None:
-            self.set_secret("app", USER_PASSWORD_KEY, new_password())
-        if self.get_secret("app", REPLICATION_PASSWORD_KEY) is None:
-            self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
-        if self.get_secret("app", REWIND_PASSWORD_KEY) is None:
-            self.set_secret("app", REWIND_PASSWORD_KEY, new_password())
-        if self.get_secret("app", MONITORING_PASSWORD_KEY) is None:
-            self.set_secret("app", MONITORING_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, USER_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, USER_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, REWIND_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, MONITORING_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -957,7 +957,7 @@ class PostgresqlOperatorCharm(CharmBase):
         postgres_snap.set(
             {
                 "exporter.user": MONITORING_USER,
-                "exporter.password": self.get_secret("app", MONITORING_PASSWORD_KEY),
+                "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
             }
         )
         postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
@@ -991,7 +991,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 # Create the monitoring user.
                 self.postgresql.create_user(
                     MONITORING_USER,
-                    self.get_secret("app", MONITORING_PASSWORD_KEY),
+                    self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                     extra_user_roles="pg_monitor",
                 )
         except PostgreSQLCreateUserError as e:
@@ -1044,7 +1044,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
-        event.set_results({"password": self.get_secret("app", f"{username}-password")})
+        event.set_results({"password": self.get_secret(APP_SCOPE, f"{username}-password")})
 
     def _on_set_password(self, event: ActionEvent) -> None:
         """Set the password for the specified user."""
@@ -1063,7 +1063,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         password = event.params.get("password", new_password())
 
-        if password == self.get_secret("app", f"{username}-password"):
+        if password == self.get_secret(APP_SCOPE, f"{username}-password"):
             event.log("The old and new passwords are equal.")
             event.set_results({"password": password})
             return
@@ -1088,7 +1088,7 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Update the password in the secret store.
-        self.set_secret("app", f"{username}-password", password)
+        self.set_secret(APP_SCOPE, f"{username}-password", password)
 
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
@@ -1209,7 +1209,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        return self.get_secret("app", USER_PASSWORD_KEY)
+        return self.get_secret(APP_SCOPE, USER_PASSWORD_KEY)
 
     @property
     def _replication_password(self) -> str:
@@ -1219,7 +1219,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        return self.get_secret("app", REPLICATION_PASSWORD_KEY)
+        return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
 
     def _install_snap_packages(self, packages: List[str]) -> None:
         """Installs package(s) to container.
