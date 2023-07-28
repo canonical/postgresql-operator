@@ -18,12 +18,13 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
+from ops import JujuVersion
 from ops.charm import (
     ActionEvent,
     CharmBase,
+    HookEvent,
     InstallEvent,
     LeaderElectedEvent,
-    RelationChangedEvent,
     RelationDepartedEvent,
     StartEvent,
 )
@@ -34,6 +35,7 @@ from ops.model import (
     BlockedStatus,
     MaintenanceStatus,
     Relation,
+    SecretNotFoundError,
     Unit,
     WaitingStatus,
 )
@@ -51,6 +53,7 @@ from cluster_topology_observer import (
     ClusterTopologyObserver,
 )
 from constants import (
+    APP_SCOPE,
     BACKUP_USER,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
@@ -61,11 +64,17 @@ from constants import (
     POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
+    SECRET_CACHE_LABEL,
+    SECRET_DELETED_LABEL,
+    SECRET_INTERNAL_LABEL,
+    SECRET_KEY_OVERRIDES,
+    SECRET_LABEL,
     SNAP_PACKAGES,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
+    UNIT_SCOPE,
     USER,
     USER_PASSWORD_KEY,
 )
@@ -86,6 +95,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
+        self.secrets = {APP_SCOPE: {}, UNIT_SCOPE: {}}
+
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -93,6 +104,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
+        self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
+        self.framework.observe(self.on.secret_remove, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
@@ -138,29 +151,166 @@ class PostgresqlOperatorCharm(CharmBase):
 
         return relation.data[self.unit]
 
+    def _scope_obj(self, scope: str):
+        if scope == APP_SCOPE:
+            return self.framework.model.app
+        if scope == UNIT_SCOPE:
+            return self.framework.model.unit
+
+    def _juju_secrets_get(self, scope: str) -> Optional[bool]:
+        """Helper function to get Juju secret."""
+        if scope == UNIT_SCOPE:
+            peer_data = self.unit_peer_data
+        elif scope == APP_SCOPE:
+            peer_data = self.app_peer_data
+
+        if not peer_data.get(SECRET_INTERNAL_LABEL):
+            return
+
+        if SECRET_CACHE_LABEL not in self.secrets[scope]:
+            try:
+                # NOTE: Secret contents are not yet available!
+                secret = self.model.get_secret(id=peer_data[SECRET_INTERNAL_LABEL])
+            except SecretNotFoundError as e:
+                logging.debug(f"No secret found for ID {peer_data[SECRET_INTERNAL_LABEL]}, {e}")
+                return
+
+            logging.debug(f"Secret {peer_data[SECRET_INTERNAL_LABEL]} downloaded")
+
+            # We keep the secret object around -- needed when applying modifications
+            self.secrets[scope][SECRET_LABEL] = secret
+
+            # We retrieve and cache actual secret data for the lifetime of the event scope
+            self.secrets[scope][SECRET_CACHE_LABEL] = secret.get_content()
+
+        if self.secrets[scope].get(SECRET_CACHE_LABEL):
+            return True
+        return False
+
+    def _juju_secret_get_key(self, scope: str, key: str) -> Optional[str]:
+        if not key:
+            return
+
+        key = SECRET_KEY_OVERRIDES.get(key, key)
+
+        if self._juju_secrets_get(scope):
+            secret_cache = self.secrets[scope].get(SECRET_CACHE_LABEL)
+            if secret_cache:
+                secret_data = secret_cache.get(key)
+                if secret_data and secret_data != SECRET_DELETED_LABEL:
+                    logging.debug(f"Getting secret {scope}:{key}")
+                    return secret_data
+        logging.debug(f"No value found for secret {scope}:{key}")
+
     def get_secret(self, scope: str, key: str) -> Optional[str]:
         """Get secret from the secret storage."""
-        if scope == "unit":
-            return self.unit_peer_data.get(key, None)
-        elif scope == "app":
-            return self.app_peer_data.get(key, None)
-        else:
+        if scope not in [APP_SCOPE, UNIT_SCOPE]:
             raise RuntimeError("Unknown secret scope.")
 
-    def set_secret(self, scope: str, key: str, value: Optional[str]) -> None:
-        """Get secret from the secret storage."""
-        if scope == "unit":
-            if not value:
-                del self.unit_peer_data[key]
-                return
-            self.unit_peer_data.update({key: value})
-        elif scope == "app":
-            if not value:
-                del self.app_peer_data[key]
-                return
-            self.app_peer_data.update({key: value})
+        juju_version = JujuVersion.from_environ()
+
+        if juju_version.has_secrets:
+            return self._juju_secret_get_key(scope, key)
+        if scope == UNIT_SCOPE:
+            return self.unit_peer_data.get(key, None)
+        elif scope == APP_SCOPE:
+            return self.app_peer_data.get(key, None)
+
+    def _juju_secret_set(self, scope: str, key: str, value: str) -> str:
+        """Helper function setting Juju secret."""
+        if scope == UNIT_SCOPE:
+            peer_data = self.unit_peer_data
+        elif scope == APP_SCOPE:
+            peer_data = self.app_peer_data
+        self._juju_secrets_get(scope)
+
+        key = SECRET_KEY_OVERRIDES.get(key, key)
+
+        secret = self.secrets[scope].get(SECRET_LABEL)
+
+        # It's not the first secret for the scope, we can re-use the existing one
+        # that was fetched in the previous call
+        if secret:
+            secret_cache = self.secrets[scope][SECRET_CACHE_LABEL]
+
+            if secret_cache.get(key) == value:
+                logging.debug(f"Key {scope}:{key} has this value defined already")
+            else:
+                secret_cache[key] = value
+                try:
+                    secret.set_content(secret_cache)
+                except OSError as error:
+                    logging.error(
+                        f"Error in attempt to set {scope}:{key}. "
+                        f"Existing keys were: {list(secret_cache.keys())}. {error}"
+                    )
+                logging.debug(f"Secret {scope}:{key} was {key} set")
+
+        # We need to create a brand-new secret for this scope
         else:
+            scope_obj = self._scope_obj(scope)
+
+            secret = scope_obj.add_secret({key: value})
+            if not secret:
+                raise RuntimeError(f"Couldn't set secret {scope}:{key}")
+
+            self.secrets[scope][SECRET_LABEL] = secret
+            self.secrets[scope][SECRET_CACHE_LABEL] = {key: value}
+            logging.debug(f"Secret {scope}:{key} published (as first). ID: {secret.id}")
+            peer_data.update({SECRET_INTERNAL_LABEL: secret.id})
+
+        return self.secrets[scope][SECRET_LABEL].id
+
+    def set_secret(self, scope: str, key: str, value: Optional[str]) -> Optional[str]:
+        """Set secret from the secret storage."""
+        if scope not in [APP_SCOPE, UNIT_SCOPE]:
             raise RuntimeError("Unknown secret scope.")
+
+        if not value:
+            return self.remove_secret(scope, key)
+
+        juju_version = JujuVersion.from_environ()
+
+        if juju_version.has_secrets:
+            self._juju_secret_set(scope, key, value)
+            return
+        if scope == UNIT_SCOPE:
+            self.unit_peer_data.update({key: value})
+        elif scope == APP_SCOPE:
+            self.app_peer_data.update({key: value})
+
+    def _juju_secret_remove(self, scope: str, key: str) -> None:
+        """Remove a Juju 3.x secret."""
+        self._juju_secrets_get(scope)
+
+        key = SECRET_KEY_OVERRIDES.get(key, key)
+
+        secret = self.secrets[scope].get(SECRET_LABEL)
+        if not secret:
+            logging.error(f"Secret {scope}:{key} wasn't deleted: no secrets are available")
+            return
+
+        secret_cache = self.secrets[scope].get(SECRET_CACHE_LABEL)
+        if not secret_cache or key not in secret_cache:
+            logging.error(f"No secret {scope}:{key}")
+            return
+
+        secret_cache[key] = SECRET_DELETED_LABEL
+        secret.set_content(secret_cache)
+        logging.debug(f"Secret {scope}:{key}")
+
+    def remove_secret(self, scope: str, key: str) -> None:
+        """Removing a secret."""
+        if scope not in [APP_SCOPE, UNIT_SCOPE]:
+            raise RuntimeError("Unknown secret scope.")
+
+        juju_version = JujuVersion.from_environ()
+        if juju_version.has_secrets:
+            return self._juju_secret_remove(scope, key)
+        if scope == UNIT_SCOPE:
+            del self.unit_peer_data[key]
+        elif scope == APP_SCOPE:
+            del self.app_peer_data[key]
 
     @property
     def is_cluster_initialised(self) -> bool:
@@ -318,7 +468,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _on_peer_relation_changed(self, event: RelationChangedEvent):
+    def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
@@ -381,14 +531,15 @@ class PostgresqlOperatorCharm(CharmBase):
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
-    def _reconfigure_cluster(self, event: RelationChangedEvent):
+    def _reconfigure_cluster(self, event: HookEvent):
         """Reconfigure the cluster by adding and removing members IPs to it.
 
         Returns:
             Whether it was possible to reconfigure the cluster.
         """
         if (
-            event.unit is not None
+            hasattr(event, "unit")
+            and event.unit is not None
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
