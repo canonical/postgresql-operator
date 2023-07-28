@@ -380,7 +380,11 @@ async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The (str) ip of the unit
     """
-    return instance_ip(ops_test.model.info.name, await unit_hostname(ops_test, unit_name))
+    application = unit_name.split("/")[0]
+    for unit in ops_test.model.applications[application].units:
+        if unit.name == unit_name:
+            break
+    return await instance_ip(ops_test, unit.machine.hostname)
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
@@ -446,19 +450,19 @@ async def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
         return False
 
 
-def instance_ip(model: str, instance: str) -> str:
+async def instance_ip(ops_test: OpsTest, instance: str) -> str:
     """Translate juju instance name to IP.
 
     Args:
-        model: The name of the model
+        ops_test: pytest ops test helper
         instance: The name of the instance
 
     Returns:
         The (str) IP address of the instance
     """
-    output = subprocess.check_output(f"juju machines --model {model}".split())
+    _, output, _ = await ops_test.juju("machines")
 
-    for line in output.decode("utf8").splitlines():
+    for line in output.splitlines():
         if instance in line:
             return line.split()[2]
 
@@ -493,8 +497,7 @@ async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
     command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
     files = {}
     for unit in units:
-        complete_command = f"run --unit {unit} -- {command}"
-        return_code, stdout, stderr = await ops_test.juju(*complete_command.split())
+        stdout = await run_command_on_unit(ops_test, unit, command)
         files[unit] = stdout.splitlines()
         files[unit] = {
             i for i in files[unit] if ".history" not in i and i != "" and i != "archive_status"
@@ -517,7 +520,7 @@ async def send_signal_to_process(
     else:
         opt = "-x"
 
-    command = f"run --unit {unit_name} -- pkill --signal {signal} {opt} {process}"
+    command = f"exec --unit {unit_name} -- pkill --signal {signal} {opt} {process}"
 
     # Send the signal.
     return_code, _, _ = await ops_test.juju(*command.split())
@@ -638,20 +641,6 @@ async def stop_continuous_writes(ops_test: OpsTest) -> int:
     return int(action.results["writes"])
 
 
-async def unit_hostname(ops_test: OpsTest, unit_name: str) -> str:
-    """Get hostname for a unit.
-
-    Args:
-        ops_test: The ops test object passed into every test case
-        unit_name: The name of the unit to be tested
-
-    Returns:
-        The machine/container hostname
-    """
-    _, raw_hostname, _ = await ops_test.juju("ssh", unit_name, "hostname")
-    return raw_hostname.strip()
-
-
 async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     """Updates the restart condition in the DB service file.
 
@@ -674,37 +663,31 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     # PATRONI_SERVICE_DEFAULT_PATH since this directory has strict permissions, instead we scp it
     # elsewhere and then move it to PATRONI_SERVICE_DEFAULT_PATH.
     await unit.scp_to(source=temp_path, destination="patroni.service")
-    mv_cmd = (
-        f"run --unit {unit.name} mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
-    )
-    return_code, _, _ = await ops_test.juju(*mv_cmd.split())
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", mv_cmd, unit.name)
+    mv_cmd = f"mv /home/ubuntu/patroni.service {PATRONI_SERVICE_DEFAULT_PATH}"
+    await run_command_on_unit(ops_test, unit.name, mv_cmd)
 
     # Remove temporary file from machine.
     os.remove(temp_path)
 
     # Reload the daemon for systemd otherwise changes are not saved.
-    reload_cmd = f"run --unit {unit.name} systemctl daemon-reload"
-    return_code, _, _ = await ops_test.juju(*reload_cmd.split())
-    if return_code != 0:
-        raise ProcessError("Command: %s failed on unit: %s.", reload_cmd, unit.name)
-    start_cmd = f"run --unit {unit.name} systemctl start {SERVICE_NAME}"
-    await ops_test.juju(*start_cmd.split())
+    reload_cmd = "systemctl daemon-reload"
+    await run_command_on_unit(ops_test, unit.name, reload_cmd)
+    start_cmd = f"systemctl start {SERVICE_NAME}"
+    await run_command_on_unit(ops_test, unit.name, start_cmd)
 
     await is_postgresql_ready(ops_test, unit.name)
 
 
 @retry(stop=stop_after_attempt(20), wait=wait_fixed(30))
-def wait_network_restore(model_name: str, hostname: str, old_ip: str) -> None:
+async def wait_network_restore(ops_test: OpsTest, hostname: str, old_ip: str) -> None:
     """Wait until network is restored.
 
     Args:
-        model_name: The name of the model
+        ops_test: pytest plugin helper
         hostname: The name of the instance
         old_ip: old registered IP address
     """
-    if instance_ip(model_name, hostname) == old_ip:
+    if await instance_ip(ops_test, hostname) == old_ip:
         raise Exception
 
 
