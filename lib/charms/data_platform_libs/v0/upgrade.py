@@ -17,7 +17,7 @@ r"""Handler for `upgrade` relation events for in-place upgrades on VMs."""
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import Iterable, List, Literal, Optional, Tuple
+from typing import List, Literal, Optional, Set, Tuple
 
 from ops.charm import (
     ActionEvent,
@@ -27,7 +27,7 @@ from ops.charm import (
     UpgradeCharmEvent,
 )
 from ops.framework import EventBase, EventSource, Object
-from ops.model import Relation, Unit
+from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus, Relation, Unit, WaitingStatus
 from pydantic import BaseModel, root_validator, validator
 
 # The unique Charmhub library identifier, never change it
@@ -38,7 +38,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 8
 
 PYDEPS = ["pydantic>=1.10,<2"]
 
@@ -435,7 +435,7 @@ class UpgradeEvents(CharmEvents):
 class DataUpgrade(Object, ABC):
     """Manages `upgrade` relation operators for in-place upgrades."""
 
-    STATES = ["failed", "idle", "ready", "upgrading", "completed"]
+    STATES = ["recovery", "failed", "idle", "ready", "upgrading", "completed"]
 
     on = UpgradeEvents()  # pyright: ignore [reportGeneralTypeIssues]
 
@@ -479,10 +479,10 @@ class DataUpgrade(Object, ABC):
         return self.charm.model.get_relation(self.relation_name)
 
     @property
-    def app_units(self) -> Iterable[Unit]:
+    def app_units(self) -> Set[Unit]:
         """The peer-related units in the application."""
         if not self.peer_relation:
-            return []
+            return set()
 
         return set([self.charm.unit] + list(self.peer_relation.units))
 
@@ -543,6 +543,18 @@ class DataUpgrade(Object, ABC):
         self._upgrade_stack = stack
 
     @property
+    def unit_states(self) -> list:
+        """Current upgrade state for all units.
+
+        Returns:
+            Unsorted list of upgrade states for all units.
+        """
+        if not self.peer_relation:
+            return []
+
+        return [self.peer_relation.data[unit].get("state", "") for unit in self.app_units]
+
+    @property
     def cluster_state(self) -> Optional[str]:
         """Current upgrade state for cluster units.
 
@@ -554,13 +566,11 @@ class DataUpgrade(Object, ABC):
         Returns:
             String of upgrade state from the furthest behind unit.
         """
-        if not self.peer_relation:
+        if not self.unit_states:
             return None
 
-        states = [self.peer_relation.data[unit].get("state", "") for unit in self.app_units]
-
         try:
-            return sorted(states, key=self.STATES.index)[0]
+            return sorted(self.unit_states, key=self.STATES.index)[0]
         except (ValueError, KeyError):
             return None
 
@@ -598,8 +608,36 @@ class DataUpgrade(Object, ABC):
         """
         pass
 
-    def set_unit_failed(self) -> None:
-        """Sets unit `state=failed` to the upgrade peer data."""
+    def _repair_upgrade_stack(self) -> None:
+        """Ensures completed units are re-added to the upgrade-stack after failure."""
+        # need to update the stack as it was not refreshed by rollback run of pre-upgrade-check
+        # avoids difficult health check implementation by charm-authors needing to exclude dead units
+
+        # if the first unit in the stack fails, the stack will be the same length as units
+        # i.e this block not ran
+        if (
+            self.cluster_state in ["failed", "recovery"]
+            and self.upgrade_stack
+            and len(self.upgrade_stack) != len(self.app_units)
+            and self.charm.unit.is_leader()
+        ):
+            new_stack = self.upgrade_stack
+            for unit in self.app_units:
+                unit_id = int(unit.name.split("/")[1])
+
+                # if a unit fails, it rolls back first
+                if unit_id not in new_stack:
+                    new_stack.insert(-1, unit_id)
+                    logger.debug(f"Inserted {unit_id} in to upgrade-stack - {new_stack}")
+
+            self.upgrade_stack = new_stack
+
+    def set_unit_failed(self, cause: Optional[str] = None) -> None:
+        """Sets unit `state=failed` to the upgrade peer data.
+
+        Args:
+            cause: short description of cause of failure
+        """
         if not self.peer_relation:
             return None
 
@@ -608,7 +646,9 @@ class DataUpgrade(Object, ABC):
         if self.charm.unit.is_leader():
             self._upgrade_stack = None
 
+        self.charm.unit.status = BlockedStatus(cause if cause else "")
         self.peer_relation.data[self.charm.unit].update({"state": "failed"})
+        self.log_rollback_instructions()
 
     def set_unit_completed(self) -> None:
         """Sets unit `state=completed` to the upgrade peer data."""
@@ -620,6 +660,7 @@ class DataUpgrade(Object, ABC):
         if self.charm.unit.is_leader():
             self._upgrade_stack = None
 
+        self.charm.unit.status = MaintenanceStatus("upgrade completed")
         self.peer_relation.data[self.charm.unit].update({"state": "completed"})
 
         # Emit upgrade_finished event to run unit's post upgrade operations.
@@ -652,6 +693,13 @@ class DataUpgrade(Object, ABC):
 
         if not self.charm.unit.is_leader():
             event.fail(message="Action must be ran on the Juju leader.")
+            return
+
+        if self.cluster_state == "failed":
+            logger.info("Entering recovery state for rolling-back to previous version...")
+            self._repair_upgrade_stack()
+            self.charm.unit.status = BlockedStatus("ready to rollback application")
+            self.peer_relation.data[self.charm.unit].update({"state": "recovery"})
             return
 
         # checking if upgrade in progress
@@ -758,47 +806,58 @@ class DataUpgrade(Object, ABC):
             event.defer()
             return
 
-        # if any other unit failed or if no stack (i.e pre-upgrade check), mark failed
-        if not self.upgrade_stack or self.cluster_state == "failed":
-            logger.error(
-                "Cluster upgrade failed. Setting failed upgrade state... {}".format(
-                    "Ensure pre-upgrade checks are ran first" if not self.upgrade_stack else ""
-                )
-            )
-            self.set_unit_failed()
-            self.log_rollback_instructions()
+        if not self.upgrade_stack:
+            logger.error("Cluster upgrade failed, ensure pre-upgrade checks are ran first.")
             return
 
-        # run version checks on leader only
-        if self.charm.unit.is_leader():
-            try:
-                self._upgrade_supported_check()
-            except VersionError as e:  # not ready if not passed check
-                logger.error(e)
-                self.set_unit_failed()
-                return
+        if self.substrate == "vm":
+            # for VM run version checks on leader only
+            if self.charm.unit.is_leader():
+                try:
+                    self._upgrade_supported_check()
+                except VersionError as e:  # not ready if not passed check
+                    logger.error(e)
+                    self.set_unit_failed()
+                    return
+            self.charm.unit.status = WaitingStatus("other units upgrading first...")
+            self.peer_relation.data[self.charm.unit].update({"state": "ready"})
 
-        # all units sets state to ready
-        self.peer_relation.data[self.charm.unit].update(
-            {"state": "ready" if self.substrate == "vm" else "upgrading"}
-        )
+        else:
+            # for k8s run version checks only on highest ordinal unit
+            if (
+                self.charm.unit.name
+                == f"{self.charm.app.name}/{self.charm.app.planned_units() -1}"
+            ):
+                try:
+                    self._upgrade_supported_check()
+                except VersionError as e:  # not ready if not passed check
+                    logger.error(e)
+                    self.set_unit_failed()
+                    return
+            # On K8s an unit that receives the upgrade-charm event is upgrading
+            self.charm.unit.status = MaintenanceStatus("upgrading unit")
+            self.peer_relation.data[self.charm.unit].update({"state": "upgrading"})
 
     def on_upgrade_changed(self, event: EventBase) -> None:
         """Handler for `upgrade-relation-changed` events."""
         if not self.peer_relation:
             return
 
-        # if any other unit failed, mark as failed
+        # if any other unit failed, don't continue with upgrade
         if self.cluster_state == "failed":
-            logger.error("Cluster upgrade failed. Setting failed upgrade state...")
-            self.set_unit_failed()
-            self.log_rollback_instructions()
+            logger.debug("Cluster failed to upgrade, exiting...")
+            return
+
+        if self.cluster_state == "recovery":
+            logger.debug("Cluster in recovery, deferring...")
+            event.defer()
             return
 
         # if all units completed, mark as complete
         if not self.upgrade_stack:
             if self.state == "completed" and self.cluster_state in ["idle", "completed"]:
                 logger.info("All units completed upgrade, setting idle upgrade state...")
+                self.charm.unit.status = ActiveStatus()
                 self.peer_relation.data[self.charm.unit].update({"state": "idle"})
                 return
             if self.cluster_state == "idle":
@@ -808,6 +867,10 @@ class DataUpgrade(Object, ABC):
                 logger.debug("Did not find upgrade-stack or completed cluster state, deferring...")
                 event.defer()
                 return
+        else:
+            # upgrade ongoing, set status for waiting units
+            if "upgrading" in self.unit_states and self.state in ["idle", "ready"]:
+                self.charm.unit.status = WaitingStatus("other units upgrading first...")
 
         # pop mutates the `upgrade_stack` attr
         top_unit_id = self.upgrade_stack.pop()
@@ -827,11 +890,16 @@ class DataUpgrade(Object, ABC):
             # in case leader is next or the last unit to complete
             self.on_upgrade_changed(event)
 
-        # if unit top of stack, emit granted event
-        if self.charm.unit == top_unit and top_state in ["ready", "upgrading"]:
+        # if unit top of stack and all units ready (i.e stack), emit granted event
+        if (
+            self.charm.unit == top_unit
+            and top_state in ["ready", "upgrading"]
+            and self.cluster_state == "ready"
+        ):
             logger.debug(
                 f"{top_unit.name} is next to upgrade, emitting `upgrade_granted` event and upgrading..."
             )
+            self.charm.unit.status = MaintenanceStatus("upgrading...")
             self.peer_relation.data[self.charm.unit].update({"state": "upgrading"})
             getattr(self.on, "upgrade_granted").emit()
 
