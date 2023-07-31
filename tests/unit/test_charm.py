@@ -21,6 +21,7 @@ from constants import (
     PEER,
     POSTGRESQL_SNAP_NAME,
     SECRET_CACHE_LABEL,
+    SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_LABEL,
     SNAP_PACKAGES,
@@ -844,6 +845,8 @@ class TestCharm(unittest.TestCase):
             self.harness.get_relation_data(self.rel_id, self.charm.app.name)["password"]
             == "test-password"
         )
+        self.charm.set_secret("app", "password", None)
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
 
         # Test unit scope.
         assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
@@ -852,6 +855,8 @@ class TestCharm(unittest.TestCase):
             self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
             == "test-password"
         )
+        self.charm.set_secret("unit", "password", None)
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
@@ -873,6 +878,13 @@ class TestCharm(unittest.TestCase):
         )
         secret_mock.reset_mock()
 
+        self.charm.set_secret("app", "password", None)
+        assert self.charm.secrets["app"][SECRET_CACHE_LABEL]["password"] == SECRET_DELETED_LABEL
+        secret_mock.set_content.assert_called_once_with(
+            self.charm.secrets["app"][SECRET_CACHE_LABEL]
+        )
+        secret_mock.reset_mock()
+
         # Test unit scope.
         assert "password" not in self.charm.secrets["unit"].get(SECRET_CACHE_LABEL, {})
         self.charm.set_secret("unit", "password", "test-password")
@@ -880,6 +892,14 @@ class TestCharm(unittest.TestCase):
         secret_mock.set_content.assert_called_once_with(
             self.charm.secrets["unit"][SECRET_CACHE_LABEL]
         )
+        secret_mock.reset_mock()
+
+        self.charm.set_secret("unit", "password", None)
+        assert self.charm.secrets["unit"][SECRET_CACHE_LABEL]["password"] == SECRET_DELETED_LABEL
+        secret_mock.set_content.assert_called_once_with(
+            self.charm.secrets["unit"][SECRET_CACHE_LABEL]
+        )
+        secret_mock.reset_mock()
 
     @patch(
         "subprocess.check_call",
