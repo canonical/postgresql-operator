@@ -806,7 +806,7 @@ class TestCharm(unittest.TestCase):
     @patch("ops.charm.model.Model.get_secret")
     @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_get_secret_juju(self, _, __, _get_secret):
+    def test_get_secret_juju_error(self, _, __, _get_secret):
         self.harness.set_leader()
 
         # clean the caches
@@ -814,11 +814,26 @@ class TestCharm(unittest.TestCase):
             del self.charm.app_peer_data[SECRET_INTERNAL_LABEL]
         self.charm.secrets["app"] = {}
 
+        # general tests
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.app.name, {SECRET_INTERNAL_LABEL: "secret_key"}
+        )
         _get_secret.side_effect = SecretNotFoundError
         assert self.charm.get_secret("app", "password") is None
+        self.harness.update_relation_data(self.rel_id, self.charm.app.name, {})
 
-        _get_secret.side_effect = None
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("ops.charm.model.Model.get_secret")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    def test_get_secret_juju(self, _, __, _get_secret):
+        self.harness.set_leader()
         _get_secret.return_value.get_content.return_value = {"password": "test-password"}
+
+        # clean the caches
+        if SECRET_INTERNAL_LABEL in self.charm.app_peer_data:
+            del self.charm.app_peer_data[SECRET_INTERNAL_LABEL]
+        self.charm.secrets["app"] = {}
 
         assert self.charm.get_secret("app", None) is None
         assert not _get_secret.called
