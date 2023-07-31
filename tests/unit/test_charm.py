@@ -833,6 +833,9 @@ class TestCharm(unittest.TestCase):
         assert self.charm.get_secret("unit", "password") == "test-password"
         _get_secret.assert_called_once_with(id="secret_key")
 
+        with self.assertRaises(RuntimeError):
+            self.charm.get_secret("test", "password")
+
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
     def test_set_secret(self, _):
@@ -857,6 +860,9 @@ class TestCharm(unittest.TestCase):
         )
         self.charm.set_secret("unit", "password", None)
         assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+
+        with self.assertRaises(RuntimeError):
+            self.charm.set_secret("test", "password", "test")
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
