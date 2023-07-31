@@ -11,7 +11,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLUpdateUserPasswordError,
 )
 from ops.framework import EventBase
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, SecretNotFoundError, WaitingStatus
 from ops.testing import Harness
 from tenacity import RetryError
 
@@ -809,11 +809,20 @@ class TestCharm(unittest.TestCase):
     def test_get_secret_juju(self, _, __, _get_secret):
         self.harness.set_leader()
 
-        _get_secret.return_value.get_content.return_value = {"password": "test-password"}
         # clean the caches
         if SECRET_INTERNAL_LABEL in self.charm.app_peer_data:
             del self.charm.app_peer_data[SECRET_INTERNAL_LABEL]
         self.charm.secrets["app"] = {}
+
+        _get_secret.side_effect = SecretNotFoundError
+        assert self.charm.get_secret("app", "password") is None
+
+        _get_secret.side_effect = None
+        _get_secret.return_value.get_content.return_value = {"password": "test-password"}
+
+        assert self.charm.get_secret("app", None) is None
+        assert not _get_secret.called
+        _get_secret.reset_mock()
 
         # Test application scope.
         assert self.charm.get_secret("app", "password") is None

@@ -183,9 +183,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # We retrieve and cache actual secret data for the lifetime of the event scope
             self.secrets[scope][SECRET_CACHE_LABEL] = secret.get_content()
 
-        if self.secrets[scope].get(SECRET_CACHE_LABEL):
-            return True
-        return False
+        return bool(self.secrets[scope].get(SECRET_CACHE_LABEL))
 
     def _juju_secret_get_key(self, scope: str, key: str) -> Optional[str]:
         if not key:
