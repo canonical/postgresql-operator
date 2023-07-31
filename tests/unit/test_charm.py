@@ -783,6 +783,11 @@ class TestCharm(unittest.TestCase):
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
         _snap_package.hold.assert_called_once_with()
 
+    def test_scope_obj(self):
+        assert self.charm._scope_obj("app") == self.charm.framework.model.app
+        assert self.charm._scope_obj("unit") == self.charm.framework.model.unit
+        assert self.charm._scope_obj("test") is None
+
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
     def test_get_secret(self, _):
