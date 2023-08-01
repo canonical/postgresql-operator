@@ -958,7 +958,10 @@ class PostgresqlOperatorCharm(CharmBase):
                 "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
             }
         )
-        postgres_snap.restart(services=[MONITORING_SNAP_SERVICE], enable=True)
+        if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
+            postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
+        else:
+            postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
