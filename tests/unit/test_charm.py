@@ -983,6 +983,7 @@ class TestCharm(unittest.TestCase):
         mock_event.defer.assert_not_called()
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.snap.SnapCache")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
@@ -995,6 +996,7 @@ class TestCharm(unittest.TestCase):
         _member_started,
         _reload_patroni_configuration,
         _restart,
+        _,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.

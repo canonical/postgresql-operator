@@ -958,7 +958,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
             }
         )
-        postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
+        postgres_snap.restart(services=[MONITORING_SNAP_SERVICE], enable=True)
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -1363,6 +1363,15 @@ class PostgresqlOperatorCharm(CharmBase):
         if restart_postgresql:
             self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
+
+        # Restart the monitoring service if the password was rotated
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        if postgres_snap.get("exporter.password") != self.get_secret(
+            APP_SCOPE, MONITORING_PASSWORD_KEY
+        ):
+            self._setup_exporter()
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
