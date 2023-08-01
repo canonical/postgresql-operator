@@ -205,14 +205,18 @@ class PostgresqlOperatorCharm(CharmBase):
         if scope not in [APP_SCOPE, UNIT_SCOPE]:
             raise RuntimeError("Unknown secret scope.")
 
-        juju_version = JujuVersion.from_environ()
+        if scope == UNIT_SCOPE:
+            result = self.unit_peer_data.get(key, None)
+        else:
+            result = self.app_peer_data.get(key, None)
 
+        # TODO change upgrade to switch to secrets once minor version upgrades is done
+        if result:
+            return result
+
+        juju_version = JujuVersion.from_environ()
         if juju_version.has_secrets:
             return self._juju_secret_get_key(scope, key)
-        if scope == UNIT_SCOPE:
-            return self.unit_peer_data.get(key, None)
-        else:
-            return self.app_peer_data.get(key, None)
 
     def _juju_secret_set(self, scope: str, key: str, value: str) -> str:
         """Helper function setting Juju secret."""
