@@ -1387,9 +1387,14 @@ class PostgresqlOperatorCharm(CharmBase):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        if postgres_snap.get("exporter.password") != self.get_secret(
-            APP_SCOPE, MONITORING_PASSWORD_KEY
-        ):
+        try:
+            snap_password = postgres_snap.get("exporter.password")
+        except snap.SnapError:
+            logger.warning(
+                "Early exit update_config: Trying to reset metrics service with no configuration set"
+            )
+            return
+        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
             self._setup_exporter()
 
     def _update_relation_endpoints(self) -> None:
