@@ -2,12 +2,13 @@
 # See LICENSE file for licensing details.
 
 import unittest
-from unittest.mock import Mock, PropertyMock, mock_open, patch, sentinel
+from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
 
 import requests as requests
 import tenacity as tenacity
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from tenacity import stop_after_delay
 
 from cluster import Patroni
 from constants import (
@@ -162,6 +163,22 @@ class TestCluster(unittest.TestCase):
             "members": [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         }
         self.assertFalse(self.patroni.is_creating_backup)
+
+    @patch("requests.get")
+    @patch("charm.Patroni.get_primary")
+    @patch("cluster.stop_after_delay", return_value=stop_after_delay(0))
+    def test_is_replication_healthy(self, _, __, _get):
+        # Test when replication is healthy.
+        _get.return_value.status_code = 200
+        self.assertTrue(self.patroni.is_replication_healthy)
+
+        # Test when replication is not healthy.
+        _get.side_effect = [
+            MagicMock(status_code=200),
+            MagicMock(status_code=200),
+            MagicMock(status_code=503),
+        ]
+        self.assertFalse(self.patroni.is_replication_healthy)
 
     @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
     @patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0))

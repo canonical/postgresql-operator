@@ -101,6 +101,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                         not self.charm._patroni.member_started
                         or self.charm.unit.name.replace("/", "-")
                         not in self.charm._patroni.cluster_members
+                        or not self.charm._patroni.is_replication_healthy
                     ):
                         logger.debug(
                             "Instance not yet back in the cluster."

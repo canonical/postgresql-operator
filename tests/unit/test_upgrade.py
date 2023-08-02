@@ -54,6 +54,7 @@ class TestUpgrade(unittest.TestCase):
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.on_upgrade_changed")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_failed")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_completed")
+    @patch("charm.Patroni.is_replication_healthy", new_callable=PropertyMock)
     @patch("charm.Patroni.cluster_members", new_callable=PropertyMock)
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("upgrade.wait_fixed", return_value=tenacity.wait_fixed(0))
@@ -70,6 +71,7 @@ class TestUpgrade(unittest.TestCase):
         _,
         _member_started,
         _cluster_members,
+        _is_replication_healthy,
         _set_unit_completed,
         _set_unit_failed,
         _on_upgrade_changed,
@@ -127,11 +129,20 @@ class TestUpgrade(unittest.TestCase):
         _set_unit_failed.assert_not_called()
         _on_upgrade_changed.assert_not_called()
 
+        # Test when the member has already joined the cluster but the replication
+        # is not healthy yet.
+        _set_unit_completed.reset_mock()
+        _is_replication_healthy.return_value = False
+        self.charm.upgrade._on_upgrade_granted(mock_event)
+        mock_event.defer.assert_called_once()
+        _set_unit_completed.assert_not_called()
+        _set_unit_failed.assert_not_called()
+
         # Test when the member is the leader.
         _member_started.reset_mock()
         _cluster_members.reset_mock()
-        _set_unit_completed.reset_mock()
-        _set_unit_failed.reset_mock()
+        mock_event.defer.reset_mock()
+        _is_replication_healthy.return_value = True
         with self.harness.hooks_disabled():
             self.harness.set_leader(True)
         self.charm.upgrade._on_upgrade_granted(mock_event)
