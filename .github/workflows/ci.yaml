@@ -70,13 +70,13 @@ jobs:
   integration-test:
     strategy:
       fail-fast: false
+      max-parallel: 6
       matrix:
         tox-environments:
           - backup-integration
           - charm-integration
           - database-relation-integration
           - db-relation-integration
-          - db-admin-relation-integration
           - ha-replication-integration
           - ha-self-healing-integration
           - ha-restore-cluster-integration
@@ -84,7 +84,13 @@ jobs:
           - plugins-integration
           - tls-integration
           - upgrade-integration
-    name: ${{ matrix.tox-environments }}
+        agent-versions:
+          - "2.9.43"  # renovate: latest juju 2
+          - "3.1.5"  # renovate: latest juju 3
+        include:
+          - tox-environments: db-admin-relation-integration
+            agent-versions: "2.9.43"  # renovate: latest juju 2
+    name: ${{ matrix.tox-environments }} | ${{ matrix.agent-versions }}
     needs:
       - lib-check
       - lint
@@ -95,12 +101,19 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Set channel
+        run: |
+          juju_channel=$(echo "${{ matrix.agent-versions }}" | cut -c 1-3)
+          echo "channel=${juju_channel}/stable" >> "$GITHUB_ENV"
+          juju_major=$(echo "${{ matrix.agent-versions }}" | cut -c 1)
+          echo "libjuju=juju${juju_major}" >> "$GITHUB_ENV"
       - name: Setup operator environment
         # TODO: Replace with custom image on self-hosted runner
         uses: charmed-kubernetes/actions-operator@main
         with:
           provider: lxd
-          bootstrap-options: "--agent-version 2.9.43"  # renovate: latest
+          bootstrap-options: "--agent-version ${{ matrix.agent-versions }}"
+          juju-channel: "${{ env.channel }}"
       - name: Download packed charm(s)
         uses: actions/download-artifact@v3
         with:
@@ -117,7 +130,7 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }} -- -m '${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }}-${{ env.libjuju }} -- -m 'not not${{ env.libjuju }} and ${{ steps.select-tests.outputs.mark_expression }}'
         env:
           AWS_ACCESS_KEY: "${{ secrets.AWS_ACCESS_KEY }}"
           AWS_SECRET_KEY: "${{ secrets.AWS_SECRET_KEY }}"

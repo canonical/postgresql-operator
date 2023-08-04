@@ -112,7 +112,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
         # Scale down to be able to restore.
         async with ops_test.fast_forward():
-            await ops_test.model.units.get(replica).remove()
+            await ops_test.model.destroy_unit(replica)
             await ops_test.model.block_until(
                 lambda: len(ops_test.model.applications[database_app_name].units) == 1
             )
