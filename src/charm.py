@@ -1147,6 +1147,9 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self._set_primary_status_message()
 
+        # Restart topology observer if it is gone
+        self._observer.start_observer()
+
     def _handle_processes_failures(self) -> bool:
         """Handle Patroni and PostgreSQL OS processes failures.
 
