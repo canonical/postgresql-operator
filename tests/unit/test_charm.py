@@ -560,6 +560,7 @@ class TestCharm(unittest.TestCase):
         )
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.ClusterTopologyObserver.start_observer")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.Patroni.restart_patroni")
     @patch("charm.Patroni.is_member_isolated")
@@ -583,6 +584,7 @@ class TestCharm(unittest.TestCase):
         _is_member_isolated,
         _restart_patroni,
         _set_primary_status_message,
+        _start_observer,
     ):
         # Test before the cluster is initialised.
         self.charm.on.update_status.emit()
@@ -625,8 +627,10 @@ class TestCharm(unittest.TestCase):
             )
         self.charm.on.update_status.emit()
         _restart_patroni.assert_called_once()
+        _start_observer.assert_called_once()
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.ClusterTopologyObserver.start_observer")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.PostgresqlOperatorCharm._handle_workload_failures")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
@@ -652,6 +656,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints,
         _handle_workload_failures,
         _set_primary_status_message,
+        _,
     ):
         # Test when the restore operation fails.
         with self.harness.hooks_disabled():
