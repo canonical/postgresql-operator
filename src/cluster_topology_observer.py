@@ -54,12 +54,16 @@ class ClusterTopologyObserver(Object):
 
     def start_observer(self):
         """Start the cluster topology observer running in a new process."""
-        if (
-            not isinstance(self._charm.unit.status, ActiveStatus)
-            or self._charm._peers is None
-            or "observer-pid" in self._charm._peers.data[self._charm.unit]
-        ):
+        if not isinstance(self._charm.unit.status, ActiveStatus) or self._charm._peers is None:
             return
+        if "observer-pid" in self._charm._peers.data[self._charm.unit]:
+            # Double check that the PID exists
+            pid = int(self._charm._peers.data[self._charm.unit]["observer-pid"])
+            try:
+                os.kill(pid, 0)
+                return
+            except OSError:
+                pass
 
         logging.info("Starting cluster topology observer process")
 
