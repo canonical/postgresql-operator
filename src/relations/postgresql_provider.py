@@ -21,7 +21,7 @@ from ops.charm import CharmBase
 from ops.framework import Object
 from ops.model import BlockedStatus
 
-from constants import ALL_CLIENT_RELATIONS, DATABASE_PORT
+from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -134,8 +134,8 @@ class PostgreSQLProvider(Object):
         for user in database_users - relation_users:
             try:
                 logger.info("Remove relation user: %s", user)
-                self.charm.set_secret("app", user, None)
-                self.charm.set_secret("app", f"{user}-database", None)
+                self.charm.set_secret(APP_SCOPE, user, None)
+                self.charm.set_secret(APP_SCOPE, f"{user}-database", None)
                 self.charm.postgresql.delete_user(user)
             except PostgreSQLDeleteUserError:
                 logger.error(f"Failed to delete user {user}")
