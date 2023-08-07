@@ -53,3 +53,13 @@ POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 
 METRICS_PORT = "9187"
+
+SECRET_LABEL = "secret"
+SECRET_CACHE_LABEL = "cache"
+SECRET_INTERNAL_LABEL = "internal-secret"
+SECRET_DELETED_LABEL = "None"
+
+APP_SCOPE = "app"
+UNIT_SCOPE = "unit"
+
+SECRET_KEY_OVERRIDES = {"ca": "cauth"}

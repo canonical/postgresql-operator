@@ -371,6 +371,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     await is_cluster_updated(ops_test, primary_name)
 
 
+@pytest.mark.unstable
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
     # Locate primary unit.
@@ -454,6 +455,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     await is_cluster_updated(ops_test, primary_name)
 
 
+@pytest.mark.unstable
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
 ):
