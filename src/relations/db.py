@@ -179,6 +179,12 @@ class DbProvides(Object):
             )
             return False
 
+        unit_relation_databag.update(
+            {
+                "extensions": ",".join(required_extensions),
+            }
+        )
+
         self.update_endpoints(relation)
 
         self._update_unit_status(relation)
