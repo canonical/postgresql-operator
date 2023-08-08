@@ -767,6 +767,25 @@ class TestCharm(unittest.TestCase):
         _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
         _snap_package.hold.assert_called_once_with()
 
+        # Test with refresh
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.present = True
+        self.charm._install_snap_packages([("postgresql", {"revision": 42})], refresh=True)
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
+        _snap_package.hold.assert_called_once_with()
+
+        # Test without refresh
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        self.charm._install_snap_packages([("postgresql", {"revision": 42})])
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        _snap_package.ensure.assert_not_called()
+        _snap_package.hold.assert_not_called()
+
     def test_scope_obj(self):
         assert self.charm._scope_obj("app") == self.charm.framework.model.app
         assert self.charm._scope_obj("unit") == self.charm.framework.model.unit
@@ -995,6 +1014,7 @@ class TestCharm(unittest.TestCase):
             self.charm.update_config()
             _render_patroni_yml_file.assert_called_once_with(
                 connectivity=True,
+                is_creating_backup=False,
                 enable_tls=False,
                 backup_id=None,
                 stanza=None,
@@ -1016,6 +1036,7 @@ class TestCharm(unittest.TestCase):
             self.charm.update_config()
             _render_patroni_yml_file.assert_called_once_with(
                 connectivity=True,
+                is_creating_backup=False,
                 enable_tls=True,
                 backup_id=None,
                 stanza=None,
