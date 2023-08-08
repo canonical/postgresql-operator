@@ -86,9 +86,12 @@ jobs:
         agent-versions:
           - "2.9.44"  # renovate: latest juju 2
           - "3.1.5"  # renovate: latest juju 3
+        free-disk-space:
+          - false
         include:
           - tox-environments: db-admin-relation-integration
             agent-versions: "2.9.44"  # renovate: latest juju 2
+            free-disk-space: true
     name: ${{ matrix.tox-environments }} | ${{ matrix.agent-versions }}
     needs:
       - lib-check
@@ -101,6 +104,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Free disk space
+        if: ${{ matrix.free-disk-space == true }}
         run: |
           sudo docker rmi $(docker image ls -aq) >/dev/null 2>&1 || true
           sudo rm -rf \
