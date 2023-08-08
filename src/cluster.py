@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Dict, Optional, Set
+from typing import Dict, List, Optional, Set
 
 import requests
 from charms.operator_libs_linux.v2 import snap
@@ -250,6 +250,19 @@ class Patroni:
                             primary = "/".join(primary.rsplit("-", 1))
                         return primary
 
+    def get_sync_standby_names(self) -> List[str]:
+        """Get the list of sync standby unit names."""
+        sync_standbys = []
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_patroni_url(attempt)
+                r = requests.get(f"{url}/cluster", verify=self.verify)
+                for member in r.json()["members"]:
+                    if member["role"] == "sync_standby":
+                        sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
+        return sync_standbys
+
     def _get_alternative_patroni_url(self, attempt: AttemptManager) -> str:
         """Get an alternative REST API URL from another member each time.
 
@@ -310,6 +323,47 @@ class Patroni:
                 )
 
         return r.json()
+
+    @property
+    def is_creating_backup(self) -> bool:
+        """Returns whether a backup is being created."""
+        # Request info from cluster endpoint (which returns the list of tags from each
+        # cluster member; the "is_creating_backup" tag means that the member is creating
+        # a backup).
+        try:
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
+                with attempt:
+                    r = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
+        except RetryError:
+            return False
+
+        return any(
+            "tags" in member and member["tags"].get("is_creating_backup")
+            for member in r.json()["members"]
+        )
+
+    @property
+    def is_replication_healthy(self) -> bool:
+        """Return whether the replication is healthy."""
+        try:
+            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+                with attempt:
+                    primary = self.get_primary()
+                    primary_ip = self.get_member_ip(primary)
+                    members_ips = {self.unit_ip}
+                    members_ips.update(self.peers_ips)
+                    for members_ip in members_ips:
+                        endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
+                        url = self._patroni_url.replace(self.unit_ip, members_ip)
+                        member_status = requests.get(f"{url}/{endpoint}", verify=self.verify)
+                        if member_status.status_code != 200:
+                            raise Exception
+        except RetryError:
+            logger.exception("replication is not healthy")
+            return False
+
+        logger.debug("replication is healthy")
+        return True
 
     @property
     def member_started(self) -> bool:
@@ -399,6 +453,7 @@ class Patroni:
     def render_patroni_yml_file(
         self,
         connectivity: bool = False,
+        is_creating_backup: bool = False,
         enable_tls: bool = False,
         stanza: str = None,
         restore_stanza: Optional[str] = None,
@@ -408,6 +463,7 @@ class Patroni:
 
         Args:
             connectivity: whether to allow external connections to the database.
+            is_creating_backup: whether this unit is creating a backup.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
@@ -420,6 +476,7 @@ class Patroni:
         rendered = template.render(
             conf_path=PATRONI_CONF_PATH,
             connectivity=connectivity,
+            is_creating_backup=is_creating_backup,
             log_path=PATRONI_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,

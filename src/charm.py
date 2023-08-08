@@ -80,6 +80,7 @@ from constants import (
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
+from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -116,6 +117,12 @@ class PostgresqlOperatorCharm(CharmBase):
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
 
+        self.upgrade = PostgreSQLUpgrade(
+            self,
+            model=get_postgresql_dependencies_model(),
+            relation_name="upgrade",
+            substrate="vm",
+        )
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
@@ -1234,18 +1241,20 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: List[str]) -> None:
+    def _install_snap_packages(self, packages: List[str], refresh: bool = False) -> None:
         """Installs package(s) to container.
 
         Args:
             packages: list of packages to install.
+            refresh: whether to refresh the snap if it's
+                already present.
         """
         for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                if not snap_package.present:
+                if not snap_package.present or refresh:
                     if snap_version.get("revision"):
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=snap_version["revision"]
@@ -1325,13 +1334,14 @@ class PostgresqlOperatorCharm(CharmBase):
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         self.backup.start_stop_pgbackrest_service()
 
-    def update_config(self) -> None:
+    def update_config(self, is_creating_backup: bool = False) -> None:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = all(self.tls.get_tls_files())
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
+            is_creating_backup=is_creating_backup,
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
