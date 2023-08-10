@@ -319,6 +319,7 @@ class DbProvides(Object):
                 else ""
             )
 
+            required_extensions, _ = self._get_extensions(relation)
             # Set the read/write endpoint.
             allowed_subnets = self._get_allowed_subnets(relation)
             allowed_units = self._get_allowed_units(relation)
@@ -336,6 +337,7 @@ class DbProvides(Object):
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
+                "extensions": ",".join(required_extensions),
             }
 
             # Set the data only in the unit databag.

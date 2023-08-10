@@ -58,7 +58,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Check libs
-        uses: canonical/charming-actions/check-libraries@2.3.0
+        uses: canonical/charming-actions/check-libraries@2.4.0
         with:
           credentials: "${{ secrets.CHARMHUB_TOKEN }}"
           github-token: "${{ secrets.GITHUB_TOKEN }}"
@@ -86,9 +86,12 @@ jobs:
         agent-versions:
           - "2.9.44"  # renovate: latest juju 2
           - "3.1.5"  # renovate: latest juju 3
-        # include:
-        #   - tox-environments: db-admin-relation-integration
-        #     agent-versions: "2.9.43"  # renovate: latest juju 2
+        free-disk-space:
+          - false
+        include:
+          - tox-environments: db-admin-relation-integration
+            agent-versions: "2.9.44"  # renovate: latest juju 2
+            free-disk-space: true
     name: ${{ matrix.tox-environments }} | ${{ matrix.agent-versions }}
     needs:
       - lib-check
@@ -100,6 +103,14 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v3
+      - name: Free disk space
+        if: ${{ matrix.free-disk-space == true }}
+        run: |
+          sudo docker rmi $(docker image ls -aq) >/dev/null 2>&1 || true
+          sudo rm -rf \
+            /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /usr/local/share/powershell /usr/share/swift /usr/local/.ghcup \
+            /usr/lib/jvm || true
       - name: Set channel
         run: |
           juju_channel=$(echo "${{ matrix.agent-versions }}" | cut -c 1-3)
@@ -129,7 +140,7 @@ jobs:
             echo "mark_expression=not unstable" >> $GITHUB_OUTPUT
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environments }}-${{ env.libjuju }} -- -m 'not not${{ env.libjuju }} and ${{ steps.select-tests.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environments }}-${{ env.libjuju }} -- -m 'not not${{ env.libjuju }} and ${{ steps.select-tests.outputs.mark_expression }}' --keep-models
         env:
           AWS_ACCESS_KEY: "${{ secrets.AWS_ACCESS_KEY }}"
           AWS_SECRET_KEY: "${{ secrets.AWS_SECRET_KEY }}"
