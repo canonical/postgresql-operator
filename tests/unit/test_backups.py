@@ -705,6 +705,7 @@ class TestPostgreSQLBackups(unittest.TestCase):
         _initialise_stanza.assert_called_once()
         _start_stop_pgbackrest_service.assert_called_once()
 
+    @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.PostgreSQLBackups._change_connectivity_to_database")
     @patch("charm.PostgreSQLBackups._list_backups")
     @patch("charm.PostgreSQLBackups._execute_command")
@@ -725,6 +726,7 @@ class TestPostgreSQLBackups(unittest.TestCase):
         _execute_command,
         _list_backups,
         _change_connectivity_to_database,
+        _update_config,
     ):
         # Test when the unit cannot perform a backup.
         mock_event = MagicMock()
@@ -772,6 +774,11 @@ Juju Version: test-juju-version
         _is_primary.return_value = True
         _execute_command.return_value = (1, "", "fake error")
         self.charm.backup._on_create_backup_action(mock_event)
+        update_config_calls = [
+            call(is_creating_backup=True),
+            call(is_creating_backup=False),
+        ]
+        _update_config.assert_has_calls(update_config_calls)
         mock_event.fail.assert_called_once()
         mock_event.set_results.assert_not_called()
 
@@ -782,6 +789,7 @@ Juju Version: test-juju-version
         _execute_command.side_effect = None
         _execute_command.return_value = (0, "fake stdout", "fake stderr")
         _list_backups.return_value = {"2023-01-01T09:00:00Z": self.charm.backup.stanza_name}
+        _update_config.reset_mock()
         self.charm.backup._on_create_backup_action(mock_event)
         _upload_content_to_s3.assert_has_calls(
             [
@@ -797,6 +805,7 @@ Juju Version: test-juju-version
                 ),
             ]
         )
+        _update_config.assert_has_calls(update_config_calls)
         mock_event.fail.assert_called_once()
         mock_event.set_results.assert_not_called()
 
@@ -805,6 +814,7 @@ Juju Version: test-juju-version
         _upload_content_to_s3.reset_mock()
         _upload_content_to_s3.side_effect = None
         _upload_content_to_s3.return_value = True
+        _update_config.reset_mock()
         self.charm.backup._on_create_backup_action(mock_event)
         _upload_content_to_s3.assert_has_calls(
             [
@@ -821,6 +831,7 @@ Juju Version: test-juju-version
             ]
         )
         _change_connectivity_to_database.assert_not_called()
+        _update_config.assert_has_calls(update_config_calls)
         mock_event.fail.assert_not_called()
         mock_event.set_results.assert_called_once()
 

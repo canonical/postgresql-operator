@@ -22,7 +22,7 @@ from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
 from pgconnstr import ConnectionString
 
-from constants import DATABASE_PORT
+from constants import APP_SCOPE, DATABASE_PORT
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -164,8 +164,8 @@ class DbProvides(Object):
 
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
-            self.charm.set_secret("app", user, password)
-            self.charm.set_secret("app", f"{user}-database", database)
+            self.charm.set_secret(APP_SCOPE, user, password)
+            self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
             self.charm.postgresql.create_user(user, password, self.admin)
             self.charm.postgresql.create_database(database, user)
@@ -283,8 +283,8 @@ class DbProvides(Object):
             # Retrieve some data from the relation.
             unit_relation_databag = relation.data[self.charm.unit]
             user = f"relation-{relation.id}"
-            password = self.charm.get_secret("app", user)
-            database = self.charm.get_secret("app", f"{user}-database")
+            password = self.charm.get_secret(APP_SCOPE, user)
+            database = self.charm.get_secret(APP_SCOPE, f"{user}-database")
 
             # If the relation data is not complete, the relations was not initialised yet.
             if not database or not user or not password:
@@ -319,6 +319,7 @@ class DbProvides(Object):
                 else ""
             )
 
+            required_extensions, _ = self._get_extensions(relation)
             # Set the read/write endpoint.
             allowed_subnets = self._get_allowed_subnets(relation)
             allowed_units = self._get_allowed_units(relation)
@@ -336,6 +337,7 @@ class DbProvides(Object):
                 "master": primary_endpoint,
                 "standbys": read_only_endpoints,
                 "state": self._get_state(),
+                "extensions": ",".join(required_extensions),
             }
 
             # Set the data only in the unit databag.

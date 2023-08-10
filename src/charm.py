@@ -18,12 +18,13 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
+from ops import JujuVersion
 from ops.charm import (
     ActionEvent,
     CharmBase,
+    HookEvent,
     InstallEvent,
     LeaderElectedEvent,
-    RelationChangedEvent,
     RelationDepartedEvent,
     StartEvent,
 )
@@ -34,6 +35,7 @@ from ops.model import (
     BlockedStatus,
     MaintenanceStatus,
     Relation,
+    SecretNotFoundError,
     Unit,
     WaitingStatus,
 )
@@ -51,6 +53,7 @@ from cluster_topology_observer import (
     ClusterTopologyObserver,
 )
 from constants import (
+    APP_SCOPE,
     BACKUP_USER,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
@@ -61,16 +64,23 @@ from constants import (
     POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
+    SECRET_CACHE_LABEL,
+    SECRET_DELETED_LABEL,
+    SECRET_INTERNAL_LABEL,
+    SECRET_KEY_OVERRIDES,
+    SECRET_LABEL,
     SNAP_PACKAGES,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
+    UNIT_SCOPE,
     USER,
     USER_PASSWORD_KEY,
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
+from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -86,6 +96,8 @@ class PostgresqlOperatorCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
+        self.secrets = {APP_SCOPE: {}, UNIT_SCOPE: {}}
+
         self._observer = ClusterTopologyObserver(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -93,6 +105,8 @@ class PostgresqlOperatorCharm(CharmBase):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
+        self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
+        self.framework.observe(self.on.secret_remove, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
@@ -103,6 +117,12 @@ class PostgresqlOperatorCharm(CharmBase):
         self._member_name = self.unit.name.replace("/", "-")
         self._storage_path = self.meta.storages["pgdata"].location
 
+        self.upgrade = PostgreSQLUpgrade(
+            self,
+            model=get_postgresql_dependencies_model(),
+            relation_name="upgrade",
+            substrate="vm",
+        )
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
@@ -138,29 +158,180 @@ class PostgresqlOperatorCharm(CharmBase):
 
         return relation.data[self.unit]
 
+    def _scope_obj(self, scope: str):
+        if scope == APP_SCOPE:
+            return self.framework.model.app
+        if scope == UNIT_SCOPE:
+            return self.framework.model.unit
+
+    def _juju_secrets_get(self, scope: str) -> Optional[bool]:
+        """Helper function to get Juju secret."""
+        if scope == UNIT_SCOPE:
+            peer_data = self.unit_peer_data
+        else:
+            peer_data = self.app_peer_data
+
+        if not peer_data.get(SECRET_INTERNAL_LABEL):
+            return
+
+        if SECRET_CACHE_LABEL not in self.secrets[scope]:
+            try:
+                # NOTE: Secret contents are not yet available!
+                secret = self.model.get_secret(id=peer_data[SECRET_INTERNAL_LABEL])
+            except SecretNotFoundError as e:
+                logging.debug(f"No secret found for ID {peer_data[SECRET_INTERNAL_LABEL]}, {e}")
+                return
+
+            logging.debug(f"Secret {peer_data[SECRET_INTERNAL_LABEL]} downloaded")
+
+            # We keep the secret object around -- needed when applying modifications
+            self.secrets[scope][SECRET_LABEL] = secret
+
+            # We retrieve and cache actual secret data for the lifetime of the event scope
+            self.secrets[scope][SECRET_CACHE_LABEL] = secret.get_content()
+
+        return bool(self.secrets[scope].get(SECRET_CACHE_LABEL))
+
+    def _juju_secret_get_key(self, scope: str, key: str) -> Optional[str]:
+        if not key:
+            return
+
+        key = SECRET_KEY_OVERRIDES.get(key, key)
+
+        if self._juju_secrets_get(scope):
+            secret_cache = self.secrets[scope].get(SECRET_CACHE_LABEL)
+            if secret_cache:
+                secret_data = secret_cache.get(key)
+                if secret_data and secret_data != SECRET_DELETED_LABEL:
+                    logging.debug(f"Getting secret {scope}:{key}")
+                    return secret_data
+        logging.debug(f"No value found for secret {scope}:{key}")
+
     def get_secret(self, scope: str, key: str) -> Optional[str]:
         """Get secret from the secret storage."""
-        if scope == "unit":
-            return self.unit_peer_data.get(key, None)
-        elif scope == "app":
-            return self.app_peer_data.get(key, None)
-        else:
+        if scope not in [APP_SCOPE, UNIT_SCOPE]:
             raise RuntimeError("Unknown secret scope.")
 
-    def set_secret(self, scope: str, key: str, value: Optional[str]) -> None:
-        """Get secret from the secret storage."""
-        if scope == "unit":
-            if not value:
-                del self.unit_peer_data[key]
-                return
-            self.unit_peer_data.update({key: value})
-        elif scope == "app":
-            if not value:
-                del self.app_peer_data[key]
-                return
-            self.app_peer_data.update({key: value})
+        if scope == UNIT_SCOPE:
+            result = self.unit_peer_data.get(key, None)
         else:
+            result = self.app_peer_data.get(key, None)
+
+        # TODO change upgrade to switch to secrets once minor version upgrades is done
+        if result:
+            return result
+
+        juju_version = JujuVersion.from_environ()
+        if juju_version.has_secrets:
+            return self._juju_secret_get_key(scope, key)
+
+    def _juju_secret_set(self, scope: str, key: str, value: str) -> str:
+        """Helper function setting Juju secret."""
+        if scope == UNIT_SCOPE:
+            peer_data = self.unit_peer_data
+        else:
+            peer_data = self.app_peer_data
+        self._juju_secrets_get(scope)
+
+        key = SECRET_KEY_OVERRIDES.get(key, key)
+
+        secret = self.secrets[scope].get(SECRET_LABEL)
+
+        # It's not the first secret for the scope, we can re-use the existing one
+        # that was fetched in the previous call
+        if secret:
+            secret_cache = self.secrets[scope][SECRET_CACHE_LABEL]
+
+            if secret_cache.get(key) == value:
+                logging.debug(f"Key {scope}:{key} has this value defined already")
+            else:
+                secret_cache[key] = value
+                try:
+                    secret.set_content(secret_cache)
+                except OSError as error:
+                    logging.error(
+                        f"Error in attempt to set {scope}:{key}. "
+                        f"Existing keys were: {list(secret_cache.keys())}. {error}"
+                    )
+                logging.debug(f"Secret {scope}:{key} was {key} set")
+
+        # We need to create a brand-new secret for this scope
+        else:
+            scope_obj = self._scope_obj(scope)
+
+            secret = scope_obj.add_secret({key: value})
+            if not secret:
+                raise RuntimeError(f"Couldn't set secret {scope}:{key}")
+
+            self.secrets[scope][SECRET_LABEL] = secret
+            self.secrets[scope][SECRET_CACHE_LABEL] = {key: value}
+            logging.debug(f"Secret {scope}:{key} published (as first). ID: {secret.id}")
+            peer_data.update({SECRET_INTERNAL_LABEL: secret.id})
+
+        # TODO change upgrade to switch to secrets once minor version upgrades is done
+        if key in peer_data:
+            del peer_data[key]
+
+        return self.secrets[scope][SECRET_LABEL].id
+
+    def set_secret(self, scope: str, key: str, value: Optional[str]) -> Optional[str]:
+        """Set secret from the secret storage."""
+        if scope not in [APP_SCOPE, UNIT_SCOPE]:
             raise RuntimeError("Unknown secret scope.")
+
+        if not value:
+            return self.remove_secret(scope, key)
+
+        juju_version = JujuVersion.from_environ()
+
+        if juju_version.has_secrets:
+            self._juju_secret_set(scope, key, value)
+            return
+        if scope == UNIT_SCOPE:
+            self.unit_peer_data.update({key: value})
+        else:
+            self.app_peer_data.update({key: value})
+
+    def _juju_secret_remove(self, scope: str, key: str) -> None:
+        """Remove a Juju 3.x secret."""
+        self._juju_secrets_get(scope)
+
+        key = SECRET_KEY_OVERRIDES.get(key, key)
+
+        secret = self.secrets[scope].get(SECRET_LABEL)
+        if not secret:
+            logging.error(f"Secret {scope}:{key} wasn't deleted: no secrets are available")
+            return
+
+        secret_cache = self.secrets[scope].get(SECRET_CACHE_LABEL)
+        if not secret_cache or key not in secret_cache:
+            logging.error(f"No secret {scope}:{key}")
+            return
+
+        secret_cache[key] = SECRET_DELETED_LABEL
+        secret.set_content(secret_cache)
+        logging.debug(f"Secret {scope}:{key}")
+
+        # TODO change upgrade to switch to secrets once minor version upgrades is done
+        if scope == UNIT_SCOPE:
+            peer_data = self.unit_peer_data
+        else:
+            peer_data = self.app_peer_data
+        if key in peer_data:
+            del peer_data[key]
+
+    def remove_secret(self, scope: str, key: str) -> None:
+        """Removing a secret."""
+        if scope not in [APP_SCOPE, UNIT_SCOPE]:
+            raise RuntimeError("Unknown secret scope.")
+
+        juju_version = JujuVersion.from_environ()
+        if juju_version.has_secrets:
+            return self._juju_secret_remove(scope, key)
+        if scope == UNIT_SCOPE:
+            del self.unit_peer_data[key]
+        else:
+            del self.app_peer_data[key]
 
     @property
     def is_cluster_initialised(self) -> bool:
@@ -174,7 +345,7 @@ class PostgresqlOperatorCharm(CharmBase):
             primary_host=self.primary_endpoint,
             current_host=self._unit_ip,
             user=USER,
-            password=self.get_secret("app", f"{USER}-password"),
+            password=self.get_secret(APP_SCOPE, f"{USER}-password"),
             database="postgres",
             system_users=SYSTEM_USERS,
         )
@@ -318,7 +489,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _on_peer_relation_changed(self, event: RelationChangedEvent):
+    def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
@@ -381,14 +552,15 @@ class PostgresqlOperatorCharm(CharmBase):
         else:
             self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
 
-    def _reconfigure_cluster(self, event: RelationChangedEvent):
+    def _reconfigure_cluster(self, event: HookEvent):
         """Reconfigure the cluster by adding and removing members IPs to it.
 
         Returns:
             Whether it was possible to reconfigure the cluster.
         """
         if (
-            event.unit is not None
+            hasattr(event, "unit")
+            and event.unit is not None
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
@@ -517,7 +689,7 @@ class PostgresqlOperatorCharm(CharmBase):
             self._peer_members_ips,
             self._get_password(),
             self._replication_password,
-            self.get_secret("app", REWIND_PASSWORD_KEY),
+            self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
         )
 
@@ -644,13 +816,6 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to install snap packages")
             return
 
-        try:
-            self._patch_snap_seccomp_profile()
-        except subprocess.CalledProcessError as e:
-            logger.exception(e)
-            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
-            return
-
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
         postgres_snap.alias("patronictl")
@@ -661,14 +826,14 @@ class PostgresqlOperatorCharm(CharmBase):
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
         # The leader sets the needed passwords if they weren't set before.
-        if self.get_secret("app", USER_PASSWORD_KEY) is None:
-            self.set_secret("app", USER_PASSWORD_KEY, new_password())
-        if self.get_secret("app", REPLICATION_PASSWORD_KEY) is None:
-            self.set_secret("app", REPLICATION_PASSWORD_KEY, new_password())
-        if self.get_secret("app", REWIND_PASSWORD_KEY) is None:
-            self.set_secret("app", REWIND_PASSWORD_KEY, new_password())
-        if self.get_secret("app", MONITORING_PASSWORD_KEY) is None:
-            self.set_secret("app", MONITORING_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, USER_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, USER_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, REWIND_PASSWORD_KEY, new_password())
+        if self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY) is None:
+            self.set_secret(APP_SCOPE, MONITORING_PASSWORD_KEY, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -806,10 +971,13 @@ class PostgresqlOperatorCharm(CharmBase):
         postgres_snap.set(
             {
                 "exporter.user": MONITORING_USER,
-                "exporter.password": self.get_secret("app", MONITORING_PASSWORD_KEY),
+                "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
             }
         )
-        postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
+        if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
+            postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
+        else:
+            postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -840,7 +1008,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 # Create the monitoring user.
                 self.postgresql.create_user(
                     MONITORING_USER,
-                    self.get_secret("app", MONITORING_PASSWORD_KEY),
+                    self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                     extra_user_roles="pg_monitor",
                 )
         except PostgreSQLCreateUserError as e:
@@ -893,7 +1061,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
-        event.set_results({"password": self.get_secret("app", f"{username}-password")})
+        event.set_results({"password": self.get_secret(APP_SCOPE, f"{username}-password")})
 
     def _on_set_password(self, event: ActionEvent) -> None:
         """Set the password for the specified user."""
@@ -912,7 +1080,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         password = event.params.get("password", new_password())
 
-        if password == self.get_secret("app", f"{username}-password"):
+        if password == self.get_secret(APP_SCOPE, f"{username}-password"):
             event.log("The old and new passwords are equal.")
             event.set_results({"password": password})
             return
@@ -937,7 +1105,7 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         # Update the password in the secret store.
-        self.set_secret("app", f"{username}-password", password)
+        self.set_secret(APP_SCOPE, f"{username}-password", password)
 
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
@@ -985,6 +1153,9 @@ class PostgresqlOperatorCharm(CharmBase):
             return
 
         self._set_primary_status_message()
+
+        # Restart topology observer if it is gone
+        self._observer.start_observer()
 
     def _handle_processes_failures(self) -> bool:
         """Handle Patroni and PostgreSQL OS processes failures.
@@ -1058,7 +1229,7 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        return self.get_secret("app", USER_PASSWORD_KEY)
+        return self.get_secret(APP_SCOPE, USER_PASSWORD_KEY)
 
     @property
     def _replication_password(self) -> str:
@@ -1068,20 +1239,22 @@ class PostgresqlOperatorCharm(CharmBase):
             The password from the peer relation or None if the
             password has not yet been set by the leader.
         """
-        return self.get_secret("app", REPLICATION_PASSWORD_KEY)
+        return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: List[str]) -> None:
+    def _install_snap_packages(self, packages: List[str], refresh: bool = False) -> None:
         """Installs package(s) to container.
 
         Args:
             packages: list of packages to install.
+            refresh: whether to refresh the snap if it's
+                already present.
         """
         for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
                 snap_package = snap_cache[snap_name]
 
-                if not snap_package.present:
+                if not snap_package.present or refresh:
                     if snap_version.get("revision"):
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=snap_version["revision"]
@@ -1095,29 +1268,6 @@ class PostgresqlOperatorCharm(CharmBase):
                     "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
                 )
                 raise
-
-    def _patch_snap_seccomp_profile(self) -> None:
-        """Patch snap seccomp profile to allow chmod on pgBackRest restore code.
-
-        This is needed due to https://github.com/pgbackrest/pgbackrest/issues/2036.
-        """
-        subprocess.check_output(
-            [
-                "sed",
-                "-i",
-                "-e",
-                "$achown",
-                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
-            ]
-        )
-        subprocess.check_output(
-            [
-                "/usr/lib/snapd/snap-seccomp",
-                "compile",
-                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.src",
-                "/var/lib/snapd/seccomp/bpf/snap.charmed-postgresql.patroni.bin",
-            ]
-        )
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
@@ -1194,13 +1344,14 @@ class PostgresqlOperatorCharm(CharmBase):
 
         return charmed_postgresql_snap.services["patroni"]["active"]
 
-    def update_config(self) -> bool:
+    def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = all(self.tls.get_tls_files())
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
+            is_creating_backup=is_creating_backup,
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
@@ -1228,6 +1379,20 @@ class PostgresqlOperatorCharm(CharmBase):
         if restart_postgresql:
             self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
+
+        # Restart the monitoring service if the password was rotated
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        try:
+            snap_password = postgres_snap.get("exporter.password")
+        except snap.SnapError:
+            logger.warning(
+                "Early exit update_config: Trying to reset metrics service with no configuration set"
+            )
+            return True
+        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
+            self._setup_exporter()
 
         return True
 

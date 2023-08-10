@@ -40,13 +40,13 @@ from tests.integration.ha_tests.helpers import (
     start_continuous_writes,
     storage_id,
     storage_type,
-    unit_hostname,
     update_restart_condition,
     wait_network_restore,
 )
 from tests.integration.helpers import (
     CHARM_SERIES,
     db_connect,
+    get_machine_from_unit,
     get_password,
     get_unit_address,
     run_command_on_unit,
@@ -371,6 +371,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     await is_cluster_updated(ops_test, primary_name)
 
 
+@pytest.mark.unstable
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
     # Locate primary unit.
@@ -381,7 +382,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     await start_continuous_writes(ops_test, app)
 
     # Get unit hostname and IP.
-    primary_hostname = await unit_hostname(ops_test, primary_name)
+    primary_hostname = await get_machine_from_unit(ops_test, primary_name)
     primary_ip = await get_unit_ip(ops_test, primary_name)
 
     # Verify that connection is possible.
@@ -397,7 +398,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     all_units_names = [unit.name for unit in ops_test.model.applications[app].units]
     for unit_name in set(all_units_names) - {primary_name}:
         logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
-        hostname = await unit_hostname(ops_test, unit_name)
+        hostname = await get_machine_from_unit(ops_test, unit_name)
         assert not is_machine_reachable_from(
             hostname, primary_hostname
         ), "unit is reachable from peer"
@@ -443,7 +444,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Wait the LXD unit has its IP updated.
     logger.info("waiting for IP address to be updated on Juju unit")
-    wait_network_restore(ops_test.model.info.name, primary_hostname, primary_ip)
+    await wait_network_restore(ops_test, primary_hostname, primary_ip)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
@@ -454,6 +455,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     await is_cluster_updated(ops_test, primary_name)
 
 
+@pytest.mark.unstable
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
 ):
@@ -466,7 +468,7 @@ async def test_network_cut_without_ip_change(
     await start_continuous_writes(ops_test, app)
 
     # Get unit hostname and IP.
-    primary_hostname = await unit_hostname(ops_test, primary_name)
+    primary_hostname = await get_machine_from_unit(ops_test, primary_name)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
@@ -481,7 +483,7 @@ async def test_network_cut_without_ip_change(
     all_units_names = [unit.name for unit in ops_test.model.applications[app].units]
     for unit_name in set(all_units_names) - {primary_name}:
         logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
-        hostname = await unit_hostname(ops_test, unit_name)
+        hostname = await get_machine_from_unit(ops_test, unit_name)
         assert not is_machine_reachable_from(
             hostname, primary_hostname
         ), "unit is reachable from peer"
