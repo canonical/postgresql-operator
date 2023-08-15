@@ -954,6 +954,12 @@ class PostgresqlOperatorCharm(CharmBase):
             self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
             return
 
+        # Open port
+        try:
+            subprocess.check_call(["open-port", "5432/tcp"])
+        except subprocess.CalledProcessError:
+            logger.exception("failed to open port")
+
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
