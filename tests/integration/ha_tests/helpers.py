@@ -20,7 +20,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from tests.integration.helpers import db_connect, get_unit_address, run_command_on_unit
+from tests.integration.helpers import db_connect, run_command_on_unit
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -122,10 +122,10 @@ async def change_patroni_setting(
             app = await app_name(ops_test)
             if use_random_unit:
                 unit = get_random_unit(ops_test, app)
-                unit_ip = get_unit_address(ops_test, unit)
+                unit_ip = await get_unit_ip(ops_test, unit)
             else:
                 primary_name = await get_primary(ops_test, app)
-                unit_ip = get_unit_address(ops_test, primary_name)
+                unit_ip = await get_unit_ip(ops_test, primary_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
                 json={setting: value},
@@ -146,7 +146,7 @@ async def change_wal_settings(
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
-            unit_ip = get_unit_address(ops_test, unit_name)
+            unit_ip = await get_unit_ip(ops_test, unit_name)
             requests.patch(
                 f"http://{unit_ip}:8008/config",
                 json={
@@ -318,7 +318,7 @@ async def get_patroni_setting(ops_test: OpsTest, setting: str) -> Optional[int]:
         with attempt:
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
-            unit_ip = get_unit_address(ops_test, primary_name)
+            unit_ip = await get_unit_ip(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
             value = configuration_info.json().get(setting)
             return int(value) if value is not None else None
@@ -338,7 +338,7 @@ async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Op
         with attempt:
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
-            unit_ip = get_unit_address(ops_test, primary_name)
+            unit_ip = await get_unit_ip(ops_test, primary_name)
             configuration_info = requests.get(f"http://{unit_ip}:8008/config")
             postgresql_dict = configuration_info.json().get("postgresql")
             if postgresql_dict is None:
@@ -539,7 +539,7 @@ async def send_signal_to_process(
 
 async def is_postgresql_ready(ops_test, unit_name: str) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
-    unit_ip = get_unit_address(ops_test, unit_name)
+    unit_ip = await get_unit_ip(ops_test, unit_name)
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3)):
             with attempt:
