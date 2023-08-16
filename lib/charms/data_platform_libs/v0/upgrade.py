@@ -12,7 +12,253 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-r"""Handler for `upgrade` relation events for in-place upgrades on VMs."""
+r"""Library to manage in-place upgrades for charms running on VMs and K8s.
+
+This library contains handlers for `upgrade` relation events used to coordinate
+between units in an application during a `juju refresh`, as well as `Pydantic` models
+for instantiating, validating and comparing dependencies.
+
+An upgrade on VMs is initiated with the command `juju refresh`. Once executed, the following
+events are emitted to each unit at random:
+    - `upgrade-charm`
+    - `config-changed`
+    - `leader-settings-changed` - Non-leader only
+
+Charm authors can implement the classes defined in this library to streamline the process of
+coordinating which unit updates when, achieved through updating of unit-data `state` throughout.
+
+At a high-level, the upgrade steps are as follows:
+    - Run pre-checks on the cluster to confirm it is safe to upgrade
+    - Create stack of unit.ids, to serve as the upgrade order (generally workload leader is last)
+    - Start the upgrade by issuing a Juju CLI command
+    - The unit at the top of the stack gets permission to upgrade
+    - The unit handles the upgrade and restarts their service
+    - Repeat, until all units have restarted
+
+### Usage by charm authors
+
+#### `upgrade` relation
+
+Charm authors must implement an additional peer-relation.
+
+As this library uses relation data exchanged between units to coordinate, charm authors
+need to add a new relation interface. The relation name does not matter.
+
+`metadata.yaml`
+```yaml
+peers:
+  upgrade:
+    interface: upgrade
+```
+
+#### Dependencies JSON/Dict
+
+Charm authors must implement a dict object tracking current charm versions, requirements + upgradability.
+
+Many workload versions may be incompatible with older/newer versions. This same idea also can apply to
+charm or snap versions. Workloads with required related applications (e.g Kafka + ZooKeeper) also need to
+ensure their versions are compatible during an upgrade, to avoid cluster failure.
+
+As such, it is necessasry to freeze any dependencies within each published charm. An example of this could
+be creating a `DEPENDENCIES` dict within the charm code, with the following structure:
+
+`src/literals.py`
+```python
+DEPENDENCIES = {
+    "kafka_charm": {
+        "dependencies": {"zookeeper": ">50"},
+        "name": "kafka",
+        "upgrade_supported": ">90",
+        "version": "100",
+    },
+    "kafka_service": {
+        "dependencies": {"zookeeper": "^3"},
+        "name": "kafka",
+        "upgrade_supported": ">=0.8",
+        "version": "3.3.2",
+    },
+}
+```
+
+The first-level key names are arbitrary labels for tracking what those versions+dependencies are for.
+The `dependencies` second-level values are a key-value map of any required external applications,
+    and the versions this packaged charm can support.
+The `upgrade_suppported` second-level values are requirements from which an in-place upgrade can be
+    supported by the charm.
+The `version` second-level values correspond to the current version of this packaged charm.
+
+Any requirements comply with [`poetry`'s dependency specifications](https://python-poetry.org/docs/dependency-specification/#caret-requirements).
+
+### Dependency Model
+
+Charm authors must implement their own class inheriting from `DependencyModel`.
+
+Using a `Pydantic` model to instantiate the aforementioned `DEPENDENCIES` dict gives stronger type safety and additional
+layers of validation.
+
+Implementation just needs to ensure that the top-level key names from `DEPENDENCIES` are defined as attributed in the model.
+
+`src/upgrade.py`
+```python
+from pydantic import BaseModel
+
+class KafkaDependenciesModel(BaseModel):
+    kafka_charm: DependencyModel
+    kafka_service: DependencyModel
+```
+
+### Overrides for `DataUpgrade`
+
+Charm authors must define their own class, inheriting from `DataUpgrade`, overriding all required `abstractmethod`s.
+
+```python
+class ZooKeeperUpgrade(DataUpgrade):
+    def __init__(self, charm: "ZooKeeperUpgrade", **kwargs):
+        super().__init__(charm, **kwargs)
+        self.charm = charm
+```
+
+#### Implementation of `pre_upgrade_check()`
+
+Before upgrading a cluster, it's a good idea to check that it is stable and healthy before permitting it.
+Here, charm authors can validate upgrade safety through API calls, relation-data checks, etc.
+If any of these checks fail, raise `ClusterNotReadyError`.
+
+```python
+    @override
+    def pre_upgrade_check(self) -> None:
+        default_message = "Pre-upgrade check failed and cannot safely upgrade"
+        try:
+            if not self.client.members_broadcasting or not len(self.client.server_members) == len(
+                self.charm.cluster.peer_units
+            ):
+                raise ClusterNotReadyError(
+                    message=default_message,
+                    cause="Not all application units are connected and broadcasting in the quorum",
+                )
+
+            if self.client.members_syncing:
+                raise ClusterNotReadyError(
+                    message=default_message, cause="Some quorum members are syncing data"
+                )
+
+            if not self.charm.cluster.stable:
+                raise ClusterNotReadyError(
+                    message=default_message, cause="Charm has not finished initialising"
+                )
+
+        except QuorumLeaderNotFoundError:
+            raise ClusterNotReadyError(message=default_message, cause="Quorum leader not found")
+        except ConnectionClosedError:
+            raise ClusterNotReadyError(
+                message=default_message, cause="Unable to connect to the cluster"
+            )
+```
+
+#### Implementation of `build_upgrade_stack()` - VM ONLY
+
+Oftentimes, it is necessary to ensure that the workload leader is the last unit to upgrade,
+to ensure high-availability during the upgrade process.
+Here, charm authors can create a LIFO stack of unit.ids, represented as a list of unit.id strings,
+with the leader unit being at i[0].
+
+```python
+@override
+def build_upgrade_stack(self) -> list[int]:
+    upgrade_stack = []
+    for unit in self.charm.cluster.peer_units:
+        config = self.charm.cluster.unit_config(unit=unit)
+
+        # upgrade quorum leader last
+        if config["host"] == self.client.leader:
+            upgrade_stack.insert(0, int(config["unit_id"]))
+        else:
+            upgrade_stack.append(int(config["unit_id"]))
+
+    return upgrade_stack
+```
+
+#### Implementation of `_on_upgrade_granted()`
+
+On relation-changed events, each unit will check the current upgrade-stack persisted to relation data.
+If that unit is at the top of the stack, it will emit an `upgrade-granted` event, which must be handled.
+Here, workloads can be re-installed with new versions, checks can be made, data synced etc.
+If the new unit successfully rejoined the cluster, call `set_unit_completed()`.
+If the new unit failed to rejoin the cluster, call `set_unit_failed()`.
+
+NOTE - It is essential here to manually call `on_upgrade_changed` if the unit is the current leader.
+This ensures that the leader gets it's own relation-changed event, and updates the upgrade-stack for
+other units to follow suit.
+
+```python
+@override
+def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
+    self.charm.snap.stop_snap_service()
+
+    if not self.charm.snap.install():
+        logger.error("Unable to install ZooKeeper Snap")
+        self.set_unit_failed()
+        return None
+
+    logger.info(f"{self.charm.unit.name} upgrading service...")
+    self.charm.snap.restart_snap_service()
+
+    try:
+        logger.debug("Running post-upgrade check...")
+        self.pre_upgrade_check()
+
+        logger.debug("Marking unit completed...")
+        self.set_unit_completed()
+
+        # ensures leader gets it's own relation-changed when it upgrades
+        if self.charm.unit.is_leader():
+            logger.debug("Re-emitting upgrade-changed on leader...")
+            self.on_upgrade_changed(event)
+
+    except ClusterNotReadyError as e:
+        logger.error(e.cause)
+        self.set_unit_failed()
+```
+
+#### Implementation of `log_rollback_instructions()`
+
+If the upgrade fails, manual intervention may be required for cluster recovery.
+Here, charm authors can log out any necessary steps to take to recover from a failed upgrade.
+When a unit fails, this library will automatically log out this message.
+
+```python
+@override
+def log_rollback_instructions(self) -> None:
+    logger.error("Upgrade failed. Please run `juju refresh` to previous version.")
+```
+
+### Instantiating in the charm and deferring events
+
+Charm authors must add a class attribute for the child class of `DataUpgrade` in the main charm.
+They must also ensure that any non-upgrade related events that may be unsafe to handle during
+an upgrade, are deferred if the unit is not in the `idle` state - i.e not currently upgrading.
+
+```python
+class ZooKeeperCharm(CharmBase):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.upgrade = ZooKeeperUpgrade(
+            self,
+            relation_name = "upgrade",
+            substrate = "vm",
+            dependency_model=ZooKeeperDependencyModel(
+                **DEPENDENCIES
+            ),
+        )
+
+    def restart(self, event) -> None:
+        if not self.upgrade.state == "idle":
+            event.defer()
+            return None
+
+        self.restart_snap_service()
+```
+"""
 
 import json
 import logging
@@ -38,7 +284,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 9
 
 PYDEPS = ["pydantic>=1.10,<2"]
 
@@ -77,27 +323,26 @@ def verify_caret_requirements(version: str, requirement: str) -> bool:
     sem_version = build_complete_sem_ver(version)
     sem_requirement = build_complete_sem_ver(requirement)
 
-    # caret uses first non-zero character, not enough to just count '.
-    max_version_index = requirement.count(".")
-    for i, semver in enumerate(sem_requirement):
-        if semver != 0:
-            max_version_index = i
-            break
+    # caret uses first non-zero character, not enough to just count '.'
+    if sem_requirement[0] == 0:
+        max_version_index = requirement.count(".")
+        for i, semver in enumerate(sem_requirement):
+            if semver != 0:
+                max_version_index = i
+                break
+    else:
+        max_version_index = 0
 
     for i in range(3):
         # version higher than first non-zero
-        if (i < max_version_index) and (sem_version[i] > sem_requirement[i]):
+        if (i <= max_version_index) and (sem_version[i] != sem_requirement[i]):
             return False
 
         # version either higher or lower than first non-zero
-        if (i == max_version_index) and (sem_version[i] != sem_requirement[i]):
+        if (i > max_version_index) and (sem_version[i] < sem_requirement[i]):
             return False
 
-        # valid
-        if (i > max_version_index) and (sem_version[i] > sem_requirement[i]):
-            return True
-
-    return False
+    return True
 
 
 def verify_tilde_requirements(version: str, requirement: str) -> bool:
@@ -403,16 +648,7 @@ class DependencyError(UpgradeError):
 
 
 class UpgradeGrantedEvent(EventBase):
-    """Used to tell units that they can process an upgrade.
-
-    Handlers of this event must meet the following:
-        - SHOULD check for related application deps from :class:`DataUpgrade.dependencies`
-            - MAY raise :class:`DependencyError` if dependency not met
-        - MUST update unit `state` after validating the success of the upgrade, calling one of:
-            - :class:`DataUpgrade.set_unit_failed` if the unit upgrade fails
-            - :class:`DataUpgrade.set_unit_completed` if the unit upgrade succeeds
-        - MUST call :class:`DataUpgarde.on_upgrade_changed` on exit so event not lost on leader
-    """
+    """Used to tell units that they can process an upgrade."""
 
 
 class UpgradeFinishedEvent(EventBase):
@@ -433,7 +669,7 @@ class UpgradeEvents(CharmEvents):
 
 
 class DataUpgrade(Object, ABC):
-    """Manages `upgrade` relation operators for in-place upgrades."""
+    """Manages `upgrade` relation operations for in-place upgrades."""
 
     STATES = ["recovery", "failed", "idle", "ready", "upgrading", "completed"]
 
@@ -573,6 +809,15 @@ class DataUpgrade(Object, ABC):
             return sorted(self.unit_states, key=self.STATES.index)[0]
         except (ValueError, KeyError):
             return None
+
+    @property
+    def idle(self) -> Optional[bool]:
+        """Flag for whether the cluster is in an idle upgrade state.
+
+        Returns:
+            True if all application units in idle state. Otherwise False
+        """
+        return self.cluster_state == "idle"
 
     @abstractmethod
     def pre_upgrade_check(self) -> None:
@@ -859,18 +1104,25 @@ class DataUpgrade(Object, ABC):
                 logger.info("All units completed upgrade, setting idle upgrade state...")
                 self.charm.unit.status = ActiveStatus()
                 self.peer_relation.data[self.charm.unit].update({"state": "idle"})
+
+                if self.charm.unit.is_leader():
+                    logger.debug("Persisting new dependencies to upgrade relation data...")
+                    self.peer_relation.data[self.charm.app].update(
+                        {"dependencies": json.dumps(self.dependency_model.dict())}
+                    )
                 return
+
             if self.cluster_state == "idle":
                 logger.debug("upgrade-changed event handled before pre-checks, exiting...")
                 return
-            else:
-                logger.debug("Did not find upgrade-stack or completed cluster state, deferring...")
-                event.defer()
-                return
-        else:
-            # upgrade ongoing, set status for waiting units
-            if "upgrading" in self.unit_states and self.state in ["idle", "ready"]:
-                self.charm.unit.status = WaitingStatus("other units upgrading first...")
+
+            logger.debug("Did not find upgrade-stack or completed cluster state, deferring...")
+            event.defer()
+            return
+
+        # upgrade ongoing, set status for waiting units
+        if "upgrading" in self.unit_states and self.state in ["idle", "ready"]:
+            self.charm.unit.status = WaitingStatus("other units upgrading first...")
 
         # pop mutates the `upgrade_stack` attr
         top_unit_id = self.upgrade_stack.pop()
@@ -901,10 +1153,25 @@ class DataUpgrade(Object, ABC):
             )
             self.charm.unit.status = MaintenanceStatus("upgrading...")
             self.peer_relation.data[self.charm.unit].update({"state": "upgrading"})
-            getattr(self.on, "upgrade_granted").emit()
+
+            try:
+                getattr(self.on, "upgrade_granted").emit()
+            except DependencyError as e:
+                logger.error(e)
+                self.set_unit_failed()
+                return
 
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
-        """Handler for `upgrade-granted` events."""
+        """Handler for `upgrade-granted` events.
+
+        Handlers of this event must meet the following:
+            - SHOULD check for related application deps from :class:`DataUpgrade.dependencies`
+                - MAY raise :class:`DependencyError` if dependency not met
+            - MUST update unit `state` after validating the success of the upgrade, calling one of:
+                - :class:`DataUpgrade.set_unit_failed` if the unit upgrade fails
+                - :class:`DataUpgrade.set_unit_completed` if the unit upgrade succeeds
+            - MUST call :class:`DataUpgarde.on_upgrade_changed` on exit so event not lost on leader
+        """
         # don't raise if k8s substrate, only return
         if self.substrate == "k8s":
             return

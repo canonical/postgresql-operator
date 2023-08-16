@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 import logging
+import subprocess
+import zipfile
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
@@ -65,11 +68,46 @@ async def test_upgrade(ops_test: OpsTest, continuous_writes) -> None:
 
     # Run juju refresh.
     logger.info("refreshing the charm")
-    application = ops_test.model.applications[app]
     charm = await ops_test.build_charm(".")
-    await application.refresh(path=charm)
+    print(f"charm: {charm}")
+    modified_charm = f"{charm}.modified"
+    print(f"modified_charm: {modified_charm}")
+    with zipfile.ZipFile(charm, "r") as charm_file, zipfile.ZipFile(
+        modified_charm, "w"
+    ) as modified_charm_file:
+        # Iterate the input files
+        unix_attributes = {}
+        for charm_info in charm_file.infolist():
+            # Read input file
+            with charm_file.open(charm_info) as file:
+                print(f"charm_info.filename: {charm_info.filename}")
+                if charm_info.filename == "src/dependency.json":
+                    content = json.loads(file.read())
+                    # Modify the content of the file by replacing a string
+                    content["snap"]["upgrade_supported"] = "^15"
+                    content["snap"]["version"] = "15.1"
+                    # Write content.
+                    modified_charm_file.writestr(charm_info.filename, json.dumps(content))
+                else:  # Other file, don't want to modify => just copy it.
+                    content = file.read()
+                    modified_charm_file.writestr(charm_info.filename, content)
+                unix_attributes[charm_info.filename] = charm_info.external_attr >> 16
+
+        for modified_charm_info in modified_charm_file.infolist():
+            modified_charm_info.external_attr = unix_attributes[modified_charm_info.filename] << 16
+    process = subprocess.run(
+        f"juju refresh --model {ops_test.model.info.name} {app} --path {modified_charm}".split(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+    )
+    if process.returncode != 0:
+        raise Exception(
+            f"Expected juju refresh command to succeed instead it failed: {process.returncode} - {process.stderr.decode()}"
+        )
     async with ops_test.fast_forward(fast_interval="30s"):
-        await ops_test.model.wait_for_idle(apps=[app], status="active", idle_period=15)
+        await ops_test.model.wait_for_idle(
+            apps=[app], status="active", idle_period=15, raise_on_blocked=True
+        )
 
     # Check whether writes are increasing.
     logger.info("checking whether writes are increasing")

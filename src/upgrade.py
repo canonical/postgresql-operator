@@ -26,6 +26,7 @@ class PostgreSQLDependencyModel(BaseModel):
     """PostgreSQL dependencies model."""
 
     charm: DependencyModel
+    snap: DependencyModel
 
 
 def get_postgresql_dependencies_model() -> PostgreSQLDependencyModel:
