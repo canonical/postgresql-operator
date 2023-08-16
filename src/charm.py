@@ -34,6 +34,7 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
     SecretNotFoundError,
     Unit,
@@ -953,6 +954,12 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.error("failed to set up postgresql_exporter options")
             self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
             return
+
+        # Open port
+        try:
+            self.unit.open_port("tcp", 5432)
+        except ModelError:
+            logger.exception("failed to open port")
 
         # Only the leader can bootstrap the cluster.
         # On replicas, only prepare for starting the instance later.
