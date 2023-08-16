@@ -758,7 +758,7 @@ class PostgresqlOperatorCharm(CharmBase):
         ips = json.loads(self._peers.data[self.app].get("members_ips", "[]"))
         if ip_to_add and ip_to_add not in ips:
             ips.append(ip_to_add)
-        elif ip_to_remove:
+        elif ip_to_remove and ip_to_remove in ips:
             ips.remove(ip_to_remove)
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
 
