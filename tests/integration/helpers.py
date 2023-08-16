@@ -788,19 +788,29 @@ async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
     subprocess.check_call(restart_machine_command.split())
 
 
-async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -> str:
+async def run_command_on_unit(
+    ops_test: OpsTest, unit_name: str, command: str, timeout: int = None
+) -> str:
     """Run a command on a specific unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit to run the command on
         command: The command to run
+        timeout: Timeout in seconds for the command to succeed
 
     Returns:
         the command output if it succeeds, otherwise raises an exception.
     """
     complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
-    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    try:
+        command_execution = ops_test.juju(*complete_command)
+        if timeout is not None:
+            command_execution = asyncio.wait_for(command_execution, timeout)
+        result = await command_execution
+        return_code, stdout = result[0], result[1]
+    except TimeoutError:
+        raise TimeoutError("Expected command %s to succeed instead it timed out")
     if return_code != 0:
         raise Exception(
             "Expected command %s to succeed instead it failed: %s", command, return_code

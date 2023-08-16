@@ -380,11 +380,16 @@ async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
     Returns:
         The (str) ip of the unit
     """
-    application = unit_name.split("/")[0]
-    for unit in ops_test.model.applications[application].units:
-        if unit.name == unit_name:
-            break
-    return await instance_ip(ops_test, unit.machine.hostname)
+    try:
+        return (await run_command_on_unit(ops_test, unit_name, "hostname -I", timeout=10)).split()[
+            0
+        ]
+    except TimeoutError:
+        application = unit_name.split("/")[0]
+        for unit in ops_test.model.applications[application].units:
+            if unit.name == unit_name:
+                break
+        return await instance_ip(ops_test, unit.machine.hostname)
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
@@ -679,15 +684,15 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
 
 
 @retry(stop=stop_after_attempt(20), wait=wait_fixed(30))
-async def wait_network_restore(ops_test: OpsTest, hostname: str, old_ip: str) -> None:
+async def wait_network_restore(ops_test: OpsTest, unit_name: str, old_ip: str) -> None:
     """Wait until network is restored.
 
     Args:
         ops_test: pytest plugin helper
-        hostname: The name of the instance
+        unit_name: The name of the unit
         old_ip: old registered IP address
     """
-    if await instance_ip(ops_test, hostname) == old_ip:
+    if await get_unit_ip(ops_test, unit_name) == old_ip:
         raise Exception
 
 

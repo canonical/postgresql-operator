@@ -444,7 +444,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Wait the LXD unit has its IP updated.
     logger.info("waiting for IP address to be updated on Juju unit")
-    await wait_network_restore(ops_test, primary_hostname, primary_ip)
+    await wait_network_restore(ops_test, primary_name, primary_ip)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
