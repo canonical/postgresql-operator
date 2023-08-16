@@ -34,6 +34,7 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     Relation,
     SecretNotFoundError,
     Unit,
@@ -956,8 +957,8 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Open port
         try:
-            subprocess.check_call(["open-port", "5432/tcp"])
-        except subprocess.CalledProcessError:
+            self.unit.open_port("tcp", 5432)
+        except ModelError:
             logger.exception("failed to open port")
 
         # Only the leader can bootstrap the cluster.

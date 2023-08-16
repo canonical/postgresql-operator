@@ -242,7 +242,6 @@ class TestCharm(unittest.TestCase):
                 harness.charm.enable_disable_extensions()
                 self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 2)
 
-    @patch("subprocess.check_call")
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
@@ -280,7 +279,6 @@ class TestCharm(unittest.TestCase):
         _get_postgresql_version,
         _snap_cache,
         _enable_disable_extensions,
-        _check_call,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -313,8 +311,6 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
         # Set an initial waiting status (like after the install hook was triggered).
         self.harness.model.unit.status = WaitingStatus("fake message")
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
 
         # Test the event of an error happening when trying to create the default postgres user.
         _member_started.return_value = True
@@ -322,8 +318,6 @@ class TestCharm(unittest.TestCase):
         _postgresql.create_user.assert_called_once()
         _oversee_users.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
 
         # Set an initial waiting status again (like after the install hook was triggered).
         self.harness.model.unit.status = WaitingStatus("fake message")
@@ -336,10 +330,7 @@ class TestCharm(unittest.TestCase):
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
 
-    @patch("subprocess.check_call")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
@@ -367,7 +358,6 @@ class TestCharm(unittest.TestCase):
         _configure_patroni_on_unit,
         _get_postgresql_version,
         _snap_cache,
-        _check_call,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -382,8 +372,6 @@ class TestCharm(unittest.TestCase):
         self.charm._peers.data[self.charm.app].update({"cluster_initialised": ""})
         self.charm.on.start.emit()
         _defer.assert_called_once()
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
 
         # Set an initial waiting status again (like after a machine restart).
         self.harness.model.unit.status = WaitingStatus("fake message")
@@ -394,8 +382,6 @@ class TestCharm(unittest.TestCase):
         self.charm.on.start.emit()
         _configure_patroni_on_unit.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
 
         # Set an initial waiting status (like after the install hook was triggered).
         self.harness.model.unit.status = WaitingStatus("fake message")
@@ -406,17 +392,7 @@ class TestCharm(unittest.TestCase):
         self.charm.on.start.emit()
         _configure_patroni_on_unit.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
 
-        # port open failure will not fail the hook
-        _check_call.side_effect = subprocess.CalledProcessError(1, "fake command")
-        self.charm.on.start.emit()
-        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
-        _check_call.reset_mock()
-
-    @patch("subprocess.check_call")
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm.postgresql")
@@ -430,7 +406,6 @@ class TestCharm(unittest.TestCase):
         patroni,
         _postgresql,
         _snap_cache,
-        _check_call,
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -446,7 +421,6 @@ class TestCharm(unittest.TestCase):
         _postgresql.create_user.assert_not_called()
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
         self.assertEqual(self.harness.model.unit.status.message, "awaiting for member to start")
-        _check_call.assert_called_once_with(["open-port", "5432/tcp"])
 
     @patch("charm.Patroni.bootstrap_cluster")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
