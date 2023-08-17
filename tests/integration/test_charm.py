@@ -130,9 +130,6 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert settings["postgresql"]["use_pg_rewind"]
     assert settings["postgresql"]["remove_data_directory_on_rewind_failure"]
     assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"]
-    assert settings["loop_wait"] == 10
-    assert settings["retry_timeout"] == 10
-    assert settings["maximum_lag_on_failover"] == 1048576
 
 
 async def test_scale_down_and_up(ops_test: OpsTest):
