@@ -213,7 +213,7 @@ async def count_writes(
                 down_ips.append(unit.public_address)
                 down_ips.append(await get_unit_ip(ops_test, unit.name))
     count = {}
-    max = {}
+    maximum = {}
     for member in cluster["members"]:
         if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
@@ -227,9 +227,9 @@ async def count_writes(
                 cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
                 results = cursor.fetchone()
                 count[member["name"]] = results[0]
-                max[member["name"]] = results[1]
+                maximum[member["name"]] = results[1]
             connection.close()
-    return count, max
+    return count, maximum
 
 
 def cut_network_from_unit(machine_name: str) -> None:
