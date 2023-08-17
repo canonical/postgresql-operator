@@ -809,7 +809,7 @@ async def run_command_on_unit(
             command_execution = asyncio.wait_for(command_execution, timeout)
         result = await command_execution
         return_code, stdout = result[0], result[1]
-    except TimeoutError:
+    except (asyncio.exceptions.CancelledError, asyncio.exceptions.TimeoutError):
         raise TimeoutError("Expected command %s to succeed instead it timed out")
     if return_code != 0:
         raise Exception(
