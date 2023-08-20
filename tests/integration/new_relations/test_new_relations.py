@@ -32,6 +32,7 @@ SECOND_DATABASE_RELATION_NAME = "second-database"
 MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "multiple-database-clusters"
 ALIASED_MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "aliased-multiple-database-clusters"
 NO_DATABASE_RELATION_NAME = "no-database"
+INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 
 @pytest.mark.abort_on_fail
@@ -478,3 +479,64 @@ async def test_admin_role(ops_test: OpsTest):
         pass
     finally:
         connection.close()
+
+
+async def test_invalid_extra_user_roles(ops_test: OpsTest):
+    async with ops_test.fast_forward():
+        # Remove the relation between the database and the first data integrator.
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME
+        )
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
+
+        another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
+        data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
+        await ops_test.model.deploy(
+            DATA_INTEGRATOR_APP_NAME, application_name=another_data_integrator_app_name
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[another_data_integrator_app_name], status="blocked"
+        )
+        for app in data_integrator_apps_names:
+            await ops_test.model.applications[app].set_config(
+                {
+                    "database-name": app.replace("-", "_"),
+                    "extra-user-roles": "test",
+                }
+            )
+        await ops_test.model.wait_for_idle(apps=data_integrator_apps_names, status="blocked")
+        for app in data_integrator_apps_names:
+            await ops_test.model.add_relation(f"{app}:postgresql", f"{DATABASE_APP_NAME}:database")
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
+        ops_test.model.block_until(
+            lambda: any(
+                unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+                for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+            ),
+            timeout=1000,
+        )
+
+        # Verify that the charm remains blocked if there are still other relations with invalid
+        # extra user roles.
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+            f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
+        ops_test.model.block_until(
+            lambda: any(
+                unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+                for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+            ),
+            timeout=1000,
+        )
+
+        # Verify that active status is restored after all relations are removed.
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+            f"{DATABASE_APP_NAME}:database", f"{another_data_integrator_app_name}:postgresql"
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME],
+            status="active",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
