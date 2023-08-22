@@ -147,7 +147,7 @@ class Patroni:
             verify=self.verify,
             timeout=API_REQUEST_TIMEOUT,
         )
-        return set([member["name"] for member in cluster_status.json()["members"]])
+        return {member["name"] for member in cluster_status.json()["members"]}
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
