@@ -284,7 +284,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 8
+LIBPATCH = 11
 
 PYDEPS = ["pydantic>=1.10,<2"]
 
@@ -323,27 +323,26 @@ def verify_caret_requirements(version: str, requirement: str) -> bool:
     sem_version = build_complete_sem_ver(version)
     sem_requirement = build_complete_sem_ver(requirement)
 
-    # caret uses first non-zero character, not enough to just count '.
-    max_version_index = requirement.count(".")
-    for i, semver in enumerate(sem_requirement):
-        if semver != 0:
-            max_version_index = i
-            break
+    # caret uses first non-zero character, not enough to just count '.'
+    if sem_requirement[0] == 0:
+        max_version_index = requirement.count(".")
+        for i, semver in enumerate(sem_requirement):
+            if semver != 0:
+                max_version_index = i
+                break
+    else:
+        max_version_index = 0
 
     for i in range(3):
         # version higher than first non-zero
-        if (i < max_version_index) and (sem_version[i] > sem_requirement[i]):
+        if (i <= max_version_index) and (sem_version[i] != sem_requirement[i]):
             return False
 
         # version either higher or lower than first non-zero
-        if (i == max_version_index) and (sem_version[i] != sem_requirement[i]):
+        if (i > max_version_index) and (sem_version[i] < sem_requirement[i]):
             return False
 
-        # valid
-        if (i > max_version_index) and (sem_version[i] > sem_requirement[i]):
-            return True
-
-    return False
+    return True
 
 
 def verify_tilde_requirements(version: str, requirement: str) -> bool:
@@ -818,7 +817,7 @@ class DataUpgrade(Object, ABC):
         Returns:
             True if all application units in idle state. Otherwise False
         """
-        return self.cluster_state == "idle"
+        return set(self.unit_states) == {"idle"}
 
     @abstractmethod
     def pre_upgrade_check(self) -> None:
@@ -1118,7 +1117,6 @@ class DataUpgrade(Object, ABC):
                 return
 
             logger.debug("Did not find upgrade-stack or completed cluster state, deferring...")
-            event.defer()
             return
 
         # upgrade ongoing, set status for waiting units
