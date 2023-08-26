@@ -316,7 +316,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 17
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -365,11 +365,11 @@ def diff(event: RelationChangedEvent, bucket: Union[Unit, Application]) -> Diff:
     return Diff(added, changed, deleted)
 
 
-# Base DataProvides and DataRequires
+# Base DataRelation
 
 
-class DataProvides(Object, ABC):
-    """Base provides-side of the data products relation."""
+class DataRelation(Object, ABC):
+    """Base relation data mainpulation class."""
 
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
@@ -379,23 +379,11 @@ class DataProvides(Object, ABC):
         self.relation_name = relation_name
         self.framework.observe(
             charm.on[relation_name].relation_changed,
-            self._on_relation_changed,
+            self._on_relation_changed_event,
         )
 
-    def _diff(self, event: RelationChangedEvent) -> Diff:
-        """Retrieves the diff of the data in the relation changed databag.
-
-        Args:
-            event: relation changed event.
-
-        Returns:
-            a Diff instance containing the added, deleted and changed
-                keys from the event relation databag.
-        """
-        return diff(event, self.local_app)
-
     @abstractmethod
-    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Event emitted when the relation data has changed."""
         raise NotImplementedError
 
@@ -404,10 +392,11 @@ class DataProvides(Object, ABC):
 
         This function can be used to retrieve data from a relation
         in the charm code when outside an event callback.
+        Function cannot be used in `*-relation-broken` events and will raise an exception.
 
         Returns:
             a dict of the values stored in the relation data bag
-                for all relation instances (indexed by the relation id).
+                for all relation instances (indexed by the relation ID).
         """
         data = {}
         for relation in self.relations:
@@ -430,13 +419,49 @@ class DataProvides(Object, ABC):
                 that should be updated in the relation.
         """
         if self.local_unit.is_leader():
-            if relation := self.charm.model.get_relation(self.relation_name, relation_id):
+            relation = self.charm.model.get_relation(self.relation_name, relation_id)
+            if relation:
                 relation.data[self.local_app].update(data)
+
+    @staticmethod
+    def _is_relation_active(relation: Relation):
+        """Whether the relation is active based on contained data."""
+        try:
+            _ = repr(relation.data)
+            return True
+        except (RuntimeError, ModelError):
+            return False
 
     @property
     def relations(self) -> List[Relation]:
         """The list of Relation instances associated with this relation_name."""
-        return list(self.charm.model.relations[self.relation_name])
+        return [
+            relation
+            for relation in self.charm.model.relations[self.relation_name]
+            if self._is_relation_active(relation)
+        ]
+
+
+# Base DataProvides and DataRequires
+
+
+class DataProvides(DataRelation):
+    """Base provides-side of the data products relation."""
+
+    def __init__(self, charm: CharmBase, relation_name: str) -> None:
+        super().__init__(charm, relation_name)
+
+    def _diff(self, event: RelationChangedEvent) -> Diff:
+        """Retrieves the diff of the data in the relation changed databag.
+
+        Args:
+            event: relation changed event.
+
+        Returns:
+            a Diff instance containing the added, deleted and changed
+                keys from the event relation databag.
+        """
+        return diff(event, self.local_app)
 
     def set_credentials(self, relation_id: int, username: str, password: str) -> None:
         """Set credentials.
@@ -476,7 +501,7 @@ class DataProvides(Object, ABC):
         self._update_relation_data(relation_id, {"tls-ca": tls_ca})
 
 
-class DataRequires(Object, ABC):
+class DataRequires(DataRelation):
     """Requires-side of the relation."""
 
     def __init__(
@@ -487,61 +512,15 @@ class DataRequires(Object, ABC):
     ):
         """Manager of base client relations."""
         super().__init__(charm, relation_name)
-        self.charm = charm
         self.extra_user_roles = extra_user_roles
-        self.local_app = self.charm.model.app
-        self.local_unit = self.charm.unit
-        self.relation_name = relation_name
         self.framework.observe(
             self.charm.on[relation_name].relation_created, self._on_relation_created_event
-        )
-        self.framework.observe(
-            self.charm.on[relation_name].relation_changed, self._on_relation_changed_event
         )
 
     @abstractmethod
     def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
         """Event emitted when the relation is created."""
         raise NotImplementedError
-
-    @abstractmethod
-    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
-        raise NotImplementedError
-
-    def fetch_relation_data(self) -> dict:
-        """Retrieves data from relation.
-
-        This function can be used to retrieve data from a relation
-        in the charm code when outside an event callback.
-        Function cannot be used in `*-relation-broken` events and will raise an exception.
-
-        Returns:
-            a dict of the values stored in the relation data bag
-                for all relation instances (indexed by the relation ID).
-        """
-        data = {}
-        for relation in self.relations:
-            data[relation.id] = (
-                {key: value for key, value in relation.data[relation.app].items() if key != "data"}
-                if relation.app
-                else {}
-            )
-        return data
-
-    def _update_relation_data(self, relation_id: int, data: dict) -> None:
-        """Updates a set of key-value pairs in the relation.
-
-        This function writes in the application data bag, therefore,
-        only the leader unit can call it.
-
-        Args:
-            relation_id: the identifier for a particular relation.
-            data: dict containing the key-value pairs
-                that should be updated in the relation.
-        """
-        if self.local_unit.is_leader():
-            relation = self.charm.model.get_relation(self.relation_name, relation_id)
-            relation.data[self.local_app].update(data)
 
     def _diff(self, event: RelationChangedEvent) -> Diff:
         """Retrieves the diff of the data in the relation changed databag.
@@ -554,23 +533,6 @@ class DataRequires(Object, ABC):
                 keys from the event relation databag.
         """
         return diff(event, self.local_unit)
-
-    @property
-    def relations(self) -> List[Relation]:
-        """The list of Relation instances associated with this relation_name."""
-        return [
-            relation
-            for relation in self.charm.model.relations[self.relation_name]
-            if self._is_relation_active(relation)
-        ]
-
-    @staticmethod
-    def _is_relation_active(relation: Relation):
-        try:
-            _ = repr(relation.data)
-            return True
-        except (RuntimeError, ModelError):
-            return False
 
     @staticmethod
     def _is_resource_created_for_relation(relation: Relation) -> bool:
@@ -797,7 +759,7 @@ class DatabaseProvides(DataProvides):
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
 
-    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Event emitted when the relation has changed."""
         # Only the leader should handle this event.
         if not self.local_unit.is_leader():
@@ -938,11 +900,8 @@ class DatabaseRequires(DataRequires):
 
         # Return if an alias was already assigned to this relation
         # (like when there are more than one unit joining the relation).
-        if (
-            self.charm.model.get_relation(self.relation_name, relation_id)
-            .data[self.local_unit]
-            .get("alias")
-        ):
+        relation = self.charm.model.get_relation(self.relation_name, relation_id)
+        if relation and relation.data[self.local_unit].get("alias"):
             return
 
         # Retrieve the available aliases (the ones that weren't assigned to any relation).
@@ -955,7 +914,8 @@ class DatabaseRequires(DataRequires):
 
         # Set the alias in the unit relation databag of the specific relation.
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
-        relation.data[self.local_unit].update({"alias": available_aliases[0]})
+        if relation:
+            relation.data[self.local_unit].update({"alias": available_aliases[0]})
 
     def _emit_aliased_event(self, event: RelationChangedEvent, event_name: str) -> None:
         """Emit an aliased event to a particular relation if it has an alias.
@@ -1197,7 +1157,7 @@ class KafkaProvides(DataProvides):
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
 
-    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Event emitted when the relation has changed."""
         # Only the leader should handle this event.
         if not self.local_unit.is_leader():
@@ -1377,7 +1337,7 @@ class OpenSearchProvides(DataProvides):
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
 
-    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Event emitted when the relation has changed."""
         # Only the leader should handle this event.
         if not self.local_unit.is_leader():
