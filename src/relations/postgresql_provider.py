@@ -202,7 +202,10 @@ class PostgreSQLProvider(Object):
             if relation.id == relation_id:
                 continue
             for data in relation.data.values():
-                extra_user_roles = tuple(data.get("extra-user-roles", "").lower().split(","))
+                extra_user_roles = data.get("extra-user-roles")
+                if extra_user_roles is None:
+                    break
+                extra_user_roles = extra_user_roles.lower().split(",")
                 for extra_user_role in extra_user_roles:
                     if (
                         extra_user_role not in valid_privileges
