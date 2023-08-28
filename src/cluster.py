@@ -498,7 +498,7 @@ class Patroni:
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o644)
+        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
