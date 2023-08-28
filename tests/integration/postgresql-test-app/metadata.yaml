@@ -1,11 +1,12 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-name: application
+name: postgresql-test-app
 description: |
-  Data platform libs application charm used in integration tests.
+  Postgresql application charm used in integration tests.
 summary: |
   Data platform libs application meant to be used
   only for testing of the libs in this repository.
+
 requires:
   first-database:
     interface: postgresql_client
@@ -18,3 +19,7 @@ requires:
     limit: 2
   no-database:
     interface: postgresql_client
+
+peers:
+  postgresql-test-peers:
+    interface: postgresql-test-peers

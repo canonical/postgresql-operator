@@ -21,7 +21,7 @@ from tests.integration.new_relations.helpers import (
 
 logger = logging.getLogger(__name__)
 
-APPLICATION_APP_NAME = "application"
+APPLICATION_APP_NAME = "postgresql-test-app"
 DATABASE_APP_NAME = "database"
 ANOTHER_DATABASE_APP_NAME = "another-database"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
@@ -35,26 +35,26 @@ NO_DATABASE_RELATION_NAME = "no-database"
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_charms(ops_test: OpsTest, application_charm, database_charm):
+async def test_deploy_charms(ops_test: OpsTest, postgrsql_test_app_charm, charm):
     """Deploy both charms (application and database) to use in the tests."""
     # Deploy both charms (multiple units for each application to test that later they correctly
     # set data in the relation application databag using only the leader unit).
     async with ops_test.fast_forward():
         await asyncio.gather(
             ops_test.model.deploy(
-                application_charm,
+                postgrsql_test_app_charm,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
                 series=CHARM_SERIES,
             ),
             ops_test.model.deploy(
-                database_charm,
+                charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
                 series=CHARM_SERIES,
             ),
             ops_test.model.deploy(
-                database_charm,
+                charm,
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
                 series=CHARM_SERIES,
@@ -175,7 +175,7 @@ async def test_user_with_extra_roles(ops_test: OpsTest):
 
 
 async def test_two_applications_doesnt_share_the_same_relation_data(
-    ops_test: OpsTest, application_charm
+    ops_test: OpsTest, postgrsql_test_app_charm
 ):
     """Test that two different application connect to the database with different credentials."""
     # Set some variables to use in this test.
@@ -185,7 +185,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
 
     # Deploy another application.
     await ops_test.model.deploy(
-        application_charm,
+        postgrsql_test_app_charm,
         application_name=another_application_app_name,
     )
     await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
@@ -210,7 +210,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
     # Check that the user cannot access other databases.
     for application, other_application_database in [
         (APPLICATION_APP_NAME, "another_application_first_database"),
-        (another_application_app_name, "application_first_database"),
+        (another_application_app_name, f"{APPLICATION_APP_NAME.replace('-', '_')}_first_database"),
     ]:
         connection_string = await build_connection_string(
             ops_test, application, FIRST_DATABASE_RELATION_NAME, database="postgres"
@@ -227,9 +227,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
             psycopg2.connect(connection_string)
 
 
-async def test_an_application_can_connect_to_multiple_database_clusters(
-    ops_test: OpsTest, database_charm
-):
+async def test_an_application_can_connect_to_multiple_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters
     # and wait for them exchanging some connection data.
@@ -259,9 +257,7 @@ async def test_an_application_can_connect_to_multiple_database_clusters(
     assert application_connection_string != another_application_connection_string
 
 
-async def test_an_application_can_connect_to_multiple_aliased_database_clusters(
-    ops_test: OpsTest, database_charm
-):
+async def test_an_application_can_connect_to_multiple_aliased_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters
     # and wait for them exchanging some connection data.
@@ -294,7 +290,7 @@ async def test_an_application_can_connect_to_multiple_aliased_database_clusters(
     assert application_connection_string != another_application_connection_string
 
 
-async def test_an_application_can_request_multiple_databases(ops_test: OpsTest, application_charm):
+async def test_an_application_can_request_multiple_databases(ops_test: OpsTest):
     """Test that an application can request additional databases using the same interface."""
     # Relate the charms using another relation and wait for them exchanging some connection data.
     await ops_test.model.add_relation(
@@ -416,7 +412,7 @@ async def test_admin_role(ops_test: OpsTest):
     # Check that the user can access all the databases.
     for database in [
         "postgres",
-        "application_first_database",
+        f"{APPLICATION_APP_NAME.replace('-', '_')}_first_database",
         "another_application_first_database",
     ]:
         logger.info(f"connecting to the following database: {database}")
