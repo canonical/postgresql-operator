@@ -188,7 +188,7 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
 async def check_writes(ops_test) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes, max_number_written = await tes(ops_test)
+    actual_writes, max_number_written = await count_writes(ops_test)
     for member, count in actual_writes.items():
         assert (
             count == max_number_written[member]
