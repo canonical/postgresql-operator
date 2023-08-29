@@ -112,7 +112,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
         # Scale down to be able to restore.
         async with ops_test.fast_forward():
-            await ops_test.model.units.get(replica).remove()
+            await ops_test.model.destroy_unit(replica)
             await ops_test.model.block_until(
                 lambda: len(ops_test.model.applications[database_app_name].units) == 1
             )
@@ -299,7 +299,7 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     # Provide valid backup configurations, with another path in the S3 bucket.
     logger.info("configuring S3 integrator for a valid cloud")
     config = cloud_configs[0][AWS].copy()
-    config["path"] = f"/postgresql-k8s/{uuid.uuid1()}"
+    config["path"] = f"/postgresql/{uuid.uuid1()}"
     await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(config)
     logger.info("waiting for the database charm to become active")
     await ops_test.model.wait_for_idle(

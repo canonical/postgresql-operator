@@ -1,0 +1,22 @@
+groups:
+  - name: PostgresqlExporterK8s
+
+    rules:
+      # Based on https://samber.github.io/awesome-prometheus-alerts/rules#rule-postgresql-1-1
+      - alert: PostgresqlDown
+        expr: pg_up == 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Postgresql down (instance {{ $labels.instance }})
+          description: "Postgresql instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+    # Based on https://samber.github.io/awesome-prometheus-alerts/rules#rule-postgresql-1-2
+      - alert: PostgresqlRestarted
+        expr: time() - pg_postmaster_start_time_seconds < 60
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: Postgresql restarted (instance {{ $labels.instance }})
+          description: "Postgresql restarted\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"

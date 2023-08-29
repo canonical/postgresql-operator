@@ -134,6 +134,12 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert settings["retry_timeout"] == 10
     assert settings["maximum_lag_on_failover"] == 1048576
 
+    logger.warning("Asserting port ranges")
+    unit = ops_test.model.applications[DATABASE_APP_NAME].units[unit_id]
+    assert unit.data["port-ranges"][0]["from-port"] == 5432
+    assert unit.data["port-ranges"][0]["to-port"] == 5432
+    assert unit.data["port-ranges"][0]["protocol"] == "tcp"
+
 
 async def test_scale_down_and_up(ops_test: OpsTest):
     """Test data is replicated to new units after a scale up."""
