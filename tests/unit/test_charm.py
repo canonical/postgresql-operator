@@ -1180,3 +1180,36 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(relation_data.get("ip-to-remove"), "2.2.2.2")
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.Patroni.render_file")
+    @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files")
+    def test_push_tls_files_to_workload(self, _get_tls_files, _render_file, _update_config):
+        _get_tls_files.side_effect = [
+            ("key", "ca", "cert"),
+            ("key", "ca", None),
+            ("key", None, "cert"),
+            (None, "ca", "cert"),
+        ]
+        _update_config.side_effect = [True, False, False, False]
+
+        # Test when all TLS files are available.
+        self.assertTrue(self.charm.push_tls_files_to_workload())
+        self.assertEqual(_render_file.call_count, 3)
+
+        # Test when not all TLS files are available.
+        for _ in range(3):
+            _render_file.reset_mock()
+            self.assertFalse(self.charm.push_tls_files_to_workload())
+            self.assertEqual(_render_file.call_count, 2)
+
+    @patch("charm.snap.SnapCache")
+    def test_is_workload_running(self, _snap_cache):
+        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+
+        pg_snap.present = False
+        self.assertFalse(self.charm._is_workload_running)
+
+        pg_snap.present = True
+        self.assertTrue(self.charm._is_workload_running)
