@@ -79,7 +79,7 @@ def ops_test(ops_test: OpsTest) -> OpsTest:
 
 
 @pytest.fixture(scope="module")
-async def postgrsql_test_app_charm(ops_test: OpsTest):
+async def postgresql_test_app_charm(ops_test: OpsTest):
     """Build the application charm."""
     charm_path = "tests/integration/postgresql-test-app"
     charm = await ops_test.build_charm(charm_path)
