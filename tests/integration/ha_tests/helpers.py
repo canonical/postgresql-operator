@@ -615,7 +615,7 @@ async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
         for relation in ops_test.model.applications[app].relations
         if not relation.is_peer
         and f"{relation.requires.application_name}:{relation.requires.name}"
-        == f"{APPLICATION_NAME.replace('-', '_')}_first_database"
+        == f"{APPLICATION_NAME}:first-database"
     ]
     if not relations:
         await ops_test.model.relate(app, f"{APPLICATION_NAME}:first-database")

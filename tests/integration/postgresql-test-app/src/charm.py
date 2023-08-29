@@ -8,12 +8,14 @@ This charm is meant to be used only for testing
 of the libraries in this repository.
 """
 
+import json
 import logging
 import os
 import signal
 import subprocess
 from typing import Dict, Optional
 
+import ops.lib
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseCreatedEvent,
@@ -26,6 +28,8 @@ from ops.model import ActiveStatus, Relation
 from tenacity import RetryError, Retrying, stop_after_delay, wait_fixed
 
 logger = logging.getLogger(__name__)
+
+pgsql = ops.lib.use("pgsql", 1, "postgresql-charmers@lists.launchpad.net")
 
 # Extra roles that this application needs when interacting with the database.
 EXTRA_USER_ROLES = "CREATEDB,CREATEROLE"
@@ -138,6 +142,15 @@ class ApplicationCharm(CharmBase):
 
         # Relation used to test the situation where no database name is provided.
         self.no_database = DatabaseRequires(self, "no-database", database_name="")
+
+        # Legacy interface
+        self.db = pgsql.PostgreSQLClient(self, "db")
+        self.framework.observe(
+            self.db.on.database_relation_joined, self._on_database_relation_joined
+        )
+
+        self.framework.observe(self.on.run_sql_action, self._on_run_sql_action)
+        self.framework.observe(self.on.test_tls_action, self._on_test_tls_action)
 
     def _on_start(self, _) -> None:
         """Only sets an Active status."""
@@ -349,6 +362,123 @@ class ApplicationCharm(CharmBase):
         os.remove(LAST_WRITTEN_FILE)
         os.remove(CONFIG_FILE)
         return last_written_value
+
+    # Legacy event handlers
+    def _on_database_relation_joined(
+        self, event: pgsql.DatabaseRelationJoinedEvent  # type: ignore
+    ) -> None:
+        """Handle db-relation-joined.
+
+        Args:
+            event: Event triggering the database relation joined handler.
+        """
+        if self.model.unit.is_leader():
+            event.database = "db_with_extensions"
+            event.extensions = ["pg_trgm:public", "unaccent:public"]
+
+    # Run_sql action handler
+    def _on_run_sql_action(self, event: ActionEvent):
+        """An action that allows us to run SQL queries from this charm."""
+        logger.info(event.params)
+
+        relation_id = event.params["relation-id"]
+        relation_name = event.params["relation-name"]
+        if relation_name == self.first_database.relation_name:
+            relation = self.first_database
+        elif relation_name == self.second_database.relation_name:
+            relation = self.second_database
+        else:
+            event.fail(message="invalid relation name")
+
+        databag = relation.fetch_relation_data()[relation_id]
+
+        dbname = event.params["dbname"]
+        query = event.params["query"]
+        user = databag.get("username")
+        password = databag.get("password")
+
+        if event.params["readonly"]:
+            host = databag.get("read-only-endpoints").split(",")[0]
+            dbname = f"{dbname}_readonly"
+        else:
+            host = databag.get("endpoints").split(",")[0]
+        endpoint = host.split(":")[0]
+        port = host.split(":")[1]
+
+        logger.info(f"running query: \n{query}")
+        connection = self.connect_to_database(
+            database=dbname, user=user, password=password, host=endpoint, port=port
+        )
+        cursor = connection.cursor()
+        cursor.execute(query)
+
+        try:
+            results = cursor.fetchall()
+        except psycopg2.Error as error:
+            results = [str(error)]
+        logger.info(results)
+
+        event.set_results({"results": json.dumps(results)})
+
+    def _on_test_tls_action(self, event: ActionEvent):
+        """An action that allows us to run SQL queries from this charm."""
+        logger.info(event.params)
+
+        relation_id = event.params["relation-id"]
+        relation_name = event.params["relation-name"]
+        if relation_name == self.first_database.relation_name:
+            relation = self.first_database
+        elif relation_name == self.second_database.relation_name:
+            relation = self.second_database
+        else:
+            event.fail(message="invalid relation name")
+
+        databag = relation.fetch_relation_data()[relation_id]
+
+        dbname = event.params["dbname"]
+        user = databag.get("username")
+        password = databag.get("password")
+
+        if event.params["readonly"]:
+            host = databag.get("read-only-endpoints").split(",")[0]
+            dbname = f"{dbname}_readonly"
+        else:
+            host = databag.get("endpoints").split(",")[0]
+        endpoint = host.split(":")[0]
+        port = host.split(":")[1]
+
+        try:
+            connection = self.connect_to_database(
+                database=dbname, user=user, password=password, host=endpoint, port=port, tls=True
+            )
+            connection.close()
+            event.set_results({"results": "True"})
+        except psycopg2.OperationalError:
+            event.set_results({"results": "False"})
+
+    def connect_to_database(
+        self, host: str, port: str, database: str, user: str, password: str, tls: bool = False
+    ) -> psycopg2.extensions.connection:
+        """Creates a psycopg2 connection object to the database, with autocommit enabled.
+
+        Args:
+            host: network host for the database
+            port: port on which to access the database
+            database: database to connect to
+            user: user to use to connect to the database
+            password: password for the given user
+            tls: whether to require TLS
+
+        Returns:
+            psycopg2 connection object using the provided data
+        """
+        connstr = f"dbname='{database}' user='{user}' host='{host}' port='{port}' password='{password}' connect_timeout=1"
+        if tls:
+            connstr = f"{connstr} sslmode=require"
+        logger.debug(f"connecting to database: \n{connstr}")
+        connection = psycopg2.connect(connstr)
+        connection.autocommit = True
+        return connection
 
 
 if __name__ == "__main__":
