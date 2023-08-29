@@ -14,12 +14,12 @@ run = True
 connection_string = None
 
 
-def sigterm_handler(_signo, _stack_frame):
+def _sigterm_handler(_signo, _stack_frame):
     global run
     run = False
 
 
-def read_config_file():
+def _read_config_file():
     with open("/tmp/continuous_writes_config") as fd:
         global connection_string
         connection_string = fd.read().strip()
@@ -34,7 +34,7 @@ def continuous_writes(starting_number: int):
     """
     write_value = starting_number
 
-    read_config_file()
+    _read_config_file()
 
     # Continuously write the record to the database (incrementing it at each iteration).
     while run:
@@ -53,6 +53,7 @@ def continuous_writes(starting_number: int):
 
 
 def write(write_value: int) -> None:
+    """Writes to the database and handles expected errors."""
     try:
         with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
             connection.autocommit = True
@@ -76,10 +77,11 @@ def write(write_value: int) -> None:
 
 
 def main():
+    """Main executor."""
     starting_number = int(sys.argv[1])
     continuous_writes(starting_number)
 
 
 if __name__ == "__main__":
-    signal.signal(signal.SIGTERM, sigterm_handler)
+    signal.signal(signal.SIGTERM, _sigterm_handler)
     main()
