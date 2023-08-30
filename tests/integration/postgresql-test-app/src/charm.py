@@ -166,6 +166,23 @@ class ApplicationCharm(CharmBase):
     def _on_first_database_endpoints_changed(self, event: DatabaseEndpointsChangedEvent) -> None:
         """Event triggered when the read/write endpoints of the database change."""
         logger.info(f"first database endpoints have been changed to: {event.endpoints}")
+        if self._connection_string is None:
+            return
+
+        if not self.app_peer_data.get(PROC_PID_KEY):
+            return None
+
+        with open(CONFIG_FILE, "w") as fd:
+            fd.write(self._connection_string)
+            os.fsync(fd)
+
+        try:
+            os.kill(int(self.app_peer_data[PROC_PID_KEY]), signal.SIGKILL)
+        except ProcessLookupError:
+            del self.app_peer_data[PROC_PID_KEY]
+            return
+        count = self._count_writes()
+        self._start_continuous_writes(count + 1)
 
     # Second database events observers.
     def _on_second_database_created(self, event: DatabaseCreatedEvent) -> None:
