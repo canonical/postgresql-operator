@@ -990,12 +990,14 @@ class TestCharm(unittest.TestCase):
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock)
     @patch("charm.Patroni.render_patroni_yml_file")
     @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files")
     def test_update_config(
         self,
         _get_tls_files,
         _render_patroni_yml_file,
+        _is_workload_running,
         _member_started,
         _reload_patroni_configuration,
         _restart,
@@ -1003,7 +1005,8 @@ class TestCharm(unittest.TestCase):
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.
-            postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False])
+            postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
+            _is_workload_running.side_effect = [True, True, False, True]
             _member_started.side_effect = [True, True, False]
 
             # Test without TLS files available.
@@ -1048,7 +1051,7 @@ class TestCharm(unittest.TestCase):
                 self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
             )
 
-            # Test with member not started yet.
+            # Test with workload not running yet.
             self.harness.update_relation_data(
                 self.rel_id, self.charm.unit.name, {"tls": ""}
             )  # Mock some data in the relation to test that it change.
@@ -1058,6 +1061,17 @@ class TestCharm(unittest.TestCase):
             _restart.assert_called_once()
             self.assertEqual(
                 self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["tls"], "enabled"
+            )
+
+            # Test with member not started yet.
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.unit.name, {"tls": ""}
+            )  # Mock some data in the relation to test that it doesn't change.
+            self.charm.update_config()
+            _reload_patroni_configuration.assert_not_called()
+            _restart.assert_called_once()
+            self.assertNotIn(
+                "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
             )
 
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
@@ -1294,3 +1308,36 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(relation_data.get("ip-to-remove"), "2.2.2.2")
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.Patroni.render_file")
+    @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files")
+    def test_push_tls_files_to_workload(self, _get_tls_files, _render_file, _update_config):
+        _get_tls_files.side_effect = [
+            ("key", "ca", "cert"),
+            ("key", "ca", None),
+            ("key", None, "cert"),
+            (None, "ca", "cert"),
+        ]
+        _update_config.side_effect = [True, False, False, False]
+
+        # Test when all TLS files are available.
+        self.assertTrue(self.charm.push_tls_files_to_workload())
+        self.assertEqual(_render_file.call_count, 3)
+
+        # Test when not all TLS files are available.
+        for _ in range(3):
+            _render_file.reset_mock()
+            self.assertFalse(self.charm.push_tls_files_to_workload())
+            self.assertEqual(_render_file.call_count, 2)
+
+    @patch("charm.snap.SnapCache")
+    def test_is_workload_running(self, _snap_cache):
+        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+
+        pg_snap.present = False
+        self.assertFalse(self.charm._is_workload_running)
+
+        pg_snap.present = True
+        self.assertTrue(self.charm._is_workload_running)
