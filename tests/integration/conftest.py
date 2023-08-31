@@ -79,14 +79,6 @@ def ops_test(ops_test: OpsTest) -> OpsTest:
 
 
 @pytest.fixture(scope="module")
-async def postgresql_test_app_charm(ops_test: OpsTest):
-    """Build the application charm."""
-    charm_path = "tests/integration/postgresql-test-app"
-    charm = await ops_test.build_charm(charm_path)
-    return charm
-
-
-@pytest.fixture(scope="module")
 async def charm(ops_test: OpsTest):
     """Build the charm-under-test."""
     # Build charm from local source folder.

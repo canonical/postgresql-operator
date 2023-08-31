@@ -36,17 +36,18 @@ INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_charms(ops_test: OpsTest, postgresql_test_app_charm, charm):
+async def test_deploy_charms(ops_test: OpsTest, charm):
     """Deploy both charms (application and database) to use in the tests."""
     # Deploy both charms (multiple units for each application to test that later they correctly
     # set data in the relation application databag using only the leader unit).
     async with ops_test.fast_forward():
         await asyncio.gather(
             ops_test.model.deploy(
-                postgresql_test_app_charm,
+                APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
                 series=CHARM_SERIES,
+                channel="edge",
             ),
             ops_test.model.deploy(
                 charm,
@@ -175,9 +176,7 @@ async def test_user_with_extra_roles(ops_test: OpsTest):
     connection.close()
 
 
-async def test_two_applications_doesnt_share_the_same_relation_data(
-    ops_test: OpsTest, postgresql_test_app_charm
-):
+async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: OpsTest):
     """Test that two different application connect to the database with different credentials."""
     # Set some variables to use in this test.
     another_application_app_name = "another-application"
@@ -186,8 +185,9 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
 
     # Deploy another application.
     await ops_test.model.deploy(
-        postgresql_test_app_charm,
+        APPLICATION_APP_NAME,
         application_name=another_application_app_name,
+        channel="edge",
     )
     await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
 

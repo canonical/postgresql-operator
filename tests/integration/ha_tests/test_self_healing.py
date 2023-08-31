@@ -80,9 +80,11 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
         async with ops_test.fast_forward():
-            charm = await ops_test.build_charm("tests/integration/postgresql-test-app")
             await ops_test.model.deploy(
-                charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
+                APPLICATION_NAME,
+                application_name=APPLICATION_NAME,
+                series=CHARM_SERIES,
+                channel="edge",
             )
 
     if wait_for_apps:
