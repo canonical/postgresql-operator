@@ -6,8 +6,8 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.ha_tests.conftest import APPLICATION_NAME
 from tests.integration.ha_tests.helpers import (
+    APPLICATION_NAME,
     app_name,
     are_writes_increasing,
     check_writes,
@@ -34,9 +34,11 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
         async with ops_test.fast_forward():
-            charm = await ops_test.build_charm("tests/integration/ha_tests/application-charm")
             await ops_test.model.deploy(
-                charm, application_name=APPLICATION_NAME, series=CHARM_SERIES
+                APPLICATION_NAME,
+                application_name=APPLICATION_NAME,
+                series=CHARM_SERIES,
+                channel="edge",
             )
 
     if wait_for_apps:
