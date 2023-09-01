@@ -5,7 +5,6 @@
 import json
 import logging
 import os
-import pwd
 import re
 import shutil
 import tempfile
@@ -243,21 +242,11 @@ class PostgreSQLBackups(Object):
     ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
 
-        def demote():
-            pw_record = pwd.getpwnam("snap_daemon")
-
-            def result():
-                os.setgid(pw_record.pw_gid)
-                os.setuid(pw_record.pw_uid)
-
-            return result
-
         process = run(
             command,
             input=command_input,
             stdout=PIPE,
             stderr=PIPE,
-            preexec_fn=demote(),
             timeout=timeout,
         )
         return process.returncode, process.stdout.decode(), process.stderr.decode()

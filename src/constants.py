@@ -30,9 +30,9 @@ MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
 
 # Snap constants.
-PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
+PGBACKREST_EXECUTABLE = "charmed-postgresql.constrained-pgbackrest"
 POSTGRESQL_SNAP_NAME = "charmed-postgresql"
-SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, {"revision": "70"})]
+SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, {"revision": "71"})]
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"

@@ -392,21 +392,18 @@ class TestPostgreSQLBackups(unittest.TestCase):
         )
         _update_config.assert_called_once()
 
-    @patch("pwd.getpwnam")
     @patch("backups.run")
-    def test_execute_command(self, _run, _getpwnam):
+    def test_execute_command(self, _run):
         # Test when the command fails.
         command = "rm -r /var/lib/postgresql/data/pgdata".split()
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         self.assertEqual(self.charm.backup._execute_command(command), (1, "", "fake stderr"))
         _run.assert_called_once_with(
-            command, input=None, stdout=PIPE, stderr=PIPE, preexec_fn=ANY, timeout=None
+            command, input=None, stdout=PIPE, stderr=PIPE, timeout=None
         )
-        _getpwnam.assert_called_once_with("snap_daemon")
 
         # Test when the command runs successfully.
         _run.reset_mock()
-        _getpwnam.reset_mock()
         _run.side_effect = None
         _run.return_value = CompletedProcess(command, 0, b"fake stdout", b"")
         self.assertEqual(
@@ -414,9 +411,8 @@ class TestPostgreSQLBackups(unittest.TestCase):
             (0, "fake stdout", ""),
         )
         _run.assert_called_once_with(
-            command, input=b"fake input", stdout=PIPE, stderr=PIPE, preexec_fn=ANY, timeout=5
+            command, input=b"fake input", stdout=PIPE, stderr=PIPE, timeout=5
         )
-        _getpwnam.assert_called_once_with("snap_daemon")
 
     def test_format_backup_list(self):
         # Test when there are no backups.
@@ -521,7 +517,7 @@ class TestPostgreSQLBackups(unittest.TestCase):
         # Test when the blocked state is any of the blocked stated that can be solved
         # by new S3 settings, but the stanza creation fails.
         stanza_creation_command = [
-            "charmed-postgresql.pgbackrest",
+            "charmed-postgresql.constrained-pgbackrest",
             "--config=/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
             f"--stanza={self.charm.backup.stanza_name}",
             "stanza-create",
