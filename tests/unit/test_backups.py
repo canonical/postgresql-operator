@@ -151,13 +151,12 @@ class TestPostgreSQLBackups(unittest.TestCase):
         )
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.Patroni.create_user_home_directory")
     @patch("charm.Patroni.reload_patroni_configuration")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.PostgreSQLBackups._execute_command")
     def test_can_use_s3_repository(
-        self, _execute_command, _update_config, _member_started, _reload_patroni_configuration, _create_home_dir
+        self, _execute_command, _update_config, _member_started, _reload_patroni_configuration
     ):
         # Define the stanza name inside the unit relation data.
         with self.harness.hooks_disabled():

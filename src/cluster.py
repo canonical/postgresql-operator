@@ -124,8 +124,6 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, 0o750)
 
-        self.create_user_home_directory()
-
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
 
@@ -161,15 +159,6 @@ class Patroni:
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
-
-    def create_user_home_directory(self) -> None:
-        """Creates the user home directory for the snap_daemon user.
-
-        This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
-        """
-        subprocess.run("mkdir -p /home/snap_daemon".split())
-        subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-        subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""

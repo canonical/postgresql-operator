@@ -359,7 +359,6 @@ class TestCluster(unittest.TestCase):
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
 
-    @patch("cluster.Patroni.create_user_home_directory")
     @patch("os.chmod")
     @patch("builtins.open")
     @patch("os.chown")
@@ -370,7 +369,6 @@ class TestCluster(unittest.TestCase):
         _chown,
         _open,
         _chmod,
-        _create_user_home_directory,
     ):
         _getpwnam.return_value.pw_uid = sentinel.uid
         _getpwnam.return_value.pw_gid = sentinel.gid
@@ -389,8 +387,6 @@ class TestCluster(unittest.TestCase):
         _chmod.assert_called_once_with(
             "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
         )
-
-        _create_user_home_directory.assert_called_once_with()
 
     @patch("cluster.requests.get")
     @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))
