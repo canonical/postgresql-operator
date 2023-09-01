@@ -4,7 +4,7 @@ import unittest
 from pathlib import PosixPath
 from subprocess import PIPE, CompletedProcess, TimeoutExpired
 from typing import OrderedDict
-from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
+from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
 
 import botocore as botocore
 from boto3.exceptions import S3UploadFailedError
@@ -398,9 +398,7 @@ class TestPostgreSQLBackups(unittest.TestCase):
         command = "rm -r /var/lib/postgresql/data/pgdata".split()
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         self.assertEqual(self.charm.backup._execute_command(command), (1, "", "fake stderr"))
-        _run.assert_called_once_with(
-            command, input=None, stdout=PIPE, stderr=PIPE, timeout=None
-        )
+        _run.assert_called_once_with(command, input=None, stdout=PIPE, stderr=PIPE, timeout=None)
 
         # Test when the command runs successfully.
         _run.reset_mock()

@@ -273,7 +273,7 @@ class TestCluster(unittest.TestCase):
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
-            0o640,
+            0o600,
         )
 
     @patch("charm.snap.SnapCache")

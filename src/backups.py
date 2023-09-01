@@ -241,7 +241,6 @@ class PostgreSQLBackups(Object):
         timeout: int = None,
     ) -> Tuple[int, str, str]:
         """Execute a command in the workload container."""
-
         process = run(
             command,
             input=command_input,
