@@ -359,7 +359,7 @@ class TestCluster(unittest.TestCase):
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
 
-    @patch("cluster.Patroni._create_user_home_directory")
+    @patch("cluster.Patroni.create_user_home_directory")
     @patch("os.chmod")
     @patch("builtins.open")
     @patch("os.chown")

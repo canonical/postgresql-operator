@@ -118,6 +118,9 @@ class PostgreSQLBackups(Object):
 
     def can_use_s3_repository(self) -> Tuple[bool, Optional[str]]:
         """Returns whether the charm was configured to use another cluster repository."""
+        # Make sure snap_daemon home exists
+        self.charm._patroni.create_user_home_directory()
+
         # Prevent creating backups and storing in another cluster repository.
         try:
             return_code, stdout, stderr = self._execute_command(
