@@ -642,7 +642,7 @@ Stderr:
         logger.info("Removing previous cluster information")
         return_code, _, stderr = self._execute_command(
             [
-                "charmed-postgresql.patronictl",
+                "charmed-postgresql.constrained-patronictl",
                 "-c",
                 f"{PATRONI_CONF_PATH}/patroni.yaml",
                 "remove",

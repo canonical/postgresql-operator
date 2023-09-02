@@ -989,7 +989,7 @@ Juju Version: test-juju-version
         )
         _execute_command.assert_called_once_with(
             [
-                "charmed-postgresql.patronictl",
+                "charmed-postgresql.constrained-patronictl",
                 "-c",
                 "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
                 "remove",
