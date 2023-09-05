@@ -63,6 +63,9 @@ bootstrap:
         archive_command: /bin/true
         {%- endif %}
         archive_mode: on
+        log_filename: 'postgresql.log'
+        log_directory: '{{ postgresql_log_path }}'
+        logging_collector: 'on'
         wal_level: logical
 
   {%- if restoring_backup %}
