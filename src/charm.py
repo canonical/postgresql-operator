@@ -822,6 +822,15 @@ class PostgresqlOperatorCharm(CharmBase):
         postgres_snap.alias("patronictl")
         postgres_snap.alias("psql")
 
+        # Create the user home directory for the snap_daemon user.
+        # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
+        try:
+            subprocess.check_call("mkdir -p /home/snap_daemon".split())
+            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
+            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())
+        except subprocess.CalledProcessError:
+            logger.exception("Unable to create snap_daemon home dir")
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
