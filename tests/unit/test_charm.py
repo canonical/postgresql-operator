@@ -331,6 +331,7 @@ class TestCharm(unittest.TestCase):
         _enable_disable_extensions.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
+    @patch("charm.PostgresqlOperatorCharm.get_secret")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
     @patch_network_get(private_address="1.1.1.1")
@@ -358,6 +359,7 @@ class TestCharm(unittest.TestCase):
         _configure_patroni_on_unit,
         _get_postgresql_version,
         _snap_cache,
+        _get_secret,
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -367,6 +369,7 @@ class TestCharm(unittest.TestCase):
         # Mock the passwords.
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
+        _get_secret.return_value = "fake-monitoring-passwordl"
 
         # Test an uninitialized cluster.
         self.charm._peers.data[self.charm.app].update({"cluster_initialised": ""})
