@@ -949,13 +949,11 @@ class PostgresqlOperatorCharm(CharmBase):
 
         try:
             # Set up the postgresql_exporter options.
-            if not self._setup_exporter():
-                logger.info("Monitoring password not ready")
-                event.defer()
-                return
+            self._setup_exporter()
         except snap.SnapError:
             logger.exception("failed to set up postgresql_exporter options")
             self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
+            event.defer()
             return
 
         # Open port
@@ -973,25 +971,21 @@ class PostgresqlOperatorCharm(CharmBase):
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
 
-    def _setup_exporter(self) -> bool:
+    def _setup_exporter(self) -> None:
         """Set up postgresql_exporter options."""
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
-        password = self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY)
-        if not password:
-            return False
 
         postgres_snap.set(
             {
                 "exporter.user": MONITORING_USER,
-                "exporter.password": password,
+                "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
             }
         )
         if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
-        return True
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
