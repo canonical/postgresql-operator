@@ -951,7 +951,7 @@ class PostgresqlOperatorCharm(CharmBase):
             # Set up the postgresql_exporter options.
             self._setup_exporter()
         except snap.SnapError:
-            logger.error("failed to set up postgresql_exporter options")
+            logger.exception("failed to set up postgresql_exporter options")
             self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
             return
 
