@@ -539,6 +539,9 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        if "exporter-started" not in self.unit_peer_data:
+            self._setup_exporter()
+
         self._update_new_unit_status()
 
     def _update_new_unit_status(self) -> None:
@@ -1391,10 +1394,7 @@ class PostgresqlOperatorCharm(CharmBase):
                 "Early exit update_config: Trying to reset metrics service with no configuration set"
             )
             return True
-        if (
-            snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY)
-            or "exporter-started" not in self.unit_peer_data
-        ):
+        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
             self._setup_exporter()
 
         return True

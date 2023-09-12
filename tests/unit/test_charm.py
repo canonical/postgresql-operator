@@ -1126,6 +1126,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
@@ -1142,6 +1143,7 @@ class TestCharm(unittest.TestCase):
         _member_started,
         _primary_endpoint,
         _update_relation_endpoints,
+        _,
     ):
         # Test an uninitialized cluster.
         mock_event = Mock()
