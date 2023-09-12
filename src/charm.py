@@ -947,16 +947,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
-        try:
-            # Set up the postgresql_exporter options.
-            # self._setup_exporter()
-            pass
-        except snap.SnapError:
-            logger.exception("failed to set up postgresql_exporter options")
-            self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
-            event.defer()
-            return
-
         # Open port
         try:
             self.unit.open_port("tcp", 5432)
@@ -987,6 +977,7 @@ class PostgresqlOperatorCharm(CharmBase):
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
+        self.unit_peer_data.update({"exporter-started": "True"})
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -1400,7 +1391,10 @@ class PostgresqlOperatorCharm(CharmBase):
                 "Early exit update_config: Trying to reset metrics service with no configuration set"
             )
             return True
-        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
+        if (
+            snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY)
+            or "exporter-started" not in self.unit_peer_data
+        ):
             self._setup_exporter()
 
         return True
