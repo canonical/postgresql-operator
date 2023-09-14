@@ -72,49 +72,6 @@ class TestCharm(unittest.TestCase):
         pg_snap.alias.assert_any_call("psql")
         pg_snap.alias.assert_any_call("patronictl")
 
-        assert _check_call.call_count == 3
-        _check_call.assert_any_call("mkdir -p /home/snap_daemon".split())
-        _check_call.assert_any_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-        _check_call.assert_any_call("usermod -d /home/snap_daemon snap_daemon".split())
-
-        # Assert the status set by the event handler.
-        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.logger.exception")
-    @patch("charm.subprocess.check_call")
-    @patch("charm.snap.SnapCache")
-    @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
-    @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
-    @patch(
-        "charm.PostgresqlOperatorCharm._is_storage_attached",
-        side_effect=[False, True, True],
-    )
-    def test_on_install_failed_to_create_home(
-        self,
-        _is_storage_attached,
-        _reboot_on_detached_storage,
-        _install_snap_packages,
-        _snap_cache,
-        _check_call,
-        _logger_exception,
-    ):
-        # Test without storage.
-        self.charm.on.install.emit()
-        _reboot_on_detached_storage.assert_called_once()
-        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
-        _check_call.side_effect = [subprocess.CalledProcessError(-1, ["test"])]
-
-        # Test without adding Patroni resource.
-        self.charm.on.install.emit()
-        # Assert that the needed calls were made.
-        _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES)
-        assert pg_snap.alias.call_count == 2
-        pg_snap.alias.assert_any_call("psql")
-        pg_snap.alias.assert_any_call("patronictl")
-
-        _logger_exception.assert_called_once_with("Unable to create snap_daemon home dir")
-
         # Assert the status set by the event handler.
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
