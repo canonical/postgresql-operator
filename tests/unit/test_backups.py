@@ -589,9 +589,16 @@ class TestPostgreSQLBackups(unittest.TestCase):
         self.assertFalse(self.charm.backup._is_primary_pgbackrest_service_running)
         _execute_command.assert_called_once()
 
+        # Test when the endpoint is not generated.
+        _execute_command.reset_mock()
+        _primary_endpoint.return_value = None
+        self.assertFalse(self.charm.backup._is_primary_pgbackrest_service_running)
+        _execute_command.assert_not_called()
+
         # Test when the pgBackRest succeeds on contacting the primary server.
         _execute_command.reset_mock()
         _execute_command.return_value = (0, "fake stdout", "")
+        _primary_endpoint.return_value = "fake_endpoint"
         self.assertTrue(self.charm.backup._is_primary_pgbackrest_service_running)
         _execute_command.assert_called_once()
 

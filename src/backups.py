@@ -399,6 +399,9 @@ class PostgreSQLBackups(Object):
 
     @property
     def _is_primary_pgbackrest_service_running(self) -> bool:
+        if not self.charm.primary_endpoint:
+            logger.warning("Failed to contact pgBackRest TLS server: no promary endpoint")
+            return False
         return_code, _, stderr = self._execute_command(
             [PGBACKREST_EXECUTABLE, "server-ping", "--io-timeout=10", self.charm.primary_endpoint]
         )
