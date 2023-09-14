@@ -539,6 +539,9 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        if "exporter-started" not in self.unit_peer_data:
+            self._setup_exporter()
+
         self._update_new_unit_status()
 
     def _update_new_unit_status(self) -> None:
@@ -956,14 +959,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
-        try:
-            # Set up the postgresql_exporter options.
-            self._setup_exporter()
-        except snap.SnapError:
-            logger.error("failed to set up postgresql_exporter options")
-            self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
-            return
-
         # Open port
         try:
             self.unit.open_port("tcp", 5432)
@@ -994,6 +989,7 @@ class PostgresqlOperatorCharm(CharmBase):
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
+        self.unit_peer_data.update({"exporter-started": "True"})
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
