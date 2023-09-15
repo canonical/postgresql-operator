@@ -134,10 +134,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await run_command_on_unit(
             ops_test,
             primary,
-            (
-                "grep 'connection authorized: user=rewind database=postgres SSL enabled' "
-                "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-            ),
+            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
         )
 
         # Remove the relation.
