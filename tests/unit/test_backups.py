@@ -588,7 +588,24 @@ class TestPostgreSQLBackups(unittest.TestCase):
         with self.harness.hooks_disabled():
             self.harness.set_leader()
 
+        # Test when the archiving is not working correctly (pgBackRest check command fails).
+        _execute_command.return_value = (49, "", "fake stderr")
+        _member_started.return_value = True
+        self.charm.backup.check_stanza()
+        self.assertEqual(_update_config.call_count, 2)
+        self.assertEqual(self.harness.get_relation_data(self.peer_rel_id, self.charm.app), {})
+        self.assertEqual(_member_started.call_count, 5)
+        self.assertEqual(_reload_patroni_configuration.call_count, 5)
+        self.assertIsInstance(self.charm.unit.status, BlockedStatus)
+        self.assertEqual(self.charm.unit.status.message, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+
         # Test when the archiving is working correctly (pgBackRest check command succeeds).
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.charm.app.name,
+                {"init-pgbackrest": "True"},
+            )
         _execute_command.reset_mock()
         _update_config.reset_mock()
         _member_started.reset_mock()
