@@ -83,7 +83,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 2
+LIBPATCH = 3
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -692,7 +692,7 @@ class SnapClient:
         socket_path: str = "/run/snapd.socket",
         opener: Optional[urllib.request.OpenerDirector] = None,
         base_url: str = "http://localhost/v2/",
-        timeout: float = 5.0,
+        timeout: float = 30.0,
     ):
         """Initialize a client instance.
 
@@ -701,7 +701,7 @@ class SnapClient:
             opener: specifies an opener for unix socket, if unspecified a default is used
             base_url: base url for making requests to the snap client. Defaults to
                 http://localhost/v2/
-            timeout: timeout in seconds to use when making requests to the API. Default is 5.0s.
+            timeout: timeout in seconds to use when making requests to the API. Default is 30.0s.
         """
         if opener is None:
             opener = self._get_default_opener(socket_path)

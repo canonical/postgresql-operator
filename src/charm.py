@@ -539,6 +539,8 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.backup.check_stanza()
+
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
 
