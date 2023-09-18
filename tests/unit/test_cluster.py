@@ -15,6 +15,7 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
+    POSTGRESQL_LOGS_PATH,
     REWIND_USER,
 )
 
@@ -245,6 +246,7 @@ class TestCluster(unittest.TestCase):
             conf_path=PATRONI_CONF_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             log_path=PATRONI_LOGS_PATH,
+            postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
