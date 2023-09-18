@@ -131,12 +131,11 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        logs = await run_command_on_unit(
-            ops_test, primary, "journalctl -u snap.charmed-postgresql.patroni.service"
+        await run_command_on_unit(
+            ops_test,
+            primary,
+            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
         )
-        assert (
-            "connection authorized: user=rewind database=postgres SSL enabled" in logs
-        ), "TLS is not being used on pg_rewind connections"
 
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
