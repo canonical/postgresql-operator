@@ -1370,6 +1370,7 @@ class PostgresqlOperatorCharm(CharmBase):
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
+            parameters=self.postgresql.build_postgresql_parameters(self.config["profile"], 0),
         )
         if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
