@@ -539,6 +539,11 @@ class PostgresqlOperatorCharm(CharmBase):
             event.defer()
             return
 
+        self.backup.check_stanza()
+
+        if "exporter-started" not in self.unit_peer_data:
+            self._setup_exporter()
+
         self._update_new_unit_status()
 
     def _update_new_unit_status(self) -> None:
@@ -822,6 +827,15 @@ class PostgresqlOperatorCharm(CharmBase):
         postgres_snap.alias("patronictl")
         postgres_snap.alias("psql")
 
+        # Create the user home directory for the snap_daemon user.
+        # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
+        try:
+            subprocess.check_call("mkdir -p /home/snap_daemon".split())
+            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
+            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())
+        except subprocess.CalledProcessError:
+            logger.exception("Unable to create snap_daemon home dir")
+
         self.unit.status = WaitingStatus("waiting to start PostgreSQL")
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
@@ -947,14 +961,6 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.unit.set_workload_version(self._patroni.get_postgresql_version())
 
-        try:
-            # Set up the postgresql_exporter options.
-            self._setup_exporter()
-        except snap.SnapError:
-            logger.error("failed to set up postgresql_exporter options")
-            self.unit.status = BlockedStatus("failed to set up postgresql_exporter options")
-            return
-
         # Open port
         try:
             self.unit.open_port("tcp", 5432)
@@ -985,6 +991,7 @@ class PostgresqlOperatorCharm(CharmBase):
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
+        self.unit_peer_data.update({"exporter-started": "True"})
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -1294,7 +1301,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         return self.model.get_relation(PEER)
 
-    def push_tls_files_to_workload(self) -> None:
+    def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
         key, ca, cert = self.tls.get_tls_files()
         if key is not None:
@@ -1304,7 +1311,7 @@ class PostgresqlOperatorCharm(CharmBase):
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
-        self.update_config()
+        return self.update_config()
 
     def _reboot_on_detached_storage(self, event: EventBase) -> None:
         """Reboot on detached storage.
@@ -1341,7 +1348,17 @@ class PostgresqlOperatorCharm(CharmBase):
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         self.backup.start_stop_pgbackrest_service()
 
-    def update_config(self, is_creating_backup: bool = False) -> None:
+    @property
+    def _is_workload_running(self) -> bool:
+        """Returns whether the workload is running (in an active state)."""
+        snap_cache = snap.SnapCache()
+        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
+        if not charmed_postgresql_snap.present:
+            return False
+
+        return charmed_postgresql_snap.services["patroni"]["active"]
+
+    def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = all(self.tls.get_tls_files())
 
@@ -1354,14 +1371,18 @@ class PostgresqlOperatorCharm(CharmBase):
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
         )
-        if not self._patroni.member_started:
+        if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            logger.debug("Early exit update_config: Workload not started yet")
+            return True
+
+        if not self._patroni.member_started:
             logger.debug("Early exit update_config: Patroni not started yet")
-            return
+            return False
 
         restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
         self._patroni.reload_patroni_configuration()
@@ -1383,9 +1404,11 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.warning(
                 "Early exit update_config: Trying to reset metrics service with no configuration set"
             )
-            return
+            return True
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
             self._setup_exporter()
+
+        return True
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""

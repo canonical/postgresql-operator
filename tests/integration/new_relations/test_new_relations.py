@@ -3,6 +3,8 @@
 # See LICENSE file for licensing details.
 import asyncio
 import logging
+import secrets
+import string
 from pathlib import Path
 
 import psycopg2
@@ -19,9 +21,10 @@ from tests.integration.new_relations.helpers import (
 
 logger = logging.getLogger(__name__)
 
-APPLICATION_APP_NAME = "application"
+APPLICATION_APP_NAME = "postgresql-test-app"
 DATABASE_APP_NAME = "database"
 ANOTHER_DATABASE_APP_NAME = "another-database"
+DATA_INTEGRATOR_APP_NAME = "data-integrator"
 APP_NAMES = [APPLICATION_APP_NAME, DATABASE_APP_NAME, ANOTHER_DATABASE_APP_NAME]
 DATABASE_APP_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 FIRST_DATABASE_RELATION_NAME = "first-database"
@@ -29,29 +32,31 @@ SECOND_DATABASE_RELATION_NAME = "second-database"
 MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "multiple-database-clusters"
 ALIASED_MULTIPLE_DATABASE_CLUSTERS_RELATION_NAME = "aliased-multiple-database-clusters"
 NO_DATABASE_RELATION_NAME = "no-database"
+INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 
 @pytest.mark.abort_on_fail
-async def test_deploy_charms(ops_test: OpsTest, application_charm, database_charm):
+async def test_deploy_charms(ops_test: OpsTest, charm):
     """Deploy both charms (application and database) to use in the tests."""
     # Deploy both charms (multiple units for each application to test that later they correctly
     # set data in the relation application databag using only the leader unit).
     async with ops_test.fast_forward():
         await asyncio.gather(
             ops_test.model.deploy(
-                application_charm,
+                APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
                 series=CHARM_SERIES,
+                channel="edge",
             ),
             ops_test.model.deploy(
-                database_charm,
+                charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
                 series=CHARM_SERIES,
             ),
             ops_test.model.deploy(
-                database_charm,
+                charm,
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
                 series=CHARM_SERIES,
@@ -171,9 +176,7 @@ async def test_user_with_extra_roles(ops_test: OpsTest):
     connection.close()
 
 
-async def test_two_applications_doesnt_share_the_same_relation_data(
-    ops_test: OpsTest, application_charm
-):
+async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: OpsTest):
     """Test that two different application connect to the database with different credentials."""
     # Set some variables to use in this test.
     another_application_app_name = "another-application"
@@ -182,8 +185,9 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
 
     # Deploy another application.
     await ops_test.model.deploy(
-        application_charm,
+        APPLICATION_APP_NAME,
         application_name=another_application_app_name,
+        channel="edge",
     )
     await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
 
@@ -207,7 +211,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
     # Check that the user cannot access other databases.
     for application, other_application_database in [
         (APPLICATION_APP_NAME, "another_application_first_database"),
-        (another_application_app_name, "application_first_database"),
+        (another_application_app_name, f"{APPLICATION_APP_NAME.replace('-', '_')}_first_database"),
     ]:
         connection_string = await build_connection_string(
             ops_test, application, FIRST_DATABASE_RELATION_NAME, database="postgres"
@@ -224,9 +228,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(
             psycopg2.connect(connection_string)
 
 
-async def test_an_application_can_connect_to_multiple_database_clusters(
-    ops_test: OpsTest, database_charm
-):
+async def test_an_application_can_connect_to_multiple_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters
     # and wait for them exchanging some connection data.
@@ -256,9 +258,7 @@ async def test_an_application_can_connect_to_multiple_database_clusters(
     assert application_connection_string != another_application_connection_string
 
 
-async def test_an_application_can_connect_to_multiple_aliased_database_clusters(
-    ops_test: OpsTest, database_charm
-):
+async def test_an_application_can_connect_to_multiple_aliased_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters
     # and wait for them exchanging some connection data.
@@ -291,7 +291,7 @@ async def test_an_application_can_connect_to_multiple_aliased_database_clusters(
     assert application_connection_string != another_application_connection_string
 
 
-async def test_an_application_can_request_multiple_databases(ops_test: OpsTest, application_charm):
+async def test_an_application_can_request_multiple_databases(ops_test: OpsTest):
     """Test that an application can request additional databases using the same interface."""
     # Relate the charms using another relation and wait for them exchanging some connection data.
     await ops_test.model.add_relation(
@@ -316,7 +316,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     # Retrieve the list of current database unit names.
     units_to_remove = [unit.name for unit in ops_test.model.applications[DATABASE_APP_NAME].units]
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval="60s"):
         # Add two more units.
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
@@ -365,6 +365,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
                     cursor.execute("DROP TABLE test;")
         connection.close()
 
+    async with ops_test.fast_forward():
         # Remove the relation and test that its user was deleted
         # (by checking that the connection string doesn't work anymore).
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
@@ -390,3 +391,148 @@ async def test_relation_with_no_database_name(ops_test: OpsTest):
             f"{DATABASE_APP_NAME}", f"{APPLICATION_APP_NAME}:{NO_DATABASE_RELATION_NAME}"
         )
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
+
+
+async def test_admin_role(ops_test: OpsTest):
+    """Test that the admin role gives access to all the databases."""
+    all_app_names = [DATA_INTEGRATOR_APP_NAME]
+    all_app_names.extend(APP_NAMES)
+    async with ops_test.fast_forward():
+        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
+        await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
+        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config(
+            {
+                "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
+                "extra-user-roles": "admin",
+            }
+        )
+        await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
+        await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
+        await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
+
+    # Check that the user can access all the databases.
+    for database in [
+        "postgres",
+        f"{APPLICATION_APP_NAME.replace('-', '_')}_first_database",
+        "another_application_first_database",
+    ]:
+        logger.info(f"connecting to the following database: {database}")
+        connection_string = await build_connection_string(
+            ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=database
+        )
+        connection = None
+        should_fail = False
+        try:
+            with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+                # Check the version that the application received is the same on the
+                # database server.
+                cursor.execute("SELECT version();")
+                data = cursor.fetchone()[0].split(" ")[1]
+
+                # Get the version of the database and compare with the information that
+                # was retrieved directly from the database.
+                version = await get_application_relation_data(
+                    ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", "version"
+                )
+                assert version == data
+
+                # Write some data (it should fail in the "postgres" database).
+                random_name = (
+                    f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+                )
+                should_fail = database == "postgres"
+                cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
+                if should_fail:
+                    assert (
+                        False
+                    ), f"failed to run a statement in the following database: {database}"
+        except psycopg2.errors.InsufficientPrivilege as e:
+            if not should_fail:
+                logger.exception(e)
+                assert (
+                    False
+                ), f"failed to connect to or run a statement in the following database: {database}"
+        finally:
+            if connection is not None:
+                connection.close()
+
+    # Test the creation and deletion of databases.
+    connection_string = await build_connection_string(
+        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database="postgres"
+    )
+    connection = psycopg2.connect(connection_string)
+    connection.autocommit = True
+    cursor = connection.cursor()
+    random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+    cursor.execute(f"CREATE DATABASE {random_name};")
+    cursor.execute(f"DROP DATABASE {random_name};")
+    try:
+        cursor.execute("DROP DATABASE postgres;")
+        assert False, "the admin extra user role was able to drop the `postgres` system database"
+    except psycopg2.errors.InsufficientPrivilege:
+        # Ignore the error, as the admin extra user role mustn't be able to drop
+        # the "postgres" system database.
+        pass
+    finally:
+        connection.close()
+
+
+async def test_invalid_extra_user_roles(ops_test: OpsTest):
+    async with ops_test.fast_forward():
+        # Remove the relation between the database and the first data integrator.
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME
+        )
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
+
+        another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
+        data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
+        await ops_test.model.deploy(
+            DATA_INTEGRATOR_APP_NAME, application_name=another_data_integrator_app_name
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[another_data_integrator_app_name], status="blocked"
+        )
+        for app in data_integrator_apps_names:
+            await ops_test.model.applications[app].set_config(
+                {
+                    "database-name": app.replace("-", "_"),
+                    "extra-user-roles": "test",
+                }
+            )
+        await ops_test.model.wait_for_idle(apps=data_integrator_apps_names, status="blocked")
+        for app in data_integrator_apps_names:
+            await ops_test.model.add_relation(f"{app}:postgresql", f"{DATABASE_APP_NAME}:database")
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
+        ops_test.model.block_until(
+            lambda: any(
+                unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+                for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+            ),
+            timeout=1000,
+        )
+
+        # Verify that the charm remains blocked if there are still other relations with invalid
+        # extra user roles.
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+            f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
+        ops_test.model.block_until(
+            lambda: any(
+                unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+                for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+            ),
+            timeout=1000,
+        )
+
+        # Verify that active status is restored after all relations are removed.
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+            f"{DATABASE_APP_NAME}:database", f"{another_data_integrator_app_name}:postgresql"
+        )
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME],
+            status="active",
+            raise_on_blocked=False,
+            timeout=1000,
+        )

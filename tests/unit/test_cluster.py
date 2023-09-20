@@ -15,6 +15,7 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
+    POSTGRESQL_LOGS_PATH,
     REWIND_USER,
 )
 
@@ -245,6 +246,7 @@ class TestCluster(unittest.TestCase):
             conf_path=PATRONI_CONF_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             log_path=PATRONI_LOGS_PATH,
+            postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
             peers_ips=self.peers_ips,
             scope=scope,
@@ -273,7 +275,7 @@ class TestCluster(unittest.TestCase):
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
-            0o644,
+            0o600,
         )
 
     @patch("charm.snap.SnapCache")
@@ -359,7 +361,6 @@ class TestCluster(unittest.TestCase):
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
 
-    @patch("cluster.Patroni._create_user_home_directory")
     @patch("os.chmod")
     @patch("builtins.open")
     @patch("os.chown")
@@ -370,7 +371,6 @@ class TestCluster(unittest.TestCase):
         _chown,
         _open,
         _chmod,
-        _create_user_home_directory,
     ):
         _getpwnam.return_value.pw_uid = sentinel.uid
         _getpwnam.return_value.pw_gid = sentinel.gid
@@ -389,8 +389,6 @@ class TestCluster(unittest.TestCase):
         _chmod.assert_called_once_with(
             "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
         )
-
-        _create_user_home_directory.assert_called_once_with()
 
     @patch("cluster.requests.get")
     @patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0))

@@ -32,6 +32,7 @@ from constants import (
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
+    POSTGRESQL_LOGS_PATH,
     POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     TLS_CA_FILE,
@@ -124,8 +125,6 @@ class Patroni:
         # Replicas refuse to start with the default permissions
         os.chmod(POSTGRESQL_DATA_PATH, 0o750)
 
-        self._create_user_home_directory()
-
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
 
@@ -147,7 +146,7 @@ class Patroni:
             verify=self.verify,
             timeout=API_REQUEST_TIMEOUT,
         )
-        return set([member["name"] for member in cluster_status.json()["members"]])
+        return {member["name"] for member in cluster_status.json()["members"]}
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
@@ -161,15 +160,6 @@ class Patroni:
         # Ensure correct permissions are set on the directory.
         os.chmod(path, mode)
         self._change_owner(path)
-
-    def _create_user_home_directory(self) -> None:
-        """Creates the user home directory for the snap_daemon user.
-
-        This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
-        """
-        subprocess.run("mkdir -p /home/snap_daemon".split())
-        subprocess.run("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-        subprocess.run("usermod -d /home/snap_daemon snap_daemon".split())
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
@@ -478,6 +468,7 @@ class Patroni:
             connectivity=connectivity,
             is_creating_backup=is_creating_backup,
             log_path=PATRONI_LOGS_PATH,
+            postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,
             member_name=self.member_name,
@@ -498,7 +489,7 @@ class Patroni:
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o644)
+        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.

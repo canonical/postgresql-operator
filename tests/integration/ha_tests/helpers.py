@@ -22,6 +22,7 @@ from tenacity import (
 
 from tests.integration.helpers import db_connect, get_unit_address, run_command_on_unit
 
+APPLICATION_NAME = "postgresql-test-app"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
@@ -213,13 +214,13 @@ async def count_writes(
                 down_ips.append(unit.public_address)
                 down_ips.append(await get_unit_ip(ops_test, unit.name))
     count = {}
-    max = {}
+    maximum = {}
     for member in cluster["members"]:
         if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
 
             connection_string = (
-                f"dbname='application' user='operator'"
+                f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
                 f" host='{host}' password='{password}' connect_timeout=10"
             )
 
@@ -227,9 +228,9 @@ async def count_writes(
                 cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
                 results = cursor.fetchone()
                 count[member["name"]] = results[0]
-                max[member["name"]] = results[1]
+                maximum[member["name"]] = results[1]
             connection.close()
-    return count, max
+    return count, maximum
 
 
 def cut_network_from_unit(machine_name: str) -> None:
@@ -584,7 +585,7 @@ async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_wr
         if unit.name == unit_name
     ][0]
     connection_string = (
-        f"dbname='application' user='operator'"
+        f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
     )
 
@@ -614,15 +615,15 @@ async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
         for relation in ops_test.model.applications[app].relations
         if not relation.is_peer
         and f"{relation.requires.application_name}:{relation.requires.name}"
-        == "application:database"
+        == f"{APPLICATION_NAME}:first-database"
     ]
     if not relations:
-        await ops_test.model.relate(app, "application")
+        await ops_test.model.relate(app, f"{APPLICATION_NAME}:first-database")
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
         with attempt:
             action = (
-                await ops_test.model.applications["application"]
+                await ops_test.model.applications[APPLICATION_NAME]
                 .units[0]
                 .run_action("start-continuous-writes")
             )
@@ -633,7 +634,7 @@ async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
 async def stop_continuous_writes(ops_test: OpsTest) -> int:
     """Stops continuous writes to PostgreSQL and returns the last written value."""
     action = (
-        await ops_test.model.applications["application"]
+        await ops_test.model.applications[APPLICATION_NAME]
         .units[0]
         .run_action("stop-continuous-writes")
     )

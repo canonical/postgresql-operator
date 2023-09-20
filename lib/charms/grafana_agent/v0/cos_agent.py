@@ -22,7 +22,7 @@ this charm library.
 Using the `COSAgentProvider` object only requires instantiating it,
 typically in the `__init__` method of your charm (the one which sends telemetry).
 
-The constructor of `COSAgentProvider` has only one required and eight optional parameters:
+The constructor of `COSAgentProvider` has only one required and nine optional parameters:
 
 ```python
     def __init__(
@@ -36,6 +36,7 @@ The constructor of `COSAgentProvider` has only one required and eight optional p
         log_slots: Optional[List[str]] = None,
         dashboard_dirs: Optional[List[str]] = None,
         refresh_events: Optional[List] = None,
+        scrape_configs: Optional[Union[List[Dict], Callable]] = None,
     ):
 ```
 
@@ -47,7 +48,8 @@ The constructor of `COSAgentProvider` has only one required and eight optional p
     the `cos_agent` interface, this is where you have to specify that.
 
 - `metrics_endpoints`: In this parameter you can specify the metrics endpoints that Grafana Agent
-    machine Charmed Operator will scrape.
+    machine Charmed Operator will scrape. The configs of this list will be merged with the configs
+    from `scrape_configs`.
 
 - `metrics_rules_dir`: The directory in which the Charmed Operator stores its metrics alert rules
   files.
@@ -62,6 +64,10 @@ The constructor of `COSAgentProvider` has only one required and eight optional p
 - `dashboard_dirs`: List of directories where the dashboards are stored in the Charmed Operator.
 
 - `refresh_events`: List of events on which to refresh relation data.
+
+- `scrape_configs`: List of standard scrape_configs dicts or a callable that returns the list in
+    case the configs need to be generated dynamically. The contents of this list will be merged
+    with the configs from `metrics_endpoints`.
 
 
 ### Example 1 - Minimal instrumentation:
@@ -91,6 +97,7 @@ class TelemetryProviderCharm(CharmBase):
             self,
             relation_name="custom-cos-agent",
             metrics_endpoints=[
+                # specify "path" and "port" to scrape from localhost
                 {"path": "/metrics", "port": 9000},
                 {"path": "/metrics", "port": 9001},
                 {"path": "/metrics", "port": 9002},
@@ -101,6 +108,46 @@ class TelemetryProviderCharm(CharmBase):
             log_slots=["my-app:slot"],
             dashboard_dirs=["./src/dashboards_1", "./src/dashboards_2"],
             refresh_events=["update-status", "upgrade-charm"],
+            scrape_configs=[
+                {
+                    "job_name": "custom_job",
+                    "metrics_path": "/metrics",
+                    "authorization": {"credentials": "bearer-token"},
+                    "static_configs": [
+                        {
+                            "targets": ["localhost:9003"]},
+                            "labels": {"key": "value"},
+                        },
+                    ],
+                },
+            ]
+        )
+```
+
+### Example 3 - Dynamic scrape configs generation:
+
+Pass a function to the `scrape_configs` to decouple the generation of the configs
+from the instantiation of the COSAgentProvider object.
+
+```python
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+...
+
+class TelemetryProviderCharm(CharmBase):
+    def generate_scrape_configs(self):
+        return [
+            {
+                "job_name": "custom",
+                "metrics_path": "/metrics",
+                "static_configs": [{"targets": ["localhost:9000"]}],
+            },
+        ]
+
+    def __init__(self, *args):
+        ...
+        self._grafana_agent = COSAgentProvider(
+            self,
+            scrape_configs=self.generate_scrape_configs,
         )
 ```
 
@@ -166,12 +213,12 @@ import lzma
 from collections import namedtuple
 from itertools import chain
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, ClassVar, Dict, List, Optional, Set, Union
+from typing import TYPE_CHECKING, Any, Callable, ClassVar, Dict, List, Optional, Set, Union
 
 import pydantic
 from cosl import JujuTopology
 from cosl.rules import AlertRules
-from ops.charm import RelationChangedEvent, RelationEvent
+from ops.charm import RelationChangedEvent
 from ops.framework import EventBase, EventSource, Object, ObjectEvents
 from ops.model import Relation, Unit
 from ops.testing import CharmType
@@ -189,15 +236,15 @@ if TYPE_CHECKING:
 
 LIBID = "dc15fa84cef84ce58155fb84f6c6213a"
 LIBAPI = 0
-LIBPATCH = 5
+LIBPATCH = 6
 
-PYDEPS = ["cosl", "pydantic<2"]
+PYDEPS = ["cosl", "pydantic < 2"]
 
 DEFAULT_RELATION_NAME = "cos-agent"
 DEFAULT_PEER_RELATION_NAME = "peers"
-DEFAULT_METRICS_ENDPOINT = {
-    "path": "/metrics",
-    "port": 80,
+DEFAULT_SCRAPE_CONFIG = {
+    "static_configs": [{"targets": ["localhost:80"]}],
+    "metrics_path": "/metrics",
 }
 
 logger = logging.getLogger(__name__)
@@ -238,6 +285,7 @@ class CosAgentProviderUnitData(pydantic.BaseModel):
     metrics_alert_rules: dict
     log_alert_rules: dict
     dashboards: List[GrafanaDashboard]
+    subordinate: Optional[bool]
 
     # The following entries may vary across units of the same principal app.
     # this data does not need to be forwarded to the gagent leader
@@ -295,6 +343,8 @@ class COSAgentProvider(Object):
         log_slots: Optional[List[str]] = None,
         dashboard_dirs: Optional[List[str]] = None,
         refresh_events: Optional[List] = None,
+        *,
+        scrape_configs: Optional[Union[List[dict], Callable]] = None,
     ):
         """Create a COSAgentProvider instance.
 
@@ -302,6 +352,8 @@ class COSAgentProvider(Object):
             charm: The `CharmBase` instance that is instantiating this object.
             relation_name: The name of the relation to communicate over.
             metrics_endpoints: List of endpoints in the form [{"path": path, "port": port}, ...].
+                This argument is a simplified form of the `scrape_configs`.
+                The contents of this list will be merged with the contents of `scrape_configs`.
             metrics_rules_dir: Directory where the metrics rules are stored.
             logs_rules_dir: Directory where the logs rules are stored.
             recurse_rules_dirs: Whether to recurse into rule paths.
@@ -309,13 +361,17 @@ class COSAgentProvider(Object):
                 in the form ["snap-name:slot", ...].
             dashboard_dirs: Directory where the dashboards are stored.
             refresh_events: List of events on which to refresh relation data.
+            scrape_configs: List of standard scrape_configs dicts or a callable
+                that returns the list in case the configs need to be generated dynamically.
+                The contents of this list will be merged with the contents of `metrics_endpoints`.
         """
         super().__init__(charm, relation_name)
         dashboard_dirs = dashboard_dirs or ["./src/grafana_dashboards"]
 
         self._charm = charm
         self._relation_name = relation_name
-        self._metrics_endpoints = metrics_endpoints or [DEFAULT_METRICS_ENDPOINT]
+        self._metrics_endpoints = metrics_endpoints or []
+        self._scrape_configs = scrape_configs or []
         self._metrics_rules = metrics_rules_dir
         self._logs_rules = logs_rules_dir
         self._recursive = recurse_rules_dirs
@@ -331,10 +387,7 @@ class COSAgentProvider(Object):
 
     def _on_refresh(self, event):
         """Trigger the class to update relation data."""
-        if isinstance(event, RelationEvent):
-            relations = [event.relation]
-        else:
-            relations = self._charm.model.relations[self._relation_name]
+        relations = self._charm.model.relations[self._relation_name]
 
         for relation in relations:
             # Before a principal is related to the grafana-agent subordinate, we'd get
@@ -349,6 +402,7 @@ class COSAgentProvider(Object):
                         dashboards=self._dashboards,
                         metrics_scrape_jobs=self._scrape_jobs,
                         log_slots=self._log_slots,
+                        subordinate=self._charm.meta.subordinate,
                     )
                     relation.data[self._charm.unit][data.KEY] = data.json()
                 except (
@@ -359,12 +413,34 @@ class COSAgentProvider(Object):
 
     @property
     def _scrape_jobs(self) -> List[Dict]:
-        """Return a prometheus_scrape-like data structure for jobs."""
-        job_name_prefix = self._charm.app.name
-        return [
-            {"job_name": f"{job_name_prefix}_{key}", **endpoint}
-            for key, endpoint in enumerate(self._metrics_endpoints)
-        ]
+        """Return a prometheus_scrape-like data structure for jobs.
+
+        https://prometheus.io/docs/prometheus/latest/configuration/configuration/#scrape_config
+        """
+        if callable(self._scrape_configs):
+            scrape_configs = self._scrape_configs()
+        else:
+            # Create a copy of the user scrape_configs, since we will mutate this object
+            scrape_configs = self._scrape_configs.copy()
+
+        # Convert "metrics_endpoints" to standard scrape_configs, and add them in
+        for endpoint in self._metrics_endpoints:
+            scrape_configs.append(
+                {
+                    "metrics_path": endpoint["path"],
+                    "static_configs": [{"targets": [f"localhost:{endpoint['port']}"]}],
+                }
+            )
+
+        scrape_configs = scrape_configs or [DEFAULT_SCRAPE_CONFIG]
+
+        # Augment job name to include the app name and a unique id (index)
+        for idx, scrape_config in enumerate(scrape_configs):
+            scrape_config["job_name"] = "_".join(
+                [self._charm.app.name, str(idx), scrape_config.get("job_name", "default")]
+            )
+
+        return scrape_configs
 
     @property
     def _metrics_alert_rules(self) -> Dict:
@@ -417,6 +493,12 @@ class COSAgentRequirerEvents(ObjectEvents):
 
     data_changed = EventSource(COSAgentDataChanged)
     validation_error = EventSource(COSAgentValidationError)
+
+
+class MultiplePrincipalsError(Exception):
+    """Custom exception for when there are multiple principal applications."""
+
+    pass
 
 
 class COSAgentRequirer(Object):
@@ -515,7 +597,9 @@ class COSAgentRequirer(Object):
             log_alert_rules=provider_data.log_alert_rules,
             dashboards=provider_data.dashboards,
         )
-        self.peer_relation.data[self._charm.unit][data.KEY] = data.json()
+        self.peer_relation.data[self._charm.unit][
+            f"{CosAgentPeersUnitData.KEY}-{event.unit.name}"
+        ] = data.json()
 
         # We can't easily tell if the data that was changed is limited to only the data
         # that goes into peer relation (in which case, if this is not a leader unit, we wouldn't
@@ -553,35 +637,40 @@ class COSAgentRequirer(Object):
 
     @property
     def _principal_relations(self):
-        # Technically it's a list, but for subordinates there can only be one.
-        return self._charm.model.relations[self._relation_name]
+        relations = []
+        for relation in self._charm.model.relations[self._relation_name]:
+            if not json.loads(relation.data[next(iter(relation.units))]["config"]).get(
+                ["subordinate"], False
+            ):
+                relations.append(relation)
+        if len(relations) > 1:
+            logger.error(
+                "Multiple applications claiming to be principal. Update the cos-agent library in the client application charms."
+            )
+            raise MultiplePrincipalsError("Multiple principal applications.")
+        return relations
 
     @property
-    def _principal_unit_data(self) -> Optional[CosAgentProviderUnitData]:
-        """Return the principal unit's data.
+    def _remote_data(self) -> List[CosAgentProviderUnitData]:
+        """Return a list of remote data from each of the related units.
 
         Assumes that the relation is of type subordinate.
         Relies on the fact that, for subordinate relations, the only remote unit visible to
         *this unit* is the principal unit that this unit is attached to.
         """
-        if not (relations := self._principal_relations):
-            return None
+        all_data = []
 
-        # Technically it's a list, but for subordinates there can only be one relation
-        principal_relation = next(iter(relations))
+        for relation in self._charm.model.relations[self._relation_name]:
+            if not relation.units:
+                continue
+            unit = next(iter(relation.units))
+            if not (raw := relation.data[unit].get(CosAgentProviderUnitData.KEY)):
+                continue
+            if not (provider_data := self._validated_provider_data(raw)):
+                continue
+            all_data.append(provider_data)
 
-        if not (units := principal_relation.units):
-            return None
-
-        # Technically it's a list, but for subordinates there can only be one
-        unit = next(iter(units))
-        if not (raw := principal_relation.data[unit].get(CosAgentProviderUnitData.KEY)):
-            return None
-
-        if not (provider_data := self._validated_provider_data(raw)):
-            return None
-
-        return provider_data
+        return all_data
 
     def _gather_peer_data(self) -> List[CosAgentPeersUnitData]:
         """Collect data from the peers.
@@ -599,18 +688,21 @@ class COSAgentRequirer(Object):
         app_names: Set[str] = set()
 
         for unit in chain((self._charm.unit,), relation.units):
-            if not relation.data.get(unit) or not (
-                raw := relation.data[unit].get(CosAgentPeersUnitData.KEY)
-            ):
-                logger.info(f"peer {unit} has not set its primary data yet; skipping for now...")
+            if not relation.data.get(unit):
                 continue
 
-            data = CosAgentPeersUnitData(**json.loads(raw))
-            app_name = data.app_name
-            # Have we already seen this principal app?
-            if app_name in app_names:
-                continue
-            peer_data.append(data)
+            for unit_name in relation.data.get(unit):  # pyright: ignore
+                if not unit_name.startswith(CosAgentPeersUnitData.KEY):
+                    continue
+                raw = relation.data[unit].get(unit_name)
+                if raw is None:
+                    continue
+                data = CosAgentPeersUnitData(**json.loads(raw))
+                # Have we already seen this principal app?
+                if (app_name := data.app_name) in app_names:
+                    continue
+                peer_data.append(data)
+                app_names.add(app_name)
 
         return peer_data
 
@@ -646,16 +738,19 @@ class COSAgentRequirer(Object):
     def metrics_jobs(self) -> List[Dict]:
         """Parse the relation data contents and extract the metrics jobs."""
         scrape_jobs = []
-        if data := self._principal_unit_data:
-            jobs = data.metrics_scrape_jobs
-            if jobs:
-                for job in jobs:
-                    job_config = {
+        for data in self._remote_data:
+            for job in data.metrics_scrape_jobs:
+                # In #220, relation schema changed from a simplified dict to the standard
+                # `scrape_configs`.
+                # This is to ensure backwards compatibility with Providers older than v0.5.
+                if "path" in job and "port" in job and "job_name" in job:
+                    job = {
                         "job_name": job["job_name"],
                         "metrics_path": job["path"],
                         "static_configs": [{"targets": [f"localhost:{job['port']}"]}],
                     }
-                    scrape_jobs.append(job_config)
+
+                scrape_jobs.append(job)
 
         return scrape_jobs
 
@@ -663,7 +758,7 @@ class COSAgentRequirer(Object):
     def snap_log_endpoints(self) -> List[SnapEndpoint]:
         """Fetch logging endpoints exposed by related snaps."""
         plugs = []
-        if data := self._principal_unit_data:
+        for data in self._remote_data:
             targets = data.log_slots
             if targets:
                 for target in targets:

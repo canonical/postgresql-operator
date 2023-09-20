@@ -8,6 +8,7 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from tests.integration.ha_tests.helpers import (
+    APPLICATION_NAME,
     ORIGINAL_RESTART_CONDITION,
     RESTART_CONDITION,
     app_name,
@@ -18,8 +19,6 @@ from tests.integration.ha_tests.helpers import (
     update_restart_condition,
 )
 from tests.integration.helpers import run_command_on_unit
-
-APPLICATION_NAME = "application"
 
 
 @pytest.fixture()

@@ -377,11 +377,20 @@ class PostgreSQLBackups(Object):
             self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
             return
 
+        self.start_stop_pgbackrest_service()
+
         # Store the stanza name to be used in configurations updates.
-        self.charm.app_peer_data.update({"stanza": self.stanza_name})
+        self.charm.app_peer_data.update({"stanza": self.stanza_name, "init-pgbackrest": "True"})
+
+    def check_stanza(self) -> None:
+        """Runs the pgbackrest stanza validation."""
+        if not self.charm.unit.is_leader() or "init-pgbackrest" not in self.charm.app_peer_data:
+            return
 
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
+
+        self.charm.unit.status = MaintenanceStatus("checking stanza")
 
         try:
             # Check that the stanza is correctly configured.
@@ -404,13 +413,19 @@ class PostgreSQLBackups(Object):
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
             self.charm.app_peer_data.update({"stanza": ""})
+            self.charm.app_peer_data.pop("init-pgbackrest", None)
             self.charm.update_config()
 
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
 
+        self.charm.app_peer_data.pop("init-pgbackrest", None)
+
     @property
     def _is_primary_pgbackrest_service_running(self) -> bool:
+        if not self.charm.primary_endpoint:
+            logger.warning("Failed to contact pgBackRest TLS server: no primary endpoint")
+            return False
         return_code, _, stderr = self._execute_command(
             [PGBACKREST_EXECUTABLE, "server-ping", "--io-timeout=10", self.charm.primary_endpoint]
         )
@@ -443,8 +458,6 @@ class PostgreSQLBackups(Object):
             return
 
         self._initialise_stanza()
-
-        self.start_stop_pgbackrest_service()
 
     def _on_create_backup_action(self, event) -> None:
         """Request that pgBackRest creates a backup."""

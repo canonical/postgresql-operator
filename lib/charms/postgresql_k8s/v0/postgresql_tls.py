@@ -33,7 +33,7 @@ from charms.tls_certificates_interface.v1.tls_certificates import (
 )
 from cryptography import x509
 from cryptography.x509.extensions import ExtensionType
-from ops.charm import ActionEvent
+from ops.charm import ActionEvent, RelationBrokenEvent
 from ops.framework import Object
 from ops.pebble import ConnectionError, PathError, ProtocolError
 
@@ -45,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 6
+LIBPATCH = 7
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -116,12 +116,14 @@ class PostgreSQLTLS(Object):
         """Request certificate when TLS relation joined."""
         self._request_certificate(None)
 
-    def _on_tls_relation_broken(self, _) -> None:
+    def _on_tls_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Disable TLS when TLS relation broken."""
         self.charm.set_secret(SCOPE, "ca", None)
         self.charm.set_secret(SCOPE, "cert", None)
         self.charm.set_secret(SCOPE, "chain", None)
-        self.charm.update_config()
+        if not self.charm.update_config():
+            logger.debug("Cannot update config at this moment")
+            event.defer()
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         """Enable TLS when TLS certificate available."""
@@ -139,7 +141,10 @@ class PostgreSQLTLS(Object):
         self.charm.set_secret(SCOPE, "ca", event.ca)
 
         try:
-            self.charm.push_tls_files_to_workload()
+            if not self.charm.push_tls_files_to_workload():
+                logger.debug("Cannot push TLS certificates at this moment")
+                event.defer()
+                return
         except (ConnectionError, PathError, ProtocolError) as e:
             logger.error("Cannot push TLS certificates: %r", e)
             event.defer()
