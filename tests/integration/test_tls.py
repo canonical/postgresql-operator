@@ -42,6 +42,7 @@ async def test_deploy_active(ops_test: OpsTest):
             application_name=APP_NAME,
             num_units=3,
             series=CHARM_SERIES,
+            config={"profile": "testing"},
         )
         # No wait between deploying charms, since we can't guarantee users will wait. Furthermore,
         # bundles don't wait between deploying charms.

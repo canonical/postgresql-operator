@@ -1053,6 +1053,7 @@ class TestCharm(unittest.TestCase):
             postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
             _is_workload_running.side_effect = [True, True, False, True]
             _member_started.side_effect = [True, True, False]
+            postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
             # Test without TLS files available.
             self.harness.update_relation_data(
@@ -1067,6 +1068,7 @@ class TestCharm(unittest.TestCase):
                 backup_id=None,
                 stanza=None,
                 restore_stanza=None,
+                parameters={"test": "test"},
             )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_not_called()
@@ -1089,6 +1091,7 @@ class TestCharm(unittest.TestCase):
                 backup_id=None,
                 stanza=None,
                 restore_stanza=None,
+                parameters={"test": "test"},
             )
             _reload_patroni_configuration.assert_called_once()
             _restart.assert_called_once()
