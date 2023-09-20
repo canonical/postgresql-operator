@@ -42,11 +42,16 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             num_units=3,
             series=CHARM_SERIES,
             storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+            config={"profile": "testing"},
         )
 
         # Deploy the second cluster
         await ops_test.model.deploy(
-            charm, application_name=SECOND_APPLICATION, num_units=1, series=CHARM_SERIES
+            charm,
+            application_name=SECOND_APPLICATION,
+            num_units=1,
+            series=CHARM_SERIES,
+            config={"profile": "testing"},
         )
 
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
