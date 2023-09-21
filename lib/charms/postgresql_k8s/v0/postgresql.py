@@ -428,11 +428,21 @@ class PostgreSQL:
 
         Args:
             profile: the profile to use.
-            available_memory: available memory to use in calculation
+            available_memory: available memory to use in calculation in bytes.
 
         Returns:
             Dictionary with the PostgreSQL parameters.
         """
         logger.debug(f"Building PostgreSQL parameters for {profile=} and {available_memory=}")
         if profile == "production":
-            return {"shared_buffers": "987MB", "effective_cache_size": "2958MB"}
+            # Use 25% of the available memory for shared_buffers.
+            # and the remaind as cache memory.
+            shared_buffers = int(available_memory * 0.25)
+            effective_cache_size = int(available_memory - shared_buffers)
+
+            parameters = {
+                "shared_buffers": f"{int(shared_buffers/10**6)}MB",
+                "effective_cache_size": f"{int(effective_cache_size/10**6)}MB",
+            }
+
+            return parameters
