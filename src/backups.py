@@ -46,6 +46,12 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 
+S3_BLOCK_MESSAGES = [
+    ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+    FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
+    FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+]
+
 
 class ListBackupsError(Exception):
     """Raised when pgBackRest fails to list backups."""
@@ -65,6 +71,7 @@ class PostgreSQLBackups(Object):
         self.framework.observe(
             self.s3_client.on.credentials_changed, self._on_s3_credential_changed
         )
+        self.framework.observe(self.s3_client.on.credentials_gone, self._on_s3_credential_gone)
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
         self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
@@ -446,6 +453,10 @@ class PostgreSQLBackups(Object):
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
             return
 
+        # Verify the s3 relation only on the leader
+        if not self.charm.unit.is_leader():
+            return
+
         try:
             self._create_bucket_if_not_exists()
         except (ClientError, ValueError):
@@ -458,6 +469,10 @@ class PostgreSQLBackups(Object):
             return
 
         self._initialise_stanza()
+
+    def _on_s3_credential_gone(self, _) -> None:
+        if self.charm.is_blocked and self.charm.unit.status.message in S3_BLOCK_MESSAGES:
+            self.charm.unit.status = ActiveStatus()
 
     def _on_create_backup_action(self, event) -> None:
         """Request that pgBackRest creates a backup."""
