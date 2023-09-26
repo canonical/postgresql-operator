@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -1391,3 +1391,20 @@ class TestCharm(unittest.TestCase):
 
         pg_snap.present = True
         self.assertTrue(self.charm._is_workload_running)
+
+    def test_get_available_memory(self):
+        meminfo = (
+            "MemTotal:       16089488 kB"
+            "MemFree:          799284 kB"
+            "MemAvailable:    3926924 kB"
+            "Buffers:          187232 kB"
+            "Cached:          4445936 kB"
+            "SwapCached:       156012 kB"
+            "Active:         11890336 kB"
+        )
+
+        with patch("builtins.open", mock_open(read_data=meminfo)):
+            self.assertEqual(self.charm.get_available_memory(), 16475635712)
+
+        with patch("builtins.open", mock_open(read_data="")):
+            self.assertEqual(self.charm.get_available_memory(), 0)

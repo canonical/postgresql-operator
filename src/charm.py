@@ -1362,6 +1362,11 @@ class PostgresqlOperatorCharm(CharmBase):
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = all(self.tls.get_tls_files())
 
+        # Build PostgreSQL parameters.
+        pg_parameters = self.postgresql.build_postgresql_parameters(
+            self.config["profile"], self.get_available_memory()
+        )
+
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
@@ -1370,7 +1375,7 @@ class PostgresqlOperatorCharm(CharmBase):
             backup_id=self.app_peer_data.get("restoring-backup"),
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
-            parameters=self.postgresql.build_postgresql_parameters(self.config["profile"], 0),
+            parameters=pg_parameters,
         )
         if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
@@ -1416,6 +1421,15 @@ class PostgresqlOperatorCharm(CharmBase):
         self.postgresql_client_relation.update_endpoints()
         self.legacy_db_relation.update_endpoints()
         self.legacy_db_admin_relation.update_endpoints()
+
+    def get_available_memory(self) -> int:
+        """Returns the system available memory in bytes."""
+        with open("/proc/meminfo") as meminfo:
+            for line in meminfo:
+                if "MemTotal" in line:
+                    return int(line.split()[1]) * 1024
+
+        return 0
 
 
 if __name__ == "__main__":
