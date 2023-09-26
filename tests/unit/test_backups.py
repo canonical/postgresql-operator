@@ -660,6 +660,9 @@ class TestPostgreSQLBackups(unittest.TestCase):
         _can_use_s3_repository,
         _initialise_stanza,
     ):
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
+
         # Test when the cluster was not initialised yet.
         self.relate_to_s3_integrator()
         self.charm.backup.s3_client.on.credentials_changed.emit(
