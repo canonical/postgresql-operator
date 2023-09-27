@@ -418,7 +418,7 @@ async def test_admin_role(ops_test: OpsTest):
     ]:
         logger.info(f"connecting to the following database: {database}")
         connection_string = await build_connection_string(
-            ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=database
+            ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=database, use_secrets=False
         )
         connection = None
         should_fail = False
@@ -458,7 +458,7 @@ async def test_admin_role(ops_test: OpsTest):
 
     # Test the creation and deletion of databases.
     connection_string = await build_connection_string(
-        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database="postgres"
+        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database="postgres", use_secrets=False
     )
     connection = psycopg2.connect(connection_string)
     connection.autocommit = True
