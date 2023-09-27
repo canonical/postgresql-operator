@@ -29,6 +29,7 @@ async def test_deploy_active(ops_test: OpsTest):
             application_name=APP_NAME,
             num_units=3,
             series=CHARM_SERIES,
+            config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 

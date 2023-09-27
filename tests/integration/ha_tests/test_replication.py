@@ -29,7 +29,12 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         wait_for_apps = True
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
-            await ops_test.model.deploy(charm, num_units=3, series=CHARM_SERIES)
+            await ops_test.model.deploy(
+                charm,
+                num_units=3,
+                series=CHARM_SERIES,
+                config={"profile": "testing"},
+            )
     # Deploy the continuous writes application charm if it wasn't already deployed.
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
@@ -111,7 +116,11 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
         charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
-                charm, application_name=new_cluster_app, num_units=2, series=CHARM_SERIES
+                charm,
+                application_name=new_cluster_app,
+                num_units=2,
+                series=CHARM_SERIES,
+                config={"profile": "testing"},
             )
             await ops_test.model.wait_for_idle(apps=[new_cluster_app], status="active")
 

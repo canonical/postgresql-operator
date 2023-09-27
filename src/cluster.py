@@ -63,8 +63,6 @@ class UpdateSyncNodeCountError(Exception):
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
-    pass
-
     def __init__(
         self,
         unit_ip: str,
@@ -448,6 +446,7 @@ class Patroni:
         stanza: str = None,
         restore_stanza: Optional[str] = None,
         backup_id: Optional[str] = None,
+        parameters: Optional[dict[str, str]] = None,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -458,6 +457,7 @@ class Patroni:
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
             backup_id: id of the backup that is being restored.
+            parameters: PostgreSQL parameters to be added to the postgresql.conf file.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
@@ -488,6 +488,7 @@ class Patroni:
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
+            pg_parameters=parameters,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

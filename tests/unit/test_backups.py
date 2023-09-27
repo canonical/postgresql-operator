@@ -690,6 +690,29 @@ class TestPostgreSQLBackups(unittest.TestCase):
         _can_use_s3_repository.assert_not_called()
         _initialise_stanza.assert_not_called()
 
+        # Test that followers will not initialise the bucket
+        self.charm.unit.status = ActiveStatus()
+        _render_pgbackrest_conf_file.reset_mock()
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.charm.app.name,
+                {"cluster_initialised": "True"},
+            )
+        _render_pgbackrest_conf_file.return_value = True
+
+        self.charm.backup.s3_client.on.credentials_changed.emit(
+            relation=self.harness.model.get_relation(S3_PARAMETERS_RELATION, self.s3_rel_id)
+        )
+        _render_pgbackrest_conf_file.assert_called_once()
+        _create_bucket_if_not_exists.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+        _can_use_s3_repository.assert_not_called()
+        _initialise_stanza.assert_not_called()
+
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
+
         # Test when the charm render the pgBackRest configuration file, but fails to
         # access or create the S3 bucket.
         for error in [
@@ -699,16 +722,8 @@ class TestPostgreSQLBackups(unittest.TestCase):
             ),
             ValueError,
         ]:
-            self.charm.unit.status = ActiveStatus()
             _render_pgbackrest_conf_file.reset_mock()
             _create_bucket_if_not_exists.reset_mock()
-            with self.harness.hooks_disabled():
-                self.harness.update_relation_data(
-                    self.peer_rel_id,
-                    self.charm.app.name,
-                    {"cluster_initialised": "True"},
-                )
-            _render_pgbackrest_conf_file.return_value = True
             _create_bucket_if_not_exists.side_effect = error
             self.charm.backup.s3_client.on.credentials_changed.emit(
                 relation=self.harness.model.get_relation(S3_PARAMETERS_RELATION, self.s3_rel_id)
@@ -743,6 +758,17 @@ class TestPostgreSQLBackups(unittest.TestCase):
         )
         _can_use_s3_repository.assert_called_once()
         _initialise_stanza.assert_called_once()
+
+    def test_on_s3_credential_gone(self):
+        # Test that unrelated blocks will remain
+        self.charm.unit.status = BlockedStatus("test block")
+        self.charm.backup._on_s3_credential_gone(None)
+        self.assertIsInstance(self.charm.unit.status, BlockedStatus)
+
+        # Test that s3 related blocks will be cleared
+        self.charm.unit.status = BlockedStatus(ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE)
+        self.charm.backup._on_s3_credential_gone(None)
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
 
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.PostgreSQLBackups._change_connectivity_to_database")
