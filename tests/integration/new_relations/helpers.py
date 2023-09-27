@@ -26,7 +26,6 @@ async def build_connection_string(
     relation_alias: str = None,
     read_only_endpoint: bool = False,
     database: str = None,
-    use_secrets: bool = True,
 ) -> str:
     """Build a PostgreSQL connection string.
 
@@ -40,7 +39,6 @@ async def build_connection_string(
         read_only_endpoint: whether to choose the read-only endpoint
             instead of the read/write endpoint
         database: optional database to be used in the connection string
-        use_secrets: whether secrets are to be used or not
 
     Returns:
         a PostgreSQL connection string
@@ -49,16 +47,14 @@ async def build_connection_string(
     if database is None:
         database = f'{application_name.replace("-", "_")}_{relation_name.replace("-", "_")}'
 
-    # If we have list_secrets, we are using libjuju 3
-    if hasattr(ops_test.model, "list_secrets") and use_secrets:
-        secret_uri = await get_application_relation_data(
-            ops_test,
-            application_name,
-            relation_name,
-            "secret-user",
-            relation_id,
-            relation_alias,
-        )
+    if secret_uri := await get_application_relation_data(
+        ops_test,
+        application_name,
+        relation_name,
+        "secret-user",
+        relation_id,
+        relation_alias,
+    ):
         secret_data = await get_juju_secret(ops_test, secret_uri)
         username = secret_data["username"]
         password = secret_data["password"]
