@@ -12,12 +12,13 @@ from charms.data_platform_libs.v0.upgrade import (
     DependencyModel,
     UpgradeGrantedEvent,
 )
-from ops.model import ActiveStatus, MaintenanceStatus, WaitingStatus
+from ops.model import ActiveStatus, MaintenanceStatus, RelationDataContent, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
-from constants import SNAP_PACKAGES
+from constants import APP_SCOPE, MONITORING_PASSWORD_KEY, MONITORING_USER, SNAP_PACKAGES
+from utils import new_password
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +44,7 @@ class PostgreSQLUpgrade(DataUpgrade):
         """Initialize the class."""
         super().__init__(charm, model, **kwargs)
         self.charm = charm
+        self.framework.observe(self.charm.on.upgrade_charm, self._on_upgrade_charm_check_legacy)
 
     @override
     def build_upgrade_stack(self) -> List[int]:
@@ -78,6 +80,32 @@ class PostgreSQLUpgrade(DataUpgrade):
             "Run `juju refresh --revision <previous-revision> postgresql` to initiate the rollback"
         )
 
+    def _on_upgrade_charm_check_legacy(self, event) -> None:
+        if not self.peer_relation or len(self.app_units) < len(self.charm.app_units):
+            # defer case relation not ready or not all units joined it
+            event.defer()
+            logger.debug("Wait all units join the upgrade relation")
+            return
+
+        if self.state:
+            # Do nothing - if state set, upgrade is supported
+            return
+
+        if not self.charm.unit.is_leader():
+            # set ready state on non-leader units
+            self.unit_upgrade_data.update({"state": "ready"})
+            return
+
+        peers_state = list(filter(lambda state: state != "", self.unit_states))
+
+        if len(peers_state) == len(self.peer_relation.units) and set(peers_state) == {"ready"}:
+            # All peers have set the state to ready
+            self.unit_upgrade_data.update({"state": "ready"})
+            self._prepare_upgrade_from_legacy()
+        else:
+            logger.debug("Wait until all peers have set upgrade state to ready")
+            event.defer()
+
     @override
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
         # Refresh the charmed PostgreSQL snap and restart the database.
@@ -91,6 +119,14 @@ class PostgreSQLUpgrade(DataUpgrade):
 
         self.charm._setup_exporter()
         self.charm.backup.start_stop_pgbackrest_service()
+
+        try:
+            self.charm.unit.set_workload_version(
+                self.charm._patroni.get_postgresql_version() or "unset"
+            )
+        except TypeError:
+            # Don't fail on this, just log it.
+            logger.warning("Failed to get PostgreSQL version")
 
         # Wait until the database initialise.
         self.charm.unit.status = WaitingStatus("waiting for database initialisation")
@@ -145,3 +181,35 @@ class PostgreSQLUpgrade(DataUpgrade):
                 "a backup is being created",
                 "wait for the backup creation to finish before starting the upgrade",
             )
+
+    def _prepare_upgrade_from_legacy(self) -> None:
+        """Prepare upgrade from legacy charm without upgrade support.
+
+        Assumes run on leader unit only.
+        """
+        logger.warning("Upgrading from unsupported version")
+
+        # Populate app upgrade databag to allow upgrade procedure
+        logger.debug("Building upgrade stack")
+        upgrade_stack = self.build_upgrade_stack()
+        logger.debug(f"Upgrade stack: {upgrade_stack}")
+        self.upgrade_stack = upgrade_stack
+        logger.debug("Persisting dependencies to upgrade relation data...")
+        self.peer_relation.data[self.charm.app].update(
+            {"dependencies": json.dumps(self.dependency_model.dict())}
+        )
+        if self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY) is None:
+            self.charm.set_secret(APP_SCOPE, MONITORING_PASSWORD_KEY, new_password())
+        users = self.charm.postgresql.list_users()
+        if MONITORING_USER not in users:
+            # Create the monitoring user.
+            self.charm.postgresql.create_user(
+                MONITORING_USER,
+                self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
+                extra_user_roles="pg_monitor",
+            )
+
+    @property
+    def unit_upgrade_data(self) -> RelationDataContent:
+        """Return the application upgrade data."""
+        return self.peer_relation.data[self.charm.unit]

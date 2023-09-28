@@ -142,6 +142,14 @@ class PostgresqlOperatorCharm(CharmBase):
         )
 
     @property
+    def app_units(self) -> set[Unit]:
+        """The peer-related units in the application."""
+        if not self._peers:
+            return set()
+
+        return {self.unit, *self._peers.units}
+
+    @property
     def app_peer_data(self) -> Dict:
         """Application peer relation data object."""
         relation = self.model.get_relation(PEER)
@@ -935,6 +943,12 @@ class PostgresqlOperatorCharm(CharmBase):
             self._reboot_on_detached_storage(event)
             return False
 
+        # Safeguard against starting while upgrading.
+        if not self.upgrade.idle:
+            logger.debug("Defer on_start: Cluster is upgrading")
+            event.defer()
+            return False
+
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
         if self.is_blocked:
@@ -980,6 +994,10 @@ class PostgresqlOperatorCharm(CharmBase):
         """Set up postgresql_exporter options."""
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        if postgres_snap.revision != list(filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES))[0][1]["revision"]:
+            logger.debug("Early exit _setup_exporter: snap was not refreshed to the right version yet")
+            return
 
         postgres_snap.set(
             {
