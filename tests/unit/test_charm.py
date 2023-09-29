@@ -304,6 +304,7 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     @patch(
         "charm.PostgresqlOperatorCharm._is_storage_attached",
         side_effect=[False, True, True, True, True],
@@ -311,6 +312,7 @@ class TestCharm(unittest.TestCase):
     def test_on_start(
         self,
         _is_storage_attached,
+        _idle,
         _reboot_on_detached_storage,
         _get_password,
         _replication_password,
@@ -388,6 +390,7 @@ class TestCharm(unittest.TestCase):
     @patch.object(EventBase, "defer")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     @patch(
         "charm.PostgresqlOperatorCharm._is_storage_attached",
         return_value=True,
@@ -395,6 +398,7 @@ class TestCharm(unittest.TestCase):
     def test_on_start_replica(
         self,
         _is_storage_attached,
+        _idle,
         _get_password,
         _replication_password,
         _defer,
@@ -443,10 +447,12 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.Patroni")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_start_no_patroni_member(
         self,
         _is_storage_attached,
+        _idle,
         _get_password,
         patroni,
         _postgresql,
