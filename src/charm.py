@@ -995,8 +995,15 @@ class PostgresqlOperatorCharm(CharmBase):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        if postgres_snap.revision != list(filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES))[0][1]["revision"]:
-            logger.debug("Early exit _setup_exporter: snap was not refreshed to the right version yet")
+        if (
+            postgres_snap.revision
+            != list(
+                filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
+            )[0][1]["revision"]
+        ):
+            logger.debug(
+                "Early exit _setup_exporter: snap was not refreshed to the right version yet"
+            )
             return
 
         postgres_snap.set(

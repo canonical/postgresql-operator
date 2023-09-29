@@ -96,7 +96,9 @@ class PostgreSQLUpgrade(DataUpgrade):
 
         peers_state = list(filter(lambda state: state != "", self.unit_states))
 
-        if len(peers_state) == len(self.peer_relation.units) and (set(peers_state) == {"ready"} or len(peers_state) == 0):
+        if len(peers_state) == len(self.peer_relation.units) and (
+            set(peers_state) == {"ready"} or len(peers_state) == 0
+        ):
             # All peers have set the state to ready
             self.unit_upgrade_data.update({"state": "ready"})
             self._prepare_upgrade_from_legacy()
