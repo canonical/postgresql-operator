@@ -44,8 +44,6 @@ class PostgreSQLUpgrade(DataUpgrade):
         """Initialize the class."""
         super().__init__(charm, model, **kwargs)
         self.charm = charm
-        # self.framework.observe(self.charm.on.upgrade_charm, self._on_upgrade_charm_check_legacy)
-        logger.error("running")
         self._on_upgrade_charm_check_legacy(None)
 
     @override
