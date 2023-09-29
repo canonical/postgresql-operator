@@ -81,6 +81,26 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
         )
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
+        # Check that on juju 3 we have secrets and no username and password in the rel databag
+        if hasattr(ops_test.model, "list_secrets"):
+            logger.info("checking for secrets")
+            secret_uri, password = await asyncio.gather(
+                get_application_relation_data(
+                    ops_test,
+                    APPLICATION_APP_NAME,
+                    FIRST_DATABASE_RELATION_NAME,
+                    "secret-user",
+                ),
+                get_application_relation_data(
+                    ops_test,
+                    APPLICATION_APP_NAME,
+                    FIRST_DATABASE_RELATION_NAME,
+                    "password",
+                ),
+            )
+            assert secret_uri is not None
+            assert password is None
+
         # Try to get the connection string of the database using the read-only endpoint.
         # It should not be available.
         assert await check_relation_data_existence(
