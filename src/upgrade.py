@@ -44,7 +44,9 @@ class PostgreSQLUpgrade(DataUpgrade):
         """Initialize the class."""
         super().__init__(charm, model, **kwargs)
         self.charm = charm
-        self.framework.observe(self.charm.on.upgrade_charm, self._on_upgrade_charm_check_legacy)
+        # self.framework.observe(self.charm.on.upgrade_charm, self._on_upgrade_charm_check_legacy)
+        logger.error("running")
+        self._on_upgrade_charm_check_legacy(None)
 
     @override
     def build_upgrade_stack(self) -> List[int]:
@@ -82,8 +84,6 @@ class PostgreSQLUpgrade(DataUpgrade):
 
     def _on_upgrade_charm_check_legacy(self, event) -> None:
         if not self.peer_relation or len(self.app_units) < len(self.charm.app_units):
-            # defer case relation not ready or not all units joined it
-            event.defer()
             logger.debug("Wait all units join the upgrade relation")
             return
 
@@ -98,13 +98,11 @@ class PostgreSQLUpgrade(DataUpgrade):
 
         peers_state = list(filter(lambda state: state != "", self.unit_states))
 
-        if len(peers_state) == len(self.peer_relation.units) and set(peers_state) == {"ready"}:
+        if len(peers_state) == len(self.peer_relation.units) and (set(peers_state) == {"ready"} or len(peers_state) == 0):
             # All peers have set the state to ready
             self.unit_upgrade_data.update({"state": "ready"})
             self._prepare_upgrade_from_legacy()
-        else:
-            logger.debug("Wait until all peers have set upgrade state to ready")
-            event.defer()
+            getattr(self.on, "upgrade_charm").emit()
 
     @override
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
