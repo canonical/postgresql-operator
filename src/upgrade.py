@@ -44,7 +44,7 @@ class PostgreSQLUpgrade(DataUpgrade):
         """Initialize the class."""
         super().__init__(charm, model, **kwargs)
         self.charm = charm
-        self._on_upgrade_charm_check_legacy(None)
+        self._on_upgrade_charm_check_legacy()
 
     @override
     def build_upgrade_stack(self) -> List[int]:
@@ -80,7 +80,7 @@ class PostgreSQLUpgrade(DataUpgrade):
             "Run `juju refresh --revision <previous-revision> postgresql` to initiate the rollback"
         )
 
-    def _on_upgrade_charm_check_legacy(self, event) -> None:
+    def _on_upgrade_charm_check_legacy(self) -> None:
         if not self.peer_relation or len(self.app_units) < len(self.charm.app_units):
             logger.debug("Wait all units join the upgrade relation")
             return
@@ -99,9 +99,10 @@ class PostgreSQLUpgrade(DataUpgrade):
         if len(peers_state) == len(self.peer_relation.units) and (
             set(peers_state) == {"ready"} or len(peers_state) == 0
         ):
-            # All peers have set the state to ready
-            self.unit_upgrade_data.update({"state": "ready"})
-            self._prepare_upgrade_from_legacy()
+            if self.charm._patroni.member_started:
+                # All peers have set the state to ready
+                self.unit_upgrade_data.update({"state": "ready"})
+                self._prepare_upgrade_from_legacy()
             getattr(self.on, "upgrade_charm").emit()
 
     @override
