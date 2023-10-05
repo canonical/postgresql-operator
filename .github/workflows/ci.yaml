@@ -75,7 +75,6 @@ jobs:
         tox-environments:
           - backup-integration
           - charm-integration
-          - database-relation-integration
           - db-relation-integration
           - ha-replication-integration
           - ha-self-healing-integration
@@ -89,6 +88,12 @@ jobs:
         free-disk-space:
           - false
         include:
+          - tox-environments: database-relation-integration
+            agent-versions: "2.9.44"  # renovate: latest juju 2
+            free-disk-space: true
+          - tox-environments: database-relation-integration
+            agent-versions: "3.1.5"  # renovate: latest juju 3
+            free-disk-space: true
           - tox-environments: db-admin-relation-integration
             agent-versions: "2.9.44"  # renovate: latest juju 2
             free-disk-space: true
