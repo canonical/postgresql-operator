@@ -19,7 +19,7 @@ The `postgresql` module provides methods for interacting with the PostgreSQL ins
 Any charm using this library should import the `psycopg2` or `psycopg2-binary` dependency.
 """
 import logging
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Set, Tuple
 
 import psycopg2
 from psycopg2 import sql
@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -305,6 +305,33 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
+    def get_applied_postgresql_parameters(self, parameters=List[str]) -> Dict:
+        """Returns the applied PostgreSQL configurations and their values.
+
+        Args:
+            parameters: list of parameters to retrieve the values.
+
+        Returns:
+            Dict containing PostgreSQL configurations and their values.
+        """
+        with self._connect_to_database() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT name, setting FROM pg_settings WHERE name IN %s;", (parameters,)
+            )
+            results = cursor.fetchall()
+            return {configuration[0]: configuration[1] for configuration in results}
+
+    def get_invalid_postgresql_parameters(self) -> List:
+        """Returns the PostgreSQL configurations that have invalid values.
+
+        Returns:
+            Dict containing PostgreSQL configurations and their values.
+        """
+        with self._connect_to_database() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT name FROM pg_file_settings WHERE error IS NOT NULL;")
+            results = cursor.fetchall()
+            return [parameter[0] for parameter in results]
+
     def get_postgresql_version(self) -> str:
         """Returns the PostgreSQL version.
 
@@ -319,6 +346,17 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to get PostgreSQL version: {e}")
             raise PostgreSQLGetPostgreSQLVersionError()
+
+    def has_pending_restart(self) -> bool:
+        """Returns whether PostgreSQL has a pending restart."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT True FROM pg_settings WHERE pending_restart;")
+                results = cursor.fetchall()
+                return len(results) > 0
+        except psycopg2.Error:
+            # Connection errors happen when PostgreSQL has not started yet.
+            return False
 
     def is_tls_enabled(self, check_current_host: bool = False) -> bool:
         """Returns whether TLS is enabled.
@@ -421,9 +459,7 @@ class PostgreSQL:
                 connection.close()
 
     @staticmethod
-    def build_postgresql_parameters(
-        profile: str, available_memory: int
-    ) -> Optional[dict[str, str]]:
+    def build_postgresql_parameters(profile: str, available_memory: int) -> dict[str, str]:
         """Builds the PostgreSQL parameters.
 
         Args:
@@ -446,3 +482,5 @@ class PostgreSQL:
             }
 
             return parameters
+
+        return {}

@@ -55,7 +55,6 @@ bootstrap:
       remove_data_directory_on_rewind_failure: true
       remove_data_directory_on_diverged_timelines: true
       parameters:
-        synchronous_commit: on
         synchronous_standby_names: "*"
         {%- if enable_pgbackrest %}
         archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
@@ -63,6 +62,10 @@ bootstrap:
         archive_command: /bin/true
         {%- endif %}
         archive_mode: on
+        autovacuum: true
+        fsync: true
+        full_page_writes: true
+        lc_messages: 'en_US.UTF8'
         log_autovacuum_min_duration: 60000
         log_checkpoints: 'on'
         log_destination: 'stderr'
@@ -121,6 +124,11 @@ postgresql:
     ssl_key_file: {{ conf_path }}/key.pem
     {%- endif %}
     unix_socket_directories: /tmp
+    {%- if pg_parameters %}
+    {%- for key, value in pg_parameters.items() %}
+    {{key}}: {{value}}
+    {%- endfor -%}
+    {% endif %}
   pgpass: /tmp/pgpass
   pg_hba:
     - local all backup peer map=operator

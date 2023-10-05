@@ -2,6 +2,75 @@
 # See LICENSE file for licensing details.
 
 options:
+  connection_ssl:
+    description: |
+      Enables SSL connections
+    type: boolean
+  durability_synchronous_commit:
+    description: |
+      Sets the current transactions synchronization level
+    type: string
+  instance_default_text_search_config:
+    description: |
+      Selects the text search configuration that is used by those variants of the text
+      search functions that do not have an explicit argument specifying it
+    type: string
+  instance_password_encryption:
+    description: |
+      Determines the algorithm to use to encrypt the password
+    type: string
+  logging_log_connections:
+    description: |
+      Logs each successful connection
+    type: boolean
+  logging_log_disconnections:
+    description: |
+      Logs end of a session, including duration
+    type: boolean
+  logging_log_lock_waits:
+    description: |
+      Logs long lock waits
+    type: boolean
+  logging_log_min_duration_statement:
+    description: |
+      Sets the minimum running time above which statements will be logged
+    type: int
+  memory_maintenance_work_mem:
+    description: |
+      Sets the maximum memory to be used for maintenance operations
+    type: int
+  memory_max_prepared_transactions:
+    description: |
+      Sets the maximum number of simultaneously prepared transactions
+    type: int
+  memory_shared_buffers:
+    description: |
+      Sets the number of shared memory buffers used by the server
+    type: int
+  memory_temp_buffers:
+    description: |
+      Sets the maximum number of temporary buffers used by each session
+    type: int
+  memory_work_mem:
+    description: |
+      Sets the maximum memory to be used for query workspaces
+    type: int
+  optimizer_constraint_exclusion:
+    description: |
+      Enables the planner to use constraints to optimize queries
+    type: string
+  optimizer_default_statistics_target:
+    description: |
+      Sets the default statistics target
+    type: int
+  optimizer_from_collapse_limit:
+    description: |
+      Sets the FROM-list size beyond which subqueries are not collapsed
+    type: int
+  optimizer_join_collapse_limit:
+    description: |
+      Sets the FROM-list size beyond which JOIN constructs are not flattened
+    type: int
   plugin_citext_enable:
     default: false
     type: boolean
@@ -34,3 +103,59 @@ options:
       minimal running performance.
    type: string
    default: production
+  request_date_style:
+    description: |
+      Sets the display format for date and time values
+    type: string
+  request_standard_conforming_strings:
+    description: |
+      Causes ... strings to treat backslashes literally
+    type: boolean
+  request_time_zone:
+    description: |
+      Sets the time zone for displaying and interpreting time stamps
+    type: string
+  response_bytea_output:
+    description: |
+      Sets the output format for bytes
+    type: string
+  response_lc_monetary:
+    description: |
+      Sets the locale for formatting monetary amounts
+    type: string
+  response_lc_numeric:
+    description: |
+      Sets the locale for formatting numbers
+    type: string
+  response_lc_time:
+    description: |
+      Sets the locale for formatting date and time values
+    type: string
+  vacuum_autovacuum_analyze_scale_factor:
+    description: |
+      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
+      deciding whether to trigger a VACUUM
+    type: float
+  vacuum_autovacuum_analyze_threshold:
+    description: |
+      Sets the minimum number of inserted, updated or deleted tuples needed to trigger
+      an ANALYZE in any one table.
+    type: int
+  vacuum_autovacuum_freeze_max_age:
+    description: |
+      Maximum age (in transactions) before triggering autovacuum on a table to prevent
+      transaction ID wraparound
+    type: int
+  vacuum_autovacuum_vacuum_cost_delay:
+    description: |
+      Sets cost delay value (milliseconds) that will be used in automatic VACUUM operations
+    type: float
+  vacuum_autovacuum_vacuum_scale_factor:
+    description: |
+      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
+      deciding whether to trigger a VACUUM
+    type: float
+  vacuum_vacuum_freeze_table_age:
+    description: |
+      Age at which VACUUM should scan whole table to freeze tuples
+    type: int
