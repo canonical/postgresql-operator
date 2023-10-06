@@ -121,6 +121,11 @@ postgresql:
     ssl_key_file: {{ conf_path }}/key.pem
     {%- endif %}
     unix_socket_directories: /tmp
+    {%- if pg_parameters %}
+    {%- for key, value in pg_parameters.items() %}
+    {{key}}: {{value}}
+    {%- endfor -%}
+    {% endif %}
   pgpass: /tmp/pgpass
   pg_hba:
     - local all backup peer map=operator
