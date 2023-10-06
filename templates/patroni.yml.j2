@@ -13,6 +13,10 @@ name: {{ member_name }}
 
 log:
   dir: {{ log_path }}
+  dateformat: "%Y-%m-%d %H:%M:%S %Z"
+  format: "%(asctime)s [%(process)d]: %(levelname)s: %(message)s "
+  file_num: 10
+  file_size: 10485760 
 
 restapi:
   listen: '{{ self_ip }}:8008'
@@ -80,7 +84,7 @@ bootstrap:
         log_statement_sample_rate: 1
         log_statement_stats: 'off'
         log_temp_files: 1
-        log_timezone: 'GMT'
+        log_timezone: 'UTC'
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
