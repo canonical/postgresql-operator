@@ -240,7 +240,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         secret = self.secrets[scope].get(SECRET_LABEL)
 
-        # It's not the first secret for the scope, we can re-use the existing one
+        # It's not the first secret for the scope, we can reuse the existing one
         # that was fetched in the previous call
         if secret:
             secret_cache = self.secrets[scope][SECRET_CACHE_LABEL]
