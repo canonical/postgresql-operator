@@ -207,6 +207,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                 self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                 extra_user_roles="pg_monitor",
             )
+        self.charm.postgresql.set_up_database()
 
     @property
     def unit_upgrade_data(self) -> RelationDataContent:
