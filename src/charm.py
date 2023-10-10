@@ -246,7 +246,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
         secret = self.secrets[scope].get(SECRET_LABEL)
 
-        # It's not the first secret for the scope, we can re-use the existing one
+        # It's not the first secret for the scope, we can reuse the existing one
         # that was fetched in the previous call
         if secret:
             secret_cache = self.secrets[scope][SECRET_CACHE_LABEL]
@@ -574,7 +574,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         if (
             hasattr(event, "unit")
-            and event.unit is not None
+            and event.relation.data.get(event.unit) is not None
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
