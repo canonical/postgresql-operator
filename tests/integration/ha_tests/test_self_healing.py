@@ -103,7 +103,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     app = await app_name(ops_test)
     if storage_type(ops_test, app) == "rootfs":
         pytest.skip(
-            "re-use of storage can only be used on deployments with persistent storage not on rootfs deployments"
+            "reuse of storage can only be used on deployments with persistent storage not on rootfs deployments"
         )
 
     # removing the only replica can be disastrous
