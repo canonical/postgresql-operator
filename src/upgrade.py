@@ -12,7 +12,7 @@ from charms.data_platform_libs.v0.upgrade import (
     DependencyModel,
     UpgradeGrantedEvent,
 )
-from ops.model import ActiveStatus, MaintenanceStatus, RelationDataContent, WaitingStatus
+from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
@@ -86,7 +86,25 @@ class PostgreSQLUpgrade(DataUpgrade):
             return
 
         if self.state:
-            # Do nothing - if state set, upgrade is supported
+            # If state set, upgrade is supported. Just set the snap information
+            # in the dependencies, as it's missing in the first revisions that
+            # support upgrades.
+            dependencies = self.peer_relation.data[self.charm.app].get("dependencies")
+            if (
+                self.charm.unit.is_leader()
+                and dependencies is not None
+                and "snap" not in json.loads(dependencies)
+            ):
+                fixed_dependencies = json.loads(dependencies)
+                fixed_dependencies["snap"] = {
+                    "dependencies": {},
+                    "name": "charmed-postgresql",
+                    "upgrade_supported": "^14",
+                    "version": "14.9",
+                }
+                self.peer_relation.data[self.charm.app].update(
+                    {"dependencies": json.dumps(fixed_dependencies)}
+                )
             return
 
         if not self.charm.unit.is_leader():
@@ -146,7 +164,6 @@ class PostgreSQLUpgrade(DataUpgrade):
                         raise Exception()
 
                     self.set_unit_completed()
-                    self.charm.unit.status = ActiveStatus()
 
                     # Ensures leader gets its own relation-changed when it upgrades
                     if self.charm.unit.is_leader():

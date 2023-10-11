@@ -603,8 +603,10 @@ class TestCharm(unittest.TestCase):
         new_callable=PropertyMock(return_value=True),
     )
     @patch("charm.PostgreSQLProvider.oversee_users")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     def test_on_update_status(
         self,
+        _,
         _oversee_users,
         _primary_endpoint,
         _update_relation_endpoints,
@@ -674,8 +676,10 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.Patroni.get_member_status")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     def test_on_update_status_after_restore_operation(
         self,
+        _,
         _get_member_status,
         _member_started,
         _update_config,
@@ -686,7 +690,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints,
         _handle_workload_failures,
         _set_primary_status_message,
-        _,
+        __,
     ):
         # Test when the restore operation fails.
         with self.harness.hooks_disabled():

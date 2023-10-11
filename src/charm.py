@@ -1154,11 +1154,7 @@ class PostgresqlOperatorCharm(CharmBase):
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
-        if "cluster_initialised" not in self._peers.data[self.app]:
-            return
-
-        if self.is_blocked:
-            logger.debug("on_update_status early exit: Unit is in Blocked status")
+        if not self._can_run_on_update_status():
             return
 
         if "restoring-backup" in self.app_peer_data:
@@ -1195,6 +1191,20 @@ class PostgresqlOperatorCharm(CharmBase):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+    def _can_run_on_update_status(self) -> bool:
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            return False
+
+        if not self.upgrade.idle:
+            logger.debug("Early exit on_update_status: upgrade in progress")
+            return False
+
+        if self.is_blocked:
+            logger.debug("on_update_status early exit: Unit is in Blocked status")
+            return False
+
+        return True
 
     def _handle_processes_failures(self) -> bool:
         """Handle Patroni and PostgreSQL OS processes failures.

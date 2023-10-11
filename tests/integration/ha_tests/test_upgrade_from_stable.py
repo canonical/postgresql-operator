@@ -29,8 +29,8 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
     await ops_test.model.deploy(
         DATABASE_APP_NAME,
-        num_units=2,
-        channel="14/edge",
+        num_units=3,
+        channel="14/stable",
         trust=True,
     ),
     await ops_test.model.deploy(
@@ -43,7 +43,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active", timeout=(20 * 60)
         )
-    # assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
+    assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
 
 @pytest.mark.abort_on_fail
@@ -86,13 +86,15 @@ async def test_upgrade_from_stable(ops_test: OpsTest):
     logger.info("Refresh the charm")
     await application.refresh(path=charm)
 
+    logger.info("Wait for upgrade to start")
+    await ops_test.model.block_until(
+        lambda: ("waiting" if "pre-upgrade-check" in actions else "maintenance")
+        in {unit.workload_status for unit in application.units},
+        timeout=TIMEOUT,
+    )
+
     logger.info("Wait for upgrade to complete")
     async with ops_test.fast_forward("60s"):
-        await ops_test.model.block_until(
-            lambda: ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status_message
-            == "upgrade completed",
-            timeout=TIMEOUT,
-        )
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", idle_period=30, timeout=TIMEOUT
         )
