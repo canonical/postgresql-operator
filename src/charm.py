@@ -568,7 +568,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         if (
             hasattr(event, "unit")
-            and event.unit is not None
+            and event.relation.data.get(event.unit) is not None
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
