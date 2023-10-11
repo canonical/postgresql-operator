@@ -241,6 +241,13 @@ def convert_records_to_dict(records: List[tuple]) -> dict:
     return records_dict
 
 
+def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
+    """Return the number of performed switchovers."""
+    unit_address = get_unit_address(ops_test, unit_name)
+    switchover_history_info = requests.get(f"http://{unit_address}:8008/history")
+    return len(switchover_history_info.json())
+
+
 def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
@@ -557,6 +564,16 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> List[str]:
     )
 
     return output
+
+
+async def get_leader_unit(ops_test: OpsTest, app: str) -> Optional[Unit]:
+    leader_unit = None
+    for unit in ops_test.model.applications[app].units:
+        if await unit.is_leader_from_status():
+            leader_unit = unit
+            break
+
+    return leader_unit
 
 
 async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
