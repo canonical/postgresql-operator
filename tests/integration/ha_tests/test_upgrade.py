@@ -1,7 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import json
 import logging
 import shutil
@@ -28,34 +27,30 @@ from tests.integration.new_relations.helpers import get_application_relation_dat
 
 logger = logging.getLogger(__name__)
 
-TEST_APP_NAME = "test-app"
 TIMEOUT = 5 * 60
 
 
 @pytest.mark.abort_on_fail
 async def test_deploy_latest(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    await asyncio.gather(
-        ops_test.model.deploy(
-            DATABASE_APP_NAME,
-            num_units=2,
-            channel="14/edge",
-            trust=True,
-            config={"profile": "testing"},
-        ),
-        ops_test.model.deploy(
-            APPLICATION_NAME,
-            application_name=TEST_APP_NAME,
-            num_units=1,
-            channel="latest/edge",
-        ),
+    await ops_test.model.deploy(
+        DATABASE_APP_NAME,
+        num_units=3,
+        channel="14/edge",
+        trust=True,
+        config={"profile": "testing"},
+    )
+    await ops_test.model.deploy(
+        APPLICATION_NAME,
+        num_units=1,
+        channel="latest/edge",
     )
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, TEST_APP_NAME], status="active"
+            apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active"
         )
-    # assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
+    assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
 
 @pytest.mark.abort_on_fail
