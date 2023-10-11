@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 19
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -377,12 +377,19 @@ class SecretsIllegalUpdateError(SecretError):
     """Secrets aren't yet available for Juju version used."""
 
 
-def get_encoded_field(relation, member, field) -> Dict[str, str]:
+def get_encoded_field(
+    relation: Relation, member: Union[Unit, Application], field: str
+) -> Union[str, List[str], Dict[str, str]]:
     """Retrieve and decode an encoded field from relation data."""
     return json.loads(relation.data[member].get(field, "{}"))
 
 
-def set_encoded_field(relation, member, field, value) -> None:
+def set_encoded_field(
+    relation: Relation,
+    member: Union[Unit, Application],
+    field: str,
+    value: Union[str, list, Dict[str, str]],
+) -> None:
     """Set an encoded field from relation data."""
     relation.data[member].update({field: json.dumps(value)})
 
@@ -400,6 +407,15 @@ def diff(event: RelationChangedEvent, bucket: Union[Unit, Application]) -> Diff:
     """
     # Retrieve the old data from the data key in the application relation databag.
     old_data = get_encoded_field(event.relation, bucket, "data")
+
+    if not old_data:
+        old_data = {}
+
+    if not isinstance(old_data, dict):
+        # We should never get here, added to re-assure pyright
+        logger.error("Previous databag diff is of a wrong type.")
+        old_data = {}
+
     # Retrieve the new data from the event relation databag.
     new_data = (
         {key: value for key, value in event.relation.data[event.app].items() if key != "data"}
@@ -408,12 +424,16 @@ def diff(event: RelationChangedEvent, bucket: Union[Unit, Application]) -> Diff:
     )
 
     # These are the keys that were added to the databag and triggered this event.
-    added = new_data.keys() - old_data.keys()
+    added = new_data.keys() - old_data.keys()  # pyright: ignore [reportGeneralTypeIssues]
     # These are the keys that were removed from the databag and triggered this event.
-    deleted = old_data.keys() - new_data.keys()
+    deleted = old_data.keys() - new_data.keys()  # pyright: ignore [reportGeneralTypeIssues]
     # These are the keys that already existed in the databag,
     # but had their values changed.
-    changed = {key for key in old_data.keys() & new_data.keys() if old_data[key] != new_data[key]}
+    changed = {
+        key
+        for key in old_data.keys() & new_data.keys()  # pyright: ignore [reportGeneralTypeIssues]
+        if old_data[key] != new_data[key]  # pyright: ignore [reportGeneralTypeIssues]
+    }
     # Convert the new_data to a serializable format and save it for a next diff check.
     set_encoded_field(event.relation, bucket, "data", new_data)
 
@@ -426,6 +446,9 @@ def leader_only(f):
 
     def wrapper(self, *args, **kwargs):
         if not self.local_unit.is_leader():
+            logger.error(
+                "This operation (%s()) can only be performed by the leader unit", f.__name__
+            )
             return
         return f(self, *args, **kwargs)
 
@@ -587,9 +610,16 @@ class DataRelation(Object, ABC):
 
     @abstractmethod
     def _fetch_specific_relation_data(
-        self, relation, fields: Optional[List[str]]
+        self, relation: Relation, fields: Optional[List[str]]
     ) -> Dict[str, str]:
         """Fetch data available (directily or indirectly -- i.e. secrets) from the relation."""
+        raise NotImplementedError
+
+    @abstractmethod
+    def _fetch_my_specific_relation_data(
+        self, relation: Relation, fields: Optional[List[str]]
+    ) -> Dict[str, str]:
+        """Fetch data available (directily or indirectly -- i.e. secrets) from the relation for owner/this_app."""
         raise NotImplementedError
 
     # Internal helper methods
@@ -658,6 +688,22 @@ class DataRelation(Object, ABC):
                 secret_fieldnames_grouped.setdefault(SecretGroup.EXTRA, []).append(key)
         return secret_fieldnames_grouped
 
+    def _retrieve_group_secret_contents(
+        self,
+        relation_id: int,
+        group: SecretGroup,
+        secret_fields: Optional[Union[Set[str], List[str]]] = None,
+    ) -> Dict[str, str]:
+        """Helper function to retrieve collective, requested contents of a secret."""
+        if not secret_fields:
+            secret_fields = []
+
+        if (secret := self._get_relation_secret(relation_id, group)) and (
+            secret_data := secret.get_content()
+        ):
+            return {k: v for k, v in secret_data.items() if k in secret_fields}
+        return {}
+
     @juju_secrets_only
     def _get_relation_secret_data(
         self, relation_id: int, group_mapping: SecretGroup, relation_name: Optional[str] = None
@@ -666,6 +712,72 @@ class DataRelation(Object, ABC):
         secret = self._get_relation_secret(relation_id, group_mapping, relation_name)
         if secret:
             return secret.get_content()
+
+    def _fetch_relation_data_without_secrets(
+        self, app: Application, relation: Relation, fields: Optional[List[str]]
+    ) -> Dict[str, str]:
+        """Fetching databag contents when no secrets are involved.
+
+        Since the Provider's databag is the only one holding secrest, we can apply
+        a simplified workflow to read the Require's side's databag.
+        This is used typically when the Provides side wants to read the Requires side's data,
+        or when the Requires side may want to read its own data.
+        """
+        if fields:
+            return {k: relation.data[app][k] for k in fields if k in relation.data[app]}
+        else:
+            return dict(relation.data[app])
+
+    def _fetch_relation_data_with_secrets(
+        self,
+        app: Application,
+        req_secret_fields: Optional[List[str]],
+        relation: Relation,
+        fields: Optional[List[str]] = None,
+    ) -> Dict[str, str]:
+        """Fetching databag contents when secrets may be involved.
+
+        This function has internal logic to resolve if a requested field may be "hidden"
+        within a Relation Secret, or directly available as a databag field. Typically
+        used to read the Provides side's databag (eigher by the Requires side, or by
+        Provides side itself).
+        """
+        result = {}
+
+        normal_fields = fields
+        if not normal_fields:
+            normal_fields = list(relation.data[app].keys())
+
+        if req_secret_fields and self.secrets_enabled:
+            if fields:
+                # Processing from what was requested
+                normal_fields = set(fields) - set(req_secret_fields)
+                secret_fields = set(fields) - set(normal_fields)
+
+                secret_fieldnames_grouped = self._group_secret_fields(list(secret_fields))
+
+                for group in secret_fieldnames_grouped:
+                    if contents := self._retrieve_group_secret_contents(
+                        relation.id, group, secret_fields
+                    ):
+                        result.update(contents)
+                    else:
+                        # If it wasn't found as a secret, let's give it a 2nd chance as "normal" field
+                        normal_fields |= set(secret_fieldnames_grouped[group])
+            else:
+                # Processing from what is given, i.e. retrieving all
+                normal_fields = [
+                    f for f in relation.data[app].keys() if not self._is_secret_field(f)
+                ]
+                secret_fields = [f for f in relation.data[app].keys() if self._is_secret_field(f)]
+                for group in SecretGroup:
+                    result.update(
+                        self._retrieve_group_secret_contents(relation.id, group, req_secret_fields)
+                    )
+
+        # Processing "normal" fields. May include leftover from what we couldn't retrieve as a secret.
+        result.update({k: relation.data[app][k] for k in normal_fields if k in relation.data[app]})
+        return result
 
     # Public methods
 
@@ -715,6 +827,57 @@ class DataRelation(Object, ABC):
             if not relation_ids or (relation_ids and relation.id in relation_ids):
                 data[relation.id] = self._fetch_specific_relation_data(relation, fields)
         return data
+
+    def fetch_relation_field(
+        self, relation_id: int, field: str, relation_name: Optional[str] = None
+    ) -> Optional[str]:
+        """Get a single field from the relation data."""
+        return (
+            self.fetch_relation_data([relation_id], [field], relation_name)
+            .get(relation_id, {})
+            .get(field)
+        )
+
+    @leader_only
+    def fetch_my_relation_data(
+        self,
+        relation_ids: Optional[List[int]] = None,
+        fields: Optional[List[str]] = None,
+        relation_name: Optional[str] = None,
+    ) -> Optional[Dict[int, Dict[str, str]]]:
+        """Fetch data of the 'owner' (or 'this app') side of the relation.
+
+        NOTE: Since only the leader can read the relation's 'this_app'-side
+        Application databag, the functionality is limited to leaders
+        """
+        if not relation_name:
+            relation_name = self.relation_name
+
+        relations = []
+        if relation_ids:
+            relations = [
+                self.get_relation(relation_name, relation_id) for relation_id in relation_ids
+            ]
+        else:
+            relations = self.relations
+
+        data = {}
+        for relation in relations:
+            if not relation_ids or relation.id in relation_ids:
+                data[relation.id] = self._fetch_my_specific_relation_data(relation, fields)
+        return data
+
+    @leader_only
+    def fetch_my_relation_field(
+        self, relation_id: int, field: str, relation_name: Optional[str] = None
+    ) -> Optional[str]:
+        """Get a single field from the relation data -- owner side.
+
+        NOTE: Since only the leader can read the relation's 'this_app'-side
+        Application databag, the functionality is limited to leaders
+        """
+        if relation_data := self.fetch_my_relation_data([relation_id], [field], relation_name):
+            return relation_data.get(relation_id, {}).get(field)
 
     # Public methods - mandatory override
 
@@ -823,18 +986,32 @@ class DataProvides(DataRelation):
         if secret_uri := relation.data[self.local_app].get(secret_field):
             return self.secrets.get(label, secret_uri)
 
-    def _fetch_specific_relation_data(self, relation, fields: Optional[List[str]]) -> dict:
+    def _fetch_specific_relation_data(
+        self, relation: Relation, fields: Optional[List[str]]
+    ) -> Dict[str, str]:
         """Fetching relation data for Provides.
 
-        NOTE: Since all secret fields are in the Requires side of the databag, we don't need to worry about that
+        NOTE: Since all secret fields are in the Provides side of the databag, we don't need to worry about that
         """
         if not relation.app:
             return {}
 
-        if fields:
-            return {k: relation.data[relation.app].get(k) for k in fields}
-        else:
-            return relation.data[relation.app]
+        return self._fetch_relation_data_without_secrets(relation.app, relation, fields)
+
+    def _fetch_my_specific_relation_data(
+        self, relation: Relation, fields: Optional[List[str]]
+    ) -> dict:
+        """Fetching our own relation data."""
+        secret_fields = None
+        if relation.app:
+            secret_fields = get_encoded_field(relation, relation.app, REQ_SECRET_FIELDS)
+
+        return self._fetch_relation_data_with_secrets(
+            self.local_app,
+            secret_fields if isinstance(secret_fields, list) else None,
+            relation,
+            fields,
+        )
 
     # Public methods -- mandatory overrides
 
@@ -843,7 +1020,10 @@ class DataProvides(DataRelation):
         """Set values for fields not caring whether it's a secret or not."""
         relation = self.get_relation(self.relation_name, relation_id)
 
-        relation_secret_fields = get_encoded_field(relation, relation.app, REQ_SECRET_FIELDS)
+        if relation.app:
+            relation_secret_fields = get_encoded_field(relation, relation.app, REQ_SECRET_FIELDS)
+        else:
+            relation_secret_fields = []
 
         normal_fields = list(fields)
         if relation_secret_fields and self.secrets_enabled:
@@ -1021,22 +1201,6 @@ class DataRequires(DataRelation):
                 else False
             )
 
-    def _retrieve_group_secret_contents(
-        self,
-        relation_id,
-        group: SecretGroup,
-        secret_fields: Optional[Union[Set[str], List[str]]] = None,
-    ) -> Dict[str, str]:
-        """Helper function to retrieve collective, requested contents of a secret."""
-        if not secret_fields:
-            secret_fields = []
-
-        if (secret := self._get_relation_secret(relation_id, group)) and (
-            secret_data := secret.get_content()
-        ):
-            return {k: v for k, v in secret_data.items() if k in secret_fields}
-        return {}
-
     # Event handlers
 
     def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
@@ -1070,49 +1234,16 @@ class DataRequires(DataRelation):
     def _fetch_specific_relation_data(
         self, relation, fields: Optional[List[str]] = None
     ) -> Dict[str, str]:
+        """Fetching Requires data -- that may include secrets."""
         if not relation.app:
             return {}
+        return self._fetch_relation_data_with_secrets(
+            relation.app, self.secret_fields, relation, fields
+        )
 
-        result = {}
-
-        normal_fields = fields
-        if not normal_fields:
-            normal_fields = list(relation.data[relation.app].keys())
-
-        if self.secret_fields and self.secrets_enabled:
-            if fields:
-                # Processing from what was requested
-                normal_fields = set(fields) - set(self.secret_fields)
-                secret_fields = set(fields) - set(normal_fields)
-
-                secret_fieldnames_grouped = self._group_secret_fields(list(secret_fields))
-
-                for group in secret_fieldnames_grouped:
-                    if contents := self._retrieve_group_secret_contents(
-                        relation.id, group, secret_fields
-                    ):
-                        result.update(contents)
-                    else:
-                        # If it wasn't found as a secret, let's give it a 2nd chance as "normal" field
-                        normal_fields |= set(secret_fieldnames_grouped[group])
-            else:
-                # Processing from what is given, i.e. retrieving all
-                normal_fields = [
-                    f for f in relation.data[relation.app].keys() if not self._is_secret_field(f)
-                ]
-                secret_fields = [
-                    f for f in relation.data[relation.app].keys() if self._is_secret_field(f)
-                ]
-                for group in SecretGroup:
-                    result.update(
-                        self._retrieve_group_secret_contents(
-                            relation.id, group, self.secret_fields
-                        )
-                    )
-
-        # Processing "normal" fields. May include leftover from what we couldn't retrieve as a secret.
-        result.update({k: relation.data[relation.app].get(k) for k in normal_fields})
-        return result
+    def _fetch_my_specific_relation_data(self, relation, fields: Optional[List[str]]) -> dict:
+        """Fetching our own relation data."""
+        return self._fetch_relation_data_without_secrets(self.local_app, relation, fields)
 
     # Public methods -- mandatory overrides
 
@@ -1134,18 +1265,6 @@ class DataRequires(DataRelation):
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
         if relation:
             relation.data[self.local_app].update(data)
-
-    # "Native" public methods
-
-    def fetch_relation_field(
-        self, relation_id: int, field: str, relation_name: Optional[str] = None
-    ) -> Optional[str]:
-        """Get a single field from the relation data."""
-        return (
-            self.fetch_relation_data([relation_id], [field], relation_name)
-            .get(relation_id, {})
-            .get(field)
-        )
 
 
 # General events
