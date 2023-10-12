@@ -41,7 +41,7 @@ class MockCharm(CharmBase):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.observer = ClusterTopologyObserver(self)
+        self.observer = ClusterTopologyObserver(self, "test-command")
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
 
     def _on_cluster_topology_change(self, _) -> None:
