@@ -1408,3 +1408,19 @@ class TestCharm(unittest.TestCase):
 
         with patch("builtins.open", mock_open(read_data="")):
             self.assertEqual(self.charm.get_available_memory(), 0)
+
+    @patch("charm.ClusterTopologyObserver")
+    @patch("charm.JujuVersion")
+    def test_juju_run_exec_divergence(self, _juju_version: Mock, _topology_observer: Mock):
+        # Juju 2
+        _juju_version.from_environ.return_value.major = 2
+        harness = Harness(PostgresqlOperatorCharm)
+        harness.begin()
+        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-run")
+        _topology_observer.reset_mock()
+
+        # Juju 3
+        _juju_version.from_environ.return_value.major = 3
+        harness = Harness(PostgresqlOperatorCharm)
+        harness.begin()
+        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
