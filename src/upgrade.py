@@ -126,6 +126,10 @@ class PostgreSQLUpgrade(DataUpgrade):
     @override
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
         # Refresh the charmed PostgreSQL snap and restart the database.
+        # Update the configuration.
+        self.charm.unit.status = MaintenanceStatus("updating configuration")
+        self.charm.update_config()
+
         self.charm.unit.status = MaintenanceStatus("refreshing the snap")
         self.charm._install_snap_packages(packages=SNAP_PACKAGES, refresh=True)
 
