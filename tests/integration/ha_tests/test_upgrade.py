@@ -37,7 +37,6 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         DATABASE_APP_NAME,
         num_units=3,
         channel="14/edge",
-        trust=True,
         config={"profile": "testing"},
     )
     await ops_test.model.deploy(

@@ -772,6 +772,43 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     return False
 
 
+def remove_chown_workaround(original_charm_filename: str, patched_charm_filename: str) -> None:
+    """Remove the chown workaround from the charm."""
+    with zipfile.ZipFile(original_charm_filename, "r") as charm_file, zipfile.ZipFile(
+        patched_charm_filename, "w"
+    ) as modified_charm_file:
+        # Iterate the input files
+        unix_attributes = {}
+        for charm_info in charm_file.infolist():
+            # Read input file
+            with charm_file.open(charm_info) as file:
+                if charm_info.filename == "src/charm.py":
+                    content = file.read()
+                    # Modify the content of the file by replacing a string
+                    content = (
+                        content.decode()
+                        .replace(
+                            """        try:
+            self._patch_snap_seccomp_profile()
+        except subprocess.CalledProcessError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
+            return""",
+                            "",
+                        )
+                        .encode()
+                    )
+                    # Write content.
+                    modified_charm_file.writestr(charm_info.filename, content)
+                else:  # Other file, don't want to modify => just copy it.
+                    content = file.read()
+                    modified_charm_file.writestr(charm_info.filename, content)
+                unix_attributes[charm_info.filename] = charm_info.external_attr >> 16
+
+        for modified_charm_info in modified_charm_file.infolist():
+            modified_charm_info.external_attr = unix_attributes[modified_charm_info.filename] << 16
+
+
 @retry(
     retry=retry_if_result(lambda x: not x),
     stop=stop_after_attempt(10),

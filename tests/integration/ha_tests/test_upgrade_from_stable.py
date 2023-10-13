@@ -1,6 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import json
 import logging
 
 import pytest
@@ -17,6 +17,7 @@ from tests.integration.helpers import (
     count_switchovers,
     get_leader_unit,
     get_primary,
+    remove_chown_workaround,
 )
 
 logger = logging.getLogger(__name__)
@@ -27,12 +28,33 @@ TIMEOUT = 5 * 60
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    await ops_test.model.deploy(
-        DATABASE_APP_NAME,
-        num_units=3,
-        channel="14/stable",
-        trust=True,
-    ),
+    return_code, charm_info, stderr = await ops_test.juju("info", "postgresql", "--format=json")
+    if return_code != 0:
+        raise Exception(f"failed to get charm info with error: {stderr}")
+    # Revisions lower than 315 have a currently broken workaround for chown.
+    if int(json.loads(charm_info)["channels"]["14"]["stable"][0]["revision"]) < 315:
+        original_charm_name = "./postgresql.charm"
+        return_code, _, stderr = await ops_test.juju(
+            "download",
+            "postgresql",
+            "--channel=14/stable",
+            f"--filepath={original_charm_name}",
+        )
+        if return_code != 0:
+            raise Exception(
+                f"failed to download charm from 14/stable channel with error: {stderr}"
+            )
+        patched_charm_name = "./modified_postgresql.charm"
+        remove_chown_workaround(original_charm_name, patched_charm_name)
+        return_code, _, stderr = await ops_test.juju("deploy", patched_charm_name, "-n", "3")
+        if return_code != 0:
+            raise Exception(f"failed to deploy charm from 14/stable channel with error: {stderr}")
+    else:
+        await ops_test.model.deploy(
+            DATABASE_APP_NAME,
+            num_units=3,
+            channel="14/stable",
+        )
     await ops_test.model.deploy(
         APPLICATION_NAME,
         num_units=1,
