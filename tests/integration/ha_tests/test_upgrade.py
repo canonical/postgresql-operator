@@ -75,7 +75,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes) -> None:
     logger.info("checking whether writes are increasing")
     await are_writes_increasing(ops_test)
 
-    primary_name = await get_primary(ops_test, DATABASE_APP_NAME)
+    primary_name = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     initial_number_of_switchovers = count_switchovers(ops_test, primary_name)
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
@@ -146,8 +146,9 @@ async def test_fail_and_rollback(ops_test, continuous_writes) -> None:
 
     logger.info("Wait for upgrade to fail")
     async with ops_test.fast_forward("60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="blocked", timeout=TIMEOUT
+        await ops_test.model.block_until(
+            lambda: "blocked" in {unit.workload_status for unit in application.units},
+            timeout=TIMEOUT,
         )
 
     logger.info("Ensure continuous_writes while in failure state on remaining units")
@@ -193,8 +194,10 @@ async def inject_dependency_fault(
         ops_test, application_name, "upgrade", "dependencies"
     )
     loaded_dependency_dict = json.loads(dependencies)
-    loaded_dependency_dict["charm"]["upgrade_supported"] = "^15"
-    loaded_dependency_dict["charm"]["version"] = "15.0"
+    if "snap" not in loaded_dependency_dict:
+        loaded_dependency_dict["snap"] = {"dependencies": {}, "name": "charmed-postgresql"}
+    loaded_dependency_dict["snap"]["upgrade_supported"] = "^15"
+    loaded_dependency_dict["snap"]["version"] = "15.0"
 
     # Overwrite dependency.json with incompatible version.
     with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
