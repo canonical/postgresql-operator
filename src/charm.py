@@ -101,7 +101,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.secrets = {APP_SCOPE: {}, UNIT_SCOPE: {}}
 
-        self._observer = ClusterTopologyObserver(self)
+        juju_version = JujuVersion.from_environ()
+        if juju_version.major > 2:
+            run_cmd = "/usr/bin/juju-exec"
+        else:
+            run_cmd = "/usr/bin/juju-run"
+        self._observer = ClusterTopologyObserver(self, run_cmd)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
