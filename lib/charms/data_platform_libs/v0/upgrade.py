@@ -285,7 +285,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 12
+LIBPATCH = 14
 
 PYDEPS = ["pydantic>=1.10,<2", "poetry-core"]
 
@@ -895,6 +895,10 @@ class DataUpgrade(Object, ABC):
             self.charm.unit.status = WaitingStatus("other units upgrading first...")
             self.peer_relation.data[self.charm.unit].update({"state": "ready"})
 
+            if self.charm.app.planned_units() == 1:
+                # single unit upgrade, emit upgrade_granted event right away
+                getattr(self.on, "upgrade_granted").emit()
+
         else:
             # for k8s run version checks only on highest ordinal unit
             if (
@@ -921,7 +925,10 @@ class DataUpgrade(Object, ABC):
             logger.debug("Cluster failed to upgrade, exiting...")
             return
 
-        if self.cluster_state == "recovery":
+        if self.substrate == "vm" and self.cluster_state == "recovery":
+            # Only defer for vm, that will set unit states to "ready" on upgrade-charm
+            # on k8s only the upgrading unit will receive the upgrade-charm event
+            # and deferring will prevent the upgrade stack from being popped
             logger.debug("Cluster in recovery, deferring...")
             event.defer()
             return
@@ -944,7 +951,7 @@ class DataUpgrade(Object, ABC):
                 logger.debug("upgrade-changed event handled before pre-checks, exiting...")
                 return
 
-            logger.debug("Did not find upgrade-stack or completed cluster state, deferring...")
+            logger.debug("Did not find upgrade-stack or completed cluster state, skipping...")
             return
 
         # upgrade ongoing, set status for waiting units

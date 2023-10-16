@@ -9,6 +9,7 @@ import os
 import subprocess
 from typing import Dict, List, Optional, Set
 
+from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -22,7 +23,6 @@ from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from ops import JujuVersion
 from ops.charm import (
     ActionEvent,
-    CharmBase,
     HookEvent,
     InstallEvent,
     LeaderElectedEvent,
@@ -54,6 +54,7 @@ from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
 )
+from config import CharmConfig
 from constants import (
     APP_SCOPE,
     BACKUP_USER,
@@ -91,9 +92,10 @@ INVALID_POSTGRESQL_CONFIGURATIONS_ERROR_MESSAGE = "invalid configuration(s) for 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
 
 
-class PostgresqlOperatorCharm(CharmBase):
+class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
+    config_type = CharmConfig
     on = ClusterTopologyChangeCharmEvents()
 
     def __init__(self, *args):
@@ -101,7 +103,12 @@ class PostgresqlOperatorCharm(CharmBase):
 
         self.secrets = {APP_SCOPE: {}, UNIT_SCOPE: {}}
 
-        self._observer = ClusterTopologyObserver(self)
+        juju_version = JujuVersion.from_environ()
+        if juju_version.major > 2:
+            run_cmd = "/usr/bin/juju-exec"
+        else:
+            run_cmd = "/usr/bin/juju-run"
+        self._observer = ClusterTopologyObserver(self, run_cmd)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -568,7 +575,7 @@ class PostgresqlOperatorCharm(CharmBase):
         """
         if (
             hasattr(event, "unit")
-            and event.unit is not None
+            and event.relation.data.get(event.unit) is not None
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
@@ -884,6 +891,12 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.debug("Early exit on_config_changed: cluster not initialised yet")
             return
 
+        if not self.upgrade.idle:
+            logger.debug("Early exit on_config_changed: upgrade in progress")
+            return
+        # update config on every run
+        self.update_config()
+
         if not self.unit.is_leader():
             return
 
@@ -913,13 +926,11 @@ class PostgresqlOperatorCharm(CharmBase):
         Args:
             database: optional database where to enable/disable the extension.
         """
-        for config, enable in self.model.config.items():
-            # Filter config option not related to plugins.
-            if not config.startswith("plugin_"):
-                continue
+        for plugin in self.config.plugin_keys():
+            enable = self.config[plugin]
 
             # Enable or disable the plugin/extension.
-            extension = "_".join(config.split("_")[1:-1])
+            extension = "_".join(plugin.split("_")[1:-1])
             try:
                 self.postgresql.enable_disable_extension(extension, enable, database)
             except PostgreSQLEnableDisableExtensionError as e:
@@ -1386,14 +1397,16 @@ class PostgresqlOperatorCharm(CharmBase):
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
-        restart_postgresql = enable_tls != self.postgresql.is_tls_enabled()
+        restart_postgresql = (
+            enable_tls != self.postgresql.is_tls_enabled()
+        ) or self.postgresql.is_restart_pending()
         self._patroni.reload_patroni_configuration()
-        restart_postgresql = restart_postgresql or self.postgresql.has_pending_restart()
         self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
 
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).
         if restart_postgresql:
+            logger.info("PostgreSQL restart required")
             self._peers.data[self.unit].pop("postgresql_restarted", None)
             self.on[self.restart_manager.name].acquire_lock.emit()
 
@@ -1417,8 +1430,11 @@ class PostgresqlOperatorCharm(CharmBase):
         self, enable_tls: bool, is_creating_backup: bool
     ) -> bool:
         # Retrieve PostgreSQL parameters.
+        limit_memory = None
+        if self.config.profile_limit_memory:
+            limit_memory = self.config.profile_limit_memory * 10 ** 6
         postgresql_parameters = self.postgresql.build_postgresql_parameters(
-            self.config["profile"], self.get_available_memory()
+            self.config["profile"], self.get_available_memory(), limit_memory
         )
 
         postgresql_parameters["max_connections"] = max(4 * os.cpu_count(), 100)

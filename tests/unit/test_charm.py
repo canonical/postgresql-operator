@@ -41,6 +41,7 @@ class TestCharm(unittest.TestCase):
         self.harness.begin()
         self.charm = self.harness.charm
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
+        self.harness.add_relation("upgrade", self.charm.app.name)
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.subprocess.check_call")
@@ -186,11 +187,12 @@ class TestCharm(unittest.TestCase):
             )
         self.assertTrue(self.charm.is_cluster_initialised)
 
+    @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("relations.db.DbProvides.set_up_relation")
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
     def test_on_config_changed(
-        self, _is_cluster_initialised, _enable_disable_extensions, _set_up_relation
+        self, _is_cluster_initialised, _enable_disable_extensions, _set_up_relation, _update_config
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -275,9 +277,21 @@ class TestCharm(unittest.TestCase):
   plugin_citext_enable:
     default: false
     type: boolean
-  other_config_option:
+  plugin_hstore_enable:
     default: false
     type: boolean
+  plugin_pg_trgm_enable:
+    default: false
+    type: boolean
+  plugin_plpython3u_enable:
+    default: false
+    type: boolean
+  plugin_unaccent_enable:
+    default: false
+    type: boolean
+  profile:
+    default: production
+    type: string
   plugin_debversion_enable:
     default: false
     type: boolean"""
@@ -285,7 +299,7 @@ class TestCharm(unittest.TestCase):
                 self.addCleanup(harness.cleanup)
                 harness.begin()
                 harness.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 2)
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
 
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
@@ -1071,12 +1085,13 @@ class TestCharm(unittest.TestCase):
                 parameters={"test": "test"},
             )
             _reload_patroni_configuration.assert_called_once()
-            _restart.assert_not_called()
+            _restart.assert_called_once()
             self.assertNotIn(
                 "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
             )
 
             # Test with TLS files available.
+            _restart.reset_mock()
             self.harness.update_relation_data(
                 self.rel_id, self.charm.unit.name, {"tls": ""}
             )  # Mock some data in the relation to test that it change.
@@ -1408,3 +1423,19 @@ class TestCharm(unittest.TestCase):
 
         with patch("builtins.open", mock_open(read_data="")):
             self.assertEqual(self.charm.get_available_memory(), 0)
+
+    @patch("charm.ClusterTopologyObserver")
+    @patch("charm.JujuVersion")
+    def test_juju_run_exec_divergence(self, _juju_version: Mock, _topology_observer: Mock):
+        # Juju 2
+        _juju_version.from_environ.return_value.major = 2
+        harness = Harness(PostgresqlOperatorCharm)
+        harness.begin()
+        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-run")
+        _topology_observer.reset_mock()
+
+        # Juju 3
+        _juju_version.from_environ.return_value.major = 3
+        harness = Harness(PostgresqlOperatorCharm)
+        harness.begin()
+        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
