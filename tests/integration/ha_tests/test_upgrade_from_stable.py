@@ -32,7 +32,14 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
     if return_code != 0:
         raise Exception(f"failed to get charm info with error: {stderr}")
     # Revisions lower than 315 have a currently broken workaround for chown.
-    if int(json.loads(charm_info)["channels"]["14"]["stable"][0]["revision"]) < 315:
+    parsed_charm_info = json.loads(charm_info)
+    revision = (
+        parsed_charm_info["channels"]["14"]["stable"][0]["revision"]
+        if "channels" in parsed_charm_info
+        else parsed_charm_info["channel-map"]["14/stable"]["revision"]
+    )
+    logger.info(f"14/stable revision: {revision}")
+    if int(revision) < 315:
         original_charm_name = "./postgresql.charm"
         return_code, _, stderr = await ops_test.juju(
             "download",
