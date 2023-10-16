@@ -42,15 +42,17 @@ class ClusterTopologyObserver(Object):
     Observed cluster topology changes cause :class"`ClusterTopologyChangeEvent` to be emitted.
     """
 
-    def __init__(self, charm: CharmBase):
+    def __init__(self, charm: CharmBase, run_cmd: str):
         """Constructor for ClusterTopologyObserver.
 
         Args:
             charm: the charm that is instantiating the library.
+            run_cmd: run command to use to dispatch events.
         """
         super().__init__(charm, "cluster-topology-observer")
 
         self._charm = charm
+        self._run_cmd = run_cmd
 
     def start_observer(self):
         """Start the cluster topology observer running in a new process."""
@@ -79,7 +81,7 @@ class ClusterTopologyObserver(Object):
                 "src/cluster_topology_observer.py",
                 self._charm._patroni._patroni_url,
                 f"{self._charm._patroni.verify}",
-                "/usr/bin/juju-run",
+                self._run_cmd,
                 self._charm.unit.name,
                 self._charm.charm_dir,
             ],

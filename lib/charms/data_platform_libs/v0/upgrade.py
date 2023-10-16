@@ -285,7 +285,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 13
+LIBPATCH = 14
 
 PYDEPS = ["pydantic>=1.10,<2", "poetry-core"]
 
@@ -894,6 +894,10 @@ class DataUpgrade(Object, ABC):
                     return
             self.charm.unit.status = WaitingStatus("other units upgrading first...")
             self.peer_relation.data[self.charm.unit].update({"state": "ready"})
+
+            if self.charm.app.planned_units() == 1:
+                # single unit upgrade, emit upgrade_granted event right away
+                getattr(self.on, "upgrade_granted").emit()
 
         else:
             # for k8s run version checks only on highest ordinal unit
