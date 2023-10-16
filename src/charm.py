@@ -922,17 +922,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Args:
             database: optional database where to enable/disable the extension.
         """
+        original_status = self.unit.status
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
 
             # Enable or disable the plugin/extension.
             extension = "_".join(plugin.split("_")[1:-1])
+            self.unit.status = WaitingStatus(
+                f"{'Enabling' if enable else 'Disabling'} {extension}"
+            )
             try:
                 self.postgresql.enable_disable_extension(extension, enable, database)
             except PostgreSQLEnableDisableExtensionError as e:
                 logger.exception(
                     f"failed to {'enable' if enable else 'disable'} {extension} plugin: %s", str(e)
                 )
+            self.unit.status = original_status
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""

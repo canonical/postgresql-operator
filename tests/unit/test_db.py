@@ -236,7 +236,7 @@ class TestDbProvides(unittest.TestCase):
             self.assertTrue(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             user = f"relation-{self.rel_id}"
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
-            postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
+            postgresql_mock.create_database.assert_called_once_with(DATABASE, user, plugins=[])
             _enable_disable_extensions.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
@@ -263,7 +263,7 @@ class TestDbProvides(unittest.TestCase):
                 )
             self.assertTrue(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
-            postgresql_mock.create_database.assert_called_once_with(DATABASE, user)
+            postgresql_mock.create_database.assert_called_once_with(DATABASE, user, plugins=[])
             _enable_disable_extensions.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
@@ -284,7 +284,9 @@ class TestDbProvides(unittest.TestCase):
                 )
             self.assertTrue(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
-            postgresql_mock.create_database.assert_called_once_with("application", user)
+            postgresql_mock.create_database.assert_called_once_with(
+                "application", user, plugins=[]
+            )
             _enable_disable_extensions.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
