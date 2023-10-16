@@ -7,6 +7,7 @@ import json
 import logging
 import os
 import subprocess
+import time
 from typing import Dict, List, Optional, Set
 
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
@@ -900,8 +901,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
-        self.update_config()
-
         # Enable and/or disable the extensions.
         self.enable_disable_extensions()
 
@@ -1432,7 +1431,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Retrieve PostgreSQL parameters.
         limit_memory = None
         if self.config.profile_limit_memory:
-            limit_memory = self.config.profile_limit_memory * 10 ** 6
+            limit_memory = self.config.profile_limit_memory * 10**6
         postgresql_parameters = self.postgresql.build_postgresql_parameters(
             self.config["profile"], self.get_available_memory(), limit_memory
         )
@@ -1475,15 +1474,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
 
         self._patroni.reload_patroni_configuration()
+        time.sleep(10)
 
         invalid_configurations = self.postgresql.get_invalid_postgresql_parameters()
         if len(invalid_configurations) > 0:
             logger.error(
                 f"invalid values for the following parameters: {''.join(invalid_configurations)}"
             )
-            applied_parameters = self.postgresql.get_applied_postgresql_parameters(
-                list(postgresql_parameters.keys())
-            )
+            applied_parameters = {
+                parameter: postgresql_parameters[parameter]
+                for parameter in postgresql_parameters.keys()
+                if parameter not in invalid_configurations
+            }
             self._patroni.render_patroni_yml_file(
                 connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
                 is_creating_backup=is_creating_backup,

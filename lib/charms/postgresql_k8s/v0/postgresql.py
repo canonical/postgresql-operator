@@ -305,29 +305,13 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
-    def get_applied_postgresql_parameters(self, parameters=List[str]) -> Dict:
-        """Returns the applied PostgreSQL configurations and their values.
-
-        Args:
-            parameters: list of parameters to retrieve the values.
-
-        Returns:
-            Dict containing PostgreSQL configurations and their values.
-        """
-        with self._connect_to_database() as connection, connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT name, setting FROM pg_settings WHERE name IN %s;", (parameters,)
-            )
-            results = cursor.fetchall()
-            return {configuration[0]: configuration[1] for configuration in results}
-
     def get_invalid_postgresql_parameters(self) -> List:
         """Returns the PostgreSQL configurations that have invalid values.
 
         Returns:
             Dict containing PostgreSQL configurations and their values.
         """
-        with self._connect_to_database() as connection, connection.cursor() as cursor:
+        with self._connect_to_database(connect_to_current_host=True) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT name FROM pg_file_settings WHERE error IS NOT NULL;")
             results = cursor.fetchall()
             return [parameter[0] for parameter in results]
