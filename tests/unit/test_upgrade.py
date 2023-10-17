@@ -62,8 +62,10 @@ class TestUpgrade(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._setup_exporter")
     @patch("charm.Patroni.start_patroni")
     @patch("charm.PostgresqlOperatorCharm._install_snap_packages")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
     def test_on_upgrade_granted(
         self,
+        _update_config,
         _install_snap_packages,
         _start_patroni,
         _setup_exporter,
@@ -80,6 +82,7 @@ class TestUpgrade(unittest.TestCase):
         mock_event = MagicMock()
         _start_patroni.return_value = False
         self.charm.upgrade._on_upgrade_granted(mock_event)
+        _update_config.assert_called_once()
         _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES, refresh=True)
         _member_started.assert_not_called()
         mock_event.defer.assert_not_called()

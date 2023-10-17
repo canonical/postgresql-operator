@@ -149,6 +149,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
 
     @property
+    def app_units(self) -> set[Unit]:
+        """The peer-related units in the application."""
+        if not self._peers:
+            return set()
+
+        return {self.unit, *self._peers.units}
+
+    @property
     def app_peer_data(self) -> Dict:
         """Application peer relation data object."""
         relation = self.model.get_relation(PEER)
@@ -951,6 +959,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._reboot_on_detached_storage(event)
             return False
 
+        # Safeguard against starting while upgrading.
+        if not self.upgrade.idle:
+            logger.debug("Defer on_start: Cluster is upgrading")
+            event.defer()
+            return False
+
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
         if self.is_blocked:
@@ -996,6 +1010,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Set up postgresql_exporter options."""
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        if (
+            postgres_snap.revision
+            != list(
+                filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
+            )[0][1]["revision"]
+        ):
+            logger.debug(
+                "Early exit _setup_exporter: snap was not refreshed to the right version yet"
+            )
+            return
 
         postgres_snap.set(
             {
@@ -1145,11 +1170,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
-        if "cluster_initialised" not in self._peers.data[self.app]:
-            return
-
-        if self.is_blocked:
-            logger.debug("on_update_status early exit: Unit is in Blocked status")
+        if not self._can_run_on_update_status():
             return
 
         if "restoring-backup" in self.app_peer_data:
@@ -1186,6 +1207,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+    def _can_run_on_update_status(self) -> bool:
+        if "cluster_initialised" not in self._peers.data[self.app]:
+            return False
+
+        if not self.upgrade.idle:
+            logger.debug("Early exit on_update_status: upgrade in progress")
+            return False
+
+        if self.is_blocked:
+            logger.debug("on_update_status early exit: Unit is in Blocked status")
+            return False
+
+        return True
 
     def _handle_processes_failures(self) -> bool:
         """Handle Patroni and PostgreSQL OS processes failures.
