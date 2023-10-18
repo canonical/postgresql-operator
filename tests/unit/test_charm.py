@@ -318,6 +318,7 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
     @patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     @patch(
         "charm.PostgresqlOperatorCharm._is_storage_attached",
         side_effect=[False, True, True, True, True],
@@ -325,6 +326,7 @@ class TestCharm(unittest.TestCase):
     def test_on_start(
         self,
         _is_storage_attached,
+        _idle,
         _reboot_on_detached_storage,
         _get_password,
         _replication_password,
@@ -402,6 +404,7 @@ class TestCharm(unittest.TestCase):
     @patch.object(EventBase, "defer")
     @patch("charm.PostgresqlOperatorCharm._replication_password")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     @patch(
         "charm.PostgresqlOperatorCharm._is_storage_attached",
         return_value=True,
@@ -409,6 +412,7 @@ class TestCharm(unittest.TestCase):
     def test_on_start_replica(
         self,
         _is_storage_attached,
+        _idle,
         _get_password,
         _replication_password,
         _defer,
@@ -457,10 +461,12 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.Patroni")
     @patch("charm.PostgresqlOperatorCharm._get_password")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
     def test_on_start_no_patroni_member(
         self,
         _is_storage_attached,
+        _idle,
         _get_password,
         patroni,
         _postgresql,
@@ -611,8 +617,10 @@ class TestCharm(unittest.TestCase):
         new_callable=PropertyMock(return_value=True),
     )
     @patch("charm.PostgreSQLProvider.oversee_users")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     def test_on_update_status(
         self,
+        _,
         _oversee_users,
         _primary_endpoint,
         _update_relation_endpoints,
@@ -682,8 +690,10 @@ class TestCharm(unittest.TestCase):
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.Patroni.get_member_status")
+    @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
     def test_on_update_status_after_restore_operation(
         self,
+        _,
         _get_member_status,
         _member_started,
         _update_config,
@@ -694,7 +704,7 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints,
         _handle_workload_failures,
         _set_primary_status_message,
-        _,
+        __,
     ):
         # Test when the restore operation fails.
         with self.harness.hooks_disabled():
