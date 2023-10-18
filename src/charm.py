@@ -5,7 +5,9 @@
 """Charmed Machine Operator for the PostgreSQL database."""
 import json
 import logging
+import os
 import subprocess
+import time
 from typing import Dict, List, Optional, Set
 
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
@@ -722,7 +724,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_tls_files())
+        return all(self.tls.get_tls_files()) and (
+            self.config.connection_ssl or self.config.connection_ssl is None
+        )
 
     @property
     def _peer_members_ips(self) -> Set[str]:
@@ -1411,14 +1415,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
-        enable_tls = all(self.tls.get_tls_files())
+        enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:
             limit_memory = self.config.profile_limit_memory * 10**6
 
         # Build PostgreSQL parameters.
         pg_parameters = self.postgresql.build_postgresql_parameters(
-            self.config.profile, self.get_available_memory(), limit_memory
+            self.model.config, self.get_available_memory(), limit_memory
         )
 
         # Update and reload configuration based on TLS files availability.
@@ -1444,10 +1448,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
-        restart_postgresql = (
-            enable_tls != self.postgresql.is_tls_enabled()
-        ) or self.postgresql.is_restart_pending()
+        self._validate_config_options()
+
+        self._patroni.update_parameter_controller_by_patroni(
+            "max_connections", max(4 * os.cpu_count(), 100)
+        )
+        self._patroni.update_parameter_controller_by_patroni(
+            "max_prepared_transactions", self.config.memory_max_prepared_transactions
+        )
+
+        restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
         self._patroni.reload_patroni_configuration()
+        # Sleep the same time as Patroni's loop_wait default value, which tells how much time
+        # Patroni will wait before checking the configuration file again to reload it.
+        time.sleep(10)
+        restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
         self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
 
         # Restart PostgreSQL if TLS configuration has changed
@@ -1472,6 +1487,33 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._setup_exporter()
 
         return True
+
+    def _validate_config_options(self) -> None:
+        """Validates specific config options that need access to the database or to the TLS status."""
+        if self.config.connection_ssl and not self.is_tls_enabled:
+            raise Exception(
+                "connection_ssl config option should not be set to true when there is no configured TLS relation"
+            )
+
+        if (
+            self.config.instance_default_text_search_config is not None
+            and self.config.instance_default_text_search_config
+            not in self.postgresql.get_postgresql_text_search_configs()
+        ):
+            raise Exception(
+                "instance_default_text_search_config config option has an invalid value"
+            )
+
+        if self.config.request_date_style is not None and not self.postgresql.validate_date_style(
+            self.config.request_date_style
+        ):
+            raise Exception("request_date_style config option has an invalid value")
+
+        if (
+            self.config.request_time_zone is not None
+            and self.config.request_time_zone not in self.postgresql.get_postgresql_timezones()
+        ):
+            raise Exception("request_time_zone config option has an invalid value")
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""

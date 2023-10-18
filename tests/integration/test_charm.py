@@ -96,10 +96,20 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
         settings_names = [
             "archive_command",
             "archive_mode",
+            "autovacuum",
             "data_directory",
             "cluster_name",
             "data_checksums",
+            "fsync",
+            "full_page_writes",
+            "lc_messages",
             "listen_addresses",
+            "log_autovacuum_min_duration",
+            "log_checkpoints",
+            "log_destination",
+            "log_temp_files",
+            "log_timezone",
+            "max_connections",
             "wal_level",
         ]
         with connection.cursor() as cursor:
@@ -116,10 +126,20 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Validate each configuration set by Patroni on PostgreSQL.
     assert settings["archive_command"] == "/bin/true"
     assert settings["archive_mode"] == "on"
+    assert settings["autovacuum"]
     assert settings["cluster_name"] == DATABASE_APP_NAME
     assert settings["data_directory"] == f"{STORAGE_PATH}/var/lib/postgresql"
     assert settings["data_checksums"] == "on"
+    assert settings["fsync"]
+    assert settings["full_page_writes"]
+    assert settings["lc_messages"] == "en_US.UTF8"
     assert settings["listen_addresses"] == host
+    assert settings["log_autovacuum_min_duration"] == "60000"
+    assert settings["log_checkpoints"] == "on"
+    assert settings["log_destination"] == "stderr"
+    assert settings["log_temp_files"] == "1"
+    assert settings["log_timezone"] == "UTC"
+    assert settings["max_connections"] == "100"
     assert settings["wal_level"] == "logical"
 
     # Retrieve settings from Patroni REST API.
@@ -139,6 +159,42 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert unit.data["port-ranges"][0]["from-port"] == 5432
     assert unit.data["port-ranges"][0]["to-port"] == 5432
     assert unit.data["port-ranges"][0]["protocol"] == "tcp"
+
+
+async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
+    """Test that's possible to change PostgreSQL parameters."""
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(
+        {
+            "memory_max_prepared_transactions": "100",
+            "memory_shared_buffers": "128",
+            "response_lc_monetary": "en_GB.utf8",
+        }
+    )
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
+    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    password = await get_password(ops_test, any_unit_name)
+
+    # Connect to PostgreSQL.
+    for unit_id in UNIT_IDS:
+        host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
+        logger.info("connecting to the database host: %s", host)
+        with db_connect(host, password) as connection:
+            settings_names = ["max_prepared_transactions", "shared_buffers", "lc_monetary"]
+            with connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
+                        sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
+                    ),
+                    settings_names,
+                )
+                records = cursor.fetchall()
+                settings = convert_records_to_dict(records)
+        connection.close()
+
+        # Validate each configuration set by Patroni on PostgreSQL.
+        assert settings["max_prepared_transactions"] == "100"
+        assert settings["shared_buffers"] == "128"
+        assert settings["lc_monetary"] == "en_GB.utf8"
 
 
 async def test_scale_down_and_up(ops_test: OpsTest):

@@ -140,7 +140,30 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
         )
 
+        # Disable TLS.
+        logger.info("disabling TLS through connection_ssl config option")
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config(
+            {"connection_ssl": "False"}
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+            assert await check_tls(ops_test, unit.name, enabled=False)
+            assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
+
+        # Re-enable TLS.
+        logger.info("re-enabling TLS through connection_ssl config option")
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config({"connection_ssl": "True"})
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+            assert await check_tls(ops_test, unit.name, enabled=True)
+            assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
+
         # Remove the relation.
+        logger.info("removing the TLS relation")
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config(
+            {"connection_ssl": "False"}
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:certificates", f"{TLS_CERTIFICATES_APP_NAME}:certificates"
         )

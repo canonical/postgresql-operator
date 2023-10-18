@@ -1058,6 +1058,8 @@ class TestCharm(unittest.TestCase):
     @patch("charm.snap.SnapCache")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
+    @patch("charm.Patroni.update_parameter_controller_by_patroni")
+    @patch("charm.PostgresqlOperatorCharm._validate_config_options")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock)
     @patch("charm.Patroni.render_patroni_yml_file")
@@ -1068,9 +1070,11 @@ class TestCharm(unittest.TestCase):
         _render_patroni_yml_file,
         _is_workload_running,
         _member_started,
+        _,
+        __,
         _reload_patroni_configuration,
         _restart,
-        _,
+        ___,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.

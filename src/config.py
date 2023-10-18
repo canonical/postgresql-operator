@@ -200,7 +200,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def response_lc_values(cls, value: str) -> Optional[str]:
         """Check if the requested locale is available in the system."""
-        output = subprocess.check_output(["locale", "-a"])
+        output = subprocess.check_output(["ls", "/snap/charmed-postgresql/current/usr/lib/locale"])
         locales = [locale.decode() for locale in output.splitlines()]
         if value not in locales:
             raise ValueError("Value not one of the locales available in the system")
