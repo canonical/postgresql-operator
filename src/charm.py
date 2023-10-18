@@ -5,9 +5,7 @@
 """Charmed Machine Operator for the PostgreSQL database."""
 import json
 import logging
-import os
 import subprocess
-import time
 from typing import Dict, List, Optional, Set
 
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
@@ -89,7 +87,6 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
-INVALID_POSTGRESQL_CONFIGURATIONS_ERROR_MESSAGE = "invalid configuration(s) for PostgreSQL"
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
 
 
@@ -1415,14 +1412,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = all(self.tls.get_tls_files())
+        limit_memory = None
+        if self.config.profile_limit_memory:
+            limit_memory = self.config.profile_limit_memory * 10**6
+
+        # Build PostgreSQL parameters.
+        pg_parameters = self.postgresql.build_postgresql_parameters(
+            self.config.profile, self.get_available_memory(), limit_memory
+        )
 
         # Update and reload configuration based on TLS files availability.
-        if not self._validate_and_render_configurations(enable_tls, is_creating_backup):
-            self.unit.status = BlockedStatus(INVALID_POSTGRESQL_CONFIGURATIONS_ERROR_MESSAGE)
-            return False
-        elif self.unit.status.message == INVALID_POSTGRESQL_CONFIGURATIONS_ERROR_MESSAGE:
-            self.unit.status = ActiveStatus()
-
+        self._patroni.render_patroni_yml_file(
+            connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
+            is_creating_backup=is_creating_backup,
+            enable_tls=enable_tls,
+            backup_id=self.app_peer_data.get("restoring-backup"),
+            stanza=self.app_peer_data.get("stanza"),
+            restore_stanza=self.app_peer_data.get("restore-stanza"),
+            parameters=pg_parameters,
+        )
         if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
@@ -1462,80 +1470,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
             self._setup_exporter()
-
-        return True
-
-    def _validate_and_render_configurations(
-        self, enable_tls: bool, is_creating_backup: bool
-    ) -> bool:
-        # Retrieve PostgreSQL parameters.
-        limit_memory = None
-        if self.config.profile_limit_memory:
-            limit_memory = self.config.profile_limit_memory * 10**6
-        postgresql_parameters = self.postgresql.build_postgresql_parameters(
-            self.config["profile"], self.get_available_memory(), limit_memory
-        )
-
-        postgresql_parameters["max_connections"] = max(4 * os.cpu_count(), 100)
-
-        for config, value in self.model.config.items():
-            # Filter config option not related to PostgreSQL parameters.
-            if not config.startswith(
-                (
-                    "connection",
-                    "durability",
-                    "instance",
-                    "logging",
-                    "memory",
-                    "optimizer",
-                    "request",
-                    "response",
-                    "vacuum",
-                )
-            ):
-                continue
-
-            parameter = "_".join(config.split("_")[1:])
-            if parameter in ["date_style", "time_zone"]:
-                parameter = "".join(x.capitalize() for x in parameter.split("_"))
-            postgresql_parameters[parameter] = value
-
-        self._patroni.render_patroni_yml_file(
-            connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
-            is_creating_backup=is_creating_backup,
-            enable_tls=enable_tls,
-            backup_id=self.app_peer_data.get("restoring-backup"),
-            stanza=self.app_peer_data.get("stanza"),
-            restore_stanza=self.app_peer_data.get("restore-stanza"),
-            parameters=postgresql_parameters,
-        )
-
-        if not self._patroni.member_started:
-            return True
-
-        self._patroni.reload_patroni_configuration()
-        time.sleep(10)
-
-        invalid_configurations = self.postgresql.get_invalid_postgresql_parameters()
-        if len(invalid_configurations) > 0:
-            logger.error(
-                f"invalid values for the following parameters: {''.join(invalid_configurations)}"
-            )
-            applied_parameters = {
-                parameter: postgresql_parameters[parameter]
-                for parameter in postgresql_parameters.keys()
-                if parameter not in invalid_configurations
-            }
-            self._patroni.render_patroni_yml_file(
-                connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
-                is_creating_backup=is_creating_backup,
-                enable_tls=enable_tls,
-                backup_id=self.app_peer_data.get("restoring-backup"),
-                stanza=self.app_peer_data.get("stanza"),
-                restore_stanza=self.app_peer_data.get("restore-stanza"),
-                parameters=applied_parameters,
-            )
-            return False
 
         return True
 
