@@ -168,7 +168,13 @@ class DbProvides(Object):
             self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
             self.charm.postgresql.create_user(user, password, self.admin)
-            self.charm.postgresql.create_database(database, user)
+            plugins = [
+                "_".join(plugin.split("_")[1:-1])
+                for plugin in self.charm.config.plugin_keys()
+                if self.charm.config[plugin]
+            ]
+
+            self.charm.postgresql.create_database(database, user, plugins=plugins)
 
             # Enable/disable extensions in the new database.
             self.charm.enable_disable_extensions(database)

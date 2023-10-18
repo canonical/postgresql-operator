@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 17
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -117,12 +117,13 @@ class PostgreSQL:
         connection.autocommit = True
         return connection
 
-    def create_database(self, database: str, user: str) -> None:
+    def create_database(self, database: str, user: str, plugins: List[str] = []) -> None:
         """Creates a new database and grant privileges to a user on it.
 
         Args:
             database: database to be created.
             user: user that will have access to the database.
+            plugins: extensions to enable in the new database.
         """
         try:
             connection = self._connect_to_database()
@@ -169,6 +170,10 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to create database: {e}")
             raise PostgreSQLCreateDatabaseError()
+
+        # Enable preset extensions
+        for plugin in plugins:
+            self.enable_disable_extension(plugin, True, database)
 
     def create_user(
         self, user: str, password: str = None, admin: bool = False, extra_user_roles: str = None

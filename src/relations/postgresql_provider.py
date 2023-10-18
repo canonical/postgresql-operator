@@ -84,7 +84,13 @@ class PostgreSQLProvider(Object):
             user = f"relation-{event.relation.id}"
             password = new_password()
             self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
-            self.charm.postgresql.create_database(database, user)
+            plugins = [
+                "_".join(plugin.split("_")[1:-1])
+                for plugin in self.charm.config.plugin_keys()
+                if self.charm.config[plugin]
+            ]
+
+            self.charm.postgresql.create_database(database, user, plugins=plugins)
 
             # Share the credentials with the application.
             self.database_provides.set_credentials(event.relation.id, user, password)
