@@ -45,6 +45,7 @@ async def test_deploy(ops_test: OpsTest, charm: str):
         application_name=DATABASE_APP_NAME,
         num_units=3,
         series=CHARM_SERIES,
+        config={"profile": "testing"},
     )
 
     # Reducing the update status frequency to speed up the triggering of deferred events.

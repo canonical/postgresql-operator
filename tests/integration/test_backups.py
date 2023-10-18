@@ -52,6 +52,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             application_name=database_app_name,
             num_units=2,
             series=CHARM_SERIES,
+            config={"profile": "testing"},
         )
         await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
         await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
