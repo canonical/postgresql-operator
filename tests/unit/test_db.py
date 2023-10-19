@@ -182,6 +182,7 @@ class TestDbProvides(unittest.TestCase):
             ([extensions[1], extensions[2]], {extensions[2]}),
         )
 
+    @patch("subprocess.check_output", return_value=b"C")
     @patch("relations.db.DbProvides._update_unit_status")
     @patch("relations.db.DbProvides.update_endpoints")
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
@@ -194,6 +195,7 @@ class TestDbProvides(unittest.TestCase):
         _enable_disable_extensions,
         _update_endpoints,
         _update_unit_status,
+        _,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Define some mocks' side effects.

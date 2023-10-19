@@ -16,7 +16,6 @@ logger = logging.getLogger(__name__)
 class CharmConfig(BaseConfigModel):
     """Manager for the structured configuration."""
 
-    connection_ssl: Optional[bool]
     durability_synchronous_commit: Optional[str]
     instance_default_text_search_config: Optional[str]
     instance_password_encryption: Optional[str]
@@ -114,7 +113,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def memory_shared_buffers_values(cls, value: int) -> Optional[int]:
         """Check memory_shared_buffers config option is greater or equal than 16."""
-        if value < 16:
+        if value < 16 or value > 1073741823:
             raise ValueError("Shared buffers config option should be at least 16")
 
         return value
@@ -202,6 +201,7 @@ class CharmConfig(BaseConfigModel):
         """Check if the requested locale is available in the system."""
         output = subprocess.check_output(["ls", "/snap/charmed-postgresql/current/usr/lib/locale"])
         locales = [locale.decode() for locale in output.splitlines()]
+        locales.append("C")
         if value not in locales:
             raise ValueError("Value not one of the locales available in the system")
 

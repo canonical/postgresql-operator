@@ -250,7 +250,8 @@ class TestCharm(unittest.TestCase):
         _enable_disable_extensions.assert_called_once()
         _set_up_relation.assert_called_once()
 
-    def test_enable_disable_extensions(self):
+    @patch("subprocess.check_output", return_value=b"C")
+    def test_enable_disable_extensions(self, _):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Test when all extensions install/uninstall succeed.
             postgresql_mock.enable_disable_extension.side_effect = None
@@ -457,6 +458,7 @@ class TestCharm(unittest.TestCase):
         self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("subprocess.check_output", return_value=b"C")
     @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm.postgresql")
     @patch("charm.Patroni")
@@ -471,6 +473,7 @@ class TestCharm(unittest.TestCase):
         patroni,
         _postgresql,
         _snap_cache,
+        _,
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -1055,6 +1058,7 @@ class TestCharm(unittest.TestCase):
         mock_event.defer.assert_not_called()
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("subprocess.check_output", return_value=b"C")
     @patch("charm.snap.SnapCache")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
@@ -1075,6 +1079,7 @@ class TestCharm(unittest.TestCase):
         _reload_patroni_configuration,
         _restart,
         ___,
+        ____,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.

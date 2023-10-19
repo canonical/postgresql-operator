@@ -724,9 +724,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_tls_files()) and (
-            self.config.connection_ssl or self.config.connection_ssl is None
-        )
+        return all(self.tls.get_tls_files())
 
     @property
     def _peer_members_ips(self) -> Set[str]:
@@ -1490,11 +1488,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""
-        if self.config.connection_ssl and not self.is_tls_enabled:
-            raise Exception(
-                "connection_ssl config option should not be set to true when there is no configured TLS relation"
-            )
-
         if (
             self.config.instance_default_text_search_config is not None
             and self.config.instance_default_text_search_config

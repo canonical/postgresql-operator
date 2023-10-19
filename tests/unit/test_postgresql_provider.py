@@ -73,6 +73,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
             {"database": DATABASE, "extra-user-roles": EXTRA_USER_ROLES},
         )
 
+    @patch("subprocess.check_output", return_value=b"C")
     @patch("charm.PostgreSQLProvider.update_endpoints")
     @patch("relations.postgresql_provider.new_password", return_value="test-password")
     @patch.object(EventBase, "defer")
@@ -82,7 +83,7 @@ class TestPostgreSQLProvider(unittest.TestCase):
     )
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     def test_on_database_requested(
-        self, _member_started, _primary_endpoint, _defer, _new_password, _update_endpoints
+        self, _member_started, _primary_endpoint, _defer, _new_password, _update_endpoints, _
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Set some side effects to test multiple situations.

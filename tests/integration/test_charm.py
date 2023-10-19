@@ -126,12 +126,12 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Validate each configuration set by Patroni on PostgreSQL.
     assert settings["archive_command"] == "/bin/true"
     assert settings["archive_mode"] == "on"
-    assert settings["autovacuum"]
+    assert settings["autovacuum"] == "on"
     assert settings["cluster_name"] == DATABASE_APP_NAME
     assert settings["data_directory"] == f"{STORAGE_PATH}/var/lib/postgresql"
     assert settings["data_checksums"] == "on"
-    assert settings["fsync"]
-    assert settings["full_page_writes"]
+    assert settings["fsync"] == "on"
+    assert settings["full_page_writes"] == "on"
     assert settings["lc_messages"] == "en_US.UTF8"
     assert settings["listen_addresses"] == host
     assert settings["log_autovacuum_min_duration"] == "60000"
@@ -147,9 +147,9 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     settings = result.json()
 
     # Validate each configuration related to Patroni
-    assert settings["postgresql"]["use_pg_rewind"]
-    assert settings["postgresql"]["remove_data_directory_on_rewind_failure"]
-    assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"]
+    assert settings["postgresql"]["use_pg_rewind"] is True
+    assert settings["postgresql"]["remove_data_directory_on_rewind_failure"] is True
+    assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"] is True
     assert settings["loop_wait"] == 10
     assert settings["retry_timeout"] == 10
     assert settings["maximum_lag_on_failover"] == 1048576
