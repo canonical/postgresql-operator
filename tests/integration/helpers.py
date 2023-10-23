@@ -423,21 +423,6 @@ async def deploy_and_relate_bundle_with_postgresql(
     return relation.id
 
 
-def enable_connections_logging(ops_test: OpsTest, unit_name: str) -> None:
-    """Turn on the log of all connections made to a PostgreSQL instance.
-
-    Args:
-        ops_test: The ops test framework instance
-        unit_name: The name of the unit to turn on the connection logs
-    """
-    unit_address = get_unit_address(ops_test, unit_name)
-    requests.patch(
-        f"https://{unit_address}:8008/config",
-        json={"postgresql": {"parameters": {"log_connections": True}}},
-        verify=False,
-    )
-
-
 async def ensure_correct_relation_data(
     ops_test: OpsTest, database_units: int, app_name: str, relation_name: str
 ) -> None:
