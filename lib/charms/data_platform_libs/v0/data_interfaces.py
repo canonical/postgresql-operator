@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 19
+LIBPATCH = 20
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -1673,6 +1673,10 @@ class DatabaseRequires(DataRequires):
         relation = self.charm.model.get_relation(self.relation_name, relation_id)
         if relation:
             relation.data[self.local_unit].update({"alias": available_aliases[0]})
+
+        # We need to set relation alias also on the application level so,
+        # it will be accessible in show-unit juju command, executed for a consumer application unit
+        self.update_relation_data(relation_id, {"alias": available_aliases[0]})
 
     def _emit_aliased_event(self, event: RelationChangedEvent, event_name: str) -> None:
         """Emit an aliased event to a particular relation if it has an alias.
