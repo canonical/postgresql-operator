@@ -24,12 +24,17 @@ HSTORE_EXTENSION_STATEMENT = "CREATE TABLE hstore_test (value hstore);"
 PG_TRGM_EXTENSION_STATEMENT = "SELECT word_similarity('word', 'two words');"
 PLPYTHON3U_EXTENSION_STATEMENT = 'CREATE FUNCTION plpython_test() RETURNS varchar[] AS $$ return "hello" $$ LANGUAGE plpython3u;'
 UNACCENT_EXTENSION_STATEMENT = "SELECT ts_lexize('unaccent','Hôtel');"
+PLPGSQL_EXTENSION_STATEMENT = "CREATE FUNCTION add_one (integer) RETURNS INTEGER AS $$ BEGIN RETURN $1 + 1; END; $$ LANGUAGE plpgsql;"
 
 
 @pytest.mark.abort_on_fail
 async def test_plugins(ops_test: OpsTest) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
     # Build and deploy the PostgreSQL charm.
+    logger.info("disabling plugins enabled by default")
+    config = {
+        "plugin_plpgsql_enable": "False",
+    }
     async with ops_test.fast_forward():
         charm = await ops_test.build_charm(".")
         await ops_test.model.deploy(
@@ -37,6 +42,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             num_units=2,
             series=CHARM_SERIES,
         )
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
     # Check that the available plugins are disabled.
@@ -70,6 +76,10 @@ async def test_plugins(ops_test: OpsTest) -> None:
         # Test unaccent extension disabled.
         with pytest.raises(psycopg2.Error):
             connection.cursor().execute(UNACCENT_EXTENSION_STATEMENT)
+
+        # Test plpgsql extension disabled.
+        with pytest.raises(psycopg2.Error):
+            connection.cursor().execute(PLPGSQL_EXTENSION_STATEMENT)
     connection.close()
 
     # Enable the plugins.
@@ -107,4 +117,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
 
         # Test unaccent extension enabled.
         connection.cursor().execute(UNACCENT_EXTENSION_STATEMENT)
+
+        # Test plpgsql extension enabled.
+        connection.cursor().execute(PLPGSQL_EXTENSION_STATEMENT)
     connection.close()
