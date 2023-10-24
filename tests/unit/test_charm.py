@@ -135,6 +135,35 @@ class TestCharm(unittest.TestCase):
         _install_snap_packages.assert_called_once()
         self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
 
+    def test_patroni_scrape_config_no_tls(self):
+        result = self.charm.patroni_scrape_config()
+
+        assert result == [
+            {
+                "metrics_path": "/metrics",
+                "scheme": "http",
+                "static_configs": [{"targets": ["localhost:8008"]}],
+                "tls_config": {"insecure_skip_verify": True},
+            },
+        ]
+
+    @patch(
+        "charm.PostgresqlOperatorCharm.is_tls_enabled",
+        return_value=True,
+        new_callable=PropertyMock,
+    )
+    def test_patroni_scrape_config_tls(self, _):
+        result = self.charm.patroni_scrape_config()
+
+        assert result == [
+            {
+                "metrics_path": "/metrics",
+                "scheme": "https",
+                "static_configs": [{"targets": ["localhost:8008"]}],
+                "tls_config": {"insecure_skip_verify": True},
+            },
+        ]
+
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
