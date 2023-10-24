@@ -2,6 +2,103 @@
 # See LICENSE file for licensing details.
 
 options:
+  durability_synchronous_commit:
+    description: |
+      Sets the current transactions synchronization level. This charm allows only the
+      “on”, “remote_apply” and “remote_write” values to avoid data loss if the primary
+      crashes and there are replicas.
+    type: string
+    default: "on"
+  instance_default_text_search_config:
+    description: |
+      Selects the text search configuration that is used by those variants of the text
+      search functions that do not have an explicit argument specifying it.
+      Allowed values start with “pg_catalog.” followed by a language name, like
+      “pg_catalog.english”.
+    type: string
+    default: "pg_catalog.simple"
+  instance_password_encryption:
+    description: |
+      Determines the algorithm to use to encrypt the password.
+      Allowed values are: “md5” and “scram-sha-256”.
+    type: string
+    default: "scram-sha-256"
+  logging_log_connections:
+    description: |
+      Logs each successful connection.
+    type: boolean
+    default: false
+  logging_log_disconnections:
+    description: |
+      Logs end of a session, including duration.
+    type: boolean
+    default: false
+  logging_log_lock_waits:
+    description: |
+      Logs long lock waits.
+    type: boolean
+    default: false
+  logging_log_min_duration_statement:
+    description: |
+      Sets the minimum running time (milliseconds) above which statements will be logged.
+      Allowed values are: from -1 to 2147483647 (-1 disables logging
+      statement durations).
+    type: int
+    default: -1
+  memory_maintenance_work_mem:
+    description: |
+      Sets the maximum memory (KB) to be used for maintenance operations.
+      Allowed values are: from 1024 to 2147483647.
+    type: int
+    default: 65536
+  memory_max_prepared_transactions:
+    description: |
+      Sets the maximum number of simultaneously prepared transactions.
+      Allowed values are: from 0 to 262143.
+    type: int
+    default: 0
+  memory_shared_buffers:
+    description: |
+      Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
+      to set this value up to 40% of the available memory from the unit, as it is unlikely
+      that an allocation of more than that will work better than a smaller amount.
+      Allowed values are: from 16 to 1073741823.
+    type: int
+  memory_temp_buffers:
+    description: |
+      Sets the maximum number of temporary buffers (8 kB) used by each session.
+      Allowed values are: from 100 to 1073741823.
+    type: int
+    default: 1024
+  memory_work_mem:
+    description: |
+      Sets the maximum memory (KB) to be used for query workspaces.
+      Allowed values are: from 64 to 2147483647.
+    type: int
+    default: 4096
+  optimizer_constraint_exclusion:
+    description: |
+      Enables the planner to use constraints to optimize queries.
+      Allowed values are: “on”, “off” and “partition”.
+    type: string
+    default: "partition"
+  optimizer_default_statistics_target:
+    description: |
+      Sets the default statistics target. Allowed values are: from 1 to 10000.
+    type: int
+    default: 100
+  optimizer_from_collapse_limit:
+    description: |
+      Sets the FROM-list size beyond which subqueries are not collapsed.
+      Allowed values are: from 1 to 2147483647.
+    type: int
+    default: 8
+  optimizer_join_collapse_limit:
+    description: |
+      Sets the FROM-list size beyond which JOIN constructs are not flattened.
+      Allowed values are: from 1 to 2147483647.
+    type: int
+    default: 8
   plugin_citext_enable:
     default: false
     type: boolean
@@ -40,3 +137,84 @@ options:
       Amount of memory in Megabytes to limit PostgreSQL and associated process to.
       If unset, this will be decided according to the default memory limit in the selected profile.
       Only comes into effect when the `production` profile is selected.
+  request_date_style:
+    description: |
+      Sets the display format for date and time values. Allowed formats are explained
+      in https://www.postgresql.org/docs/14/runtime-config-client.html#GUC-DATESTYLE.
+    type: string
+    default: "ISO, MDY"
+  request_standard_conforming_strings:
+    description: |
+      Causes ... strings to treat backslashes literally.
+    type: boolean
+    default: true
+  request_time_zone:
+    description: |
+      Sets the time zone for displaying and interpreting time stamps.
+      Allowed values are the ones from IANA time zone data, a time zone abbreviation
+      like PST and POSIX-style time zone specifications.
+    type: string
+    default: "UTC"
+  response_bytea_output:
+    description: |
+      Sets the output format for bytes.
+      Allowed values are: “escape” and “hex”.
+    type: string
+    default: "hex"
+  response_lc_monetary:
+    description: |
+      Sets the locale for formatting monetary amounts.
+      Allowed values are the locales available in the unit.
+    type: string
+    default: "C"
+  response_lc_numeric:
+    description: |
+      Sets the locale for formatting numbers.
+      Allowed values are the locales available in the unit.
+    type: string
+    default: "C"
+  response_lc_time:
+    description: |
+      Sets the locale for formatting date and time values.
+      Allowed values are the locales available in the unit.
+    type: string
+    default: "C"
+  vacuum_autovacuum_analyze_scale_factor:
+    description: |
+      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
+      deciding whether to trigger a VACUUM. The default, 0.1, means 10% of table size.
+      Allowed values are: from 0 to 100.
+    type: float
+    default: 0.1
+  vacuum_autovacuum_analyze_threshold:
+    description: |
+      Sets the minimum number of inserted, updated or deleted tuples needed to trigger
+      an ANALYZE in any one table. Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 50
+  vacuum_autovacuum_freeze_max_age:
+    description: |
+      Maximum age (in transactions) before triggering autovacuum on a table to prevent
+      transaction ID wraparound. Allowed values are: from 100000 to 2000000000.
+    type: int
+    default: 200000000
+  vacuum_autovacuum_vacuum_cost_delay:
+    description: |
+      Sets cost delay value (milliseconds) that will be used in automatic VACUUM operations.
+      Allowed values are: from -1 to 100 (-1 tells PostgreSQL to use the regular
+      vacuum_cost_delay value).
+    type: float
+    default: 2.0
+  vacuum_autovacuum_vacuum_scale_factor:
+    description: |
+      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
+      deciding whether to trigger a VACUUM. The default, 0.2, means 20% of table size.
+      Allowed values are: from 0 to 100.
+    type: float
+    default: 0.2
+  vacuum_vacuum_freeze_table_age:
+    description: |
+      Age (in transactions) at which VACUUM should scan whole table to freeze tuples.
+      Allowed values are: from 0 to 2000000000.
+    type: int
+    default: 150000000
