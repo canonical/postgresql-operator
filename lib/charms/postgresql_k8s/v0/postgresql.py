@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 17
+LIBPATCH = 18
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -310,6 +310,32 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
+    def get_postgresql_text_search_configs(self) -> Set[str]:
+        """Returns the PostgreSQL available text search configs.
+
+        Returns:
+            Set of PostgreSQL text search configs.
+        """
+        with self._connect_to_database(
+            connect_to_current_host=True
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
+            text_search_configs = cursor.fetchall()
+            return {text_search_config[0] for text_search_config in text_search_configs}
+
+    def get_postgresql_timezones(self) -> Set[str]:
+        """Returns the PostgreSQL available timezones.
+
+        Returns:
+            Set of PostgreSQL timezones.
+        """
+        with self._connect_to_database(
+            connect_to_current_host=True
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT name FROM pg_timezone_names;")
+            timezones = cursor.fetchall()
+            return {timezone[0] for timezone in timezones}
+
     def get_postgresql_version(self) -> str:
         """Returns the PostgreSQL version.
 
@@ -445,12 +471,12 @@ class PostgreSQL:
 
     @staticmethod
     def build_postgresql_parameters(
-        profile: str, available_memory: int, limit_memory: Optional[int] = None
-    ) -> Optional[Dict[str, str]]:
+        config_options: Dict, available_memory: int, limit_memory: Optional[int] = None
+    ) -> Optional[Dict]:
         """Builds the PostgreSQL parameters.
 
         Args:
-            profile: the profile to use.
+            config_options: charm config options containing profile and PostgreSQL parameters.
             available_memory: available memory to use in calculation in bytes.
             limit_memory: (optional) limit memory to use in calculation in bytes.
 
@@ -459,19 +485,60 @@ class PostgreSQL:
         """
         if limit_memory:
             available_memory = min(available_memory, limit_memory)
+        profile = config_options["profile"]
         logger.debug(f"Building PostgreSQL parameters for {profile=} and {available_memory=}")
+        parameters = {}
+        for config, value in config_options.items():
+            # Filter config option not related to PostgreSQL parameters.
+            if not config.startswith(
+                (
+                    "durability",
+                    "instance",
+                    "logging",
+                    "memory",
+                    "optimizer",
+                    "request",
+                    "response",
+                    "vacuum",
+                )
+            ):
+                continue
+            parameter = "_".join(config.split("_")[1:])
+            if parameter in ["date_style", "time_zone"]:
+                parameter = "".join(x.capitalize() for x in parameter.split("_"))
+            parameters[parameter] = value
+        shared_buffers_max_value = int(int(available_memory * 0.4) / 10**6)
+        if parameters.get("shared_buffers", 0) > shared_buffers_max_value:
+            raise Exception(
+                f"Shared buffers config option should be at most 40% of the available memory, which is {shared_buffers_max_value}MB"
+            )
         if profile == "production":
             # Use 25% of the available memory for shared_buffers.
             # and the remaind as cache memory.
             shared_buffers = int(available_memory * 0.25)
             effective_cache_size = int(available_memory - shared_buffers)
-
-            parameters = {
-                "shared_buffers": f"{int(shared_buffers/10**6)}MB",
-                "effective_cache_size": f"{int(effective_cache_size/10**6)}MB",
-            }
-
-            return parameters
+            parameters.setdefault("shared_buffers", f"{int(shared_buffers/10**6)}MB")
+            parameters.update({"effective_cache_size": f"{int(effective_cache_size/10**6)}MB"})
         else:
             # Return default
-            return {"shared_buffers": "128MB"}
+            parameters.setdefault("shared_buffers", "128MB")
+        return parameters
+
+    def validate_date_style(self, date_style: str) -> bool:
+        """Validate a date style against PostgreSQL.
+
+        Returns:
+            Whether the date style is valid.
+        """
+        try:
+            with self._connect_to_database(
+                connect_to_current_host=True
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    sql.SQL(
+                        "SET DateStyle to {};",
+                    ).format(sql.Identifier(date_style))
+                )
+            return True
+        except psycopg2.Error:
+            return False
