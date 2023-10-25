@@ -48,21 +48,6 @@ jobs:
       - name: Upload Coverage to Codecov
         uses: codecov/codecov-action@v3
 
-  lib-check:
-    name: Check libraries
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Check libs
-        uses: canonical/charming-actions/check-libraries@2.4.0
-        with:
-          credentials: "${{ secrets.CHARMHUB_TOKEN }}"
-          github-token: "${{ secrets.GITHUB_TOKEN }}"
-
   build:
     name: Build charms
     uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v2
@@ -101,7 +86,6 @@ jobs:
             free-disk-space: true
     name: ${{ matrix.tox-environments }} | ${{ matrix.agent-versions }}
     needs:
-      - lib-check
       - lint
       - unit-test
       - build

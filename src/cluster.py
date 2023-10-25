@@ -7,7 +7,7 @@ import logging
 import os
 import pwd
 import subprocess
-from typing import Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set
 
 import requests
 from charms.operator_libs_linux.v2 import snap
@@ -619,6 +619,18 @@ class Patroni:
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
         requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
+
+    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    def update_parameter_controller_by_patroni(self, parameter: str, value: Any) -> None:
+        """Update the value of a parameter controller by Patroni.
+
+        For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
+        """
+        requests.patch(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"postgresql": {"parameters": {parameter: value}}},
+        )
 
     def update_synchronous_node_count(self, units: int = None) -> None:
         """Update synchronous_node_count to the minority of the planned cluster."""
