@@ -19,17 +19,19 @@ jobs:
     name: Tests
     uses: ./.github/workflows/ci.yaml
     secrets: inherit
+    permissions:
+      actions: write  # Needed to manage GitHub Actions cache
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v4.2.3
 
   release:
     name: Release charm
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v2
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v4.2.3
     with:
       channel: 14/edge
       artifact-name: ${{ needs.build.outputs.artifact-name }}
