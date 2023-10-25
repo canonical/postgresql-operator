@@ -157,7 +157,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return [
             {
                 "metrics_path": "/metrics",
-                "static_configs": [{"targets": ["localhost:8008"]}],
+                "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
                 "scheme": "https" if self.is_tls_enabled else "http",
             }
