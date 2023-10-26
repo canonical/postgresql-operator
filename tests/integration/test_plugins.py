@@ -36,6 +36,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             charm,
             num_units=2,
             series=CHARM_SERIES,
+            config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
