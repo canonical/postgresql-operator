@@ -68,10 +68,9 @@ def ops_test(
 
     async def build_charm(charm_path) -> pathlib.Path:
         if pathlib.Path(charm_path) == pathlib.Path("."):
-            # Building mysql charm
+            # Building postgresql charm
             return await _build_charm(
                 charm_path,
-                bases_index=pytestconfig.option.mysql_charm_bases_index,
             )
         else:
             return await _build_charm(charm_path)
