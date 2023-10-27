@@ -51,6 +51,7 @@ class TestUpgrade(unittest.TestCase):
         )
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.Patroni.get_postgresql_version")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.on_upgrade_changed")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_failed")
     @patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_completed")
@@ -77,6 +78,7 @@ class TestUpgrade(unittest.TestCase):
         _set_unit_completed,
         _set_unit_failed,
         _on_upgrade_changed,
+        __,
     ):
         # Test when the charm fails to start Patroni.
         mock_event = MagicMock()

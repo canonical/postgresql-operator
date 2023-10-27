@@ -144,11 +144,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer.start_observer()
         self._grafana_agent = COSAgentProvider(
             self,
-            metrics_endpoints=[
-                {"path": "/metrics", "port": METRICS_PORT},
+            metrics_endpoints=[{"path": "/metrics", "port": METRICS_PORT}],
+            scrape_configs=self.patroni_scrape_config,
+            refresh_events=[
+                self.on[PEER].relation_changed,
+                self.on.secret_changed,
+                self.on.secret_remove,
             ],
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
         )
+
+    def patroni_scrape_config(self) -> List[Dict]:
+        """Generates scrape config for the Patroni metrics endpoint."""
+        return [
+            {
+                "metrics_path": "/metrics",
+                "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
+                "tls_config": {"insecure_skip_verify": True},
+                "scheme": "https" if self.is_tls_enabled else "http",
+            }
+        ]
 
     @property
     def app_units(self) -> set[Unit]:
