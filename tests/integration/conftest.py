@@ -61,25 +61,6 @@ async def cloud_configs(ops_test: OpsTest) -> None:
 
 
 @pytest.fixture(scope="module")
-def ops_test(
-    ops_test: pytest_operator.plugin.OpsTest, pytestconfig
-) -> pytest_operator.plugin.OpsTest:
-    _build_charm = ops_test.build_charm
-
-    async def build_charm(charm_path) -> pathlib.Path:
-        if pathlib.Path(charm_path) == pathlib.Path("."):
-            # Building postgresql charm
-            return await _build_charm(
-                charm_path,
-            )
-        else:
-            return await _build_charm(charm_path)
-
-    ops_test.build_charm = build_charm
-    return ops_test
-
-
-@pytest.fixture(scope="module")
 async def charm(ops_test: OpsTest):
     """Build the charm-under-test."""
     # Build charm from local source folder.
