@@ -2,12 +2,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import os
-import pathlib
 import uuid
 
 import boto3
 import pytest
-import pytest_operator.plugin
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.helpers import construct_endpoint
