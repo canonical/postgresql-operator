@@ -288,7 +288,7 @@ class TestCharm(unittest.TestCase):
             postgresql_mock.enable_disable_extension.side_effect = None
             with self.assertNoLogs("charm", "ERROR"):
                 self.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 29)
 
             # Test when one extension install/uninstall fails.
             postgresql_mock.reset_mock()
@@ -297,7 +297,7 @@ class TestCharm(unittest.TestCase):
             )
             with self.assertLogs("charm", "ERROR") as logs:
                 self.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 29)
                 self.assertIn("failed to disable citext plugin", "".join(logs.output))
 
             # Test when one config option should be skipped (because it's not related
@@ -321,17 +321,86 @@ class TestCharm(unittest.TestCase):
   plugin_unaccent_enable:
     default: false
     type: boolean
-  profile:
-    default: production
-    type: string
   plugin_debversion_enable:
     default: false
-    type: boolean"""
+    type: boolean
+  plugin_bloom_enable:
+    default: false
+    type: boolean
+  plugin_btree_gin_enable:
+    default: false
+    type: boolean
+  plugin_btree_gist_enable:
+    default: false
+    type: boolean
+  plugin_cube_enable:
+    default: false
+    type: boolean
+  plugin_dict_int_enable:
+    default: false
+    type: boolean
+  plugin_dict_xsyn_enable:
+    default: false
+    type: boolean
+  plugin_earthdistance_enable:
+    default: false
+    type: boolean
+  plugin_fuzzystrmatch_enable:
+    default: false
+    type: boolean
+  plugin_intarray_enable:
+    default: false
+    type: boolean
+  plugin_isn_enable:
+    default: false
+    type: boolean
+  plugin_lo_enable:
+    default: false
+    type: boolean
+  plugin_ltree_enable:
+    default: false
+    type: boolean
+  plugin_old_snapshot_enable:
+    default: false
+    type: boolean
+  plugin_pg_freespacemap_enable:
+    default: false
+    type: boolean
+  plugin_pgrowlocks_enable:
+    default: false
+    type: boolean
+  plugin_pgstattuple_enable:
+    default: false
+    type: boolean
+  plugin_pg_visibility_enable:
+    default: false
+    type: boolean
+  plugin_seg_enable:
+    default: false
+    type: boolean
+  plugin_tablefunc_enable:
+    default: false
+    type: boolean
+  plugin_tcn_enable:
+    default: false
+    type: boolean
+  plugin_tsm_system_rows_enable:
+    default: false
+    type: boolean
+  plugin_tsm_system_time_enable:
+    default: false
+    type: boolean
+  plugin_uuid_ossp_enable:
+    default: false
+    type: boolean
+  profile:
+    default: production
+    type: string"""
                 harness = Harness(PostgresqlOperatorCharm, config=config)
                 self.addCleanup(harness.cleanup)
                 harness.begin()
                 harness.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 29)
 
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")

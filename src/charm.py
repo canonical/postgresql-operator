@@ -948,11 +948,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             database: optional database where to enable/disable the extension.
         """
         original_status = self.unit.status
+        plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
 
             # Enable or disable the plugin/extension.
             extension = "_".join(plugin.split("_")[1:-1])
+            if extension in plugins_exception:
+                extension = plugins_exception[extension]
             self.unit.status = WaitingStatus(
                 f"{'Enabling' if enable else 'Disabling'} {extension}"
             )
