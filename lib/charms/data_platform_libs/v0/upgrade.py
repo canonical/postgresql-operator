@@ -263,7 +263,7 @@ class ZooKeeperCharm(CharmBase):
 import json
 import logging
 from abc import ABC, abstractmethod
-from typing import List, Literal, Optional, Set, Tuple
+from typing import Dict, List, Literal, Optional, Set, Tuple
 
 import poetry.core.constraints.version as poetry_version
 from ops.charm import (
@@ -285,7 +285,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 14
+LIBPATCH = 15
 
 PYDEPS = ["pydantic>=1.10,<2", "poetry-core"]
 
@@ -346,7 +346,7 @@ class DependencyModel(BaseModel):
         print(model.dict())  # exporting back validated deps
     """
 
-    dependencies: dict[str, str]
+    dependencies: Dict[str, str]
     name: str
     upgrade_supported: str
     version: str
