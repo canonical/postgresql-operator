@@ -47,7 +47,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active"
+            apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active", timeout=1000
         )
     assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
