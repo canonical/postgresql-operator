@@ -71,9 +71,11 @@ jobs:
           - juju-snap-channel: "3.1/stable"
             agent-version: "3.1.6"
             libjuju-version:  "3.2.2"
+            exclude-mark:  "not juju2"
           - juju-snap-channel: "2.9/stable"
             agent-version: "2.9.45"
             libjuju-version:  "2.9.45.0"
+            exclude-mark:  "not juju3"
     name: ${{ matrix.juju-snap-channel }} - (GH hosted) ${{ matrix.tox-environment }}
     needs:
       - lint
@@ -122,7 +124,7 @@ jobs:
             echo "mark_expression=and not unstable" >> "$GITHUB_OUTPUT"
           fi
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environment }} -- -m 'test ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
+        run: tox run -e ${{ matrix.tox-environment }} -- -m 'not ${{ matrix.exclude-mark }} ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
         env:
           LIBJUJU_VERSION_SPECIFIER: ${{ matrix.libjuju-version }}
           SECRETS_FROM_GITHUB: |
