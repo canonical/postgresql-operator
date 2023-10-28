@@ -22,7 +22,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v4.2.3
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v5.1.2
 
   unit-test:
     name: Unit test charm
@@ -42,7 +42,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v4.2.3
+    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v5.1.2
     permissions:
       actions: write  # Needed to manage GitHub Actions cache
 
@@ -106,7 +106,7 @@ jobs:
           bootstrap-options: "--agent-version ${{ matrix.agent-version }}"
           juju-channel: ${{ matrix.juju-snap-channel }}
       - name: Update python-libjuju version
-        if: ${{ matrix.libjuju-version == '2.9.45.0' }}
+        if: ${{ matrix.juju-snap-channel == '2.9/stable' }}
         run: poetry add --lock --group integration juju@'${{ matrix.libjuju-version }}'
       - name: Download packed charm(s)
         uses: actions/download-artifact@v3
