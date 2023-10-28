@@ -46,69 +46,39 @@ jobs:
     permissions:
       actions: write  # Needed to manage GitHub Actions cache
 
-  gh-hosted-collect-integration-tests:
-    name: (GH hosted) Collect integration test groups
-    needs:
-      - lint
-      - unit-test
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v3
-      - name: Install tox & poetry
-        run: |
-          pipx install tox
-          pipx install poetry
-      - name: Select test stability level
-        id: select-test-stability
-        run: |
-          if [[ "${{ github.event_name }}" == "schedule" ]]
-          then
-            echo Running unstable and stable tests
-            echo "mark_expression=" >> "$GITHUB_OUTPUT"
-          else
-            echo Skipping unstable tests
-            echo "mark_expression=not unstable" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Collect test groups
-        id: collect-groups
-        run: tox run -e integration -- tests/integration -m '${{ steps.select-test-stability.outputs.mark_expression }}' --collect-groups
-    outputs:
-      groups: ${{ steps.collect-groups.outputs.groups }}
-
   gh-hosted-integration-test:
     strategy:
       fail-fast: false
       matrix:
-        groups: ${{ fromJSON(needs.gh-hosted-collect-integration-tests.outputs.groups) }}
+        tox-environment:
+          - backup-integration
+          - charm-integration
+          - db-relation-integration
+          - ha-replication-integration
+          - ha-self-healing-integration
+          - ha-restore-cluster-integration
+          - password-rotation-integration
+          - plugins-integration
+          - tls-integration
+          - upgrade-integration
+          - upgrade-from-stable-integration
+          - database-relation-integration
+          - db-admin-relation-integration
         juju-snap-channel:  ["2.9/stable", "3.1/stable"]
+        free-disk-space:
+          - false
         include:
           - juju-snap-channel: "3.1/stable"
             agent-version: "3.1.6"
             libjuju-version:  "3.2.2"
           - juju-snap-channel: "2.9/stable"
             agent-version: "2.9.45"
-            libjuju-version:  "2.9.44.1"
-        exclude:
-          # Disabling HA tests, as long as we want to have a limited pipeline on Juju3
-          - juju-snap-channel: "3.1/stable"
-            groups:
-              job_name: "high_availability/test_replication.py | group 1"
-          - juju-snap-channel: "3.1/stable"
-            groups:
-              job_name: "high_availability/test_self_healing.py | group 1"
-          - juju-snap-channel: "3.1/stable"
-            groups:
-              job_name: "high_availability/test_upgrade.py | group 1"
-          - juju-snap-channel: "3.1/stable"
-            groups:
-              job_name: "high_availability/test_upgrade_from_stable.py | group 1"
-    name: ${{ matrix.juju-snap-channel }} - (GH hosted) ${{ matrix.groups.job_name }}
+            libjuju-version:  "2.9.45.0"
+    name: ${{ matrix.juju-snap-channel }} - (GH hosted) ${{ matrix.tox-environment }}
     needs:
       - lint
       - unit-test
       - build
-      - gh-hosted-collect-integration-tests
     runs-on: ubuntu-latest
     timeout-minutes: 120
     steps:
@@ -118,6 +88,14 @@ jobs:
         run: |
           pipx install tox
           pipx install poetry
+      - name: Free up disk space
+        if: ${{ matrix.free-disk-space == true }}
+        run: |
+          # From https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /opt/ghc
+          sudo rm -rf /usr/local/share/boost
+          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
@@ -126,7 +104,7 @@ jobs:
           bootstrap-options: "--agent-version ${{ matrix.agent-version }}"
           juju-channel: ${{ matrix.juju-snap-channel }}
       - name: Update python-libjuju version
-        if: ${{ matrix.libjuju-version == '2.9.44.1' }}
+        if: ${{ matrix.libjuju-version == '2.9.45.0' }}
         run: poetry add --lock --group integration juju@'${{ matrix.libjuju-version }}'
       - name: Download packed charm(s)
         uses: actions/download-artifact@v3
@@ -144,7 +122,7 @@ jobs:
             echo "mark_expression=and not unstable" >> "$GITHUB_OUTPUT"
           fi
       - name: Run integration tests
-        run: tox run -e integration -- "${{ matrix.groups.path_to_test_file }}" --group="${{ matrix.groups.group_number }}" -m '${{ steps.select-test-stability.outputs.mark_expression }}'
+        run: tox run -e ${{ matrix.tox-environment }} -- -m 'test ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
         env:
           LIBJUJU_VERSION_SPECIFIER: ${{ matrix.libjuju-version }}
           SECRETS_FROM_GITHUB: |
