@@ -53,7 +53,9 @@ jobs:
         tox-environment:
           - backup-integration
           - charm-integration
+          - database-relation-integration
           - db-relation-integration
+          - db-admin-relation-integration
           - ha-replication-integration
           - ha-self-healing-integration
           - ha-restore-cluster-integration
@@ -62,20 +64,20 @@ jobs:
           - tls-integration
           - upgrade-integration
           - upgrade-from-stable-integration
-          - database-relation-integration
-          - db-admin-relation-integration
         juju-snap-channel:  ["2.9/stable", "3.1/stable"]
-        free-disk-space:
-          - false
+        exclude:
+          # Admin tests need landscape on juju 2
+          - tox-environment: db-admin-relation-integration
+            juju-snap-channel: "3.1/stable"
         include:
           - juju-snap-channel: "3.1/stable"
             agent-version: "3.1.6"
             libjuju-version:  "3.2.2"
-            exclude-mark:  "not juju2"
+            exclude-mark:  "juju2"
           - juju-snap-channel: "2.9/stable"
             agent-version: "2.9.45"
             libjuju-version:  "2.9.45.0"
-            exclude-mark:  "not juju3"
+            exclude-mark:  "juju3"
     name: ${{ matrix.juju-snap-channel }} - (GH hosted) ${{ matrix.tox-environment }}
     needs:
       - lint
@@ -91,7 +93,6 @@ jobs:
           pipx install tox
           pipx install poetry
       - name: Free up disk space
-        if: ${{ matrix.free-disk-space == true }}
         run: |
           # From https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
           sudo rm -rf /usr/share/dotnet
@@ -101,8 +102,7 @@ jobs:
       - name: Setup operator environment
         uses: charmed-kubernetes/actions-operator@main
         with:
-          provider: microk8s
-          channel: "1.28-strict/stable"
+          provider: lxd
           bootstrap-options: "--agent-version ${{ matrix.agent-version }}"
           juju-channel: ${{ matrix.juju-snap-channel }}
       - name: Update python-libjuju version
@@ -126,7 +126,6 @@ jobs:
       - name: Run integration tests
         run: tox run -e ${{ matrix.tox-environment }} -- -m 'not ${{ matrix.exclude-mark }} ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
         env:
-          LIBJUJU_VERSION_SPECIFIER: ${{ matrix.libjuju-version }}
           SECRETS_FROM_GITHUB: |
             {
               "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
