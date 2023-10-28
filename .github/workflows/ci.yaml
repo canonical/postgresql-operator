@@ -65,17 +65,11 @@ jobs:
           - upgrade-integration
           - upgrade-from-stable-integration
         juju-snap-channel:  ["2.9/stable", "3.1/stable"]
-        free-disk-space:
-          - false
         exclude:
           # Admin tests need landscape on juju 2
           - tox-environment: db-admin-relation-integration
             juju-snap-channel: "3.1/stable"
         include:
-          - tox-environment: database-relation-integration
-            free-disk-space: true
-          - tox-environment: db-admin-relation-integration
-            free-disk-space: true
           - juju-snap-channel: "3.1/stable"
             agent-version: "3.1.6"
             libjuju-version:  "3.2.2"
@@ -99,7 +93,6 @@ jobs:
           pipx install tox
           pipx install poetry
       - name: Free up disk space
-        if: ${{ matrix.free-disk-space == true }}
         run: |
           # From https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
           sudo rm -rf /usr/share/dotnet
