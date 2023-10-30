@@ -4,6 +4,7 @@
 import json
 import logging
 
+import pytest
 from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
 
@@ -32,6 +33,7 @@ DATABASE_UNITS = 3
 RELATION_NAME = "db-admin"
 
 
+@pytest.mark.group(1)
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     await ops_test.model.deploy(

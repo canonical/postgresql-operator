@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy two PostgreSQL clusters."""
@@ -66,6 +67,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.destroy_unit(second_primary)
 
 
+@pytest.mark.group(1)
 async def test_cluster_restore(ops_test):
     """Recreates the cluster from storage volumes."""
     # Write some data.

@@ -79,6 +79,7 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
             bucket_object.delete()
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
@@ -216,6 +217,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
     await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
 
+@pytest.mark.group(1)
 async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     charm = await ops_test.build_charm(".")
@@ -293,6 +295,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     connection.close()
 
 
+@pytest.mark.group(1)
 async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:

@@ -18,6 +18,7 @@ from tests.integration.helpers import (
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_deploy_active(ops_test: OpsTest):
@@ -34,6 +35,7 @@ async def test_deploy_active(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
 
+@pytest.mark.group(1)
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
     # Get the initial passwords set for the system users.

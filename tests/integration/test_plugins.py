@@ -26,6 +26,7 @@ PLPYTHON3U_EXTENSION_STATEMENT = 'CREATE FUNCTION plpython_test() RETURNS varcha
 UNACCENT_EXTENSION_STATEMENT = "SELECT ts_lexize('unaccent','Hôtel');"
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_plugins(ops_test: OpsTest) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
