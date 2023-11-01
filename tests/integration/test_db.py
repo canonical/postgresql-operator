@@ -316,7 +316,7 @@ async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("weebl", block_until_done=True)
 
 
-@pytest.mark.notjuju3
+@pytest.mark.juju2
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
     # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).

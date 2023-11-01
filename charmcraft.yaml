@@ -11,6 +11,13 @@ bases:
         channel: "22.04"
 parts:
   charm:
+    override-pull: |
+      craftctl default
+      if [[ ! -f requirements.txt ]]
+      then
+          echo 'ERROR: Use "tox run -e build" instead of calling "charmcraft pack" directly' >&2
+          exit 1
+      fi
     build-packages:
       - libffi-dev
       - libssl-dev
