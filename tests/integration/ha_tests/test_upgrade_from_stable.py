@@ -6,18 +6,18 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ha_tests.helpers import (
-    APPLICATION_NAME,
-    are_writes_increasing,
-    check_writes,
-    start_continuous_writes,
-)
-from tests.integration.helpers import (
+from ..helpers import (
     DATABASE_APP_NAME,
     count_switchovers,
     get_leader_unit,
     get_primary,
     remove_chown_workaround,
+)
+from .helpers import (
+    APPLICATION_NAME,
+    are_writes_increasing,
+    check_writes,
+    start_continuous_writes,
 )
 
 logger = logging.getLogger(__name__)

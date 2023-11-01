@@ -6,19 +6,19 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ha_tests.helpers import (
-    add_unit_with_storage,
-    get_patroni_cluster,
-    reused_full_cluster_recovery_storage,
-    storage_id,
-)
-from tests.integration.helpers import (
+from ..helpers import (
     CHARM_SERIES,
     db_connect,
     get_password,
     get_primary,
     get_unit_address,
     set_password,
+)
+from .helpers import (
+    add_unit_with_storage,
+    get_patroni_cluster,
+    reused_full_cluster_recovery_storage,
+    storage_id,
 )
 
 FIRST_APPLICATION = "first-cluster"

@@ -20,7 +20,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from tests.integration.helpers import db_connect, get_unit_address, run_command_on_unit
+from ..helpers import db_connect, get_unit_address, run_command_on_unit
 
 APPLICATION_NAME = "postgresql-test-app"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())

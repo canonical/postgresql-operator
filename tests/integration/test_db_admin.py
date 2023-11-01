@@ -8,7 +8,7 @@ import pytest
 from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
     check_database_users_existence,

@@ -7,7 +7,7 @@ import psycopg2 as psycopg2
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
     db_connect,

@@ -8,8 +8,16 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.ha_tests.conftest import APPLICATION_NAME
-from tests.integration.ha_tests.helpers import (
+from ..helpers import (
+    CHARM_SERIES,
+    db_connect,
+    get_machine_from_unit,
+    get_password,
+    get_unit_address,
+    run_command_on_unit,
+)
+from .conftest import APPLICATION_NAME
+from .helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
     add_unit_with_storage,
@@ -42,14 +50,6 @@ from tests.integration.ha_tests.helpers import (
     storage_type,
     update_restart_condition,
     wait_network_restore,
-)
-from tests.integration.helpers import (
-    CHARM_SERIES,
-    db_connect,
-    get_machine_from_unit,
-    get_password,
-    get_unit_address,
-    run_command_on_unit,
 )
 
 logger = logging.getLogger(__name__)

@@ -12,8 +12,8 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import CHARM_SERIES, scale_application
-from tests.integration.new_relations.helpers import (
+from ..helpers import CHARM_SERIES, scale_application
+from .helpers import (
     build_connection_string,
     check_relation_data_existence,
     get_application_relation_data,

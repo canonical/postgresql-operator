@@ -11,7 +11,7 @@ from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
     build_connection_string,

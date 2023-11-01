@@ -33,6 +33,7 @@ from tenacity import (
 CHARM_SERIES = "jammy"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
+STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 
 
 async def build_connection_string(

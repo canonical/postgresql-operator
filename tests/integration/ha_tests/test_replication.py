@@ -6,7 +6,8 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.ha_tests.helpers import (
+from ..helpers import CHARM_SERIES, db_connect, scale_application
+from .helpers import (
     APPLICATION_NAME,
     app_name,
     are_writes_increasing,
@@ -16,7 +17,6 @@ from tests.integration.ha_tests.helpers import (
     get_primary,
     start_continuous_writes,
 )
-from tests.integration.helpers import CHARM_SERIES, db_connect, scale_application
 
 
 @pytest.mark.group(1)

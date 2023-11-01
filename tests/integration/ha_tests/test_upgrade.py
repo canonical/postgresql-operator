@@ -11,19 +11,19 @@ from typing import Union
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ha_tests.helpers import (
-    APPLICATION_NAME,
-    are_writes_increasing,
-    check_writes,
-    start_continuous_writes,
-)
-from tests.integration.helpers import (
+from ..helpers import (
     DATABASE_APP_NAME,
     count_switchovers,
     get_leader_unit,
     get_primary,
 )
-from tests.integration.new_relations.helpers import get_application_relation_data
+from ..new_relations.helpers import get_application_relation_data
+from .helpers import (
+    APPLICATION_NAME,
+    are_writes_increasing,
+    check_writes,
+    start_continuous_writes,
+)
 
 logger = logging.getLogger(__name__)
 

@@ -12,10 +12,10 @@ from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
-from tests.helpers import STORAGE_PATH
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    STORAGE_PATH,
     check_cluster_members,
     convert_records_to_dict,
     db_connect,
