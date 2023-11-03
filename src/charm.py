@@ -278,7 +278,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             content[secret_key] = SECRET_DELETED_LABEL
             secret.set_content(content)
             # Just in case we started on databag
-            self.unit_peer_data.pop(key, None)
+            self._peer_data(scope).pop(key, None)
         else:
             try:
                 self._peer_data(scope).pop(key)
