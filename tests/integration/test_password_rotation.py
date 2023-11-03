@@ -90,7 +90,9 @@ async def test_password_from_secret_same_as_cli(ops_test: OpsTest):
     # So we take the single member of the list
     # NOTE: This would BREAK if for instance units had secrets at the start...
     #
-    password = await get_password(ops_test, username="replication")
+    leader_unit = await get_leader_unit(ops_test, APP_NAME)
+    leader = leader_unit.name
+    password = await get_password(ops_test, unit_name=leader, username="replication")
     complete_command = "list-secrets"
     _, stdout, _ = await ops_test.juju(*complete_command.split())
     secret_id = stdout.split("\n")[1].split(" ")[0]
@@ -118,9 +120,9 @@ async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None
     """Test that in general, there is no change when password validation fails."""
     leader_unit = await get_leader_unit(ops_test, APP_NAME)
     leader = leader_unit.name
-    password1 = await get_password(ops_test, username="replication")
+    password1 = await get_password(ops_test, unit_name=leader, username="replication")
     # The password has to be minimum 3 characters
     await set_password(ops_test, unit_name=leader, username="replication", password="ca" * 1000000)
-    password2 = await get_password(ops_test, username="replication")
+    password2 = await get_password(ops_test, unit_name=leader, username="replication")
     # The password didn't change
     assert password1 == password2
