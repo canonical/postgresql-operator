@@ -123,8 +123,14 @@ jobs:
             echo Skipping unstable tests
             echo "mark_expression=and not unstable" >> "$GITHUB_OUTPUT"
           fi
+      - name: Select test secret usage
+        id: select-test-secrets
+        if: ${{ github.event.pull_request.head.repo.full_name != 'canonical/postgresql-operator' }}
+        run: |
+          echo Skipping tests using secrets
+          echo "mark_secrets=and not uses_secrets" >> "$GITHUB_OUTPUT"
       - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environment }} -- -m 'not ${{ matrix.exclude-mark }} ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
+        run: tox run -e ${{ matrix.tox-environment }} -- -m 'not ${{ matrix.exclude-mark }} ${{ steps.select-test-secrets.outputs.mark_secrets }} ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
         env:
           SECRETS_FROM_GITHUB: |
             {

@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 22
+LIBPATCH = 23
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -807,6 +807,9 @@ class DataRelation(Object, ABC):
         This is used typically when the Provides side wants to read the Requires side's data,
         or when the Requires side may want to read its own data.
         """
+        if app not in relation.data or not relation.data[app]:
+            return {}
+
         if fields:
             return {k: relation.data[app][k] for k in fields if k in relation.data[app]}
         else:
@@ -830,6 +833,9 @@ class DataRelation(Object, ABC):
         normal_fields = []
 
         if not fields:
+            if app not in relation.data or not relation.data[app]:
+                return {}
+
             all_fields = list(relation.data[app].keys())
             normal_fields = [field for field in all_fields if not self._is_secret_field(field)]
 
@@ -853,8 +859,11 @@ class DataRelation(Object, ABC):
 
     def _update_relation_data_without_secrets(
         self, app: Application, relation: Relation, data: Dict[str, str]
-    ):
+    ) -> None:
         """Updating databag contents when no secrets are involved."""
+        if app not in relation.data or relation.data[app] is None:
+            return
+
         if any(self._is_secret_field(key) for key in data.keys()):
             raise SecretsIllegalUpdateError("Can't update secret {key}.")
 
@@ -865,8 +874,19 @@ class DataRelation(Object, ABC):
         self, app: Application, relation: Relation, fields: List[str]
     ) -> None:
         """Remove databag fields 'fields' from Relation."""
+        if app not in relation.data or not relation.data[app]:
+            return
+
         for field in fields:
-            relation.data[app].pop(field)
+            try:
+                relation.data[app].pop(field)
+            except KeyError:
+                logger.debug(
+                    "Non-existing field was attempted to be removed from the databag %s, %s",
+                    str(relation.id),
+                    str(field),
+                )
+                pass
 
     # Public interface methods
     # Handling Relation Fields seamlessly, regardless if in databag or a Juju Secret
@@ -879,9 +899,6 @@ class DataRelation(Object, ABC):
             raise DataInterfacesError(
                 "Relation %s %s couldn't be retrieved", relation_name, relation_id
             )
-
-        if not relation.app:
-            raise DataInterfacesError("Relation's application missing")
 
         return relation
 
@@ -1089,7 +1106,10 @@ class DataProvides(DataRelation):
         # Remove secret from the relation if it's fully gone
         if not new_content:
             field = self._generate_secret_field_name(group)
-            relation.data[self.local_app].pop(field)
+            try:
+                relation.data[self.local_app].pop(field)
+            except KeyError:
+                pass
 
         # Return the content that was removed
         return True
