@@ -176,8 +176,6 @@ class DbProvides(Object):
 
             self.charm.postgresql.create_database(database, user, plugins=plugins)
 
-            # Enable/disable extensions in the new database.
-            self.charm.enable_disable_extensions(database)
         except (PostgreSQLCreateDatabaseError, PostgreSQLCreateUserError) as e:
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(
