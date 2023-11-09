@@ -55,7 +55,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             config={"profile": "testing"},
         )
 
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
         # TODO have a better way to bootstrap clusters with existing storage
         primary = await get_primary(

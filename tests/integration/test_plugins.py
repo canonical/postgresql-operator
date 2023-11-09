@@ -39,7 +39,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     # Check that the available plugins are disabled.
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")

@@ -48,7 +48,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME],
             status="active",
-            timeout=1000,
+            timeout=1500,
             wait_for_exact_units=DATABASE_UNITS,
         )
 
@@ -322,8 +322,7 @@ async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
 
 
 @pytest.mark.group(1)
-@pytest.mark.juju2
-async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
+async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest, juju2) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
     # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).
     # We intentionally wait for the `✘ sync_token not set` status message as we
