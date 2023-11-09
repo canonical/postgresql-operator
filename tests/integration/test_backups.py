@@ -2,8 +2,8 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
-import os
 import logging
+import os
 import uuid
 from typing import Dict, Tuple
 
