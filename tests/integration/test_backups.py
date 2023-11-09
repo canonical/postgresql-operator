@@ -40,6 +40,7 @@ GCP = "GCP"
 @pytest.fixture(scope="module")
 async def cloud_configs(ops_test: OpsTest) -> None:
     # Define some configurations and credentials.
+    # Test.
     secrets = json.loads(os.environ.get("SECRETS_FROM_GITHUB", "{}"))
     configs = {
         AWS: {
