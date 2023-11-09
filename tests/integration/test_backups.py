@@ -1,6 +1,8 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
+import os
 import logging
 import uuid
 from typing import Dict, Tuple
@@ -36,8 +38,9 @@ GCP = "GCP"
 
 
 @pytest.fixture(scope="module")
-async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
+async def cloud_configs(ops_test: OpsTest) -> None:
     # Define some configurations and credentials.
+    secrets = json.loads(os.environ.get("SECRETS_FROM_GITHUB", "{}"))
     configs = {
         AWS: {
             "endpoint": "https://s3.amazonaws.com",
@@ -54,17 +57,19 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
     }
     credentials = {
         AWS: {
-            "access-key": github_secrets["AWS_ACCESS_KEY"],
-            "secret-key": github_secrets["AWS_SECRET_KEY"],
+            "access-key": secrets.get("AWS_ACCESS_KEY"),
+            "secret-key": secrets.get("AWS_SECRET_KEY"),
         },
         GCP: {
-            "access-key": github_secrets["GCP_ACCESS_KEY"],
-            "secret-key": github_secrets["GCP_SECRET_KEY"],
+            "access-key": secrets.get("GCP_ACCESS_KEY"),
+            "secret-key": secrets.get("GCP_SECRET_KEY"),
         },
     }
     yield configs, credentials
     # Delete the previously created objects.
     for cloud, config in configs.items():
+        if not credentials[cloud].get("secret-key"):
+            continue
         session = boto3.session.Session(
             aws_access_key_id=credentials[cloud]["access-key"],
             aws_secret_access_key=credentials[cloud]["secret-key"],
@@ -80,12 +85,6 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
 
 
 @pytest.mark.group(1)
-async def test_none() -> None:
-    """Empty test so that the suite will not fail if all tests are skippedi."""
-    pass
-
-
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
@@ -98,6 +97,11 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
     await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=config, channel="legacy/stable")
 
     for cloud, config in cloud_configs[0].items():
+        # Check if credentials are available
+        if not cloud_configs[1][cloud]["secret-key"]:
+            logger.warning(f"Skipping tests for {cloud}. No credentials provided")
+            continue
+
         # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
         # as archive_mode is disabled after restoring the backup) and to TLS Certificates Operator
         # (to be able to create backups from replicas).
@@ -224,8 +228,11 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
 
 @pytest.mark.group(1)
-async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
+async def test_restore_on_new_cluster(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
+    if not cloud_configs[1][AWS]["secret-key"]:
+        pytest.skip("No AWS credentials")
+
     charm = await ops_test.build_charm(".")
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(
@@ -306,6 +313,9 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:
     """Test that the charm can handle invalid and valid backup configurations."""
+    if not cloud_configs[1][AWS]["secret-key"]:
+        pytest.skip("No AWS credentials")
+
     database_app_name = f"new-{DATABASE_APP_NAME}"
 
     # Provide invalid backup configurations.
