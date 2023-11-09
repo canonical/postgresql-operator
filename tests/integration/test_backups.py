@@ -80,6 +80,12 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
 
 
 @pytest.mark.group(1)
+async def test_none() -> None:
+    """Empty test so that the suite will not fail if all tests are skippedi."""
+    pass
+
+
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
