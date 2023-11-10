@@ -50,6 +50,7 @@ jobs:
     name: Integration test charm on Juju 3
     needs:
       - build
+      - lint
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@test-large
     with:
       artifact-name: ${{ needs.build.outputs.artifact-name }}
@@ -62,13 +63,14 @@ jobs:
           "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
           "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
           "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}"
+          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
         }
 
   integration-test-juju2:
     name: Integration test charm on Juju 2
     needs:
       - build
+      - lint
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@test-large
     with:
       artifact-name: ${{ needs.build.outputs.artifact-name }}
@@ -82,5 +84,5 @@ jobs:
           "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
           "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
           "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}"
+          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
         }
