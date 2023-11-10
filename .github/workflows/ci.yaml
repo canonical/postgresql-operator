@@ -46,8 +46,8 @@ jobs:
     permissions:
       actions: write  # Needed to manage GitHub Actions cache
 
-  integration-test:
-    name: Integration test charm
+  integration-test-juju3:
+    name: Integration test charm on Juju 3
     needs:
       - build
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@test-large
@@ -55,6 +55,27 @@ jobs:
       artifact-name: ${{ needs.build.outputs.artifact-name }}
       cloud: lxd
       juju-agent-version: 3.1.6
+      juju-snap-channel: "3.1/stable"
+    secrets:
+      integration-test: |
+        {
+          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
+          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
+          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
+          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}"
+        }
+
+  integration-test-juju2:
+    name: Integration test charm on Juju 2
+    needs:
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@test-large
+    with:
+      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      cloud: lxd
+      juju-agent-version: "2.9.45"
+      juju-snap-channel: "2.9/stable"
+      libjuju-version-constraint: "2.9.45.0"
     secrets:
       integration-test: |
         {
