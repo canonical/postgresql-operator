@@ -50,16 +50,29 @@ jobs:
     name: Integration test charm
     needs:
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@test-large
-    with:
-      artifact-name: ${{ needs.build.outputs.artifact-name }}
-      cloud: lxd
-      juju-agent-version: 3.1.6
-    secrets:
-      integration-test: |
-        {
-          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
-          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
-          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}"
-        }
+    strategy:
+      fail-fast: false
+      matrix:
+        juju-snap-channel: ["2.9/stable", "3.1/stable"]
+        include:
+          - juju-snap-channel: "3.1/stable"
+            agent-version: "3.1.6"
+            libjuju-version:  "3.2.0.1"
+          - juju-snap-channel: "2.9/stable"
+            agent-version: "2.9.45"
+            libjuju-version:  "2.9.44.1"
+      uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@test-large
+      with:
+        artifact-name: ${{ needs.build.outputs.artifact-name }}
+        cloud: lxd
+        juju-agent-version: ${{ matrix.agent-version }}
+        channel: ${{ matrix.juju-snap-channel }}
+        libjuju-version-constraint: ${{ matrix.libjuju-version }}
+      secrets:
+        integration-test: |
+          {
+            "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
+            "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
+            "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
+            "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}"
+          }
