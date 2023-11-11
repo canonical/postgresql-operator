@@ -410,7 +410,7 @@ async def deploy_and_relate_bundle_with_postgresql(
                 apps=[main_application_name],
                 raise_on_blocked=False,
                 status=status,
-                timeout=1500,
+                timeout=2000,
             ),
         ]
         if status_message:

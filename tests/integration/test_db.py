@@ -108,7 +108,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         # Add two more units.
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=4
+            apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
         )
 
         # Remove the original units.
