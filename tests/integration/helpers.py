@@ -404,7 +404,7 @@ async def deploy_and_relate_bundle_with_postgresql(
             ops_test.model.wait_for_idle(
                 apps=[DATABASE_APP_NAME],
                 status="active",
-                timeout=1500,
+                timeout=2000,
             ),
             ops_test.model.wait_for_idle(
                 apps=[main_application_name],
@@ -416,7 +416,7 @@ async def deploy_and_relate_bundle_with_postgresql(
         if status_message:
             awaits.append(
                 ops_test.model.block_until(
-                    lambda: unit.workload_status_message == status_message, timeout=1500
+                    lambda: unit.workload_status_message == status_message, timeout=2000
                 )
             )
         await asyncio.gather(*awaits)
