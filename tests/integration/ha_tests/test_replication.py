@@ -126,7 +126,9 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
                 series=CHARM_SERIES,
                 config={"profile": "testing"},
             )
-            await ops_test.model.wait_for_idle(apps=[new_cluster_app], status="active")
+            await ops_test.model.wait_for_idle(
+                apps=[new_cluster_app], status="active", timeout=1000
+            )
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
