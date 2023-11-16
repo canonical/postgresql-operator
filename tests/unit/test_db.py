@@ -185,14 +185,12 @@ class TestDbProvides(unittest.TestCase):
     @patch("subprocess.check_output", return_value=b"C")
     @patch("relations.db.DbProvides._update_unit_status")
     @patch("relations.db.DbProvides.update_endpoints")
-    @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("relations.db.new_password", return_value="test-password")
     @patch("relations.db.DbProvides._get_extensions")
     def test_set_up_relation(
         self,
         _get_extensions,
         _new_password,
-        _enable_disable_extensions,
         _update_endpoints,
         _update_unit_status,
         _,
@@ -222,7 +220,6 @@ class TestDbProvides(unittest.TestCase):
             self.assertFalse(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             postgresql_mock.create_user.assert_not_called()
             postgresql_mock.create_database.assert_not_called()
-            _enable_disable_extensions.assert_not_called()
             postgresql_mock.get_postgresql_version.assert_not_called()
             _update_endpoints.assert_not_called()
             _update_unit_status.assert_not_called()
@@ -239,7 +236,6 @@ class TestDbProvides(unittest.TestCase):
             user = f"relation-{self.rel_id}"
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user, plugins=[])
-            _enable_disable_extensions.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
             self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
@@ -248,7 +244,6 @@ class TestDbProvides(unittest.TestCase):
             # provided in both application and unit databags.
             postgresql_mock.create_user.reset_mock()
             postgresql_mock.create_database.reset_mock()
-            _enable_disable_extensions.reset_mock()
             postgresql_mock.get_postgresql_version.reset_mock()
             _update_endpoints.reset_mock()
             _update_unit_status.reset_mock()
@@ -266,7 +261,6 @@ class TestDbProvides(unittest.TestCase):
             self.assertTrue(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
             postgresql_mock.create_database.assert_called_once_with(DATABASE, user, plugins=[])
-            _enable_disable_extensions.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
             self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
@@ -274,7 +268,6 @@ class TestDbProvides(unittest.TestCase):
             # Assert that the correct calls were made when the database name is not provided.
             postgresql_mock.create_user.reset_mock()
             postgresql_mock.create_database.reset_mock()
-            _enable_disable_extensions.reset_mock()
             postgresql_mock.get_postgresql_version.reset_mock()
             _update_endpoints.reset_mock()
             _update_unit_status.reset_mock()
@@ -289,20 +282,17 @@ class TestDbProvides(unittest.TestCase):
             postgresql_mock.create_database.assert_called_once_with(
                 "application", user, plugins=[]
             )
-            _enable_disable_extensions.assert_called_once()
             _update_endpoints.assert_called_once()
             _update_unit_status.assert_called_once()
             self.assertNotIsInstance(self.harness.model.unit.status, BlockedStatus)
 
             # BlockedStatus due to a PostgreSQLCreateUserError.
             postgresql_mock.create_database.reset_mock()
-            _enable_disable_extensions.reset_mock()
             postgresql_mock.get_postgresql_version.reset_mock()
             _update_endpoints.reset_mock()
             _update_unit_status.reset_mock()
             self.assertFalse(self.harness.charm.legacy_db_relation.set_up_relation(relation))
             postgresql_mock.create_database.assert_not_called()
-            _enable_disable_extensions.assert_not_called()
             _update_endpoints.assert_not_called()
             _update_unit_status.assert_not_called()
             self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
@@ -310,7 +300,6 @@ class TestDbProvides(unittest.TestCase):
             # BlockedStatus due to a PostgreSQLCreateDatabaseError.
             self.harness.charm.unit.status = ActiveStatus()
             self.assertFalse(self.harness.charm.legacy_db_relation.set_up_relation(relation))
-            _enable_disable_extensions.assert_not_called()
             _update_endpoints.assert_not_called()
             _update_unit_status.assert_not_called()
             self.assertIsInstance(self.harness.model.unit.status, BlockedStatus)
