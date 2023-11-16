@@ -89,7 +89,7 @@ class PostgreSQLBackups(Object):
                 "Relation with s3-integrator charm missing, cannot create/restore backup.",
             )
 
-        s3_parameters, missing_parameters = self._retrieve_s3_parameters()
+        _, missing_parameters = self._retrieve_s3_parameters()
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
