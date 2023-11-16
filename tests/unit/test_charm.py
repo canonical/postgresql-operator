@@ -288,22 +288,22 @@ class TestCharm(unittest.TestCase):
             postgresql_mock.enable_disable_extension.side_effect = None
             with self.assertNoLogs("charm", "ERROR"):
                 self.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+                self.assertEqual(postgresql_mock.enable_disable_extensions.call_count, 1)
 
             # Test when one extension install/uninstall fails.
             postgresql_mock.reset_mock()
-            postgresql_mock.enable_disable_extension.side_effect = (
+            postgresql_mock.enable_disable_extensions.side_effect = (
                 PostgreSQLEnableDisableExtensionError
             )
             with self.assertLogs("charm", "ERROR") as logs:
                 self.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
-                self.assertIn("failed to disable citext plugin", "".join(logs.output))
+                self.assertEqual(postgresql_mock.enable_disable_extensions.call_count, 1)
+                self.assertIn("failed to change plugins", "".join(logs.output))
 
             # Test when one config option should be skipped (because it's not related
             # to a plugin/extension).
             postgresql_mock.reset_mock()
-            postgresql_mock.enable_disable_extension.side_effect = None
+            postgresql_mock.enable_disable_extensions.side_effect = None
             with self.assertNoLogs("charm", "ERROR"):
                 config = """options:
   plugin_citext_enable:
@@ -331,7 +331,7 @@ class TestCharm(unittest.TestCase):
                 self.addCleanup(harness.cleanup)
                 harness.begin()
                 harness.charm.enable_disable_extensions()
-                self.assertEqual(postgresql_mock.enable_disable_extension.call_count, 6)
+                self.assertEqual(postgresql_mock.enable_disable_extensions.call_count, 1)
 
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
