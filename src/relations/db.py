@@ -131,7 +131,7 @@ class DbProvides(Object):
         """Set up the relation to be used by the application charm."""
         # Do not allow apps requesting extensions to be installed
         # (let them now about config options).
-        required_extensions, disabled_extensions = self._get_extensions(relation)
+        _, disabled_extensions = self._get_extensions(relation)
         if disabled_extensions:
             logger.error(
                 f"ERROR - `extensions` ({', '.join(disabled_extensions)}) cannot be requested through relations"
