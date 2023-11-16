@@ -949,6 +949,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         original_status = self.unit.status
         plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
+        extensions = {}
+        # collect extensions
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
 
@@ -956,16 +958,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             extension = "_".join(plugin.split("_")[1:-1])
             if extension in plugins_exception:
                 extension = plugins_exception[extension]
-            self.unit.status = WaitingStatus(
-                f"{'Enabling' if enable else 'Disabling'} {extension}"
-            )
-            try:
-                self.postgresql.enable_disable_extension(extension, enable, database)
-            except PostgreSQLEnableDisableExtensionError as e:
-                logger.exception(
-                    f"failed to {'enable' if enable else 'disable'} {extension} plugin: %s", str(e)
-                )
-            self.unit.status = original_status
+            extensions[extension] = enable
+        self.unit.status = WaitingStatus("Updating extensions")
+        try:
+            self.postgresql.enable_disable_extensions(extensions, database)
+        except PostgreSQLEnableDisableExtensionError as e:
+            logger.exception("failed to change plugins: %s", str(e))
+        self.unit.status = original_status
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""

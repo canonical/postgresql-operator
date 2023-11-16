@@ -1,0 +1,23 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["github>canonical/data-platform//renovate_presets/charm.json5"],
+  "reviewers": ["dragomirp", "marceloneppel", "taurus-forever"],
+  "packageRules": [
+    // Later rules override earlier rules
+    {
+      "matchPackageNames": ["pydantic"],
+      "allowedVersions": "<2.0.0"
+    }, {
+      "matchPackageNames": ["python"],
+      "allowedVersions": "<3.11"
+    }
+  ],
+  "regexManagers": [
+    {
+      "fileMatch": ["(^|/)([\\w-]*)charmcraft\\.ya?ml$"],
+      "matchStrings": ["- (?<depName>.*?)(?:\\[.*?\\])?==(?<currentValue>.*?) +# renovate"],
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "loose"
+    }
+  ]
+}

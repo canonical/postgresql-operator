@@ -32,7 +32,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 20
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -172,8 +172,7 @@ class PostgreSQL:
             raise PostgreSQLCreateDatabaseError()
 
         # Enable preset extensions
-        for plugin in plugins:
-            self.enable_disable_extension(plugin, True, database)
+        self.enable_disable_extensions({plugin: True for plugin in plugins}, database)
 
     def create_user(
         self, user: str, password: str = None, admin: bool = False, extra_user_roles: str = None
@@ -270,22 +269,16 @@ class PostgreSQL:
             logger.error(f"Failed to delete user: {e}")
             raise PostgreSQLDeleteUserError()
 
-    def enable_disable_extension(self, extension: str, enable: bool, database: str = None) -> None:
+    def enable_disable_extensions(self, extensions: Dict[str, bool], database: str = None) -> None:
         """Enables or disables a PostgreSQL extension.
 
         Args:
-            extension: the name of the extensions.
-            enable: whether the extension should be enabled or disabled.
+            extensions: the name of the extensions.
             database: optional database where to enable/disable the extension.
 
         Raises:
             PostgreSQLEnableDisableExtensionError if the operation fails.
         """
-        statement = (
-            f"CREATE EXTENSION IF NOT EXISTS {extension};"
-            if enable
-            else f"DROP EXTENSION IF EXISTS {extension};"
-        )
         connection = None
         try:
             if database is not None:
@@ -301,7 +294,12 @@ class PostgreSQL:
                 with self._connect_to_database(
                     database=database
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute(statement)
+                    for extension, enable in extensions.items():
+                        cursor.execute(
+                            f"CREATE EXTENSION IF NOT EXISTS {extension};"
+                            if enable
+                            else f"DROP EXTENSION IF EXISTS {extension};"
+                        )
         except psycopg2.errors.UniqueViolation:
             pass
         except psycopg2.Error:
@@ -514,7 +512,7 @@ class PostgreSQL:
             )
         if profile == "production":
             # Use 25% of the available memory for shared_buffers.
-            # and the remaind as cache memory.
+            # and the remaining as cache memory.
             shared_buffers = int(available_memory * 0.25)
             effective_cache_size = int(available_memory - shared_buffers)
             parameters.setdefault("shared_buffers", f"{int(shared_buffers/10**6)}MB")

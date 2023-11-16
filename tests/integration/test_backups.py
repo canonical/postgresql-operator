@@ -5,14 +5,15 @@ import logging
 import uuid
 from typing import Dict, Tuple
 
+import boto3
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential
 
-from tests.integration.conftest import AWS
 from tests.integration.helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    construct_endpoint,
     db_connect,
     get_password,
     get_primary,
@@ -30,7 +31,60 @@ TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
 
 logger = logging.getLogger(__name__)
 
+AWS = "AWS"
+GCP = "GCP"
 
+
+@pytest.fixture(scope="module")
+async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
+    # Define some configurations and credentials.
+    configs = {
+        AWS: {
+            "endpoint": "https://s3.amazonaws.com",
+            "bucket": "data-charms-testing",
+            "path": f"/postgresql-vm/{uuid.uuid1()}",
+            "region": "us-east-1",
+        },
+        GCP: {
+            "endpoint": "https://storage.googleapis.com",
+            "bucket": "data-charms-testing",
+            "path": f"/postgresql-vm/{uuid.uuid1()}",
+            "region": "",
+        },
+    }
+    credentials = {
+        AWS: {
+            "access-key": github_secrets["AWS_ACCESS_KEY"],
+            "secret-key": github_secrets["AWS_SECRET_KEY"],
+        },
+        GCP: {
+            "access-key": github_secrets["GCP_ACCESS_KEY"],
+            "secret-key": github_secrets["GCP_SECRET_KEY"],
+        },
+    }
+    yield configs, credentials
+    # Delete the previously created objects.
+    for cloud, config in configs.items():
+        session = boto3.session.Session(
+            aws_access_key_id=credentials[cloud]["access-key"],
+            aws_secret_access_key=credentials[cloud]["secret-key"],
+            region_name=config["region"],
+        )
+        s3 = session.resource(
+            "s3", endpoint_url=construct_endpoint(config["endpoint"], config["region"])
+        )
+        bucket = s3.Bucket(config["bucket"])
+        # GCS doesn't support batch delete operation, so delete the objects one by one.
+        for bucket_object in bucket.objects.filter(Prefix=config["path"].lstrip("/")):
+            bucket_object.delete()
+
+
+async def test_none() -> None:
+    """Empty test so that the suite will not fail if all tests are skippedi."""
+    pass
+
+
+@pytest.mark.uses_secrets
 @pytest.mark.abort_on_fail
 async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
@@ -168,6 +222,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
     await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
 
+@pytest.mark.uses_secrets
 async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     charm = await ops_test.build_charm(".")
@@ -245,6 +300,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest) -> None:
     connection.close()
 
 
+@pytest.mark.uses_secrets
 async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:
