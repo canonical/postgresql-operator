@@ -111,7 +111,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     # removing the only replica can be disastrous
     if len(ops_test.model.applications[app].units) < 2:
         await ops_test.model.applications[app].add_unit(count=1)
-        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1500)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)

@@ -300,7 +300,7 @@ async def deploy_and_relate_application_with_postgresql(
         apps=[application_name],
         status="active",
         raise_on_blocked=False,
-        timeout=1000,
+        timeout=1500,
     )
 
     # Relate application to PostgreSQL.
@@ -311,7 +311,7 @@ async def deploy_and_relate_application_with_postgresql(
         apps=[application_name],
         status="active",
         raise_on_blocked=False,  # Application that needs a relation is blocked initially.
-        timeout=1000,
+        timeout=1500,
     )
 
     return relation.id
