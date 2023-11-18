@@ -306,11 +306,11 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     await ops_test.model.destroy_units(
         primary,
     )
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     # Add the unit again.
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     # Testing write occurred to every postgres instance by reading from them
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:

@@ -326,6 +326,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     status: str = "active",
     status_message: str = None,
     overlay: Dict = None,
+    timeout: int = 2000,
 ) -> str:
     """Helper function to deploy and relate a bundle with PostgreSQL.
 
@@ -343,6 +344,7 @@ async def deploy_and_relate_bundle_with_postgresql(
         status_message: Status message to wait for in the application after
             relating it to PostgreSQL.
         overlay: Optional overlay to be used when deploying the bundle.
+        timeout: Timeout to wait for the deployment to idle.
     """
     # Deploy the bundle.
     with tempfile.NamedTemporaryFile(dir=os.getcwd()) as original:
@@ -404,19 +406,19 @@ async def deploy_and_relate_bundle_with_postgresql(
             ops_test.model.wait_for_idle(
                 apps=[DATABASE_APP_NAME],
                 status="active",
-                timeout=2000,
+                timeout=timeout,
             ),
             ops_test.model.wait_for_idle(
                 apps=[main_application_name],
                 raise_on_blocked=False,
                 status=status,
-                timeout=2000,
+                timeout=timeout,
             ),
         ]
         if status_message:
             awaits.append(
                 ops_test.model.block_until(
-                    lambda: unit.workload_status_message == status_message, timeout=2000
+                    lambda: unit.workload_status_message == status_message, timeout=timeout
                 )
             )
         await asyncio.gather(*awaits)
