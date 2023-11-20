@@ -10,7 +10,7 @@ import pytest
 import requests
 from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, wait_exponential
+from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from .helpers import (
     CHARM_SERIES,
@@ -290,8 +290,10 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     """Test data persists through a primary deletion."""
     # Set a composite application name in order to test in more than one series at the same time.
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    primary = await get_primary(ops_test, any_unit_name)
-    password = await get_password(ops_test, primary)
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            primary = await get_primary(ops_test, any_unit_name)
+            password = await get_password(ops_test, primary)
 
     # Write data to primary IP.
     host = get_unit_address(ops_test, primary)
