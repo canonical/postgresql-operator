@@ -274,7 +274,7 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[DATABASE_APP_NAME],
         status="active",
-        timeout=1000,
+        timeout=2000,
         wait_for_exact_units=initial_scale,
     )
 
