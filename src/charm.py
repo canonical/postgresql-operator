@@ -1520,7 +1520,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.config.request_time_zone is not None
             and self.config.request_time_zone not in self.postgresql.get_postgresql_timezones()
         ):
-            raise Exception("request_time_zone config option has an invalid value")
+            raise Exception("request_time_zone config option has an invalid value 1")
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
