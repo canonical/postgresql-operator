@@ -41,7 +41,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
         series=CHARM_SERIES,
-        config={"profile": "testing"},
+        config={"profile": "testing", "plugin_plpython3u_enable": "True"},
     )
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
