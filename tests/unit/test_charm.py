@@ -321,12 +321,81 @@ class TestCharm(unittest.TestCase):
   plugin_unaccent_enable:
     default: false
     type: boolean
-  profile:
-    default: production
-    type: string
   plugin_debversion_enable:
     default: false
-    type: boolean"""
+    type: boolean
+  plugin_bloom_enable:
+    default: false
+    type: boolean
+  plugin_btree_gin_enable:
+    default: false
+    type: boolean
+  plugin_btree_gist_enable:
+    default: false
+    type: boolean
+  plugin_cube_enable:
+    default: false
+    type: boolean
+  plugin_dict_int_enable:
+    default: false
+    type: boolean
+  plugin_dict_xsyn_enable:
+    default: false
+    type: boolean
+  plugin_earthdistance_enable:
+    default: false
+    type: boolean
+  plugin_fuzzystrmatch_enable:
+    default: false
+    type: boolean
+  plugin_intarray_enable:
+    default: false
+    type: boolean
+  plugin_isn_enable:
+    default: false
+    type: boolean
+  plugin_lo_enable:
+    default: false
+    type: boolean
+  plugin_ltree_enable:
+    default: false
+    type: boolean
+  plugin_old_snapshot_enable:
+    default: false
+    type: boolean
+  plugin_pg_freespacemap_enable:
+    default: false
+    type: boolean
+  plugin_pgrowlocks_enable:
+    default: false
+    type: boolean
+  plugin_pgstattuple_enable:
+    default: false
+    type: boolean
+  plugin_pg_visibility_enable:
+    default: false
+    type: boolean
+  plugin_seg_enable:
+    default: false
+    type: boolean
+  plugin_tablefunc_enable:
+    default: false
+    type: boolean
+  plugin_tcn_enable:
+    default: false
+    type: boolean
+  plugin_tsm_system_rows_enable:
+    default: false
+    type: boolean
+  plugin_tsm_system_time_enable:
+    default: false
+    type: boolean
+  plugin_uuid_ossp_enable:
+    default: false
+    type: boolean
+  profile:
+    default: production
+    type: string"""
                 harness = Harness(PostgresqlOperatorCharm, config=config)
                 self.addCleanup(harness.cleanup)
                 harness.begin()
