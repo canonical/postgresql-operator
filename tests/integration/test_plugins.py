@@ -53,6 +53,10 @@ TCN_EXTENSION_STATEMENT = "CREATE TABLE tcn_test (i int);CREATE TRIGGER tcn_test
 TSM_SYSTEM_ROWS_EXTENSION_STATEMENT = "CREATE TABLE tsm_system_rows_test (i int);SELECT * FROM tsm_system_rows_test TABLESAMPLE SYSTEM_ROWS(100);"
 TSM_SYSTEM_TIME_EXTENSION_STATEMENT = "CREATE TABLE tsm_system_time_test (i int);SELECT * FROM tsm_system_time_test TABLESAMPLE SYSTEM_TIME(1000);"
 UUID_OSSP_EXTENSION_STATEMENT = "SELECT uuid_nil();"
+REFINT_EXTENSION_STATEMENT = "CREATE TABLE A (ID int4 not null); CREATE UNIQUE INDEX AI ON A (ID);CREATE TABLE B (REFB int4);CREATE INDEX BI ON B (REFB);CREATE TRIGGER BT BEFORE INSERT OR UPDATE ON B FOR EACH ROW EXECUTE PROCEDURE check_primary_key ('REFB', 'A', 'ID');"
+AUTOINC_EXTENSION_STATEMENT = "CREATE TABLE ids (id int4, idesc text);CREATE TRIGGER ids_nextid BEFORE INSERT OR UPDATE ON ids FOR EACH ROW EXECUTE PROCEDURE autoinc (id, next_id);"
+INSERT_USERNAME_EXTENSION_STATEMENT = "CREATE TABLE username_test (name text, username text not null);CREATE TRIGGER insert_usernames BEFORE INSERT OR UPDATE ON username_test FOR EACH ROW EXECUTE PROCEDURE insert_username (username);"
+MODDATETIME_EXTENSION_STATEMENT = "CREATE TABLE mdt (moddate timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL);CREATE TRIGGER mdt_moddatetime BEFORE UPDATE ON mdt FOR EACH ROW EXECUTE PROCEDURE moddatetime (moddate);"
 
 
 @pytest.mark.abort_on_fail
@@ -99,6 +103,12 @@ async def test_plugins(ops_test: OpsTest) -> None:
         "plugin_tsm_system_rows_enable": TSM_SYSTEM_ROWS_EXTENSION_STATEMENT,
         "plugin_tsm_system_time_enable": TSM_SYSTEM_TIME_EXTENSION_STATEMENT,
         "plugin_uuid_ossp_enable": UUID_OSSP_EXTENSION_STATEMENT,
+        "plugin_spi_enable": [
+            REFINT_EXTENSION_STATEMENT,
+            AUTOINC_EXTENSION_STATEMENT,
+            INSERT_USERNAME_EXTENSION_STATEMENT,
+            MODDATETIME_EXTENSION_STATEMENT,
+        ],
     }
 
     def enable_disable_config(enabled: False):
@@ -120,8 +130,13 @@ async def test_plugins(ops_test: OpsTest) -> None:
     with db_connect(host=address, password=password) as connection:
         connection.autocommit = True
         for query in sql_tests.values():
-            with pytest.raises(psycopg2.Error):
-                connection.cursor().execute(query)
+            if isinstance(query, list):
+                for test in query:
+                    with pytest.raises(psycopg2.Error):
+                        connection.cursor().execute(test)
+            else:
+                with pytest.raises(psycopg2.Error):
+                    connection.cursor().execute(query)
     connection.close()
 
     # Enable the plugins.
@@ -136,5 +151,9 @@ async def test_plugins(ops_test: OpsTest) -> None:
     with db_connect(host=address, password=password) as connection:
         connection.autocommit = True
         for query in sql_tests.values():
-            connection.cursor().execute(query)
+            if isinstance(query, list):
+                for test in query:
+                    connection.cursor().execute(test)
+            else:
+                connection.cursor().execute(query)
     connection.close()
