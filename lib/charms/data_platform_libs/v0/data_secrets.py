@@ -9,7 +9,7 @@ from ops.charm import CharmBase
 from ops.model import SecretNotFoundError
 
 # The unique Charmhub library identifier, never change it
-LIBID = "cd223b249c294092b9ac703760e64b3f"
+LIBID = "d77fb3d01aba41ed88e837d0beab6be5"
 
 # Increment this major API version when introducing breaking changes
 LIBAPI = 0
@@ -21,14 +21,14 @@ LIBPATCH = 1
 
 APP_SCOPE = "app"
 UNIT_SCOPE = "unit"
-Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
+Scopes = Literal["app", "unit"]
 
 
-class PostgresSQLSecretsError(Exception):
+class DataSecretsError(Exception):
     """A secret that we want to create already exists."""
 
 
-class SecretAlreadyExistsError(PostgresSQLSecretsError):
+class SecretAlreadyExistsError(DataSecretsError):
     """A secret that we want to create already exists."""
 
 

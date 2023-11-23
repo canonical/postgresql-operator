@@ -919,7 +919,7 @@ class TestCharm(unittest.TestCase):
             # Test application scope.
             _secret_cache.get.return_value = None
             assert self.charm.get_secret("app", "password") is None
-            _secret_cache.get.assert_called_once_with("postgresql.app")
+            _secret_cache.get.assert_called_once_with("postgresql.app", None)
             _secret_cache.reset_mock()
 
             _secret_cache.get.return_value = Mock()
@@ -927,7 +927,7 @@ class TestCharm(unittest.TestCase):
                 sentinel.test_password
             )
             assert self.charm.get_secret("app", "password") == sentinel.test_password
-            _secret_cache.get.assert_called_once_with("postgresql.app")
+            _secret_cache.get.assert_called_once_with("postgresql.app", None)
             _secret_cache.get.return_value.get_content.return_value.get.assert_called_once_with(
                 "password"
             )
@@ -936,7 +936,7 @@ class TestCharm(unittest.TestCase):
             # Test unit scope.
             _secret_cache.get.return_value = None
             assert self.charm.get_secret("unit", "password") is None
-            _secret_cache.get.assert_called_once_with("postgresql.unit")
+            _secret_cache.get.assert_called_once_with("postgresql.unit", None)
             _secret_cache.reset_mock()
 
             _secret_cache.get.return_value = Mock()
@@ -944,7 +944,7 @@ class TestCharm(unittest.TestCase):
                 sentinel.test_password
             )
             assert self.charm.get_secret("unit", "password") == sentinel.test_password
-            _secret_cache.get.assert_called_once_with("postgresql.unit")
+            _secret_cache.get.assert_called_once_with("postgresql.unit", None)
             _secret_cache.get.return_value.get_content.return_value.get.assert_called_once_with(
                 "password"
             )
@@ -989,7 +989,7 @@ class TestCharm(unittest.TestCase):
         with patch.object(self.charm, "secrets") as _secret_cache:
             # Test application scope.
             self.charm.set_secret("app", "password", "test-password")
-            _secret_cache.get.assert_called_once_with("postgresql.app")
+            _secret_cache.get.assert_called_once_with("postgresql.app", None)
             _secret_cache.get().get_content().update.assert_called_once_with(
                 {"password": "test-password"}
             )
@@ -1004,7 +1004,7 @@ class TestCharm(unittest.TestCase):
 
             # Test unit scope.
             self.charm.set_secret("unit", "password", "test-password")
-            _secret_cache.get.assert_called_once_with("postgresql.unit")
+            _secret_cache.get.assert_called_once_with("postgresql.unit", None)
             _secret_cache.get().get_content().update.assert_called_once_with(
                 {"password": "test-password"}
             )
