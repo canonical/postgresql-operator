@@ -13,6 +13,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import CHARM_SERIES, scale_application
+from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
     check_relation_data_existence,
@@ -86,7 +87,7 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
         # Check that on juju 3 we have secrets and no username and password in the rel databag
-        if hasattr(ops_test.model, "list_secrets"):
+        if juju_major_version > 2:
             logger.info("checking for secrets")
             secret_uri, password = await asyncio.gather(
                 get_application_relation_data(

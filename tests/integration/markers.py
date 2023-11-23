@@ -3,7 +3,8 @@
 
 
 import pytest
-from juju.model import Model
 
-juju2 = pytest.mark.skipif(not hasattr(Model, "list_secrets"), reason="Requires juju 2")
-juju3 = pytest.mark.skipif(hasattr(Model, "list_secrets"), reason="Requires juju 3")
+from .juju_ import juju_major_version
+
+juju2 = pytest.mark.skipif(juju_major_version != 2, reason="Requires juju 2")
+juju3 = pytest.mark.skipif(juju_major_version != 3, reason="Requires juju 3")
