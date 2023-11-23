@@ -11,6 +11,7 @@ from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from . import markers
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -321,8 +322,9 @@ async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("weebl", block_until_done=True)
 
 
+@markers.juju2
 @pytest.mark.group(1)
-async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest, juju2) -> None:
+async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
     # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).
     # We intentionally wait for the `✘ sync_token not set` status message as we
