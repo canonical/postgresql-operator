@@ -8,9 +8,10 @@ import logging
 import os
 import subprocess
 import time
-from typing import Dict, List, Optional, Set
+from typing import Dict, List, Literal, Optional, Set, get_args
 
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
+from charms.data_platform_libs.v0.data_secrets import SecretCache, generate_secret_label
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -38,7 +39,6 @@ from ops.model import (
     MaintenanceStatus,
     ModelError,
     Relation,
-    SecretNotFoundError,
     Unit,
     WaitingStatus,
 )
@@ -68,11 +68,9 @@ from constants import (
     POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
-    SECRET_CACHE_LABEL,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
-    SECRET_LABEL,
     SNAP_PACKAGES,
     SYSTEM_USERS,
     TLS_CA_FILE,
@@ -91,6 +89,8 @@ logger = logging.getLogger(__name__)
 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
 
+Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
+
 
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
@@ -101,7 +101,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.secrets = {APP_SCOPE: {}, UNIT_SCOPE: {}}
+        self.secrets = SecretCache(self)
 
         juju_version = JujuVersion.from_environ()
         if juju_version.major > 2:
@@ -191,180 +191,114 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return relation.data[self.unit]
 
-    def _scope_obj(self, scope: str):
+    def _peer_data(self, scope: Scopes) -> Dict:
+        """Return corresponding databag for app/unit."""
+        relation = self.model.get_relation(PEER)
+        if relation is None:
+            return {}
+
+        return relation.data[self._scope_obj(scope)]
+
+    def _scope_obj(self, scope: Scopes):
         if scope == APP_SCOPE:
-            return self.framework.model.app
+            return self.app
         if scope == UNIT_SCOPE:
-            return self.framework.model.unit
+            return self.unit
 
-    def _juju_secrets_get(self, scope: str) -> Optional[bool]:
-        """Helper function to get Juju secret."""
-        if scope == UNIT_SCOPE:
-            peer_data = self.unit_peer_data
-        else:
-            peer_data = self.app_peer_data
-
-        if not peer_data.get(SECRET_INTERNAL_LABEL):
-            return
-
-        if SECRET_CACHE_LABEL not in self.secrets[scope]:
-            try:
-                # NOTE: Secret contents are not yet available!
-                secret = self.model.get_secret(id=peer_data[SECRET_INTERNAL_LABEL])
-            except SecretNotFoundError as e:
-                logging.debug(f"No secret found for ID {peer_data[SECRET_INTERNAL_LABEL]}, {e}")
-                return
-
-            logging.debug(f"Secret {peer_data[SECRET_INTERNAL_LABEL]} downloaded")
-
-            # We keep the secret object around -- needed when applying modifications
-            self.secrets[scope][SECRET_LABEL] = secret
-
-            # We retrieve and cache actual secret data for the lifetime of the event scope
-            self.secrets[scope][SECRET_CACHE_LABEL] = secret.get_content()
-
-        return bool(self.secrets[scope].get(SECRET_CACHE_LABEL))
-
-    def _juju_secret_get_key(self, scope: str, key: str) -> Optional[str]:
-        if not key:
-            return
-
+    def _translate_field_to_secret_key(self, key: str) -> str:
+        """Change 'key' to secrets-compatible key field."""
         key = SECRET_KEY_OVERRIDES.get(key, key)
+        new_key = key.replace("_", "-")
+        return new_key.strip("-")
 
-        if self._juju_secrets_get(scope):
-            secret_cache = self.secrets[scope].get(SECRET_CACHE_LABEL)
-            if secret_cache:
-                secret_data = secret_cache.get(key)
-                if secret_data and secret_data != SECRET_DELETED_LABEL:
-                    logging.debug(f"Getting secret {scope}:{key}")
-                    return secret_data
-        logging.debug(f"No value found for secret {scope}:{key}")
+    def _safe_get_secret(self, scope: Scopes, label: str) -> SecretCache:
+        """Safety measure, for upgrades between versions based on secret URI usage to others with labels usage.
 
-    def get_secret(self, scope: str, key: str) -> Optional[str]:
+        If the secret can't be retrieved by label, we search for the uri -- and if found, we "stick" the
+        label on the secret for further usage.
+        """
+        secret_uri = self._peer_data(scope).get(SECRET_INTERNAL_LABEL, None)
+        secret = self.secrets.get(label, secret_uri)
+
+        # Since now we switched to labels, the databag reference can be removed
+        if secret_uri and secret and scope == APP_SCOPE and self.unit.is_leader():
+            self._peer_data(scope).pop(SECRET_INTERNAL_LABEL, None)
+        return secret
+
+    def get_secret(self, scope: Scopes, key: str) -> Optional[str]:
         """Get secret from the secret storage."""
-        if scope not in [APP_SCOPE, UNIT_SCOPE]:
+        if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
-        if scope == UNIT_SCOPE:
-            result = self.unit_peer_data.get(key, None)
-        else:
-            result = self.app_peer_data.get(key, None)
+        if value := self._peer_data(scope).get(key, None):
+            return value
 
-        # TODO change upgrade to switch to secrets once minor version upgrades is done
-        if result:
-            return result
+        if JujuVersion.from_environ().has_secrets:
+            label = generate_secret_label(self, scope)
+            secret = self._safe_get_secret(scope, label)
 
-        juju_version = JujuVersion.from_environ()
-        if juju_version.has_secrets:
-            return self._juju_secret_get_key(scope, key)
-
-    def _juju_secret_set(self, scope: str, key: str, value: str) -> str:
-        """Helper function setting Juju secret."""
-        if scope == UNIT_SCOPE:
-            peer_data = self.unit_peer_data
-        else:
-            peer_data = self.app_peer_data
-        self._juju_secrets_get(scope)
-
-        key = SECRET_KEY_OVERRIDES.get(key, key)
-
-        secret = self.secrets[scope].get(SECRET_LABEL)
-
-        # It's not the first secret for the scope, we can reuse the existing one
-        # that was fetched in the previous call
-        if secret:
-            secret_cache = self.secrets[scope][SECRET_CACHE_LABEL]
-
-            if secret_cache.get(key) == value:
-                logging.debug(f"Key {scope}:{key} has this value defined already")
-            else:
-                secret_cache[key] = value
-                try:
-                    secret.set_content(secret_cache)
-                except OSError as error:
-                    logging.error(
-                        f"Error in attempt to set {scope}:{key}. "
-                        f"Existing keys were: {list(secret_cache.keys())}. {error}"
-                    )
-                logging.debug(f"Secret {scope}:{key} was {key} set")
-
-        # We need to create a brand-new secret for this scope
-        else:
-            scope_obj = self._scope_obj(scope)
-
-            secret = scope_obj.add_secret({key: value})
             if not secret:
-                raise RuntimeError(f"Couldn't set secret {scope}:{key}")
+                return
 
-            self.secrets[scope][SECRET_LABEL] = secret
-            self.secrets[scope][SECRET_CACHE_LABEL] = {key: value}
-            logging.debug(f"Secret {scope}:{key} published (as first). ID: {secret.id}")
-            peer_data.update({SECRET_INTERNAL_LABEL: secret.id})
+            secret_key = self._translate_field_to_secret_key(key)
+            value = secret.get_content().get(secret_key)
+            if value != SECRET_DELETED_LABEL:
+                return value
 
-        # TODO change upgrade to switch to secrets once minor version upgrades is done
-        if key in peer_data:
-            del peer_data[key]
-
-        return self.secrets[scope][SECRET_LABEL].id
-
-    def set_secret(self, scope: str, key: str, value: Optional[str]) -> Optional[str]:
+    def set_secret(self, scope: Scopes, key: str, value: Optional[str]) -> Optional[str]:
         """Set secret from the secret storage."""
-        if scope not in [APP_SCOPE, UNIT_SCOPE]:
+        if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
         if not value:
             return self.remove_secret(scope, key)
 
-        juju_version = JujuVersion.from_environ()
+        if JujuVersion.from_environ().has_secrets:
+            # Charm must have been upgraded since last run
+            # We move from databag to secrets
+            self._peer_data(scope).pop(key, None)
 
-        if juju_version.has_secrets:
-            self._juju_secret_set(scope, key, value)
-            return
-        if scope == UNIT_SCOPE:
-            self.unit_peer_data.update({key: value})
+            secret_key = self._translate_field_to_secret_key(key)
+            label = generate_secret_label(self, scope)
+            secret = self._safe_get_secret(scope, label)
+            if not secret:
+                self.secrets.add(label, {secret_key: value}, scope)
+            else:
+                content = secret.get_content()
+                content.update({secret_key: value})
+                secret.set_content(content)
+            return label
         else:
-            self.app_peer_data.update({key: value})
+            self._peer_data(scope).update({key: value})
 
-    def _juju_secret_remove(self, scope: str, key: str) -> None:
-        """Remove a Juju 3.x secret."""
-        self._juju_secrets_get(scope)
-
-        key = SECRET_KEY_OVERRIDES.get(key, key)
-
-        secret = self.secrets[scope].get(SECRET_LABEL)
-        if not secret:
-            logging.error(f"Secret {scope}:{key} wasn't deleted: no secrets are available")
-            return
-
-        secret_cache = self.secrets[scope].get(SECRET_CACHE_LABEL)
-        if not secret_cache or key not in secret_cache:
-            logging.error(f"No secret {scope}:{key}")
-            return
-
-        secret_cache[key] = SECRET_DELETED_LABEL
-        secret.set_content(secret_cache)
-        logging.debug(f"Secret {scope}:{key}")
-
-        # TODO change upgrade to switch to secrets once minor version upgrades is done
-        if scope == UNIT_SCOPE:
-            peer_data = self.unit_peer_data
-        else:
-            peer_data = self.app_peer_data
-        if key in peer_data:
-            del peer_data[key]
-
-    def remove_secret(self, scope: str, key: str) -> None:
+    def remove_secret(self, scope: Scopes, key: str) -> None:
         """Removing a secret."""
-        if scope not in [APP_SCOPE, UNIT_SCOPE]:
+        if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
-        juju_version = JujuVersion.from_environ()
-        if juju_version.has_secrets:
-            return self._juju_secret_remove(scope, key)
-        if scope == UNIT_SCOPE:
-            del self.unit_peer_data[key]
+        if JujuVersion.from_environ().has_secrets:
+            secret_key = self._translate_field_to_secret_key(key)
+            label = generate_secret_label(self, scope)
+            secret = self.secrets.get(label)
+
+            if not secret:
+                return
+
+            content = secret.get_content()
+
+            if not content.get(secret_key) or content[secret_key] == SECRET_DELETED_LABEL:
+                logger.error(f"Non-existing secret {scope}:{key} was attempted to be removed.")
+                return
+
+            content[secret_key] = SECRET_DELETED_LABEL
+            secret.set_content(content)
+            # Just in case we started on databag
+            self._peer_data(scope).pop(key, None)
         else:
-            del self.app_peer_data[key]
+            try:
+                self._peer_data(scope).pop(key)
+            except KeyError:
+                logger.error(f"Non-existing secret {scope}:{key} was attempted to be removed.")
 
     @property
     def is_cluster_initialised(self) -> bool:
@@ -947,6 +881,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Args:
             database: optional database where to enable/disable the extension.
         """
+        spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
         original_status = self.unit.status
         plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
         extensions = {}
@@ -956,6 +891,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
             # Enable or disable the plugin/extension.
             extension = "_".join(plugin.split("_")[1:-1])
+            if extension == "spi":
+                for ext in spi_module:
+                    extensions[ext] = enable
+                continue
             if extension in plugins_exception:
                 extension = plugins_exception[extension]
             extensions[extension] = enable

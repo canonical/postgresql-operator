@@ -32,7 +32,7 @@ SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USE
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 POSTGRESQL_SNAP_NAME = "charmed-postgresql"
-SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, {"revision": "86"})]
+SNAP_PACKAGES = [(POSTGRESQL_SNAP_NAME, {"revision": "87"})]
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
@@ -55,8 +55,6 @@ PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.con
 
 METRICS_PORT = "9187"
 
-SECRET_LABEL = "secret"
-SECRET_CACHE_LABEL = "cache"
 SECRET_INTERNAL_LABEL = "internal-secret"
 SECRET_DELETED_LABEL = "None"
 
