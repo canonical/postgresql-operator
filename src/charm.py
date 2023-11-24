@@ -947,6 +947,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Args:
             database: optional database where to enable/disable the extension.
         """
+        spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
         original_status = self.unit.status
         plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
         extensions = {}
@@ -956,6 +957,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
             # Enable or disable the plugin/extension.
             extension = "_".join(plugin.split("_")[1:-1])
+            if extension == "spi":
+                for ext in spi_module:
+                    extensions[ext] = enable
+                continue
             if extension in plugins_exception:
                 extension = plugins_exception[extension]
             extensions[extension] = enable
