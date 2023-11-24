@@ -10,12 +10,12 @@ import pytest
 import requests
 from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, wait_exponential
+from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
-from tests.helpers import STORAGE_PATH
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    STORAGE_PATH,
     check_cluster_members,
     convert_records_to_dict,
     db_connect,
@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 UNIT_IDS = [0, 1, 2]
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_deploy(ops_test: OpsTest, charm: str):
@@ -51,10 +52,11 @@ async def test_deploy(ops_test: OpsTest, charm: str):
     # Reducing the update status frequency to speed up the triggering of deferred events.
     await ops_test.model.set_config({"update-status-hook-interval": "10s"})
 
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
     assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_database_is_up(ops_test: OpsTest, unit_id: int):
@@ -65,6 +67,7 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     assert result.status_code == 200
 
 
+@pytest.mark.group(1)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
     # Query Patroni REST API and check the status that indicates
@@ -77,6 +80,7 @@ async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
     ), "Scrape error in postgresql_prometheus_exporter"
 
 
+@pytest.mark.group(1)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Connect to the PostgreSQL instance.
@@ -162,6 +166,7 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert unit.data["port-ranges"][0]["protocol"] == "tcp"
 
 
+@pytest.mark.group(1)
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
     await ops_test.model.applications[DATABASE_APP_NAME].set_config(
@@ -198,6 +203,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         assert settings["lc_monetary"] == "en_GB.utf8"
 
 
+@pytest.mark.group(1)
 async def test_scale_down_and_up(ops_test: OpsTest):
     """Test data is replicated to new units after a scale up."""
     # Ensure the initial number of units in the application.
@@ -268,7 +274,7 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[DATABASE_APP_NAME],
         status="active",
-        timeout=1000,
+        timeout=2000,
         wait_for_exact_units=initial_scale,
     )
 
@@ -279,12 +285,15 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
 
 
+@pytest.mark.group(1)
 async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     """Test data persists through a primary deletion."""
     # Set a composite application name in order to test in more than one series at the same time.
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    primary = await get_primary(ops_test, any_unit_name)
-    password = await get_password(ops_test, primary)
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            primary = await get_primary(ops_test, any_unit_name)
+            password = await get_password(ops_test, primary)
 
     # Write data to primary IP.
     host = get_unit_address(ops_test, primary)
@@ -299,11 +308,11 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     await ops_test.model.destroy_units(
         primary,
     )
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     # Add the unit again.
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     # Testing write occurred to every postgres instance by reading from them
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:

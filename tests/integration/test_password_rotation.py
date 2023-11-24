@@ -6,9 +6,9 @@ import time
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.helpers import METADATA
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
+    METADATA,
     check_patroni,
     get_password,
     restart_patroni,
@@ -18,6 +18,7 @@ from tests.integration.helpers import (
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_deploy_active(ops_test: OpsTest):
@@ -31,9 +32,10 @@ async def test_deploy_active(ops_test: OpsTest):
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
 
 
+@pytest.mark.group(1)
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
     # Get the initial passwords set for the system users.

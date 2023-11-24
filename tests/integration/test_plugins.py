@@ -7,7 +7,7 @@ import psycopg2 as psycopg2
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
     db_connect,
@@ -55,6 +55,7 @@ TSM_SYSTEM_TIME_EXTENSION_STATEMENT = "CREATE TABLE tsm_system_time_test (i int)
 UUID_OSSP_EXTENSION_STATEMENT = "SELECT uuid_nil();"
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_plugins(ops_test: OpsTest) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
@@ -67,7 +68,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
     sql_tests = {
         "plugin_citext_enable": CITEXT_EXTENSION_STATEMENT,
