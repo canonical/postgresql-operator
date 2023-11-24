@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 import time
 
 import pytest
@@ -10,6 +11,7 @@ from tests.helpers import METADATA
 from tests.integration.helpers import (
     CHARM_SERIES,
     check_patroni,
+    get_leader_unit,
     get_password,
     restart_patroni,
     set_password,
@@ -74,3 +76,53 @@ async def test_password_rotation(ops_test: OpsTest):
         if not await unit.is_leader_from_status():
             restart_patroni(ops_test, unit.name)
             assert check_patroni(ops_test, unit.name, restart_time)
+
+
+@pytest.mark.juju3
+async def test_password_from_secret_same_as_cli(ops_test: OpsTest):
+    """Checking if password is same as returned by CLI.
+
+    I.e. we're manipulating the secret we think we're manipulating.
+    """
+    #
+    # No way to retrieve a secet by label for now (https://bugs.launchpad.net/juju/+bug/2037104)
+    # Therefore we take advantage of the fact, that we only have ONE single secret a this point
+    # So we take the single member of the list
+    # NOTE: This would BREAK if for instance units had secrets at the start...
+    #
+    leader_unit = await get_leader_unit(ops_test, APP_NAME)
+    leader = leader_unit.name
+    password = await get_password(ops_test, unit_name=leader, username="replication")
+    complete_command = "list-secrets"
+    _, stdout, _ = await ops_test.juju(*complete_command.split())
+    secret_id = stdout.split("\n")[1].split(" ")[0]
+
+    # Getting back the pw from juju CLI
+    complete_command = f"show-secret {secret_id} --reveal --format=json"
+    _, stdout, _ = await ops_test.juju(*complete_command.split())
+    data = json.loads(stdout)
+    assert data[secret_id]["content"]["Data"]["replication-password"] == password
+
+
+async def test_empty_password(ops_test: OpsTest) -> None:
+    """Test that the password can't be set to an empty string."""
+    leader_unit = await get_leader_unit(ops_test, APP_NAME)
+    leader = leader_unit.name
+    await set_password(ops_test, unit_name=leader, username="replication", password="")
+    password = await get_password(ops_test, unit_name=leader, username="replication")
+    # The password is 'None', BUT NOT because of SECRET_DELETED_LABEL
+    # `get_secret()` returns a None value (as the field in the secret is set to string value "None")
+    # And this true None value is turned to a string when the event is setting results.
+    assert password == "None"
+
+
+async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None:
+    """Test that in general, there is no change when password validation fails."""
+    leader_unit = await get_leader_unit(ops_test, APP_NAME)
+    leader = leader_unit.name
+    password1 = await get_password(ops_test, unit_name=leader, username="replication")
+    # The password has to be minimum 3 characters
+    await set_password(ops_test, unit_name=leader, username="replication", password="ca" * 1000000)
+    password2 = await get_password(ops_test, unit_name=leader, username="replication")
+    # The password didn't change
+    assert password1 == password2
