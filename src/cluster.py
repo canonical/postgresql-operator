@@ -43,6 +43,8 @@ logger = logging.getLogger(__name__)
 
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
+RUNNING_STATES = ["running", "streaming"]
+
 
 class NotReadyError(Exception):
     """Raised when not all cluster members healthy or finished initial sync."""
@@ -297,7 +299,7 @@ class Patroni:
         # because sometimes there may exist (for some period of time) only
         # replicas after a failed switchover.
         return all(
-            member["state"] == "running" for member in cluster_status.json()["members"]
+            member["state"] in RUNNING_STATES for member in cluster_status.json()["members"]
         ) and any(member["role"] == "leader" for member in cluster_status.json()["members"])
 
     def get_patroni_health(self) -> Dict[str, str]:
@@ -366,7 +368,7 @@ class Patroni:
         except RetryError:
             return False
 
-        return response["state"] == "running"
+        return response["state"] in RUNNING_STATES
 
     @property
     def member_inactive(self) -> bool:
@@ -381,7 +383,7 @@ class Patroni:
         except RetryError:
             return True
 
-        return response["state"] not in ["running", "starting", "restarting"]
+        return response["state"] not in [*RUNNING_STATES, "starting", "restarting"]
 
     @property
     def member_replication_lag(self) -> str:
