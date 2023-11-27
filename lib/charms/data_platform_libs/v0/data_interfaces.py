@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 23
+LIBPATCH = 24
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -526,7 +526,16 @@ class CachedSecret:
         """Getting cached secret content."""
         if not self._secret_content:
             if self.meta:
-                self._secret_content = self.meta.get_content()
+                try:
+                    self._secret_content = self.meta.get_content(refresh=True)
+                except (ValueError, ModelError) as err:
+                    # https://bugs.launchpad.net/juju/+bug/2042596
+                    # Only triggered when 'refresh' is set
+                    msg = "ERROR either URI or label should be used for getting an owned secret but not both"
+                    if isinstance(err, ModelError) and msg not in str(err):
+                        raise
+                    # Due to: ValueError: Secret owner cannot use refresh=True
+                    self._secret_content = self.meta.get_content()
         return self._secret_content
 
     def set_content(self, content: Dict[str, str]) -> None:
@@ -1085,7 +1094,7 @@ class DataProvides(DataRelation):
         secret = self._get_relation_secret(relation.id, group)
 
         if not secret:
-            logging.error("Can't update secret for relation %s", str(relation.id))
+            logging.error("Can't delete secret for relation %s", str(relation.id))
             return False
 
         old_content = secret.get_content()
@@ -1827,7 +1836,8 @@ class DatabaseRequires(DataRequires):
 
         # We need to set relation alias also on the application level so,
         # it will be accessible in show-unit juju command, executed for a consumer application unit
-        self.update_relation_data(relation_id, {"alias": available_aliases[0]})
+        if self.local_unit.is_leader():
+            self.update_relation_data(relation_id, {"alias": available_aliases[0]})
 
     def _emit_aliased_event(self, event: RelationChangedEvent, event_name: str) -> None:
         """Emit an aliased event to a particular relation if it has an alias.
@@ -1914,6 +1924,9 @@ class DatabaseRequires(DataRequires):
 
         # Sets both database and extra user roles in the relation
         # if the roles are provided. Otherwise, sets only the database.
+        if not self.local_unit.is_leader():
+            return
+
         if self.extra_user_roles:
             self.update_relation_data(
                 event.relation.id,
@@ -2173,6 +2186,9 @@ class KafkaRequires(DataRequires):
         """Event emitted when the Kafka relation is created."""
         super()._on_relation_created_event(event)
 
+        if not self.local_unit.is_leader():
+            return
+
         # Sets topic, extra user roles, and "consumer-group-prefix" in the relation
         relation_data = {
             f: getattr(self, f.replace("-", "_"), "")
@@ -2344,6 +2360,9 @@ class OpenSearchRequires(DataRequires):
     def _on_relation_created_event(self, event: RelationCreatedEvent) -> None:
         """Event emitted when the OpenSearch relation is created."""
         super()._on_relation_created_event(event)
+
+        if not self.local_unit.is_leader():
+            return
 
         # Sets both index and extra user roles in the relation if the roles are provided.
         # Otherwise, sets only the index.
