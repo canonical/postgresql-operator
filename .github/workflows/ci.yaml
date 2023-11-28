@@ -22,7 +22,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v5.1.2
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v6.3.2
 
   unit-test:
     name: Unit test charm
@@ -42,100 +42,35 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v5.1.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v6.3.2
     permissions:
       actions: write  # Needed to manage GitHub Actions cache
 
-  gh-hosted-integration-test:
+
+  integration-test:
     strategy:
       fail-fast: false
       matrix:
-        tox-environment:
-          - backup-integration
-          - charm-integration
-          - database-relation-integration
-          - db-relation-integration
-          - db-admin-relation-integration
-          - ha-replication-integration
-          - ha-self-healing-integration
-          - ha-restore-cluster-integration
-          - password-rotation-integration
-          - plugins-integration
-          - tls-integration
-          - upgrade-integration
-          - upgrade-from-stable-integration
-        juju-snap-channel:  ["2.9/stable", "3.1/stable"]
-        exclude:
-          # Admin tests need landscape on juju 2
-          - tox-environment: db-admin-relation-integration
-            juju-snap-channel: "3.1/stable"
-        include:
-          - juju-snap-channel: "3.1/stable"
-            agent-version: "3.1.6"
-            libjuju-version:  "3.2.2"
-            exclude-mark:  "juju2"
-          - juju-snap-channel: "2.9/stable"
-            agent-version: "2.9.45"
-            libjuju-version:  "2.9.45.0"
-            exclude-mark:  "juju3"
-    name: ${{ matrix.juju-snap-channel }} - (GH hosted) ${{ matrix.tox-environment }}
+        juju:
+          - agent: 2.9.45
+            libjuju: ^2
+          - agent: 3.1.6
+    name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
       - lint
       - unit-test
       - build
-    runs-on: ubuntu-latest
-    timeout-minutes: 120
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install tox & poetry
-        run: |
-          pipx install tox
-          pipx install poetry
-      - name: Free up disk space
-        run: |
-          # From https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /usr/local/share/boost
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
-      - name: Setup operator environment
-        uses: charmed-kubernetes/actions-operator@main
-        with:
-          provider: lxd
-          bootstrap-options: "--agent-version ${{ matrix.agent-version }}"
-          juju-channel: ${{ matrix.juju-snap-channel }}
-      - name: Update python-libjuju version
-        if: ${{ matrix.juju-snap-channel == '2.9/stable' }}
-        run: poetry add --lock --group integration juju@'${{ matrix.libjuju-version }}'
-      - name: Download packed charm(s)
-        uses: actions/download-artifact@v3
-        with:
-          name: ${{ needs.build.outputs.artifact-name }}
-      - name: Select test stability level
-        id: select-test-stability
-        run: |
-          if [[ "${{ github.event_name }}" == "schedule" ]]
-          then
-            echo Running unstable and stable tests
-            echo "mark_expression=" >> "$GITHUB_OUTPUT"
-          else
-            echo Skipping unstable tests
-            echo "mark_expression=and not unstable" >> "$GITHUB_OUTPUT"
-          fi
-      - name: Select test secret usage
-        id: select-test-secrets
-        if: ${{ github.event.pull_request.head.repo.full_name != 'canonical/postgresql-operator' }}
-        run: |
-          echo Skipping tests using secrets
-          echo "mark_secrets=and not uses_secrets" >> "$GITHUB_OUTPUT"
-      - name: Run integration tests
-        run: tox run -e ${{ matrix.tox-environment }} -- -m 'not ${{ matrix.exclude-mark }} ${{ steps.select-test-secrets.outputs.mark_secrets }} ${{ steps.select-test-stability.outputs.mark_expression }}' --keep-models
-        env:
-          SECRETS_FROM_GITHUB: |
-            {
-              "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
-              "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
-              "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-              "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
-            }
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm_self_hosted.yaml@v6.3.2
+    with:
+      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      cloud: lxd
+      juju-agent-version: ${{ matrix.juju.agent }}
+      libjuju-version-constraint: ${{ matrix.juju.libjuju }}
+    secrets:
+      integration-test: |
+        {
+          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
+          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
+          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
+          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
+        }

@@ -33,6 +33,7 @@ from tenacity import (
 CHARM_SERIES = "jammy"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
+STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 
 
 async def build_connection_string(
@@ -299,7 +300,7 @@ async def deploy_and_relate_application_with_postgresql(
         apps=[application_name],
         status="active",
         raise_on_blocked=False,
-        timeout=1000,
+        timeout=1500,
     )
 
     # Relate application to PostgreSQL.
@@ -310,7 +311,7 @@ async def deploy_and_relate_application_with_postgresql(
         apps=[application_name],
         status="active",
         raise_on_blocked=False,  # Application that needs a relation is blocked initially.
-        timeout=1000,
+        timeout=1500,
     )
 
     return relation.id
@@ -325,6 +326,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     status: str = "active",
     status_message: str = None,
     overlay: Dict = None,
+    timeout: int = 2000,
 ) -> str:
     """Helper function to deploy and relate a bundle with PostgreSQL.
 
@@ -342,6 +344,7 @@ async def deploy_and_relate_bundle_with_postgresql(
         status_message: Status message to wait for in the application after
             relating it to PostgreSQL.
         overlay: Optional overlay to be used when deploying the bundle.
+        timeout: Timeout to wait for the deployment to idle.
     """
     # Deploy the bundle.
     with tempfile.NamedTemporaryFile(dir=os.getcwd()) as original:
@@ -403,19 +406,19 @@ async def deploy_and_relate_bundle_with_postgresql(
             ops_test.model.wait_for_idle(
                 apps=[DATABASE_APP_NAME],
                 status="active",
-                timeout=1500,
+                timeout=timeout,
             ),
             ops_test.model.wait_for_idle(
                 apps=[main_application_name],
                 raise_on_blocked=False,
                 status=status,
-                timeout=1500,
+                timeout=timeout,
             ),
         ]
         if status_message:
             awaits.append(
                 ops_test.model.block_until(
-                    lambda: unit.workload_status_message == status_message, timeout=1500
+                    lambda: unit.workload_status_message == status_message, timeout=timeout
                 )
             )
         await asyncio.gather(*awaits)
@@ -864,7 +867,7 @@ async def scale_application(ops_test: OpsTest, application_name: str, count: int
         ]
         await ops_test.model.applications[application_name].destroy_units(*units)
     await ops_test.model.wait_for_idle(
-        apps=[application_name], status="active", timeout=1500, wait_for_exact_units=count
+        apps=[application_name], status="active", timeout=2000, wait_for_exact_units=count
     )
 
 

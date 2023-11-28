@@ -6,25 +6,26 @@ import logging
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ha_tests.helpers import (
-    APPLICATION_NAME,
-    are_writes_increasing,
-    check_writes,
-    start_continuous_writes,
-)
-from tests.integration.helpers import (
+from ..helpers import (
     DATABASE_APP_NAME,
     count_switchovers,
     get_leader_unit,
     get_primary,
     remove_chown_workaround,
 )
+from .helpers import (
+    APPLICATION_NAME,
+    are_writes_increasing,
+    check_writes,
+    start_continuous_writes,
+)
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT = 5 * 60
+TIMEOUT = 600
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
@@ -75,6 +76,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
     assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     """Test that the pre-upgrade-check action runs successfully."""
@@ -92,6 +94,7 @@ async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     await action.wait()
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_upgrade_from_stable(ops_test: OpsTest):
     """Test updating from stable channel."""
