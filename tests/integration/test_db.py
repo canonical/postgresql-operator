@@ -11,7 +11,8 @@ from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.helpers import (
+from . import markers
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
     build_connection_string,
@@ -32,6 +33,7 @@ DATABASE_UNITS = 2
 RELATION_NAME = "db"
 
 
+@pytest.mark.group(1)
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
     async with ops_test.fast_forward():
@@ -47,7 +49,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME],
             status="active",
-            timeout=1000,
+            timeout=1500,
             wait_for_exact_units=DATABASE_UNITS,
         )
 
@@ -97,6 +99,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         assert domain_name not in [domain.mail_host for domain in client.domains]
 
 
+@pytest.mark.group(1)
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
     # Retrieve the list of current database unit names.
@@ -106,7 +109,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         # Add two more units.
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=4
+            apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
         )
 
         # Remove the original units.
@@ -169,6 +172,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
                 psycopg2.connect(primary_connection_string)
 
 
+@pytest.mark.group(1)
 @pytest.mark.unstable
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
@@ -210,6 +214,7 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("nextcloud", block_until_done=True)
 
 
+@pytest.mark.group(1)
 async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         # Deploy Sentry and its dependencies.
@@ -289,6 +294,7 @@ async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
         )
 
 
+@pytest.mark.group(1)
 @pytest.mark.unstable
 async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
@@ -316,7 +322,8 @@ async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("weebl", block_until_done=True)
 
 
-@pytest.mark.juju2
+@markers.juju2
+@pytest.mark.group(1)
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
     # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).

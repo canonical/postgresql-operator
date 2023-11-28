@@ -20,7 +20,7 @@ from tenacity import (
     wait_fixed,
 )
 
-from tests.integration.helpers import db_connect, get_unit_address, run_command_on_unit
+from ..helpers import db_connect, get_unit_address, run_command_on_unit
 
 APPLICATION_NAME = "postgresql-test-app"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
@@ -753,7 +753,7 @@ async def add_unit_with_storage(ops_test, app, storage):
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1500)
     assert (
         len(ops_test.model.applications[app].units) == expected_units
     ), "New unit not added to model"

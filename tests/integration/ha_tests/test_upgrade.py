@@ -11,25 +11,26 @@ from typing import Union
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ha_tests.helpers import (
-    APPLICATION_NAME,
-    are_writes_increasing,
-    check_writes,
-    start_continuous_writes,
-)
-from tests.integration.helpers import (
+from ..helpers import (
     DATABASE_APP_NAME,
     count_switchovers,
     get_leader_unit,
     get_primary,
 )
-from tests.integration.new_relations.helpers import get_application_relation_data
+from ..new_relations.helpers import get_application_relation_data
+from .helpers import (
+    APPLICATION_NAME,
+    are_writes_increasing,
+    check_writes,
+    start_continuous_writes,
+)
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT = 5 * 60
+TIMEOUT = 600
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_latest(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
@@ -47,11 +48,12 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active", timeout=1000
+            apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active", timeout=1500
         )
     assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     """Test that the pre-upgrade-check action runs successfully."""
@@ -64,6 +66,7 @@ async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     await action.wait()
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
@@ -113,6 +116,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes) -> None:
     ) <= 2, "Number of switchovers is greater than 2"
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_fail_and_rollback(ops_test, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
