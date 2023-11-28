@@ -46,40 +46,26 @@ jobs:
     permissions:
       actions: write  # Needed to manage GitHub Actions cache
 
-  integration-test-juju3:
-    name: Integration tests on Juju 3
-    needs:
-      - build
-      - lint
-      - unit-test
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v6.3.1
-    with:
-      artifact-name: ${{ needs.build.outputs.artifact-name }}
-      cloud: lxd
-      juju-agent-version: 3.1.6
-      juju-snap-channel: "3.1/stable"
-    secrets:
-      integration-test: |
-        {
-          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
-          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
-          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
-        }
 
-  integration-test-juju2:
-    name: Integration tests on Juju 2
+  integration-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        juju:
+          - agent: 2.9.45
+            libjuju: ^2
+          - agent: 3.1.6
+    name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
-      - build
       - lint
       - unit-test
+      - build
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v6.3.1
     with:
       artifact-name: ${{ needs.build.outputs.artifact-name }}
       cloud: lxd
-      juju-agent-version: "2.9.45"
-      juju-snap-channel: "2.9/stable"
-      libjuju-version-constraint: "2.9.45.0"
+      juju-agent-version: ${{ matrix.juju.agent }}
+      libjuju-version-constraint: ${{ matrix.juju.libjuju }}
     secrets:
       integration-test: |
         {
