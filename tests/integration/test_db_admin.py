@@ -4,10 +4,11 @@
 import json
 import logging
 
+import pytest
 from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
     check_database_users_existence,
@@ -32,6 +33,7 @@ DATABASE_UNITS = 3
 RELATION_NAME = "db-admin"
 
 
+@pytest.mark.group(1)
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     await ops_test.model.deploy(
@@ -39,7 +41,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
         series=CHARM_SERIES,
-        config={"profile": "testing"},
+        config={"profile": "testing", "plugin_plpython3u_enable": "True"},
     )
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
@@ -49,6 +51,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         LANDSCAPE_APP_NAME,
         main_application_num_units=2,
         relation_name=RELATION_NAME,
+        timeout=3000,
     )
     await check_databases_creation(
         ops_test,
@@ -117,7 +120,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # rebooting the unit machine in the middle of a hook (what is needed when the issue from
     # https://bugs.launchpad.net/juju/+bug/1999758 happens).
     await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME], status="active", timeout=600, raise_on_error=False
+        apps=[DATABASE_APP_NAME], status="active", timeout=1500, raise_on_error=False
     )
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)

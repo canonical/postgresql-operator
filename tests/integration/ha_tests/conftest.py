@@ -7,7 +7,8 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from tests.integration.ha_tests.helpers import (
+from ..helpers import run_command_on_unit
+from .helpers import (
     APPLICATION_NAME,
     ORIGINAL_RESTART_CONDITION,
     RESTART_CONDITION,
@@ -18,7 +19,6 @@ from tests.integration.ha_tests.helpers import (
     get_postgresql_parameter,
     update_restart_condition,
 )
-from tests.integration.helpers import run_command_on_unit
 
 
 @pytest.fixture()

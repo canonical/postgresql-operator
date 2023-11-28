@@ -24,14 +24,14 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v5.1.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v6.3.2
 
   release:
     name: Release charm
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v5.1.2
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v6.3.2
     with:
       channel: 14/edge
       artifact-name: ${{ needs.build.outputs.artifact-name }}

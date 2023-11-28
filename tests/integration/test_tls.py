@@ -8,10 +8,10 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
-from tests.helpers import METADATA
-from tests.integration.helpers import (
+from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    METADATA,
     change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
@@ -30,6 +30,7 @@ APP_NAME = METADATA["name"]
 TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_deploy_active(ops_test: OpsTest):
@@ -47,6 +48,7 @@ async def test_deploy_active(ops_test: OpsTest):
         # bundles don't wait between deploying charms.
 
 
+@pytest.mark.group(1)
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
@@ -156,6 +158,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
 
 
+@pytest.mark.group(1)
 @pytest.mark.skipif(
     not os.environ.get("RESTART_MACHINE_TEST"),
     reason="RESTART_MACHINE_TEST environment variable not set",
