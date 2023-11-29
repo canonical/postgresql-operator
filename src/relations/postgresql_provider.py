@@ -90,7 +90,9 @@ class PostgreSQLProvider(Object):
                 if self.charm.config[plugin]
             ]
 
-            self.charm.postgresql.create_database(database, user, plugins=plugins)
+            self.charm.postgresql.create_database(
+                database, user, plugins=plugins, client_relations=self.charm.client_relations
+            )
 
             # Share the credentials with the application.
             self.database_provides.set_credentials(event.relation.id, user, password)

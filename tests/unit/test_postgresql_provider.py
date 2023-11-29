@@ -124,7 +124,11 @@ class TestPostgreSQLProvider(unittest.TestCase):
             postgresql_mock.create_user.assert_called_once_with(
                 user, "test-password", extra_user_roles=EXTRA_USER_ROLES
             )
-            postgresql_mock.create_database.assert_called_once_with(DATABASE, user, plugins=[])
+            database_relation = self.harness.model.get_relation(RELATION_NAME)
+            client_relations = [database_relation]
+            postgresql_mock.create_database.assert_called_once_with(
+                DATABASE, user, plugins=[], client_relations=client_relations
+            )
             postgresql_mock.get_postgresql_version.assert_called_once()
             _update_endpoints.assert_called_once()
 
