@@ -17,6 +17,23 @@ list-backups:
   description: Lists backups in s3 storage.
 pre-upgrade-check:
   description: Run necessary pre-upgrade checks and preparations before executing a charm refresh.
+promote-standby-cluster:
+  description: Promotes the standby cluster of choice to a leader. Must be ran against the charm unit leader of the standby cluster.
+  params:
+    force:
+      type: boolean
+      default: False
+      description: |
+        WARNING: this option set to True WILL WIPE OUT your current primary cluster!
+        If this option and "force-really-really-mean-it" are set both to true, then this unit will take over the primary role.
+        It only works in the case of cross-cluster replication, where both clusters are connected to each other in the async-primary.
+    force-really-really-mean-it:
+      type: boolean
+      default: False
+      description: |
+        WARNING: this option set to True WILL WIPE OUT your current primary cluster!
+        If this option and "force" are set both to true, then this unit will take over the primary role.
+        It only works in the case of cross-cluster replication, where both clusters are connected to each other in the async-primary.
 restore:
   description: Restore a database backup using pgBackRest.
     S3 credentials are retrieved from a relation with the S3 integrator charm.

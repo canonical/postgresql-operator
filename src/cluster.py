@@ -464,6 +464,9 @@ class Patroni:
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
+
+        primary = self._charm.async_manager.get_primary_data()
+
         # Render the template file with the correct values.
         rendered = template.render(
             conf_path=PATRONI_CONF_PATH,
@@ -479,8 +482,12 @@ class Patroni:
             scope=self.cluster_name,
             self_ip=self.unit_ip,
             superuser=USER,
-            superuser_password=self.superuser_password,
-            replication_password=self.replication_password,
+            superuser_password=primary["superuser-password"]
+            if primary
+            else self.superuser_password,
+            replication_password=primary["replication-password"]
+            if primary
+            else self.replication_password,
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
             enable_pgbackrest=stanza is not None,
@@ -491,6 +498,10 @@ class Patroni:
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
             pg_parameters=parameters,
+            standby_cluster_endpoint=primary["endpoint"] if primary else None,
+            extra_replication_endpoints={"{}/32".format(primary["endpoint"])}
+            if primary
+            else self._charm.async_manager.standby_endpoints(),
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

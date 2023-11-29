@@ -80,6 +80,7 @@ from constants import (
     USER,
     USER_PASSWORD_KEY,
 )
+from relations.async_replication import PostgreSQLAsyncReplication
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -153,6 +154,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ],
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
         )
+        self.async_manager = PostgreSQLAsyncReplication(self)
 
     def patroni_scrape_config(self) -> List[Dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
