@@ -3,7 +3,7 @@
 name: Tests
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  group: ${{ github.workflow }}-${{ github.ref }}-ghhosted
   cancel-in-progress: true
 
 on:
@@ -42,7 +42,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v6.3.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@free-disk-space
     permissions:
       actions: write  # Needed to manage GitHub Actions cache
 
@@ -60,7 +60,7 @@ jobs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm_self_hosted.yaml@v6.3.2
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@free-disk-space
     with:
       artifact-name: ${{ needs.build.outputs.artifact-name }}
       cloud: lxd
