@@ -179,7 +179,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
 
 
 @pytest.mark.group(1)
-@pytest.mark.unstable
+@pytest.mark.skip(reason="Should be ported and moved to the new relation tests")
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         # Deploy Nextcloud.
