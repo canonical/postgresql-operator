@@ -1479,6 +1479,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return 0
 
+    @property
+    def client_relations(self) -> List[Relation]:
+        """Return the list of established client relations."""
+        relations = []
+        for relation_name in ["database", "db", "db-admin"]:
+            for relation in self.model.relations.get(relation_name, []):
+                relations.append(relation)
+        return relations
+
 
 if __name__ == "__main__":
     main(PostgresqlOperatorCharm)

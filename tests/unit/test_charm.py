@@ -1538,3 +1538,18 @@ class TestCharm(unittest.TestCase):
         harness = Harness(PostgresqlOperatorCharm)
         harness.begin()
         _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
+
+    def test_client_relations(self):
+        # Test when the charm has no relations.
+        self.assertEqual(self.charm.client_relations, [])
+
+        # Test when the charm has some relations.
+        self.harness.add_relation("database", "application")
+        self.harness.add_relation("db", "legacy-application")
+        self.harness.add_relation("db-admin", "legacy-admin-application")
+        database_relation = self.harness.model.get_relation("database")
+        db_relation = self.harness.model.get_relation("db")
+        db_admin_relation = self.harness.model.get_relation("db-admin")
+        self.assertEqual(
+            self.charm.client_relations, [database_relation, db_relation, db_admin_relation]
+        )
