@@ -39,7 +39,7 @@ ROLES_BLOCKING_MESSAGE = (
 class DbProvides(Object):
     """Defines functionality for the 'provides' side of the 'db' relation.
 
-    or roles    Hook events observed:
+    Hook events observed:
         - relation-changed
         - relation-departed
         - relation-broken
