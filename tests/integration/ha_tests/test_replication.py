@@ -6,9 +6,8 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import CHARM_SERIES, db_connect, scale_application
+from ..helpers import APPLICATION_NAME, CHARM_SERIES, db_connect, scale_application
 from .helpers import (
-    APPLICATION_NAME,
     app_name,
     are_writes_increasing,
     check_writes,
