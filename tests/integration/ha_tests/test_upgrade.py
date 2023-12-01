@@ -12,6 +12,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
+    APPLICATION_NAME,
     DATABASE_APP_NAME,
     count_switchovers,
     get_leader_unit,
@@ -19,7 +20,6 @@ from ..helpers import (
 )
 from ..new_relations.helpers import get_application_relation_data
 from .helpers import (
-    APPLICATION_NAME,
     are_writes_increasing,
     check_writes,
     start_continuous_writes,
