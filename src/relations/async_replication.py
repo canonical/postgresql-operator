@@ -28,9 +28,8 @@ from ops.model import (
     Unit,
 )
 
-from constants import PATRONI_CONF_PATH
+from constants import PATRONI_CONF_PATH, POSTGRESQL_DATA_PATH
 from coordinator_ops import CoordinatedOpsManager
-from src.constants import POSTGRESQL_DATA_PATH
 
 logger = logging.getLogger(__name__)
 
@@ -41,19 +40,6 @@ ASYNC_REPLICA_RELATION = "async-replica"
 
 class MoreThanOnePrimarySelectedError(Exception):
     """Represents more than one primary has been selected."""
-
-
-def _get_pod_ip():
-    """Reads some files to quickly figure out its own pod IP.
-
-    It should work for any Ubuntu-based image
-    """
-    with open("/etc/hosts") as f:
-        hosts = f.read()
-    with open("/etc/hostname") as f:
-        hostname = f.read().replace("\n", "")
-    line = [ln for ln in hosts.split("\n") if ln.find(hostname) >= 0][0]
-    return line.split("\t")[0]
 
 
 class PostgreSQLAsyncReplication(Object):
@@ -117,8 +103,8 @@ class PostgreSQLAsyncReplication(Object):
             for unit in self._all_units(rel):
                 if not rel.data[unit].get("elected", None):
                     standby_endpoints.add("{}/32".format(str(rel.data[unit]["ingress-address"])))
-                    if "pod-address" in rel.data[unit]:
-                        standby_endpoints.add("{}/32".format(str(rel.data[unit]["pod-address"])))
+                    if "unit-address" in rel.data[unit]:
+                        standby_endpoints.add("{}/32".format(str(rel.data[unit]["unit-address"])))
         return standby_endpoints
 
     def get_primary_data(self) -> Dict[str, str]:
@@ -144,13 +130,13 @@ class PostgreSQLAsyncReplication(Object):
         logger.debug(f"Units found: {found_units}")
         return found_units
 
-    def _all_replica_published_pod_ips(self) -> bool:
+    def _all_replica_published_unit_ips(self) -> bool:
         for rel in self.relation_set:
             for unit in self._all_units(rel):
                 if "elected" in rel.data[unit]:
-                    # This is the leader unit, it will not publish its own pod address
+                    # This is the leader unit, it will not publish its own unit address
                     continue
-                if "pod-address" not in rel.data[unit]:
+                if "unit-address" not in rel.data[unit]:
                     return False
         return True
 
@@ -161,8 +147,8 @@ class PostgreSQLAsyncReplication(Object):
         ]:
             if not rel:  # if no relation exits, then it rel == None
                 continue
-            if "pod-address" in rel.data[self.charm.unit]:
-                del rel.data[self.charm.unit]["pod-address"]
+            if "unit-address" in rel.data[self.charm.unit]:
+                del rel.data[self.charm.unit]["unit-address"]
             if "elected" in rel.data[self.charm.unit]:
                 del rel.data[self.charm.unit]["elected"]
             if "primary-cluster-ready" in rel.data[self.charm.unit]:
@@ -197,11 +183,11 @@ class PostgreSQLAsyncReplication(Object):
             return
         logger.info("_on_primary_changed: unit is the primary's leader")
 
-        if not self._all_replica_published_pod_ips():
+        if not self._all_replica_published_unit_ips():
             # We will have more events happening, no need for retrigger
             event.defer()
             return
-        logger.info("_on_primary_changed: all replicas published pod details")
+        logger.info("_on_primary_changed: all replicas published unit details")
 
         # This unit is the leader, generate  a new configuration and leave.
         # There is nothing to do for the leader.
@@ -228,14 +214,14 @@ class PostgreSQLAsyncReplication(Object):
             return
         logger.info("_on_standby_changed: primary is present")
 
-        # Check if we have already published pod-address. If not, then we are waiting
-        # for the leader to catch all the pod ips and restart itself
-        if "pod-address" not in replica_relation.data[self.charm.unit]:
-            replica_relation.data[self.charm.unit]["pod-address"] = _get_pod_ip()
+        # Check if we have already published unit-address. If not, then we are waiting
+        # for the leader to catch all the unit ips and restart itself
+        if "unit-address" not in replica_relation.data[self.charm.unit]:
+            replica_relation.data[self.charm.unit]["unit-address"] = self.charm._unit_ip
             # Finish here and wait for the retrigger from the primary cluster
             event.defer()
             return
-        logger.info("_on_standby_changed: pod-address published in own replica databag")
+        logger.info("_on_standby_changed: unit-address published in own replica databag")
 
         if not self.get_primary_data():
             # We've made thus far.
@@ -385,15 +371,15 @@ class PostgreSQLAsyncReplication(Object):
         primary_relation.data[self.charm.unit]["elected"] = json.dumps(
             {
                 "endpoint": self.endpoint,
-                "replication-password": self.charm._patroni._replication_password,
-                "superuser-password": self.charm._patroni._superuser_password,
+                "replication-password": self.charm._patroni.replication_password,
+                "superuser-password": self.charm._patroni.superuser_password,
             }
         )
 
-        # Now, check if postgresql it had originally published its pod IP in the
+        # Now, check if postgresql it had originally published its unit IP in the
         # replica relation databag. Delete it, if yes.
         replica_relation = self.model.get_relation(ASYNC_PRIMARY_RELATION)
-        if not replica_relation or "pod-address" not in replica_relation.data[self.charm.unit]:
+        if not replica_relation or "unit-address" not in replica_relation.data[self.charm.unit]:
             return
-        del replica_relation.data[self.charm.unit]["pod-address"]
+        del replica_relation.data[self.charm.unit]["unit-address"]
         # event.set_result()

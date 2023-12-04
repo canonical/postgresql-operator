@@ -67,6 +67,7 @@ class Patroni:
 
     def __init__(
         self,
+        charm,
         unit_ip: str,
         cluster_name: str,
         member_name: str,
@@ -80,6 +81,7 @@ class Patroni:
         """Initialize the Patroni class.
 
         Args:
+            charm: PostgreSQL charm instance.
             unit_ip: IP address of the current unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
@@ -90,6 +92,7 @@ class Patroni:
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
+        self.charm = charm
         self.unit_ip = unit_ip
         self.cluster_name = cluster_name
         self.member_name = member_name
@@ -465,7 +468,7 @@ class Patroni:
         with open("templates/patroni.yml.j2", "r") as file:
             template = Template(file.read())
 
-        primary = self._charm.async_manager.get_primary_data()
+        primary = self.charm.async_manager.get_primary_data()
 
         # Render the template file with the correct values.
         rendered = template.render(
@@ -501,7 +504,7 @@ class Patroni:
             standby_cluster_endpoint=primary["endpoint"] if primary else None,
             extra_replication_endpoints={"{}/32".format(primary["endpoint"])}
             if primary
-            else self._charm.async_manager.standby_endpoints(),
+            else self.charm.async_manager.standby_endpoints(),
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
