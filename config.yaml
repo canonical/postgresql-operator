@@ -230,9 +230,17 @@ options:
   profile-limit-memory:
     type: int
     description: |
+      [DEPRECTATED] Use profile_limit_memory instead. Amount of memory in Megabytes to limit PostgreSQL
+      and associated process to. If unset, this will be decided according to the default memory limit
+      in the selected profile. Only comes into effect when the `production` profile is selected. This
+      config option cannot be set at the same time as profile_limit_memory.
+  profile_limit_memory:
+    type: int
+    description: |
       Amount of memory in Megabytes to limit PostgreSQL and associated process to.
       If unset, this will be decided according to the default memory limit in the selected profile.
-      Only comes into effect when the `production` profile is selected.
+      Only comes into effect when the `production` profile is selected. This config option cannot be
+      set at the same time as profile-limit-memory.
   request_date_style:
     description: |
       Sets the display format for date and time values. Allowed formats are explained
