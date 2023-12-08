@@ -204,7 +204,7 @@ class CharmConfig(BaseConfigModel):
         if value < 128:
             raise ValueError("PostgreSQL Charm requires at least 128MB")
         if value > 9999999:
-            raise ValueError("`profile-limit-memory` limited to 7 digits (9999999MB)")
+            raise ValueError("`profile_limit_memory` limited to 7 digits (9999999MB)")
 
         return value
 

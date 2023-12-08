@@ -1164,11 +1164,28 @@ class TestCharm(unittest.TestCase):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.
             postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
-            _is_workload_running.side_effect = [True, True, False, True]
+            _is_workload_running.side_effect = [False, False, True, True, False, True]
             _member_started.side_effect = [True, True, False]
             postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
+            # Test when only one of the two config options for profile limit memory is set.
+            self.harness.update_config({"profile-limit-memory": 1000})
+            self.charm.update_config()
+
+            # Test when only one of the two config options for profile limit memory is set.
+            self.harness.update_config(
+                {"profile_limit_memory": 1000}, unset={"profile-limit-memory"}
+            )
+            self.charm.update_config()
+
+            # Test when the two config options for profile limit memory are set at the same time.
+            _render_patroni_yml_file.reset_mock()
+            self.harness.update_config({"profile-limit-memory": 1000})
+            with self.assertRaises(ValueError):
+                self.charm.update_config()
+
             # Test without TLS files available.
+            self.harness.update_config(unset={"profile-limit-memory", "profile_limit_memory"})
             self.harness.update_relation_data(
                 self.rel_id, self.charm.unit.name, {"tls": "enabled"}
             )  # Mock some data in the relation to test that it change.
