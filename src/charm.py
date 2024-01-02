@@ -1275,7 +1275,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
-                snap_package = snap_cache[snap_name]
+                try:
+                    snap_package = snap_cache[snap_name]
+                except snap.SnapNotFoundError:
+                    # TODO Arm64 snap fails to install due to missing metadata
+                    # (no channel) remove when it is released properly
+                    subprocess.check_output(
+                        [
+                            "snap",
+                            "install",
+                            snap_name,
+                            f'--revision="{snap_version.get("revision")}"',
+                        ]
+                    )
+                    continue
 
                 if not snap_package.present or refresh:
                     if snap_version.get("revision"):
