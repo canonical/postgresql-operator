@@ -52,6 +52,8 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         main_application_num_units=2,
         relation_name=RELATION_NAME,
         timeout=3000,
+        # Stable hangs on apt install
+        channel="latest/edge",
     )
     await check_databases_creation(
         ops_test,

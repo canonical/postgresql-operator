@@ -328,6 +328,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     status_message: str = None,
     overlay: Dict = None,
     timeout: int = 2000,
+    channel: Optional[str] = None,
 ) -> str:
     """Helper function to deploy and relate a bundle with PostgreSQL.
 
@@ -346,11 +347,15 @@ async def deploy_and_relate_bundle_with_postgresql(
             relating it to PostgreSQL.
         overlay: Optional overlay to be used when deploying the bundle.
         timeout: Timeout to wait for the deployment to idle.
+        channel: Optional channel for the bundle.
     """
     # Deploy the bundle.
     with tempfile.NamedTemporaryFile(dir=os.getcwd()) as original:
         # Download the original bundle.
-        await ops_test.juju("download", bundle_name, "--filepath", original.name)
+        commands = ["download", bundle_name, "--filepath", original.name]
+        if channel:
+            commands += ["--channel", channel]
+        await ops_test.juju(*commands)
 
         # Open the bundle compressed file and update the contents
         # of the bundle.yaml file to deploy it.
