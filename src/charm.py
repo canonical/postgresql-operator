@@ -882,8 +882,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             database: optional database where to enable/disable the extension.
         """
         spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
-        original_status = self.unit.status
         plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
+        required_plugins = {"address_standardizer": ["postgis"], "address_standardizer_data_us": ["postgis"],
+                            "jsonb_plperl": ["plperl"],
+                            "postgis_raster": ["postgis"], "postgis_tiger_geocoder": ["postgis", "fuzzystrmatch"],
+                            "postgis_topology": ["postgis"]}
+        original_status = self.unit.status
         extensions = {}
         # collect extensions
         for plugin in self.config.plugin_keys():
@@ -897,6 +901,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 continue
             if extension in plugins_exception:
                 extension = plugins_exception[extension]
+            if extension in required_plugins:
+                skip = False
+                if enable:
+                    for ext in required_plugins[extension]:
+                        if not self.config[ext]:
+                            skip = True
+                            logger.exception("cannot enable %s, extension required %s to be enabled before", extension, ext)
+                else:
+                    for n, v in required_plugins.items():
+                        if v == extension and self.config[n]:
+                            skip = True
+                            logger.exception(f"{n} require plugin {extension}. Switch off first {n} before disable {extension}")
+                if skip:
+                    continue
             extensions[extension] = enable
         self.unit.status = WaitingStatus("Updating extensions")
         try:
