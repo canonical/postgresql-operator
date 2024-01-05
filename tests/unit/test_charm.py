@@ -393,6 +393,60 @@ class TestCharm(unittest.TestCase):
   plugin_spi_enable:
     default: false
     type: boolean
+  plugin_bool_plperl_enable:
+    default: false
+    type: boolean
+  plugin_hll_enable:
+    default: false
+    type: boolean
+  plugin_hypopg_enable:
+    default: false
+    type: boolean
+  plugin_ip4r_enable:
+    default: false
+    type: boolean
+  plugin_jsonb_plperl_enable:
+    default: false
+    type: boolean
+  plugin_orafce_enable:
+    default: false
+    type: boolean
+  plugin_pg_similarity_enable:
+    default: false
+    type: boolean
+  plugin_plperl_enable:
+    default: false
+    type: boolean
+  plugin_prefix_enable:
+    default: false
+    type: boolean
+  plugin_rdkit_enable:
+    default: false
+    type: boolean
+  plugin_tds_fdw_enable:
+    default: false
+    type: boolean
+  plugin_icu_ext_enable:
+    default: false
+    type: boolean
+  plugin_pltcl_enable:
+    default: false
+    type: boolean
+  plugin_postgis_enable:
+    default: false
+    type: boolean
+  plugin_address_standardizer_enable:
+    default: false
+    type: boolean
+  plugin_address_standardizer_data_us_enable:
+    default: false
+    type: boolean
+  plugin_postgis_tiger_geocoder_enable:
+    default: false
+    type: boolean
+  plugin_postgis_topology_enable:
+    default: false
+    type: boolean
   profile:
     default: production
     type: string"""
