@@ -45,6 +45,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     )
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
+    overlay = {
+        "applications": {LANDSCAPE_APP_NAME: {"revision": 105}}
+    }
     relation_id = await deploy_and_relate_bundle_with_postgresql(
         ops_test,
         "ch:landscape-scalable",
@@ -52,6 +55,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         main_application_num_units=2,
         relation_name=RELATION_NAME,
         timeout=3000,
+        overlay=overlay
     )
     await check_databases_creation(
         ops_test,
