@@ -57,6 +57,7 @@ REFINT_EXTENSION_STATEMENT = "CREATE TABLE A (ID int4 not null); CREATE UNIQUE I
 AUTOINC_EXTENSION_STATEMENT = "CREATE TABLE ids (id int4, idesc text);CREATE TRIGGER ids_nextid BEFORE INSERT OR UPDATE ON ids FOR EACH ROW EXECUTE PROCEDURE autoinc (id, next_id);"
 INSERT_USERNAME_EXTENSION_STATEMENT = "CREATE TABLE username_test (name text, username text not null);CREATE TRIGGER insert_usernames BEFORE INSERT OR UPDATE ON username_test FOR EACH ROW EXECUTE PROCEDURE insert_username (username);"
 MODDATETIME_EXTENSION_STATEMENT = "CREATE TABLE mdt (moddate timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL);CREATE TRIGGER mdt_moddatetime BEFORE UPDATE ON mdt FOR EACH ROW EXECUTE PROCEDURE moddatetime (moddate);"
+VECTOR_EXTENSION_STATEMENT = "CREATE TABLE vector_test (id bigserial PRIMARY KEY, embedding vector(3));"
 
 
 @pytest.mark.group(1)
@@ -110,6 +111,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             INSERT_USERNAME_EXTENSION_STATEMENT,
             MODDATETIME_EXTENSION_STATEMENT,
         ],
+        "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):
