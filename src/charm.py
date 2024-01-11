@@ -1391,11 +1391,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._validate_config_options()
 
-        self._patroni.update_parameter_controller_by_patroni(
-            "max_connections", max(4 * os.cpu_count(), 100)
-        )
-        self._patroni.update_parameter_controller_by_patroni(
-            "max_prepared_transactions", self.config.memory_max_prepared_transactions
+        self._patroni.bulk_update_parameters_controller_by_patroni(
+            {
+                "max_connections": max(4 * os.cpu_count(), 100),
+                "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+            }
         )
 
         restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
