@@ -12,7 +12,6 @@ from typing import Dict, List, Literal, Optional, Set, get_args
 
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
-from charms.data_platform_libs.v0.data_secrets import SecretCache
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -102,7 +101,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.secrets = SecretCache(self)
         self.peer_relation_app = DataPeer(
             self,
             relation_name=PEER,
