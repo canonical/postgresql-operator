@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 24
+LIBPATCH = 26
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -345,16 +345,6 @@ class SecretGroup(Enum):
     USER = "user"
     TLS = "tls"
     EXTRA = "extra"
-
-
-# Local map to associate mappings with secrets potentially as a group
-SECRET_LABEL_MAP = {
-    "username": SecretGroup.USER,
-    "password": SecretGroup.USER,
-    "uris": SecretGroup.USER,
-    "tls": SecretGroup.TLS,
-    "tls-ca": SecretGroup.TLS,
-}
 
 
 class DataInterfacesError(Exception):
@@ -453,7 +443,7 @@ def leader_only(f):
     """Decorator to ensure that only leader can perform given operation."""
 
     def wrapper(self, *args, **kwargs):
-        if not self.local_unit.is_leader():
+        if self.component == self.local_app and not self.local_unit.is_leader():
             logger.error(
                 "This operation (%s()) can only be performed by the leader unit", f.__name__
             )
@@ -487,12 +477,19 @@ class CachedSecret:
     The data structure is precisely re-using/simulating as in the actual Secret Storage
     """
 
-    def __init__(self, charm: CharmBase, label: str, secret_uri: Optional[str] = None):
+    def __init__(
+        self,
+        charm: CharmBase,
+        component: Union[Application, Unit],
+        label: str,
+        secret_uri: Optional[str] = None,
+    ):
         self._secret_meta = None
         self._secret_content = {}
         self._secret_uri = secret_uri
         self.label = label
         self.charm = charm
+        self.component = component
 
     def add_secret(self, content: Dict[str, str], relation: Relation) -> Secret:
         """Create a new secret."""
@@ -501,8 +498,10 @@ class CachedSecret:
                 "Secret is already defined with uri %s", self._secret_uri
             )
 
-        secret = self.charm.app.add_secret(content, label=self.label)
-        secret.grant(relation)
+        secret = self.component.add_secret(content, label=self.label)
+        if relation.app != self.charm.app:
+            # If it's not a peer relation, grant is to be applied
+            secret.grant(relation)
         self._secret_uri = secret.id
         self._secret_meta = secret
         return self._secret_meta
@@ -531,8 +530,13 @@ class CachedSecret:
                 except (ValueError, ModelError) as err:
                     # https://bugs.launchpad.net/juju/+bug/2042596
                     # Only triggered when 'refresh' is set
-                    msg = "ERROR either URI or label should be used for getting an owned secret but not both"
-                    if isinstance(err, ModelError) and msg not in str(err):
+                    known_model_errors = [
+                        "ERROR either URI or label should be used for getting an owned secret but not both",
+                        "ERROR secret owner cannot use --refresh",
+                    ]
+                    if isinstance(err, ModelError) and not any(
+                        msg in str(err) for msg in known_model_errors
+                    ):
                         raise
                     # Due to: ValueError: Secret owner cannot use refresh=True
                     self._secret_content = self.meta.get_content()
@@ -558,14 +562,15 @@ class CachedSecret:
 class SecretCache:
     """A data structure storing CachedSecret objects."""
 
-    def __init__(self, charm):
+    def __init__(self, charm: CharmBase, component: Union[Application, Unit]):
         self.charm = charm
+        self.component = component
         self._secrets: Dict[str, CachedSecret] = {}
 
     def get(self, label: str, uri: Optional[str] = None) -> Optional[CachedSecret]:
         """Getting a secret from Juju Secret store or cache."""
         if not self._secrets.get(label):
-            secret = CachedSecret(self.charm, label, uri)
+            secret = CachedSecret(self.charm, self.component, label, uri)
             if secret.meta:
                 self._secrets[label] = secret
         return self._secrets.get(label)
@@ -575,7 +580,7 @@ class SecretCache:
         if self._secrets.get(label):
             raise SecretAlreadyExistsError(f"Secret {label} already exists")
 
-        secret = CachedSecret(self.charm, label)
+        secret = CachedSecret(self.charm, self.component, label)
         secret.add_secret(content, relation)
         self._secrets[label] = secret
         return self._secrets[label]
@@ -586,6 +591,17 @@ class SecretCache:
 
 class DataRelation(Object, ABC):
     """Base relation data mainpulation (abstract) class."""
+
+    SCOPE = Scope.APP
+
+    # Local map to associate mappings with secrets potentially as a group
+    SECRET_LABEL_MAP = {
+        "username": SecretGroup.USER,
+        "password": SecretGroup.USER,
+        "uris": SecretGroup.USER,
+        "tls": SecretGroup.TLS,
+        "tls-ca": SecretGroup.TLS,
+    }
 
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
@@ -598,7 +614,8 @@ class DataRelation(Object, ABC):
             self._on_relation_changed_event,
         )
         self._jujuversion = None
-        self.secrets = SecretCache(self.charm)
+        self.component = self.local_app if self.SCOPE == Scope.APP else self.local_unit
+        self.secrets = SecretCache(self.charm, self.component)
 
     @property
     def relations(self) -> List[Relation]:
@@ -677,8 +694,7 @@ class DataRelation(Object, ABC):
         """Generate unique group_mappings for secrets within a relation context."""
         return f"{relation_name}.{relation_id}.{group_mapping.value}.secret"
 
-    @staticmethod
-    def _generate_secret_field_name(group_mapping: SecretGroup) -> str:
+    def _generate_secret_field_name(self, group_mapping: SecretGroup) -> str:
         """Generate unique group_mappings for secrets within a relation context."""
         return f"{PROV_SECRET_PREFIX}{group_mapping.value}"
 
@@ -705,8 +721,8 @@ class DataRelation(Object, ABC):
         except ModelError:
             return
 
-    @staticmethod
-    def _group_secret_fields(secret_fields: List[str]) -> Dict[SecretGroup, List[str]]:
+    @classmethod
+    def _group_secret_fields(cls, secret_fields: List[str]) -> Dict[SecretGroup, List[str]]:
         """Helper function to arrange secret mappings under their group.
 
         NOTE: All unrecognized items end up in the 'extra' secret bucket.
@@ -714,7 +730,7 @@ class DataRelation(Object, ABC):
         """
         secret_fieldnames_grouped = {}
         for key in secret_fields:
-            if group := SECRET_LABEL_MAP.get(key):
+            if group := cls.SECRET_LABEL_MAP.get(key):
                 secret_fieldnames_grouped.setdefault(group, []).append(key)
             else:
                 secret_fieldnames_grouped.setdefault(SecretGroup.EXTRA, []).append(key)
@@ -736,22 +752,22 @@ class DataRelation(Object, ABC):
             return {k: v for k, v in secret_data.items() if k in secret_fields}
         return {}
 
-    @staticmethod
+    @classmethod
     def _content_for_secret_group(
-        content: Dict[str, str], secret_fields: Set[str], group_mapping: SecretGroup
+        cls, content: Dict[str, str], secret_fields: Set[str], group_mapping: SecretGroup
     ) -> Dict[str, str]:
         """Select <field>: <value> pairs from input, that belong to this particular Secret group."""
         if group_mapping == SecretGroup.EXTRA:
             return {
                 k: v
                 for k, v in content.items()
-                if k in secret_fields and k not in SECRET_LABEL_MAP.keys()
+                if k in secret_fields and k not in cls.SECRET_LABEL_MAP.keys()
             }
 
         return {
             k: v
             for k, v in content.items()
-            if k in secret_fields and SECRET_LABEL_MAP.get(k) == group_mapping
+            if k in secret_fields and cls.SECRET_LABEL_MAP.get(k) == group_mapping
         }
 
     @juju_secrets_only
@@ -784,7 +800,7 @@ class DataRelation(Object, ABC):
         fallback_to_databag = (
             req_secret_fields
             and self.local_unit.is_leader()
-            and set(req_secret_fields) & set(relation.data[self.local_app])
+            and set(req_secret_fields) & set(relation.data[self.component])
         )
 
         normal_fields = set(impacted_rel_fields)
@@ -807,7 +823,7 @@ class DataRelation(Object, ABC):
         return (result, normal_fields)
 
     def _fetch_relation_data_without_secrets(
-        self, app: Application, relation: Relation, fields: Optional[List[str]]
+        self, component: Union[Application, Unit], relation: Relation, fields: Optional[List[str]]
     ) -> Dict[str, str]:
         """Fetching databag contents when no secrets are involved.
 
@@ -816,17 +832,19 @@ class DataRelation(Object, ABC):
         This is used typically when the Provides side wants to read the Requires side's data,
         or when the Requires side may want to read its own data.
         """
-        if app not in relation.data or not relation.data[app]:
+        if component not in relation.data or not relation.data[component]:
             return {}
 
         if fields:
-            return {k: relation.data[app][k] for k in fields if k in relation.data[app]}
+            return {
+                k: relation.data[component][k] for k in fields if k in relation.data[component]
+            }
         else:
-            return dict(relation.data[app])
+            return dict(relation.data[component])
 
     def _fetch_relation_data_with_secrets(
         self,
-        app: Application,
+        component: Union[Application, Unit],
         req_secret_fields: Optional[List[str]],
         relation: Relation,
         fields: Optional[List[str]] = None,
@@ -842,10 +860,10 @@ class DataRelation(Object, ABC):
         normal_fields = []
 
         if not fields:
-            if app not in relation.data or not relation.data[app]:
+            if component not in relation.data or not relation.data[component]:
                 return {}
 
-            all_fields = list(relation.data[app].keys())
+            all_fields = list(relation.data[component].keys())
             normal_fields = [field for field in all_fields if not self._is_secret_field(field)]
 
             # There must have been secrets there
@@ -862,38 +880,35 @@ class DataRelation(Object, ABC):
         # (Typically when Juju3 Requires meets Juju2 Provides)
         if normal_fields:
             result.update(
-                self._fetch_relation_data_without_secrets(app, relation, list(normal_fields))
+                self._fetch_relation_data_without_secrets(component, relation, list(normal_fields))
             )
         return result
 
     def _update_relation_data_without_secrets(
-        self, app: Application, relation: Relation, data: Dict[str, str]
+        self, component: Union[Application, Unit], relation: Relation, data: Dict[str, str]
     ) -> None:
         """Updating databag contents when no secrets are involved."""
-        if app not in relation.data or relation.data[app] is None:
+        if component not in relation.data or relation.data[component] is None:
             return
 
-        if any(self._is_secret_field(key) for key in data.keys()):
-            raise SecretsIllegalUpdateError("Can't update secret {key}.")
-
         if relation:
-            relation.data[app].update(data)
+            relation.data[component].update(data)
 
     def _delete_relation_data_without_secrets(
-        self, app: Application, relation: Relation, fields: List[str]
+        self, component: Union[Application, Unit], relation: Relation, fields: List[str]
     ) -> None:
         """Remove databag fields 'fields' from Relation."""
-        if app not in relation.data or not relation.data[app]:
+        if component not in relation.data or relation.data[component] is None:
             return
 
         for field in fields:
             try:
-                relation.data[app].pop(field)
+                relation.data[component].pop(field)
             except KeyError:
-                logger.debug(
-                    "Non-existing field was attempted to be removed from the databag %s, %s",
-                    str(relation.id),
+                logger.error(
+                    "Non-existing field '%s' was attempted to be removed from the databag (relation ID: %s)",
                     str(field),
+                    str(relation.id),
                 )
                 pass
 
@@ -954,7 +969,6 @@ class DataRelation(Object, ABC):
             .get(field)
         )
 
-    @leader_only
     def fetch_my_relation_data(
         self,
         relation_ids: Optional[List[int]] = None,
@@ -983,7 +997,6 @@ class DataRelation(Object, ABC):
                 data[relation.id] = self._fetch_my_specific_relation_data(relation, fields)
         return data
 
-    @leader_only
     def fetch_my_relation_field(
         self, relation_id: int, field: str, relation_name: Optional[str] = None
     ) -> Optional[str]:
@@ -1035,27 +1048,38 @@ class DataProvides(DataRelation):
 
     @juju_secrets_only
     def _add_relation_secret(
-        self, relation: Relation, content: Dict[str, str], group_mapping: SecretGroup
+        self,
+        relation: Relation,
+        group_mapping: SecretGroup,
+        secret_fields: Set[str],
+        data: Dict[str, str],
+        uri_to_databag=True,
     ) -> bool:
         """Add a new Juju Secret that will be registered in the relation databag."""
         secret_field = self._generate_secret_field_name(group_mapping)
-        if relation.data[self.local_app].get(secret_field):
+        if uri_to_databag and relation.data[self.component].get(secret_field):
             logging.error("Secret for relation %s already exists, not adding again", relation.id)
             return False
+
+        content = self._content_for_secret_group(data, secret_fields, group_mapping)
 
         label = self._generate_secret_label(self.relation_name, relation.id, group_mapping)
         secret = self.secrets.add(label, content, relation)
 
         # According to lint we may not have a Secret ID
-        if secret.meta and secret.meta.id:
-            relation.data[self.local_app][secret_field] = secret.meta.id
+        if uri_to_databag and secret.meta and secret.meta.id:
+            relation.data[self.component][secret_field] = secret.meta.id
 
         # Return the content that was added
         return True
 
     @juju_secrets_only
     def _update_relation_secret(
-        self, relation: Relation, content: Dict[str, str], group_mapping: SecretGroup
+        self,
+        relation: Relation,
+        group_mapping: SecretGroup,
+        secret_fields: Set[str],
+        data: Dict[str, str],
     ) -> bool:
         """Update the contents of an existing Juju Secret, referred in the relation databag."""
         secret = self._get_relation_secret(relation.id, group_mapping)
@@ -1063,6 +1087,8 @@ class DataProvides(DataRelation):
         if not secret:
             logging.error("Can't update secret for relation %s", relation.id)
             return False
+
+        content = self._content_for_secret_group(data, secret_fields, group_mapping)
 
         old_content = secret.get_content()
         full_content = copy.deepcopy(old_content)
@@ -1078,13 +1104,13 @@ class DataProvides(DataRelation):
         group: SecretGroup,
         secret_fields: Set[str],
         data: Dict[str, str],
+        uri_to_databag=True,
     ) -> bool:
         """Update contents for Secret group. If the Secret doesn't exist, create it."""
-        secret_content = self._content_for_secret_group(data, secret_fields, group)
         if self._get_relation_secret(relation.id, group):
-            return self._update_relation_secret(relation, secret_content, group)
+            return self._update_relation_secret(relation, group, secret_fields, data)
         else:
-            return self._add_relation_secret(relation, secret_content, group)
+            return self._add_relation_secret(relation, group, secret_fields, data, uri_to_databag)
 
     @juju_secrets_only
     def _delete_relation_secret(
@@ -1116,7 +1142,7 @@ class DataProvides(DataRelation):
         if not new_content:
             field = self._generate_secret_field_name(group)
             try:
-                relation.data[self.local_app].pop(field)
+                relation.data[self.component].pop(field)
             except KeyError:
                 pass
 
@@ -1233,6 +1259,11 @@ class DataProvides(DataRelation):
         """
         self.update_relation_data(relation_id, {"tls-ca": tls_ca})
 
+    # Public functions -- inherited
+
+    fetch_my_relation_data = leader_only(DataRelation.fetch_my_relation_data)
+    fetch_my_relation_field = leader_only(DataRelation.fetch_my_relation_field)
+
 
 class DataRequires(DataRelation):
     """Requires-side of the relation."""
@@ -1297,7 +1328,7 @@ class DataRequires(DataRelation):
         label = self._generate_secret_label(relation_name, relation_id, group)
 
         # Fetchin the Secret's meta information ensuring that it's locally getting registered with
-        CachedSecret(self.charm, label, secret_id).meta
+        CachedSecret(self.charm, self.component, label, secret_id).meta
 
     def _register_secrets_to_relation(self, relation: Relation, params_name_list: List[str]):
         """Make sure that secrets of the provided list are locally 'registered' from the databag.
@@ -1425,6 +1456,219 @@ class DataRequires(DataRelation):
             fields: list containing the field names that should be removed from the relation.
         """
         return self._delete_relation_data_without_secrets(self.local_app, relation, fields)
+
+    # Public functions -- inherited
+
+    fetch_my_relation_data = leader_only(DataRelation.fetch_my_relation_data)
+    fetch_my_relation_field = leader_only(DataRelation.fetch_my_relation_field)
+
+
+# Base DataPeer
+
+
+class DataPeer(DataRequires, DataProvides):
+    """Represents peer relations."""
+
+    SECRET_FIELDS = ["operator-password"]
+    SECRET_FIELD_NAME = "internal_secret"
+    SECRET_LABEL_MAP = {}
+
+    def __init__(
+        self,
+        charm,
+        relation_name: str,
+        extra_user_roles: Optional[str] = None,
+        additional_secret_fields: Optional[List[str]] = [],
+        secret_field_name: Optional[str] = None,
+        deleted_label: Optional[str] = None,
+    ):
+        """Manager of base client relations."""
+        DataRequires.__init__(
+            self, charm, relation_name, extra_user_roles, additional_secret_fields
+        )
+        self.secret_field_name = secret_field_name if secret_field_name else self.SECRET_FIELD_NAME
+        self.deleted_label = deleted_label
+
+    @property
+    def scope(self) -> Optional[Scope]:
+        """Turn component information into Scope."""
+        if isinstance(self.component, Application):
+            return Scope.APP
+        if isinstance(self.component, Unit):
+            return Scope.UNIT
+
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
+        """Event emitted when the relation has changed."""
+        pass
+
+    def _on_secret_changed_event(self, event: SecretChangedEvent) -> None:
+        """Event emitted when the secret has changed."""
+        pass
+
+    def _generate_secret_label(
+        self, relation_name: str, relation_id: int, group_mapping: SecretGroup
+    ) -> str:
+        members = [self.charm.app.name]
+        if self.scope:
+            members.append(self.scope.value)
+        return f"{'.'.join(members)}"
+
+    def _generate_secret_field_name(self, group_mapping: SecretGroup = SecretGroup.EXTRA) -> str:
+        """Generate unique group_mappings for secrets within a relation context."""
+        return f"{self.secret_field_name}"
+
+    @juju_secrets_only
+    def _get_relation_secret(
+        self,
+        relation_id: int,
+        group_mapping: SecretGroup = SecretGroup.EXTRA,
+        relation_name: Optional[str] = None,
+    ) -> Optional[CachedSecret]:
+        """Retrieve a Juju Secret specifically for peer relations.
+
+        In case this code may be executed within a rolling upgrade, and we may need to
+        migrate secrets from the databag to labels, we make sure to stick the correct
+        label on the secret, and clean up the local databag.
+        """
+        if not relation_name:
+            relation_name = self.relation_name
+
+        relation = self.charm.model.get_relation(relation_name, relation_id)
+        if not relation:
+            return
+
+        label = self._generate_secret_label(relation_name, relation_id, group_mapping)
+        secret_uri = relation.data[self.component].get(self._generate_secret_field_name(), None)
+
+        # Fetching the secret with fallback to URI (in case label is not yet known)
+        # Label would we "stuck" on the secret in case it is found
+        secret = self.secrets.get(label, secret_uri)
+
+        # Either app scope secret with leader executing, or unit scope secret
+        leader_or_unit_scope = self.component != self.local_app or self.local_unit.is_leader()
+        if secret_uri and secret and leader_or_unit_scope:
+            # Databag reference to the secret URI can be removed, now that it's labelled
+            relation.data[self.component].pop(self._generate_secret_field_name(), None)
+        return secret
+
+    def _get_group_secret_contents(
+        self,
+        relation: Relation,
+        group: SecretGroup,
+        secret_fields: Optional[Union[Set[str], List[str]]] = None,
+    ) -> Dict[str, str]:
+        """Helper function to retrieve collective, requested contents of a secret."""
+        result = super()._get_group_secret_contents(relation, group, secret_fields)
+        if not self.deleted_label:
+            return result
+        return {key: result[key] for key in result if result[key] != self.deleted_label}
+
+    def _remove_secret_from_databag(self, relation, fields: List[str]) -> None:
+        """For Rolling Upgrades -- when moving from databag to secrets usage.
+
+        Practically what happens here is to remove stuff from the databag that is
+        to be stored in secrets.
+        """
+        if not self.secret_fields:
+            return
+
+        secret_fields_passed = set(self.secret_fields) & set(fields)
+        for field in secret_fields_passed:
+            if self._fetch_relation_data_without_secrets(self.component, relation, [field]):
+                self._delete_relation_data_without_secrets(self.component, relation, [field])
+
+    def _fetch_specific_relation_data(
+        self, relation: Relation, fields: Optional[List[str]]
+    ) -> Dict[str, str]:
+        """Fetch data available (directily or indirectly -- i.e. secrets) from the relation."""
+        return self._fetch_relation_data_with_secrets(
+            self.component, self.secret_fields, relation, fields
+        )
+
+    def _fetch_my_specific_relation_data(
+        self, relation: Relation, fields: Optional[List[str]]
+    ) -> Dict[str, str]:
+        """Fetch data available (directily or indirectly -- i.e. secrets) from the relation for owner/this_app."""
+        return self._fetch_relation_data_with_secrets(
+            self.component, self.secret_fields, relation, fields
+        )
+
+    def _update_relation_data(self, relation: Relation, data: Dict[str, str]) -> None:
+        """Update data available (directily or indirectly -- i.e. secrets) from the relation for owner/this_app."""
+        self._remove_secret_from_databag(relation, list(data.keys()))
+        _, normal_fields = self._process_secret_fields(
+            relation,
+            self.secret_fields,
+            list(data),
+            self._add_or_update_relation_secrets,
+            data=data,
+            uri_to_databag=False,
+        )
+
+        normal_content = {k: v for k, v in data.items() if k in normal_fields}
+        self._update_relation_data_without_secrets(self.component, relation, normal_content)
+
+    def _delete_relation_data(self, relation: Relation, fields: List[str]) -> None:
+        """Delete data available (directily or indirectly -- i.e. secrets) from the relation for owner/this_app."""
+        if self.secret_fields and self.deleted_label:
+            current_data = self.fetch_my_relation_data([relation.id], fields)
+            if current_data is not None:
+                # Check if the secret we wanna delete actually exists
+                # Given the "deleted label", here we can't rely on the default mechanism (i.e. 'key not found')
+                if non_existent := (set(fields) & set(self.secret_fields)) - set(
+                    current_data.get(relation.id, [])
+                ):
+                    logger.error(
+                        "Non-existing secret %s was attempted to be removed.", non_existent
+                    )
+
+            _, normal_fields = self._process_secret_fields(
+                relation,
+                self.secret_fields,
+                fields,
+                self._update_relation_secret,
+                data={field: self.deleted_label for field in fields},
+            )
+        else:
+            _, normal_fields = self._process_secret_fields(
+                relation, self.secret_fields, fields, self._delete_relation_secret, fields=fields
+            )
+        self._delete_relation_data_without_secrets(self.component, relation, list(normal_fields))
+
+    def fetch_relation_data(
+        self,
+        relation_ids: Optional[List[int]] = None,
+        fields: Optional[List[str]] = None,
+        relation_name: Optional[str] = None,
+    ) -> Dict[int, Dict[str, str]]:
+        """This method makes no sense for a Peer Relation."""
+        raise NotImplementedError(
+            "Peer Relation only supports 'self-side' fetch methods: "
+            "fetch_my_relation_data() and fetch_my_relation_field()"
+        )
+
+    def fetch_relation_field(
+        self, relation_id: int, field: str, relation_name: Optional[str] = None
+    ) -> Optional[str]:
+        """This method makes no sense for a Peer Relation."""
+        raise NotImplementedError(
+            "Peer Relation only supports 'self-side' fetch methods: "
+            "fetch_my_relation_data() and fetch_my_relation_field()"
+        )
+
+    # Public functions -- inherited
+
+    fetch_my_relation_data = DataRelation.fetch_my_relation_data
+    fetch_my_relation_field = DataRelation.fetch_my_relation_field
+
+
+class DataPeerUnit(DataPeer):
+    """Unit databag representation."""
+
+    SCOPE = Scope.UNIT
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 # General events
