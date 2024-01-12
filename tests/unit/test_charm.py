@@ -1016,7 +1016,7 @@ class TestCharm(unittest.TestCase):
     @patch("charm.snap.SnapCache")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
-    @patch("charm.Patroni.update_parameter_controller_by_patroni")
+    @patch("charm.Patroni.bulk_update_parameters_controller_by_patroni")
     @patch("charm.PostgresqlOperatorCharm._validate_config_options")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock)

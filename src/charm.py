@@ -12,7 +12,6 @@ from typing import Dict, List, Literal, Optional, Set, get_args
 
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
-from charms.data_platform_libs.v0.data_secrets import SecretCache
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -102,7 +101,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.secrets = SecretCache(self)
         self.peer_relation_app = DataPeer(
             self,
             relation_name=PEER,
@@ -1391,11 +1389,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._validate_config_options()
 
-        self._patroni.update_parameter_controller_by_patroni(
-            "max_connections", max(4 * os.cpu_count(), 100)
-        )
-        self._patroni.update_parameter_controller_by_patroni(
-            "max_prepared_transactions", self.config.memory_max_prepared_transactions
+        self._patroni.bulk_update_parameters_controller_by_patroni(
+            {
+                "max_connections": max(4 * os.cpu_count(), 100),
+                "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+            }
         )
 
         restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
