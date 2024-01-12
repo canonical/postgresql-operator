@@ -66,11 +66,17 @@ ORAFCE_EXTENSION_STATEMENT = "SELECT add_months(date '2005-05-31',1);"
 PG_SIMILARITY_EXTENSION_STATEMENT = "SHOW pg_similarity.levenshtein_threshold;"
 PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION plperl_test(name text) RETURNS text AS $$ return $_SHARED{$_[0]}; $$ LANGUAGE plperl;"
 PREFIX_EXTENSION_STATEMENT = "SELECT '123'::prefix_range @> '123456';"
-RDKIT_EXTENSION_STATEMENT = "SELECT id, structure FROM molecules WHERE structure@>'c1cccnc1' LIMIT 100;"
+RDKIT_EXTENSION_STATEMENT = (
+    "SELECT id, structure FROM molecules WHERE structure@>'c1cccnc1' LIMIT 100;"
+)
 TDS_FDW_EXTENSION_STATEMENT = "CREATE SERVER mssql_svr FOREIGN DATA WRAPPER tds_fdw OPTIONS (servername 'tds_fdw_test', port '3306', database 'tds_fdw_test', tds_version '7.1');"
-ICU_EXT_EXTENSION_STATEMENT = 'CREATE COLLATION "vat-lat" (provider = icu, locale = "la-VA-u-kn-true")'
-PLTCL_EXTENSION_STATEMENT = 'CREATE FUNCTION pltcl_test(integer) RETURNS integer AS $$ return $1 $$ LANGUAGE pltcl STRICT;'
-POSTGIS_EXTENSION_STATEMENT = 'SELECT PostGIS_Full_Version();'
+ICU_EXT_EXTENSION_STATEMENT = (
+    'CREATE COLLATION "vat-lat" (provider = icu, locale = "la-VA-u-kn-true")'
+)
+PLTCL_EXTENSION_STATEMENT = (
+    "CREATE FUNCTION pltcl_test(integer) RETURNS integer AS $$ return $1 $$ LANGUAGE pltcl STRICT;"
+)
+POSTGIS_EXTENSION_STATEMENT = "SELECT PostGIS_Full_Version();"
 ADDRESS_STANDARDIZER_EXTENSION_STATEMENT = "SELECT num, street, city, zip, zipplus FROM parse_address('1 Devonshire Place, Boston, MA 02109-1234');"
 ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT = "SELECT house_num, name, suftype, city, country, state, unit  FROM standardize_address('us_lex', 'us_gaz', 'us_rules', 'One Devonshire Place, PH 301, Boston, MA 02109');"
 POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT = "SELECT *  FROM standardize_address('tiger.pagc_lex', 'tiger.pagc_gaz', 'tiger.pagc_rules', 'One Devonshire Place, PH 301, Boston, MA 02109-1234');"
