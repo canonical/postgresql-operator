@@ -1,9 +1,11 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
+from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
 
+import pytest
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
@@ -11,23 +13,20 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLUpdateUserPasswordError,
 )
 from ops.framework import EventBase
-from ops.model import ActiveStatus, BlockedStatus, WaitingStatus
+from ops.model import ActiveStatus, BlockedStatus, RelationDataTypeError, WaitingStatus
 from ops.testing import Harness
+from parameterized import parameterized
 from tenacity import RetryError
 
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from cluster import RemoveRaftMemberFailedError
-from constants import (
-    PEER,
-    POSTGRESQL_SNAP_NAME,
-    SECRET_DELETED_LABEL,
-    SNAP_PACKAGES,
-)
+from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 from tests.helpers import patch_network_get
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 
+# @pytest.mark.usefixtures("juju_has_secrets")
 class TestCharm(unittest.TestCase):
     def setUp(self):
         self._peer_relation = PEER
@@ -39,6 +38,10 @@ class TestCharm(unittest.TestCase):
         self.charm = self.harness.charm
         self.rel_id = self.harness.add_relation(self._peer_relation, self.charm.app.name)
         self.harness.add_relation("upgrade", self.charm.app.name)
+
+    @pytest.fixture
+    def use_caplog(self, caplog):
+        self._caplog = caplog
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.subprocess.check_call")
@@ -691,8 +694,11 @@ class TestCharm(unittest.TestCase):
         # Assert the status didn't change.
         self.assertEqual(self.harness.model.unit.status, initial_status)
 
-    def test_on_get_password(self):
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    def test_on_get_password(self, _):
         # Create a mock event and set passwords in peer relation data.
+        self.harness.set_leader(True)
         mock_event = MagicMock(params={})
         self.harness.update_relation_data(
             self.rel_id,
@@ -1040,137 +1046,6 @@ class TestCharm(unittest.TestCase):
         _snap_package.ensure.assert_not_called()
         _snap_package.hold.assert_not_called()
 
-    def test_scope_obj(self):
-        assert self.charm._scope_obj("app") == self.charm.framework.model.app
-        assert self.charm._scope_obj("unit") == self.charm.framework.model.unit
-        assert self.charm._scope_obj("test") is None
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_get_secret(self, _):
-        self.harness.set_leader()
-
-        # Test application scope.
-        assert self.charm.get_secret("app", "password") is None
-        self.harness.update_relation_data(
-            self.rel_id, self.charm.app.name, {"password": "test-password"}
-        )
-        assert self.charm.get_secret("app", "password") == "test-password"
-
-        # Test unit scope.
-        assert self.charm.get_secret("unit", "password") is None
-        self.harness.update_relation_data(
-            self.rel_id, self.charm.unit.name, {"password": "test-password"}
-        )
-        assert self.charm.get_secret("unit", "password") == "test-password"
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_get_secret_juju(self, _, __):
-        self.harness.set_leader()
-        with patch.object(self.charm, "secrets") as _secret_cache:
-            # Test application scope.
-            _secret_cache.get.return_value = None
-            assert self.charm.get_secret("app", "password") is None
-            _secret_cache.get.assert_called_once_with("postgresql.app", None)
-            _secret_cache.reset_mock()
-
-            _secret_cache.get.return_value = Mock()
-            _secret_cache.get.return_value.get_content.return_value.get.return_value = (
-                sentinel.test_password
-            )
-            assert self.charm.get_secret("app", "password") == sentinel.test_password
-            _secret_cache.get.assert_called_once_with("postgresql.app", None)
-            _secret_cache.get.return_value.get_content.return_value.get.assert_called_once_with(
-                "password"
-            )
-            _secret_cache.reset_mock()
-
-            # Test unit scope.
-            _secret_cache.get.return_value = None
-            assert self.charm.get_secret("unit", "password") is None
-            _secret_cache.get.assert_called_once_with("postgresql.unit", None)
-            _secret_cache.reset_mock()
-
-            _secret_cache.get.return_value = Mock()
-            _secret_cache.get.return_value.get_content.return_value.get.return_value = (
-                sentinel.test_password
-            )
-            assert self.charm.get_secret("unit", "password") == sentinel.test_password
-            _secret_cache.get.assert_called_once_with("postgresql.unit", None)
-            _secret_cache.get.return_value.get_content.return_value.get.assert_called_once_with(
-                "password"
-            )
-            _secret_cache.reset_mock()
-
-            with self.assertRaises(RuntimeError):
-                self.charm.get_secret("test", "password")
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_set_secret(self, _):
-        self.harness.set_leader()
-
-        # Test application scope.
-        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
-        self.charm.set_secret("app", "password", "test-password")
-        assert (
-            self.harness.get_relation_data(self.rel_id, self.charm.app.name)["password"]
-            == "test-password"
-        )
-        self.charm.set_secret("app", "password", None)
-        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
-
-        # Test unit scope.
-        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
-        self.charm.set_secret("unit", "password", "test-password")
-        assert (
-            self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
-            == "test-password"
-        )
-        self.charm.set_secret("unit", "password", None)
-        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
-
-        with self.assertRaises(RuntimeError):
-            self.charm.set_secret("test", "password", "test")
-
-    @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-    def test_set_secret_juju(self, _, __):
-        self.harness.set_leader()
-        with patch.object(self.charm, "secrets") as _secret_cache:
-            # Test application scope.
-            self.charm.set_secret("app", "password", "test-password")
-            _secret_cache.get.assert_called_once_with("postgresql.app", None)
-            _secret_cache.get().get_content().update.assert_called_once_with(
-                {"password": "test-password"}
-            )
-            _secret_cache.reset_mock()
-
-            self.charm.set_secret("app", "password", None)
-            _secret_cache.get.assert_called_once_with("postgresql.app")
-            content = _secret_cache.get().get_content()
-            content.__setitem__.assert_called_once_with("password", SECRET_DELETED_LABEL)
-            _secret_cache.get().set_content.assert_called_once_with(content)
-            _secret_cache.reset_mock()
-
-            # Test unit scope.
-            self.charm.set_secret("unit", "password", "test-password")
-            _secret_cache.get.assert_called_once_with("postgresql.unit", None)
-            _secret_cache.get().get_content().update.assert_called_once_with(
-                {"password": "test-password"}
-            )
-            _secret_cache.reset_mock()
-
-            self.charm.set_secret("unit", "password", None)
-            _secret_cache.get.assert_called_once_with("postgresql.unit")
-            content = _secret_cache.get().get_content()
-            content.__setitem__.assert_called_once_with("password", SECRET_DELETED_LABEL)
-            _secret_cache.get().set_content.assert_called_once_with(content)
-            _secret_cache.reset_mock()
-
     @patch(
         "subprocess.check_call",
         side_effect=[None, subprocess.CalledProcessError(1, "fake command")],
@@ -1223,7 +1098,7 @@ class TestCharm(unittest.TestCase):
     @patch("charm.snap.SnapCache")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
     @patch("charm.Patroni.reload_patroni_configuration")
-    @patch("charm.Patroni.update_parameter_controller_by_patroni")
+    @patch("charm.Patroni.bulk_update_parameters_controller_by_patroni")
     @patch("charm.PostgresqlOperatorCharm._validate_config_options")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock)
@@ -1513,7 +1388,8 @@ class TestCharm(unittest.TestCase):
         _add_members.assert_called_once_with(mock_event)
 
     @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
-    def test_update_certificate(self, _request_certificate):
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=False)
+    def test_update_certificate(self, _, _request_certificate):
         # If there is no current TLS files, _request_certificate should be called
         # only when the certificates relation is established.
         self.charm._update_certificate()
@@ -1536,6 +1412,36 @@ class TestCharm(unittest.TestCase):
             )
         self.charm._update_certificate()
         _request_certificate.assert_called_once_with(private_key)
+
+        self.harness.charm.get_secret("unit", "ca") == ca
+        self.harness.charm.get_secret("unit", "cert") == cert
+        self.harness.charm.get_secret("unit", "key") == key
+        self.harness.charm.get_secret("unit", "private-key") == private_key
+
+    @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_update_certificate_secrets(self, _, _request_certificate):
+        # If there is no current TLS files, _request_certificate should be called
+        # only when the certificates relation is established.
+        self.charm._update_certificate()
+        _request_certificate.assert_not_called()
+
+        # Test with already present TLS files (when they will be replaced by new ones).
+        ca = "fake CA"
+        cert = "fake certificate"
+        key = private_key = "fake private key"
+        self.harness.charm.set_secret("unit", "ca", ca)
+        self.harness.charm.set_secret("unit", "cert", cert)
+        self.harness.charm.set_secret("unit", "key", key)
+        self.harness.charm.set_secret("unit", "private-key", private_key)
+
+        self.charm._update_certificate()
+        _request_certificate.assert_called_once_with(private_key)
+
+        self.harness.charm.get_secret("unit", "ca") == ca
+        self.harness.charm.get_secret("unit", "cert") == cert
+        self.harness.charm.get_secret("unit", "key") == key
+        self.harness.charm.get_secret("unit", "private-key") == private_key
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._update_certificate")
@@ -1651,4 +1557,266 @@ class TestCharm(unittest.TestCase):
         db_admin_relation = self.harness.model.get_relation("db-admin")
         self.assertEqual(
             self.charm.client_relations, [database_relation, db_relation, db_admin_relation]
+        )
+
+    #
+    # Secrets
+    #
+
+    def test_scope_obj(self):
+        assert self.charm._scope_obj("app") == self.charm.framework.model.app
+        assert self.charm._scope_obj("unit") == self.charm.framework.model.unit
+        assert self.charm._scope_obj("test") is None
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    def test_get_secret(self, _):
+        # App level changes require leader privileges
+        self.harness.set_leader()
+        # Test application scope.
+        assert self.charm.get_secret("app", "password") is None
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.app.name, {"password": "test-password"}
+        )
+        assert self.charm.get_secret("app", "password") == "test-password"
+
+        # Unit level changes don't require leader privileges
+        self.harness.set_leader(False)
+        # Test unit scope.
+        assert self.charm.get_secret("unit", "password") is None
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.unit.name, {"password": "test-password"}
+        )
+        assert self.charm.get_secret("unit", "password") == "test-password"
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_on_get_password_secrets(self, mock1, mock2):
+        # Create a mock event and set passwords in peer relation data.
+        self.harness.set_leader()
+        mock_event = MagicMock(params={})
+        self.harness.charm.set_secret("app", "operator-password", "test-password")
+        self.harness.charm.set_secret("app", "replication-password", "replication-test-password")
+
+        # Test providing an invalid username.
+        mock_event.params["username"] = "user"
+        self.charm._on_get_password(mock_event)
+        mock_event.fail.assert_called_once()
+        mock_event.set_results.assert_not_called()
+
+        # Test without providing the username option.
+        mock_event.reset_mock()
+        del mock_event.params["username"]
+        self.charm._on_get_password(mock_event)
+        mock_event.set_results.assert_called_once_with({"password": "test-password"})
+
+        # Also test providing the username option.
+        mock_event.reset_mock()
+        mock_event.params["username"] = "replication"
+        self.charm._on_get_password(mock_event)
+        mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
+
+    @parameterized.expand([("app"), ("unit")])
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_get_secret_secrets(self, scope, _, __):
+        self.harness.set_leader()
+
+        assert self.charm.get_secret(scope, "operator-password") is None
+        self.charm.set_secret(scope, "operator-password", "test-password")
+        assert self.charm.get_secret(scope, "operator-password") == "test-password"
+
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    def test_set_secret(self, _):
+        self.harness.set_leader()
+
+        # Test application scope.
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
+        self.charm.set_secret("app", "password", "test-password")
+        assert (
+            self.harness.get_relation_data(self.rel_id, self.charm.app.name)["password"]
+            == "test-password"
+        )
+        self.charm.set_secret("app", "password", None)
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.app.name)
+
+        # Test unit scope.
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+        self.charm.set_secret("unit", "password", "test-password")
+        assert (
+            self.harness.get_relation_data(self.rel_id, self.charm.unit.name)["password"]
+            == "test-password"
+        )
+        self.charm.set_secret("unit", "password", None)
+        assert "password" not in self.harness.get_relation_data(self.rel_id, self.charm.unit.name)
+
+        with self.assertRaises(RuntimeError):
+            self.charm.set_secret("test", "password", "test")
+
+    @parameterized.expand([("app", True), ("unit", True), ("unit", False)])
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_set_reset_new_secret(self, scope, is_leader, _, __):
+        """NOTE: currently ops.testing seems to allow for non-leader to set secrets too!"""
+        # App has to be leader, unit can be either
+        self.harness.set_leader(is_leader)
+        # Getting current password
+        self.harness.charm.set_secret(scope, "new-secret", "bla")
+        assert self.harness.charm.get_secret(scope, "new-secret") == "bla"
+
+        # Reset new secret
+        self.harness.charm.set_secret(scope, "new-secret", "blablabla")
+        assert self.harness.charm.get_secret(scope, "new-secret") == "blablabla"
+
+        # Set another new secret
+        self.harness.charm.set_secret(scope, "new-secret2", "blablabla")
+        assert self.harness.charm.get_secret(scope, "new-secret2") == "blablabla"
+
+    @parameterized.expand([("app", True), ("unit", True), ("unit", False)])
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_invalid_secret(self, scope, is_leader, _, __):
+        # App has to be leader, unit can be either
+        self.harness.set_leader(is_leader)
+
+        with self.assertRaises(RelationDataTypeError):
+            self.harness.charm.set_secret(scope, "somekey", 1)
+
+        self.harness.charm.set_secret(scope, "somekey", "")
+        assert self.harness.charm.get_secret(scope, "somekey") is None
+
+    @pytest.mark.usefixtures("use_caplog")
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    def test_delete_password(self, _):
+        """NOTE: currently ops.testing seems to allow for non-leader to remove secrets too!"""
+        self.harness.set_leader(True)
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.app.name, {"replication": "somepw"}
+        )
+        self.harness.charm.remove_secret("app", "replication")
+        assert self.harness.charm.get_secret("app", "replication") is None
+
+        self.harness.set_leader(False)
+        self.harness.update_relation_data(
+            self.rel_id, self.charm.unit.name, {"somekey": "somevalue"}
+        )
+        self.harness.charm.remove_secret("unit", "somekey")
+        assert self.harness.charm.get_secret("unit", "somekey") is None
+
+        self.harness.set_leader(True)
+        with self._caplog.at_level(logging.ERROR):
+            self.harness.charm.remove_secret("app", "replication")
+            assert (
+                "Non-existing field 'replication' was attempted to be removed" in self._caplog.text
+            )
+
+            self.harness.charm.remove_secret("unit", "somekey")
+            assert "Non-existing field 'somekey' was attempted to be removed" in self._caplog.text
+
+            self.harness.charm.remove_secret("app", "non-existing-secret")
+            assert (
+                "Non-existing field 'non-existing-secret' was attempted to be removed"
+                in self._caplog.text
+            )
+
+            self.harness.charm.remove_secret("unit", "non-existing-secret")
+            assert (
+                "Non-existing field 'non-existing-secret' was attempted to be removed"
+                in self._caplog.text
+            )
+
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @pytest.mark.usefixtures("use_caplog")
+    def test_delete_existing_password_secrets(self, _, __):
+        """NOTE: currently ops.testing seems to allow for non-leader to remove secrets too!"""
+        self.harness.set_leader(True)
+        self.harness.charm.set_secret("app", "operator-password", "somepw")
+        self.harness.charm.remove_secret("app", "operator-password")
+        assert self.harness.charm.get_secret("app", "operator-password") is None
+
+        self.harness.set_leader(False)
+        self.harness.charm.set_secret("unit", "operator-password", "somesecret")
+        self.harness.charm.remove_secret("unit", "operator-password")
+        assert self.harness.charm.get_secret("unit", "operator-password") is None
+
+        self.harness.set_leader(True)
+        with self._caplog.at_level(logging.ERROR):
+            self.harness.charm.remove_secret("app", "operator-password")
+            assert (
+                "Non-existing secret {'operator-password'} was attempted to be removed."
+                in self._caplog.text
+            )
+
+            self.harness.charm.remove_secret("unit", "operator-password")
+            assert (
+                "Non-existing secret {'operator-password'} was attempted to be removed."
+                in self._caplog.text
+            )
+
+            self.harness.charm.remove_secret("app", "non-existing-secret")
+            assert (
+                "Non-existing field 'non-existing-secret' was attempted to be removed"
+                in self._caplog.text
+            )
+
+            self.harness.charm.remove_secret("unit", "non-existing-secret")
+            assert (
+                "Non-existing field 'non-existing-secret' was attempted to be removed"
+                in self._caplog.text
+            )
+
+    @parameterized.expand([("app", True), ("unit", True), ("unit", False)])
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_migration_from_databag(self, scope, is_leader, _, __):
+        """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
+        # App has to be leader, unit can be either
+        self.harness.set_leader(is_leader)
+
+        # Getting current password
+        entity = getattr(self.charm, scope)
+        self.harness.update_relation_data(self.rel_id, entity.name, {"operator-password": "bla"})
+        assert self.harness.charm.get_secret(scope, "operator-password") == "bla"
+
+        # Reset new secret
+        self.harness.charm.set_secret(scope, "operator-password", "blablabla")
+        assert self.harness.charm.model.get_secret(label=f"postgresql.{scope}")
+        assert self.harness.charm.get_secret(scope, "operator-password") == "blablabla"
+        assert "operator-password" not in self.harness.get_relation_data(
+            self.rel_id, getattr(self.charm, scope).name
+        )
+
+    @parameterized.expand([("app", True), ("unit", True), ("unit", False)])
+    @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
+    @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
+    def test_migration_from_single_secret(self, scope, is_leader, _, __):
+        """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
+        # App has to be leader, unit can be either
+        self.harness.set_leader(is_leader)
+
+        secret = self.harness.charm.app.add_secret({"operator-password": "bla"})
+
+        # Getting current password
+        entity = getattr(self.charm, scope)
+        self.harness.update_relation_data(
+            self.rel_id, entity.name, {SECRET_INTERNAL_LABEL: secret.id}
+        )
+        assert self.harness.charm.get_secret(scope, "operator-password") == "bla"
+
+        # Reset new secret
+        self.harness.charm.set_secret(scope, "operator-password", "blablabla")
+        assert self.harness.charm.model.get_secret(label=f"postgresql.{scope}")
+        assert self.harness.charm.get_secret(scope, "operator-password") == "blablabla"
+        assert SECRET_INTERNAL_LABEL not in self.harness.get_relation_data(
+            self.rel_id, getattr(self.charm, scope).name
         )
