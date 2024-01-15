@@ -10,8 +10,8 @@ import subprocess
 import time
 from typing import Dict, List, Literal, Optional, Set, get_args
 
+from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
-from charms.data_platform_libs.v0.data_secrets import SecretCache, generate_secret_label
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -101,7 +101,31 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def __init__(self, *args):
         super().__init__(*args)
 
-        self.secrets = SecretCache(self)
+        self.peer_relation_app = DataPeer(
+            self,
+            relation_name=PEER,
+            additional_secret_fields=[
+                "monitoring-password",
+                "operator-password",
+                "replication-password",
+                "rewind-password",
+            ],
+            secret_field_name=SECRET_INTERNAL_LABEL,
+            deleted_label=SECRET_DELETED_LABEL,
+        )
+        self.peer_relation_unit = DataPeerUnit(
+            self,
+            relation_name=PEER,
+            additional_secret_fields=[
+                "key",
+                "csr",
+                "cauth",
+                "cert",
+                "chain",
+            ],
+            secret_field_name=SECRET_INTERNAL_LABEL,
+            deleted_label=SECRET_DELETED_LABEL,
+        )
 
         juju_version = JujuVersion.from_environ()
         if juju_version.major > 2:
@@ -207,43 +231,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _translate_field_to_secret_key(self, key: str) -> str:
         """Change 'key' to secrets-compatible key field."""
+        if not JujuVersion.from_environ().has_secrets:
+            return key
         key = SECRET_KEY_OVERRIDES.get(key, key)
         new_key = key.replace("_", "-")
         return new_key.strip("-")
-
-    def _safe_get_secret(self, scope: Scopes, label: str) -> SecretCache:
-        """Safety measure, for upgrades between versions based on secret URI usage to others with labels usage.
-
-        If the secret can't be retrieved by label, we search for the uri -- and if found, we "stick" the
-        label on the secret for further usage.
-        """
-        secret_uri = self._peer_data(scope).get(SECRET_INTERNAL_LABEL, None)
-        secret = self.secrets.get(label, secret_uri)
-
-        # Since now we switched to labels, the databag reference can be removed
-        if secret_uri and secret and scope == APP_SCOPE and self.unit.is_leader():
-            self._peer_data(scope).pop(SECRET_INTERNAL_LABEL, None)
-        return secret
 
     def get_secret(self, scope: Scopes, key: str) -> Optional[str]:
         """Get secret from the secret storage."""
         if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
-        if value := self._peer_data(scope).get(key, None):
-            return value
-
-        if JujuVersion.from_environ().has_secrets:
-            label = generate_secret_label(self, scope)
-            secret = self._safe_get_secret(scope, label)
-
-            if not secret:
-                return
-
-            secret_key = self._translate_field_to_secret_key(key)
-            value = secret.get_content().get(secret_key)
-            if value != SECRET_DELETED_LABEL:
-                return value
+        peers = self.model.get_relation(PEER)
+        secret_key = self._translate_field_to_secret_key(key)
+        if scope == APP_SCOPE:
+            value = self.peer_relation_app.fetch_my_relation_field(peers.id, secret_key)
+        else:
+            value = self.peer_relation_unit.fetch_my_relation_field(peers.id, secret_key)
+        return value
 
     def set_secret(self, scope: Scopes, key: str, value: Optional[str]) -> Optional[str]:
         """Set secret from the secret storage."""
@@ -253,52 +258,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not value:
             return self.remove_secret(scope, key)
 
-        if JujuVersion.from_environ().has_secrets:
-            # Charm must have been upgraded since last run
-            # We move from databag to secrets
-            self._peer_data(scope).pop(key, None)
-
-            secret_key = self._translate_field_to_secret_key(key)
-            label = generate_secret_label(self, scope)
-            secret = self._safe_get_secret(scope, label)
-            if not secret:
-                self.secrets.add(label, {secret_key: value}, scope)
-            else:
-                content = secret.get_content()
-                content.update({secret_key: value})
-                secret.set_content(content)
-            return label
+        peers = self.model.get_relation(PEER)
+        secret_key = self._translate_field_to_secret_key(key)
+        if scope == APP_SCOPE:
+            self.peer_relation_app.update_relation_data(peers.id, {secret_key: value})
         else:
-            self._peer_data(scope).update({key: value})
+            self.peer_relation_unit.update_relation_data(peers.id, {secret_key: value})
 
     def remove_secret(self, scope: Scopes, key: str) -> None:
         """Removing a secret."""
         if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
-        if JujuVersion.from_environ().has_secrets:
-            secret_key = self._translate_field_to_secret_key(key)
-            label = generate_secret_label(self, scope)
-            secret = self.secrets.get(label)
-
-            if not secret:
-                return
-
-            content = secret.get_content()
-
-            if not content.get(secret_key) or content[secret_key] == SECRET_DELETED_LABEL:
-                logger.error(f"Non-existing secret {scope}:{key} was attempted to be removed.")
-                return
-
-            content[secret_key] = SECRET_DELETED_LABEL
-            secret.set_content(content)
-            # Just in case we started on databag
-            self._peer_data(scope).pop(key, None)
+        peers = self.model.get_relation(PEER)
+        secret_key = self._translate_field_to_secret_key(key)
+        if scope == APP_SCOPE:
+            self.peer_relation_app.delete_relation_data(peers.id, [secret_key])
         else:
-            try:
-                self._peer_data(scope).pop(key)
-            except KeyError:
-                logger.error(f"Non-existing secret {scope}:{key} was attempted to be removed.")
+            self.peer_relation_unit.delete_relation_data(peers.id, [secret_key])
 
     @property
     def is_cluster_initialised(self) -> bool:
@@ -1412,11 +1389,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._validate_config_options()
 
-        self._patroni.update_parameter_controller_by_patroni(
-            "max_connections", max(4 * os.cpu_count(), 100)
-        )
-        self._patroni.update_parameter_controller_by_patroni(
-            "max_prepared_transactions", self.config.memory_max_prepared_transactions
+        self._patroni.bulk_update_parameters_controller_by_patroni(
+            {
+                "max_connections": max(4 * os.cpu_count(), 100),
+                "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+            }
         )
 
         restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
