@@ -876,9 +876,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 continue
             extension = plugins_exception.get(extension, extension)
             if self._check_extension_dependencies(extension, enable):
-                self.unit.status = BlockedStatus("Extension dependencies")
+                self.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
                 return
             extensions[extension] = enable
+        if self.is_blocked and self.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE:
+            self.unit.status = ActiveStatus()
         self.unit.status = WaitingStatus("Updating extensions")
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
@@ -890,7 +892,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         skip = False
         if enable and extension in REQUIRED_PLUGINS:
             for ext in REQUIRED_PLUGINS[extension]:
-                if not self.config[ext]:
+                if not self.config[f"plugin_{ext}_enable"]:
                     skip = True
                     logger.exception(
                         "cannot enable %s, extension required %s to be enabled before",
