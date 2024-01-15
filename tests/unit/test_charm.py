@@ -433,6 +433,9 @@ class TestCharm(unittest.TestCase):
   plugin_ip4r_enable:
     default: false
     type: boolean
+  plugin_plperl_enable:
+    default: false
+    type: boolean
   plugin_jsonb_plperl_enable:
     default: false
     type: boolean
@@ -440,9 +443,6 @@ class TestCharm(unittest.TestCase):
     default: false
     type: boolean
   plugin_pg_similarity_enable:
-    default: false
-    type: boolean
-  plugin_plperl_enable:
     default: false
     type: boolean
   plugin_prefix_enable:

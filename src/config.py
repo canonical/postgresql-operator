@@ -68,10 +68,10 @@ class CharmConfig(BaseConfigModel):
     plugin_hll_enable: bool
     plugin_hypopg_enable: bool
     plugin_ip4r_enable: bool
+    plugin_plperl_enable: bool
     plugin_jsonb_plperl_enable: bool
     plugin_orafce_enable: bool
     plugin_pg_similarity_enable: bool
-    plugin_plperl_enable: bool
     plugin_prefix_enable: bool
     plugin_rdkit_enable: bool
     plugin_tds_fdw_enable: bool
