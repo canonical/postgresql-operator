@@ -279,6 +279,31 @@ class TestCharm(unittest.TestCase):
         _set_up_relation.assert_called_once()
 
     @patch("subprocess.check_output", return_value=b"C")
+    def test_check_extension_dependencies(self, _):
+        with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as _:
+            # Test when plugins dependencies exception is not caused
+            config = {
+                "plugin_address_standardizer_enable": False,
+                "plugin_postgis_enable": False,
+                "plugin_address_standardizer_data_us_enable": False,
+                "plugin_jsonb_plperl_enable": False,
+                "plugin_plperl_enable": False,
+                "plugin_postgis_raster_enable": False,
+                "plugin_postgis_tiger_geocoder_enable": False,
+                "plugin_fuzzystrmatch_enable": False,
+                "plugin_postgis_topology_enable": False,
+            }
+            self.harness.update_config(config)
+            self.harness.charm.enable_disable_extensions()
+            self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
+
+            # Test when plugins dependencies exception caused
+            config["plugin_address_standardizer_enable"] = True
+            self.harness.update_config(config)
+            self.harness.charm.enable_disable_extensions()
+            self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+
+    @patch("subprocess.check_output", return_value=b"C")
     def test_enable_disable_extensions(self, _):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Test when all extensions install/uninstall succeed.
@@ -433,6 +458,9 @@ class TestCharm(unittest.TestCase):
     default: false
     type: boolean
   plugin_postgis_enable:
+    default: false
+    type: boolean
+  plugin_postgis_raster_enable:
     default: false
     type: boolean
   plugin_address_standardizer_enable:

@@ -59,6 +59,7 @@ from config import CharmConfig
 from constants import (
     APP_SCOPE,
     BACKUP_USER,
+    DEPENDENCY_PLUGINS,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -897,8 +898,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     extensions[ext] = enable
                 continue
             extension = plugins_exception.get(extension, extension)
-            if self._check_extension_dependencies(extension, enable, REQUIRED_PLUGINS):
-                continue
+            if self._check_extension_dependencies(extension, enable):
+                self.unit.status = BlockedStatus("Extension dependencies")
+                return
             extensions[extension] = enable
         self.unit.status = WaitingStatus("Updating extensions")
         try:
@@ -907,27 +909,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception("failed to change plugins: %s", str(e))
         self.unit.status = original_status
 
-    def _check_extension_dependencies(
-        self, extension: str, enable: bool, required_plugins: Dict[str, list[str]]
-    ) -> bool:
+    def _check_extension_dependencies(self, extension: str, enable: bool) -> bool:
         skip = False
-        if extension in required_plugins:
-            if enable:
-                for ext in required_plugins[extension]:
-                    if not self.config[ext]:
-                        skip = True
-                        logger.exception(
-                            "cannot enable %s, extension required %s to be enabled before",
-                            extension,
-                            ext,
-                        )
-            else:
-                for n, v in required_plugins.items():
-                    if extension in v and self.config[n]:
-                        skip = True
-                        logger.exception(
-                            f"{n} require plugin {extension}. Switch off first {n} before disable {extension}"
-                        )
+        if enable and extension in REQUIRED_PLUGINS:
+            for ext in REQUIRED_PLUGINS[extension]:
+                if not self.config[ext]:
+                    skip = True
+                    logger.exception(
+                        "cannot enable %s, extension required %s to be enabled before",
+                        extension,
+                        ext,
+                    )
+        elif not enable and extension in DEPENDENCY_PLUGINS:
+            for n, v in REQUIRED_PLUGINS.items():
+                if extension in v and self.config["plugin_" + n + "_enable"]:
+                    skip = True
+                    logger.exception(
+                        f"{n} require plugin {extension}. Switch off first {n} before disable {extension}"
+                    )
         return skip
 
     def _get_ips_to_remove(self) -> Set[str]:

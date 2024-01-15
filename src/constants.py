@@ -71,3 +71,7 @@ REQUIRED_PLUGINS = {
     "postgis_tiger_geocoder": ["postgis", "fuzzystrmatch"],
     "postgis_topology": ["postgis"],
 }
+
+DEPENDENCY_PLUGINS = set()
+for dependencies in REQUIRED_PLUGINS.values():
+    DEPENDENCY_PLUGINS |= set(dependencies)
