@@ -21,6 +21,7 @@ from tenacity import RetryError
 from charm import NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
 from cluster import RemoveRaftMemberFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
+from relations.db import EXTENSIONS_BLOCKING_MESSAGE
 from tests.helpers import patch_network_get
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -305,6 +306,7 @@ class TestCharm(unittest.TestCase):
             self.harness.update_config(config)
             self.harness.charm.enable_disable_extensions()
             self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+            self.assertEqual(self.harness.model.unit.status.message, EXTENSIONS_BLOCKING_MESSAGE)
 
     @patch("subprocess.check_output", return_value=b"C")
     def test_enable_disable_extensions(self, _):

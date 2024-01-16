@@ -66,9 +66,7 @@ ORAFCE_EXTENSION_STATEMENT = "SELECT add_months(date '2005-05-31',1);"
 PG_SIMILARITY_EXTENSION_STATEMENT = "SHOW pg_similarity.levenshtein_threshold;"
 PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION plperl_test(name text) RETURNS text AS $$ return $_SHARED{$_[0]}; $$ LANGUAGE plperl;"
 PREFIX_EXTENSION_STATEMENT = "SELECT '123'::prefix_range @> '123456';"
-RDKIT_EXTENSION_STATEMENT = (
-    "SELECT id, structure FROM molecules WHERE structure@>'c1cccnc1' LIMIT 100;"
-)
+RDKIT_EXTENSION_STATEMENT = "SELECT is_valid_smiles('CCC');"
 TDS_FDW_EXTENSION_STATEMENT = "CREATE SERVER mssql_svr FOREIGN DATA WRAPPER tds_fdw OPTIONS (servername 'tds_fdw_test', port '3306', database 'tds_fdw_test', tds_version '7.1');"
 ICU_EXT_EXTENSION_STATEMENT = (
     'CREATE COLLATION "vat-lat" (provider = icu, locale = "la-VA-u-kn-true")'
@@ -95,6 +93,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             num_units=2,
             series=CHARM_SERIES,
             config={"profile": "testing"},
+            constraints="arch=arm64",
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 

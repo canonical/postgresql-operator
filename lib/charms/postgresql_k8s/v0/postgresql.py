@@ -25,6 +25,9 @@ import psycopg2
 from ops.model import Relation
 from psycopg2 import sql
 from psycopg2.sql import Composed
+from constants import DEPENDENCY_PLUGINS
+
+from collections import OrderedDict
 
 # The unique Charmhub library identifier, never change it
 LIBID = "24ee217a54e840a598ff21a079c3e678"
@@ -289,12 +292,18 @@ class PostgreSQL:
                     cursor.execute("SELECT datname FROM pg_database WHERE NOT datistemplate;")
                     databases = {database[0] for database in cursor.fetchall()}
 
+            orderedExtensions = OrderedDict()
+            for plugin in DEPENDENCY_PLUGINS:
+                orderedExtensions[plugin] = extensions[plugin]
+            for extension, enable in extensions.items():
+                orderedExtensions[extension] = enable
+
             # Enable/disabled the extension in each database.
             for database in databases:
                 with self._connect_to_database(
                     database=database
                 ) as connection, connection.cursor() as cursor:
-                    for extension, enable in extensions.items():
+                    for extension, enable in orderedExtensions.items():
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
                             if enable
