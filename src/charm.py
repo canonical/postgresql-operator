@@ -15,11 +15,11 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
+    REQUIRED_PLUGINS,
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLUpdateUserPasswordError,
-    REQUIRED_PLUGINS,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
