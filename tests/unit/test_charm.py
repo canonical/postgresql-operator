@@ -396,6 +396,9 @@ class TestCharm(unittest.TestCase):
   plugin_spi_enable:
     default: false
     type: boolean
+  plugin_vector_enable:
+    default: false
+    type: boolean
   profile:
     default: production
     type: string"""
