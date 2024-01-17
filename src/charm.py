@@ -19,6 +19,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLUpdateUserPasswordError,
+    REQUIRED_PLUGINS,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
@@ -59,7 +60,6 @@ from config import CharmConfig
 from constants import (
     APP_SCOPE,
     BACKUP_USER,
-    DEPENDENCY_PLUGINS,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -68,7 +68,6 @@ from constants import (
     PEER,
     POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
-    REQUIRED_PLUGINS,
     REWIND_PASSWORD_KEY,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
@@ -90,6 +89,7 @@ from utils import new_password
 logger = logging.getLogger(__name__)
 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
+EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -876,10 +876,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 continue
             extension = plugins_exception.get(extension, extension)
             if self._check_extension_dependencies(extension, enable):
-                self.unit.status = BlockedStatus(EXTENSIONS_BLOCKING_MESSAGE)
+                self.unit.status = BlockedStatus(EXTENSIONS_DEPENDENCY_MESSAGE)
                 return
             extensions[extension] = enable
-        if self.is_blocked and self.unit.status.message == EXTENSIONS_BLOCKING_MESSAGE:
+        if self.is_blocked and self.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE:
             self.unit.status = ActiveStatus()
         self.unit.status = WaitingStatus("Updating extensions")
         try:
@@ -898,13 +898,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         "cannot enable %s, extension required %s to be enabled before",
                         extension,
                         ext,
-                    )
-        elif not enable and extension in DEPENDENCY_PLUGINS:
-            for n, v in REQUIRED_PLUGINS.items():
-                if extension in v and self.config["plugin_" + n + "_enable"]:
-                    skip = True
-                    logger.exception(
-                        f"{n} require plugin {extension}. Switch off first {n} before disable {extension}"
                     )
         return skip
 

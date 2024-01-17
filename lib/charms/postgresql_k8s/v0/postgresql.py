@@ -25,7 +25,6 @@ import psycopg2
 from ops.model import Relation
 from psycopg2 import sql
 from psycopg2.sql import Composed
-from constants import DEPENDENCY_PLUGINS
 
 from collections import OrderedDict
 
@@ -37,9 +36,22 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 22
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
+
+
+REQUIRED_PLUGINS = {
+    "address_standardizer": ["postgis"],
+    "address_standardizer_data_us": ["postgis"],
+    "jsonb_plperl": ["plperl"],
+    "postgis_raster": ["postgis"],
+    "postgis_tiger_geocoder": ["postgis", "fuzzystrmatch"],
+    "postgis_topology": ["postgis"],
+}
+DEPENDENCY_PLUGINS = set()
+for dependencies in REQUIRED_PLUGINS.values():
+    DEPENDENCY_PLUGINS |= set(dependencies)
 
 
 logger = logging.getLogger(__name__)
