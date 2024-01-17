@@ -64,6 +64,7 @@ class CharmConfig(BaseConfigModel):
     plugin_tsm_system_time_enable: bool
     plugin_uuid_ossp_enable: bool
     plugin_spi_enable: bool
+    plugin_vector_enable: bool
     request_date_style: Optional[str]
     request_standard_conforming_strings: Optional[bool]
     request_time_zone: Optional[str]
