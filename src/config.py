@@ -83,6 +83,7 @@ class CharmConfig(BaseConfigModel):
     plugin_postgis_tiger_geocoder_enable: bool
     plugin_postgis_topology_enable: bool
     plugin_postgis_raster_enable: bool
+    plugin_vector_enable: bool
     request_date_style: Optional[str]
     request_standard_conforming_strings: Optional[bool]
     request_time_zone: Optional[str]

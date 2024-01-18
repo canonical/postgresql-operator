@@ -479,6 +479,9 @@ class TestCharm(unittest.TestCase):
   plugin_postgis_topology_enable:
     default: false
     type: boolean
+  plugin_vector_enable:
+    default: false
+    type: boolean
   profile:
     default: production
     type: string"""
@@ -1815,7 +1818,12 @@ class TestCharm(unittest.TestCase):
         assert self.harness.charm.get_secret(scope, "operator-password") == "bla"
 
         # Reset new secret
+        # Only the leader can set app secret content.
+        with self.harness.hooks_disabled():
+            self.harness.set_leader(True)
         self.harness.charm.set_secret(scope, "operator-password", "blablabla")
+        with self.harness.hooks_disabled():
+            self.harness.set_leader(is_leader)
         assert self.harness.charm.model.get_secret(label=f"postgresql.{scope}")
         assert self.harness.charm.get_secret(scope, "operator-password") == "blablabla"
         assert SECRET_INTERNAL_LABEL not in self.harness.get_relation_data(
