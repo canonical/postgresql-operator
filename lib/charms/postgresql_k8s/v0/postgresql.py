@@ -306,7 +306,7 @@ class PostgreSQL:
 
             orderedExtensions = OrderedDict()
             for plugin in DEPENDENCY_PLUGINS:
-                orderedExtensions[plugin] = extensions[plugin]
+                orderedExtensions[plugin] = extensions.get(plugin, False)
             for extension, enable in extensions.items():
                 orderedExtensions[extension] = enable
 
