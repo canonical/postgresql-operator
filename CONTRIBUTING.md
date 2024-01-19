@@ -43,7 +43,7 @@ tox                      # runs 'lint' and 'unit' environments
 Build the charm in this git repository using:
 
 ```shell
-tox -e build
+tox run -e build-dev
 ```
 
 The tox build environment assumes that there is a preinstalled [poetry](https://python-poetry.org/) on the system.
