@@ -26,6 +26,17 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+      - name: Set up environment
+        run: |
+          pipx install tox
+          pipx install poetry
+          pipx inject poetry poetry-plugin-export
+          # TODO: Remove after https://github.com/python-poetry/poetry/pull/5980 is closed
+          poetry config warnings.export false
+      - name: Generate requirements
+        run: |
+          tox run -e build-wrapper
+          mv requirements-last-build.txt requirements.txt
       - name: Check libs
         uses: canonical/charming-actions/check-libraries@2.4.0
         with:

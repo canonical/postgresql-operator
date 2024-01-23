@@ -15,6 +15,7 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
+    REQUIRED_PLUGINS,
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
@@ -88,6 +89,7 @@ from utils import new_password
 logger = logging.getLogger(__name__)
 
 NO_PRIMARY_MESSAGE = "no primary in the cluster"
+EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -859,8 +861,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             database: optional database where to enable/disable the extension.
         """
         spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
-        original_status = self.unit.status
         plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
+        original_status = self.unit.status
         extensions = {}
         # collect extensions
         for plugin in self.config.plugin_keys():
@@ -872,15 +874,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 for ext in spi_module:
                     extensions[ext] = enable
                 continue
-            if extension in plugins_exception:
-                extension = plugins_exception[extension]
+            extension = plugins_exception.get(extension, extension)
+            if self._check_extension_dependencies(extension, enable):
+                self.unit.status = BlockedStatus(EXTENSIONS_DEPENDENCY_MESSAGE)
+                return
             extensions[extension] = enable
+        if self.is_blocked and self.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE:
+            self.unit.status = ActiveStatus()
         self.unit.status = WaitingStatus("Updating extensions")
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
         except PostgreSQLEnableDisableExtensionError as e:
             logger.exception("failed to change plugins: %s", str(e))
         self.unit.status = original_status
+
+    def _check_extension_dependencies(self, extension: str, enable: bool) -> bool:
+        skip = False
+        if enable and extension in REQUIRED_PLUGINS:
+            for ext in REQUIRED_PLUGINS[extension]:
+                if not self.config[f"plugin_{ext}_enable"]:
+                    skip = True
+                    logger.exception(
+                        "cannot enable %s, extension required %s to be enabled before",
+                        extension,
+                        ext,
+                    )
+        return skip
 
     def _get_ips_to_remove(self) -> Set[str]:
         """List the IPs that were part of the cluster but departed."""

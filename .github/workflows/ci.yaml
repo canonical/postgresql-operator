@@ -22,7 +22,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v7.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v9.3.1
 
   unit-test:
     name: Unit test charm
@@ -42,25 +42,24 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v7.0.0
-    permissions:
-      actions: write  # Needed to manage GitHub Actions cache
-
+    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v9.3.1
+    with:
+      charmcraft-snap-channel: beta
 
   integration-test:
     strategy:
       fail-fast: false
       matrix:
         juju:
-          - agent: 2.9.45
+          - agent: 2.9.46
             libjuju: ^2
-          - agent: 3.1.6
+          - agent: 3.1.7
     name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v7.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v9.3.1
     with:
       artifact-name: ${{ needs.build.outputs.artifact-name }}
       cloud: lxd

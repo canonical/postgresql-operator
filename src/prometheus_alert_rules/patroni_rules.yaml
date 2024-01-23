@@ -1,0 +1,26 @@
+# This file based on https://samber.github.io/awesome-prometheus-alerts/rules#patroni-1
+
+groups:
+
+- name: PatroniExporter
+
+  rules:
+
+    - alert: PatroniPostgresqlDown
+      expr: "patroni_postgres_running == 0"
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Patroni Posrgresql Down (instance {{ $labels.instance }})
+        description: "Patroni Postgresql instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+
+    # 2.4.1
+    - alert: PatroniHasNoLeader
+      expr: '(max by (scope) (patroni_master) < 1) and (max by (scope) (patroni_standby_leader) < 1)'
+      for: 0m
+      labels:
+        severity: critical
+      annotations:
+        summary: Patroni has no Leader (instance {{ $labels.instance }})
+        description: "A leader node (neither primary nor standby) cannot be found inside the cluster {{ $labels.scope }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
