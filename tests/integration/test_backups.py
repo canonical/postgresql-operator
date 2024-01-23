@@ -235,6 +235,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
         application_name=database_app_name,
         series=CHARM_SERIES,
     )
+    await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
     async with ops_test.fast_forward():
         logger.info(
@@ -243,7 +244,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
         await wait_for_idle_on_blocked(
             ops_test,
             previous_database_app_name,
-            0,
+            2,
             S3_INTEGRATOR_APP_NAME,
             ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
         )
