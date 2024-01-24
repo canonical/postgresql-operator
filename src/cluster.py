@@ -623,7 +623,7 @@ class Patroni:
         requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def update_parameter_controller_by_patroni(self, parameter: str, value: Any) -> None:
+    def bulk_update_parameters_controller_by_patroni(self, parameters: Dict[str, Any]) -> None:
         """Update the value of a parameter controller by Patroni.
 
         For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
@@ -631,7 +631,7 @@ class Patroni:
         requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
-            json={"postgresql": {"parameters": {parameter: value}}},
+            json={"postgresql": {"parameters": parameters}},
         )
 
     def update_synchronous_node_count(self, units: int = None) -> None:

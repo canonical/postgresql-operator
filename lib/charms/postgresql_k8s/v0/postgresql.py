@@ -26,6 +26,8 @@ from ops.model import Relation
 from psycopg2 import sql
 from psycopg2.sql import Composed
 
+from collections import OrderedDict
+
 # The unique Charmhub library identifier, never change it
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
@@ -34,9 +36,22 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 21
+LIBPATCH = 22
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
+
+
+REQUIRED_PLUGINS = {
+    "address_standardizer": ["postgis"],
+    "address_standardizer_data_us": ["postgis"],
+    "jsonb_plperl": ["plperl"],
+    "postgis_raster": ["postgis"],
+    "postgis_tiger_geocoder": ["postgis", "fuzzystrmatch"],
+    "postgis_topology": ["postgis"],
+}
+DEPENDENCY_PLUGINS = set()
+for dependencies in REQUIRED_PLUGINS.values():
+    DEPENDENCY_PLUGINS |= set(dependencies)
 
 
 logger = logging.getLogger(__name__)
@@ -289,12 +304,18 @@ class PostgreSQL:
                     cursor.execute("SELECT datname FROM pg_database WHERE NOT datistemplate;")
                     databases = {database[0] for database in cursor.fetchall()}
 
+            orderedExtensions = OrderedDict()
+            for plugin in DEPENDENCY_PLUGINS:
+                orderedExtensions[plugin] = extensions.get(plugin, False)
+            for extension, enable in extensions.items():
+                orderedExtensions[extension] = enable
+
             # Enable/disabled the extension in each database.
             for database in databases:
                 with self._connect_to_database(
                     database=database
                 ) as connection, connection.cursor() as cursor:
-                    for extension, enable in extensions.items():
+                    for extension, enable in orderedExtensions.items():
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
                             if enable
