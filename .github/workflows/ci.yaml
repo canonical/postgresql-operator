@@ -42,9 +42,10 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charms_with_cache.yaml@v11.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v11.0.0
     with:
       charmcraft-snap-channel: beta
+      cache: true
 
   integration-test:
     strategy:
@@ -61,7 +62,7 @@ jobs:
       - build
     uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v11.0.0
     with:
-      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       cloud: lxd
       juju-agent-version: ${{ matrix.juju.agent }}
       libjuju-version-constraint: ${{ matrix.juju.libjuju }}
