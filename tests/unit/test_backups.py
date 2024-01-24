@@ -154,9 +154,15 @@ class TestPostgreSQLBackups(unittest.TestCase):
     @patch("charm.Patroni.reload_patroni_configuration")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.Patroni.get_postgresql_version", return_value="14.10")
     @patch("charm.PostgreSQLBackups._execute_command")
     def test_can_use_s3_repository(
-        self, _execute_command, _update_config, _member_started, _reload_patroni_configuration
+        self,
+        _execute_command,
+        _get_postgresql_version,
+        _update_config,
+        _member_started,
+        _reload_patroni_configuration,
     ):
         # Define the stanza name inside the unit relation data.
         with self.harness.hooks_disabled():
@@ -178,13 +184,13 @@ class TestPostgreSQLBackups(unittest.TestCase):
             (False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE),
         )
 
-        # Test when the unit is a replica and there is a backup from another cluster
-        # in the S3 repository.
-        _execute_command.return_value = (
+        # Test when the unit is a replica.
+        pgbackrest_info_same_cluster_backup_output = (
             0,
-            f'[{{"name": "another-model.{self.charm.cluster_name}"}}]',
+            f'[{{"db": [{{"system-id": "12345"}}], "name": "{self.charm.backup.stanza_name}"}}]',
             "",
         )
+        _execute_command.return_value = pgbackrest_info_same_cluster_backup_output
         self.assertEqual(
             self.charm.backup.can_use_s3_repository(),
             (True, None),
@@ -196,10 +202,80 @@ class TestPostgreSQLBackups(unittest.TestCase):
             {"stanza": self.charm.backup.stanza_name},
         )
 
-        # Test when the unit is the leader and the workload is running.
+        # Test when the unit is the leader and the workload is running,
+        # but an exception happens when retrieving the cluster system id.
         _member_started.return_value = True
+        _execute_command.side_effect = [
+            pgbackrest_info_same_cluster_backup_output,
+            (1, "", "fake error"),
+        ]
         with self.harness.hooks_disabled():
             self.harness.set_leader()
+        with self.assertRaises(Exception):
+            self.assertEqual(
+                self.charm.backup.can_use_s3_repository(),
+                (False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE),
+            )
+        _update_config.assert_not_called()
+        _member_started.assert_not_called()
+        _reload_patroni_configuration.assert_not_called()
+
+        # Test when the cluster system id can be retrieved, but it's different from the stanza system id.
+        pgbackrest_info_other_cluster_system_id_backup_output = (
+            0,
+            f'[{{"db": [{{"system-id": "12345"}}], "name": "{self.charm.backup.stanza_name}"}}]',
+            "",
+        )
+        other_instance_system_identifier_output = (
+            0,
+            "Database system identifier:           67890",
+            "",
+        )
+        _execute_command.side_effect = [
+            pgbackrest_info_other_cluster_system_id_backup_output,
+            other_instance_system_identifier_output,
+        ]
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.charm.app.name,
+                {"stanza": self.charm.backup.stanza_name},
+            )
+        self.assertEqual(
+            self.charm.backup.can_use_s3_repository(),
+            (False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE),
+        )
+        _update_config.assert_called_once()
+        _member_started.assert_called_once()
+        _reload_patroni_configuration.assert_called_once()
+
+        # Assert that the stanza name is not present in the unit relation data anymore.
+        self.assertEqual(self.harness.get_relation_data(self.peer_rel_id, self.charm.app), {})
+
+        # Test when the cluster system id can be retrieved, but it's different from the stanza system id.
+        _update_config.reset_mock()
+        _member_started.reset_mock()
+        _reload_patroni_configuration.reset_mock()
+        pgbackrest_info_other_cluster_name_backup_output = (
+            0,
+            f'[{{"db": [{{"system-id": "12345"}}], "name": "another-model.{self.charm.cluster_name}"}}]',
+            "",
+        )
+        same_instance_system_identifier_output = (
+            0,
+            "Database system identifier:           12345",
+            "",
+        )
+        _execute_command.side_effect = [
+            pgbackrest_info_other_cluster_name_backup_output,
+            same_instance_system_identifier_output,
+        ]
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.peer_rel_id,
+                self.charm.app.name,
+                {"stanza": self.charm.backup.stanza_name},
+            )
         self.assertEqual(
             self.charm.backup.can_use_s3_repository(),
             (False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE),
@@ -222,6 +298,10 @@ class TestPostgreSQLBackups(unittest.TestCase):
                 self.charm.app.name,
                 {"stanza": self.charm.backup.stanza_name},
             )
+        _execute_command.side_effect = [
+            pgbackrest_info_same_cluster_backup_output,
+            other_instance_system_identifier_output,
+        ]
         self.assertEqual(
             self.charm.backup.can_use_s3_repository(),
             (False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE),
@@ -240,7 +320,10 @@ class TestPostgreSQLBackups(unittest.TestCase):
                 self.charm.app.name,
                 {"stanza": self.charm.backup.stanza_name},
             )
-        _execute_command.return_value = (0, f'[{{"name": "{self.charm.backup.stanza_name}"}}]', "")
+        _execute_command.side_effect = [
+            pgbackrest_info_same_cluster_backup_output,
+            same_instance_system_identifier_output,
+        ]
         self.assertEqual(
             self.charm.backup.can_use_s3_repository(),
             (True, None),

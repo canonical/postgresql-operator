@@ -227,14 +227,27 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     charm = await ops_test.build_charm(".")
+    previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
+    await ops_test.model.deploy(charm, application_name=previous_database_app_name)
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
         series=CHARM_SERIES,
     )
+    await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
     async with ops_test.fast_forward():
+        logger.info(
+            "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
+        )
+        await wait_for_idle_on_blocked(
+            ops_test,
+            previous_database_app_name,
+            2,
+            S3_INTEGRATOR_APP_NAME,
+            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+        )
         logger.info(
             "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
         )
@@ -245,6 +258,10 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
             S3_INTEGRATOR_APP_NAME,
             ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
         )
+
+    # Remove the database app with the same name as the previous one (that was used only to test
+    # that the cluster becomes blocked).
+    await ops_test.model.remove_application(previous_database_app_name, block_until_done=True)
 
     # Run the "list backups" action.
     unit_name = f"{database_app_name}/0"
