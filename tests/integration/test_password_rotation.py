@@ -21,6 +21,7 @@ from .helpers import (
 APP_NAME = METADATA["name"]
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
@@ -38,6 +39,7 @@ async def test_deploy_active(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
@@ -81,6 +83,7 @@ async def test_password_rotation(ops_test: OpsTest):
             assert check_patroni(ops_test, unit.name, restart_time)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @markers.juju_secrets
 async def test_password_from_secret_same_as_cli(ops_test: OpsTest):
@@ -108,6 +111,7 @@ async def test_password_from_secret_same_as_cli(ops_test: OpsTest):
     assert data[secret_id]["content"]["Data"]["replication-password"] == password
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_empty_password(ops_test: OpsTest) -> None:
     """Test that the password can't be set to an empty string."""
@@ -121,6 +125,7 @@ async def test_empty_password(ops_test: OpsTest) -> None:
     assert password == "None"
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None:
     """Test that in general, there is no change when password validation fails."""
