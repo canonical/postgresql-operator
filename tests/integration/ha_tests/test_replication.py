@@ -18,6 +18,7 @@ from .helpers import (
 )
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -51,6 +52,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_timeout) -> None:
     """Kill primary unit, check reelection."""
@@ -89,6 +91,7 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     await check_writes(ops_test)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     """Write to primary, read data from secondaries (check consistency)."""
@@ -106,6 +109,7 @@ async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     await check_writes(ops_test)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous_writes) -> None:
     """Check that writes in one cluster are not replicated to another cluster."""

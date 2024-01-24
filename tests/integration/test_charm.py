@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 UNIT_IDS = [0, 1, 2]
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
@@ -56,6 +57,7 @@ async def test_deploy(ops_test: OpsTest, charm: str):
     assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
@@ -67,6 +69,7 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     assert result.status_code == 200
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
@@ -80,6 +83,7 @@ async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
     ), "Scrape error in postgresql_prometheus_exporter"
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
@@ -166,6 +170,7 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert unit.data["port-ranges"][0]["protocol"] == "tcp"
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
@@ -203,6 +208,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         assert settings["lc_monetary"] == "en_GB.utf8"
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_scale_down_and_up(ops_test: OpsTest):
     """Test data is replicated to new units after a scale up."""
@@ -285,6 +291,7 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     """Test data persists through a primary deletion."""

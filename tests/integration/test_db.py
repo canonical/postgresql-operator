@@ -39,6 +39,7 @@ ROLES_BLOCKING_MESSAGE = (
 )
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
@@ -105,6 +106,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         assert domain_name not in [domain.mail_host for domain in client.domains]
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
@@ -178,6 +180,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
                 psycopg2.connect(primary_connection_string)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.skip(reason="Should be ported and moved to the new relation tests")
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
@@ -220,6 +223,7 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("nextcloud", block_until_done=True)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
@@ -300,6 +304,7 @@ async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
         )
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     await ops_test.model.deploy(
@@ -358,6 +363,7 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.unstable
 async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
@@ -386,6 +392,7 @@ async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
         await ops_test.model.remove_application("weebl", block_until_done=True)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @markers.juju2
 @pytest.mark.group(1)
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
