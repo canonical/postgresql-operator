@@ -87,7 +87,7 @@ VECTOR_EXTENSION_STATEMENT = (
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_plugins(ops_test: OpsTest) -> None:
+async def test_plugins(ops_test: OpsTest, cpu_arch) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
     # Build and deploy the PostgreSQL charm.
     async with ops_test.fast_forward():
@@ -97,6 +97,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
             num_units=2,
             series=CHARM_SERIES,
             config={"profile": "testing"},
+            constraints={"arch": cpu_arch},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
