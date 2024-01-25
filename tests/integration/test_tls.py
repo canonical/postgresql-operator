@@ -49,7 +49,6 @@ async def test_deploy_active(ops_test: OpsTest):
         # bundles don't wait between deploying charms.
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
@@ -160,7 +159,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.skipif(
     not os.environ.get("RESTART_MACHINE_TEST"),

@@ -68,7 +68,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.destroy_unit(second_primary)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_cluster_restore(ops_test):
     """Recreates the cluster from storage volumes."""

@@ -77,7 +77,6 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
     assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
@@ -96,7 +95,6 @@ async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     await action.wait()
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_upgrade_from_stable(ops_test: OpsTest):

@@ -95,7 +95,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_storage_re_use(ops_test, continuous_writes):
     """Verifies that database units with attached storage correctly repurpose storage.
@@ -143,7 +142,6 @@ async def test_storage_re_use(ops_test, continuous_writes):
     ), "new instance not up to date."
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_kill_db_process(
@@ -172,7 +170,6 @@ async def test_kill_db_process(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
@@ -211,7 +208,6 @@ async def test_freeze_db_process(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_restart_db_process(
@@ -240,7 +236,6 @@ async def test_restart_db_process(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
@@ -311,7 +306,6 @@ async def test_full_cluster_restart(
         await check_writes(ops_test)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.unstable
 async def test_forceful_restart_without_data_and_transaction_logs(
@@ -388,7 +382,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.unstable
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
@@ -474,7 +467,6 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.unstable
 async def test_network_cut_without_ip_change(
