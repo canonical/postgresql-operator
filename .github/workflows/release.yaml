@@ -22,19 +22,17 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v9.3.1
-    with:
-      charmcraft-snap-channel: beta
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v11.0.0
 
   release:
     name: Release charm
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v9.3.1
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v11.0.0
     with:
       channel: 14/edge
-      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
