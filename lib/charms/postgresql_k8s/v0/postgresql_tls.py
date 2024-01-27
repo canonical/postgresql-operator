@@ -24,15 +24,13 @@ import re
 import socket
 from typing import List, Optional
 
-from charms.tls_certificates_interface.v1.tls_certificates import (
+from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
-    TLSCertificatesRequiresV1,
+    TLSCertificatesRequiresV2,
     generate_csr,
     generate_private_key,
 )
-from cryptography import x509
-from cryptography.x509.extensions import ExtensionType
 from ops.charm import ActionEvent, RelationBrokenEvent
 from ops.framework import Object
 from ops.pebble import ConnectionError, PathError, ProtocolError
@@ -45,7 +43,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 7
+LIBPATCH = 8
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -63,7 +61,7 @@ class PostgreSQLTLS(Object):
         self.charm = charm
         self.peer_relation = peer_relation
         self.additional_dns_names = additional_dns_names or []
-        self.certs = TLSCertificatesRequiresV1(self.charm, TLS_RELATION)
+        self.certs = TLSCertificatesRequiresV2(self.charm, TLS_RELATION)
         self.framework.observe(
             self.charm.on.set_tls_private_key_action, self._on_set_tls_private_key
         )
@@ -90,7 +88,6 @@ class PostgreSQLTLS(Object):
         csr = generate_csr(
             private_key=key,
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
-            additional_critical_extensions=self._get_tls_extensions(),
             **self._get_sans(),
         )
 
@@ -161,7 +158,6 @@ class PostgreSQLTLS(Object):
         new_csr = generate_csr(
             private_key=key,
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
-            additional_critical_extensions=self._get_tls_extensions(),
             **self._get_sans(),
         )
         self.certs.request_certificate_renewal(
@@ -206,12 +202,6 @@ class PostgreSQLTLS(Object):
             "sans_ip": sans_ip,
             "sans_dns": sans_dns,
         }
-
-    @staticmethod
-    def _get_tls_extensions() -> Optional[List[ExtensionType]]:
-        """Return a list of TLS extensions for which certificate key can be used."""
-        basic_constraints = x509.BasicConstraints(ca=True, path_length=None)
-        return [basic_constraints]
 
     def get_tls_files(self) -> (Optional[str], Optional[str], Optional[str]):
         """Prepare TLS files in special PostgreSQL way.
