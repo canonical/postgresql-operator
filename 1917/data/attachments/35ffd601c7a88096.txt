@@ -1,0 +1,145 @@
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:487 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:492 Cutting network for postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:498 checking for no connectivity between postgresql/1 and postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:498 checking for no connectivity between postgresql/1 and postgresql/3
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:505 checking for no connectivity between postgresql/1 and the controller
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:512 checking whether the connectivity to the database is not working
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:518 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:521 checking whether a new primary was elected
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:528 Restoring network for postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:532 waiting for cluster to become idle
+[32mINFO    [0m juju.model:model.py:2947 Waiting for model:
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+  postgresql/3 [executing] active: Primary
+[32mINFO    [0m pytest_operator.plugin:plugin.py:784 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  02:34:04Z
+
+App                  Version  Status  Scale  Charm                Channel  Rev  Exposed  Message
+postgresql           14.10    active      3  postgresql                      0  no       
+postgresql-test-app           active      1  postgresql-test-app  edge      43  no       received database credentials of the first database
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle       3        10.93.184.223             received database credentials of the first database
+postgresql/1            active    executing  1        10.93.184.88    5432/tcp  
+postgresql/2            active    executing  2        10.93.184.28    5432/tcp  
+postgresql/3*           active    idle       4        10.93.184.63    5432/tcp  Primary
+
+Machine  State    Address        Inst id        Base          AZ  Message
+1        started  10.93.184.88   juju-088da1-1  ubuntu@22.04      Running
+2        started  10.93.184.28   juju-088da1-2  ubuntu@22.04      Running
+3        started  10.93.184.223  juju-088da1-3  ubuntu@22.04      Running
+4        started  10.93.184.63   juju-088da1-4  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:790 Juju error logs:
+
+machine-2: 01:32:22 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:22 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:22 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-2: 01:32:23 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:32:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:32:25 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:32:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:32:25 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:32:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:32:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:32:27 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-test-app-0: 01:32:27 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:32:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:32:27 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:32:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:32:29 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:48:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:48:29 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:48:29 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-3: 01:48:30 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-2: 02:12:37 ERROR unit.postgresql/2.juju-log Failed to list PostgreSQL database users: connection to server at "10.93.184.63", port 5432 failed: timeout expired
+
+machine-2: 02:27:52 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: api connection broken unexpectedly
+machine-2: 02:27:55 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-2" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: connect: network is unreachable
+machine-2: 02:27:58 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-2" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: connect: network is unreachable
+machine-2: 02:28:03 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-2" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: connect: network is unreachable
+unit-postgresql-3: 02:31:46 ERROR unit.postgresql/3.juju-log database-peers:0: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 1497, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/main.py", line 436, in main
+    _emit_charm_event(charm, dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/main.py", line 144, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 351, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 853, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 942, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 447, in _on_peer_relation_changed
+    if self.unit.is_leader() and not self._reconfigure_cluster(event):
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 523, in _reconfigure_cluster
+    self._remove_from_members_ips(ip_to_remove)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 694, in _remove_from_members_ips
+    self._update_members_ips(ip_to_remove=ip)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 713, in _update_members_ips
+    ips.remove(ip_to_remove)
+ValueError: list.remove(x): x not in list
+unit-postgresql-3: 02:31:47 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+unit-postgresql-3: 02:31:53 ERROR unit.postgresql/3.juju-log database-peers:0: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 1497, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/main.py", line 436, in main
+    _emit_charm_event(charm, dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/main.py", line 144, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 351, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 853, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 942, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 447, in _on_peer_relation_changed
+    if self.unit.is_leader() and not self._reconfigure_cluster(event):
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 523, in _reconfigure_cluster
+    self._remove_from_members_ips(ip_to_remove)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 694, in _remove_from_members_ips
+    self._update_members_ips(ip_to_remove=ip)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 713, in _update_members_ips
+    ips.remove(ip_to_remove)
+ValueError: list.remove(x): x not in list
+unit-postgresql-3: 02:31:53 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+unit-postgresql-3: 02:32:05 ERROR unit.postgresql/3.juju-log database-peers:0: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 1497, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/main.py", line 436, in main
+    _emit_charm_event(charm, dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/main.py", line 144, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 351, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 853, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/venv/ops/framework.py", line 942, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 447, in _on_peer_relation_changed
+    if self.unit.is_leader() and not self._reconfigure_cluster(event):
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 523, in _reconfigure_cluster
+    self._remove_from_members_ips(ip_to_remove)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 694, in _remove_from_members_ips
+    self._update_members_ips(ip_to_remove=ip)
+  File "/var/lib/juju/agents/unit-postgresql-3/charm/./src/charm.py", line 713, in _update_members_ips
+    ips.remove(ip_to_remove)
+ValueError: list.remove(x): x not in list
+unit-postgresql-3: 02:32:05 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+machine-1: 02:32:55 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: api connection broken unexpectedly
+machine-1: 02:32:55 ERROR juju.worker.uniter.metrics failed to close the collect-metrics listener: close unix /var/lib/juju/agents/unit-postgresql-1/3142164814/s: use of closed network connection
+machine-1: 02:33:01 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-1" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: i/o timeout
+machine-1: 02:33:07 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-1" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: i/o timeout
+machine-1: 02:33:15 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-1" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: i/o timeout
+machine-1: 02:33:22 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-1" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: connect: no route to host
+machine-1: 02:33:31 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-1" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: connect: no route to host
+machine-1: 02:33:42 ERROR juju.worker.dependency "api-caller" manifold worker returned unexpected error: [6bcd69] "machine-1" cannot open api: unable to connect to API: dial tcp 10.93.184.181:17070: i/o timeout
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:856 Forgetting main...
