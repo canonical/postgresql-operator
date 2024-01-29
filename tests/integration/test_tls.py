@@ -8,7 +8,6 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
-from . import markers
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -24,12 +23,19 @@ from .helpers import (
     restart_machine,
     run_command_on_unit,
 )
+from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-SELF_SIGNED_CERTIFICATES_APP_NAME = "self-signed-certificates"
-TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
+if juju_major_version < 3:
+    TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
+    TLS_CHANNEL = "legacy/stable"
+    TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
+else:
+    TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
+    TLS_CHANNEL = "latest/stable"
+    TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
@@ -56,9 +62,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
-        config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
         await ops_test.model.deploy(
-            TLS_CERTIFICATES_APP_NAME, config=config, channel="legacy/stable"
+            TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL
         )
 
         # Relate it to the PostgreSQL to enable TLS.
@@ -206,20 +211,3 @@ async def test_restart_machine(ops_test: OpsTest) -> None:
     assert await check_tls(ops_test, "postgresql/0", enabled=True)
     logger.info(f"checking TLS on Patroni API from {unit_name}")
     assert await check_tls_patroni_api(ops_test, "postgresql/0", enabled=True)
-
-
-@markers.juju3
-@pytest.mark.group(1)
-async def test_relation_with_self_signed_certificates_operator(ops_test: OpsTest) -> None:
-    """Test the relation with the Self Signed Certificates operator."""
-    async with ops_test.fast_forward(fast_interval="60s"):
-        # Deploy Self Signed Certificates operator.
-        await ops_test.model.deploy(SELF_SIGNED_CERTIFICATES_APP_NAME)
-        # Relate it to the PostgreSQL to enable TLS.
-        await ops_test.model.relate(DATABASE_APP_NAME, SELF_SIGNED_CERTIFICATES_APP_NAME)
-        await ops_test.model.wait_for_idle(status="active", timeout=1500)
-
-        # Wait for all units enabling TLS.
-        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-            assert await check_tls(ops_test, unit.name, enabled=True)
-            assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
