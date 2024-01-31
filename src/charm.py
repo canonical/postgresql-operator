@@ -484,6 +484,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self.backup.coordinate_stanza_fields()
+
         self.backup.check_stanza()
 
         if "exporter-started" not in self.unit_peer_data:

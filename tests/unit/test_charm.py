@@ -1269,18 +1269,26 @@ class TestCharm(unittest.TestCase):
     @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    @patch("backups.PostgreSQLBackups.check_stanza")
+    @patch("backups.PostgreSQLBackups.coordinate_stanza_fields")
+    @patch("backups.PostgreSQLBackups.start_stop_pgbackrest_service")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.Patroni.start_patroni")
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.PostgresqlOperatorCharm._update_member_ip")
     @patch("charm.PostgresqlOperatorCharm._reconfigure_cluster")
+    @patch("ops.framework.EventBase.defer")
     def test_on_peer_relation_changed(
         self,
+        _defer,
         _reconfigure_cluster,
         _update_member_ip,
         _update_config,
         _start_patroni,
         _member_started,
+        _start_stop_pgbackrest_service,
+        _coordinate_stanza_fields,
+        _check_stanza,
         _primary_endpoint,
         _update_relation_endpoints,
         _,
@@ -1355,6 +1363,28 @@ class TestCharm(unittest.TestCase):
         _start_patroni.assert_called_once()
         _update_relation_endpoints.assert_not_called()
         self.assertIsInstance(self.harness.model.unit.status, WaitingStatus)
+
+        # Test when Patroni has already started but it was not possible to start
+        # the pgBackRest service yet.
+        self.relation = self.harness.model.get_relation(self._peer_relation, self.rel_id)
+        _member_started.return_value = True
+        _defer.reset_mock()
+        _coordinate_stanza_fields.reset_mock()
+        _check_stanza.reset_mock()
+        _start_stop_pgbackrest_service.return_value = False
+        self.charm.on.database_peers_relation_changed.emit(self.relation)
+        _defer.assert_called_once()
+        _coordinate_stanza_fields.assert_not_called()
+        _check_stanza.assert_not_called()
+
+        # Test the last calls been made when it was possible to start the
+        # pgBackRest service.
+        _defer.reset_mock()
+        _start_stop_pgbackrest_service.return_value = True
+        self.charm.on.database_peers_relation_changed.emit(self.relation)
+        _defer.assert_not_called()
+        _coordinate_stanza_fields.assert_called_once()
+        _check_stanza.assert_called_once()
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._add_members")
