@@ -286,7 +286,6 @@ from cryptography.hazmat._oid import ExtensionOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
-from cryptography.x509.extensions import Extension, ExtensionNotFound
 from jsonschema import exceptions, validate  # type: ignore[import-untyped]
 from ops.charm import (
     CharmBase,
@@ -308,7 +307,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 22
+LIBPATCH = 24
 
 PYDEPS = ["cryptography", "jsonschema"]
 
@@ -939,9 +938,11 @@ def generate_private_key(
     key_bytes = private_key.private_bytes(
         encoding=serialization.Encoding.PEM,
         format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.BestAvailableEncryption(password)
-        if password
-        else serialization.NoEncryption(),
+        encryption_algorithm=(
+            serialization.BestAvailableEncryption(password)
+            if password
+            else serialization.NoEncryption()
+        ),
     )
     return key_bytes
 
@@ -1676,7 +1677,7 @@ class TLSCertificatesRequiresV2(Object):
         """
         final_list = []
         for csr in self.get_certificate_signing_requests(fulfilled_only=True):
-            assert type(csr["certificate_signing_request"]) == str
+            assert isinstance(csr["certificate_signing_request"], str)
             if cert := self._find_certificate_in_relation_data(csr["certificate_signing_request"]):
                 final_list.append(cert)
         return final_list
@@ -1699,7 +1700,7 @@ class TLSCertificatesRequiresV2(Object):
         """
         final_list = []
         for csr in self.get_certificate_signing_requests(fulfilled_only=True):
-            assert type(csr["certificate_signing_request"]) == str
+            assert isinstance(csr["certificate_signing_request"], str)
             if cert := self._find_certificate_in_relation_data(csr["certificate_signing_request"]):
                 expiry_time = _get_certificate_expiry_time(cert["certificate"])
                 if not expiry_time:
@@ -1719,11 +1720,12 @@ class TLSCertificatesRequiresV2(Object):
         """Gets the list of CSR's that were sent to the provider.
 
         You can choose to get only the CSR's that have a certificate assigned or only the CSR's
-        that don't.
+          that don't.
 
         Args:
             fulfilled_only (bool): This option will discard CSRs that don't have certificates yet.
             unfulfilled_only (bool): This option will discard CSRs that have certificates signed.
+
         Returns:
             List of CSR dictionaries. For example:
             [
@@ -1733,10 +1735,9 @@ class TLSCertificatesRequiresV2(Object):
                 }
             ]
         """
-
         final_list = []
         for csr in self._requirer_csrs:
-            assert type(csr["certificate_signing_request"]) == str
+            assert isinstance(csr["certificate_signing_request"], str)
             cert = self._find_certificate_in_relation_data(csr["certificate_signing_request"])
             if (unfulfilled_only and cert) or (fulfilled_only and not cert):
                 continue

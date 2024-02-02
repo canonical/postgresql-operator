@@ -1755,13 +1755,13 @@ class TestCharm(unittest.TestCase):
         with self._caplog.at_level(logging.ERROR):
             self.harness.charm.remove_secret("app", "operator-password")
             assert (
-                "Non-existing secret {'operator-password'} was attempted to be removed."
+                "Non-existing secret operator-password was attempted to be removed."
                 in self._caplog.text
             )
 
             self.harness.charm.remove_secret("unit", "operator-password")
             assert (
-                "Non-existing secret {'operator-password'} was attempted to be removed."
+                "Non-existing secret operator-password was attempted to be removed."
                 in self._caplog.text
             )
 

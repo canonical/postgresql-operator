@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 26
+LIBPATCH = 27
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -422,15 +422,15 @@ def diff(event: RelationChangedEvent, bucket: Union[Unit, Application]) -> Diff:
     )
 
     # These are the keys that were added to the databag and triggered this event.
-    added = new_data.keys() - old_data.keys()  # pyright: ignore [reportGeneralTypeIssues]
+    added = new_data.keys() - old_data.keys()  # pyright: ignore [reportAssignmentType]
     # These are the keys that were removed from the databag and triggered this event.
-    deleted = old_data.keys() - new_data.keys()  # pyright: ignore [reportGeneralTypeIssues]
+    deleted = old_data.keys() - new_data.keys()  # pyright: ignore [reportAssignmentType]
     # These are the keys that already existed in the databag,
     # but had their values changed.
     changed = {
         key
-        for key in old_data.keys() & new_data.keys()  # pyright: ignore [reportGeneralTypeIssues]
-        if old_data[key] != new_data[key]  # pyright: ignore [reportGeneralTypeIssues]
+        for key in old_data.keys() & new_data.keys()  # pyright: ignore [reportAssignmentType]
+        if old_data[key] != new_data[key]  # pyright: ignore [reportAssignmentType]
     }
     # Convert the new_data to a serializable format and save it for a next diff check.
     set_encoded_field(event.relation, bucket, "data", new_data)
@@ -1619,7 +1619,8 @@ class DataPeer(DataRequires, DataProvides):
                     current_data.get(relation.id, [])
                 ):
                     logger.error(
-                        "Non-existing secret %s was attempted to be removed.", non_existent
+                        "Non-existing secret %s was attempted to be removed.",
+                        ", ".join(non_existent),
                     )
 
             _, normal_fields = self._process_secret_fields(
@@ -1686,12 +1687,8 @@ class ExtraRoleEvent(RelationEvent):
         return self.relation.data[self.relation.app].get("extra-user-roles")
 
 
-class AuthenticationEvent(RelationEvent):
-    """Base class for authentication fields for events.
-
-    The amount of logic added here is not ideal -- but this was the only way to preserve
-    the interface when moving to Juju Secrets
-    """
+class RelationEventWithSecret(RelationEvent):
+    """Base class for Relation Events that need to handle secrets."""
 
     @property
     def _secrets(self) -> dict:
@@ -1702,18 +1699,6 @@ class AuthenticationEvent(RelationEvent):
         if not hasattr(self, "_cached_secrets"):
             self._cached_secrets = {}
         return self._cached_secrets
-
-    @property
-    def _jujuversion(self) -> JujuVersion:
-        """Caching jujuversion to avoid a Juju call on each field evaluation.
-
-        DON'T USE the encapsulated helper variable outside of this function
-        """
-        if not hasattr(self, "_cached_jujuversion"):
-            self._cached_jujuversion = None
-        if not self._cached_jujuversion:
-            self._cached_jujuversion = JujuVersion.from_environ()
-        return self._cached_jujuversion
 
     def _get_secret(self, group) -> Optional[Dict[str, str]]:
         """Retrieveing secrets."""
@@ -1730,7 +1715,15 @@ class AuthenticationEvent(RelationEvent):
     @property
     def secrets_enabled(self):
         """Is this Juju version allowing for Secrets usage?"""
-        return self._jujuversion.has_secrets
+        return JujuVersion.from_environ().has_secrets
+
+
+class AuthenticationEvent(RelationEventWithSecret):
+    """Base class for authentication fields for events.
+
+    The amount of logic added here is not ideal -- but this was the only way to preserve
+    the interface when moving to Juju Secrets
+    """
 
     @property
     def username(self) -> Optional[str]:
@@ -1813,7 +1806,7 @@ class DatabaseProvidesEvents(CharmEvents):
     database_requested = EventSource(DatabaseRequestedEvent)
 
 
-class DatabaseRequiresEvent(RelationEvent):
+class DatabaseRequiresEvent(RelationEventWithSecret):
     """Base class for database events."""
 
     @property
@@ -1868,6 +1861,11 @@ class DatabaseRequiresEvent(RelationEvent):
         if not self.relation.app:
             return None
 
+        if self.secrets_enabled:
+            secret = self._get_secret("user")
+            if secret:
+                return secret.get("uris")
+
         return self.relation.data[self.relation.app].get("uris")
 
     @property
@@ -1911,7 +1909,7 @@ class DatabaseRequiresEvents(CharmEvents):
 class DatabaseProvides(DataProvides):
     """Provider-side of the database relations."""
 
-    on = DatabaseProvidesEvents()  # pyright: ignore [reportGeneralTypeIssues]
+    on = DatabaseProvidesEvents()  # pyright: ignore [reportAssignmentType]
 
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
@@ -2006,7 +2004,7 @@ class DatabaseProvides(DataProvides):
 class DatabaseRequires(DataRequires):
     """Requires-side of the database relation."""
 
-    on = DatabaseRequiresEvents()  # pyright: ignore [reportGeneralTypeIssues]
+    on = DatabaseRequiresEvents()  # pyright: ignore [reportAssignmentType]
 
     def __init__(
         self,
@@ -2335,7 +2333,7 @@ class KafkaRequiresEvents(CharmEvents):
 class KafkaProvides(DataProvides):
     """Provider-side of the Kafka relation."""
 
-    on = KafkaProvidesEvents()  # pyright: ignore [reportGeneralTypeIssues]
+    on = KafkaProvidesEvents()  # pyright: ignore [reportAssignmentType]
 
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
@@ -2396,7 +2394,7 @@ class KafkaProvides(DataProvides):
 class KafkaRequires(DataRequires):
     """Requires-side of the Kafka relation."""
 
-    on = KafkaRequiresEvents()  # pyright: ignore [reportGeneralTypeIssues]
+    on = KafkaRequiresEvents()  # pyright: ignore [reportAssignmentType]
 
     def __init__(
         self,
@@ -2533,7 +2531,7 @@ class OpenSearchRequiresEvents(CharmEvents):
 class OpenSearchProvides(DataProvides):
     """Provider-side of the OpenSearch relation."""
 
-    on = OpenSearchProvidesEvents()  # pyright: ignore[reportGeneralTypeIssues]
+    on = OpenSearchProvidesEvents()  # pyright: ignore[reportAssignmentType]
 
     def __init__(self, charm: CharmBase, relation_name: str) -> None:
         super().__init__(charm, relation_name)
@@ -2586,7 +2584,7 @@ class OpenSearchProvides(DataProvides):
 class OpenSearchRequires(DataRequires):
     """Requires-side of the OpenSearch relation."""
 
-    on = OpenSearchRequiresEvents()  # pyright: ignore[reportGeneralTypeIssues]
+    on = OpenSearchRequiresEvents()  # pyright: ignore[reportAssignmentType]
 
     def __init__(
         self,
