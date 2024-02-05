@@ -25,7 +25,7 @@ APP_NAME = METADATA["name"]
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_active(ops_test: OpsTest, cpu_arch):
+async def test_deploy_active(ops_test: OpsTest):
     """Build the charm and deploy it."""
     charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
@@ -35,7 +35,6 @@ async def test_deploy_active(ops_test: OpsTest, cpu_arch):
             num_units=3,
             series=CHARM_SERIES,
             config={"profile": "testing"},
-            constraints={"arch": cpu_arch},
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
 

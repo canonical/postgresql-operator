@@ -6,6 +6,7 @@
 import json
 import logging
 import os
+import platform
 import subprocess
 import time
 from typing import Dict, List, Literal, Optional, Set, get_args
@@ -965,12 +966,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        if (
-            postgres_snap.revision
-            != list(
-                filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
-            )[0][1]["revision"]
-        ):
+        if postgres_snap.revision != list(
+            filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
+        )[0][1]["revision"].get(platform.machine()):
             logger.debug(
                 "Early exit _setup_exporter: snap was not refreshed to the right version yet"
             )
@@ -1271,26 +1269,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for snap_name, snap_version in packages:
             try:
                 snap_cache = snap.SnapCache()
-                try:
-                    snap_package = snap_cache[snap_name]
-                except snap.SnapNotFoundError:
-                    # TODO Arm64 snap fails to install due to missing metadata
-                    # (no channel) remove when it is released properly
-                    subprocess.check_output(
-                        [
-                            "snap",
-                            "install",
-                            snap_name,
-                            f'--revision="{snap_version.get("revision")}"',
-                        ]
-                    )
-                    continue
+                snap_package = snap_cache[snap_name]
 
                 if not snap_package.present or refresh:
-                    if snap_version.get("revision"):
-                        snap_package.ensure(
-                            snap.SnapState.Latest, revision=snap_version["revision"]
-                        )
+                    if revision := snap_version.get("revision"):
+                        if type(revision) is dict:
+                            try:
+                                revision = revision[platform.machine()]
+                            except Exception:
+                                logger.error(
+                                    "Unavailable snap architecture %s", platform.machine()
+                                )
+                                raise
+                        snap_package.ensure(snap.SnapState.Latest, revision=revision)
                         snap_package.hold()
                     else:
                         snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
