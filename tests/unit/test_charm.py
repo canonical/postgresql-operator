@@ -1028,17 +1028,23 @@ class TestCharm(unittest.TestCase):
         self.charm._install_snap_packages([("postgresql", {"revision": 42})])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
-        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
+        _snap_package.ensure.assert_called_once_with(
+            snap.SnapState.Latest, revision=42, channel=""
+        )
         _snap_package.hold.assert_called_once_with()
 
         # Test with refresh
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.present = True
-        self.charm._install_snap_packages([("postgresql", {"revision": 42})], refresh=True)
+        self.charm._install_snap_packages(
+            [("postgresql", {"revision": 42, "channel": "latest/test"})], refresh=True
+        )
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
-        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, revision=42)
+        _snap_package.ensure.assert_called_once_with(
+            snap.SnapState.Latest, revision=42, channel="latest/test"
+        )
         _snap_package.hold.assert_called_once_with()
 
         # Test without refresh

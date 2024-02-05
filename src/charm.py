@@ -1281,7 +1281,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                                     "Unavailable snap architecture %s", platform.machine()
                                 )
                                 raise
-                        snap_package.ensure(snap.SnapState.Latest, revision=revision)
+                        channel = snap_version.get("channel", "")
+                        snap_package.ensure(
+                            snap.SnapState.Latest, revision=revision, channel=channel
+                        )
                         snap_package.hold()
                     else:
                         snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
