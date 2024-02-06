@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
+import platform
 import subprocess
 import unittest
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
@@ -1025,11 +1026,13 @@ class TestCharm(unittest.TestCase):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        self.charm._install_snap_packages([("postgresql", {"revision": 42})])
+        self.charm._install_snap_packages(
+            [("postgresql", {"revision": {platform.machine(): "42"}})]
+        )
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(
-            snap.SnapState.Latest, revision=42, channel=""
+            snap.SnapState.Latest, revision="42", channel=""
         )
         _snap_package.hold.assert_called_once_with()
 
@@ -1038,23 +1041,40 @@ class TestCharm(unittest.TestCase):
         _snap_package.reset_mock()
         _snap_package.present = True
         self.charm._install_snap_packages(
-            [("postgresql", {"revision": 42, "channel": "latest/test"})], refresh=True
+            [("postgresql", {"revision": {platform.machine(): "42"}, "channel": "latest/test"})],
+            refresh=True,
         )
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(
-            snap.SnapState.Latest, revision=42, channel="latest/test"
+            snap.SnapState.Latest, revision="42", channel="latest/test"
         )
         _snap_package.hold.assert_called_once_with()
 
         # Test without refresh
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
-        self.charm._install_snap_packages([("postgresql", {"revision": 42})])
+        self.charm._install_snap_packages(
+            [("postgresql", {"revision": {platform.machine(): "42"}})]
+        )
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_not_called()
         _snap_package.hold.assert_not_called()
+
+        # test missing architecture
+        _snap_cache.reset_mock()
+        _snap_package.reset_mock()
+        _snap_package.present = True
+        with self.assertRaises(KeyError):
+            self.charm._install_snap_packages(
+                [("postgresql", {"revision": {"missingarch": "42"}})],
+                refresh=True,
+            )
+        _snap_cache.assert_called_once_with()
+        _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
+        assert not _snap_package.ensure.called
+        assert not _snap_package.hold.called
 
     @patch(
         "subprocess.check_call",

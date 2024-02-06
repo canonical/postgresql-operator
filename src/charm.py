@@ -1273,14 +1273,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
                 if not snap_package.present or refresh:
                     if revision := snap_version.get("revision"):
-                        if type(revision) is dict:
-                            try:
-                                revision = revision[platform.machine()]
-                            except Exception:
-                                logger.error(
-                                    "Unavailable snap architecture %s", platform.machine()
-                                )
-                                raise
+                        try:
+                            revision = revision[platform.machine()]
+                        except Exception:
+                            logger.error("Unavailable snap architecture %s", platform.machine())
+                            raise
                         channel = snap_version.get("channel", "")
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=revision, channel=channel
