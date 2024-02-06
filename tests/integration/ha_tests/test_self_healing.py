@@ -467,7 +467,6 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
 
 @pytest.mark.group(1)
-@pytest.mark.unstable
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
 ):
@@ -515,7 +514,7 @@ async def test_network_cut_without_ip_change(
 
     async with ops_test.fast_forward():
         logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, primary_name)
+        await are_writes_increasing(ops_test, primary_name, use_ip_from_inside=True)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
@@ -538,4 +537,4 @@ async def test_network_cut_without_ip_change(
         ops_test, primary_name
     ), "Connection is not possible after network restore"
 
-    await is_cluster_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)

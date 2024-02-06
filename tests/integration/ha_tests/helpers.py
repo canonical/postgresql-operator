@@ -77,13 +77,19 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
     return True
 
 
-async def are_writes_increasing(ops_test, down_unit: str = None) -> None:
+async def are_writes_increasing(
+    ops_test, down_unit: str = None, use_ip_from_inside: bool = False
+) -> None:
     """Verify new writes are continuing by counting the number of writes."""
-    writes, _ = await count_writes(ops_test, down_unit=down_unit)
+    writes, _ = await count_writes(
+        ops_test, down_unit=down_unit, use_ip_from_inside=use_ip_from_inside
+    )
     for member, count in writes.items():
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
-                more_writes, _ = await count_writes(ops_test, down_unit=down_unit)
+                more_writes, _ = await count_writes(
+                    ops_test, down_unit=down_unit, use_ip_from_inside=use_ip_from_inside
+                )
                 assert more_writes[member] > count, f"{member}: writes not continuing to DB"
 
 
@@ -228,13 +234,7 @@ async def count_writes(
         for unit in ops_test.model.applications[app].units:
             if unit.name == down_unit:
                 down_ips.append(unit.public_address)
-                down_ips.append(
-                    await (
-                        get_ip_from_inside_the_unit(ops_test, unit.name)
-                        if use_ip_from_inside
-                        else get_unit_ip(ops_test, unit.name)
-                    )
-                )
+                down_ips.append(await get_unit_ip(ops_test, unit.name))
     count = {}
     maximum = {}
     for member in cluster["members"]:

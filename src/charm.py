@@ -515,7 +515,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
-            logger.info("Removing %s from the cluster", ip_to_remove)
+            logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
                 self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
