@@ -1375,20 +1375,36 @@ class TestCharm(unittest.TestCase):
         # Test when a change is needed in the member IP, but it fails.
         _remove_raft_member.side_effect = RemoveRaftMemberFailedError
         _add_members.reset_mock()
-        mock_event.relation.data = {mock_event.unit: {"ip-to-remove": "1.1.1.1"}}
+        ip_to_remove = "1.1.1.1"
+        relation_data = {mock_event.unit: {"ip-to-remove": ip_to_remove}}
+        mock_event.relation.data = relation_data
         self.assertFalse(self.charm._reconfigure_cluster(mock_event))
-        _remove_raft_member.assert_called_once()
+        _remove_raft_member.assert_called_once_with(ip_to_remove)
         _remove_from_members_ips.assert_not_called()
         _add_members.assert_not_called()
 
-        # Test when a change is needed in the member IP and it succeeds.
+        # Test when a change is needed in the member IP, and it succeeds
+        # (but the old IP was already been removed).
         _remove_raft_member.reset_mock()
         _remove_raft_member.side_effect = None
         _add_members.reset_mock()
-        mock_event.relation.data = {mock_event.unit: {"ip-to-remove": "1.1.1.1"}}
+        mock_event.relation.data = relation_data
         self.assertTrue(self.charm._reconfigure_cluster(mock_event))
-        _remove_raft_member.assert_called_once()
-        _remove_from_members_ips.assert_called_once()
+        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_from_members_ips.assert_not_called()
+        _add_members.assert_called_once_with(mock_event)
+
+        # Test when the old IP wasn't removed yet.
+        _remove_raft_member.reset_mock()
+        _add_members.reset_mock()
+        mock_event.relation.data = relation_data
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"members_ips": '["' + ip_to_remove + '"]'}
+            )
+        self.assertTrue(self.charm._reconfigure_cluster(mock_event))
+        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_from_members_ips.assert_called_once_with(ip_to_remove)
         _add_members.assert_called_once_with(mock_event)
 
     @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
