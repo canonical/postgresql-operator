@@ -383,7 +383,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
 
 @pytest.mark.group(1)
-@pytest.mark.unstable
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
     # Locate primary unit.
@@ -456,15 +455,15 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Wait the LXD unit has its IP updated.
     logger.info("waiting for IP address to be updated on Juju unit")
-    await wait_network_restore(ops_test, primary_hostname, primary_ip)
+    await wait_network_restore(ops_test, primary_name, primary_ip)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
     assert await is_connection_possible(
-        ops_test, primary_name
+        ops_test, primary_name, use_ip_from_inside=True
     ), "Connection is not possible after network restore"
 
-    await is_cluster_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)
 
 
 @pytest.mark.group(1)

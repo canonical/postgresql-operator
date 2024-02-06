@@ -515,12 +515,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
+            logger.info("Removing %s from the cluster", ip_to_remove)
             try:
                 self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
-            self._remove_from_members_ips(ip_to_remove)
+            if ip_to_remove in self.members_ips:
+                self._remove_from_members_ips(ip_to_remove)
         self._add_members(event)
         return True
 
@@ -803,6 +805,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Remove departing units when the leader changes.
         for ip in self._get_ips_to_remove():
+            logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
 
         self.update_config()

@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 import os
 import random
 import subprocess
@@ -21,6 +22,8 @@ from tenacity import (
 )
 
 from ..helpers import APPLICATION_NAME, db_connect, get_unit_address, run_command_on_unit
+
+logger = logging.getLogger(__name__)
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
@@ -161,14 +164,18 @@ async def change_wal_settings(
             )
 
 
-async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
+async def is_cluster_updated(
+    ops_test: OpsTest, primary_name: str, use_ip_from_inside: bool = False
+) -> None:
     # Verify that the old primary is now a replica.
+    logger.info("checking that the former primary is now a replica")
     assert await is_replica(
-        ops_test, primary_name
+        ops_test, primary_name, use_ip_from_inside
     ), "there are more than one primary in the cluster."
 
     # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
+    logger.info("checking that all units are part of the same cluster")
+    member_ips = await fetch_cluster_members(ops_test, use_ip_from_inside)
     app = primary_name.split("/")[0]
     ip_addresses = [
         await get_unit_ip(ops_test, unit.name) for unit in ops_test.model.applications[app].units
@@ -176,18 +183,22 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
     # Verify that no writes to the database were missed after stopping the writes.
-    total_expected_writes = await check_writes(ops_test)
+    logger.info("checking that no writes to the database were missed after stopping the writes")
+    total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
 
     # Verify that old primary is up-to-date.
+    logger.info("checking that the former primary is up to date with the cluster after restarting")
     assert await is_secondary_up_to_date(
-        ops_test, primary_name, total_expected_writes
+        ops_test, primary_name, total_expected_writes, use_ip_from_inside
     ), "secondary not up to date with the cluster after restarting."
 
 
-async def check_writes(ops_test) -> int:
+async def check_writes(ops_test, use_ip_from_inside: bool = False) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes, max_number_written = await count_writes(ops_test)
+    actual_writes, max_number_written = await count_writes(
+        ops_test, use_ip_from_inside=use_ip_from_inside
+    )
     for member, count in actual_writes.items():
         assert (
             count == max_number_written[member]
@@ -197,21 +208,33 @@ async def check_writes(ops_test) -> int:
 
 
 async def count_writes(
-    ops_test: OpsTest, down_unit: str = None
+    ops_test: OpsTest, down_unit: str = None, use_ip_from_inside: bool = False
 ) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
     for unit in ops_test.model.applications[app].units:
         if unit.name != down_unit:
-            cluster = get_patroni_cluster(await get_unit_ip(ops_test, unit.name))
+            cluster = get_patroni_cluster(
+                await (
+                    get_ip_from_inside_the_unit(ops_test, unit.name)
+                    if use_ip_from_inside
+                    else get_unit_ip(ops_test, unit.name)
+                )
+            )
             break
     down_ips = []
     if down_unit:
         for unit in ops_test.model.applications[app].units:
             if unit.name == down_unit:
                 down_ips.append(unit.public_address)
-                down_ips.append(await get_unit_ip(ops_test, unit.name))
+                down_ips.append(
+                    await (
+                        get_ip_from_inside_the_unit(ops_test, unit.name)
+                        if use_ip_from_inside
+                        else get_unit_ip(ops_test, unit.name)
+                    )
+                )
     count = {}
     maximum = {}
     for member in cluster["members"]:
@@ -263,16 +286,21 @@ def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
 
 
-async def fetch_cluster_members(ops_test: OpsTest):
+async def fetch_cluster_members(ops_test: OpsTest, use_ip_from_inside: bool = False):
     """Fetches the IPs listed by Patroni as cluster members.
 
     Args:
         ops_test: OpsTest instance.
+        use_ip_from_inside: whether to use the IP from inside the unit.
     """
     app = await app_name(ops_test)
     member_ips = {}
     for unit in ops_test.model.applications[app].units:
-        unit_ip = await get_unit_ip(ops_test, unit.name)
+        unit_ip = await (
+            get_ip_from_inside_the_unit(ops_test, unit.name)
+            if use_ip_from_inside
+            else get_unit_ip(ops_test, unit.name)
+        )
         cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
         if len(member_ips) > 0:
             # If the list of members IPs was already fetched, also compare the
@@ -302,6 +330,16 @@ async def get_controller_machine(ops_test: OpsTest) -> str:
         machine.get("instance-id")
         for machine in controller[ops_test.controller_name]["controller-machines"].values()
     ][0]
+
+
+async def get_ip_from_inside_the_unit(ops_test: OpsTest, unit_name: str) -> str:
+    command = f"exec --unit {unit_name} -- hostname -I"
+    return_code, stdout, stderr = await ops_test.juju(*command.split())
+    if return_code != 0:
+        raise ProcessError(
+            "Expected command %s to succeed instead it failed: %s %s", command, return_code, stderr
+        )
+    return stdout.splitlines()[0].strip()
 
 
 async def get_patroni_setting(ops_test: OpsTest, setting: str) -> Optional[int]:
@@ -388,11 +426,17 @@ async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
-async def is_connection_possible(ops_test: OpsTest, unit_name: str) -> bool:
+async def is_connection_possible(
+    ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool = False
+) -> bool:
     """Test a connection to a PostgreSQL server."""
     app = unit_name.split("/")[0]
     password = await get_password(ops_test, app, unit_name)
-    address = await get_unit_ip(ops_test, unit_name)
+    address = await (
+        get_ip_from_inside_the_unit(ops_test, unit_name)
+        if use_ip_from_inside
+        else get_unit_ip(ops_test, unit_name)
+    )
     try:
         with db_connect(
             host=address, password=password
@@ -420,9 +464,13 @@ def is_machine_reachable_from(origin_machine: str, target_machine: str) -> bool:
         return False
 
 
-async def is_replica(ops_test: OpsTest, unit_name: str) -> bool:
+async def is_replica(ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool = False) -> bool:
     """Returns whether the unit a replica in the cluster."""
-    unit_ip = await get_unit_ip(ops_test, unit_name)
+    unit_ip = await (
+        get_ip_from_inside_the_unit(ops_test, unit_name)
+        if use_ip_from_inside
+        else get_unit_ip(ops_test, unit_name)
+    )
     member_name = unit_name.replace("/", "-")
 
     try:
@@ -571,7 +619,9 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
 
 
-async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_writes: int) -> bool:
+async def is_secondary_up_to_date(
+    ops_test: OpsTest, unit_name: str, expected_writes: int, use_ip_from_inside: bool = False
+) -> bool:
     """Checks if secondary is up-to-date with the cluster.
 
     Retries over the period of one minute to give secondary adequate time to copy over data.
@@ -579,7 +629,11 @@ async def is_secondary_up_to_date(ops_test: OpsTest, unit_name: str, expected_wr
     app = await app_name(ops_test)
     password = await get_password(ops_test, app)
     host = [
-        await get_unit_ip(ops_test, unit.name)
+        await (
+            get_ip_from_inside_the_unit(ops_test, unit.name)
+            if use_ip_from_inside
+            else get_unit_ip(ops_test, unit.name)
+        )
         for unit in ops_test.model.applications[app].units
         if unit.name == unit_name
     ][0]
@@ -679,15 +733,17 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
 
 
 @retry(stop=stop_after_attempt(20), wait=wait_fixed(30))
-async def wait_network_restore(ops_test: OpsTest, hostname: str, old_ip: str) -> None:
+async def wait_network_restore(ops_test: OpsTest, unit_name: str, old_ip: str) -> None:
     """Wait until network is restored.
 
     Args:
         ops_test: pytest plugin helper
-        hostname: The name of the instance
+        unit_name: name of the unit
         old_ip: old registered IP address
     """
-    if await instance_ip(ops_test, hostname) == old_ip:
+    # Retrieve the unit IP from inside the unit because it may not be updated in the
+    # Juju status too quickly.
+    if (await get_ip_from_inside_the_unit(ops_test, unit_name)) == old_ip:
         raise Exception
 
 
