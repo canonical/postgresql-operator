@@ -184,7 +184,10 @@ async def is_cluster_updated(
     member_ips = await fetch_cluster_members(ops_test, use_ip_from_inside)
     app = primary_name.split("/")[0]
     ip_addresses = [
-        await get_unit_ip(ops_test, unit.name) for unit in ops_test.model.applications[app].units
+        await get_ip_from_inside_the_unit(ops_test, unit.name)
+        if use_ip_from_inside
+        else get_unit_ip(ops_test, unit.name)
+        for unit in ops_test.model.applications[app].units
     ]
     assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
 
