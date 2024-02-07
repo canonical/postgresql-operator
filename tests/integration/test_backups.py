@@ -74,6 +74,7 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
     }
     yield configs, credentials
     # Delete the previously created objects.
+    logger.info("deleting the previously created backups")
     for cloud, config in configs.items():
         session = boto3.session.Session(
             aws_access_key_id=credentials[cloud]["access-key"],
@@ -130,9 +131,10 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             **cloud_configs[1][cloud],
         )
         await action.wait()
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
-        )
+        async with ops_test.fast_forward():
+            await ops_test.model.wait_for_idle(
+                apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
+            )
 
         primary = await get_primary(ops_test, f"{database_app_name}/0")
         for unit in ops_test.model.applications[database_app_name].units:
@@ -238,7 +240,8 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             )
 
             # Scale up to be able to test primary and leader being different.
-            await scale_application(ops_test, database_app_name, 2)
+            async with ops_test.fast_forward():
+                await scale_application(ops_test, database_app_name, 2)
 
             # Ensure replication is working correctly.
             new_unit_name = f"{database_app_name}/2"
