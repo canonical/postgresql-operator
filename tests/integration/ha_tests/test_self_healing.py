@@ -459,7 +459,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Verify that the database service got restarted and is ready in the old primary.
     logger.info(f"waiting for the database service to restart on {primary_name}")
-    assert await is_postgresql_ready(ops_test, primary_name)
+    assert await is_postgresql_ready(ops_test, primary_name, use_ip_from_inside=True)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
