@@ -441,14 +441,16 @@ async def is_connection_possible(
         else get_unit_ip(ops_test, unit_name)
     )
     try:
-        with db_connect(
-            host=address, password=password
-        ) as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT 1;")
-            success = cursor.fetchone()[0] == 1
-        connection.close()
-        return success
-    except psycopg2.Error:
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                with db_connect(
+                    host=address, password=password
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute("SELECT 1;")
+                    success = cursor.fetchone()[0] == 1
+                connection.close()
+                return success
+    except (psycopg2.Error, RetryError):
         # Error raised when the connection is not possible.
         return False
 

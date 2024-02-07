@@ -457,6 +457,10 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     logger.info("waiting for IP address to be updated on Juju unit")
     await wait_network_restore(ops_test, primary_name, primary_ip)
 
+    # Verify that the database service got restarted and is ready in the old primary.
+    logger.info(f"waiting for the database service to restart on {primary_name}")
+    assert await is_postgresql_ready(ops_test, primary_name)
+
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
     assert await is_connection_possible(
@@ -530,6 +534,10 @@ async def test_network_cut_without_ip_change(
     logger.info("waiting for cluster to become idle")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active")
+
+    # Verify that the database service got restarted and is ready in the old primary.
+    logger.info(f"waiting for the database service to restart on {primary_name}")
+    assert await is_postgresql_ready(ops_test, primary_name)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
