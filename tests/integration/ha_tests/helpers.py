@@ -588,7 +588,7 @@ async def send_signal_to_process(
 async def is_postgresql_ready(ops_test, unit_name: str, use_ip_from_inside: bool = False) -> bool:
     """Verifies a PostgreSQL instance is running and available."""
     unit_ip = (
-        get_ip_from_inside_the_unit(ops_test, unit_name)
+        (await get_ip_from_inside_the_unit(ops_test, unit_name))
         if use_ip_from_inside
         else get_unit_address(ops_test, unit_name)
     )
