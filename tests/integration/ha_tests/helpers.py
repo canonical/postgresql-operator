@@ -3,6 +3,7 @@
 import os
 import random
 import subprocess
+from juju.model import Model
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Dict, Optional, Set, Tuple
@@ -85,7 +86,7 @@ async def are_writes_increasing(ops_test, down_unit: str = None) -> None:
                 assert more_writes[member] > count, f"{member}: writes not continuing to DB"
 
 
-async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
+async def app_name(ops_test: OpsTest, application_name: str = "postgresql", model: Model = None) -> Optional[str]:
     """Returns the name of the cluster running PostgreSQL.
 
     This is important since not all deployments of the PostgreSQL charm have the application name
@@ -93,8 +94,10 @@ async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> O
 
     Note: if multiple clusters are running PostgreSQL this will return the one first found.
     """
-    status = await ops_test.model.get_status()
-    for app in ops_test.model.applications:
+    if model is None:
+        model = ops_test.model
+    status = await model.get_status()
+    for app in model.applications:
         if application_name in status["applications"][app]["charm"]:
             return app
 

@@ -16,7 +16,7 @@ import pwd
 import shutil
 from pathlib import Path
 from subprocess import PIPE, run
-from typing import Dict, Set
+from typing import Dict, Optional, Set, Tuple
 
 from charms.operator_libs_linux.v2 import snap
 from ops.charm import (
@@ -28,7 +28,13 @@ from ops.model import (
     Unit,
 )
 
-from constants import PATRONI_CONF_PATH, POSTGRESQL_DATA_PATH
+from constants import (
+    APP_SCOPE,
+    MONITORING_PASSWORD_KEY,
+    PATRONI_CONF_PATH,
+    POSTGRESQL_DATA_PATH,
+    REWIND_PASSWORD_KEY,
+)
 from coordinator_ops import CoordinatedOpsManager
 
 logger = logging.getLogger(__name__)
@@ -250,19 +256,32 @@ class PostgreSQLAsyncReplication(Object):
             self.restart_coordinator.coordinate()
 
     def _on_coordination_request(self, event):
-        # Stop the service.
-        # We need all replicas to be stopped, so we can remove the patroni-postgresql-k8s
-        # service from Kubernetes and not getting it recreated!
-        # We will restart the it once the cluster is ready.
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            raise Exception("Cannot start/stop service, snap is not yet installed.")
-        charmed_postgresql_snap.stop(services=["patroni"])
         self.restart_coordinator.acknowledge(event)
 
     def _on_coordination_approval(self, event):
         """Runs when the coordinator guaranteed all units have stopped."""
+        snap_cache = snap.SnapCache()
+        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
+        if not charmed_postgresql_snap.present:
+            raise Exception("Cannot restart service, snap is not yet installed.")
+        charmed_postgresql_snap.stop(services=["patroni"])
+
+        # Clean folder and generate configuration.
+        try:
+            path = Path(POSTGRESQL_DATA_PATH)
+            if path.exists() and path.is_dir():
+                shutil.rmtree(path)
+        except OSError as e:
+            raise Exception(
+                f"Failed to remove contents of the data directory with error: {str(e)}"
+            )
+
+        self.charm.update_config()
+        logger.info("_on_standby_changed: configuration done, waiting for restart of the service")
+
+        # We are ready to restart the service now: all peers have configured themselves.
+        charmed_postgresql_snap.start(services=["patroni"])
+
         if self.charm.unit.is_leader():
             # Remove previous cluster information to make it possible to initialise a new cluster.
             logger.info("Removing previous cluster information")
@@ -284,7 +303,7 @@ class PostgreSQLAsyncReplication(Object):
                     "remove",
                     self.charm.cluster_name,
                 ],
-                input=f"{self.charm.cluster_name}\nYes I am aware".encode(),
+                input=f"{self.charm.cluster_name}\nYes I am aware\npostgresql-0\n".encode(),
                 stdout=PIPE,
                 stderr=PIPE,
                 preexec_fn=demote(),
@@ -294,26 +313,6 @@ class PostgreSQLAsyncReplication(Object):
                 raise Exception(
                     f"Failed to remove previous cluster information with error: {process.stderr.decode()}"
                 )
-
-        # Clean folder and generate configuration.
-        try:
-            path = Path(POSTGRESQL_DATA_PATH)
-            if path.exists() and path.is_dir():
-                shutil.rmtree(path)
-        except OSError as e:
-            raise Exception(
-                f"Failed to remove contents of the data directory with error: {str(e)}"
-            )
-
-        self.charm.update_config()
-        logger.info("_on_standby_changed: configuration done, waiting for restart of the service")
-
-        # We are ready to restart the service now: all peers have configured themselves.
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            raise Exception("Cannot start/stop service, snap is not yet installed.")
-        charmed_postgresql_snap.start(services=["patroni"])
 
     def _get_primary_candidates(self):
         rel = self.model.get_relation(ASYNC_PRIMARY_RELATION)
@@ -354,12 +353,6 @@ class PostgreSQLAsyncReplication(Object):
             event.fail("No primary relation")
             return
 
-        # Check if this is a take over from a standby cluster
-        if event.params.get("force", False) and event.params.get(
-            "force-really-really-mean-it", False
-        ):
-            pass
-
         # Let the exception error the unit
         unit = self._check_if_primary_already_selected()
         if unit:
@@ -367,7 +360,6 @@ class PostgreSQLAsyncReplication(Object):
             return
 
         # If this is a standby-leader, then execute switchover logic
-        # TODO
         primary_relation.data[self.charm.unit]["elected"] = json.dumps(
             {
                 "endpoint": self.endpoint,
@@ -382,4 +374,62 @@ class PostgreSQLAsyncReplication(Object):
         if not replica_relation or "unit-address" not in replica_relation.data[self.charm.unit]:
             return
         del replica_relation.data[self.charm.unit]["unit-address"]
-        # event.set_result()
+
+    def get_system_identifier(self) -> Tuple[Optional[str], Optional[str]]:
+        """Returns the PostgreSQL system identifier from this instance."""
+
+        def demote():
+            pw_record = pwd.getpwnam("snap_daemon")
+
+            def result():
+                os.setgid(pw_record.pw_gid)
+                os.setuid(pw_record.pw_uid)
+
+            return result
+
+        process = run(
+            [
+                f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
+                POSTGRESQL_DATA_PATH,
+            ],
+            stdout=PIPE,
+            stderr=PIPE,
+            preexec_fn=demote(),
+        )
+        if process.returncode != 0:
+            return None, process.stderr.decode()
+        system_identifier = [
+            line
+            for line in process.stdout.decode().splitlines()
+            if "Database system identifier" in line
+        ][0].split(" ")[-1]
+        return system_identifier, None
+
+    def update_async_replication_data(self) -> None:
+        """Updates the async-replication data, if the unit is the leader.
+
+        This is used to update the standby units with the new primary information.
+        If the unit is not the leader, then the data is removed from its databag.
+        """
+        if "promoted" not in self.charm.app_peer_data:
+            return
+
+        primary_relation = self.model.get_relation(ASYNC_PRIMARY_RELATION)
+        if self.charm.unit.is_leader():
+            system_identifier, error = self.get_system_identifier()
+            if error is not None:
+                raise Exception(f"Failed to get system identifier: {error}")
+            primary_relation.data[self.charm.unit]["elected"] = json.dumps(
+                {
+                    "endpoint": self.endpoint,
+                    "monitoring-password": self.charm.get_secret(
+                        APP_SCOPE, MONITORING_PASSWORD_KEY
+                    ),
+                    "replication-password": self.charm._patroni._replication_password,
+                    "rewind-password": self.charm.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
+                    "superuser-password": self.charm._patroni._superuser_password,
+                    "system-id": system_identifier,
+                }
+            )
+        else:
+            primary_relation.data[self.charm.unit]["elected"] = ""
