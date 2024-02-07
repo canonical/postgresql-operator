@@ -6,6 +6,7 @@
 import json
 import logging
 import os
+import platform
 import subprocess
 import time
 from typing import Dict, List, Literal, Optional, Set, get_args
@@ -968,12 +969,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        if (
-            postgres_snap.revision
-            != list(
-                filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
-            )[0][1]["revision"]
-        ):
+        if postgres_snap.revision != list(
+            filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
+        )[0][1]["revision"].get(platform.machine()):
             logger.debug(
                 "Early exit _setup_exporter: snap was not refreshed to the right version yet"
             )
@@ -1277,9 +1275,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 snap_package = snap_cache[snap_name]
 
                 if not snap_package.present or refresh:
-                    if snap_version.get("revision"):
+                    if revision := snap_version.get("revision"):
+                        try:
+                            revision = revision[platform.machine()]
+                        except Exception:
+                            logger.error("Unavailable snap architecture %s", platform.machine())
+                            raise
+                        channel = snap_version.get("channel", "")
                         snap_package.ensure(
-                            snap.SnapState.Latest, revision=snap_version["revision"]
+                            snap.SnapState.Latest, revision=revision, channel=channel
                         )
                         snap_package.hold()
                     else:
