@@ -20,6 +20,7 @@ from .helpers import (
     get_unit_address,
     wait_for_idle_on_blocked,
 )
+from .juju_ import juju_major_version
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
@@ -27,7 +28,14 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
-TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
+if juju_major_version < 3:
+    TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
+    TLS_CHANNEL = "legacy/stable"
+    TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
+else:
+    TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
+    TLS_CHANNEL = "latest/stable"
+    TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -79,11 +87,14 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
             bucket_object.delete()
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
+@pytest.mark.group(1)
 async def test_none() -> None:
     """Empty test so that the suite will not fail if all tests are skippedi."""
     pass
 
 
+@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
@@ -92,8 +103,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME)
-    config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-    await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=config, channel="legacy/stable")
+    await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL)
 
     for cloud, config in cloud_configs[0].items():
         # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
@@ -221,17 +231,31 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
     await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
 
+@pytest.mark.group(1)
 async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     charm = await ops_test.build_charm(".")
+    previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
+    await ops_test.model.deploy(charm, application_name=previous_database_app_name)
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
         series=CHARM_SERIES,
     )
+    await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
     async with ops_test.fast_forward():
+        logger.info(
+            "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
+        )
+        await wait_for_idle_on_blocked(
+            ops_test,
+            previous_database_app_name,
+            2,
+            S3_INTEGRATOR_APP_NAME,
+            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+        )
         logger.info(
             "waiting for the database charm to become blocked due to existing backups from another cluster in the repository"
         )
@@ -242,6 +266,10 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
             S3_INTEGRATOR_APP_NAME,
             ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
         )
+
+    # Remove the database app with the same name as the previous one (that was used only to test
+    # that the cluster becomes blocked).
+    await ops_test.model.remove_application(previous_database_app_name, block_until_done=True)
 
     # Run the "list backups" action.
     unit_name = f"{database_app_name}/0"
@@ -298,6 +326,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
     connection.close()
 
 
+@pytest.mark.group(1)
 async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:

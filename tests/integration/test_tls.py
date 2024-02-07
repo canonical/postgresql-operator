@@ -23,13 +23,22 @@ from .helpers import (
     restart_machine,
     run_command_on_unit,
 )
+from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
+if juju_major_version < 3:
+    TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
+    TLS_CHANNEL = "legacy/stable"
+    TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
+else:
+    TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
+    TLS_CHANNEL = "latest/stable"
+    TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
@@ -53,9 +62,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
-        config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
         await ops_test.model.deploy(
-            TLS_CERTIFICATES_APP_NAME, config=config, channel="legacy/stable"
+            TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL
         )
 
         # Relate it to the PostgreSQL to enable TLS.

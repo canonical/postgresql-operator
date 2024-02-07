@@ -20,21 +20,21 @@ jobs:
     uses: ./.github/workflows/ci.yaml
     secrets: inherit
     permissions:
-      actions: write  # Needed to manage GitHub Actions cache
+      contents: write  # Needed for Allure Report beta
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm_without_cache.yaml@v6.3.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v11.0.1
 
   release:
     name: Release charm
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v6.3.2
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v11.0.1
     with:
       channel: 14/edge
-      artifact-name: ${{ needs.build.outputs.artifact-name }}
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:

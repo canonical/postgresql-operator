@@ -14,11 +14,12 @@ from lightkube.resources.core_v1 import Pod
 from pytest_operator.plugin import OpsTest
 
 from tests.integration.ha_tests.helpers import (
+    app_name,
     are_writes_increasing,
     check_writes,
     get_standby_leader,
     get_sync_standby,
-    start_continuous_writes, app_name,
+    start_continuous_writes,
 )
 from tests.integration.helpers import (
     APPLICATION_NAME,

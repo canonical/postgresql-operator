@@ -7,6 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
+    APPLICATION_NAME,
     DATABASE_APP_NAME,
     count_switchovers,
     get_leader_unit,
@@ -14,7 +15,6 @@ from ..helpers import (
     remove_chown_workaround,
 )
 from .helpers import (
-    APPLICATION_NAME,
     are_writes_increasing,
     check_writes,
     start_continuous_writes,
@@ -25,6 +25,7 @@ logger = logging.getLogger(__name__)
 TIMEOUT = 600
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:

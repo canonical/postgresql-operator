@@ -64,6 +64,26 @@ class CharmConfig(BaseConfigModel):
     plugin_tsm_system_time_enable: bool
     plugin_uuid_ossp_enable: bool
     plugin_spi_enable: bool
+    plugin_bool_plperl_enable: bool
+    plugin_hll_enable: bool
+    plugin_hypopg_enable: bool
+    plugin_ip4r_enable: bool
+    plugin_plperl_enable: bool
+    plugin_jsonb_plperl_enable: bool
+    plugin_orafce_enable: bool
+    plugin_pg_similarity_enable: bool
+    plugin_prefix_enable: bool
+    plugin_rdkit_enable: bool
+    plugin_tds_fdw_enable: bool
+    plugin_icu_ext_enable: bool
+    plugin_pltcl_enable: bool
+    plugin_postgis_enable: bool
+    plugin_address_standardizer_enable: bool
+    plugin_address_standardizer_data_us_enable: bool
+    plugin_postgis_tiger_geocoder_enable: bool
+    plugin_postgis_topology_enable: bool
+    plugin_postgis_raster_enable: bool
+    plugin_vector_enable: bool
     request_date_style: Optional[str]
     request_standard_conforming_strings: Optional[bool]
     request_time_zone: Optional[str]
@@ -204,7 +224,7 @@ class CharmConfig(BaseConfigModel):
         if value < 128:
             raise ValueError("PostgreSQL Charm requires at least 128MB")
         if value > 9999999:
-            raise ValueError("`profile-limit-memory` limited to 7 digits (9999999MB)")
+            raise ValueError("`profile_limit_memory` limited to 7 digits (9999999MB)")
 
         return value
 

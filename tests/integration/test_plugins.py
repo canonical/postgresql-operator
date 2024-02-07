@@ -57,8 +57,35 @@ REFINT_EXTENSION_STATEMENT = "CREATE TABLE A (ID int4 not null); CREATE UNIQUE I
 AUTOINC_EXTENSION_STATEMENT = "CREATE TABLE ids (id int4, idesc text);CREATE TRIGGER ids_nextid BEFORE INSERT OR UPDATE ON ids FOR EACH ROW EXECUTE PROCEDURE autoinc (id, next_id);"
 INSERT_USERNAME_EXTENSION_STATEMENT = "CREATE TABLE username_test (name text, username text not null);CREATE TRIGGER insert_usernames BEFORE INSERT OR UPDATE ON username_test FOR EACH ROW EXECUTE PROCEDURE insert_username (username);"
 MODDATETIME_EXTENSION_STATEMENT = "CREATE TABLE mdt (moddate timestamp DEFAULT CURRENT_TIMESTAMP NOT NULL);CREATE TRIGGER mdt_moddatetime BEFORE UPDATE ON mdt FOR EACH ROW EXECUTE PROCEDURE moddatetime (moddate);"
+BOOL_PLPERL_EXTENSION_STATEMENT = "CREATE FUNCTION hello_bool(bool) RETURNS TEXT TRANSFORM FOR TYPE bool LANGUAGE plperl AS $$ my $with_world = shift; return sprintf('hello%s', $with_world ? ' world' : ''); $$;"
+HLL_EXTENSION_STATEMENT = "CREATE TABLE hll_test (users hll);"
+HYPOPG_EXTENSION_STATEMENT = "CREATE TABLE hypopg_test (id integer, val text); SELECT hypopg_create_index('CREATE INDEX ON hypopg_test (id)');"
+IP4R_EXTENSION_STATEMENT = "CREATE TABLE ip4r_test (ip ip4);"
+JSONB_PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION jsonb_plperl_test(val jsonb) RETURNS jsonb TRANSFORM FOR TYPE jsonb LANGUAGE plperl as $$ return $_[0]; $$;"
+ORAFCE_EXTENSION_STATEMENT = "SELECT add_months(date '2005-05-31',1);"
+PG_SIMILARITY_EXTENSION_STATEMENT = "SHOW pg_similarity.levenshtein_threshold;"
+PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION plperl_test(name text) RETURNS text AS $$ return $_SHARED{$_[0]}; $$ LANGUAGE plperl;"
+PREFIX_EXTENSION_STATEMENT = "SELECT '123'::prefix_range @> '123456';"
+RDKIT_EXTENSION_STATEMENT = "SELECT is_valid_smiles('CCC');"
+TDS_FDW_EXTENSION_STATEMENT = "CREATE SERVER mssql_svr FOREIGN DATA WRAPPER tds_fdw OPTIONS (servername 'tds_fdw_test', port '3306', database 'tds_fdw_test', tds_version '7.1');"
+ICU_EXT_EXTENSION_STATEMENT = (
+    'CREATE COLLATION "vat-lat" (provider = icu, locale = "la-VA-u-kn-true")'
+)
+PLTCL_EXTENSION_STATEMENT = (
+    "CREATE FUNCTION pltcl_test(integer) RETURNS integer AS $$ return $1 $$ LANGUAGE pltcl STRICT;"
+)
+POSTGIS_EXTENSION_STATEMENT = "SELECT PostGIS_Full_Version();"
+ADDRESS_STANDARDIZER_EXTENSION_STATEMENT = "SELECT num, street, city, zip, zipplus FROM parse_address('1 Devonshire Place, Boston, MA 02109-1234');"
+ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT = "SELECT house_num, name, suftype, city, country, state, unit  FROM standardize_address('us_lex', 'us_gaz', 'us_rules', 'One Devonshire Place, PH 301, Boston, MA 02109');"
+POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT = "SELECT *  FROM standardize_address('tiger.pagc_lex', 'tiger.pagc_gaz', 'tiger.pagc_rules', 'One Devonshire Place, PH 301, Boston, MA 02109-1234');"
+POSTGIS_TOPOLOGY_STATEMENT = "SELECT topology.CreateTopology('nyc_topo', 26918, 0.5);"
+POSTGIS_RASTER_STATEMENT = "CREATE TABLE test_postgis_raster (name varchar, rast raster);"
+VECTOR_EXTENSION_STATEMENT = (
+    "CREATE TABLE vector_test (id bigserial PRIMARY KEY, embedding vector(3));"
+)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_plugins(ops_test: OpsTest) -> None:
@@ -110,6 +137,26 @@ async def test_plugins(ops_test: OpsTest) -> None:
             INSERT_USERNAME_EXTENSION_STATEMENT,
             MODDATETIME_EXTENSION_STATEMENT,
         ],
+        "plugin_bool_plperl_enable": BOOL_PLPERL_EXTENSION_STATEMENT,
+        "plugin_hll_enable": HLL_EXTENSION_STATEMENT,
+        "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
+        "plugin_hypopg_enable": HYPOPG_EXTENSION_STATEMENT,
+        "plugin_ip4r_enable": IP4R_EXTENSION_STATEMENT,
+        "plugin_plperl_enable": PLPERL_EXTENSION_STATEMENT,
+        "plugin_jsonb_plperl_enable": JSONB_PLPERL_EXTENSION_STATEMENT,
+        "plugin_orafce_enable": ORAFCE_EXTENSION_STATEMENT,
+        "plugin_pg_similarity_enable": ORAFCE_EXTENSION_STATEMENT,
+        "plugin_prefix_enable": PREFIX_EXTENSION_STATEMENT,
+        "plugin_rdkit_enable": RDKIT_EXTENSION_STATEMENT,
+        "plugin_tds_fdw_enable": TDS_FDW_EXTENSION_STATEMENT,
+        "plugin_icu_ext_enable": ICU_EXT_EXTENSION_STATEMENT,
+        "plugin_pltcl_enable": PLTCL_EXTENSION_STATEMENT,
+        "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
+        "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
+        "plugin_postgis_tiger_geocoder_enable": POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT,
+        "plugin_postgis_raster_enable": POSTGIS_RASTER_STATEMENT,
+        "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_STATEMENT,
+        "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):

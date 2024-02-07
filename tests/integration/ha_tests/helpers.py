@@ -3,7 +3,6 @@
 import os
 import random
 import subprocess
-from juju.model import Model
 from pathlib import Path
 from tempfile import mkstemp
 from typing import Dict, Optional, Set, Tuple
@@ -11,6 +10,7 @@ from typing import Dict, Optional, Set, Tuple
 import psycopg2
 import requests
 import yaml
+from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import (
     RetryError,
@@ -21,9 +21,8 @@ from tenacity import (
     wait_fixed,
 )
 
-from ..helpers import db_connect, get_unit_address, run_command_on_unit
+from ..helpers import APPLICATION_NAME, db_connect, get_unit_address, run_command_on_unit
 
-APPLICATION_NAME = "postgresql-test-app"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 PORT = 5432
 APP_NAME = METADATA["name"]
@@ -86,7 +85,9 @@ async def are_writes_increasing(ops_test, down_unit: str = None) -> None:
                 assert more_writes[member] > count, f"{member}: writes not continuing to DB"
 
 
-async def app_name(ops_test: OpsTest, application_name: str = "postgresql", model: Model = None) -> Optional[str]:
+async def app_name(
+    ops_test: OpsTest, application_name: str = "postgresql", model: Model = None
+) -> Optional[str]:
     """Returns the name of the cluster running PostgreSQL.
 
     This is important since not all deployments of the PostgreSQL charm have the application name
