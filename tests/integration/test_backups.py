@@ -241,7 +241,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
             await scale_application(ops_test, database_app_name, 2)
 
             # Ensure replication is working correctly.
-            new_unit_name = f"{database_app_name}/1"
+            new_unit_name = f"{database_app_name}/2"
             address = get_unit_address(ops_test, new_unit_name)
             with db_connect(
                 host=address, password=password
