@@ -360,6 +360,42 @@ def get_random_unit(ops_test: OpsTest, app: str) -> str:
     return random.choice(ops_test.model.applications[app].units).name
 
 
+async def get_standby_leader(model: Model, application_name: str) -> str:
+    """Get the standby leader name.
+
+    Args:
+        model: the model instance.
+        application_name: the name of the application to get the value for.
+
+    Returns:
+        the name of the standby leader.
+    """
+    status = await model.get_status()
+    first_unit_ip = list(status["applications"][application_name]["units"].values())[0]["address"]
+    cluster = get_patroni_cluster(first_unit_ip)
+    for member in cluster["members"]:
+        if member["role"] == "standby_leader":
+            return member["name"]
+
+
+async def get_sync_standby(model: Model, application_name: str) -> str:
+    """Get the sync_standby name.
+
+    Args:
+        model: the model instance.
+        application_name: the name of the application to get the value for.
+
+    Returns:
+        the name of the sync standby.
+    """
+    status = await model.get_status()
+    first_unit_ip = list(status["applications"][application_name]["units"].values())[0]["address"]
+    cluster = get_patroni_cluster(first_unit_ip)
+    for member in cluster["members"]:
+        if member["role"] == "sync_standby":
+            return member["name"]
+
+
 async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 

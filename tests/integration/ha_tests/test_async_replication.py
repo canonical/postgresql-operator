@@ -9,11 +9,16 @@ from typing import Optional
 import pytest as pytest
 from juju.controller import Controller
 from juju.model import Model
-from lightkube import Client
-from lightkube.resources.core_v1 import Pod
 from pytest_operator.plugin import OpsTest
 
-from tests.integration.ha_tests.helpers import (
+from ..helpers import (
+    APPLICATION_NAME,
+    DATABASE_APP_NAME,
+    get_leader_unit,
+    wait_for_relation_removed_between,
+)
+from ..juju_ import juju_major_version
+from .helpers import (
     app_name,
     are_writes_increasing,
     check_writes,
@@ -21,14 +26,6 @@ from tests.integration.ha_tests.helpers import (
     get_sync_standby,
     start_continuous_writes,
 )
-from tests.integration.helpers import (
-    APPLICATION_NAME,
-    DATABASE_APP_NAME,
-    build_and_deploy,
-    get_leader_unit,
-    wait_for_relation_removed_between,
-)
-from tests.integration.juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +76,19 @@ async def test_deploy_async_replication_setup(
 ) -> None:
     """Build and deploy two PostgreSQL cluster in two separate models to test async replication."""
     if not await app_name(ops_test):
-        await build_and_deploy(ops_test, 3, wait_for_idle=False)
-    if not await app_name(ops_test, second_model):
-        await build_and_deploy(ops_test, 3, wait_for_idle=False, model=second_model)
+        charm = await ops_test.build_charm(".")
+        await ops_test.model.deploy(
+            charm,
+            num_units=3,
+            config={"profile": "testing"},
+        )
+    if not await app_name(ops_test, model=second_model):
+        charm = await ops_test.build_charm(".")
+        await second_model.deploy(
+            charm,
+            num_units=3,
+            config={"profile": "testing"},
+        )
     await ops_test.model.deploy(APPLICATION_NAME, num_units=1)
 
     async with ops_test.fast_forward(), fast_forward(second_model):
@@ -89,10 +96,12 @@ async def test_deploy_async_replication_setup(
             first_model.wait_for_idle(
                 apps=[DATABASE_APP_NAME, APPLICATION_NAME],
                 status="active",
+                timeout=1500,
             ),
             second_model.wait_for_idle(
                 apps=[DATABASE_APP_NAME],
                 status="active",
+                timeout=1500,
             ),
         )
 
@@ -230,9 +239,8 @@ async def test_async_replication_failover_in_main_cluster(
 
     sync_standby = await get_sync_standby(first_model, DATABASE_APP_NAME)
     logger.info(f"Sync-standby: {sync_standby}")
-    logger.info("deleting the sync-standby pod")
-    client = Client(namespace=first_model.info.name)
-    client.delete(Pod, name=sync_standby.replace("/", "-"))
+    logger.info("removing the sync-standby unit")
+    await first_model.applications[DATABASE_APP_NAME].remove_unit(sync_standby)
 
     async with ops_test.fast_forward("60s"), fast_forward(second_model, "60s"):
         await gather(
@@ -267,9 +275,8 @@ async def test_async_replication_failover_in_secondary_cluster(
 
     standby_leader = await get_standby_leader(second_model, DATABASE_APP_NAME)
     logger.info(f"Standby leader: {standby_leader}")
-    logger.info("deleting the standby leader pod")
-    client = Client(namespace=second_model.info.name)
-    client.delete(Pod, name=standby_leader.replace("/", "-"))
+    logger.info("removing the standby leader unit")
+    await second_model.applications[DATABASE_APP_NAME].remove_unit(standby_leader)
 
     async with ops_test.fast_forward("60s"), fast_forward(second_model, "60s"):
         await gather(

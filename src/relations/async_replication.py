@@ -14,11 +14,12 @@ import logging
 import os
 import pwd
 import shutil
+import subprocess
+from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, run
 from typing import Dict, Optional, Set, Tuple
 
-from charms.operator_libs_linux.v2 import snap
 from ops.charm import (
     ActionEvent,
     CharmBase,
@@ -26,14 +27,18 @@ from ops.charm import (
 from ops.framework import Object
 from ops.model import (
     Unit,
+    WaitingStatus,
 )
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     APP_SCOPE,
     MONITORING_PASSWORD_KEY,
     PATRONI_CONF_PATH,
     POSTGRESQL_DATA_PATH,
+    REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
+    USER_PASSWORD_KEY,
 )
 from coordinator_ops import CoordinatedOpsManager
 
@@ -98,9 +103,12 @@ class PostgreSQLAsyncReplication(Object):
     @property
     def endpoint(self) -> str:
         """Assumes the endpoint is the same, disregard if we are a primary or standby cluster."""
-        for rel in self.relation_set:
-            return str(self.charm.model.get_binding(rel).network.ingress_address)
-        return None
+        sync_standby_names = self.charm._patroni.get_sync_standby_names()
+        if len(sync_standby_names) > 0:
+            unit = self.model.get_unit(sync_standby_names[0])
+            return self.charm.get_unit_ip(unit)
+        else:
+            return self.charm.get_unit_ip(self.charm.unit)
 
     def standby_endpoints(self) -> Set[str]:
         """Returns the set of IPs used by each standby unit with a /32 mask."""
@@ -109,24 +117,27 @@ class PostgreSQLAsyncReplication(Object):
             for unit in self._all_units(rel):
                 if not rel.data[unit].get("elected", None):
                     standby_endpoints.add("{}/32".format(str(rel.data[unit]["ingress-address"])))
-                    if "unit-address" in rel.data[unit]:
-                        standby_endpoints.add("{}/32".format(str(rel.data[unit]["unit-address"])))
+                    if "pod-address" in rel.data[unit]:
+                        standby_endpoints.add("{}/32".format(str(rel.data[unit]["pod-address"])))
         return standby_endpoints
 
-    def get_primary_data(self) -> Dict[str, str]:
+    def get_primary_data(self) -> Optional[Dict[str, str]]:
         """Returns the primary info, if available and if the primary cluster is ready."""
         for rel in self.relation_set:
             for unit in self._all_units(rel):
                 if "elected" in rel.data[unit] and unit.name == self.charm.unit.name:
                     # If this unit is the leader, then return None
                     return None
+
                 if rel.data[unit].get("elected", None) and rel.data[unit].get(
                     "primary-cluster-ready", None
                 ):
                     elected_data = json.loads(rel.data[unit]["elected"])
                     return {
                         "endpoint": str(elected_data["endpoint"]),
+                        "monitoring-password": elected_data["monitoring-password"],
                         "replication-password": elected_data["replication-password"],
+                        "rewind-password": elected_data["rewind-password"],
                         "superuser-password": elected_data["superuser-password"],
                     }
         return None
@@ -153,20 +164,22 @@ class PostgreSQLAsyncReplication(Object):
         ]:
             if not rel:  # if no relation exits, then it rel == None
                 continue
-            if "unit-address" in rel.data[self.charm.unit]:
-                del rel.data[self.charm.unit]["unit-address"]
+            if "pod-address" in rel.data[self.charm.unit]:
+                del rel.data[self.charm.unit]["pod-address"]
             if "elected" in rel.data[self.charm.unit]:
                 del rel.data[self.charm.unit]["elected"]
             if "primary-cluster-ready" in rel.data[self.charm.unit]:
                 del rel.data[self.charm.unit]["primary-cluster-ready"]
+        if self.charm.unit.is_leader() and "promoted" in self.charm.app_peer_data:
+            del self.charm.app_peer_data["promoted"]
 
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            raise Exception("Cannot start/stop service, snap is not yet installed.")
-        charmed_postgresql_snap.stop(services=["patroni"])
+        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+            with attempt:
+                if not self.charm._patroni.stop_patroni():
+                    raise Exception("Failed to stop patroni service.")
         self.charm.update_config()
-        charmed_postgresql_snap.start(services=["patroni"])
+        if not self.charm._patroni.start_patroni():
+            raise Exception("Failed to start patroni service.")
 
     def _on_primary_changed(self, event):
         """Triggers a configuration change in the primary units."""
@@ -193,17 +206,17 @@ class PostgreSQLAsyncReplication(Object):
             # We will have more events happening, no need for retrigger
             event.defer()
             return
-        logger.info("_on_primary_changed: all replicas published unit details")
+        logger.info("_on_primary_changed: all replicas published pod details")
 
         # This unit is the leader, generate  a new configuration and leave.
         # There is nothing to do for the leader.
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            raise Exception("Cannot start/stop service, snap is not yet installed.")
-        charmed_postgresql_snap.stop(services=["patroni"])
+        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+            with attempt:
+                if not self.charm._patroni.stop_patroni():
+                    raise Exception("Failed to stop patroni service.")
         self.charm.update_config()
-        charmed_postgresql_snap.start(services=["patroni"])
+        if not self.charm._patroni.start_patroni():
+            raise Exception("Failed to start patroni service.")
 
         # Retrigger the other units' async-replica-changed
         primary_relation.data[self.charm.unit]["primary-cluster-ready"] = "True"
@@ -229,13 +242,35 @@ class PostgreSQLAsyncReplication(Object):
             return
         logger.info("_on_standby_changed: unit-address published in own replica databag")
 
-        if not self.get_primary_data():
+        primary_data = self.get_primary_data()
+        if not primary_data:
             # We've made thus far.
             # However, the get_primary_data will return != None ONLY if the primary cluster
             # is ready and configured. Until then, we wait.
             event.defer()
             return
         logger.info("_on_standby_changed: primary cluster is ready")
+
+        if "system-id" not in replica_relation.data[self.charm.unit]:
+            system_identifier, error = self.get_system_identifier()
+            if error is not None:
+                raise Exception(f"Failed to get system identifier: {error}")
+            replica_relation.data[self.charm.unit]["system-id"] = system_identifier
+
+            if self.charm.unit.is_leader():
+                self.charm.set_secret(
+                    APP_SCOPE, MONITORING_PASSWORD_KEY, primary_data["monitoring-password"]
+                )
+                self.charm.set_secret(
+                    APP_SCOPE, USER_PASSWORD_KEY, primary_data["superuser-password"]
+                )
+                self.charm.set_secret(
+                    APP_SCOPE, REPLICATION_PASSWORD_KEY, primary_data["replication-password"]
+                )
+                self.charm.set_secret(
+                    APP_SCOPE, REWIND_PASSWORD_KEY, primary_data["rewind-password"]
+                )
+                del self.charm._peers.data[self.charm.app]["cluster_initialised"]
 
         ################
         # Initiate restart logic
@@ -244,7 +279,7 @@ class PostgreSQLAsyncReplication(Object):
         # We need to:
         # 1) Stop all standby units
         # 2) Delete the k8s service
-        # 3) Remove the pgdata folder
+        # 3) Remove the pgdata folder (if the clusters are different)
         # 4) Start all standby units
         # For that, the peer leader must first stop its own service and then, issue a
         # coordination request to all units. All units ack that request once they all have
@@ -256,33 +291,51 @@ class PostgreSQLAsyncReplication(Object):
             self.restart_coordinator.coordinate()
 
     def _on_coordination_request(self, event):
+        # Stop the service.
+        # We need all replicas to be stopped, so we can remove the previous cluster info.
+        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                if not self.charm._patroni.stop_patroni():
+                    raise Exception("Failed to stop patroni service.")
+
+        replica_relation = self.model.get_relation(ASYNC_REPLICA_RELATION)
+        for unit in replica_relation.units:
+            if "elected" not in replica_relation.data[unit]:
+                continue
+            elected_data = json.loads(replica_relation.data[unit]["elected"])
+            if "system-id" not in elected_data:
+                continue
+            if replica_relation.data[self.charm.unit]["system-id"] != elected_data["system-id"]:
+                if self.charm.unit.is_leader():
+                    # Store current data in a ZIP file, clean folder and generate configuration.
+                    logger.info("Creating backup of pgdata folder")
+                    subprocess.check_call(
+                        f"tar -zcf {POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.zip {POSTGRESQL_DATA_PATH}".split()
+                    )
+                logger.info("Removing and recreating pgdata folder")
+                try:
+                    path = Path(POSTGRESQL_DATA_PATH)
+                    if path.exists() and path.is_dir():
+                        shutil.rmtree(path)
+                except OSError as e:
+                    raise Exception(
+                        f"Failed to remove contents of the data directory with error: {str(e)}"
+                    )
+                break
         self.restart_coordinator.acknowledge(event)
 
     def _on_coordination_approval(self, event):
         """Runs when the coordinator guaranteed all units have stopped."""
-        snap_cache = snap.SnapCache()
-        charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
-            raise Exception("Cannot restart service, snap is not yet installed.")
-        charmed_postgresql_snap.stop(services=["patroni"])
-
-        # Clean folder and generate configuration.
-        try:
-            path = Path(POSTGRESQL_DATA_PATH)
-            if path.exists() and path.is_dir():
-                shutil.rmtree(path)
-        except OSError as e:
-            raise Exception(
-                f"Failed to remove contents of the data directory with error: {str(e)}"
-            )
-
         self.charm.update_config()
-        logger.info("_on_standby_changed: configuration done, waiting for restart of the service")
-
-        # We are ready to restart the service now: all peers have configured themselves.
-        charmed_postgresql_snap.start(services=["patroni"])
+        logger.info(
+            "_on_coordination_approval: configuration done, waiting for restart of the service"
+        )
 
         if self.charm.unit.is_leader():
+            # We are ready to restart the service now: all peers have configured themselves.
+            if not self.charm._patroni.start_patroni():
+                raise Exception("Failed to start patroni service.")
+
             # Remove previous cluster information to make it possible to initialise a new cluster.
             logger.info("Removing previous cluster information")
 
@@ -313,12 +366,17 @@ class PostgreSQLAsyncReplication(Object):
                 raise Exception(
                     f"Failed to remove previous cluster information with error: {process.stderr.decode()}"
                 )
+            self.charm._peers.data[self.charm.app]["cluster_initialised"] = "True"
+        else:
+            self.charm.unit.status = WaitingStatus("waiting for primary to be ready")
+            event.defer()
+            return
 
     def _get_primary_candidates(self):
         rel = self.model.get_relation(ASYNC_PRIMARY_RELATION)
         return rel.units if rel else []
 
-    def _check_if_primary_already_selected(self) -> Unit:
+    def _check_if_primary_already_selected(self) -> Optional[Unit]:
         """Returns the unit if a primary is present."""
         result = None
         if not self.relation_set:
