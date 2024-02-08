@@ -46,7 +46,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
 
-from backups import PostgreSQLBackups
+from backups import PostgreSQLBackups, CANNOT_RESTORE_PITR
 from cluster import (
     NotReadyError,
     Patroni,
@@ -464,6 +464,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
             return
+
+        if "restoring-backup" in self.app_peer_data and isinstance(self.unit.status, BlockedStatus):
+            event.defer()
 
         # Start can be called here multiple times as it's idempotent.
         # At this moment, it starts Patroni at the first time the data is received
@@ -1131,12 +1134,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.unit.status = BlockedStatus("Failed to restore backup")
                 return
 
+            if "restore-to-time" in self.app_peer_data and self._patroni.is_pitr_failed():
+                logger.error("Restore failed: database service failed to reach point-in-time-recovery target. "
+                             "You can launch another restore with different parameters")
+                self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+                return
+
             if not self._patroni.member_started:
                 logger.debug("on_update_status early exit: Patroni has not started yet")
                 return
 
             # Remove the restoring backup flag and the restore stanza name.
-            self.app_peer_data.update({"restoring-backup": "", "restore-stanza": ""})
+            self.app_peer_data.update({"restoring-backup": "", "restore-stanza": "", "restore-to-time": ""})
             self.update_config()
             logger.info("Restore succeeded")
 
@@ -1393,6 +1402,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             is_creating_backup=is_creating_backup,
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
+            pitr_target=self.app_peer_data.get("restore-to-time"),
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,

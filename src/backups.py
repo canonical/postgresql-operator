@@ -45,11 +45,13 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
     "failed to access/create the bucket, check your S3 settings"
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
+CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 
 S3_BLOCK_MESSAGES = [
     ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
     FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+    CANNOT_RESTORE_PITR,
 ]
 
 
@@ -688,6 +690,10 @@ Stderr:
                 "restore-stanza": backups[backup_id],
             }
         )
+        if event.params.get("restore-to-time") is not None:
+            self.charm.app_peer_data["restore-to-time"] = event.params.get("restore-to-time")
+        else:
+            self.charm.app_peer_data.pop("restore-to-time", None)
         self.charm.update_config()
 
         # Start the database to start the restore process.
@@ -737,6 +743,7 @@ Stderr:
         if (
             self.charm.is_blocked
             and self.charm.unit.status.message != ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+            and self.charm.unit.status.message != CANNOT_RESTORE_PITR
         ):
             error_message = "Cluster or unit is in a blocking state"
             logger.error(f"Restore failed: {error_message}")

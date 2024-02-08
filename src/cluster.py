@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Helper class used to manage cluster lifecycle."""
+import glob
 import logging
 import os
 import pwd
@@ -448,6 +449,7 @@ class Patroni:
         stanza: str = None,
         restore_stanza: Optional[str] = None,
         backup_id: Optional[str] = None,
+        pitr_target: Optional[str] = None,
         parameters: Optional[dict[str, str]] = None,
     ) -> None:
         """Render the Patroni configuration file.
@@ -459,6 +461,7 @@ class Patroni:
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
             backup_id: id of the backup that is being restored.
+            pitr_target: point-in-time-recovery target for the backup.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
         """
         # Open the template patroni.yml file.
@@ -485,7 +488,9 @@ class Patroni:
             rewind_password=self.rewind_password,
             enable_pgbackrest=stanza is not None,
             restoring_backup=backup_id is not None,
+            restoring_to_pitr_target=pitr_target is not None,
             backup_id=backup_id,
+            pitr_target=pitr_target,
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
@@ -509,6 +514,38 @@ class Patroni:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
             return False
+
+    def is_pitr_failed(self) -> bool:
+        patroni_logs = self._patroni_logs()
+        if "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster" not in patroni_logs:
+            return False
+        postgresql_logs = self._last_postgresql_logs()
+        if "FATAL:  recovery ended before configured recovery target was reached" not in postgresql_logs:
+            return False
+        return True
+
+    def _patroni_logs(self, num_lines: int | None = 10) -> str:
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            return selected_snap.logs(services=["patroni"], num_lines=num_lines)
+        except snap.SnapError as e:
+            error_message = "Failed to get logs from patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return ""
+
+    def _last_postgresql_logs(self) -> str:
+        log_files = glob.glob(f"{POSTGRESQL_LOGS_PATH}/*.log")
+        if len(log_files) == 0:
+            return ""
+        log_files.sort(reverse=True)
+        try:
+            with open(log_files[0], 'r') as last_log_file:
+                return last_log_file.read()
+        except OSError as e:
+            error_message = "Failed to read last postgresql log file"
+            logger.exception(error_message, exc_info=e)
+            return ""
 
     def stop_patroni(self) -> bool:
         """Stop Patroni service using systemd.
