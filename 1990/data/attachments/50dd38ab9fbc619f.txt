@@ -1,0 +1,83 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:784 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  01:43:51Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.10    active      3  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0   active    idle   0        10.134.246.132  5432/tcp  
+postgresql/1   active    idle   1        10.134.246.205  5432/tcp  
+postgresql/2*  active    idle   2        10.134.246.115  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.134.246.132  juju-5f3462-0  ubuntu@22.04      Running
+1        started  10.134.246.205  juju-5f3462-1  ubuntu@22.04      Running
+2        started  10.134.246.115  juju-5f3462-2  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:790 Juju error logs:
+
+machine-2: 01:29:49 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:29:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:29:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:29:49 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:29:50 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:29:50 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:29:50 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-1: 01:29:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:29:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:29:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:29:52 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-0: 01:29:52 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-2: 01:43:48 ERROR unit.postgresql/2.juju-log Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/./src/charm.py", line 1501, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/main.py", line 436, in main
+    _emit_charm_event(charm, dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/main.py", line 144, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/framework.py", line 351, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/framework.py", line 853, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/framework.py", line 942, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/./src/charm.py", line 1115, in _on_set_password
+    self.set_secret(APP_SCOPE, f"{username}-password", password)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/./src/charm.py", line 267, in set_secret
+    self.peer_relation_app.update_relation_data(peers.id, {secret_key: value})
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 451, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1016, in update_relation_data
+    return self._update_relation_data(relation, data)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1599, in _update_relation_data
+    _, normal_fields = self._process_secret_fields(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 815, in _process_secret_fields
+    if group_result := operation(relation, group, secret_fields, *args, **kwargs):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1111, in _add_or_update_relation_secrets
+    return self._update_relation_secret(relation, group, secret_fields, data)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 462, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1096, in _update_relation_secret
+    secret.set_content(full_content)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 551, in set_content
+    self.meta.set_content(content)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/model.py", line 1330, in set_content
+    self._backend.secret_set(typing.cast(str, self.id), content=content)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/model.py", line 3359, in secret_set
+    self._run_for_secret('secret-set', *args)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/model.py", line 3321, in _run_for_secret
+    return self._run(*args, return_output=return_output, use_json=use_json)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/ops/model.py", line 2955, in _run
+    result = subprocess.run(args, **kwargs)  # type: ignore
+  File "/usr/lib/python3.10/subprocess.py", line 503, in run
+    with Popen(*popenargs, **kwargs) as process:
+  File "/usr/lib/python3.10/subprocess.py", line 971, in __init__
+    self._execute_child(args, executable, preexec_fn, close_fds,
+  File "/usr/lib/python3.10/subprocess.py", line 1863, in _execute_child
+    raise child_exception_type(errno_num, err_msg, err_filename)
+OSError: [Errno 7] Argument list too long: '/var/lib/juju/tools/unit-postgresql-2/secret-set'
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:856 Forgetting main...
