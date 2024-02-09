@@ -477,6 +477,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        # Restart the workload if it's stuck on the starting state after a timeline divergence
+        # due to a backup that was restored.
+        if not self.is_primary and (
+            self._patroni.member_replication_lag == "unknown"
+            or int(self._patroni.member_replication_lag) > 1000
+        ):
+            self._patroni.reinitialize_postgresql()
+            logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
+            self.unit.status = MaintenanceStatus("reinitialising replica")
+            event.defer()
+            return
+
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         if not self.backup.start_stop_pgbackrest_service():
             logger.debug(
@@ -484,6 +496,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             event.defer()
             return
+
+        self.backup.coordinate_stanza_fields()
 
         self.backup.check_stanza()
 
