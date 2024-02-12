@@ -26,7 +26,11 @@ from ops.testing import Harness
 from parameterized import parameterized
 from tenacity import RetryError
 
-from charm import EXTENSIONS_DEPENDENCY_MESSAGE, NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
+from charm import (
+    EXTENSIONS_DEPENDENCY_MESSAGE,
+    PRIMARY_NOT_REACHABLE_MESSAGE,
+    PostgresqlOperatorCharm,
+)
 from cluster import RemoveRaftMemberFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 from tests.helpers import patch_network_get
@@ -208,12 +212,12 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()
         self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
 
-        # Check for a BlockedStatus when there is no primary endpoint.
+        # Check for a WaitingStatus when the primary is not reachable yet.
         _primary_endpoint.return_value = None
         self.harness.set_leader(False)
         self.harness.set_leader()
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     def test_is_cluster_initialised(self):
         # Test when the cluster was not initialised yet.
@@ -1270,15 +1274,14 @@ class TestCharm(unittest.TestCase):
     def test_on_cluster_topology_change_keep_blocked(
         self, _update_relation_endpoints, _primary_endpoint
     ):
-        self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+        self.harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
         self.charm._on_cluster_topology_change(Mock())
 
         _update_relation_endpoints.assert_not_called()
-        self.assertEqual(_primary_endpoint.call_count, 2)
-        _primary_endpoint.assert_called_with()
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-        self.assertEqual(self.harness.model.unit.status.message, NO_PRIMARY_MESSAGE)
+        _primary_endpoint.assert_called_once_with()
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
+        self.assertEqual(self.harness.model.unit.status.message, PRIMARY_NOT_REACHABLE_MESSAGE)
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -1289,13 +1292,12 @@ class TestCharm(unittest.TestCase):
     def test_on_cluster_topology_change_clear_blocked(
         self, _update_relation_endpoints, _primary_endpoint
     ):
-        self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+        self.harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
         self.charm._on_cluster_topology_change(Mock())
 
         _update_relation_endpoints.assert_called_once_with()
-        self.assertEqual(_primary_endpoint.call_count, 2)
-        _primary_endpoint.assert_called_with()
+        _primary_endpoint.assert_called_once_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch_network_get(private_address="1.1.1.1")
