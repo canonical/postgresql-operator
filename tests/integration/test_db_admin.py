@@ -35,7 +35,6 @@ RELATION_NAME = "db-admin"
 
 @pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
-@pytest.mark.skip(reason="DB Admin tests are currently broken")
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     await ops_test.model.deploy(
@@ -47,12 +46,18 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     )
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
+    overlay = {
+        "applications": {
+            LANDSCAPE_APP_NAME: {"options": {"landscape_ppa": "ppa:landscape/self-hosted-23.03"}}
+        }
+    }
     relation_id = await deploy_and_relate_bundle_with_postgresql(
         ops_test,
         "ch:landscape-scalable",
         LANDSCAPE_APP_NAME,
         main_application_num_units=2,
         relation_name=RELATION_NAME,
+        overlay=overlay,
         timeout=3000,
     )
     await check_databases_creation(
