@@ -39,6 +39,7 @@ async def test_deploy_active(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
@@ -46,6 +47,9 @@ async def test_password_rotation(ops_test: OpsTest):
     any_unit_name = ops_test.model.applications[APP_NAME].units[0].name
     superuser_password = await get_password(ops_test, any_unit_name)
     replication_password = await get_password(ops_test, any_unit_name, "replication")
+    monitoring_password = await get_password(ops_test, any_unit_name, "monitoring")
+    backup_password = await get_password(ops_test, any_unit_name, "backup")
+    rewind_password = await get_password(ops_test, any_unit_name, "rewind")
 
     # Get the leader unit name (because passwords can only be set through it).
     leader = None
@@ -67,11 +71,41 @@ async def test_password_rotation(ops_test: OpsTest):
     assert "password" in result.keys()
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
-    new_superuser_password = await get_password(ops_test, any_unit_name)
+    # For monitoring, generate a specific password and pass it to the action.
+    new_monitoring_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="monitoring", password=new_monitoring_password
+    )
+    assert "password" in result.keys()
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
+    # For backup, generate a specific password and pass it to the action.
+    new_backup_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="backup", password=new_backup_password
+    )
+    assert "password" in result.keys()
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
+    # For rewind, generate a specific password and pass it to the action.
+    new_rewind_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="rewind", password=new_rewind_password
+    )
+    assert "password" in result.keys()
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
+    new_superuser_password = await get_password(ops_test, any_unit_name)
     assert superuser_password != new_superuser_password
     assert new_replication_password == await get_password(ops_test, any_unit_name, "replication")
     assert replication_password != new_replication_password
+    assert new_monitoring_password == await get_password(ops_test, any_unit_name, "monitoring")
+    assert monitoring_password != new_monitoring_password
+    assert new_backup_password == await get_password(ops_test, any_unit_name, "backup")
+    assert backup_password != new_backup_password
+    assert new_rewind_password == await get_password(ops_test, any_unit_name, "rewind")
+    assert rewind_password != new_rewind_password
+
 
     # Restart Patroni on any non-leader unit and check that
     # Patroni and PostgreSQL continue to work.
