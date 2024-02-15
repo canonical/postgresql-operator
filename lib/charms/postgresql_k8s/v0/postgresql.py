@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 22
+LIBPATCH = 23
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -572,10 +572,11 @@ END; $$;"""
             if parameter in ["date_style", "time_zone"]:
                 parameter = "".join(x.capitalize() for x in parameter.split("_"))
             parameters[parameter] = value
-        shared_buffers_max_value = int(int(available_memory * 0.4) / 10**6)
+        shared_buffers_max_value_in_mb = int(available_memory * 0.4 / 10**6)
+        shared_buffers_max_value = int(shared_buffers_max_value_in_mb * 10**3 / 8)
         if parameters.get("shared_buffers", 0) > shared_buffers_max_value:
             raise Exception(
-                f"Shared buffers config option should be at most 40% of the available memory, which is {shared_buffers_max_value}MB"
+                f"Shared buffers config option should be at most 40% of the available memory, which is {shared_buffers_max_value_in_mb}MB"
             )
         if profile == "production":
             # Use 25% of the available memory for shared_buffers.
