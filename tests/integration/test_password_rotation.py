@@ -4,6 +4,7 @@
 import json
 import time
 
+import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
 
@@ -12,8 +13,11 @@ from .helpers import (
     CHARM_SERIES,
     METADATA,
     check_patroni,
+    db_connect,
     get_leader_unit,
     get_password,
+    get_primary,
+    get_unit_address,
     restart_patroni,
     set_password,
 )
@@ -106,7 +110,6 @@ async def test_password_rotation(ops_test: OpsTest):
     assert new_rewind_password == await get_password(ops_test, any_unit_name, "rewind")
     assert rewind_password != new_rewind_password
 
-
     # Restart Patroni on any non-leader unit and check that
     # Patroni and PostgreSQL continue to work.
     restart_time = time.time()
@@ -154,6 +157,16 @@ async def test_empty_password(ops_test: OpsTest) -> None:
     # `get_secret()` returns a None value (as the field in the secret is set to string value "None")
     # And this true None value is turned to a string when the event is setting results.
     assert password == "None"
+
+
+@pytest.mark.group(1)
+async def test_db_connection_with_empty_password(ops_test: OpsTest):
+    """Test that user can't connect with empty password."""
+    primary = await get_primary(ops_test, f"{APP_NAME}/0")
+    address = get_unit_address(ops_test, primary)
+    with pytest.raises(psycopg2.Error):
+        with db_connect(address, "") as connection:
+            connection.close()
 
 
 @pytest.mark.group(1)
