@@ -579,9 +579,13 @@ END; $$;"""
                 f"Shared buffers config option should be at most 40% of the available memory, which is {shared_buffers_max_value_in_mb}MB"
             )
         if profile == "production":
-            # Use 25% of the available memory for shared_buffers.
-            # and the remaining as cache memory.
-            shared_buffers = int(available_memory * 0.25)
+            if "shared_buffers" in parameters:
+                # Convert to bytes to use in the calculation.
+                shared_buffers = parameters["shared_buffers"] * 8 * 10**3
+            else:
+                # Use 25% of the available memory for shared_buffers.
+                # and the remaining as cache memory.
+                shared_buffers = int(available_memory * 0.25)
             effective_cache_size = int(available_memory - shared_buffers)
             parameters.setdefault("shared_buffers", f"{int(shared_buffers/10**6)}MB")
             parameters.update({"effective_cache_size": f"{int(effective_cache_size/10**6)}MB"})
