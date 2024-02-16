@@ -1942,6 +1942,7 @@ class TestCharm(unittest.TestCase):
             for values in itertools.product(
                 [True, False], [True, False], [True, False], [True, False], [True, False]
             ):
+                _reload_patroni_configuration.reset_mock()
                 _restart.reset_mock()
                 with self.harness.hooks_disabled():
                     self.harness.update_relation_data(
@@ -1958,6 +1959,7 @@ class TestCharm(unittest.TestCase):
                 postgresql_mock.is_restart_pending = PropertyMock(return_value=values[3])
 
                 self.charm._handle_postgresql_restart_need(values[0])
+                _reload_patroni_configuration.assert_called_once()
                 self.assertIn(
                     "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit)
                 ) if values[0] else self.assertNotIn(
