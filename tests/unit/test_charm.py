@@ -1130,7 +1130,6 @@ class TestCharm(unittest.TestCase):
         mock_event.defer.assert_not_called()
 
     @patch_network_get(private_address="1.1.1.1")
-    @patch("charm.time.sleep", return_value=None)
     @patch("subprocess.check_output", return_value=b"C")
     @patch("charm.snap.SnapCache")
     @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
@@ -1153,7 +1152,6 @@ class TestCharm(unittest.TestCase):
         _restart,
         ___,
         ____,
-        _____,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.
