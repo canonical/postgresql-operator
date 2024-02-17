@@ -88,7 +88,7 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
-NO_PRIMARY_MESSAGE = "no primary in the cluster"
+PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
@@ -386,7 +386,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.primary_endpoint:
                 self._update_relation_endpoints()
             else:
-                self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+                self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
                 return
 
     def _on_pgdata_storage_detaching(self, _) -> None:
@@ -512,10 +512,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            if not self.is_blocked or self.unit.status.message == NO_PRIMARY_MESSAGE:
+            if not self.is_blocked:
                 self.unit.status = ActiveStatus()
         else:
-            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+            self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     def _reconfigure_cluster(self, event: HookEvent):
         """Reconfigure the cluster by adding and removing members IPs to it.
@@ -764,9 +764,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.info("Cluster topology changed")
         if self.primary_endpoint:
             self._update_relation_endpoints()
-        if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
-            if self.primary_endpoint:
-                self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -836,7 +834,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
         else:
-            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+            self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     def _on_config_changed(self, _) -> None:
         """Handle configuration changes, like enabling plugins."""
