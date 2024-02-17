@@ -62,9 +62,10 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         primary = await get_primary(
             ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
         )
-        password = await get_password(ops_test, primary)
-        second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
-        await set_password(ops_test, second_primary, password=password)
+        for user in ["monitoring", "operator", "replication", "rewind"]:
+            password = await get_password(ops_test, primary, user)
+            second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
+            await set_password(ops_test, second_primary, user, password)
         await ops_test.model.destroy_unit(second_primary)
 
 
