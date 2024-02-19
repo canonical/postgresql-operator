@@ -1,10 +1,11 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
+import itertools
 import logging
 import platform
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch
 
 import pytest
 from charms.operator_libs_linux.v2 import snap
@@ -13,13 +14,24 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLUpdateUserPasswordError,
 )
+from ops import Unit
 from ops.framework import EventBase
-from ops.model import ActiveStatus, BlockedStatus, RelationDataTypeError, WaitingStatus
+from ops.model import (
+    ActiveStatus,
+    BlockedStatus,
+    MaintenanceStatus,
+    RelationDataTypeError,
+    WaitingStatus,
+)
 from ops.testing import Harness
 from parameterized import parameterized
 from tenacity import RetryError
 
-from charm import EXTENSIONS_DEPENDENCY_MESSAGE, NO_PRIMARY_MESSAGE, PostgresqlOperatorCharm
+from charm import (
+    EXTENSIONS_DEPENDENCY_MESSAGE,
+    PRIMARY_NOT_REACHABLE_MESSAGE,
+    PostgresqlOperatorCharm,
+)
 from cluster import RemoveRaftMemberFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 from tests.helpers import patch_network_get
@@ -201,12 +213,12 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_called_once()
         self.assertFalse(isinstance(self.harness.model.unit.status, BlockedStatus))
 
-        # Check for a BlockedStatus when there is no primary endpoint.
+        # Check for a WaitingStatus when the primary is not reachable yet.
         _primary_endpoint.return_value = None
         self.harness.set_leader(False)
         self.harness.set_leader()
         _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
 
     def test_is_cluster_initialised(self):
         # Test when the cluster was not initialised yet.
@@ -1263,15 +1275,14 @@ class TestCharm(unittest.TestCase):
     def test_on_cluster_topology_change_keep_blocked(
         self, _update_relation_endpoints, _primary_endpoint
     ):
-        self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+        self.harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
         self.charm._on_cluster_topology_change(Mock())
 
         _update_relation_endpoints.assert_not_called()
-        self.assertEqual(_primary_endpoint.call_count, 2)
-        _primary_endpoint.assert_called_with()
-        self.assertTrue(isinstance(self.harness.model.unit.status, BlockedStatus))
-        self.assertEqual(self.harness.model.unit.status.message, NO_PRIMARY_MESSAGE)
+        _primary_endpoint.assert_called_once_with()
+        self.assertTrue(isinstance(self.harness.model.unit.status, WaitingStatus))
+        self.assertEqual(self.harness.model.unit.status.message, PRIMARY_NOT_REACHABLE_MESSAGE)
 
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -1282,31 +1293,44 @@ class TestCharm(unittest.TestCase):
     def test_on_cluster_topology_change_clear_blocked(
         self, _update_relation_endpoints, _primary_endpoint
     ):
-        self.harness.model.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+        self.harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
         self.charm._on_cluster_topology_change(Mock())
 
         _update_relation_endpoints.assert_called_once_with()
-        self.assertEqual(_primary_endpoint.call_count, 2)
-        _primary_endpoint.assert_called_with()
+        _primary_endpoint.assert_called_once_with()
         self.assertTrue(isinstance(self.harness.model.unit.status, ActiveStatus))
 
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    @patch("backups.PostgreSQLBackups.check_stanza")
+    @patch("backups.PostgreSQLBackups.coordinate_stanza_fields")
+    @patch("backups.PostgreSQLBackups.start_stop_pgbackrest_service")
+    @patch("charm.Patroni.reinitialize_postgresql")
+    @patch("charm.Patroni.member_replication_lag", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm.is_primary")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.Patroni.start_patroni")
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("charm.PostgresqlOperatorCharm._update_member_ip")
     @patch("charm.PostgresqlOperatorCharm._reconfigure_cluster")
+    @patch("ops.framework.EventBase.defer")
     def test_on_peer_relation_changed(
         self,
+        _defer,
         _reconfigure_cluster,
         _update_member_ip,
         _update_config,
         _start_patroni,
         _member_started,
+        _is_primary,
+        _member_replication_lag,
+        _reinitialize_postgresql,
+        _start_stop_pgbackrest_service,
+        _coordinate_stanza_fields,
+        _check_stanza,
         _primary_endpoint,
         _update_relation_endpoints,
         _,
@@ -1382,6 +1406,50 @@ class TestCharm(unittest.TestCase):
         _update_relation_endpoints.assert_not_called()
         self.assertIsInstance(self.harness.model.unit.status, WaitingStatus)
 
+        # Test when Patroni has already started but this is a replica with a
+        # huge or unknown lag.
+        self.relation = self.harness.model.get_relation(self._peer_relation, self.rel_id)
+        _member_started.return_value = True
+        for values in itertools.product([True, False], ["0", "1000", "1001", "unknown"]):
+            _defer.reset_mock()
+            _check_stanza.reset_mock()
+            _start_stop_pgbackrest_service.reset_mock()
+            _is_primary.return_value = values[0]
+            _member_replication_lag.return_value = values[1]
+            self.charm.unit.status = ActiveStatus()
+            self.charm.on.database_peers_relation_changed.emit(self.relation)
+            if _is_primary.return_value == values[0] or int(values[1]) <= 1000:
+                _defer.assert_not_called()
+                _check_stanza.assert_called_once()
+                _start_stop_pgbackrest_service.assert_called_once()
+                self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+            else:
+                _defer.assert_called_once()
+                _check_stanza.assert_not_called()
+                _start_stop_pgbackrest_service.assert_not_called()
+                self.assertIsInstance(self.charm.unit.status, MaintenanceStatus)
+
+        # Test when it was not possible to start the pgBackRest service yet.
+        self.relation = self.harness.model.get_relation(self._peer_relation, self.rel_id)
+        _member_started.return_value = True
+        _defer.reset_mock()
+        _coordinate_stanza_fields.reset_mock()
+        _check_stanza.reset_mock()
+        _start_stop_pgbackrest_service.return_value = False
+        self.charm.on.database_peers_relation_changed.emit(self.relation)
+        _defer.assert_called_once()
+        _coordinate_stanza_fields.assert_not_called()
+        _check_stanza.assert_not_called()
+
+        # Test the last calls been made when it was possible to start the
+        # pgBackRest service.
+        _defer.reset_mock()
+        _start_stop_pgbackrest_service.return_value = True
+        self.charm.on.database_peers_relation_changed.emit(self.relation)
+        _defer.assert_not_called()
+        _coordinate_stanza_fields.assert_called_once()
+        _check_stanza.assert_called_once()
+
     @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm._add_members")
     @patch("charm.PostgresqlOperatorCharm._remove_from_members_ips")
@@ -1401,20 +1469,36 @@ class TestCharm(unittest.TestCase):
         # Test when a change is needed in the member IP, but it fails.
         _remove_raft_member.side_effect = RemoveRaftMemberFailedError
         _add_members.reset_mock()
-        mock_event.relation.data = {mock_event.unit: {"ip-to-remove": "1.1.1.1"}}
+        ip_to_remove = "1.1.1.1"
+        relation_data = {mock_event.unit: {"ip-to-remove": ip_to_remove}}
+        mock_event.relation.data = relation_data
         self.assertFalse(self.charm._reconfigure_cluster(mock_event))
-        _remove_raft_member.assert_called_once()
+        _remove_raft_member.assert_called_once_with(ip_to_remove)
         _remove_from_members_ips.assert_not_called()
         _add_members.assert_not_called()
 
-        # Test when a change is needed in the member IP and it succeeds.
+        # Test when a change is needed in the member IP, and it succeeds
+        # (but the old IP was already been removed).
         _remove_raft_member.reset_mock()
         _remove_raft_member.side_effect = None
         _add_members.reset_mock()
-        mock_event.relation.data = {mock_event.unit: {"ip-to-remove": "1.1.1.1"}}
+        mock_event.relation.data = relation_data
         self.assertTrue(self.charm._reconfigure_cluster(mock_event))
-        _remove_raft_member.assert_called_once()
-        _remove_from_members_ips.assert_called_once()
+        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_from_members_ips.assert_not_called()
+        _add_members.assert_called_once_with(mock_event)
+
+        # Test when the old IP wasn't removed yet.
+        _remove_raft_member.reset_mock()
+        _add_members.reset_mock()
+        mock_event.relation.data = relation_data
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"members_ips": '["' + ip_to_remove + '"]'}
+            )
+        self.assertTrue(self.charm._reconfigure_cluster(mock_event))
+        _remove_raft_member.assert_called_once_with(ip_to_remove)
+        _remove_from_members_ips.assert_called_once_with(ip_to_remove)
         _add_members.assert_called_once_with(mock_event)
 
     @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
@@ -1855,3 +1939,213 @@ class TestCharm(unittest.TestCase):
         assert SECRET_INTERNAL_LABEL not in self.harness.get_relation_data(
             self.rel_id, getattr(self.charm, scope).name
         )
+
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm.update_config")
+    @patch("charm.PostgresqlOperatorCharm._remove_from_members_ips")
+    @patch("charm.Patroni.are_all_members_ready")
+    @patch("charm.PostgresqlOperatorCharm._get_ips_to_remove")
+    @patch("charm.PostgresqlOperatorCharm._updated_synchronous_node_count")
+    @patch("charm.Patroni.remove_raft_member")
+    @patch("charm.PostgresqlOperatorCharm._unit_ip")
+    @patch("charm.Patroni.get_member_ip")
+    def test_on_peer_relation_departed(
+        self,
+        _get_member_ip,
+        _unit_ip,
+        _remove_raft_member,
+        _updated_synchronous_node_count,
+        _get_ips_to_remove,
+        _are_all_members_ready,
+        _remove_from_members_ips,
+        _update_config,
+        _primary_endpoint,
+        _update_relation_endpoints,
+    ):
+        # Test when the current unit is the departing unit.
+        self.charm.unit.status = ActiveStatus()
+        event = Mock()
+        event.departing_unit = self.harness.charm.unit
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_not_called()
+        event.defer.assert_not_called()
+        _updated_synchronous_node_count.assert_not_called()
+        _get_ips_to_remove.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when the current unit is not the departing unit, but removing
+        # the member from the raft cluster fails.
+        _remove_raft_member.side_effect = RemoveRaftMemberFailedError
+        event.departing_unit = Unit(
+            f"{self.charm.app.name}/1", None, self.harness.charm.app._backend, {}
+        )
+        mock_ip_address = "1.1.1.1"
+        _get_member_ip.return_value = mock_ip_address
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_called_once()
+        _updated_synchronous_node_count.assert_not_called()
+        _get_ips_to_remove.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when the member is successfully removed from the raft cluster,
+        # but the unit is not the leader.
+        _remove_raft_member.reset_mock()
+        event.defer.reset_mock()
+        _remove_raft_member.side_effect = None
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_not_called()
+        _updated_synchronous_node_count.assert_not_called()
+        _get_ips_to_remove.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when the unit is the leader, but the cluster hasn't initialized yet,
+        # or it was unable to set synchronous_node_count.
+        _remove_raft_member.reset_mock()
+        with self.harness.hooks_disabled():
+            self.harness.set_leader()
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_called_once()
+        _updated_synchronous_node_count.assert_not_called()
+        _get_ips_to_remove.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        _remove_raft_member.reset_mock()
+        event.defer.reset_mock()
+        _updated_synchronous_node_count.return_value = False
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id, self.charm.app.name, {"cluster_initialised": "True"}
+            )
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_called_once()
+        _updated_synchronous_node_count.assert_called_once_with(1)
+        _get_ips_to_remove.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when there is more units in the cluster.
+        _remove_raft_member.reset_mock()
+        event.defer.reset_mock()
+        _updated_synchronous_node_count.reset_mock()
+        self.harness.add_relation_unit(self.rel_id, f"{self.charm.app.name}/2")
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_called_once()
+        _updated_synchronous_node_count.assert_called_once_with(2)
+        _get_ips_to_remove.assert_not_called()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when the cluster is initialised, and it could set synchronous_node_count,
+        # but there is no IPs to be removed from the members list.
+        _remove_raft_member.reset_mock()
+        event.defer.reset_mock()
+        _updated_synchronous_node_count.reset_mock()
+        _updated_synchronous_node_count.return_value = True
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_not_called()
+        _updated_synchronous_node_count.assert_called_once_with(2)
+        _get_ips_to_remove.assert_called_once()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when there are IPs to be removed from the members list, but not all
+        # the members are ready yet.
+        _remove_raft_member.reset_mock()
+        _updated_synchronous_node_count.reset_mock()
+        _get_ips_to_remove.reset_mock()
+        ips_to_remove = ["2.2.2.2", "3.3.3.3"]
+        _get_ips_to_remove.return_value = ips_to_remove
+        _are_all_members_ready.return_value = False
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_called_once()
+        _updated_synchronous_node_count.assert_called_once_with(2)
+        _get_ips_to_remove.assert_called_once()
+        _remove_from_members_ips.assert_not_called()
+        _update_config.assert_not_called()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when all members are ready.
+        _remove_raft_member.reset_mock()
+        event.defer.reset_mock()
+        _updated_synchronous_node_count.reset_mock()
+        _get_ips_to_remove.reset_mock()
+        _are_all_members_ready.return_value = True
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_not_called()
+        _updated_synchronous_node_count.assert_called_once_with(2)
+        _get_ips_to_remove.assert_called_once()
+        _remove_from_members_ips.assert_has_calls([call(ips_to_remove[0]), call(ips_to_remove[1])])
+        self.assertEqual(_update_config.call_count, 2)
+        self.assertEqual(_update_relation_endpoints.call_count, 2)
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when the primary is not reachable yet.
+        _remove_raft_member.reset_mock()
+        event.defer.reset_mock()
+        _updated_synchronous_node_count.reset_mock()
+        _get_ips_to_remove.reset_mock()
+        _remove_from_members_ips.reset_mock()
+        _update_config.reset_mock()
+        _update_relation_endpoints.reset_mock()
+        _primary_endpoint.return_value = None
+        self.charm._on_peer_relation_departed(event)
+        _remove_raft_member.assert_called_once_with(mock_ip_address)
+        event.defer.assert_not_called()
+        _updated_synchronous_node_count.assert_called_once_with(2)
+        _get_ips_to_remove.assert_called_once()
+        _remove_from_members_ips.assert_called_once()
+        _update_config.assert_called_once()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, WaitingStatus)
+
+    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
+    @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
+    def test_update_new_unit_status(self, _primary_endpoint, _update_relation_endpoints):
+        # Test when the charm is blocked.
+        _primary_endpoint.return_value = "endpoint"
+        self.charm.unit.status = BlockedStatus("fake blocked status")
+        self.charm._update_new_unit_status()
+        _update_relation_endpoints.assert_called_once()
+        self.assertIsInstance(self.charm.unit.status, BlockedStatus)
+
+        # Test when the charm is not blocked.
+        _update_relation_endpoints.reset_mock()
+        self.charm.unit.status = WaitingStatus()
+        self.charm._update_new_unit_status()
+        _update_relation_endpoints.assert_called_once()
+        self.assertIsInstance(self.charm.unit.status, ActiveStatus)
+
+        # Test when the primary endpoint is not reachable yet.
+        _update_relation_endpoints.reset_mock()
+        _primary_endpoint.return_value = None
+        self.charm._update_new_unit_status()
+        _update_relation_endpoints.assert_not_called()
+        self.assertIsInstance(self.charm.unit.status, WaitingStatus)

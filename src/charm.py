@@ -89,7 +89,7 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
-NO_PRIMARY_MESSAGE = "no primary in the cluster"
+PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
@@ -387,7 +387,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.primary_endpoint:
                 self._update_relation_endpoints()
             else:
-                self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+                self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
                 return
 
     def _on_pgdata_storage_detaching(self, _) -> None:
@@ -480,6 +480,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        # Restart the workload if it's stuck on the starting state after a timeline divergence
+        # due to a backup that was restored.
+        if not self.is_primary and (
+            self._patroni.member_replication_lag == "unknown"
+            or int(self._patroni.member_replication_lag) > 1000
+        ):
+            self._patroni.reinitialize_postgresql()
+            logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
+            self.unit.status = MaintenanceStatus("reinitialising replica")
+            event.defer()
+            return
+
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         if not self.backup.start_stop_pgbackrest_service():
             logger.debug(
@@ -487,6 +499,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             event.defer()
             return
+
+        self.backup.coordinate_stanza_fields()
 
         self.backup.check_stanza()
 
@@ -502,10 +516,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            if not self.is_blocked or self.unit.status.message == NO_PRIMARY_MESSAGE:
+            if not self.is_blocked:
                 self.unit.status = ActiveStatus()
         else:
-            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+            self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     def _reconfigure_cluster(self, event: HookEvent):
         """Reconfigure the cluster by adding and removing members IPs to it.
@@ -519,12 +533,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
+            logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
                 self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
-            self._remove_from_members_ips(ip_to_remove)
+            if ip_to_remove in self.members_ips:
+                self._remove_from_members_ips(ip_to_remove)
         self._add_members(event)
         return True
 
@@ -752,9 +768,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.info("Cluster topology changed")
         if self.primary_endpoint:
             self._update_relation_endpoints()
-        if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
-            if self.primary_endpoint:
-                self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -807,6 +821,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Remove departing units when the leader changes.
         for ip in self._get_ips_to_remove():
+            logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
 
         self.update_config()
@@ -823,7 +838,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
         else:
-            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+            self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     def _on_config_changed(self, _) -> None:
         """Handle configuration changes, like enabling plugins."""
