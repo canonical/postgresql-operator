@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 23
+LIBPATCH = 24
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -353,6 +353,13 @@ END; $$;"""
                     sql.Identifier(user),
                     sql.Identifier(user),
                     sql.Identifier(user),
+                )
+            )
+            statements.append(
+                """UPDATE pg_catalog.pg_largeobject_metadata
+SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}')
+WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
+                    user, self.user
                 )
             )
         else:
