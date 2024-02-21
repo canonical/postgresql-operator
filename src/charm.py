@@ -19,6 +19,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
+    PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
@@ -1041,6 +1042,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
+            return
+        except PostgreSQLListUsersError:
+            logger.warning("Deferriing on_start: Unable to list users")
+            event.defer()
             return
 
         self.postgresql.set_up_database()
