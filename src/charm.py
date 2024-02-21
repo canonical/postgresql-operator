@@ -311,7 +311,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).
                     if not primary_endpoint or primary_endpoint not in self._units_ips:
-                        raise ValueError()
+                        logger.debug(
+                            "primary endpoint early exit: Primary IP not in cached peer list."
+                        )
+                        primary_endpoint = None
         except RetryError:
             return None
         else:
