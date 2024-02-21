@@ -846,8 +846,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.upgrade.idle:
             logger.debug("Early exit on_config_changed: upgrade in progress")
             return
-        # update config on every run
-        self.update_config()
+
+        try:
+            # update config on every run
+            self.update_config()
+        except ValueError as e:
+            self.unit.status = BlockedStatus(f"Configuration Error: {str(e)}")
+            return
+
+        if self.is_blocked and "Configuration Error" in self.unit.status.message:
+            self.unit.status = ActiveStatus()
+
 
         if not self.unit.is_leader():
             return
