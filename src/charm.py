@@ -44,6 +44,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
+from psycopg2 import OperationalError
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import PostgreSQLBackups
@@ -1435,7 +1436,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
-        self._validate_config_options()
+        try:
+            self._validate_config_options()
+        except OperationalError:
+            logger.debug("Early exit update_config: Postgresql not yet available")
+            return False
 
         self._patroni.bulk_update_parameters_controller_by_patroni(
             {
