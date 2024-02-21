@@ -43,7 +43,6 @@ async def test_deploy_active(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
