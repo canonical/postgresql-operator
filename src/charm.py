@@ -1395,10 +1395,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def _can_connect_to_postgresql(self) -> bool:
         try:
-            for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
-                with attempt:
-                    assert self.postgresql.get_postgresql_timezones()
-        except RetryError:
+            assert self.postgresql.get_postgresql_timezones()
+        except Exception:
             logger.debug("Cannot connect to database")
             return False
         return True
