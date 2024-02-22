@@ -1015,7 +1015,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         # Assert the member is up and running before marking it as initialised.
-        if not self._patroni.member_started:
+        if not self._peers or not self._patroni.member_started:
             logger.debug("Deferring on_start: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
