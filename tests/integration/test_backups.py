@@ -90,7 +90,6 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
             bucket_object.delete()
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 async def test_none() -> None:
     """Empty test so that the suite will not fail if all tests are skippedi."""
