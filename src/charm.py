@@ -1021,10 +1021,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        if not self.primary_endpoint:
-            logger.debug("Primary endpoint not generated")
-            self.postgresql.primary_host = self.postgresql.current_host
-
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
