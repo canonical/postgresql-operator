@@ -504,6 +504,11 @@ class TestCharm(unittest.TestCase):
                 harness.charm.enable_disable_extensions()
                 self.assertEqual(postgresql_mock.enable_disable_extensions.call_count, 1)
 
+    @patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock,
+        return_value="127.0.0.1",
+    )
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.snap.SnapCache")
     @patch("charm.Patroni.get_postgresql_version")
@@ -543,6 +548,7 @@ class TestCharm(unittest.TestCase):
         _get_postgresql_version,
         _snap_cache,
         _enable_disable_extensions,
+        ___,
     ):
         _get_postgresql_version.return_value = "14.0"
 
