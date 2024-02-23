@@ -312,6 +312,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).
                     if not primary_endpoint or primary_endpoint not in self._units_ips:
+                        # TODO figure out why peer data is not available
                         if (
                             primary_endpoint
                             and len(self._units_ips) == 1
