@@ -26,6 +26,8 @@ USER_PASSWORD_KEY = "operator-password"
 MONITORING_USER = "monitoring"
 MONITORING_PASSWORD_KEY = "monitoring-password"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
+PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
+PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 # List of system usernames needed for correct work of the charm/workload.
 SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
 

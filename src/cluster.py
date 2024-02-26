@@ -7,6 +7,7 @@ import glob
 import logging
 import os
 import pwd
+import re
 import subprocess
 from typing import Any, Dict, List, Optional, Set
 
@@ -37,7 +38,7 @@ from constants import (
     POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     TLS_CA_FILE,
-    USER,
+    USER, PATRONI_SERVICE_DEFAULT_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -687,3 +688,25 @@ class Patroni:
                 # Check whether the update was unsuccessful.
                 if r.status_code != 200:
                     raise UpdateSyncNodeCountError(f"received {r.status_code}")
+
+    def get_patroni_restart_condition(self) -> str:
+        """Get current restart condition for Patroni systemd service. Executes only on current unit."""
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+            patroni_service = patroni_service_file.read()
+            found_restart = re.findall(r"Restart=(\w+)", patroni_service)
+            if len(found_restart) == 1:
+                return str(found_restart[0])
+        raise RuntimeError("failed to find patroni service restart condition")
+
+    def update_patroni_restart_condition(self, new_condition: str) -> None:
+        """Override restart condition for Patroni systemd service by rewriting service file and doing daemon-reload.
+        Executes only on current unit."""
+        logger.info(f"setting restart-condition to {new_condition} for patroni service")
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+            patroni_service = patroni_service_file.read()
+        logger.debug(f"patroni service file: {patroni_service}")
+        new_patroni_service = re.sub("Restart=\w+", f"Restart={new_condition}", patroni_service)
+        logger.debug(f"new patroni service file: {new_patroni_service}")
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
+            patroni_service_file.write(new_patroni_service)
+        subprocess.run(["/bin/systemctl", "daemon-reload"])
