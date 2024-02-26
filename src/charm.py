@@ -1458,7 +1458,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Try to connect
         if not self._can_connect_to_postgresql:
-            logger.debug("Early exit update_config: Cannot connect to Postgresql")
+            logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
         self._validate_config_options()
 
