@@ -589,6 +589,7 @@ class Patroni:
         ).decode("UTF-8")
 
         if "SUCCESS" not in result:
+            logger.error(f"!!!!!!!!!!!!!!!{result}")
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
