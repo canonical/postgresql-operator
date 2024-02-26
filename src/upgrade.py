@@ -115,8 +115,10 @@ class PostgreSQLUpgrade(DataUpgrade):
 
         peers_state = list(filter(lambda state: state != "", self.unit_states))
 
-        if len(peers_state) == len(self.peer_relation.units) and (
-            set(peers_state) == {"ready"} or len(peers_state) == 0
+        if (
+            len(peers_state) == len(self.peer_relation.units)
+            and (set(peers_state) == {"ready"} or len(peers_state) == 0)
+            and self.charm.is_cluster_initialised
         ):
             if self.charm._patroni.member_started:
                 # All peers have set the state to ready
