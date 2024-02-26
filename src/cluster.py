@@ -517,12 +517,12 @@ class Patroni:
 
     def is_pitr_failed(self) -> bool:
         patroni_logs = self._patroni_logs()
-        if "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster" not in patroni_logs:
-            return False
-        postgresql_logs = self._last_postgresql_logs()
-        if "FATAL:  recovery ended before configured recovery target was reached" not in postgresql_logs:
-            return False
-        return True
+        if "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster" in patroni_logs:
+            postgresql_logs = self._last_postgresql_logs()
+            if "FATAL:  recovery ended before configured recovery target was reached" in postgresql_logs:
+                return True
+            return True
+        return False
 
     def _patroni_logs(self, num_lines: int | None = 10) -> str:
         try:
