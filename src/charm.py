@@ -1294,15 +1294,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         except Exception:
                             logger.error("Unavailable snap architecture %s", platform.machine())
                             raise
-                        logger.debug (f"Installing SNAP {snap_name} rev {revision}, tracking {channel}")
+                        logger.debug(
+                            f"Installing SNAP {snap_name} rev {revision}, tracking {channel}"
+                        )
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=revision, channel=channel
                         )
                         snap_package.hold()
                     else:
-                        logger.debug (f"Re-freshing SNAP {snap_name} to the latest revision in {channel}")
+                        logger.debug(
+                            f"Re-freshing SNAP {snap_name} to the latest revision in {channel}"
+                        )
                         snap_package.ensure(snap.SnapState.Latest, channel=channel)
-                    logger.debug ("The snap installation completed successfully")
+                    logger.debug("The snap installation completed successfully")
 
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
