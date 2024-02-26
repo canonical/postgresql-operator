@@ -5,7 +5,7 @@ import logging
 import platform
 import subprocess
 import unittest
-from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch
+from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
 import pytest
 from charms.operator_libs_linux.v2 import snap
@@ -178,6 +178,33 @@ class TestCharm(unittest.TestCase):
                 "tls_config": {"insecure_skip_verify": True},
             },
         ]
+
+    @patch(
+        "charm.PostgresqlOperatorCharm._units_ips",
+        new_callable=PropertyMock,
+        return_value={"1.1.1.1", "1.1.1.2"},
+    )
+    @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
+    def test_primary_endpoint(self, _patroni, _):
+        _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
+        _patroni.return_value.get_primary.return_value = sentinel.primary
+        assert self.charm.primary_endpoint == "1.1.1.1"
+
+        _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
+        _patroni.return_value.get_primary.assert_called_once_with()
+
+    @patch("charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None)
+    @patch(
+        "charm.PostgresqlOperatorCharm._units_ips",
+        new_callable=PropertyMock,
+        return_value={"1.1.1.1", "1.1.1.2"},
+    )
+    @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
+    def test_primary_endpoint_no_peers(self, _patroni, _, __):
+        assert self.charm.primary_endpoint is None
+
+        assert not _patroni.return_value.get_member_ip.called
+        assert not _patroni.return_value.get_primary.called
 
     @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
     @patch(
