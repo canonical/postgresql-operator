@@ -8,7 +8,6 @@ import logging
 import os
 import platform
 import subprocess
-import time
 from typing import Dict, List, Literal, Optional, Set, get_args
 
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
@@ -20,6 +19,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
+    PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
@@ -44,7 +44,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
+from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import PostgreSQLBackups
 from cluster import (
@@ -300,6 +300,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def primary_endpoint(self) -> Optional[str]:
         """Returns the endpoint of the primary instance or None when no primary available."""
+        if not self._peers:
+            logger.debug("primary endpoint early exit: Peer relation not joined yet.")
+            return None
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
@@ -309,7 +312,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).
                     if not primary_endpoint or primary_endpoint not in self._units_ips:
-                        raise ValueError()
+                        # TODO figure out why peer data is not available
+                        if (
+                            primary_endpoint
+                            and len(self._units_ips) == 1
+                            and len(self._peers.units) > 1
+                        ):
+                            logger.warning(
+                                "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                            )
+                            return primary_endpoint
+                        logger.debug(
+                            "primary endpoint early exit: Primary IP not in cached peer list."
+                        )
+                        primary_endpoint = None
         except RetryError:
             return None
         else:
@@ -1037,6 +1053,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
             return
+        except PostgreSQLListUsersError:
+            logger.warning("Deferriing on_start: Unable to list users")
+            event.defer()
+            return
 
         self.postgresql.set_up_database()
 
@@ -1382,6 +1402,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return charmed_postgresql_snap.services["patroni"]["active"]
 
+    @property
+    def _can_connect_to_postgresql(self) -> bool:
+        try:
+            for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
+                with attempt:
+                    assert self.postgresql.get_postgresql_timezones()
+        except RetryError:
+            logger.debug("Cannot connect to database")
+            return False
+        return True
+
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         if (
@@ -1425,6 +1456,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
+        # Try to connect
+        if not self._can_connect_to_postgresql:
+            logger.warning("Early exit update_config: Cannot connect to Postgresql")
+            return False
         self._validate_config_options()
 
         self._patroni.bulk_update_parameters_controller_by_patroni(
@@ -1434,20 +1469,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             }
         )
 
-        restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
-        self._patroni.reload_patroni_configuration()
-        # Sleep the same time as Patroni's loop_wait default value, which tells how much time
-        # Patroni will wait before checking the configuration file again to reload it.
-        time.sleep(10)
-        restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
-
-        # Restart PostgreSQL if TLS configuration has changed
-        # (so the both old and new connections use the configuration).
-        if restart_postgresql:
-            logger.info("PostgreSQL restart required")
-            self._peers.data[self.unit].pop("postgresql_restarted", None)
-            self.on[self.restart_manager.name].acquire_lock.emit()
+        self._handle_postgresql_restart_need(enable_tls)
 
         # Restart the monitoring service if the password was rotated
         cache = snap.SnapCache()
@@ -1486,6 +1508,31 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and self.config.request_time_zone not in self.postgresql.get_postgresql_timezones()
         ):
             raise Exception("request_time_zone config option has an invalid value")
+
+    def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
+        """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
+        restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+        self._patroni.reload_patroni_configuration()
+        # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
+        # which tells how much time Patroni will wait before checking the configuration
+        # file again to reload it.
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+                with attempt:
+                    restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
+                    if not restart_postgresql:
+                        raise Exception
+        except RetryError:
+            # Ignore the error, as it happens only to indicate that the configuration has not changed.
+            pass
+        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+
+        # Restart PostgreSQL if TLS configuration has changed
+        # (so the both old and new connections use the configuration).
+        if restart_postgresql:
+            logger.info("PostgreSQL restart required")
+            self._peers.data[self.unit].pop("postgresql_restarted", None)
+            self.on[self.restart_manager.name].acquire_lock.emit()
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""
