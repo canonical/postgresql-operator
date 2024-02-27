@@ -19,6 +19,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
+    PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
@@ -299,6 +300,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def primary_endpoint(self) -> Optional[str]:
         """Returns the endpoint of the primary instance or None when no primary available."""
+        if not self._peers:
+            logger.debug("primary endpoint early exit: Peer relation not joined yet.")
+            return None
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
@@ -308,7 +312,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).
                     if not primary_endpoint or primary_endpoint not in self._units_ips:
-                        raise ValueError()
+                        # TODO figure out why peer data is not available
+                        if (
+                            primary_endpoint
+                            and len(self._units_ips) == 1
+                            and len(self._peers.units) > 1
+                        ):
+                            logger.warning(
+                                "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                            )
+                            return primary_endpoint
+                        logger.debug(
+                            "primary endpoint early exit: Primary IP not in cached peer list."
+                        )
+                        primary_endpoint = None
         except RetryError:
             return None
         else:
@@ -1036,6 +1053,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
             return
+        except PostgreSQLListUsersError:
+            logger.warning("Deferriing on_start: Unable to list users")
+            event.defer()
+            return
 
         self.postgresql.set_up_database()
 
@@ -1381,6 +1402,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return charmed_postgresql_snap.services["patroni"]["active"]
 
+    @property
+    def _can_connect_to_postgresql(self) -> bool:
+        try:
+            for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
+                with attempt:
+                    assert self.postgresql.get_postgresql_timezones()
+        except RetryError:
+            logger.debug("Cannot connect to database")
+            return False
+        return True
+
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         if (
@@ -1424,6 +1456,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
+        # Try to connect
+        if not self._can_connect_to_postgresql:
+            logger.warning("Early exit update_config: Cannot connect to Postgresql")
+            return False
         self._validate_config_options()
 
         self._patroni.bulk_update_parameters_controller_by_patroni(
