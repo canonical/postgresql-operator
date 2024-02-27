@@ -1,0 +1,45 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:784 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  03:02:55Z
+
+App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql                14.10    active      3  postgresql                                 0  no       
+self-signed-certificates           active      1  self-signed-certificates  latest/stable   72  no       
+
+Unit                         Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*                active    idle   0        10.97.56.76     5432/tcp  
+postgresql/1                 active    idle   1        10.97.56.170    5432/tcp  
+postgresql/2                 active    idle   2        10.97.56.94     5432/tcp  Primary
+self-signed-certificates/0*  active    idle   3        10.97.56.229              
+
+Machine  State    Address       Inst id        Base          AZ  Message
+0        started  10.97.56.76   juju-cf317a-0  ubuntu@22.04      Running
+1        started  10.97.56.170  juju-cf317a-1  ubuntu@22.04      Running
+2        started  10.97.56.94   juju-cf317a-2  ubuntu@22.04      Running
+3        started  10.97.56.229  juju-cf317a-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:790 Juju error logs:
+
+machine-0: 02:43:42 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 02:43:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 02:43:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 02:43:43 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 02:43:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 02:43:44 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 02:43:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 02:43:45 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 02:43:47 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 02:43:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 02:43:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 02:43:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 02:43:48 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 02:43:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 02:43:49 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 02:43:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 02:59:30 ERROR unit.postgresql/0.juju-log Non-existing secret cauth was attempted to be removed.
+unit-postgresql-0: 02:59:30 ERROR unit.postgresql/0.juju-log Non-existing secret cert was attempted to be removed.
+unit-postgresql-0: 02:59:30 ERROR unit.postgresql/0.juju-log Non-existing secret chain was attempted to be removed.
+unit-postgresql-2: 02:59:37 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "f1e25c6f-b100-4bc9-898e-05cd57cf317a:r#3#self-signed-certificates": settings f1e25c6f-b100-4bc9-898e-05cd57cf317a:r#3#self-signed-certificates not found (not found)
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:856 Forgetting main...
