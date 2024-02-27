@@ -590,6 +590,15 @@ class Patroni:
 
         if "SUCCESS" not in result:
             logger.error(f"!!!!!!!!!!!!!!!{result}")
+            status = subprocess.check_output(
+                [
+                    "charmed-postgresql.syncobj-admin",
+                    "-conn",
+                    "127.0.0.1:2222",
+                    "-status",
+                ]
+            ).decode("UTF-8")
+            logger.error(f"@@@@@@@@@@@@@@@@2{status}")
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
