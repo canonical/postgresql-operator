@@ -83,7 +83,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 3
+LIBPATCH = 4
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -214,7 +214,7 @@ class Snap(object):
       - state: a `SnapState` representation of its install status
       - channel: "stable", "candidate", "beta", and "edge" are common
       - revision: a string representing the snap's revision
-      - confinement: "classic" or "strict"
+      - confinement: "classic", "strict", or "devmode"
     """
 
     def __init__(
@@ -475,6 +475,8 @@ class Snap(object):
         args = []
         if self.confinement == "classic":
             args.append("--classic")
+        if self.confinement == "devmode":
+            args.append("--devmode")
         if channel:
             args.append('--channel="{}"'.format(channel))
         if revision:
@@ -489,6 +491,7 @@ class Snap(object):
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
         revision: Optional[str] = None,
+        devmode: bool = False,
         leave_cohort: Optional[bool] = False,
     ) -> None:
         """Refresh a snap.
@@ -497,6 +500,7 @@ class Snap(object):
           channel: the channel to install from
           cohort: optionally, specify a cohort.
           revision: optionally, specify the revision of the snap to refresh
+          devmode: optionally, specify devmode confinement
           leave_cohort: leave the current cohort.
         """
         args = []
@@ -505,6 +509,9 @@ class Snap(object):
 
         if revision:
             args.append('--revision="{}"'.format(revision))
+
+        if devmode:
+            args.append("--devmode")
 
         if not cohort:
             cohort = self._cohort
@@ -530,6 +537,7 @@ class Snap(object):
         self,
         state: SnapState,
         classic: Optional[bool] = False,
+        devmode: bool = False,
         channel: Optional[str] = "",
         cohort: Optional[str] = "",
         revision: Optional[str] = None,
@@ -539,6 +547,7 @@ class Snap(object):
         Args:
           state: a `SnapState` to reconcile to.
           classic: an (Optional) boolean indicating whether classic confinement should be used
+          devmode: an (Optional) boolean indicating whether devmode confinement should be used
           channel: the channel to install from
           cohort: optional. Specify the key of a snap cohort.
           revision: optional. the revision of the snap to install/refresh
@@ -549,7 +558,15 @@ class Snap(object):
         Raises:
           SnapError if an error is encountered
         """
-        self._confinement = "classic" if classic or self._confinement == "classic" else ""
+        if classic and devmode:
+            raise ValueError("Cannot set both classic and devmode confinement")
+
+        if classic or self._confinement == "classic":
+            self._confinement = "classic"
+        elif devmode or self._confinement == "devmode":
+            self._confinement = "devmode"
+        else:
+            self._confinement = ""
 
         if state not in (SnapState.Present, SnapState.Latest):
             # We are attempting to remove this snap.
@@ -566,7 +583,7 @@ class Snap(object):
                 self._install(channel, cohort, revision)
             else:
                 # The snap is installed, but we are changing it (e.g., switching channels).
-                self._refresh(channel, cohort, revision)
+                self._refresh(channel=channel, cohort=cohort, revision=revision, devmode=devmode)
 
         self._update_snap_apps()
         self._state = state
@@ -892,6 +909,7 @@ def add(
     state: Union[str, SnapState] = SnapState.Latest,
     channel: Optional[str] = "",
     classic: Optional[bool] = False,
+    devmode: bool = False,
     cohort: Optional[str] = "",
     revision: Optional[str] = None,
 ) -> Union[Snap, List[Snap]]:
@@ -903,6 +921,8 @@ def add(
             [`Present` or `Latest`]
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic
+            confinement. Default `False`
+        devmode: an (Optional) boolean specifying whether it should be added with devmode
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
         revision: an (Optional) string specifying the snap revision to use
@@ -920,7 +940,7 @@ def add(
     if isinstance(state, str):
         state = SnapState(state)
 
-    return _wrap_snap_operations(snap_names, state, channel, classic, cohort, revision)
+    return _wrap_snap_operations(snap_names, state, channel, classic, devmode, cohort, revision)
 
 
 @_cache_init
@@ -936,8 +956,13 @@ def remove(snap_names: Union[str, List[str]]) -> Union[Snap, List[Snap]]:
     snap_names = [snap_names] if isinstance(snap_names, str) else snap_names
     if not snap_names:
         raise TypeError("Expected at least one snap to add, received zero!")
-
-    return _wrap_snap_operations(snap_names, SnapState.Absent, "", False)
+    return _wrap_snap_operations(
+        snap_names=snap_names,
+        state=SnapState.Absent,
+        channel="",
+        classic=False,
+        devmode=False,
+    )
 
 
 @_cache_init
@@ -946,6 +971,7 @@ def ensure(
     state: str,
     channel: Optional[str] = "",
     classic: Optional[bool] = False,
+    devmode: bool = False,
     cohort: Optional[str] = "",
     revision: Optional[int] = None,
 ) -> Union[Snap, List[Snap]]:
@@ -956,6 +982,8 @@ def ensure(
         state: a string representation of the desired state, from `SnapState`
         channel: an (Optional) channel as a string. Defaults to 'latest'
         classic: an (Optional) boolean specifying whether it should be added with classic
+            confinement. Default `False`
+        devmode: an (Optional) boolean specifying whether it should be added with devmode
             confinement. Default `False`
         cohort: an (Optional) string specifying the snap cohort to use
         revision: an (Optional) integer specifying the snap revision to use
@@ -970,7 +998,15 @@ def ensure(
         channel = "latest"
 
     if state in ("present", "latest") or revision:
-        return add(snap_names, SnapState(state), channel, classic, cohort, revision)
+        return add(
+            snap_names=snap_names,
+            state=SnapState(state),
+            channel=channel,
+            classic=classic,
+            devmode=devmode,
+            cohort=cohort,
+            revision=revision,
+        )
     else:
         return remove(snap_names)
 
@@ -980,6 +1016,7 @@ def _wrap_snap_operations(
     state: SnapState,
     channel: str,
     classic: bool,
+    devmode: bool,
     cohort: Optional[str] = "",
     revision: Optional[str] = None,
 ) -> Union[Snap, List[Snap]]:
@@ -995,7 +1032,12 @@ def _wrap_snap_operations(
                 snap.ensure(state=SnapState.Absent)
             else:
                 snap.ensure(
-                    state=state, classic=classic, channel=channel, cohort=cohort, revision=revision
+                    state=state,
+                    classic=classic,
+                    devmode=devmode,
+                    channel=channel,
+                    cohort=cohort,
+                    revision=revision,
                 )
             snaps["success"].append(snap)
         except SnapError as e:
@@ -1014,13 +1056,17 @@ def _wrap_snap_operations(
 
 
 def install_local(
-    filename: str, classic: Optional[bool] = False, dangerous: Optional[bool] = False
+    filename: str,
+    classic: Optional[bool] = False,
+    devmode: Optional[bool] = False,
+    dangerous: Optional[bool] = False,
 ) -> Snap:
     """Perform a snap operation.
 
     Args:
         filename: the path to a local .snap file to install
         classic: whether to use classic confinement
+        devmode: whether to use devmode confinement
         dangerous: whether --dangerous should be passed to install snaps without a signature
 
     Raises:
@@ -1033,6 +1079,8 @@ def install_local(
     ]
     if classic:
         args.append("--classic")
+    if devmode:
+        args.append("--devmode")
     if dangerous:
         args.append("--dangerous")
     try:
