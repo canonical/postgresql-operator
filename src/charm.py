@@ -867,12 +867,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # update config on every run
             self.update_config()
         except ValueError as e:
-            self.unit.status = BlockedStatus(f"Configuration Error: {str(e)}")
+            self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
+            logger.error("Invalid configuration: %s", str(e))
             return
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.unit.status = ActiveStatus()
-
 
         if not self.unit.is_leader():
             return
