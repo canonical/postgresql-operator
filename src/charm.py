@@ -44,6 +44,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
+from pysyncobj.utility import TcpUtility
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import PostgreSQLBackups
@@ -147,6 +148,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -991,6 +993,54 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
+
+    def _remove_raft_node(self, syncobj_util: TcpUtility, partner: str, current: str) -> None:
+        """Try to remove a raft member calling a partner node."""
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                if not self._patroni.stop_patroni():
+                    logger.warning("cannot remove raft member: failed to stop Patroni")
+                    raise Exception("Failed to stop service")
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                status = syncobj_util.executeCommand(partner, ["status"])
+                if f"partner_node_status_server_{current}" not in status:
+                    logger.debug("cannot remove raft member: not part of the cluster")
+                    return
+                removal_result = syncobj_util.executeCommand(partner, ["remove", current])
+                if removal_result.startswith("FAIL"):
+                    logger.warning("failed to remove raft member: %s", removal_result)
+                    raise Exception("Failed to remove the unit")
+
+    def _on_stop(self, _) -> None:
+        syncobj_util = TcpUtility(timeout=3)
+        raft_host = "localhost:2222"
+        # Try to call a different unit
+        for ip in self._units_ips:
+            if ip != self._unit_ip:
+                raft_host = f"{ip}:2222"
+                break
+        status = syncobj_util.executeCommand(raft_host, ["status"])
+        partners = []
+        ready = []
+        for key in status.keys():
+            if key.startswith("partner_node_status_server_") and status[key]:
+                partner = key.split("partner_node_status_server_")[-1]
+                partners.append(partner)
+                if status[key] == 2:
+                    ready.append(partner)
+        if not ready and not partners:
+            logger.debug("Terminating last node")
+            self._patroni.stop_patroni()
+            return
+        if not ready:
+            raise Exception("Cannot stop unit: All other members are connecting")
+
+        try:
+            self._remove_raft_node(syncobj_util, ready[0], status["self"].address)
+        except Exception:
+            self._patroni.start_patroni()
+            raise
 
     def _setup_exporter(self) -> None:
         """Set up postgresql_exporter options."""
