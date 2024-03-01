@@ -4,13 +4,16 @@
 import json
 import logging
 
+import psycopg2
 import pytest
 from landscape_api.base import HTTPError, run_query
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    build_connection_string,
     check_database_users_existence,
     check_databases_creation,
     deploy_and_relate_bundle_with_postgresql,
@@ -33,9 +36,7 @@ DATABASE_UNITS = 3
 RELATION_NAME = "db-admin"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
-@pytest.mark.skip(reason="DB Admin tests are currently broken")
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     await ops_test.model.deploy(
@@ -80,7 +81,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         }
     )
     await ops_test.model.wait_for_idle(
-        apps=["landscape-server", DATABASE_APP_NAME], status="active"
+        apps=["landscape-server", DATABASE_APP_NAME],
+        status="active",
+        timeout=1200,
     )
 
     # Connect to the Landscape API through HAProxy and do some CRUD calls (without the update).
@@ -145,7 +148,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         }
     )
     await ops_test.model.wait_for_idle(
-        apps=["landscape-server", DATABASE_APP_NAME], status="active"
+        apps=["landscape-server", DATABASE_APP_NAME], timeout=1200, status="active"
     )
 
     # Create a role and list the available roles later to check that the new one is there.
@@ -155,27 +158,27 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     except HTTPError as e:
         assert False, f"error when trying to create role on Landscape: {e}"
 
-    # database_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    # connection_string = await build_connection_string(
-    #     ops_test, LANDSCAPE_APP_NAME, RELATION_NAME, remote_unit_name=database_unit_name
-    # )
+    database_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    connection_string = await build_connection_string(
+        ops_test, LANDSCAPE_APP_NAME, RELATION_NAME, remote_unit_name=database_unit_name
+    )
 
     # Remove the applications from the bundle.
     await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
     await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
     await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
 
-    # # Remove the relation and test that its user was deleted
-    # # (by checking that the connection string doesn't work anymore).
-    # async with ops_test.fast_forward():
-    #     await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-    #         f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{LANDSCAPE_APP_NAME}:{RELATION_NAME}"
-    #     )
-    #     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
-    # for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
-    #     with attempt:
-    #         with pytest.raises(psycopg2.OperationalError):
-    #             psycopg2.connect(connection_string)
+    # Remove the relation and test that its user was deleted
+    # (by checking that the connection string doesn't work anymore).
+    async with ops_test.fast_forward():
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{LANDSCAPE_APP_NAME}:{RELATION_NAME}"
+        )
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
+        with attempt:
+            with pytest.raises(psycopg2.OperationalError):
+                psycopg2.connect(connection_string)
 
     # Remove the PostgreSQL application.
     await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
