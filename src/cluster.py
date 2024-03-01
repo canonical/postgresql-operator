@@ -6,12 +6,12 @@
 import logging
 import os
 import pwd
-import subprocess
 from typing import Any, Dict, List, Optional, Set
 
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
     AttemptManager,
     RetryError,
@@ -564,31 +564,27 @@ class Patroni:
                 is not part of the raft cluster.
         """
         # Get the status of the raft cluster.
-        raft_status = subprocess.check_output(
-            [
-                "charmed-postgresql.syncobj-admin",
-                "-conn",
-                "127.0.0.1:2222",
-                "-status",
-            ]
-        ).decode("UTF-8")
+        syncobj_util = TcpUtility(timeout=3)
+
+        raft_host = "127.0.0.1:2222"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException:
+            logger.warning("Remove raft member: Cannot connect to raft cluster")
+            raise RemoveRaftMemberFailedError()
 
         # Check whether the member is still part of the raft cluster.
-        if not member_ip or member_ip not in raft_status:
+        if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
             return
 
         # Remove the member from the raft cluster.
-        result = subprocess.check_output(
-            [
-                "charmed-postgresql.syncobj-admin",
-                "-conn",
-                "127.0.0.1:2222",
-                "-remove",
-                f"{member_ip}:2222",
-            ]
-        ).decode("UTF-8")
+        try:
+            result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])
+        except UtilityException:
+            logger.debug("Remove raft member: Remove call failed")
+            raise RemoveRaftMemberFailedError()
 
-        if "SUCCESS" not in result:
+        if not result.startswith("SUCCESS"):
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))

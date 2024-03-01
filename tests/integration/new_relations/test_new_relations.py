@@ -12,7 +12,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from ..helpers import CHARM_SERIES, scale_application
+from ..helpers import CHARM_SERIES, assert_sync_standbys, scale_application
 from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
@@ -356,10 +356,14 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
         )
 
+        assert_sync_standbys(
+            ops_test.model.applications[DATABASE_APP_NAME].units[0].public_address, 2
+        )
+
         # Remove the original units.
         await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*units_to_remove)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=3000, wait_for_exact_units=2
+            apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=2
         )
 
         # Get the updated connection data and assert it can be used
