@@ -994,9 +994,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
 
-    def _remove_raft_node(
-        self, syncobj_util: TcpUtility, partner: str, current: str, is_leader: bool
-    ) -> None:
+    def _remove_raft_node(self, syncobj_util: TcpUtility, partner: str, current: str) -> None:
         """Try to remove a raft member calling a partner node."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
@@ -1006,15 +1004,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
                 if not (status := self._get_raft_status(syncobj_util, partner)):
-                    raise Exception("Cannot get status")
-
+                    raise Exception("Cannot remove raft member: cannot get status")
                 if f"partner_node_status_server_{current}" not in status:
                     logger.debug("Raft member already removed")
                     return
-                if is_leader:
-                    if status["leader"].address == current:
-                        logger.warning("cannot remove raft member: still leader")
-                        raise Exception("Raft member is still leader")
+                if status["leader"].address == current:
+                    logger.warning("cannot remove raft member: member is leader")
+                    raise Exception("Raft member is leader")
                 removal_result = syncobj_util.executeCommand(partner, ["remove", current])
                 if not removal_result.startswith("SUCCESS"):
                     logger.warning("failed to remove raft member: %s", removal_result)
@@ -1065,9 +1061,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not ready:
             raise Exception("Cannot stop unit: All other members are still connecting")
 
-        is_leader = status["leader"] and status["leader"].host == self._unit_ip
         try:
-            self._remove_raft_node(syncobj_util, ready[0], status["self"].address, is_leader)
+            self._remove_raft_node(syncobj_util, ready[0], status["self"].address)
         except Exception:
             self._patroni.start_patroni()
             raise

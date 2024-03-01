@@ -739,6 +739,63 @@ class TestCharm(unittest.TestCase):
         self.assertEqual(self.harness.model.unit.status, initial_status)
 
     @patch_network_get(private_address="1.1.1.1")
+    @patch("charm.PostgresqlOperatorCharm._remove_raft_node", side_effect=Exception)
+    @patch("charm.PostgresqlOperatorCharm._parse_raft_partners", return_value=([], []))
+    @patch(
+        "charm.PostgresqlOperatorCharm._get_raft_status",
+        side_effect=[None, {"leader": "1.1.1.1:2222"}],
+    )
+    @patch(
+        "charm.PostgresqlOperatorCharm._units_ips",
+        new_callable=PropertyMock,
+        return_value=["1.1.1.1", "1.1.1.2", "1.1.1.3"],
+    )
+    @patch("charm.TcpUtility")
+    @patch("charm.Patroni.start_patroni")
+    @patch("charm.Patroni.stop_patroni")
+    def test_on_stop(
+        self,
+        _stop_patroni,
+        _start_patroni,
+        _tcp_utility,
+        _,
+        _get_raft_status,
+        _parse_raft_partners,
+        _remove_raft_node,
+    ):
+        # Last node
+        self.charm.on.stop.emit()
+
+        assert _get_raft_status.call_count == 2
+        _get_raft_status.assert_any_call(_tcp_utility.return_value, "1.1.1.2:2222")
+        _get_raft_status.assert_any_call(_tcp_utility.return_value, "1.1.1.3:2222")
+        _tcp_utility.assert_called_once_with(timeout=3)
+        _stop_patroni.assert_called_once_with()
+        _parse_raft_partners.assert_called_once_with({"leader": "1.1.1.1:2222"})
+        _stop_patroni.reset_mock()
+        _parse_raft_partners.reset_mock()
+
+        # No raft
+        _get_raft_status.return_value = None
+        _get_raft_status.side_effect = None
+        self.charm.on.stop.emit()
+        assert not _parse_raft_partners.called
+        _stop_patroni.assert_called_once_with()
+
+        # No ready members
+        _parse_raft_partners.return_value = (["1.1.1.2:2222"], [])
+        _get_raft_status.return_value = {"leader": "1.1.1.1:2222"}
+        with self.assertRaises(Exception) as e:
+            self.charm.on.stop.emit()
+            assert e.msg == "Cannot stop unit: All other members are still connecting"
+
+        # Exception during removal
+        _parse_raft_partners.return_value = (["1.1.1.2:2222"], ["1.1.1.2:2222"])
+        with self.assertRaises(Exception):
+            self.charm.on.stop.emit()
+        _start_patroni.assert_called_once_with()
+
+    @patch_network_get(private_address="1.1.1.1")
     @patch("charm.PostgresqlOperatorCharm.update_config")
     def test_on_get_password(self, _):
         # Create a mock event and set passwords in peer relation data.
