@@ -367,17 +367,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return
 
-        # Remove the departing member from the raft cluster.
-        try:
-            departing_member = event.departing_unit.name.replace("/", "-")
-            member_ip = self._patroni.get_member_ip(departing_member)
-            self._patroni.remove_raft_member(member_ip)
-        except RemoveRaftMemberFailedError:
-            logger.debug(
-                "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
-            )
-            event.defer()
-            return
+        departing_member = event.departing_unit.name.replace("/", "-")
+        member_ip = self._patroni.get_member_ip(departing_member)
 
         # Allow leader to update the cluster members.
         if not self.unit.is_leader():
