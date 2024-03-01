@@ -1002,7 +1002,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     logger.warning("cannot remove raft member: failed to stop Patroni")
                     raise Exception("Failed to stop service")
 
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+        for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(3), reraise=True):
             with attempt:
                 status = None
                 for partner in partners:
