@@ -544,7 +544,7 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
         for app in data_integrator_apps_names:
             await ops_test.model.add_relation(f"{app}:postgresql", f"{DATABASE_APP_NAME}:database")
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
-        ops_test.model.block_until(
+        await ops_test.model.block_until(
             lambda: any(
                 unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
                 for unit in ops_test.model.applications[DATABASE_APP_NAME].units
