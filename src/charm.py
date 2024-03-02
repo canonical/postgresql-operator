@@ -1016,6 +1016,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
                 # If removing multiple units partner list will drift
                 _, partners = self._parse_raft_partners(status)
+                partners.insert(0, partner)
 
                 for partner in partners:
                     removal_result = syncobj_util.executeCommand(partner, ["remove", current])
