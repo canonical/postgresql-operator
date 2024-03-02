@@ -10,13 +10,13 @@ from ..helpers import (
     CHARM_SERIES,
     db_connect,
     get_password,
+    get_patroni_cluster,
     get_primary,
     get_unit_address,
     set_password,
 )
 from .helpers import (
     add_unit_with_storage,
-    get_patroni_cluster,
     reused_full_cluster_recovery_storage,
     storage_id,
 )
