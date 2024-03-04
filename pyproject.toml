@@ -104,10 +104,12 @@ target-version = ["py38"]
 [tool.ruff]
 # preview and explicit preview are enabled for CPY001
 preview = true
-explicit-preview-rules = true
 target-version = "py38"
 src = ["src", "."]
 line-length = 99
+
+[tool.ruff.lint]
+explicit-preview-rules = true
 select = ["A", "E", "W", "F", "C", "N", "D", "I001", "CPY001"]
 extend-ignore = [
     "D203",
@@ -126,16 +128,16 @@ extend-ignore = [
 # Ignore D107 Missing docstring in __init__
 ignore = ["E501", "D107"]
 
-[tool.ruff.per-file-ignores]
+[tool.ruff.lint.per-file-ignores]
 "tests/*" = ["D100", "D101", "D102", "D103", "D104"]
 
-[tool.ruff.flake8-copyright]
+[tool.ruff.lint.flake8-copyright]
 # Check for properly formatted copyright header in each file
 author = "Canonical Ltd."
 notice-rgx = "Copyright\\s\\d{4}([-,]\\d{4})*\\s+"
 
-[tool.ruff.mccabe]
+[tool.ruff.lint.mccabe]
 max-complexity = 10
 
-[tool.ruff.pydocstyle]
+[tool.ruff.lint.pydocstyle]
 convention = "google"
