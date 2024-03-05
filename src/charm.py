@@ -2,7 +2,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Charmed Machine Operator for the PostgreSQL database."""
+"""Charmed Machine Operator for the PostgreSQL database. Test"""
 import json
 import logging
 import os
