@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S LD_LIBRARY_PATH=lib python3
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 

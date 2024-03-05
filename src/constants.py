@@ -33,7 +33,10 @@ SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USE
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
 POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
-    (POSTGRESQL_SNAP_NAME, {"revision": {"aarch64": "97", "x86_64": "98"}, "channel": "14/stable"})
+    (
+        POSTGRESQL_SNAP_NAME,
+        {"revision": {"aarch64": "105", "x86_64": "104"}, "channel": "14/stable"},
+    )
 ]
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
