@@ -733,12 +733,9 @@ Stderr:
             {
                 "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
                 "restore-stanza": backups[backup_id],
+                "restore-to-time": event.params.get("restore-to-time") or ""
             }
         )
-        if event.params.get("restore-to-time") is not None:
-            self.charm.app_peer_data["restore-to-time"] = event.params.get("restore-to-time")
-        else:
-            self.charm.app_peer_data.pop("restore-to-time", None)
         self.charm.update_config()
 
         # Start the database to start the restore process.
