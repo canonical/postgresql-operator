@@ -21,7 +21,13 @@ from tenacity import (
     wait_fixed,
 )
 
-from ..helpers import APPLICATION_NAME, db_connect, get_unit_address, run_command_on_unit
+from ..helpers import (
+    APPLICATION_NAME,
+    db_connect,
+    get_patroni_cluster,
+    get_unit_address,
+    run_command_on_unit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -107,11 +113,6 @@ async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> O
             return app
 
     return None
-
-
-def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
-    resp = requests.get(f"http://{unit_ip}:8008/cluster")
-    return resp.json()
 
 
 async def change_patroni_setting(
@@ -819,7 +820,7 @@ async def add_unit_with_storage(ops_test, app, storage):
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1500)
+        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=2000)
     assert (
         len(ops_test.model.applications[app].units) == expected_units
     ), "New unit not added to model"

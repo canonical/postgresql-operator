@@ -38,7 +38,8 @@ from constants import (
     POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     TLS_CA_FILE,
-    USER, PATRONI_SERVICE_DEFAULT_PATH,
+    USER,
+    PATRONI_SERVICE_DEFAULT_PATH,
 )
 
 logger = logging.getLogger(__name__)

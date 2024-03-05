@@ -320,7 +320,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 27
+LIBPATCH = 28
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -1796,6 +1796,17 @@ class DatabaseProvidesEvent(RelationEvent):
 class DatabaseRequestedEvent(DatabaseProvidesEvent, ExtraRoleEvent):
     """Event emitted when a new database is requested for use on this relation."""
 
+    @property
+    def external_node_connectivity(self) -> bool:
+        """Returns the requested external_node_connectivity field."""
+        if not self.relation.app:
+            return False
+
+        return (
+            self.relation.data[self.relation.app].get("external-node-connectivity", "false")
+            == "true"
+        )
+
 
 class DatabaseProvidesEvents(CharmEvents):
     """Database events.
@@ -2014,11 +2025,13 @@ class DatabaseRequires(DataRequires):
         extra_user_roles: Optional[str] = None,
         relations_aliases: Optional[List[str]] = None,
         additional_secret_fields: Optional[List[str]] = [],
+        external_node_connectivity: bool = False,
     ):
         """Manager of database client relations."""
         super().__init__(charm, relation_name, extra_user_roles, additional_secret_fields)
         self.database = database_name
         self.relations_aliases = relations_aliases
+        self.external_node_connectivity = external_node_connectivity
 
         # Define custom event names for each alias.
         if relations_aliases:
@@ -2169,16 +2182,16 @@ class DatabaseRequires(DataRequires):
         if not self.local_unit.is_leader():
             return
 
+        event_data = {"database": self.database}
+
         if self.extra_user_roles:
-            self.update_relation_data(
-                event.relation.id,
-                {
-                    "database": self.database,
-                    "extra-user-roles": self.extra_user_roles,
-                },
-            )
-        else:
-            self.update_relation_data(event.relation.id, {"database": self.database})
+            event_data["extra-user-roles"] = self.extra_user_roles
+
+        # set external-node-connectivity field
+        if self.external_node_connectivity:
+            event_data["external-node-connectivity"] = "true"
+
+        self.update_relation_data(event.relation.id, event_data)
 
     def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
         """Event emitted when the database relation has changed."""

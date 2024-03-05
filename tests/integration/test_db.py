@@ -16,6 +16,7 @@ from .helpers import (
     APPLICATION_NAME,
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    assert_sync_standbys,
     build_connection_string,
     check_database_users_existence,
     check_databases_creation,
@@ -39,8 +40,8 @@ ROLES_BLOCKING_MESSAGE = (
 )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
     async with ops_test.fast_forward():
@@ -107,6 +108,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
 
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
     # Retrieve the list of current database unit names.
@@ -119,10 +121,14 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
         )
 
+        assert_sync_standbys(
+            ops_test.model.applications[DATABASE_APP_NAME].units[0].public_address, 2
+        )
+
         # Remove the original units.
         await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*units_to_remove)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=3000, wait_for_exact_units=2
+            apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=2
         )
 
     # Get the updated connection data and assert it can be used
