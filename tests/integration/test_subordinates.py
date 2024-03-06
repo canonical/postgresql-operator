@@ -63,11 +63,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
         }
     )
     await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
-    await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, DATABASE_APP_NAME],
-        wait_for_at_least_units=3,
-        status="active",
-    )
+    await ops_test.model.wait_for_idle(apps=[LS_CLIENT, DATABASE_APP_NAME], status="active")
 
 
 @pytest.mark.group(1)
@@ -75,10 +71,7 @@ async def test_scale_up(ops_test: OpsTest, github_secrets):
     await scale_application(ops_test, DATABASE_APP_NAME, 4)
 
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, DATABASE_APP_NAME],
-        wait_for_at_least_units=4,
-        status="active",
-        timeout=1500,
+        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active", timeout=1500
     )
 
 
@@ -87,8 +80,5 @@ async def test_scale_down(ops_test: OpsTest, github_secrets):
     await scale_application(ops_test, DATABASE_APP_NAME, 3)
 
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, DATABASE_APP_NAME],
-        wait_for_at_least_units=3,
-        status="active",
-        timeout=1500,
+        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active", timeout=1500
     )
