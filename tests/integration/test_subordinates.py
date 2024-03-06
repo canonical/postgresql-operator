@@ -5,6 +5,7 @@
 import logging
 import subprocess
 from asyncio import gather
+from base64 import b64encode
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -12,6 +13,7 @@ from pytest_operator.plugin import OpsTest
 from .helpers import (
     CHARM_SERIES,
     get_unit_address,
+    scale_application,
 )
 
 DATABASE_APP_NAME = "pg"
@@ -47,41 +49,45 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
     haproxy_unit = ops_test.model.applications["haproxy"].units[0]
     haproxy_addr = get_unit_address(ops_test, haproxy_unit.name)
     haproxy_host = haproxy_unit.machine.hostname
-    subprocess.check_output(
-        ["lxc", "file", "pull", f"{haproxy_host}/var/lib/haproxy/selfsigned_ca.crt", "/tmp/"]
+    cert = subprocess.check_output(
+        ["lxc", "exec", haproxy_host, "cat", "/var/lib/haproxy/selfsigned_ca.crt"]
     )
-    for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-        subprocess.check_output(
-            [
-                "lxc",
-                "file",
-                "push",
-                "/tmp/selfsigned_ca.crt",
-                f"{unit.machine.hostname}/var/selfsigned_ca.crt",
-            ]
-        )
-        subprocess.check_output(
-            [
-                "lxc",
-                "exec",
-                unit.machine.hostname,
-                "chmod",
-                "666",
-                "/var/selfsigned_ca.crt",
-            ]
-        )
+    ssl_public_key = f"base64:{b64encode(cert).decode()}"
 
     await ops_test.model.applications[LS_CLIENT].set_config(
         {
             "account-name": "standalone",
             "ping-url": f"http://{haproxy_addr}/ping",
             "url": f"https://{haproxy_addr}/message-system",
-            "ssl-public-key": "/var/selfsigned_ca.crt",
+            "ssl-public-key": ssl_public_key,
         }
     )
-    await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", LS_CLIENT)
+    await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT],
+        apps=[LS_CLIENT, DATABASE_APP_NAME],
+        wait_for_at_least_units=3,
+        status="active",
+    )
+
+
+@pytest.mark.group(1)
+async def test_scale_up(ops_test: OpsTest, github_secrets):
+    await scale_application(ops_test, DATABASE_APP_NAME, 4)
+
+    await ops_test.model.wait_for_idle(
+        apps=[LS_CLIENT, DATABASE_APP_NAME],
+        wait_for_at_least_units=4,
+        status="active",
+        timeout=1500,
+    )
+
+
+@pytest.mark.group(1)
+async def test_scale_down(ops_test: OpsTest, github_secrets):
+    await scale_application(ops_test, DATABASE_APP_NAME, 3)
+
+    await ops_test.model.wait_for_idle(
+        apps=[LS_CLIENT, DATABASE_APP_NAME],
         wait_for_at_least_units=3,
         status="active",
         timeout=1500,
