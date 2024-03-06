@@ -31,6 +31,7 @@ from constants import (
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
+    PATRONI_SERVICE_DEFAULT_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
@@ -39,7 +40,6 @@ from constants import (
     REWIND_USER,
     TLS_CA_FILE,
     USER,
-    PATRONI_SERVICE_DEFAULT_PATH,
 )
 
 logger = logging.getLogger(__name__)
@@ -518,15 +518,31 @@ class Patroni:
             return False
 
     def is_pitr_failed(self) -> bool:
+        """Check if Patroni service is down and there is fatal error during cluster bootstrap process in its logs.
+
+        In restore action, this means that database service failed to reach point-in-time-recovery target or has been
+        supplied with bad PITR parameter. Executes only on current unit.
+        """
         patroni_logs = self._patroni_logs()
         if "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster" in patroni_logs:
             postgresql_logs = self._last_postgresql_logs()
-            if "FATAL:  recovery ended before configured recovery target was reached" in postgresql_logs:
+            if (
+                "FATAL:  recovery ended before configured recovery target was reached"
+                in postgresql_logs
+            ):
                 return True
             return True
         return False
 
     def _patroni_logs(self, num_lines: int | None = 10) -> str:
+        """Get Patroni snap service logs. Executes only on current unit.
+
+        Args:
+            num_lines: number of log last lines being returned.
+
+        Returns:
+            Multi-line logs string.
+        """
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
@@ -537,12 +553,19 @@ class Patroni:
             return ""
 
     def _last_postgresql_logs(self) -> str:
+        """Get last log file content of Postgresql service.
+
+        If there is no available log files, empty line will be returned.
+
+        Returns:
+            Content of last log file of Postgresql service.
+        """
         log_files = glob.glob(f"{POSTGRESQL_LOGS_PATH}/*.log")
         if len(log_files) == 0:
             return ""
         log_files.sort(reverse=True)
         try:
-            with open(log_files[0], 'r') as last_log_file:
+            with open(log_files[0], "r") as last_log_file:
                 return last_log_file.read()
         except OSError as e:
             error_message = "Failed to read last postgresql log file"
@@ -691,7 +714,11 @@ class Patroni:
                     raise UpdateSyncNodeCountError(f"received {r.status_code}")
 
     def get_patroni_restart_condition(self) -> str:
-        """Get current restart condition for Patroni systemd service. Executes only on current unit."""
+        """Get current restart condition for Patroni systemd service. Executes only on current unit.
+
+        Returns:
+            Patroni systemd service restart condition.
+        """
         with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
             patroni_service = patroni_service_file.read()
             found_restart = re.findall(r"Restart=(\w+)", patroni_service)
@@ -701,12 +728,17 @@ class Patroni:
 
     def update_patroni_restart_condition(self, new_condition: str) -> None:
         """Override restart condition for Patroni systemd service by rewriting service file and doing daemon-reload.
-        Executes only on current unit."""
+
+        Executes only on current unit.
+
+        Args:
+            new_condition: new Patroni systemd service restart condition.
+        """
         logger.info(f"setting restart-condition to {new_condition} for patroni service")
         with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
             patroni_service = patroni_service_file.read()
         logger.debug(f"patroni service file: {patroni_service}")
-        new_patroni_service = re.sub("Restart=\w+", f"Restart={new_condition}", patroni_service)
+        new_patroni_service = re.sub(r"Restart=\w+", f"Restart={new_condition}", patroni_service)
         logger.debug(f"new patroni service file: {new_patroni_service}")
         with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
             patroni_service_file.write(new_patroni_service)

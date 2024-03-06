@@ -388,7 +388,6 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
 @pytest.mark.abort_on_fail
 async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
     """Build, deploy two units of PostgreSQL and do backup. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
-
     # Build the PostgreSQL charm.
     charm = await ops_test.build_charm(".")
 
@@ -436,7 +435,9 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         logger.info("creating a table in the database")
         with db_connect(host=address, password=password) as connection:
             connection.autocommit = True
-            connection.cursor().execute("CREATE TABLE IF NOT EXISTS backup_table_1 (test_column INT);")
+            connection.cursor().execute(
+                "CREATE TABLE IF NOT EXISTS backup_table_1 (test_column INT);"
+            )
         connection.close()
 
         # Run the "create backup" action.
@@ -461,15 +462,21 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         logger.info("creating after-backup data in the database")
         with db_connect(host=address, password=password) as connection:
             connection.autocommit = True
-            connection.cursor().execute("INSERT INTO backup_table_1 (test_column) VALUES (1), (2), (3), (4), (5);")
+            connection.cursor().execute(
+                "INSERT INTO backup_table_1 (test_column) VALUES (1), (2), (3), (4), (5);"
+            )
         connection.close()
-        with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
+        with db_connect(
+            host=address, password=password
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT current_timestamp;")
             after_backup_ts = str(cursor.fetchone()[0])
         connection.close()
         with db_connect(host=address, password=password) as connection:
             connection.autocommit = True
-            connection.cursor().execute("CREATE TABLE IF NOT EXISTS backup_table_2 (test_column INT);")
+            connection.cursor().execute(
+                "CREATE TABLE IF NOT EXISTS backup_table_2 (test_column INT);"
+            )
         connection.close()
         with db_connect(host=address, password=password) as connection:
             connection.autocommit = True
@@ -495,7 +502,9 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
                 logger.info("restoring the backup")
                 most_recent_backup = backups.split("\n")[-1]
                 backup_id = most_recent_backup.split()[0]
-                action = await remaining_unit.run_action("restore", **{"backup-id": backup_id, "restore-to-time": after_backup_ts})
+                action = await remaining_unit.run_action(
+                    "restore", **{"backup-id": backup_id, "restore-to-time": after_backup_ts}
+                )
                 await action.wait()
                 restore_status = action.results.get("restore-status")
                 assert restore_status, "restore hasn't succeeded"
@@ -518,10 +527,10 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
             assert cursor.fetchone()[
                 0
             ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
-            cursor.execute(
-                "SELECT COUNT(1) FROM backup_table_1;"
-            )
-            assert int(cursor.fetchone()[0]) == 5, "backup wasn't correctly restored: table 'backup_table_1' doesn't have 5 rows"
+            cursor.execute("SELECT COUNT(1) FROM backup_table_1;")
+            assert (
+                int(cursor.fetchone()[0]) == 5
+            ), "backup wasn't correctly restored: table 'backup_table_1' doesn't have 5 rows"
             cursor.execute(
                 "SELECT EXISTS (SELECT FROM information_schema.tables"
                 " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
@@ -590,6 +599,7 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         await ops_test.model.remove_application(database_app_name, block_until_done=True)
     # Remove the TLS operator.
     await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
+
 
 @pytest.mark.group(1)
 async def test_invalid_config_and_recovery_after_fixing_it(

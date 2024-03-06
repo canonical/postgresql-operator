@@ -46,7 +46,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
-from backups import PostgreSQLBackups, CANNOT_RESTORE_PITR
+from backups import CANNOT_RESTORE_PITR, PostgreSQLBackups
 from cluster import (
     NotReadyError,
     Patroni,
@@ -1570,8 +1570,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return relations
 
     def override_patroni_restart_condition(self, new_condition: str) -> None:
-        """Temporary override Patroni service restart condition. Will do nothing if already overriden.
-        Executes only on current unit."""
+        """Temporary override Patroni systemd service restart condition.
+
+        Will do nothing if already overriden. Executes only on current unit.
+
+        Args:
+            new_condition: new Patroni systemd service restart condition.
+        """
         current_condition = self._patroni.get_patroni_restart_condition()
         if "overriden-patroni-restart-condition" in self.app_peer_data:
             already_overriden_condition = self.app_peer_data["overriden-patroni-restart-condition"]
@@ -1583,8 +1588,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.app_peer_data["overriden-patroni-restart-condition"] = current_condition
 
     def restore_patroni_restart_condition(self) -> None:
-        """Restore Patroni service restart condition that was before overriding. Will do nothing if not overriden.
-        Executes only on current unit."""
+        """Restore Patroni systemd service restart condition that was before overriding.
+
+        Will do nothing if not overriden. Executes only on current unit.
+        """
         if "overriden-patroni-restart-condition" in self.app_peer_data:
             self._patroni.update_patroni_restart_condition(self.app_peer_data["overriden-patroni-restart-condition"])
             self.app_peer_data.pop("overriden-patroni-restart-condition")

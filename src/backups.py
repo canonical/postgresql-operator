@@ -733,7 +733,7 @@ Stderr:
             {
                 "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
                 "restore-stanza": backups[backup_id],
-                "restore-to-time": event.params.get("restore-to-time") or ""
+                "restore-to-time": event.params.get("restore-to-time") or "",
             }
         )
         self.charm.update_config()
