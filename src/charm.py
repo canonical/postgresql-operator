@@ -477,8 +477,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Update the members of the cluster in the Patroni configuration on this unit.
             self.update_config()
-        except RetryError:
-            self.unit.status = BlockedStatus("failed to update cluster members on member")
+        except ValueError as e:
+            self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
+            logger.error("Invalid configuration: %s", str(e))
             return
 
         # Start can be called here multiple times as it's idempotent.
