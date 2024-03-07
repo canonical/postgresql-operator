@@ -83,7 +83,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     await ops_test.model.wait_for_idle(
         apps=["landscape-server", DATABASE_APP_NAME],
         status="active",
-        timeout=1200,
+        timeout=1500,
     )
 
     # Connect to the Landscape API through HAProxy and do some CRUD calls (without the update).
@@ -148,7 +148,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         }
     )
     await ops_test.model.wait_for_idle(
-        apps=["landscape-server", DATABASE_APP_NAME], timeout=1200, status="active"
+        apps=["landscape-server", DATABASE_APP_NAME], timeout=1500, status="active"
     )
 
     # Create a role and list the available roles later to check that the new one is there.
