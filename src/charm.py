@@ -477,6 +477,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Update the members of the cluster in the Patroni configuration on this unit.
             self.update_config()
+        except RetryError:
+            self.unit.status = BlockedStatus("failed to update cluster members on member")
+            return
         except ValueError as e:
             self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
             logger.error("Invalid configuration: %s", str(e))
@@ -506,6 +509,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self._start_stop_pgbackrest_service(event)
+
+        self._update_new_unit_status()
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         if not self.backup.start_stop_pgbackrest_service():
             logger.debug(
@@ -520,8 +529,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
-
-        self._update_new_unit_status()
 
     def _update_new_unit_status(self) -> None:
         """Update the status of a new unit that recently joined the cluster."""
