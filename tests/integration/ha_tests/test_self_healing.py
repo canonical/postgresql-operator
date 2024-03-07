@@ -545,3 +545,51 @@ async def test_network_cut_without_ip_change(
     ), "Connection is not possible after network restore"
 
     await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)
+
+
+@pytest.mark.group(1)
+async def test_legacy_modern_endpoints(ops_test: OpsTest):
+    """Scale the database to zero units and scale up again."""
+    wait_for_apps = False
+    # It is possible for users to provide their own cluster for HA testing. Hence, check if there
+    # is a pre-existing cluster.
+    if not await app_name(ops_test):
+        wait_for_apps = True
+        charm = await ops_test.build_charm(".")
+        async with ops_test.fast_forward():
+            await ops_test.model.deploy(
+                charm,
+                num_units=1,
+                series=CHARM_SERIES,
+                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+                config={"profile": "testing"},
+            )
+    # Deploy the continuous writes application charm if it wasn't already deployed.
+    if not await app_name(ops_test, APPLICATION_NAME):
+        wait_for_apps = True
+        async with ops_test.fast_forward():
+            await ops_test.model.deploy(
+                APPLICATION_NAME,
+                application_name=APPLICATION_NAME,
+                series=CHARM_SERIES,
+                channel="edge",
+            )
+
+    if not await app_name(ops_test, "mailman3-core"):
+        await ops_test.model.deploy(
+            "mailman3-core",
+            channel="stable",
+            application_name="mailman3-core",
+            config={"hostname": "example.org"},
+        )
+
+    if wait_for_apps:
+        async with ops_test.fast_forward():
+            await ops_test.model.wait_for_idle(status="active", timeout=3000)
+
+    # dbname = f"{APPLICATION_NAME.replace('-', '_')}_first_database"
+
+    await ops_test.model.relate("mailman3-core", f"{APP_NAME}:db")
+    await ops_test.model.relate(APP_NAME, f"{APPLICATION_NAME}:first-database")
+
+    await ops_test.model.wait_for_idle(status="active", timeout=1000)
