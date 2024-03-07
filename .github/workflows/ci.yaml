@@ -8,73 +8,14 @@ concurrency:
 
 on:
   pull_request:
-    paths-ignore:
-      - '.gitignore'
-      - '.jujuignore'
-      - 'LICENSE'
-      - '**.md'
-      - .github/renovate.json5
-  schedule:
-    - cron: '53 0 * * *' # Daily at 00:53 UTC
-  # Triggered on push to branch "main" by .github/workflows/release.yaml
-  workflow_call:
 
 jobs:
-  lint:
-    name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v12.6.2
-
-  unit-test:
-    name: Unit test charm
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-      - name: Install tox & poetry
-        run: |
-          pipx install tox
-          pipx install poetry
-      - name: Run tests
-        run: tox run -e unit
-      - name: Upload Coverage to Codecov
-        uses: codecov/codecov-action@v3
-
-  build:
+  build-1:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v12.6.2
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@libpq-dev
     with:
       cache: true
 
-  integration-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        juju:
-          - agent: 2.9.46
-            libjuju: ^2
-            allure: false
-          - agent: 3.1.7
-            allure: true
-    name: Integration test charm | ${{ matrix.juju.agent }}
-    needs:
-      - lint
-      - unit-test
-      - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v12.6.2
-    with:
-      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-      cloud: lxd
-      juju-agent-version: ${{ matrix.juju.agent }}
-      libjuju-version-constraint: ${{ matrix.juju.libjuju }}
-      _beta_allure_report: ${{ matrix.juju.allure }}
-    secrets:
-      integration-test: |
-        {
-          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
-          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
-          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
-        }
-    permissions:
-      contents: write  # Needed for Allure Report beta
+  build-2:
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@libpq-dev
