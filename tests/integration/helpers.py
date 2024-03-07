@@ -394,7 +394,7 @@ async def deploy_and_relate_bundle_with_postgresql(
     async with ops_test.fast_forward(fast_interval="30s"):
         # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
-            f"{main_application_name}:db", f"{DATABASE_APP_NAME}:{relation_name}"
+            main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
         )
 
         # Restore previous existing relations.
