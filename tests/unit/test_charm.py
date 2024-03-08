@@ -1219,6 +1219,7 @@ class TestCharm(unittest.TestCase):
                 backup_id=None,
                 stanza=None,
                 restore_stanza=None,
+                pitr_target=None,
                 parameters={"test": "test"},
             )
             _handle_postgresql_restart_need.assert_called_once_with(False)
@@ -1241,6 +1242,7 @@ class TestCharm(unittest.TestCase):
                 backup_id=None,
                 stanza=None,
                 restore_stanza=None,
+                pitr_target=None,
                 parameters={"test": "test"},
             )
             _handle_postgresql_restart_need.assert_called_once()

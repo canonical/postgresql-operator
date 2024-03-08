@@ -1263,8 +1263,12 @@ Juju Version: test-juju-version
     @patch("charm.Patroni.stop_patroni")
     @patch("charm.PostgreSQLBackups._list_backups")
     @patch("charm.PostgreSQLBackups._pre_restore_checks")
+    @patch("charm.PostgresqlOperatorCharm.override_patroni_restart_condition")
+    @patch("charm.PostgresqlOperatorCharm.restore_patroni_restart_condition")
     def test_on_restore_action(
         self,
+        _restore_patroni_restart_condition,
+        _override_patroni_restart_condition,
         _pre_restore_checks,
         _list_backups,
         _stop_patroni,
