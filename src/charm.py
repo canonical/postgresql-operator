@@ -485,7 +485,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
-        if "restoring-backup" in self.app_peer_data and isinstance(self.unit.status, BlockedStatus):
+        # If PITR restore failed, then wait it for resolve.
+        if "restoring-backup" in self.app_peer_data and isinstance(
+            self.unit.status, BlockedStatus
+        ):
             event.defer()
 
         # Start can be called here multiple times as it's idempotent.
@@ -1187,8 +1190,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
 
             if "restore-to-time" in self.app_peer_data and self._patroni.is_pitr_failed():
-                logger.error("Restore failed: database service failed to reach point-in-time-recovery target. "
-                             "You can launch another restore with different parameters")
+                logger.error(
+                    "Restore failed: database service failed to reach point-in-time-recovery target. "
+                    "You can launch another restore with different parameters"
+                )
                 self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
                 return
 
@@ -1197,7 +1202,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
 
             # Remove the restoring backup flag and the restore stanza name.
-            self.app_peer_data.update({"restoring-backup": "", "restore-stanza": "", "restore-to-time": ""})
+            self.app_peer_data.update(
+                {"restoring-backup": "", "restore-stanza": "", "restore-to-time": ""}
+            )
             self.update_config()
             self.restore_patroni_restart_condition()
             logger.info("Restore succeeded")
@@ -1589,32 +1596,37 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def override_patroni_restart_condition(self, new_condition: str) -> None:
         """Temporary override Patroni systemd service restart condition.
 
-        Will do nothing if already overriden. Executes only on current unit.
+        Will do nothing if already overridden. Executes only on current unit.
 
         Args:
             new_condition: new Patroni systemd service restart condition.
         """
         current_condition = self._patroni.get_patroni_restart_condition()
-        if "overriden-patroni-restart-condition" in self.app_peer_data:
-            already_overriden_condition = self.app_peer_data["overriden-patroni-restart-condition"]
-            logger.warning(f"trying to override patroni restart condition to {new_condition}"
-                           f"while already overriden from {already_overriden_condition} to {current_condition},"
-                           "so ignoring this operation")
+        if "overridden-patroni-restart-condition" in self.unit_peer_data:
+            already_overridden_condition = self.unit_peer_data[
+                "overridden-patroni-restart-condition"
+            ]
+            logger.warning(
+                f"trying to override patroni restart condition to {new_condition}"
+                f"while already overridden from {already_overridden_condition} to {current_condition},"
+                "so ignoring this operation"
+            )
             return None
         self._patroni.update_patroni_restart_condition(new_condition)
-        self.app_peer_data["overriden-patroni-restart-condition"] = current_condition
+        self.unit_peer_data["overridden-patroni-restart-condition"] = current_condition
 
     def restore_patroni_restart_condition(self) -> None:
         """Restore Patroni systemd service restart condition that was before overriding.
 
-        Will do nothing if not overriden. Executes only on current unit.
+        Will do nothing if not overridden. Executes only on current unit.
         """
-        if "overriden-patroni-restart-condition" in self.app_peer_data:
-            self._patroni.update_patroni_restart_condition(self.app_peer_data["overriden-patroni-restart-condition"])
-            self.app_peer_data.pop("overriden-patroni-restart-condition")
+        if "overriden-patroni-restart-condition" in self.unit_peer_data:
+            self._patroni.update_patroni_restart_condition(
+                self.unit_peer_data["overridden-patroni-restart-condition"]
+            )
+            self.unit_peer_data.pop("overridden-patroni-restart-condition")
         else:
-            logger.warning("cannot restore patroni restart condition as it's not overriden")
-
+            logger.warning("not restoring patroni restart condition as it's not overridden")
 
 
 if __name__ == "__main__":
