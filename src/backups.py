@@ -870,9 +870,9 @@ Stderr:
         # Clean up extra slash symbols to avoid issues on 3rd-party storages
         # like Ceph Object Gateway (radosgw).
         s3_parameters["endpoint"] = s3_parameters["endpoint"].rstrip("/")
-        s3_parameters[
-            "path"
-        ] = f'/{s3_parameters["path"].strip("/")}'  # The slash in the beginning is required by pgBackRest.
+        s3_parameters["path"] = (
+            f'/{s3_parameters["path"].strip("/")}'  # The slash in the beginning is required by pgBackRest.
+        )
         s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
         return s3_parameters, []
