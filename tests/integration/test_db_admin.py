@@ -83,7 +83,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     await ops_test.model.wait_for_idle(
         apps=["landscape-server", DATABASE_APP_NAME],
         status="active",
-        timeout=1500,
+        timeout=1200,
     )
 
     # Connect to the Landscape API through HAProxy and do some CRUD calls (without the update).
@@ -172,7 +172,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # (by checking that the connection string doesn't work anymore).
     async with ops_test.fast_forward():
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{LANDSCAPE_APP_NAME}:{RELATION_NAME}"
+            DATABASE_APP_NAME, LANDSCAPE_APP_NAME
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
