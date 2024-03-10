@@ -27,6 +27,7 @@ from ops.testing import Harness
 from parameterized import parameterized
 from tenacity import RetryError, wait_fixed
 
+from backups import CANNOT_RESTORE_PITR
 from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
     PRIMARY_NOT_REACHABLE_MESSAGE,
@@ -853,8 +854,14 @@ class TestCharm(unittest.TestCase):
     )
     @patch("charm.PostgreSQLProvider.oversee_users")
     @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
+    @patch("charm.Patroni._last_postgresql_logs")
+    @patch("charm.Patroni._patroni_logs")
+    @patch("charm.Patroni.get_member_status")
     def test_on_update_status(
         self,
+        _get_member_status,
+        _patroni_logs,
+        _last_postgresql_logs,
         _,
         _oversee_users,
         _primary_endpoint,
@@ -880,7 +887,32 @@ class TestCharm(unittest.TestCase):
         self.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
 
+        # Test the point-in-time-recovery fail.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "True",
+                    "restore-to-time": "True",
+                },
+            )
+        self.charm.unit.status = ActiveStatus()
+        _patroni_logs.return_value = (
+            "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
+        )
+        self.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+        assert self.charm.unit.status.message == CANNOT_RESTORE_PITR
+
         # Test with the unit in a status different that blocked.
+        with self.harness.hooks_disabled():
+            self.harness.update_relation_data(
+                self.rel_id,
+                self.charm.app.name,
+                {"cluster_initialised": "True", "restoring-backup": "", "restore-to-time": ""},
+            )
         self.charm.unit.status = ActiveStatus()
         self.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
