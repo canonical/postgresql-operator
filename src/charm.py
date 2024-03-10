@@ -490,6 +490,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status, BlockedStatus
         ):
             event.defer()
+            return
 
         # Start can be called here multiple times as it's idempotent.
         # At this moment, it starts Patroni at the first time the data is received
