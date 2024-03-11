@@ -492,7 +492,9 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         most_recent_backup = backups.split("\n")[-1]
         backup_id = most_recent_backup.split()[0]
         # Wrong timestamp pointing to one year ahead
-        wrong_ts = after_backup_ts.replace(after_backup_ts[:4], str(int(after_backup_ts[:4]) + 1), 1)
+        wrong_ts = after_backup_ts.replace(
+            after_backup_ts[:4], str(int(after_backup_ts[:4]) + 1), 1
+        )
 
         # Run the "restore backup" action with bad PITR parameter.
         logger.info("restoring the backup with bad restore-to-time parameter")
@@ -504,11 +506,13 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         await wait_for_idle_on_blocked(
             ops_test,
             database_app_name,
-            int(remaining_unit.name.split('/')[1]),
+            int(remaining_unit.name.split("/")[1]),
             S3_INTEGRATOR_APP_NAME,
             CANNOT_RESTORE_PITR,
         )
-        logger.info("database charm become in blocked state, as supposed to be with bad PITR parameter")
+        logger.info(
+            "database charm become in blocked state, as supposed to be with bad PITR parameter"
+        )
 
         # Run the "restore backup" action with unreachable PITR parameter.
         logger.info("restoring the backup with unreachable restore-to-time parameter")
@@ -520,11 +524,13 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         await wait_for_idle_on_blocked(
             ops_test,
             database_app_name,
-            int(remaining_unit.name.split('/')[1]),
+            int(remaining_unit.name.split("/")[1]),
             S3_INTEGRATOR_APP_NAME,
             CANNOT_RESTORE_PITR,
         )
-        logger.info("database charm become in blocked state, as supposed to be with unreachable PITR parameter")
+        logger.info(
+            "database charm become in blocked state, as supposed to be with unreachable PITR parameter"
+        )
 
         # Run the "restore backup" action.
         for attempt in Retrying(

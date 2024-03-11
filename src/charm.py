@@ -1621,7 +1621,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         Will do nothing if not overridden. Executes only on current unit.
         """
-        if "overriden-patroni-restart-condition" in self.unit_peer_data:
+        if "overridden-patroni-restart-condition" in self.unit_peer_data:
             self._patroni.update_patroni_restart_condition(
                 self.unit_peer_data["overridden-patroni-restart-condition"]
             )
