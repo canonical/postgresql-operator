@@ -1507,7 +1507,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""
         if (
-            self.config.instance_default_text_search_config is not None
+            self.config.instance_default_text_search_config != "pg_catalog.simple"
             and self.config.instance_default_text_search_config
             not in self.postgresql.get_postgresql_text_search_configs()
         ):
@@ -1515,13 +1515,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "instance_default_text_search_config config option has an invalid value"
             )
 
-        if self.config.request_date_style is not None and not self.postgresql.validate_date_style(
-            self.config.request_date_style
+        if (
+            self.config.request_date_style != "ISO, MDY"
+            and not self.postgresql.validate_date_style(self.config.request_date_style)
         ):
             raise Exception("request_date_style config option has an invalid value")
 
         if (
-            self.config.request_time_zone is not None
+            self.config.request_time_zone != "UTC"
             and self.config.request_time_zone not in self.postgresql.get_postgresql_timezones()
         ):
             raise Exception("request_time_zone config option has an invalid value")
