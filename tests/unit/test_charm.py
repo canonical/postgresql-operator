@@ -2254,3 +2254,37 @@ class TestCharm(unittest.TestCase):
         self.charm._update_new_unit_status()
         _update_relation_endpoints.assert_not_called()
         self.assertIsInstance(self.charm.unit.status, WaitingStatus)
+
+    @patch("charm.Patroni.update_patroni_restart_condition")
+    @patch("charm.Patroni.get_patroni_restart_condition")
+    @patch("charm.PostgresqlOperatorCharm._unit_ip")
+    def test_override_patroni_restart_condition(
+        self, _unit_ip, get_restart_condition, update_restart_condition
+    ):
+        get_restart_condition.return_value = "always"
+
+        # Do override
+        self.charm.override_patroni_restart_condition("no")
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_called_once_with("no")
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "no"
+
+        # Must not be overridden twice
+        self.charm.override_patroni_restart_condition("on-failure")
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_not_called()
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        # Reset override
+        self.charm.restore_patroni_restart_condition()
+        update_restart_condition.assert_called_once_with("always")
+        update_restart_condition.reset_mock()
+
+        # Must not be reset twice
+        self.charm.restore_patroni_restart_condition()
+        update_restart_condition.assert_not_called()
+        update_restart_condition.reset_mock()
