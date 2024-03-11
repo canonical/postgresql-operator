@@ -29,6 +29,7 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
     "failed to access/create the bucket, check your S3 settings"
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
+CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
     TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
@@ -488,14 +489,49 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
             remaining_unit = unit
             break
 
+        most_recent_backup = backups.split("\n")[-1]
+        backup_id = most_recent_backup.split()[0]
+        # Wrong timestamp pointing to one year ahead
+        wrong_ts = after_backup_ts.replace(after_backup_ts[:4], str(int(after_backup_ts[:4]) + 1), 1)
+
+        # Run the "restore backup" action with bad PITR parameter.
+        logger.info("restoring the backup with bad restore-to-time parameter")
+        action = await remaining_unit.run_action(
+            "restore", **{"backup-id": backup_id, "restore-to-time": "bad data"}
+        )
+        await action.wait()
+        logger.info("waiting for the database charm to become blocked")
+        await wait_for_idle_on_blocked(
+            ops_test,
+            database_app_name,
+            int(remaining_unit.name.split('/')[1]),
+            S3_INTEGRATOR_APP_NAME,
+            CANNOT_RESTORE_PITR,
+        )
+        logger.info("database charm become in blocked state, as supposed to be with bad PITR parameter")
+
+        # Run the "restore backup" action with unreachable PITR parameter.
+        logger.info("restoring the backup with unreachable restore-to-time parameter")
+        action = await remaining_unit.run_action(
+            "restore", **{"backup-id": backup_id, "restore-to-time": wrong_ts}
+        )
+        await action.wait()
+        logger.info("waiting for the database charm to become blocked")
+        await wait_for_idle_on_blocked(
+            ops_test,
+            database_app_name,
+            int(remaining_unit.name.split('/')[1]),
+            S3_INTEGRATOR_APP_NAME,
+            CANNOT_RESTORE_PITR,
+        )
+        logger.info("database charm become in blocked state, as supposed to be with unreachable PITR parameter")
+
         # Run the "restore backup" action.
         for attempt in Retrying(
             stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
             with attempt:
                 logger.info("restoring the backup")
-                most_recent_backup = backups.split("\n")[-1]
-                backup_id = most_recent_backup.split()[0]
                 action = await remaining_unit.run_action(
                     "restore", **{"backup-id": backup_id, "restore-to-time": after_backup_ts}
                 )
