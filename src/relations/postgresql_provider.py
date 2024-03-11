@@ -3,7 +3,6 @@
 
 """Postgres client relation hooks & helpers."""
 
-
 import logging
 
 from charms.data_platform_libs.v0.data_interfaces import (

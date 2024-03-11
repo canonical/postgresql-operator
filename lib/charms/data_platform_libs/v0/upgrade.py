@@ -285,7 +285,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 15
+LIBPATCH = 16
 
 PYDEPS = ["pydantic>=1.10,<2", "poetry-core"]
 
@@ -501,7 +501,7 @@ class DataUpgrade(Object, ABC):
 
     STATES = ["recovery", "failed", "idle", "ready", "upgrading", "completed"]
 
-    on = UpgradeEvents()  # pyright: ignore [reportGeneralTypeIssues]
+    on = UpgradeEvents()  # pyright: ignore [reportAssignmentType]
 
     def __init__(
         self,
@@ -605,6 +605,21 @@ class DataUpgrade(Object, ABC):
 
         self.peer_relation.data[self.charm.app].update({"upgrade-stack": json.dumps(stack)})
         self._upgrade_stack = stack
+
+    @property
+    def other_unit_states(self) -> list:
+        """Current upgrade state for other units.
+
+        Returns:
+            Unsorted list of upgrade states for other units.
+        """
+        if not self.peer_relation:
+            return []
+
+        return [
+            self.peer_relation.data[unit].get("state", "")
+            for unit in list(self.peer_relation.units)
+        ]
 
     @property
     def unit_states(self) -> list:
@@ -926,11 +941,8 @@ class DataUpgrade(Object, ABC):
             return
 
         if self.substrate == "vm" and self.cluster_state == "recovery":
-            # Only defer for vm, that will set unit states to "ready" on upgrade-charm
-            # on k8s only the upgrading unit will receive the upgrade-charm event
-            # and deferring will prevent the upgrade stack from being popped
-            logger.debug("Cluster in recovery, deferring...")
-            event.defer()
+            # skip run while in recovery. The event will be retrigged when the cluster is ready
+            logger.debug("Cluster in recovery, skip...")
             return
 
         # if all units completed, mark as complete
@@ -981,6 +993,7 @@ class DataUpgrade(Object, ABC):
             self.charm.unit == top_unit
             and top_state in ["ready", "upgrading"]
             and self.cluster_state == "ready"
+            and "upgrading" not in self.other_unit_states
         ):
             logger.debug(
                 f"{top_unit.name} is next to upgrade, emitting `upgrade_granted` event and upgrading..."
