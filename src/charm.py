@@ -473,6 +473,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
             return
+        except ValueError as e:
+            self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
+            logger.error("Invalid configuration: %s", str(e))
+            return
 
         # Start can be called here multiple times as it's idempotent.
         # At this moment, it starts Patroni at the first time the data is received
@@ -498,6 +502,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self._start_stop_pgbackrest_service(event)
+
+        self._update_new_unit_status()
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         if not self.backup.start_stop_pgbackrest_service():
             logger.debug(
@@ -512,8 +522,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
-
-        self._update_new_unit_status()
 
     def _update_new_unit_status(self) -> None:
         """Update the status of a new unit that recently joined the cluster."""
@@ -855,8 +863,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.upgrade.idle:
             logger.debug("Early exit on_config_changed: upgrade in progress")
             return
-        # update config on every run
-        self.update_config()
+
+        try:
+            # update config on every run
+            self.update_config()
+        except ValueError as e:
+            self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
+            logger.error("Invalid configuration: %s", str(e))
+            return
+
+        if self.is_blocked and "Configuration Error" in self.unit.status.message:
+            self.unit.status = ActiveStatus()
 
         if not self.unit.is_leader():
             return
