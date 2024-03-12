@@ -598,7 +598,7 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     # Scale the database to one unit.
     logger.info("scaling database to one unit")
     await add_unit_with_storage(ops_test, app=app, storage=primary_storage)
-    await ops_test.model.wait_for_idle(status="active", timeout=3000)
+    await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
     connection_string, primary_name = await get_db_connection(ops_test, dbname=dbname)
     logger.info("checking whether writes are increasing")
@@ -610,7 +610,6 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     # Scale the database to three units.
     logger.info("scaling database to two unit")
     await scale_application(ops_test, application_name=app, count=2)
-    await ops_test.model.wait_for_idle(status="active", timeout=3000)
     for unit in ops_test.model.applications[app].units:
         if not await unit.is_leader_from_status():
             assert await reused_replica_storage(
