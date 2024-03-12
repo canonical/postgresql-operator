@@ -51,7 +51,7 @@ from .helpers import (
     storage_id,
     storage_type,
     update_restart_condition,
-    wait_network_restore, get_db_connection, validate_test_data,
+    wait_network_restore, get_db_connection, validate_test_data, create_test_data,
 )
 
 logger = logging.getLogger(__name__)
