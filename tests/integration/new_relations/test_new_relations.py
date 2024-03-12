@@ -440,12 +440,10 @@ async def test_admin_role(ops_test: OpsTest):
     async with ops_test.fast_forward():
         await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
-        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config(
-            {
-                "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-                "extra-user-roles": "admin",
-            }
-        )
+        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
+            "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
+            "extra-user-roles": "admin",
+        })
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
         await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
@@ -535,12 +533,10 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
             apps=[another_data_integrator_app_name], status="blocked"
         )
         for app in data_integrator_apps_names:
-            await ops_test.model.applications[app].set_config(
-                {
-                    "database-name": app.replace("-", "_"),
-                    "extra-user-roles": "test",
-                }
-            )
+            await ops_test.model.applications[app].set_config({
+                "database-name": app.replace("-", "_"),
+                "extra-user-roles": "test",
+            })
         await ops_test.model.wait_for_idle(apps=data_integrator_apps_names, status="blocked")
         for app in data_integrator_apps_names:
             await ops_test.model.add_relation(f"{app}:postgresql", f"{DATABASE_APP_NAME}:database")
