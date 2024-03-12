@@ -503,13 +503,10 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         )
         await action.wait()
         logger.info("waiting for the database charm to become blocked")
-        await wait_for_idle_on_blocked(
-            ops_test,
-            database_app_name,
-            int(remaining_unit.name.split("/")[1]),
-            S3_INTEGRATOR_APP_NAME,
-            CANNOT_RESTORE_PITR,
-        )
+        async with ops_test.fast_forward():
+            await ops_test.model.block_until(
+                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR
+            )
         logger.info(
             "database charm become in blocked state, as supposed to be with bad PITR parameter"
         )
@@ -521,13 +518,10 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         )
         await action.wait()
         logger.info("waiting for the database charm to become blocked")
-        await wait_for_idle_on_blocked(
-            ops_test,
-            database_app_name,
-            int(remaining_unit.name.split("/")[1]),
-            S3_INTEGRATOR_APP_NAME,
-            CANNOT_RESTORE_PITR,
-        )
+        async with ops_test.fast_forward():
+            await ops_test.model.block_until(
+                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR
+            )
         logger.info(
             "database charm become in blocked state, as supposed to be with unreachable PITR parameter"
         )
