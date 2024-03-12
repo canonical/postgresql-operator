@@ -104,6 +104,22 @@ def change_primary_start_timeout(
             )
 
 
+def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
+    resp = requests.get(f"http://{unit_ip}:8008/cluster")
+    return resp.json()
+
+
+def assert_sync_standbys(unit_ip: str, standbys: int) -> None:
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            cluster = get_patroni_cluster(unit_ip)
+            cluster_standbys = 0
+            for member in cluster["members"]:
+                if member["role"] == "sync_standby":
+                    cluster_standbys += 1
+            assert cluster_standbys >= standbys, "Less than expected standbys"
+
+
 async def check_database_users_existence(
     ops_test: OpsTest,
     users_that_should_exist: List[str],
@@ -360,9 +376,9 @@ async def deploy_and_relate_bundle_with_postgresql(
             data = yaml.load(bundle_yaml, Loader=yaml.FullLoader)
 
             if main_application_num_units is not None:
-                data["applications"][main_application_name][
-                    "num_units"
-                ] = main_application_num_units
+                data["applications"][main_application_name]["num_units"] = (
+                    main_application_num_units
+                )
 
             # Save the list of relations other than `db` and `db-admin`,
             # so we can add them back later.
@@ -953,13 +969,9 @@ def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -
         with attempt:
             response = requests.get(f"http://{primary_ip}:8008/cluster")
             assert response.status_code == 200
-            standbys = len(
-                [
-                    member
-                    for member in response.json()["members"]
-                    if member["role"] == "sync_standby"
-                ]
-            )
+            standbys = len([
+                member for member in response.json()["members"] if member["role"] == "sync_standby"
+            ])
             assert standbys >= minority_count
 
 

@@ -4,6 +4,7 @@
 import json
 import time
 
+import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
 
@@ -12,8 +13,11 @@ from .helpers import (
     CHARM_SERIES,
     METADATA,
     check_patroni,
+    db_connect,
     get_leader_unit,
     get_password,
+    get_primary,
+    get_unit_address,
     restart_patroni,
     set_password,
 )
@@ -21,7 +25,6 @@ from .helpers import (
 APP_NAME = METADATA["name"]
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
@@ -46,6 +49,9 @@ async def test_password_rotation(ops_test: OpsTest):
     any_unit_name = ops_test.model.applications[APP_NAME].units[0].name
     superuser_password = await get_password(ops_test, any_unit_name)
     replication_password = await get_password(ops_test, any_unit_name, "replication")
+    monitoring_password = await get_password(ops_test, any_unit_name, "monitoring")
+    backup_password = await get_password(ops_test, any_unit_name, "backup")
+    rewind_password = await get_password(ops_test, any_unit_name, "rewind")
 
     # Get the leader unit name (because passwords can only be set through it).
     leader = None
@@ -67,11 +73,40 @@ async def test_password_rotation(ops_test: OpsTest):
     assert "password" in result.keys()
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
-    new_superuser_password = await get_password(ops_test, any_unit_name)
+    # For monitoring, generate a specific password and pass it to the action.
+    new_monitoring_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="monitoring", password=new_monitoring_password
+    )
+    assert "password" in result.keys()
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
+    # For backup, generate a specific password and pass it to the action.
+    new_backup_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="backup", password=new_backup_password
+    )
+    assert "password" in result.keys()
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
+    # For rewind, generate a specific password and pass it to the action.
+    new_rewind_password = "test-password"
+    result = await set_password(
+        ops_test, unit_name=leader, username="rewind", password=new_rewind_password
+    )
+    assert "password" in result.keys()
+    await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
+
+    new_superuser_password = await get_password(ops_test, any_unit_name)
     assert superuser_password != new_superuser_password
     assert new_replication_password == await get_password(ops_test, any_unit_name, "replication")
     assert replication_password != new_replication_password
+    assert new_monitoring_password == await get_password(ops_test, any_unit_name, "monitoring")
+    assert monitoring_password != new_monitoring_password
+    assert new_backup_password == await get_password(ops_test, any_unit_name, "backup")
+    assert backup_password != new_backup_password
+    assert new_rewind_password == await get_password(ops_test, any_unit_name, "rewind")
+    assert rewind_password != new_rewind_password
 
     # Restart Patroni on any non-leader unit and check that
     # Patroni and PostgreSQL continue to work.
@@ -120,6 +155,16 @@ async def test_empty_password(ops_test: OpsTest) -> None:
     # `get_secret()` returns a None value (as the field in the secret is set to string value "None")
     # And this true None value is turned to a string when the event is setting results.
     assert password == "None"
+
+
+@pytest.mark.group(1)
+async def test_db_connection_with_empty_password(ops_test: OpsTest):
+    """Test that user can't connect with empty password."""
+    primary = await get_primary(ops_test, f"{APP_NAME}/0")
+    address = get_unit_address(ops_test, primary)
+    with pytest.raises(psycopg2.Error):
+        with db_connect(address, "") as connection:
+            connection.close()
 
 
 @pytest.mark.group(1)

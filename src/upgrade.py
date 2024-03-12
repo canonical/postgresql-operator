@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 """Upgrades implementation."""
+
 import json
 import logging
 from typing import List
@@ -102,9 +103,9 @@ class PostgreSQLUpgrade(DataUpgrade):
                     "upgrade_supported": "^14",
                     "version": "14.9",
                 }
-                self.peer_relation.data[self.charm.app].update(
-                    {"dependencies": json.dumps(fixed_dependencies)}
-                )
+                self.peer_relation.data[self.charm.app].update({
+                    "dependencies": json.dumps(fixed_dependencies)
+                })
             return
 
         if not self.charm.unit.is_leader():
@@ -215,9 +216,9 @@ class PostgreSQLUpgrade(DataUpgrade):
         logger.debug(f"Upgrade stack: {upgrade_stack}")
         self.upgrade_stack = upgrade_stack
         logger.debug("Persisting dependencies to upgrade relation data...")
-        self.peer_relation.data[self.charm.app].update(
-            {"dependencies": json.dumps(self.dependency_model.dict())}
-        )
+        self.peer_relation.data[self.charm.app].update({
+            "dependencies": json.dumps(self.dependency_model.dict())
+        })
         if self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY) is None:
             self.charm.set_secret(APP_SCOPE, MONITORING_PASSWORD_KEY, new_password())
         users = self.charm.postgresql.list_users()

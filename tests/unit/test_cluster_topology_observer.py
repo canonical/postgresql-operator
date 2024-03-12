@@ -110,11 +110,9 @@ class TestClusterTopologyChange(unittest.TestCase):
         command = "test-command"
         charm_dir = "/path"
         dispatch(command, self.charm.unit.name, charm_dir)
-        _run.assert_called_once_with(
-            [
-                command,
-                "-u",
-                self.charm.unit.name,
-                f"JUJU_DISPATCH_PATH=hooks/cluster_topology_change {charm_dir}/dispatch",
-            ]
-        )
+        _run.assert_called_once_with([
+            command,
+            "-u",
+            self.charm.unit.name,
+            f"JUJU_DISPATCH_PATH=hooks/cluster_topology_change {charm_dir}/dispatch",
+        ])

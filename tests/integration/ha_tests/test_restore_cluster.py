@@ -10,13 +10,13 @@ from ..helpers import (
     CHARM_SERIES,
     db_connect,
     get_password,
+    get_patroni_cluster,
     get_primary,
     get_unit_address,
     set_password,
 )
 from .helpers import (
     add_unit_with_storage,
-    get_patroni_cluster,
     reused_full_cluster_recovery_storage,
     storage_id,
 )
@@ -29,7 +29,6 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -62,9 +61,10 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         primary = await get_primary(
             ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
         )
-        password = await get_password(ops_test, primary)
-        second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
-        await set_password(ops_test, second_primary, password=password)
+        for user in ["monitoring", "operator", "replication", "rewind"]:
+            password = await get_password(ops_test, primary, user)
+            second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
+            await set_password(ops_test, second_primary, user, password)
         await ops_test.model.destroy_unit(second_primary)
 
 

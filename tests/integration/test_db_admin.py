@@ -33,9 +33,7 @@ DATABASE_UNITS = 3
 RELATION_NAME = "db-admin"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
-@pytest.mark.skip(reason="DB Admin tests are currently broken")
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     await ops_test.model.deploy(
@@ -72,13 +70,11 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     await check_database_users_existence(ops_test, landscape_users, [])
 
     # Create the admin user on Landscape through configs.
-    await ops_test.model.applications["landscape-server"].set_config(
-        {
-            "admin_email": "admin@canonical.com",
-            "admin_name": "Admin",
-            "admin_password": "test1234",
-        }
-    )
+    await ops_test.model.applications["landscape-server"].set_config({
+        "admin_email": "admin@canonical.com",
+        "admin_name": "Admin",
+        "admin_password": "test1234",
+    })
     await ops_test.model.wait_for_idle(
         apps=["landscape-server", DATABASE_APP_NAME], status="active"
     )
@@ -139,11 +135,9 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     # Trigger a config change to start the Landscape API service again.
     # The Landscape API was stopped after a new primary (postgresql) was elected.
-    await ops_test.model.applications["landscape-server"].set_config(
-        {
-            "admin_name": "Admin 1",
-        }
-    )
+    await ops_test.model.applications["landscape-server"].set_config({
+        "admin_name": "Admin 1",
+    })
     await ops_test.model.wait_for_idle(
         apps=["landscape-server", DATABASE_APP_NAME], status="active"
     )
