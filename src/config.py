@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Structured configuration for the PostgreSQL charm."""
+
 import logging
 import subprocess
 from typing import Optional
