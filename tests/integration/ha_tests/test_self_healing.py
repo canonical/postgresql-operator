@@ -35,6 +35,7 @@ from .helpers import (
     fetch_cluster_members,
     get_controller_machine,
     get_db_connection,
+    get_last_added_unit,
     get_patroni_setting,
     get_primary,
     get_unit_ip,
@@ -54,7 +55,7 @@ from .helpers import (
     storage_type,
     update_restart_condition,
     validate_test_data,
-    wait_network_restore, get_last_added_unit,
+    wait_network_restore,
 )
 
 logger = logging.getLogger(__name__)

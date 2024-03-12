@@ -902,6 +902,7 @@ async def create_test_data(connection_string):
             assert data[0] == "some data"
     connection.close()
 
+
 async def get_last_added_unit(ops_test, app, prev_units):
     curr_units = [unit.name for unit in ops_test.model.applications[app].units]
     new_unit = list(set(curr_units) - set(prev_units))[0]
