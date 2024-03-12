@@ -809,6 +809,7 @@ async def get_db_connection(ops_test, dbname, is_primary=True, replica_unit_name
     )
     return connection_string, unit_name
 
+
 async def validate_test_data(connection_string):
     with psycopg2.connect(connection_string) as connection:
         connection.autocommit = True

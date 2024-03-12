@@ -4,7 +4,6 @@
 import asyncio
 import logging
 
-import psycopg2
 import pytest
 from pip._vendor import requests
 from pytest_operator.plugin import OpsTest
@@ -16,7 +15,8 @@ from ..helpers import (
     get_machine_from_unit,
     get_password,
     get_unit_address,
-    run_command_on_unit, scale_application, build_connection_string, FIRST_DATABASE_RELATION_NAME,
+    run_command_on_unit,
+    scale_application,
 )
 from .conftest import APPLICATION_NAME
 from .helpers import (
@@ -29,10 +29,12 @@ from .helpers import (
     change_patroni_setting,
     change_wal_settings,
     check_writes,
+    create_test_data,
     cut_network_from_unit,
     cut_network_from_unit_without_ip_change,
     fetch_cluster_members,
     get_controller_machine,
+    get_db_connection,
     get_patroni_setting,
     get_primary,
     get_unit_ip,
@@ -51,7 +53,8 @@ from .helpers import (
     storage_id,
     storage_type,
     update_restart_condition,
-    wait_network_restore, get_db_connection, validate_test_data, create_test_data,
+    validate_test_data,
+    wait_network_restore,
 )
 
 logger = logging.getLogger(__name__)
@@ -584,8 +587,10 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     for unit_ip in unit_ip_addresses:
         try:
             resp = requests.get(f"http://{unit_ip}:8008")
-            assert resp.status_code != 200, f"status code = {resp.status_code}, message = {resp.text}"
-        except requests.exceptions.ConnectionError as e:
+            assert (
+                resp.status_code != 200
+            ), f"status code = {resp.status_code}, message = {resp.text}"
+        except requests.exceptions.ConnectionError:
             assert True, f"unit host = http://{unit_ip}:8008, all units shutdown"
         except Exception as e:
             assert False, f"{e} unit host = http://{unit_ip}:8008, something went wrong"
@@ -608,13 +613,13 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(status="active", timeout=3000)
     for unit in ops_test.model.applications[app].units:
         if not await unit.is_leader_from_status():
-            assert await reused_replica_storage(ops_test, unit_name=unit.name
-                                                              ), "attached storage not properly re-used by Postgresql."
+            assert await reused_replica_storage(
+                ops_test, unit_name=unit.name
+            ), "attached storage not properly re-used by Postgresql."
             logger.info(f"check test database data of unit name {unit.name}")
-            connection_string, _ = await get_db_connection(ops_test,
-                                                           dbname=dbname,
-                                                           is_primary=False,
-                                                           replica_unit_name=unit.name)
+            connection_string, _ = await get_db_connection(
+                ops_test, dbname=dbname, is_primary=False, replica_unit_name=unit.name
+            )
             await validate_test_data(connection_string)
 
     await check_writes(ops_test)
