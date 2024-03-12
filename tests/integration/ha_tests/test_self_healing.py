@@ -570,16 +570,13 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     await create_test_data(connection_string)
 
     unit_ip_addresses = []
-    storage_id_list = []
     primary_storage = ""
     for unit in ops_test.model.applications[app].units:
         # Save IP addresses of units
         unit_ip_addresses.append(await get_unit_ip(ops_test, unit.name))
 
         # Save detached storage ID
-        if primary_name != unit.name:
-            storage_id_list.append(storage_id(ops_test, unit.name))
-        else:
+        if await unit.is_leader_from_status:
             primary_storage = storage_id(ops_test, unit.name)
 
     # Scale the database to zero units.
