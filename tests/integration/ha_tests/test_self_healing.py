@@ -54,7 +54,7 @@ from .helpers import (
     storage_type,
     update_restart_condition,
     validate_test_data,
-    wait_network_restore,
+    wait_network_restore, get_last_added_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -595,7 +595,7 @@ async def test_deploy_zero_units(ops_test: OpsTest):
         except Exception as e:
             assert False, f"{e} unit host = http://{unit_ip}:8008, something went wrong"
 
-    # Scale the database to one unit.
+    # Scale up to one unit.
     logger.info("scaling database to one unit")
     await add_unit_with_storage(ops_test, app=app, storage=primary_storage)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
@@ -607,18 +607,34 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     logger.info("check test database data")
     await validate_test_data(connection_string)
 
-    # Scale the database to three units.
+    # Scale up to two units.
     logger.info("scaling database to two unit")
+    prev_units = [unit.name for unit in ops_test.model.applications[app].units]
     await scale_application(ops_test, application_name=app, count=2)
-    for unit in ops_test.model.applications[app].units:
-        if not await unit.is_leader_from_status():
-            assert await reused_replica_storage(
-                ops_test, unit_name=unit.name
-            ), "attached storage not properly re-used by Postgresql."
-            logger.info(f"check test database data of unit name {unit.name}")
-            connection_string, _ = await get_db_connection(
-                ops_test, dbname=dbname, is_primary=False, replica_unit_name=unit.name
-            )
-            await validate_test_data(connection_string)
+    unit = await get_last_added_unit(ops_test, app, prev_units)
+
+    logger.info(f"check test database data of unit name {unit.name}")
+    connection_string, _ = await get_db_connection(
+        ops_test, dbname=dbname, is_primary=False, replica_unit_name=unit.name
+    )
+    await validate_test_data(connection_string)
+    assert await reused_replica_storage(
+        ops_test, unit_name=unit.name
+    ), "attached storage not properly re-used by Postgresql."
+
+    # Scale up to three units.
+    logger.info("scaling database to three unit")
+    prev_units = [unit.name for unit in ops_test.model.applications[app].units]
+    await scale_application(ops_test, application_name=app, count=3)
+    unit = await get_last_added_unit(ops_test, app, prev_units)
+
+    logger.info(f"check test database data of unit name {unit.name}")
+    connection_string, _ = await get_db_connection(
+        ops_test, dbname=dbname, is_primary=False, replica_unit_name=unit.name
+    )
+    await validate_test_data(connection_string)
+    assert await reused_replica_storage(
+        ops_test, unit_name=unit.name
+    ), "attached storage not properly re-used by Postgresql."
 
     await check_writes(ops_test)
