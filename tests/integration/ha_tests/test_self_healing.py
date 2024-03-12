@@ -556,7 +556,7 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     app = await app_name(ops_test)
 
     dbname = f"{APPLICATION_NAME.replace('-', '_')}_first_database"
-    connection_string, primary_name = await get_db_connection(ops_test, dbname=dbname)
+    connection_string, _ = await get_db_connection(ops_test, dbname=dbname)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
