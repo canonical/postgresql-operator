@@ -277,7 +277,7 @@ import json
 import logging
 import uuid
 from contextlib import suppress
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from ipaddress import IPv4Address
 from typing import Any, Dict, List, Literal, Optional, Union
 
@@ -286,7 +286,7 @@ from cryptography.hazmat._oid import ExtensionOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.primitives.serialization import pkcs12
-from jsonschema import exceptions, validate  # type: ignore[import-untyped]
+from jsonschema import exceptions, validate
 from ops.charm import (
     CharmBase,
     CharmEvents,
@@ -307,7 +307,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 27
+LIBPATCH = 28
 
 PYDEPS = ["cryptography", "jsonschema"]
 
@@ -635,7 +635,9 @@ def _get_closest_future_time(
         datetime: expiry_notification_time if not in the past, expiry_time otherwise
     """
     return (
-        expiry_notification_time if datetime.utcnow() < expiry_notification_time else expiry_time
+        expiry_notification_time
+        if datetime.now(timezone.utc) < expiry_notification_time
+        else expiry_time
     )
 
 
@@ -650,7 +652,7 @@ def _get_certificate_expiry_time(certificate: str) -> Optional[datetime]:
     """
     try:
         certificate_object = x509.load_pem_x509_certificate(data=certificate.encode())
-        return certificate_object.not_valid_after
+        return certificate_object.not_valid_after_utc
     except ValueError:
         logger.warning("Could not load certificate.")
         return None
@@ -705,8 +707,8 @@ def generate_ca(
         .issuer_name(subject_name)
         .public_key(private_key_object.public_key())  # type: ignore[arg-type]
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=validity))
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=validity))
         .add_extension(x509.SubjectKeyIdentifier(digest=subject_identifier), critical=False)
         .add_extension(
             x509.AuthorityKeyIdentifier(
@@ -860,8 +862,8 @@ def generate_certificate(
         .issuer_name(issuer)
         .public_key(csr_object.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(datetime.utcnow())
-        .not_valid_after(datetime.utcnow() + timedelta(days=validity))
+        .not_valid_before(datetime.now(timezone.utc))
+        .not_valid_after(datetime.now(timezone.utc) + timedelta(days=validity))
     )
     extensions = get_certificate_extensions(
         authority_key_identifier=ca_pem.extensions.get_extension_for_class(
@@ -1070,7 +1072,7 @@ class CertificatesRequirerCharmEvents(CharmEvents):
 class TLSCertificatesProvidesV2(Object):
     """TLS certificates provider class to be instantiated by TLS certificates providers."""
 
-    on = CertificatesProviderCharmEvents()
+    on = CertificatesProviderCharmEvents()  # type: ignore[reportAssignmentType]
 
     def __init__(self, charm: CharmBase, relationship_name: str):
         super().__init__(charm, relationship_name)
@@ -1481,7 +1483,7 @@ class TLSCertificatesProvidesV2(Object):
 class TLSCertificatesRequiresV2(Object):
     """TLS certificates requirer class to be instantiated by TLS certificates requirers."""
 
-    on = CertificatesRequirerCharmEvents()
+    on = CertificatesRequirerCharmEvents()  # type: ignore[reportAssignmentType]
 
     def __init__(
         self,
@@ -1708,7 +1710,7 @@ class TLSCertificatesRequiresV2(Object):
                 expiry_notification_time = expiry_time - timedelta(
                     hours=self.expiry_notification_time
                 )
-                if datetime.utcnow() > expiry_notification_time:
+                if datetime.now(timezone.utc) > expiry_notification_time:
                     final_list.append(cert)
         return final_list
 
@@ -1891,7 +1893,7 @@ class TLSCertificatesRequiresV2(Object):
             event.secret.remove_all_revisions()
             return
 
-        if datetime.utcnow() < expiry_time:
+        if datetime.now(timezone.utc) < expiry_time:
             logger.warning("Certificate almost expired")
             self.on.certificate_expiring.emit(
                 certificate=certificate_dict["certificate"],
@@ -1937,7 +1939,7 @@ class TLSCertificatesRequiresV2(Object):
             expiry_time = _get_certificate_expiry_time(certificate_dict["certificate"])
             if not expiry_time:
                 continue
-            time_difference = expiry_time - datetime.utcnow()
+            time_difference = expiry_time - datetime.now(timezone.utc)
             if time_difference.total_seconds() < 0:
                 logger.warning("Certificate is expired")
                 self.on.certificate_invalidated.emit(
