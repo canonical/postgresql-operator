@@ -8,7 +8,7 @@ import logging
 import os
 import platform
 import subprocess
-from typing import Dict, List, Literal, Optional, Set, get_args
+from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
 
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
@@ -44,6 +44,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
+from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import PostgreSQLBackups
@@ -145,8 +146,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_remove, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
-        self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
+        # self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
+        self.framework.observe(self.on.stop, self._on_stop)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.update_status, self._on_update_status)
@@ -365,17 +367,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return
 
-        # Remove the departing member from the raft cluster.
-        try:
-            departing_member = event.departing_unit.name.replace("/", "-")
-            member_ip = self._patroni.get_member_ip(departing_member)
-            self._patroni.remove_raft_member(member_ip)
-        except RemoveRaftMemberFailedError:
-            logger.debug(
-                "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
-            )
-            event.defer()
-            return
+        departing_member = event.departing_unit.name.replace("/", "-")
+        member_ip = self._patroni.get_member_ip(departing_member)
 
         # Allow leader to update the cluster members.
         if not self.unit.is_leader():
@@ -1008,6 +1001,98 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
+
+    def _remove_raft_status_check(self, status: Dict, current: str) -> None:
+        if not status:
+            raise Exception("Failed to get raft status")
+        if status["leader"].address == current:
+            logger.warning("cannot remove raft member: member is leader")
+            raise Exception("Failed to remove raft leader")
+
+    def _remove_raft_node(
+        self, syncobj_util: TcpUtility, partners: List[str], current: str
+    ) -> None:
+        """Try to remove a raft member calling a partner node."""
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                if not self._patroni.stop_patroni():
+                    logger.warning("cannot remove raft member: failed to stop Patroni")
+                    raise Exception("Failed to stop service")
+
+        for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                status = None
+                for partner in partners:
+                    if not (status := self._get_raft_status(syncobj_util, partner)):
+                        continue
+                self._remove_raft_status_check(status, current)
+
+                if f"partner_node_status_server_{current}" not in status:
+                    logger.debug("Raft member already removed")
+                    return
+
+                # If removing multiple units partner list will drift
+                _, partners = self._parse_raft_partners(status)
+                partners.insert(0, partner)
+
+                for partner in partners:
+                    removal_result = syncobj_util.executeCommand(partner, ["remove", current])
+                    if not removal_result.startswith("SUCCESS"):
+                        logger.warning("failed to remove raft member: %s", removal_result)
+                        continue
+                    return
+                raise Exception("Failed to remove raft member")
+
+    def _get_raft_status(self, syncobj_util: TcpUtility, host: str) -> Optional[Dict]:
+        """Get raft status."""
+        try:
+            return syncobj_util.executeCommand(host, ["status"])
+        except UtilityException:
+            return None
+
+    def _parse_raft_partners(self, status: Dict) -> Tuple[List[str], List[str]]:
+        """Collect raft partner and ready nodes."""
+        partners = []
+        ready = []
+        for key in status.keys():
+            if key.startswith("partner_node_status_server_") and status[key]:
+                partner = key.split("partner_node_status_server_")[-1]
+                partners.append(partner)
+                if status[key] == 2:
+                    ready.append(partner)
+        return partners, ready
+
+    def _on_stop(self, _) -> None:
+        syncobj_util = TcpUtility(timeout=3)
+        raft_host = "localhost:2222"
+        # Try to call a different unit
+        status = None
+        for ip in self._units_ips:
+            if ip != self._unit_ip:
+                raft_host = f"{ip}:2222"
+                if not (status := self._get_raft_status(syncobj_util, raft_host)):
+                    continue
+                break
+        if not status:
+            raft_host = "localhost:2222"
+            if not (status := self._get_raft_status(syncobj_util, raft_host)):
+                logger.warning("Stopping unit: all raft members are unreachable")
+                self._patroni.stop_patroni()
+                return
+
+        partners, ready = self._parse_raft_partners(status)
+        if not ready and not partners:
+            logger.debug("Terminating the last raft member")
+            self._patroni.stop_patroni()
+            return
+        if not ready:
+            raise Exception("Cannot stop unit: All other members are still connecting")
+
+        try:
+            self._remove_raft_node(syncobj_util, ready, status["self"].address)
+        except Exception:
+            self._patroni.start_patroni()
+            raise
 
     def _setup_exporter(self) -> None:
         """Set up postgresql_exporter options."""
