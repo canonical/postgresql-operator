@@ -600,7 +600,7 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     await add_unit_with_storage(ops_test, app=app, storage=primary_storage)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
-    connection_string, primary_name = await get_db_connection(ops_test, dbname=dbname)
+    connection_string, _ = await get_db_connection(ops_test, dbname=dbname)
     logger.info("checking whether writes are increasing")
     await are_writes_increasing(ops_test)
 
