@@ -830,6 +830,5 @@ async def create_test_data(connection_string):
             cursor.execute("INSERT INTO test(data) VALUES('some data');")
             cursor.execute("SELECT data FROM test;")
             data = cursor.fetchone()
-            logger.info("check test data")
             assert data[0] == "some data"
     connection.close()
