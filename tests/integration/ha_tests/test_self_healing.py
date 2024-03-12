@@ -51,7 +51,7 @@ from .helpers import (
     storage_id,
     storage_type,
     update_restart_condition,
-    wait_network_restore,
+    wait_network_restore, get_db_connection, validate_test_data,
 )
 
 logger = logging.getLogger(__name__)
@@ -543,10 +543,14 @@ async def test_network_cut_without_ip_change(
 
     await is_cluster_updated(ops_test, primary_name)
 
+
 @pytest.mark.group(1)
 async def test_deploy_zero_units(ops_test: OpsTest):
     """Scale the database to zero units and scale up again."""
-    app = await app_name(ops_test, APP_NAME)
+    app = await app_name(ops_test)
+
+    dbname = f"{APPLICATION_NAME.replace('-', '_')}_first_database"
+    connection_string, primary_name = await get_db_connection(ops_test, dbname=dbname)
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
@@ -554,30 +558,15 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     logger.info("checking whether writes are increasing")
     await are_writes_increasing(ops_test)
 
-    connection_string = await build_connection_string(
-        ops_test, APPLICATION_NAME, FIRST_DATABASE_RELATION_NAME
-    )
-
     # Connect to the database.
-    # Create test data
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
-        with connection.cursor() as cursor:
-            # Check that it's possible to write and read data from the database that
-            # was created for the application.
-            cursor.execute("DROP TABLE IF EXISTS test;")
-            cursor.execute("CREATE TABLE test(data TEXT);")
-            cursor.execute("INSERT INTO test(data) VALUES('some data');")
-            cursor.execute("SELECT data FROM test;")
-            data = cursor.fetchone()
-            assert data[0] == "some data"
-    connection.close()
+    # Create test data.
+    logger.info("connect to DB and create test table")
+    await create_test_data(connection_string)
 
     unit_ip_addresses = []
     storage_id_list = []
-    primary_name = await get_primary(ops_test, APP_NAME)
     primary_storage = ""
-    for unit in ops_test.model.applications[APP_NAME].units:
+    for unit in ops_test.model.applications[app].units:
         # Save IP addresses of units
         unit_ip_addresses.append(await get_unit_ip(ops_test, unit.name))
 
@@ -589,9 +578,9 @@ async def test_deploy_zero_units(ops_test: OpsTest):
 
     # Scale the database to zero units.
     logger.info("scaling database to zero units")
-    await scale_application(ops_test, APP_NAME, 0)
+    await scale_application(ops_test, app, 0)
 
-    # Checking shutdown units
+    # Checking shutdown units.
     for unit_ip in unit_ip_addresses:
         try:
             resp = requests.get(f"http://{unit_ip}:8008")
@@ -603,37 +592,29 @@ async def test_deploy_zero_units(ops_test: OpsTest):
 
     # Scale the database to one unit.
     logger.info("scaling database to one unit")
-    await ops_test.model.applications[app].add_unit(attach_storage=[primary_storage])
+    await add_unit_with_storage(ops_test, app=app, storage=primary_storage)
+    await ops_test.model.wait_for_idle(status="active", timeout=3000)
+
+    connection_string, primary_name = await get_db_connection(ops_test, dbname=dbname)
     logger.info("checking whether writes are increasing")
     await are_writes_increasing(ops_test)
 
-    # Scale the database to three units.
-    await ops_test.model.applications[app].add_unit()
-
-    # Connect to the database.
-    # Create test data
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
-        with connection.cursor() as cursor:
-            # Check that it's possible to write and read data from the database that
-            # was created for the application.
-            cursor.execute("SELECT data FROM test;")
-            data = cursor.fetchone()
-            assert data[0] == "some data"
-    connection.close()
+    logger.info("check test database data")
+    await validate_test_data(connection_string)
 
     # Scale the database to three units.
-    await ops_test.model.applications[app].add_unit()
-    # Connect to the database.
-    # Create test data
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
-        with connection.cursor() as cursor:
-            # Check that it's possible to write and read data from the database that
-            # was created for the application.
-            cursor.execute("SELECT data FROM test;")
-            data = cursor.fetchone()
-            assert data[0] == "some data"
-    connection.close()
+    logger.info("scaling database to two unit")
+    await scale_application(ops_test, application_name=app, count=2)
+    await ops_test.model.wait_for_idle(status="active", timeout=3000)
+    for unit in ops_test.model.applications[app].units:
+        if not await unit.is_leader_from_status():
+            assert await reused_replica_storage(ops_test, unit_name=unit.name
+                                                              ), "attached storage not properly re-used by Postgresql."
+            logger.info(f"check test database data of unit name {unit.name}")
+            connection_string, _ = await get_db_connection(ops_test,
+                                                           dbname=dbname,
+                                                           is_primary=False,
+                                                           replica_unit_name=unit.name)
+            await validate_test_data(connection_string)
 
     await check_writes(ops_test)

@@ -794,3 +794,42 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
+
+
+async def get_db_connection(ops_test, dbname, is_primary=True, replica_unit_name=""):
+    unit_name = await get_primary(ops_test, APP_NAME)
+    password = await get_password(ops_test, APP_NAME)
+    address = get_unit_address(ops_test, unit_name)
+    if not is_primary and unit_name != "":
+        unit_name = replica_unit_name
+        address = ops_test.model.applications[APP_NAME].units[unit_name].public_address
+    connection_string = (
+        f"dbname='{dbname}' user='operator'"
+        f" host='{address}' password='{password}' connect_timeout=10"
+    )
+    return connection_string, unit_name
+
+async def validate_test_data(connection_string):
+    with psycopg2.connect(connection_string) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT data FROM test;")
+            data = cursor.fetchone()
+            assert data[0] == "some data"
+    connection.close()
+
+
+async def create_test_data(connection_string):
+    with psycopg2.connect(connection_string) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            # Check that it's possible to write and read data from the database that
+            # was created for the application.
+            cursor.execute("DROP TABLE IF EXISTS test;")
+            cursor.execute("CREATE TABLE test(data TEXT);")
+            cursor.execute("INSERT INTO test(data) VALUES('some data');")
+            cursor.execute("SELECT data FROM test;")
+            data = cursor.fetchone()
+            logger.info("check test data")
+            assert data[0] == "some data"
+    connection.close()
