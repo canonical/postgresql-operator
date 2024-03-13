@@ -18,7 +18,7 @@ from .helpers import (
 
 DATABASE_APP_NAME = "pg"
 LS_CLIENT = "landscape-client"
-UBUNTU_PRO_APP_NAME = "ubuntu-pro"
+UBUNTU_PRO_APP_NAME = "ubuntu-advantage"
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,6 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
         ops_test.model.deploy("landscape-scalable"),
         ops_test.model.deploy(
             UBUNTU_PRO_APP_NAME,
-            channel="latest/edge",
             config={"token": github_secrets["UBUNTU_PRO_TOKEN"]},
             num_units=0,
         ),
