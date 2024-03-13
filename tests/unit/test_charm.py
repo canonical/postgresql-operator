@@ -25,6 +25,7 @@ from ops.model import (
 )
 from ops.testing import Harness
 from parameterized import parameterized
+from psycopg2 import OperationalError
 from tenacity import RetryError, wait_fixed
 
 from charm import (
@@ -258,12 +259,18 @@ class TestCharm(unittest.TestCase):
             )
         self.assertTrue(self.charm.is_cluster_initialised)
 
+    @patch("charm.PostgresqlOperatorCharm._validate_config_options")
     @patch("charm.PostgresqlOperatorCharm.update_config")
     @patch("relations.db.DbProvides.set_up_relation")
     @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
     @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
     def test_on_config_changed(
-        self, _is_cluster_initialised, _enable_disable_extensions, _set_up_relation, _update_config
+        self,
+        _is_cluster_initialised,
+        _enable_disable_extensions,
+        _set_up_relation,
+        _update_config,
+        _validate_config_options,
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -274,8 +281,16 @@ class TestCharm(unittest.TestCase):
         # Test when the unit is not the leader.
         _is_cluster_initialised.return_value = True
         self.charm.on.config_changed.emit()
+        _validate_config_options.assert_called_once()
         _enable_disable_extensions.assert_not_called()
         _set_up_relation.assert_not_called()
+
+        # Test unable to connect to db
+        _update_config.reset_mock()
+        _validate_config_options.side_effect = OperationalError
+        self.charm.on.config_changed.emit()
+        assert not _update_config.called
+        _validate_config_options.side_effect = None
 
         # Test after the cluster was initialised.
         with self.harness.hooks_disabled():
@@ -1166,7 +1181,6 @@ class TestCharm(unittest.TestCase):
     @patch("charm.snap.SnapCache")
     @patch("charm.PostgresqlOperatorCharm._handle_postgresql_restart_need")
     @patch("charm.Patroni.bulk_update_parameters_controller_by_patroni")
-    @patch("charm.PostgresqlOperatorCharm._validate_config_options")
     @patch("charm.Patroni.member_started", new_callable=PropertyMock)
     @patch("charm.PostgresqlOperatorCharm._is_workload_running", new_callable=PropertyMock)
     @patch("charm.Patroni.render_patroni_yml_file")
@@ -1178,10 +1192,9 @@ class TestCharm(unittest.TestCase):
         _is_workload_running,
         _member_started,
         _,
-        __,
         _handle_postgresql_restart_need,
+        __,
         ___,
-        ____,
     ):
         with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
             # Mock some properties.
@@ -1328,17 +1341,11 @@ class TestCharm(unittest.TestCase):
         _charm_lib.return_value.validate_date_style.return_value = []
         _charm_lib.return_value.get_postgresql_timezones.return_value = []
 
-        self.charm._validate_config_options()
-
-        assert not _charm_lib.return_value.get_postgresql_text_search_configs.called
-        assert not _charm_lib.return_value.validate_date_style.called
-        assert not _charm_lib.return_value.get_postgresql_timezones.called
-
         # Test instance_default_text_search_config exception
         with self.harness.hooks_disabled():
             self.harness.update_config({"instance_default_text_search_config": "pg_catalog.test"})
 
-        with self.assertRaises(Exception) as e:
+        with self.assertRaises(ValueError) as e:
             self.charm._validate_config_options()
             assert (
                 e.msg == "instance_default_text_search_config config option has an invalid value"
@@ -1353,7 +1360,7 @@ class TestCharm(unittest.TestCase):
         with self.harness.hooks_disabled():
             self.harness.update_config({"request_date_style": "ISO, TEST"})
 
-        with self.assertRaises(Exception) as e:
+        with self.assertRaises(ValueError) as e:
             self.charm._validate_config_options()
             assert e.msg == "request_date_style config option has an invalid value"
 
@@ -1364,7 +1371,7 @@ class TestCharm(unittest.TestCase):
         with self.harness.hooks_disabled():
             self.harness.update_config({"request_time_zone": "TEST_ZONE"})
 
-        with self.assertRaises(Exception) as e:
+        with self.assertRaises(ValueError) as e:
             self.charm._validate_config_options()
             assert e.msg == "request_time_zone config option has an invalid value"
 
