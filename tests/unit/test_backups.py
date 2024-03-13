@@ -577,9 +577,10 @@ class TestPostgreSQLBackups(unittest.TestCase):
         )
         self.assertEqual(
             self.charm.backup._list_backups(show_failed=True),
-            OrderedDict[str, str](
-                [("2023-01-01T09:00:00Z", "test-stanza"), ("2023-01-01T10:00:00Z", "test-stanza")]
-            ),
+            OrderedDict[str, str]([
+                ("2023-01-01T09:00:00Z", "test-stanza"),
+                ("2023-01-01T10:00:00Z", "test-stanza"),
+            ]),
         )
 
         # Test when some backups are available, but it's not desired to list failed backups.
@@ -1146,20 +1147,18 @@ Juju Version: test-juju-version
         _list_backups.return_value = {"2023-01-01T09:00:00Z": self.charm.backup.stanza_name}
         _update_config.reset_mock()
         self.charm.backup._on_create_backup_action(mock_event)
-        _upload_content_to_s3.assert_has_calls(
-            [
-                call(
-                    expected_metadata,
-                    f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/latest",
-                    mock_s3_parameters,
-                ),
-                call(
-                    "Stdout:\nfake stdout\n\nStderr:\nfake stderr\n",
-                    f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/2023-01-01T09:00:00Z/backup.log",
-                    mock_s3_parameters,
-                ),
-            ]
-        )
+        _upload_content_to_s3.assert_has_calls([
+            call(
+                expected_metadata,
+                f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/latest",
+                mock_s3_parameters,
+            ),
+            call(
+                "Stdout:\nfake stdout\n\nStderr:\nfake stderr\n",
+                f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/2023-01-01T09:00:00Z/backup.log",
+                mock_s3_parameters,
+            ),
+        ])
         _update_config.assert_has_calls(update_config_calls)
         mock_event.fail.assert_called_once()
         mock_event.set_results.assert_not_called()
@@ -1171,20 +1170,18 @@ Juju Version: test-juju-version
         _upload_content_to_s3.return_value = True
         _update_config.reset_mock()
         self.charm.backup._on_create_backup_action(mock_event)
-        _upload_content_to_s3.assert_has_calls(
-            [
-                call(
-                    expected_metadata,
-                    f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/latest",
-                    mock_s3_parameters,
-                ),
-                call(
-                    "Stdout:\nfake stdout\n\nStderr:\nfake stderr\n",
-                    f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/2023-01-01T09:00:00Z/backup.log",
-                    mock_s3_parameters,
-                ),
-            ]
-        )
+        _upload_content_to_s3.assert_has_calls([
+            call(
+                expected_metadata,
+                f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/latest",
+                mock_s3_parameters,
+            ),
+            call(
+                "Stdout:\nfake stdout\n\nStderr:\nfake stderr\n",
+                f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/2023-01-01T09:00:00Z/backup.log",
+                mock_s3_parameters,
+            ),
+        ])
         _change_connectivity_to_database.assert_not_called()
         _update_config.assert_has_calls(update_config_calls)
         mock_event.fail.assert_not_called()
@@ -1195,20 +1192,18 @@ Juju Version: test-juju-version
         _upload_content_to_s3.reset_mock()
         _is_primary.return_value = False
         self.charm.backup._on_create_backup_action(mock_event)
-        _upload_content_to_s3.assert_has_calls(
-            [
-                call(
-                    expected_metadata,
-                    f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/latest",
-                    mock_s3_parameters,
-                ),
-                call(
-                    "Stdout:\nfake stdout\n\nStderr:\nfake stderr\n",
-                    f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/2023-01-01T09:00:00Z/backup.log",
-                    mock_s3_parameters,
-                ),
-            ]
-        )
+        _upload_content_to_s3.assert_has_calls([
+            call(
+                expected_metadata,
+                f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/latest",
+                mock_s3_parameters,
+            ),
+            call(
+                "Stdout:\nfake stdout\n\nStderr:\nfake stderr\n",
+                f"test-path/backup/{self.charm.model.name}.{self.charm.cluster_name}/2023-01-01T09:00:00Z/backup.log",
+                mock_s3_parameters,
+            ),
+        ])
         self.assertEqual(_change_connectivity_to_database.call_count, 2)
         mock_event.fail.assert_not_called()
         mock_event.set_results.assert_called_once_with({"backup-status": "backup created"})
@@ -1244,14 +1239,12 @@ Juju Version: test-juju-version
 2023-01-01T10:00:00Z  | physical     | finished"""
         self.charm.backup._on_list_backups_action(mock_event)
         _generate_backup_list_output.assert_called_once()
-        mock_event.set_results.assert_called_once_with(
-            {
-                "backups": """backup-id             | backup-type  | backup-status
+        mock_event.set_results.assert_called_once_with({
+            "backups": """backup-id             | backup-type  | backup-status
 ----------------------------------------------------
 2023-01-01T09:00:00Z  | physical     | failed: fake error
 2023-01-01T10:00:00Z  | physical     | finished"""
-            }
-        )
+        })
         mock_event.fail.assert_not_called()
 
     @patch_network_get(private_address="1.1.1.1")
@@ -1442,15 +1435,18 @@ Juju Version: test-juju-version
         _render_file.assert_not_called()
 
         # Test when all parameters are provided.
-        _retrieve_s3_parameters.return_value = {
-            "bucket": "test-bucket",
-            "access-key": "test-access-key",
-            "secret-key": "test-secret-key",
-            "endpoint": "https://storage.googleapis.com",
-            "path": "test-path/",
-            "region": "us-east-1",
-            "s3-uri-style": "path",
-        }, []
+        _retrieve_s3_parameters.return_value = (
+            {
+                "bucket": "test-bucket",
+                "access-key": "test-access-key",
+                "secret-key": "test-secret-key",
+                "endpoint": "https://storage.googleapis.com",
+                "path": "test-path/",
+                "region": "us-east-1",
+                "s3-uri-style": "path",
+            },
+            [],
+        )
 
         # Get the expected content from a file.
         with open("templates/pgbackrest.conf.j2") as file:

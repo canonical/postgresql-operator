@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 """Backups implementation."""
+
 import json
 import logging
 import os
@@ -153,12 +154,10 @@ class PostgreSQLBackups(Object):
 
         if self.charm.unit.is_leader():
             for stanza in json.loads(stdout):
-                return_code, system_identifier_from_instance, error = self._execute_command(
-                    [
-                        f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
-                        POSTGRESQL_DATA_PATH,
-                    ]
-                )
+                return_code, system_identifier_from_instance, error = self._execute_command([
+                    f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
+                    POSTGRESQL_DATA_PATH,
+                ])
                 if return_code != 0:
                     raise Exception(error)
                 system_identifier_from_instance = [
@@ -307,9 +306,12 @@ class PostgreSQLBackups(Object):
         List contains successful and failed backups in order of ascending time.
         """
         backup_list = []
-        return_code, output, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"]
-        )
+        return_code, output, stderr = self._execute_command([
+            PGBACKREST_EXECUTABLE,
+            PGBACKREST_CONFIGURATION_FILE,
+            "info",
+            "--output=json",
+        ])
         if return_code != 0:
             raise ListBackupsError(f"Failed to list backups with error: {stderr}")
 
@@ -336,9 +338,12 @@ class PostgreSQLBackups(Object):
             a dict of previously created backups (id + stanza name) or an empty list
                 if there is no backups in the S3 bucket.
         """
-        return_code, output, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"]
-        )
+        return_code, output, stderr = self._execute_command([
+            PGBACKREST_EXECUTABLE,
+            PGBACKREST_CONFIGURATION_FILE,
+            "info",
+            "--output=json",
+        ])
         if return_code != 0:
             raise ListBackupsError(f"Failed to list backups with error: {stderr}")
 
@@ -385,14 +390,12 @@ class PostgreSQLBackups(Object):
         self.charm.unit.status = MaintenanceStatus("initialising stanza")
 
         # Create the stanza.
-        return_code, _, stderr = self._execute_command(
-            [
-                PGBACKREST_EXECUTABLE,
-                PGBACKREST_CONFIGURATION_FILE,
-                f"--stanza={self.stanza_name}",
-                "stanza-create",
-            ]
-        )
+        return_code, _, stderr = self._execute_command([
+            PGBACKREST_EXECUTABLE,
+            PGBACKREST_CONFIGURATION_FILE,
+            f"--stanza={self.stanza_name}",
+            "stanza-create",
+        ])
         if return_code == 49:
             # Raise an error if the connection timeouts, so the user has the possibility to
             # fix network issues and call juju resolve to re-trigger the hook that calls
@@ -410,13 +413,15 @@ class PostgreSQLBackups(Object):
 
         # Store the stanza name to be used in configurations updates.
         if self.charm.unit.is_leader():
-            self.charm.app_peer_data.update(
-                {"stanza": self.stanza_name, "init-pgbackrest": "True"}
-            )
+            self.charm.app_peer_data.update({
+                "stanza": self.stanza_name,
+                "init-pgbackrest": "True",
+            })
         else:
-            self.charm.unit_peer_data.update(
-                {"stanza": self.stanza_name, "init-pgbackrest": "True"}
-            )
+            self.charm.unit_peer_data.update({
+                "stanza": self.stanza_name,
+                "init-pgbackrest": "True",
+            })
 
     def check_stanza(self) -> None:
         """Runs the pgbackrest stanza validation."""
@@ -434,14 +439,12 @@ class PostgreSQLBackups(Object):
                 with attempt:
                     if self.charm._patroni.member_started:
                         self.charm._patroni.reload_patroni_configuration()
-                    return_code, _, stderr = self._execute_command(
-                        [
-                            PGBACKREST_EXECUTABLE,
-                            PGBACKREST_CONFIGURATION_FILE,
-                            f"--stanza={self.stanza_name}",
-                            "check",
-                        ]
-                    )
+                    return_code, _, stderr = self._execute_command([
+                        PGBACKREST_EXECUTABLE,
+                        PGBACKREST_CONFIGURATION_FILE,
+                        f"--stanza={self.stanza_name}",
+                        "check",
+                    ])
                     if return_code != 0:
                         raise Exception(stderr)
             self.charm.unit.status = ActiveStatus()
@@ -468,9 +471,10 @@ class PostgreSQLBackups(Object):
             # If the stanza name is not set in the application databag, then the primary is not
             # the leader unit, and it's needed to set the stanza name in the application databag.
             if "stanza" not in self.charm.app_peer_data and self.charm.unit.is_leader():
-                self.charm.app_peer_data.update(
-                    {"stanza": self.stanza_name, "init-pgbackrest": "True"}
-                )
+                self.charm.app_peer_data.update({
+                    "stanza": self.stanza_name,
+                    "init-pgbackrest": "True",
+                })
                 break
             # If the stanza was already checked and its name is still in the unit databag, mark
             # the stanza as already checked in the application databag and remove it from the
@@ -487,9 +491,12 @@ class PostgreSQLBackups(Object):
         if not self.charm.primary_endpoint:
             logger.warning("Failed to contact pgBackRest TLS server: no primary endpoint")
             return False
-        return_code, _, stderr = self._execute_command(
-            [PGBACKREST_EXECUTABLE, "server-ping", "--io-timeout=10", self.charm.primary_endpoint]
-        )
+        return_code, _, stderr = self._execute_command([
+            PGBACKREST_EXECUTABLE,
+            "server-ping",
+            "--io-timeout=10",
+            self.charm.primary_endpoint,
+        ])
         if return_code != 0:
             logger.warning(
                 f"Failed to contact pgBackRest TLS server on {self.charm.primary_endpoint} with error {stderr}"
@@ -729,13 +736,11 @@ Stderr:
 
         # Mark the cluster as in a restoring backup state and update the Patroni configuration.
         logger.info("Configuring Patroni to restore the backup")
-        self.charm.app_peer_data.update(
-            {
-                "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
-                "restore-stanza": backups[backup_id],
-                "restore-to-time": event.params.get("restore-to-time") or "",
-            }
-        )
+        self.charm.app_peer_data.update({
+            "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
+            "restore-stanza": backups[backup_id],
+            "restore-to-time": event.params.get("restore-to-time") or "",
+        })
         self.charm.update_config()
 
         # Start the database to start the restore process.
@@ -880,9 +885,9 @@ Stderr:
         # Clean up extra slash symbols to avoid issues on 3rd-party storages
         # like Ceph Object Gateway (radosgw).
         s3_parameters["endpoint"] = s3_parameters["endpoint"].rstrip("/")
-        s3_parameters[
-            "path"
-        ] = f'/{s3_parameters["path"].strip("/")}'  # The slash in the beginning is required by pgBackRest.
+        s3_parameters["path"] = (
+            f'/{s3_parameters["path"].strip("/")}'  # The slash in the beginning is required by pgBackRest.
+        )
         s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
         return s3_parameters, []

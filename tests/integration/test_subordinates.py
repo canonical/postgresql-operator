@@ -49,19 +49,21 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
     haproxy_unit = ops_test.model.applications["haproxy"].units[0]
     haproxy_addr = get_unit_address(ops_test, haproxy_unit.name)
     haproxy_host = haproxy_unit.machine.hostname
-    cert = subprocess.check_output(
-        ["lxc", "exec", haproxy_host, "cat", "/var/lib/haproxy/selfsigned_ca.crt"]
-    )
+    cert = subprocess.check_output([
+        "lxc",
+        "exec",
+        haproxy_host,
+        "cat",
+        "/var/lib/haproxy/selfsigned_ca.crt",
+    ])
     ssl_public_key = f"base64:{b64encode(cert).decode()}"
 
-    await ops_test.model.applications[LS_CLIENT].set_config(
-        {
-            "account-name": "standalone",
-            "ping-url": f"http://{haproxy_addr}/ping",
-            "url": f"https://{haproxy_addr}/message-system",
-            "ssl-public-key": ssl_public_key,
-        }
-    )
+    await ops_test.model.applications[LS_CLIENT].set_config({
+        "account-name": "standalone",
+        "ping-url": f"http://{haproxy_addr}/ping",
+        "url": f"https://{haproxy_addr}/message-system",
+        "ssl-public-key": ssl_public_key,
+    })
     await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
     await ops_test.model.wait_for_idle(apps=[LS_CLIENT, DATABASE_APP_NAME], status="active")
 

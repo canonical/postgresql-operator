@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Charmed Machine Operator for the PostgreSQL database."""
+
 import json
 import logging
 import os
@@ -1029,12 +1030,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
 
-        postgres_snap.set(
-            {
-                "exporter.user": MONITORING_USER,
-                "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-            }
-        )
+        postgres_snap.set({
+            "exporter.user": MONITORING_USER,
+            "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
+        })
         if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
@@ -1498,12 +1497,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         self._validate_config_options()
 
-        self._patroni.bulk_update_parameters_controller_by_patroni(
-            {
-                "max_connections": max(4 * os.cpu_count(), 100),
-                "max_prepared_transactions": self.config.memory_max_prepared_transactions,
-            }
-        )
+        self._patroni.bulk_update_parameters_controller_by_patroni({
+            "max_connections": max(4 * os.cpu_count(), 100),
+            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+        })
 
         self._handle_postgresql_restart_need(enable_tls)
 

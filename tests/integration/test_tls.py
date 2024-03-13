@@ -87,9 +87,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Enable additional logs on the PostgreSQL instance to check TLS
         # being used in a later step and make the fail-over to happens faster.
-        await ops_test.model.applications[DATABASE_APP_NAME].set_config(
-            {"logging_log_connections": "True"}
-        )
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+            "logging_log_connections": "True"
+        })
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", idle_period=30
         )

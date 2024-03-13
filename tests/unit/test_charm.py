@@ -1097,9 +1097,9 @@ class TestCharm(unittest.TestCase):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        self.charm._install_snap_packages(
-            [("postgresql", {"revision": {platform.machine(): "42"}})]
-        )
+        self.charm._install_snap_packages([
+            ("postgresql", {"revision": {platform.machine(): "42"}})
+        ])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(
@@ -1125,9 +1125,9 @@ class TestCharm(unittest.TestCase):
         # Test without refresh
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
-        self.charm._install_snap_packages(
-            [("postgresql", {"revision": {platform.machine(): "42"}})]
-        )
+        self.charm._install_snap_packages([
+            ("postgresql", {"revision": {platform.machine(): "42"}})
+        ])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_not_called()
@@ -2024,10 +2024,14 @@ class TestCharm(unittest.TestCase):
 
                 self.charm._handle_postgresql_restart_need(values[0])
                 _reload_patroni_configuration.assert_called_once()
-                self.assertIn(
-                    "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit)
-                ) if values[0] else self.assertNotIn(
-                    "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit)
+                (
+                    self.assertIn(
+                        "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit)
+                    )
+                    if values[0]
+                    else self.assertNotIn(
+                        "tls", self.harness.get_relation_data(self.rel_id, self.charm.unit)
+                    )
                 )
                 if (values[1] != values[2]) or values[3]:
                     self.assertNotIn(
@@ -2036,12 +2040,16 @@ class TestCharm(unittest.TestCase):
                     )
                     _restart.assert_called_once()
                 else:
-                    self.assertIn(
-                        "postgresql_restarted",
-                        self.harness.get_relation_data(self.rel_id, self.charm.unit),
-                    ) if values[4] else self.assertNotIn(
-                        "postgresql_restarted",
-                        self.harness.get_relation_data(self.rel_id, self.charm.unit),
+                    (
+                        self.assertIn(
+                            "postgresql_restarted",
+                            self.harness.get_relation_data(self.rel_id, self.charm.unit),
+                        )
+                        if values[4]
+                        else self.assertNotIn(
+                            "postgresql_restarted",
+                            self.harness.get_relation_data(self.rel_id, self.charm.unit),
+                        )
                     )
                     _restart.assert_not_called()
 

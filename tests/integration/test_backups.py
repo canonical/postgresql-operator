@@ -640,14 +640,12 @@ async def test_invalid_config_and_recovery_after_fixing_it(
 
     # Provide invalid backup configurations.
     logger.info("configuring S3 integrator for an invalid cloud")
-    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(
-        {
-            "endpoint": "endpoint",
-            "bucket": "bucket",
-            "path": "path",
-            "region": "region",
-        }
-    )
+    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config({
+        "endpoint": "endpoint",
+        "bucket": "bucket",
+        "path": "path",
+        "region": "region",
+    })
     action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
         "sync-s3-credentials",
         **{
