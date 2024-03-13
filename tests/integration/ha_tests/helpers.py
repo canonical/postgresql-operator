@@ -11,6 +11,7 @@ from typing import Dict, Optional, Set, Tuple
 import psycopg2
 import requests
 import yaml
+from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import (
     RetryError,
@@ -99,7 +100,9 @@ async def are_writes_increasing(
                 assert more_writes[member] > count, f"{member}: writes not continuing to DB"
 
 
-async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
+async def app_name(
+    ops_test: OpsTest, application_name: str = "postgresql", model: Model = None
+) -> Optional[str]:
     """Returns the name of the cluster running PostgreSQL.
 
     This is important since not all deployments of the PostgreSQL charm have the application name
@@ -107,8 +110,10 @@ async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> O
 
     Note: if multiple clusters are running PostgreSQL this will return the one first found.
     """
-    status = await ops_test.model.get_status()
-    for app in ops_test.model.applications:
+    if model is None:
+        model = ops_test.model
+    status = await model.get_status()
+    for app in model.applications:
         if application_name in status["applications"][app]["charm"]:
             return app
 
@@ -397,6 +402,42 @@ async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Op
 def get_random_unit(ops_test: OpsTest, app: str) -> str:
     """Returns a random unit name."""
     return random.choice(ops_test.model.applications[app].units).name
+
+
+async def get_standby_leader(model: Model, application_name: str) -> str:
+    """Get the standby leader name.
+
+    Args:
+        model: the model instance.
+        application_name: the name of the application to get the value for.
+
+    Returns:
+        the name of the standby leader.
+    """
+    status = await model.get_status()
+    first_unit_ip = list(status["applications"][application_name]["units"].values())[0]["address"]
+    cluster = get_patroni_cluster(first_unit_ip)
+    for member in cluster["members"]:
+        if member["role"] == "standby_leader":
+            return member["name"]
+
+
+async def get_sync_standby(model: Model, application_name: str) -> str:
+    """Get the sync_standby name.
+
+    Args:
+        model: the model instance.
+        application_name: the name of the application to get the value for.
+
+    Returns:
+        the name of the sync standby.
+    """
+    status = await model.get_status()
+    first_unit_ip = list(status["applications"][application_name]["units"].values())[0]["address"]
+    cluster = get_patroni_cluster(first_unit_ip)
+    for member in cluster["members"]:
+        if member["role"] == "sync_standby":
+            return member["name"]
 
 
 async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
