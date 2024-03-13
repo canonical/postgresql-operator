@@ -163,22 +163,19 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         ops_test, LANDSCAPE_APP_NAME, RELATION_NAME, remote_unit_name=database_unit_name
     )
 
+    # Remove the applications from the bundle.
+    await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
+    await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
+
     # Remove the relation and test that its user was deleted
     # (by checking that the connection string doesn't work anymore).
     async with ops_test.fast_forward():
-        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{LANDSCAPE_APP_NAME}:db"
-        )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
         with attempt:
             with pytest.raises(psycopg2.OperationalError):
                 psycopg2.connect(connection_string)
-
-    # Remove the applications from the bundle.
-    await ops_test.model.remove_application(LANDSCAPE_APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(HAPROXY_APP_NAME, block_until_done=True)
-    await ops_test.model.remove_application(RABBITMQ_APP_NAME, block_until_done=True)
 
     # Remove the PostgreSQL application.
     await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
