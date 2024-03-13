@@ -1202,9 +1202,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
 
             # Remove the restoring backup flag and the restore stanza name.
-            self.app_peer_data.update(
-                {"restoring-backup": "", "restore-stanza": "", "restore-to-time": ""}
-            )
+            self.app_peer_data.update({
+                "restoring-backup": "",
+                "restore-stanza": "",
+                "restore-to-time": "",
+            })
             self.update_config()
             self.restore_patroni_restart_condition()
             logger.info("Restore succeeded")
