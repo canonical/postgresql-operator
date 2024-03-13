@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Helper class used to manage cluster lifecycle."""
+
 import logging
 import os
 import pwd
@@ -564,29 +565,25 @@ class Patroni:
                 is not part of the raft cluster.
         """
         # Get the status of the raft cluster.
-        raft_status = subprocess.check_output(
-            [
-                "charmed-postgresql.syncobj-admin",
-                "-conn",
-                "127.0.0.1:2222",
-                "-status",
-            ]
-        ).decode("UTF-8")
+        raft_status = subprocess.check_output([
+            "charmed-postgresql.syncobj-admin",
+            "-conn",
+            "127.0.0.1:2222",
+            "-status",
+        ]).decode("UTF-8")
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or member_ip not in raft_status:
             return
 
         # Remove the member from the raft cluster.
-        result = subprocess.check_output(
-            [
-                "charmed-postgresql.syncobj-admin",
-                "-conn",
-                "127.0.0.1:2222",
-                "-remove",
-                f"{member_ip}:2222",
-            ]
-        ).decode("UTF-8")
+        result = subprocess.check_output([
+            "charmed-postgresql.syncobj-admin",
+            "-conn",
+            "127.0.0.1:2222",
+            "-remove",
+            f"{member_ip}:2222",
+        ]).decode("UTF-8")
 
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()

@@ -1065,9 +1065,9 @@ class TestCharm(unittest.TestCase):
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        self.charm._install_snap_packages(
-            [("postgresql", {"revision": {platform.machine(): "42"}})]
-        )
+        self.charm._install_snap_packages([
+            ("postgresql", {"revision": {platform.machine(): "42"}})
+        ])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_called_once_with(
@@ -1093,9 +1093,9 @@ class TestCharm(unittest.TestCase):
         # Test without refresh
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
-        self.charm._install_snap_packages(
-            [("postgresql", {"revision": {platform.machine(): "42"}})]
-        )
+        self.charm._install_snap_packages([
+            ("postgresql", {"revision": {platform.machine(): "42"}})
+        ])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_package.ensure.assert_not_called()

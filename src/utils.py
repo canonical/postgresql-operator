@@ -2,6 +2,7 @@
 # See LICENSE file for licensing details.
 
 """A collection of utility functions that are used in the charm."""
+
 import secrets
 import string
 
