@@ -18,6 +18,7 @@ from .helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    run_command_on_unit,
     scale_application,
     switchover,
     wait_for_idle_on_blocked,
@@ -438,3 +439,12 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     await ops_test.model.wait_for_idle(
         apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active"
     )
+
+
+async def test_pgbackrest_logs_presence(ops_test: OpsTest):
+    database_app_name = f"new-{DATABASE_APP_NAME}"
+    unit_name = f"{database_app_name}/0"
+    logs_path = "/var/snap/charmed-postgresql/common/var/log"
+    check_pgbackrest_logs_cmd = f"sudo cat {logs_path}/pgbackrest/* 2> /dev/null"
+    stdout = await run_command_on_unit(ops_test, unit_name, check_pgbackrest_logs_cmd)
+    assert stdout.strip(), "pgbackrest logs not present"
