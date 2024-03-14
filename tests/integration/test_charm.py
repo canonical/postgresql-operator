@@ -12,6 +12,8 @@ from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
+from integration.helpers import run_command_on_unit
+
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -54,6 +56,24 @@ async def test_deploy(ops_test: OpsTest, charm: str):
 
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
     assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
+
+
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+@pytest.mark.parametrize("unit_id", UNIT_IDS)
+async def test_logs_presence(ops_test: OpsTest, unit_id: int):
+    """Test if patroni and postgresql logs are present."""
+    logs_path = "/var/snap/charmed-postgresql/common/var/log"
+    check_patroni_logs_cmd = f"sudo cat {logs_path}/patroni/* 2> /dev/null"
+    check_postgresql_logs_cmd = f"sudo cat {logs_path}/postgresql/* 2> /dev/null"
+
+    unit = ops_test.model.applications[DATABASE_APP_NAME].units[unit_id]
+
+    stdout = await run_command_on_unit(ops_test, unit.name, check_patroni_logs_cmd)
+    assert stdout.strip(), "patroni logs not present"
+
+    stdout = await run_command_on_unit(ops_test, unit.name, check_postgresql_logs_cmd)
+    assert stdout.strip(), "postgresql logs not present"
 
 
 @pytest.mark.group(1)
