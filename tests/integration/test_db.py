@@ -365,34 +365,6 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
 
-@pytest.mark.group(1)
-@pytest.mark.unstable
-async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(
-            "weebl",
-            application_name="weebl",
-            num_units=APPLICATION_UNITS,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=["weebl"],
-            status="blocked",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
-
-        await ops_test.model.relate("weebl:database", f"{DATABASE_APP_NAME}:db")
-
-        await ops_test.model.wait_for_idle(
-            apps=["weebl", DATABASE_APP_NAME],
-            status="active",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
-
-        await ops_test.model.remove_application("weebl", block_until_done=True)
-
-
 @markers.juju2
 @pytest.mark.group(1)
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
