@@ -81,6 +81,13 @@ async def test_config_parameters(ops_test: OpsTest) -> None:
         {
             "vacuum_vacuum_freeze_table_age": ["-1", "150000000"]
         },  # config option is between 0 and 2000000000
+        {
+            "instance_default_text_search_config": [test_string, "pg_catalog.simple"]
+        },  # config option is validated against the db
+        {
+            "request_date_style": [test_string, "ISO, MDY"]
+        },  # config option is validated against the db
+        {"request_time_zone": [test_string, "UTC"]},  # config option is validated against the db
     ]
 
     charm_config = {}

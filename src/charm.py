@@ -11,6 +11,7 @@ import platform
 import subprocess
 from typing import Dict, List, Literal, Optional, Set, get_args
 
+import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -862,19 +863,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
-    def _on_config_changed(self, _) -> None:
+    def _on_config_changed(self, event) -> None:
         """Handle configuration changes, like enabling plugins."""
         if not self.is_cluster_initialised:
-            logger.debug("Early exit on_config_changed: cluster not initialised yet")
+            logger.debug("Defer on_config_changed: cluster not initialised yet")
+            event.defer()
             return
 
         if not self.upgrade.idle:
-            logger.debug("Early exit on_config_changed: upgrade in progress")
+            logger.debug("Defer on_config_changed: upgrade in progress")
+            event.defer()
             return
-
         try:
+            self._validate_config_options()
             # update config on every run
             self.update_config()
+        except psycopg2.OperationalError:
+            logger.debug("Defer on_config_changed: Cannot connect to database")
+            event.defer()
+            return
         except ValueError as e:
             self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
             logger.error("Invalid configuration: %s", str(e))
@@ -1476,7 +1483,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_connect_to_postgresql:
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
-        self._validate_config_options()
 
         self._patroni.bulk_update_parameters_controller_by_patroni({
             "max_connections": max(4 * os.cpu_count(), 100),
@@ -1504,24 +1510,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""
         if (
-            self.config.instance_default_text_search_config is not None
-            and self.config.instance_default_text_search_config
+            self.config.instance_default_text_search_config
             not in self.postgresql.get_postgresql_text_search_configs()
         ):
-            raise Exception(
+            raise ValueError(
                 "instance_default_text_search_config config option has an invalid value"
             )
 
-        if self.config.request_date_style is not None and not self.postgresql.validate_date_style(
-            self.config.request_date_style
-        ):
-            raise Exception("request_date_style config option has an invalid value")
+        if not self.postgresql.validate_date_style(self.config.request_date_style):
+            raise ValueError("request_date_style config option has an invalid value")
 
-        if (
-            self.config.request_time_zone is not None
-            and self.config.request_time_zone not in self.postgresql.get_postgresql_timezones()
-        ):
-            raise Exception("request_time_zone config option has an invalid value")
+        if self.config.request_time_zone not in self.postgresql.get_postgresql_timezones():
+            raise ValueError("request_time_zone config option has an invalid value")
 
     def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
