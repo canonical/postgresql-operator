@@ -441,6 +441,7 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     )
 
 
+@pytest.mark.group(1)
 async def test_pgbackrest_logs_presence(ops_test: OpsTest):
     database_app_name = f"new-{DATABASE_APP_NAME}"
     unit_name = f"{database_app_name}/0"
