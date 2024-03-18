@@ -5,6 +5,7 @@ import asyncio
 import logging
 
 import pytest
+from pip._vendor import requests
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
@@ -15,6 +16,7 @@ from ..helpers import (
     get_password,
     get_unit_address,
     run_command_on_unit,
+    scale_application,
 )
 from .conftest import APPLICATION_NAME
 from .helpers import (
@@ -27,10 +29,13 @@ from .helpers import (
     change_patroni_setting,
     change_wal_settings,
     check_writes,
+    create_test_data,
     cut_network_from_unit,
     cut_network_from_unit_without_ip_change,
     fetch_cluster_members,
     get_controller_machine,
+    get_db_connection,
+    get_last_added_unit,
     get_patroni_setting,
     get_primary,
     get_unit_ip,
@@ -49,6 +54,7 @@ from .helpers import (
     storage_id,
     storage_type,
     update_restart_condition,
+    validate_test_data,
     wait_network_restore,
 )
 
@@ -543,3 +549,93 @@ async def test_network_cut_without_ip_change(
     ), "Connection is not possible after network restore"
 
     await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)
+
+
+@pytest.mark.group(1)
+async def test_deploy_zero_units(ops_test: OpsTest):
+    """Scale the database to zero units and scale up again."""
+    app = await app_name(ops_test)
+
+    dbname = f"{APPLICATION_NAME.replace('-', '_')}_first_database"
+    connection_string, _ = await get_db_connection(ops_test, dbname=dbname)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    logger.info("checking whether writes are increasing")
+    await are_writes_increasing(ops_test)
+
+    # Connect to the database.
+    # Create test data.
+    logger.info("connect to DB and create test table")
+    await create_test_data(connection_string)
+
+    unit_ip_addresses = []
+    primary_storage = ""
+    for unit in ops_test.model.applications[app].units:
+        # Save IP addresses of units
+        unit_ip_addresses.append(await get_unit_ip(ops_test, unit.name))
+
+        # Save detached storage ID
+        if await unit.is_leader_from_status:
+            primary_storage = storage_id(ops_test, unit.name)
+
+    # Scale the database to zero units.
+    logger.info("scaling database to zero units")
+    await scale_application(ops_test, app, 0)
+
+    # Checking shutdown units.
+    for unit_ip in unit_ip_addresses:
+        try:
+            resp = requests.get(f"http://{unit_ip}:8008")
+            assert (
+                resp.status_code != 200
+            ), f"status code = {resp.status_code}, message = {resp.text}"
+        except requests.exceptions.ConnectionError:
+            assert True, f"unit host = http://{unit_ip}:8008, all units shutdown"
+        except Exception as e:
+            assert False, f"{e} unit host = http://{unit_ip}:8008, something went wrong"
+
+    # Scale up to one unit.
+    logger.info("scaling database to one unit")
+    await add_unit_with_storage(ops_test, app=app, storage=primary_storage)
+    await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+    connection_string, _ = await get_db_connection(ops_test, dbname=dbname)
+    logger.info("checking whether writes are increasing")
+    await are_writes_increasing(ops_test)
+
+    logger.info("check test database data")
+    await validate_test_data(connection_string)
+
+    # Scale up to two units.
+    logger.info("scaling database to two unit")
+    prev_units = [unit.name for unit in ops_test.model.applications[app].units]
+    await scale_application(ops_test, application_name=app, count=2)
+    unit = await get_last_added_unit(ops_test, app, prev_units)
+
+    logger.info(f"check test database data of unit name {unit.name}")
+    connection_string, _ = await get_db_connection(
+        ops_test, dbname=dbname, is_primary=False, replica_unit_name=unit.name
+    )
+    await validate_test_data(connection_string)
+    assert await reused_replica_storage(
+        ops_test, unit_name=unit.name
+    ), "attached storage not properly re-used by Postgresql."
+
+    # Scale up to three units.
+    logger.info("scaling database to three unit")
+    prev_units = [unit.name for unit in ops_test.model.applications[app].units]
+    await scale_application(ops_test, application_name=app, count=3)
+    unit = await get_last_added_unit(ops_test, app, prev_units)
+
+    logger.info(f"check test database data of unit name {unit.name}")
+    connection_string, _ = await get_db_connection(
+        ops_test, dbname=dbname, is_primary=False, replica_unit_name=unit.name
+    )
+    await validate_test_data(connection_string)
+    assert await reused_replica_storage(
+        ops_test, unit_name=unit.name
+    ), "attached storage not properly re-used by Postgresql."
+
+    await check_writes(ops_test)
