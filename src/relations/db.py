@@ -296,7 +296,8 @@ class DbProvides(Object):
             return
 
         # List the replicas endpoints.
-        replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
+        replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
+        replicas_endpoint.sort()
 
         for relation in relations:
             # Retrieve some data from the relation.
