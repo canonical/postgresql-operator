@@ -929,7 +929,6 @@ class TestCharm(unittest.TestCase):
     @patch("charm.ClusterTopologyObserver.start_observer")
     @patch("charm.PostgresqlOperatorCharm._set_primary_status_message")
     @patch("charm.PostgresqlOperatorCharm._handle_workload_failures")
-    @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
     @patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
         new_callable=PropertyMock(return_value=True),
@@ -951,7 +950,6 @@ class TestCharm(unittest.TestCase):
         _handle_processes_failures,
         _oversee_users,
         _primary_endpoint,
-        _update_relation_endpoints,
         _handle_workload_failures,
         _set_primary_status_message,
         __,
@@ -969,7 +967,6 @@ class TestCharm(unittest.TestCase):
         _update_config.assert_not_called()
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
-        _update_relation_endpoints.assert_not_called()
         _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         self.assertIsInstance(self.charm.unit.status, BlockedStatus)
@@ -982,7 +979,6 @@ class TestCharm(unittest.TestCase):
         _update_config.assert_not_called()
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
-        _update_relation_endpoints.assert_not_called()
         _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         self.assertIsInstance(self.charm.unit.status, ActiveStatus)
@@ -1002,7 +998,6 @@ class TestCharm(unittest.TestCase):
         _update_config.assert_called_once()
         _handle_processes_failures.assert_called_once()
         _oversee_users.assert_called_once()
-        _update_relation_endpoints.assert_called_once()
         _handle_workload_failures.assert_called_once()
         _set_primary_status_message.assert_called_once()
         self.assertIsInstance(self.charm.unit.status, ActiveStatus)
@@ -1017,7 +1012,6 @@ class TestCharm(unittest.TestCase):
         _update_config.reset_mock()
         _handle_processes_failures.reset_mock()
         _oversee_users.reset_mock()
-        _update_relation_endpoints.reset_mock()
         _handle_workload_failures.reset_mock()
         _set_primary_status_message.reset_mock()
         with self.harness.hooks_disabled():
@@ -1031,7 +1025,6 @@ class TestCharm(unittest.TestCase):
         _update_config.assert_called_once()
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
-        _update_relation_endpoints.assert_not_called()
         _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         self.assertIsInstance(self.charm.unit.status, BlockedStatus)

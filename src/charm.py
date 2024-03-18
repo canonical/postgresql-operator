@@ -1207,8 +1207,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self.postgresql_client_relation.oversee_users()
-        if self.primary_endpoint:
-            self._update_relation_endpoints()
 
         if self._handle_workload_failures():
             return
