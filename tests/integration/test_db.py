@@ -128,12 +128,12 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         # Remove the original units.
         leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
         await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*[
-            unit for unit in units_to_remove if unit != leader_unit
+            unit for unit in units_to_remove if unit != leader_unit.name
         ])
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=3
         )
-        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit)
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=2
         )
