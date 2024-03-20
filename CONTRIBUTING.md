@@ -41,7 +41,7 @@ tox                      # runs 'lint' and 'unit' environments
 ## Build charm
 
 The build environment assumes that there are preinstalled on the system:
-* [tox](https://tox.wiki/en/4.14.1/)
+* [tox](https://tox.wiki/)
 * [poetry](https://python-poetry.org/)
 * [charmcraft](https://snapcraft.io/charmcraft)
 * [charmcraftcache](https://pypi.org/project/charmcraftcache/)
@@ -68,7 +68,7 @@ pipx ensurepath
 
 Ensure local pip binaries are in your $PATH (otherwise re-login to your shell):
 ```shell
-charmcraftcache version
+charmcraftcache --help
 ```
 
 Make sure the install tox version is 4+ (using `tox --version`), if missing OR
