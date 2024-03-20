@@ -1330,19 +1330,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 snap_package = snap_cache[snap_name]
 
                 if not snap_package.present or refresh:
+                    channel = snap_version.get("channel", "")
                     if revision := snap_version.get("revision"):
                         try:
                             revision = revision[platform.machine()]
                         except Exception:
                             logger.error("Unavailable snap architecture %s", platform.machine())
                             raise
-                        channel = snap_version.get("channel", "")
+                        logger.debug(
+                            f"Installing SNAP {snap_name} rev {revision}, tracking {channel}"
+                        )
                         snap_package.ensure(
                             snap.SnapState.Latest, revision=revision, channel=channel
                         )
                         snap_package.hold()
                     else:
-                        snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
+                        logger.debug(
+                            f"Re-freshing SNAP {snap_name} to the latest revision in {channel}"
+                        )
+                        snap_package.ensure(snap.SnapState.Latest, channel=channel)
+                    logger.debug("The snap installation completed successfully")
 
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
