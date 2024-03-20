@@ -263,9 +263,9 @@ class DbProvides(Object):
         current_allowed_units = local_unit_data.get("allowed_units", "")
 
         logger.debug(f"Removing unit {departing_unit} from allowed_units")
-        local_app_data["allowed_units"] = local_unit_data["allowed_units"] = " ".join(
-            {unit for unit in current_allowed_units.split() if unit != departing_unit}
-        )
+        local_app_data["allowed_units"] = local_unit_data["allowed_units"] = " ".join({
+            unit for unit in current_allowed_units.split() if unit != departing_unit
+        })
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Remove the user created for this relation."""
@@ -326,7 +326,8 @@ class DbProvides(Object):
             return
 
         # List the replicas endpoints.
-        replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
+        replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
+        replicas_endpoint.sort()
 
         for relation in relations:
             # Retrieve some data from the relation.

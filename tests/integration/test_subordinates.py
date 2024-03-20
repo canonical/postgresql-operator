@@ -18,6 +18,7 @@ from .helpers import (
 
 DATABASE_APP_NAME = "pg"
 LS_CLIENT = "landscape-client"
+UBUNTU_PRO_APP_NAME = "ubuntu-advantage"
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,11 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             config={"profile": "testing"},
         ),
         ops_test.model.deploy("landscape-scalable"),
+        ops_test.model.deploy(
+            UBUNTU_PRO_APP_NAME,
+            config={"token": github_secrets["UBUNTU_PRO_TOKEN"]},
+            num_units=0,
+        ),
         ops_test.model.deploy(LS_CLIENT, num_units=0),
     )
     await ops_test.model.applications["landscape-server"].set_config(landscape_config)
@@ -49,21 +55,28 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
     haproxy_unit = ops_test.model.applications["haproxy"].units[0]
     haproxy_addr = get_unit_address(ops_test, haproxy_unit.name)
     haproxy_host = haproxy_unit.machine.hostname
-    cert = subprocess.check_output(
-        ["lxc", "exec", haproxy_host, "cat", "/var/lib/haproxy/selfsigned_ca.crt"]
-    )
+    cert = subprocess.check_output([
+        "lxc",
+        "exec",
+        haproxy_host,
+        "cat",
+        "/var/lib/haproxy/selfsigned_ca.crt",
+    ])
     ssl_public_key = f"base64:{b64encode(cert).decode()}"
 
-    await ops_test.model.applications[LS_CLIENT].set_config(
-        {
-            "account-name": "standalone",
-            "ping-url": f"http://{haproxy_addr}/ping",
-            "url": f"https://{haproxy_addr}/message-system",
-            "ssl-public-key": ssl_public_key,
-        }
-    )
+    await ops_test.model.applications[LS_CLIENT].set_config({
+        "account-name": "standalone",
+        "ping-url": f"http://{haproxy_addr}/ping",
+        "url": f"https://{haproxy_addr}/message-system",
+        "ssl-public-key": ssl_public_key,
+    })
     await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
-    await ops_test.model.wait_for_idle(apps=[LS_CLIENT, DATABASE_APP_NAME], status="active")
+    await ops_test.model.relate(
+        f"{DATABASE_APP_NAME}:juju-info", f"{UBUNTU_PRO_APP_NAME}:juju-info"
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active"
+    )
 
 
 @pytest.mark.group(1)
@@ -71,7 +84,7 @@ async def test_scale_up(ops_test: OpsTest, github_secrets):
     await scale_application(ops_test, DATABASE_APP_NAME, 4)
 
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active", timeout=1500
+        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
     )
 
 
@@ -80,5 +93,5 @@ async def test_scale_down(ops_test: OpsTest, github_secrets):
     await scale_application(ops_test, DATABASE_APP_NAME, 3)
 
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active", timeout=1500
+        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
     )
