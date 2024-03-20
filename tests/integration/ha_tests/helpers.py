@@ -189,11 +189,12 @@ async def is_cluster_updated(ops_test: OpsTest, primary_name: str) -> None:
     ), "secondary not up to date with the cluster after restarting."
 
 
-async def check_writes(ops_test) -> int:
+async def check_writes(ops_test, extra_model: Model = None) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes, max_number_written = await count_writes(ops_test)
+    actual_writes, max_number_written = await count_writes(ops_test, extra_model=extra_model)
     for member, count in actual_writes.items():
+        print(f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}")
         assert (
             count == max_number_written[member]
         ), f"{member}: writes to the db were missed: count of actual writes different from the max number written."
@@ -202,15 +203,22 @@ async def check_writes(ops_test) -> int:
 
 
 async def count_writes(
-    ops_test: OpsTest, down_unit: str = None
+    ops_test: OpsTest, down_unit: str = None, extra_model: Model = None
 ) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
-    for unit in ops_test.model.applications[app].units:
-        if unit.name != down_unit:
-            cluster = get_patroni_cluster(await get_unit_ip(ops_test, unit.name))
-            break
+    members = []
+    for model in [ops_test.model, extra_model]:
+        if model is None:
+            continue
+        for unit in model.applications[app].units:
+            if unit.name != down_unit:
+                members_data = get_patroni_cluster(await get_unit_ip(ops_test, unit.name))["members"]
+                for index, member_data in enumerate(members_data):
+                    members_data[index]["model"] = model.info.name
+                members.extend(members_data)
+                break
     down_ips = []
     if down_unit:
         for unit in ops_test.model.applications[app].units:
@@ -219,7 +227,7 @@ async def count_writes(
                 down_ips.append(await get_unit_ip(ops_test, unit.name))
     count = {}
     maximum = {}
-    for member in cluster["members"]:
+    for member in members:
         if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
 
@@ -228,12 +236,23 @@ async def count_writes(
                 f" host='{host}' password='{password}' connect_timeout=10"
             )
 
-            with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
-                results = cursor.fetchone()
-                count[member["name"]] = results[0]
-                maximum[member["name"]] = results[1]
-            connection.close()
+            member_name = f'{member["model"]}.{member["name"]}'
+            connection = None
+            try:
+                with psycopg2.connect(
+                    connection_string
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                    results = cursor.fetchone()
+                    count[member_name] = results[0]
+                    maximum[member_name] = results[1]
+            except psycopg2.Error:
+                # Error raised when the connection is not possible.
+                count[member_name] = -1
+                maximum[member_name] = -1
+            finally:
+                if connection is not None:
+                    connection.close()
     return count, maximum
 
 
@@ -412,20 +431,24 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
     return action.results["password"]
 
 
-async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
+async def get_unit_ip(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Wrapper for getting unit ip.
 
     Args:
         ops_test: The ops test object passed into every test case
         unit_name: The name of the unit to get the address
+        model: Optional model instance to use
     Returns:
         The (str) ip of the unit
     """
-    application = unit_name.split("/")[0]
-    for unit in ops_test.model.applications[application].units:
-        if unit.name == unit_name:
-            break
-    return await instance_ip(ops_test, unit.machine.hostname)
+    if model is None:
+        application = unit_name.split("/")[0]
+        for unit in ops_test.model.applications[application].units:
+            if unit.name == unit_name:
+                break
+        return await instance_ip(ops_test, unit.machine.hostname)
+    else:
+        return get_unit_address(ops_test, unit_name)
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)

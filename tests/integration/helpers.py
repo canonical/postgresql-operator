@@ -643,17 +643,20 @@ async def get_tls_ca(
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
 
 
-def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
+def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Get unit IP address.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        model: Optional model to use to get the unit address
 
     Returns:
         IP address of the unit
     """
-    return ops_test.model.units.get(unit_name).public_address
+    if model is None:
+        model = ops_test.model
+    return model.units.get(unit_name).public_address
 
 
 async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:

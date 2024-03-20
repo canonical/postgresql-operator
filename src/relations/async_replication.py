@@ -27,9 +27,9 @@ from ops.charm import (
 from ops.framework import Object
 from ops.model import (
     Unit,
-    WaitingStatus,
+    WaitingStatus, MaintenanceStatus, ActiveStatus,
 )
-from tenacity import Retrying, stop_after_attempt, wait_fixed
+from tenacity import Retrying, stop_after_attempt, wait_fixed, RetryError
 
 from constants import (
     APP_SCOPE,
@@ -106,9 +106,9 @@ class PostgreSQLAsyncReplication(Object):
         sync_standby_names = self.charm._patroni.get_sync_standby_names()
         if len(sync_standby_names) > 0:
             unit = self.model.get_unit(sync_standby_names[0])
-            return self.charm.get_unit_ip(unit)
+            return self.charm._get_unit_ip(unit)
         else:
-            return self.charm.get_unit_ip(self.charm.unit)
+            return self.charm._get_unit_ip(self.charm.unit)
 
     def standby_endpoints(self) -> Set[str]:
         """Returns the set of IPs used by each standby unit with a /32 mask."""
@@ -186,6 +186,7 @@ class PostgreSQLAsyncReplication(Object):
         primary_relation = self.model.get_relation(ASYNC_PRIMARY_RELATION)
         if not primary_relation:
             return
+        self.charm.unit.status = MaintenanceStatus("configuring main cluster")
         logger.info("_on_primary_changed: primary_relation exists")
 
         primary = self._check_if_primary_already_selected()
@@ -193,39 +194,50 @@ class PostgreSQLAsyncReplication(Object):
             # primary may not be available because the action of promoting a cluster was
             # executed way after the relation changes.
             # Defer it until
+            logger.debug("defer _on_primary_changed: primary not present")
             event.defer()
             return
         logger.info("_on_primary_changed: primary cluster exists")
 
         if primary.name != self.charm.unit.name:
             # this unit is not the system leader
+            logger.debug("early exit _on_primary_changed: unit is not the primary's leader")
+            self.charm.unit.status = ActiveStatus()
             return
         logger.info("_on_primary_changed: unit is the primary's leader")
 
         if not self._all_replica_published_unit_ips():
             # We will have more events happening, no need for retrigger
+            logger.debug("defer _on_primary_changed: not all replicas published pod details")
             event.defer()
             return
         logger.info("_on_primary_changed: all replicas published pod details")
 
         # This unit is the leader, generate  a new configuration and leave.
         # There is nothing to do for the leader.
-        for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
-            with attempt:
-                if not self.charm._patroni.stop_patroni():
-                    raise Exception("Failed to stop patroni service.")
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+                with attempt:
+                    if not self.charm._patroni.stop_patroni():
+                        raise Exception("Failed to stop patroni service.")
+        except RetryError:
+            logger.debug("defer _on_primary_changed: failed to stop the container")
+            event.defer()
+            return
         self.charm.update_config()
         if not self.charm._patroni.start_patroni():
             raise Exception("Failed to start patroni service.")
 
         # Retrigger the other units' async-replica-changed
         primary_relation.data[self.charm.unit]["primary-cluster-ready"] = "True"
+        self.charm.unit.status = ActiveStatus()
 
     def _on_standby_changed(self, event):  # noqa C901
         """Triggers a configuration change."""
         replica_relation = self.model.get_relation(ASYNC_REPLICA_RELATION)
         if not replica_relation:
             return
+        self.charm.unit.status = MaintenanceStatus("configuring standby cluster")
         logger.info("_on_standby_changed: replica relation available")
 
         primary = self._check_if_primary_already_selected()
@@ -272,6 +284,9 @@ class PostgreSQLAsyncReplication(Object):
                 )
                 del self.charm._peers.data[self.charm.app]["cluster_initialised"]
 
+        if "cluster_initialised" in self.charm._peers.data[self.charm.app]:
+            return
+
         ################
         # Initiate restart logic
         ################
@@ -289,6 +304,8 @@ class PostgreSQLAsyncReplication(Object):
         if self.charm.unit.is_leader() and not self.restart_coordinator.under_coordination:
             # The leader now requests a ack from each unit that they have stopped.
             self.restart_coordinator.coordinate()
+
+        self.charm.unit.status = WaitingStatus("waiting for promotion of the main cluster")
 
     def _on_coordination_request(self, event):
         # Stop the service.
@@ -417,12 +434,20 @@ class PostgreSQLAsyncReplication(Object):
             event.fail(f"Cannot promote - {unit.name} is already primary: demote it first")
             return
 
+        system_identifier, error = self.get_system_identifier()
+        if error is not None:
+            event.fail(f"Failed to get system identifier: {error}")
+            return
+
         # If this is a standby-leader, then execute switchover logic
         primary_relation.data[self.charm.unit]["elected"] = json.dumps(
             {
                 "endpoint": self.endpoint,
+                "monitoring-password": self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                 "replication-password": self.charm._patroni.replication_password,
+                "rewind-password": self.charm.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
                 "superuser-password": self.charm._patroni.superuser_password,
+                "system-id": system_identifier,
             }
         )
 
