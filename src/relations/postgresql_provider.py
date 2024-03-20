@@ -7,7 +7,8 @@ import logging
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
-    DatabaseRequestedEvent, diff,
+    DatabaseRequestedEvent,
+    diff,
 )
 from charms.postgresql_k8s.v0.postgresql import (
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
@@ -30,6 +31,7 @@ logger = logging.getLogger(__name__)
 ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
     "Please choose one endpoint to use. No need to relate all of them simultaneously!"
 )
+
 
 class PostgreSQLProvider(Object):
     """Defines functionality for the 'provides' side of the 'postgresql-client' relation.
@@ -236,7 +238,10 @@ class PostgreSQLProvider(Object):
 
     def _update_unit_status_on_blocking_endpoint_simultaneously(self):
         """# Clean up Blocked status if this is due related of multiple endpoints."""
-        if self.charm.is_blocked and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE:
+        if (
+            self.charm.is_blocked
+            and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+        ):
             if not self._check_multiple_endpoints():
                 self.charm.unit.status = ActiveStatus()
 
