@@ -692,7 +692,14 @@ Stderr:
             return
 
         backup_id = event.params.get("backup-id")
-        logger.info(f"A restore with backup-id {backup_id} has been requested on unit")
+        restore_to_time = event.params.get("restore-to-time")
+        if restore_to_time:
+            logger.info(
+                f"A restore with backup-id {backup_id} to time point {restore_to_time} has been requested on "
+                f"unit"
+            )
+        else:
+            logger.info(f"A restore with backup-id {backup_id} has been requested on unit")
 
         # Validate the provided backup id.
         logger.info("Validating provided backup-id")
@@ -706,6 +713,12 @@ Stderr:
         except ListBackupsError as e:
             logger.exception(e)
             error_message = "Failed to retrieve backup id"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return
+
+        if restore_to_time and not re.match("^[0-9-:.+ ]+$", restore_to_time):
+            error_message = "Bad restore-to-time format"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
@@ -739,7 +752,7 @@ Stderr:
         self.charm.app_peer_data.update({
             "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
             "restore-stanza": backups[backup_id],
-            "restore-to-time": event.params.get("restore-to-time") or "",
+            "restore-to-time": restore_to_time or "",
         })
         self.charm.update_config()
 

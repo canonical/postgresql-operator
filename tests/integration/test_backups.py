@@ -502,14 +502,9 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
             "restore", **{"backup-id": backup_id, "restore-to-time": "bad data"}
         )
         await action.wait()
-        logger.info("waiting for the database charm to become blocked")
-        async with ops_test.fast_forward():
-            await ops_test.model.block_until(
-                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR
-            )
-        logger.info(
-            "database charm become in blocked state, as supposed to be with bad PITR parameter"
-        )
+        assert (
+            action.status == "failed"
+        ), "action must fail with bad restore-to-time parameter, but it succeeded"
 
         # Run the "restore backup" action with unreachable PITR parameter.
         logger.info("restoring the backup with unreachable restore-to-time parameter")
@@ -520,7 +515,8 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         logger.info("waiting for the database charm to become blocked")
         async with ops_test.fast_forward():
             await ops_test.model.block_until(
-                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR
+                lambda: remaining_unit.workload_status_message == CANNOT_RESTORE_PITR,
+                timeout=1000,
             )
         logger.info(
             "database charm become in blocked state, as supposed to be with unreachable PITR parameter"

@@ -8,8 +8,9 @@ import json
 import logging
 import os
 import platform
+import re
 import subprocess
-from typing import Dict, List, Literal, Optional, Set, get_args
+from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
 
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
@@ -1196,7 +1197,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.unit.status = BlockedStatus("Failed to restore backup")
                 return
 
-            if "restore-to-time" in self.app_peer_data and self._patroni.is_pitr_failed():
+            if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
                 logger.error(
                     "Restore failed: database service failed to reach point-in-time-recovery target. "
                     "You can launch another restore with different parameters"
@@ -1627,6 +1628,30 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.pop("overridden-patroni-restart-condition")
         else:
             logger.warning("not restoring patroni restart condition as it's not overridden")
+
+    def is_pitr_failed(self) -> Tuple[bool, bool]:
+        """Check if Patroni service failed to bootstrap cluster during point-in-time-recovery.
+
+        Typically, this means that database service failed to reach point-in-time-recovery target or has been
+        supplied with bad PITR parameter. Also, remembers last state and can provide info is it new event, or
+        it belongs to previous action. Executes only on current unit.
+
+        Returns:
+            Tuple[bool, bool]:
+                - Is patroni service failed to bootstrap cluster.
+                - Is it new fail, that wasn't observed previously.
+        """
+        patroni_logs = self._patroni.patroni_logs()
+        patroni_exceptions = re.findall(
+            r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
+            patroni_logs,
+            re.MULTILINE,
+        )
+        if len(patroni_exceptions) > 0:
+            old_pitr_fail_id = self.unit_peer_data.get("last_pitr_fail_id", None)
+            self.unit_peer_data["last_pitr_fail_id"] = patroni_exceptions[-1]
+            return True, patroni_exceptions[-1] != old_pitr_fail_id
+        return False, False
 
 
 if __name__ == "__main__":

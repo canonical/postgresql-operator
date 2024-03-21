@@ -518,24 +518,7 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def is_pitr_failed(self) -> bool:
-        """Check if Patroni service is down and there is fatal error during cluster bootstrap process in its logs.
-
-        In restore action, this means that database service failed to reach point-in-time-recovery target or has been
-        supplied with bad PITR parameter. Executes only on current unit.
-        """
-        patroni_logs = self._patroni_logs()
-        if "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster" in patroni_logs:
-            postgresql_logs = self._last_postgresql_logs()
-            if (
-                "FATAL:  recovery ended before configured recovery target was reached"
-                in postgresql_logs
-            ):
-                return True
-            return True
-        return False
-
-    def _patroni_logs(self, num_lines: int | None = 10) -> str:
+    def patroni_logs(self, num_lines: int | None = 10) -> str:
         """Get Patroni snap service logs. Executes only on current unit.
 
         Args:
