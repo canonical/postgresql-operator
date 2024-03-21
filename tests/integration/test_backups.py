@@ -539,7 +539,7 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) 
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
-        # Check that the backup was correctly restored by having only the first created table with no rows.
+        # Check that the backup was correctly restored.
         primary = await get_primary(ops_test, remaining_unit.name)
         address = get_unit_address(ops_test, primary)
         logger.info("checking that the backup was correctly restored")
