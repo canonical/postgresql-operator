@@ -49,6 +49,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 MAILMAN3_CORE_APP_NAME,
                 application_name=MAILMAN3_CORE_APP_NAME,
                 channel="stable",
+                series="focal",
                 config={"hostname": "example.org"},
             ),
         )
