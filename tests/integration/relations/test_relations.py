@@ -40,7 +40,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
             ),
             ops_test.model.deploy(
                 charm,
-                application_name=DATABASE_APP_NAME,
+                application_name=APP_NAME,
                 num_units=1,
                 series=CHARM_SERIES,
                 config={"profile": "testing"},
