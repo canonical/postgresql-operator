@@ -21,7 +21,12 @@ from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
 from pgconnstr import ConnectionString
 
-from constants import ALL_LEGACY_RELATIONS, APP_SCOPE, DATABASE_PORT, ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+from constants import (
+    ALL_LEGACY_RELATIONS,
+    APP_SCOPE,
+    DATABASE_PORT,
+    ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -33,6 +38,7 @@ EXTENSIONS_BLOCKING_MESSAGE = (
 ROLES_BLOCKING_MESSAGE = (
     "roles requested through relation, use postgresql_client interface instead"
 )
+
 
 class DbProvides(Object):
     """Defines functionality for the 'provides' side of the 'db' relation.

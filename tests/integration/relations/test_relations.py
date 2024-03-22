@@ -9,7 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import CHARM_SERIES, DATABASE_APP_NAME, METADATA
+from ..helpers import CHARM_SERIES, METADATA
 from ..new_relations.test_new_relations import APPLICATION_APP_NAME, build_connection_string
 from ..relations.helpers import get_legacy_db_connection_str
 

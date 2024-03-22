@@ -22,10 +22,16 @@ from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
-from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT, ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+from constants import (
+    ALL_CLIENT_RELATIONS,
+    APP_SCOPE,
+    DATABASE_PORT,
+    ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
+
 
 class PostgreSQLProvider(Object):
     """Defines functionality for the 'provides' side of the 'postgresql-client' relation.
@@ -195,7 +201,7 @@ class PostgreSQLProvider(Object):
 
     def _check_multiple_endpoints(self) -> bool:
         """Checks if there are relations with other endpoints."""
-        relation_names = set(relation.name for relation in self.charm.client_relations)
+        relation_names = {relation.name for relation in self.charm.client_relations}
         if "database" in relation_names and len(relation_names) > 1:
             return True
         return False
