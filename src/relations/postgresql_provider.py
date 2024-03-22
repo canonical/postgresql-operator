@@ -237,7 +237,7 @@ class PostgreSQLProvider(Object):
             )
 
     def _update_unit_status_on_blocking_endpoint_simultaneously(self):
-        """# Clean up Blocked status if this is due related of multiple endpoints."""
+        """Clean up Blocked status if this is due related of multiple endpoints."""
         if (
             self.charm.is_blocked
             and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
