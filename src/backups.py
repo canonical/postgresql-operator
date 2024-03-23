@@ -46,11 +46,13 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
     "failed to access/create the bucket, check your S3 settings"
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
+CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 
 S3_BLOCK_MESSAGES = [
     ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
     FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+    CANNOT_RESTORE_PITR,
 ]
 
 
@@ -690,7 +692,14 @@ Stderr:
             return
 
         backup_id = event.params.get("backup-id")
-        logger.info(f"A restore with backup-id {backup_id} has been requested on unit")
+        restore_to_time = event.params.get("restore-to-time")
+        if restore_to_time:
+            logger.info(
+                f"A restore with backup-id {backup_id} to time point {restore_to_time} has been requested on "
+                f"unit"
+            )
+        else:
+            logger.info(f"A restore with backup-id {backup_id} has been requested on unit")
 
         # Validate the provided backup id.
         logger.info("Validating provided backup-id")
@@ -708,6 +717,12 @@ Stderr:
             event.fail(error_message)
             return
 
+        if restore_to_time and not re.match("^[0-9-:.+ ]+$", restore_to_time):
+            error_message = "Bad restore-to-time format"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return
+
         self.charm.unit.status = MaintenanceStatus("restoring backup")
 
         # Stop the database service before performing the restore.
@@ -717,6 +732,12 @@ Stderr:
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
+
+        # Temporarily disabling patroni service auto-restart. This is required as point-in-time-recovery can fail
+        # on restore, therefore during cluster bootstrapping process. In this case, we need be able to check patroni
+        # service status and logs. Disabling auto-restart feature is essential to prevent wrong status indicated
+        # and logs reading race condition (as logs cleared / moved with service restarts).
+        self.charm.override_patroni_restart_condition("no")
 
         logger.info("Removing the contents of the data directory")
         if not self._empty_data_files():
@@ -731,6 +752,7 @@ Stderr:
         self.charm.app_peer_data.update({
             "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
             "restore-stanza": backups[backup_id],
+            "restore-to-time": restore_to_time or "",
         })
         self.charm.update_config()
 
@@ -781,6 +803,7 @@ Stderr:
         if (
             self.charm.is_blocked
             and self.charm.unit.status.message != ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+            and self.charm.unit.status.message != CANNOT_RESTORE_PITR
         ):
             error_message = "Cluster or unit is in a blocking state"
             logger.error(f"Restore failed: {error_message}")

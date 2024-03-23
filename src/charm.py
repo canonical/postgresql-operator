@@ -8,8 +8,9 @@ import json
 import logging
 import os
 import platform
+import re
 import subprocess
-from typing import Dict, List, Literal, Optional, Set, get_args
+from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
 
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
@@ -48,7 +49,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
-from backups import PostgreSQLBackups
+from backups import CANNOT_RESTORE_PITR, PostgreSQLBackups
 from cluster import (
     NotReadyError,
     Patroni,
@@ -485,6 +486,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except ValueError as e:
             self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
             logger.error("Invalid configuration: %s", str(e))
+            return
+
+        # If PITR restore failed, then wait it for resolve.
+        if "restoring-backup" in self.app_peer_data and isinstance(
+            self.unit.status, BlockedStatus
+        ):
+            event.defer()
             return
 
         # Start can be called here multiple times as it's idempotent.
@@ -1189,13 +1197,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.unit.status = BlockedStatus("Failed to restore backup")
                 return
 
+            if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
+                logger.error(
+                    "Restore failed: database service failed to reach point-in-time-recovery target. "
+                    "You can launch another restore with different parameters"
+                )
+                self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+                return
+
             if not self._patroni.member_started:
                 logger.debug("on_update_status early exit: Patroni has not started yet")
                 return
 
             # Remove the restoring backup flag and the restore stanza name.
-            self.app_peer_data.update({"restoring-backup": "", "restore-stanza": ""})
+            self.app_peer_data.update({
+                "restoring-backup": "",
+                "restore-stanza": "",
+                "restore-to-time": "",
+            })
             self.update_config()
+            self.restore_patroni_restart_condition()
             logger.info("Restore succeeded")
 
             can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
@@ -1462,6 +1483,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             is_creating_backup=is_creating_backup,
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
+            pitr_target=self.app_peer_data.get("restore-to-time"),
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
@@ -1571,6 +1593,65 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for relation in self.model.relations.get(relation_name, []):
                 relations.append(relation)
         return relations
+
+    def override_patroni_restart_condition(self, new_condition: str) -> None:
+        """Temporary override Patroni systemd service restart condition.
+
+        Will do nothing if already overridden. Executes only on current unit.
+
+        Args:
+            new_condition: new Patroni systemd service restart condition.
+        """
+        current_condition = self._patroni.get_patroni_restart_condition()
+        if "overridden-patroni-restart-condition" in self.unit_peer_data:
+            already_overridden_condition = self.unit_peer_data[
+                "overridden-patroni-restart-condition"
+            ]
+            logger.warning(
+                f"trying to override patroni restart condition to {new_condition}"
+                f"while already overridden from {already_overridden_condition} to {current_condition},"
+                "so ignoring this operation"
+            )
+            return None
+        self._patroni.update_patroni_restart_condition(new_condition)
+        self.unit_peer_data["overridden-patroni-restart-condition"] = current_condition
+
+    def restore_patroni_restart_condition(self) -> None:
+        """Restore Patroni systemd service restart condition that was before overriding.
+
+        Will do nothing if not overridden. Executes only on current unit.
+        """
+        if "overridden-patroni-restart-condition" in self.unit_peer_data:
+            self._patroni.update_patroni_restart_condition(
+                self.unit_peer_data["overridden-patroni-restart-condition"]
+            )
+            self.unit_peer_data.pop("overridden-patroni-restart-condition")
+        else:
+            logger.warning("not restoring patroni restart condition as it's not overridden")
+
+    def is_pitr_failed(self) -> Tuple[bool, bool]:
+        """Check if Patroni service failed to bootstrap cluster during point-in-time-recovery.
+
+        Typically, this means that database service failed to reach point-in-time-recovery target or has been
+        supplied with bad PITR parameter. Also, remembers last state and can provide info is it new event, or
+        it belongs to previous action. Executes only on current unit.
+
+        Returns:
+            Tuple[bool, bool]:
+                - Is patroni service failed to bootstrap cluster.
+                - Is it new fail, that wasn't observed previously.
+        """
+        patroni_logs = self._patroni.patroni_logs()
+        patroni_exceptions = re.findall(
+            r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
+            patroni_logs,
+            re.MULTILINE,
+        )
+        if len(patroni_exceptions) > 0:
+            old_pitr_fail_id = self.unit_peer_data.get("last_pitr_fail_id", None)
+            self.unit_peer_data["last_pitr_fail_id"] = patroni_exceptions[-1]
+            return True, patroni_exceptions[-1] != old_pitr_fail_id
+        return False, False
 
 
 if __name__ == "__main__":

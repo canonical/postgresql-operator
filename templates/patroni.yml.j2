@@ -100,7 +100,11 @@ bootstrap:
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
+    {%- if restoring_to_pitr_target %}
+    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --target="{{ pitr_target }}" --type=time --target-action=promote restore
+    {% else %}
     command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    {%- endif %}
     no_params: True
     keep_existing_recovery_conf: True
   {% else %}
