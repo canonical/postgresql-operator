@@ -98,7 +98,7 @@ class DbProvides(Object):
                 return True
         return False
 
-    def _check_relation_another_endpoint(self) -> bool:
+    def _check_multiple_endpoints(self) -> bool:
         """Checks if there are relations with other endpoints."""
         is_exist = self._check_exist_current_relation()
         for relation in self.charm.client_relations:
@@ -115,7 +115,7 @@ class DbProvides(Object):
         if not self.charm.unit.is_leader():
             return
 
-        if self._check_relation_another_endpoint():
+        if self._check_multiple_endpoints():
             self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
             return
 
@@ -308,7 +308,7 @@ class DbProvides(Object):
             self.charm.is_blocked
             and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
         ):
-            if not self._check_relation_another_endpoint():
+            if not self._check_multiple_endpoints():
                 self.charm.unit.status = ActiveStatus()
 
     def update_endpoints(self, relation: Relation = None) -> None:
