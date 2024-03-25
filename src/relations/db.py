@@ -308,7 +308,7 @@ class DbProvides(Object):
             self.charm.is_blocked
             and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
         ):
-            if not self._check_multiple_endpoints():
+            if not self._check_relation_another_endpoint():
                 self.charm.unit.status = ActiveStatus()
 
     def update_endpoints(self, relation: Relation = None) -> None:
