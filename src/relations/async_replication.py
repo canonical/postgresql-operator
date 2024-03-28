@@ -1,13 +1,7 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Implements the state-machine.
-
-1) First async replication relation is made: both units get blocked waiting for a leader
-2) User runs the promote action against one of the clusters
-3) The cluster moves leader and sets the async-replication data, marking itself as leader
-4) The other units receive that new information and update themselves to become standby-leaders.
-"""
+"""Implements the state-machine."""
 
 import json
 import logging
@@ -26,11 +20,15 @@ from ops.charm import (
 )
 from ops.framework import Object
 from ops.model import (
+    ActiveStatus,
+    MaintenanceStatus,
+    Relation,
     Unit,
-    WaitingStatus, MaintenanceStatus, ActiveStatus,
+    WaitingStatus,
 )
-from tenacity import Retrying, stop_after_attempt, wait_fixed, RetryError
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
+from cluster import ClusterNotPromotedError, StandbyClusterAlreadyPromotedError
 from constants import (
     APP_SCOPE,
     MONITORING_PASSWORD_KEY,
@@ -180,6 +178,7 @@ class PostgreSQLAsyncReplication(Object):
         self.charm.update_config()
         if not self.charm._patroni.start_patroni():
             raise Exception("Failed to start patroni service.")
+        self.charm.unit.status = ActiveStatus()
 
     def _on_primary_changed(self, event):
         """Triggers a configuration change in the primary units."""
@@ -237,9 +236,9 @@ class PostgreSQLAsyncReplication(Object):
         replica_relation = self.model.get_relation(ASYNC_REPLICA_RELATION)
         if not replica_relation:
             return
-        self.charm.unit.status = MaintenanceStatus("configuring standby cluster")
         logger.info("_on_standby_changed: replica relation available")
 
+        self.charm.unit.status = MaintenanceStatus("configuring standby cluster")
         primary = self._check_if_primary_already_selected()
         if not primary:
             return
@@ -310,6 +309,7 @@ class PostgreSQLAsyncReplication(Object):
     def _on_coordination_request(self, event):
         # Stop the service.
         # We need all replicas to be stopped, so we can remove the previous cluster info.
+        self.charm.unit.status = MaintenanceStatus("stopping database to enable async replication")
         for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3), reraise=True):
             with attempt:
                 if not self.charm._patroni.stop_patroni():
@@ -338,60 +338,107 @@ class PostgreSQLAsyncReplication(Object):
                     raise Exception(
                         f"Failed to remove contents of the data directory with error: {str(e)}"
                     )
+                os.mkdir(POSTGRESQL_DATA_PATH)
+                os.chmod(POSTGRESQL_DATA_PATH, 0o750)
+                self.charm._patroni._change_owner(POSTGRESQL_DATA_PATH)
                 break
+
+        # Remove previous cluster information to make it possible to initialise a new cluster.
+        logger.info("Removing previous cluster information")
+        try:
+            path = Path(f"{PATRONI_CONF_PATH}/raft")
+            if path.exists() and path.is_dir():
+                shutil.rmtree(path)
+        except OSError as e:
+            raise Exception(
+                f"Failed to remove previous cluster information with error: {str(e)}"
+            )
+
         self.restart_coordinator.acknowledge(event)
 
     def _on_coordination_approval(self, event):
         """Runs when the coordinator guaranteed all units have stopped."""
+        self.charm.unit.status = MaintenanceStatus("starting database to enable async replication")
+
         self.charm.update_config()
         logger.info(
             "_on_coordination_approval: configuration done, waiting for restart of the service"
         )
 
-        if self.charm.unit.is_leader():
-            # We are ready to restart the service now: all peers have configured themselves.
-            if not self.charm._patroni.start_patroni():
-                raise Exception("Failed to start patroni service.")
+        # We are ready to restart the service now: all peers have configured themselves.
+        if not self.charm._patroni.start_patroni():
+            raise Exception("Failed to start patroni service.")
 
-            # Remove previous cluster information to make it possible to initialise a new cluster.
-            logger.info("Removing previous cluster information")
-
-            def demote():
-                pw_record = pwd.getpwnam("snap_daemon")
-
-                def result():
-                    os.setgid(pw_record.pw_gid)
-                    os.setuid(pw_record.pw_uid)
-
-                return result
-
-            process = run(
-                [
-                    "charmed-postgresql.patronictl",
-                    "-c",
-                    f"{PATRONI_CONF_PATH}/patroni.yaml",
-                    "remove",
-                    self.charm.cluster_name,
-                ],
-                input=f"{self.charm.cluster_name}\nYes I am aware\npostgresql-0\n".encode(),
-                stdout=PIPE,
-                stderr=PIPE,
-                preexec_fn=demote(),
-                timeout=10,
-            )
-            if process.returncode != 0:
-                raise Exception(
-                    f"Failed to remove previous cluster information with error: {process.stderr.decode()}"
-                )
-            self.charm._peers.data[self.charm.app]["cluster_initialised"] = "True"
-        else:
-            self.charm.unit.status = WaitingStatus("waiting for primary to be ready")
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5)):
+                with attempt:
+                    if not self.charm._patroni.member_started:
+                        raise Exception
+        except RetryError:
+            logger.debug("defer _on_coordination_approval: database hasn't started yet")
             event.defer()
             return
 
-    def _get_primary_candidates(self):
-        rel = self.model.get_relation(ASYNC_PRIMARY_RELATION)
-        return rel.units if rel else []
+        if self.charm.unit.is_leader():
+            self._handle_leader_startup(event)
+        elif not self.charm._patroni.get_standby_leader(unit_name_pattern=True):
+            self.charm.unit.status = WaitingStatus("waiting for standby leader to be ready")
+            event.defer()
+            return
+        self.charm.unit.status = ActiveStatus()
+
+    def _handle_leader_startup(self, event) -> None:
+        diverging_databases = False
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5)):
+                with attempt:
+                    if (
+                        self.charm._patroni.get_standby_leader(unit_name_pattern=True)
+                        != self.charm.unit.name
+                    ):
+                        raise Exception
+        except RetryError:
+            diverging_databases = True
+        if diverging_databases:
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3), reraise=True):
+                with attempt:
+                    if not self.charm._patroni.stop_patroni():
+                        raise Exception("Failed to stop patroni service.")
+
+            logger.info(
+                "Removing and recreating pgdata folder due to diverging databases between this and the other cluster"
+            )
+            try:
+                path = Path(POSTGRESQL_DATA_PATH)
+                if path.exists() and path.is_dir():
+                    shutil.rmtree(path)
+            except OSError as e:
+                raise Exception(
+                    f"Failed to remove contents of the data directory with error: {str(e)}"
+                )
+            os.mkdir(POSTGRESQL_DATA_PATH)
+            os.chmod(POSTGRESQL_DATA_PATH, 0o750)
+            self.charm._patroni._change_owner(POSTGRESQL_DATA_PATH)
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3), reraise=True):
+                with attempt:
+                    if not self.charm._patroni.start_patroni():
+                        raise Exception("Failed to start patroni service.")
+            try:
+                for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5)):
+                    with attempt:
+                        if not self.charm._patroni.member_started:
+                            raise Exception
+            except RetryError:
+                logger.debug("defer _on_coordination_approval: database hasn't started yet")
+                event.defer()
+                return
+
+        if not self.charm._patroni.are_all_members_ready():
+            self.charm.unit.status = WaitingStatus("waiting for all members to be ready")
+            event.defer()
+            return
+
+        self.charm._peers.data[self.charm.app]["cluster_initialised"] = "True"
 
     def _check_if_primary_already_selected(self) -> Optional[Unit]:
         """Returns the unit if a primary is present."""
@@ -424,15 +471,31 @@ class PostgreSQLAsyncReplication(Object):
             event.fail("No relation found.")
             return
         primary_relation = self.model.get_relation(ASYNC_PRIMARY_RELATION)
-        if not primary_relation:
-            event.fail("No primary relation")
-            return
+        if primary_relation:
+            self._promote_standby_cluster_from_two_clusters(event, primary_relation)
+        else:
+            # Remove the standby cluster information from the Patroni configuration.
+            try:
+                self.charm._patroni.promote_standby_cluster()
+            except Exception as e:
+                event.fail(str(e))
 
+    def _promote_standby_cluster_from_two_clusters(
+        self, event: ActionEvent, primary_relation: Relation
+    ) -> None:
         # Let the exception error the unit
         unit = self._check_if_primary_already_selected()
         if unit:
-            event.fail(f"Cannot promote - {unit.name} is already primary: demote it first")
+            event.fail(f"Cannot promote - {self.charm.app.name} is already the main cluster")
             return
+
+        try:
+            self.charm._patroni.promote_standby_cluster()
+        except StandbyClusterAlreadyPromotedError:
+            # Ignore this error for non-standby clusters.
+            pass
+        except ClusterNotPromotedError as e:
+            event.fail(str(e))
 
         system_identifier, error = self.get_system_identifier()
         if error is not None:
@@ -450,6 +513,7 @@ class PostgreSQLAsyncReplication(Object):
                 "system-id": system_identifier,
             }
         )
+        self.charm.app_peer_data["promoted"] = "True"
 
         # Now, check if postgresql it had originally published its unit IP in the
         # replica relation databag. Delete it, if yes.

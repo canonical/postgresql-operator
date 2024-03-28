@@ -46,8 +46,20 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 
+class ClusterNotPromotedError(Exception):
+    """Raised when a cluster is not promoted."""
+
+
 class NotReadyError(Exception):
     """Raised when not all cluster members healthy or finished initial sync."""
+
+
+class EndpointNotReadyError(Exception):
+    """Raised when an endpoint is not ready."""
+
+
+class StandbyClusterAlreadyPromotedError(Exception):
+    """Raised when a standby cluster is already promoted."""
 
 
 class RemoveRaftMemberFailedError(Exception):
@@ -243,6 +255,32 @@ class Patroni:
                             primary = "/".join(primary.rsplit("-", 1))
                         return primary
 
+    def get_standby_leader(self, unit_name_pattern=False) -> str:
+        """Get standby leader instance.
+
+        Args:
+            unit_name_pattern: whether to convert pod name to unit name
+
+        Returns:
+            standby leader pod or unit name.
+        """
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_patroni_url(attempt)
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+                for member in cluster_status.json()["members"]:
+                    if member["role"] == "standby_leader":
+                        standby_leader = member["name"]
+                        if unit_name_pattern:
+                            # Change the last dash to / in order to match unit name pattern.
+                            standby_leader = "/".join(standby_leader.rsplit("-", 1))
+                        return standby_leader
+
     def get_sync_standby_names(self) -> List[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
@@ -298,12 +336,12 @@ class Patroni:
         except RetryError:
             return False
 
-        # Check if all members are running and one of them is a leader (primary),
-        # because sometimes there may exist (for some period of time) only
-        # replicas after a failed switchover.
+        # Check if all members are running and one of them is a leader (primary) or
+        # a standby leader, because sometimes there may exist (for some period of time)
+        # only replicas after a failed switchover.
         return all(
             member["state"] in RUNNING_STATES for member in cluster_status.json()["members"]
-        ) and any(member["role"] == "leader" for member in cluster_status.json()["members"])
+        ) and any(member["role"] in ["leader", "standby_leader"] for member in cluster_status.json()["members"])
 
     def get_patroni_health(self) -> Dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
@@ -425,6 +463,19 @@ class Patroni:
 
         return len(cluster_status.json()["members"]) == 0
 
+    def promote_standby_cluster(self) -> None:
+        """Promote a standby cluster to be a regular cluster."""
+        config_response = requests.get(f"{self._patroni_url}/config", verify=self.verify)
+        if "standby_cluster" not in config_response.json():
+            raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
+        requests.patch(
+            f"{self._patroni_url}/config", verify=self.verify, json={"standby_cluster": None}
+        )
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                if self.get_primary() is None:
+                    raise ClusterNotPromotedError("cluster not promoted")
+
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
@@ -506,7 +557,7 @@ class Patroni:
             if primary
             else self.charm.async_manager.standby_endpoints(),
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
+        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o644)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.
