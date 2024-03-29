@@ -862,3 +862,59 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
+
+
+async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
+    """Returns True if storage exists by provided storage ID 
+    
+    Checks juju storage output
+    """
+    complete_command = ["show-storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", storage_id]
+    print(f"command: {complete_command}")
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        if return_code == 1:
+            return storage_id in stdout
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s with code: ", complete_command, stdout, return_code
+        )
+    
+    return storage_id in stdout
+
+
+async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
+    """Creates database with specified name
+
+    """
+    unit = ops_test.model.applications[app].units[0]
+    unit_address = await unit.get_public_address()
+    password = await get_password(ops_test, app)
+
+    conn = db_connect(unit_address, password)
+    conn.autocommit = True
+    cursor = conn.cursor()
+    cursor.execute(f"CREATE DATABASE {db};")
+    cursor.close()
+    conn.close()
+
+
+async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
+    """Returns True if database with specified name is alredy exists
+
+    """
+    unit = ops_test.model.applications[app].units[0]
+    unit_address = await unit.get_public_address()
+    password = await get_password(ops_test, app)
+
+    query = await execute_query_on_unit(
+        unit_address,
+        password,
+        "select datname from pg_catalog.pg_database where datname = '{db}';",
+    )
+
+    if "ERROR" in query:
+        raise Exception (
+            f"Database check is failed with postgresql err: {query}"
+        )
+
+    return db in query
