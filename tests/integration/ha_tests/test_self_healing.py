@@ -262,12 +262,10 @@ async def test_full_cluster_restart(
     await start_continuous_writes(ops_test, app)
 
     # Restart all units "simultaneously".
-    await asyncio.gather(
-        *[
-            send_signal_to_process(ops_test, unit.name, process, signal)
-            for unit in ops_test.model.applications[app].units
-        ]
-    )
+    await asyncio.gather(*[
+        send_signal_to_process(ops_test, unit.name, process, signal)
+        for unit in ops_test.model.applications[app].units
+    ])
 
     # This test serves to verify behavior when all replicas are down at the same time that when
     # they come back online they operate as expected. This check verifies that we meet the criteria

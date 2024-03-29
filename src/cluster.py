@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 """Helper class used to manage cluster lifecycle."""
+
 import logging
 import os
 import pwd
