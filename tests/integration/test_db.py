@@ -16,6 +16,7 @@ from .helpers import (
     APPLICATION_NAME,
     CHARM_SERIES,
     DATABASE_APP_NAME,
+    assert_sync_standbys,
     build_connection_string,
     check_database_users_existence,
     check_databases_creation,
@@ -39,8 +40,8 @@ ROLES_BLOCKING_MESSAGE = (
 )
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
     async with ops_test.fast_forward():
@@ -107,6 +108,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
 
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
     # Retrieve the list of current database unit names.
@@ -119,10 +121,21 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
         )
 
+        assert_sync_standbys(
+            ops_test.model.applications[DATABASE_APP_NAME].units[0].public_address, 2
+        )
+
         # Remove the original units.
-        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*units_to_remove)
+        leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*[
+            unit for unit in units_to_remove if unit != leader_unit.name
+        ])
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=3000, wait_for_exact_units=2
+            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=3
+        )
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=2
         )
 
     # Get the updated connection data and assert it can be used
@@ -177,48 +190,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         with attempt:
             with pytest.raises(psycopg2.OperationalError):
                 psycopg2.connect(primary_connection_string)
-
-
-@pytest.mark.group(1)
-@pytest.mark.skip(reason="Should be ported and moved to the new relation tests")
-async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
-    async with ops_test.fast_forward():
-        # Deploy Nextcloud.
-        await ops_test.model.deploy(
-            "nextcloud",
-            channel="edge",
-            application_name="nextcloud",
-            num_units=APPLICATION_UNITS,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=["nextcloud"],
-            status="blocked",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
-
-        await ops_test.model.relate("nextcloud:db", f"{DATABASE_APP_NAME}:db")
-
-        # Only the leader will block
-        leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)
-
-        try:
-            await ops_test.model.wait_for_idle(
-                apps=[DATABASE_APP_NAME],
-                status="blocked",
-                raise_on_blocked=True,
-                timeout=1000,
-            )
-            assert False, "Leader didn't block"
-        except JujuUnitError:
-            pass
-
-        assert (
-            leader_unit.workload_status_message
-            == "extensions requested through relation, enable them through config options"
-        )
-
-        await ops_test.model.remove_application("nextcloud", block_until_done=True)
 
 
 @pytest.mark.group(1)
@@ -357,34 +328,6 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
         status="active",
         timeout=1000,
     )
-
-
-@pytest.mark.group(1)
-@pytest.mark.unstable
-async def test_weebl_db(ops_test: OpsTest, charm: str) -> None:
-    async with ops_test.fast_forward():
-        await ops_test.model.deploy(
-            "weebl",
-            application_name="weebl",
-            num_units=APPLICATION_UNITS,
-        )
-        await ops_test.model.wait_for_idle(
-            apps=["weebl"],
-            status="blocked",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
-
-        await ops_test.model.relate("weebl:database", f"{DATABASE_APP_NAME}:db")
-
-        await ops_test.model.wait_for_idle(
-            apps=["weebl", DATABASE_APP_NAME],
-            status="active",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
-
-        await ops_test.model.remove_application("weebl", block_until_done=True)
 
 
 @markers.juju2

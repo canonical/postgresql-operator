@@ -60,7 +60,6 @@ POSTGRESQL_PROCESS = "postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
@@ -263,12 +262,10 @@ async def test_full_cluster_restart(
     await start_continuous_writes(ops_test, app)
 
     # Restart all units "simultaneously".
-    await asyncio.gather(
-        *[
-            send_signal_to_process(ops_test, unit.name, process, signal)
-            for unit in ops_test.model.applications[app].units
-        ]
-    )
+    await asyncio.gather(*[
+        send_signal_to_process(ops_test, unit.name, process, signal)
+        for unit in ops_test.model.applications[app].units
+    ])
 
     # This test serves to verify behavior when all replicas are down at the same time that when
     # they come back online they operate as expected. This check verifies that we meet the criteria
@@ -383,7 +380,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
 
 @pytest.mark.group(1)
-@pytest.mark.unstable
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
     # Locate primary unit.
@@ -456,19 +452,22 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Wait the LXD unit has its IP updated.
     logger.info("waiting for IP address to be updated on Juju unit")
-    await wait_network_restore(ops_test, primary_hostname, primary_ip)
+    await wait_network_restore(ops_test, primary_name, primary_ip)
+
+    # Verify that the database service got restarted and is ready in the old primary.
+    logger.info(f"waiting for the database service to be ready on {primary_name}")
+    assert await is_postgresql_ready(ops_test, primary_name, use_ip_from_inside=True)
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
     assert await is_connection_possible(
-        ops_test, primary_name
+        ops_test, primary_name, use_ip_from_inside=True
     ), "Connection is not possible after network restore"
 
-    await is_cluster_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)
 
 
 @pytest.mark.group(1)
-@pytest.mark.unstable
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
 ):
@@ -516,7 +515,7 @@ async def test_network_cut_without_ip_change(
 
     async with ops_test.fast_forward():
         logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, primary_name)
+        await are_writes_increasing(ops_test, primary_name, use_ip_from_inside=True)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
@@ -533,10 +532,14 @@ async def test_network_cut_without_ip_change(
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active")
 
+    # Verify that the database service got restarted and is ready in the old primary.
+    logger.info(f"waiting for the database service to be ready on {primary_name}")
+    assert await is_postgresql_ready(ops_test, primary_name)
+
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
     assert await is_connection_possible(
         ops_test, primary_name
     ), "Connection is not possible after network restore"
 
-    await is_cluster_updated(ops_test, primary_name)
+    await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)

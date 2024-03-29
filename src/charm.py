@@ -1,16 +1,17 @@
-#!/usr/bin/env python3
+#!/usr/bin/env -S LD_LIBRARY_PATH=lib python3
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
 """Charmed Machine Operator for the PostgreSQL database."""
+
 import json
 import logging
 import os
 import platform
 import subprocess
-import time
 from typing import Dict, List, Literal, Optional, Set, get_args
 
+import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
@@ -20,6 +21,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
+    PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
@@ -44,7 +46,7 @@ from ops.model import (
     Unit,
     WaitingStatus,
 )
-from tenacity import RetryError, Retrying, retry, stop_after_delay, wait_fixed
+from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import PostgreSQLBackups
 from cluster import (
@@ -90,7 +92,7 @@ from utils import new_password
 
 logger = logging.getLogger(__name__)
 
-NO_PRIMARY_MESSAGE = "no primary in the cluster"
+PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
@@ -302,6 +304,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def primary_endpoint(self) -> Optional[str]:
         """Returns the endpoint of the primary instance or None when no primary available."""
+        if not self._peers:
+            logger.debug("primary endpoint early exit: Peer relation not joined yet.")
+            return None
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
@@ -311,7 +316,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     # returned is not in the list of the current cluster members
                     # (like when the cluster was not updated yet after a failed switchover).
                     if not primary_endpoint or primary_endpoint not in self._units_ips:
-                        raise ValueError()
+                        # TODO figure out why peer data is not available
+                        if (
+                            primary_endpoint
+                            and len(self._units_ips) == 1
+                            and len(self._peers.units) > 1
+                        ):
+                            logger.warning(
+                                "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                            )
+                            return primary_endpoint
+                        logger.debug(
+                            "primary endpoint early exit: Primary IP not in cached peer list."
+                        )
+                        primary_endpoint = None
         except RetryError:
             return None
         else:
@@ -389,7 +407,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.primary_endpoint:
                 self._update_relation_endpoints()
             else:
-                self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+                self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
                 return
 
     def _on_pgdata_storage_detaching(self, _) -> None:
@@ -466,6 +484,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
             return
+        except ValueError as e:
+            self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
+            logger.error("Invalid configuration: %s", str(e))
+            return
 
         # Start can be called here multiple times as it's idempotent.
         # At this moment, it starts Patroni at the first time the data is received
@@ -479,6 +501,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        # Restart the workload if it's stuck on the starting state after a timeline divergence
+        # due to a backup that was restored.
+        if not self.is_primary and (
+            self._patroni.member_replication_lag == "unknown"
+            or int(self._patroni.member_replication_lag) > 1000
+        ):
+            self._patroni.reinitialize_postgresql()
+            logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
+            self.unit.status = MaintenanceStatus("reinitialising replica")
+            event.defer()
+            return
+
+        self._start_stop_pgbackrest_service(event)
+
+        self._update_new_unit_status()
+
+    # Split off into separate function, because of complexity _on_peer_relation_changed
+    def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         if not self.backup.start_stop_pgbackrest_service():
             logger.debug(
@@ -487,12 +527,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self.backup.coordinate_stanza_fields()
+
         self.backup.check_stanza()
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
-
-        self._update_new_unit_status()
 
     def _update_new_unit_status(self) -> None:
         """Update the status of a new unit that recently joined the cluster."""
@@ -501,10 +541,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            if not self.is_blocked or self.unit.status.message == NO_PRIMARY_MESSAGE:
+            if not self.is_blocked:
                 self.unit.status = ActiveStatus()
         else:
-            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+            self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     def _reconfigure_cluster(self, event: HookEvent):
         """Reconfigure the cluster by adding and removing members IPs to it.
@@ -518,12 +558,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and event.relation.data[event.unit].get("ip-to-remove") is not None
         ):
             ip_to_remove = event.relation.data[event.unit].get("ip-to-remove")
+            logger.info("Removing %s from the cluster due to IP change", ip_to_remove)
             try:
                 self._patroni.remove_raft_member(ip_to_remove)
             except RemoveRaftMemberFailedError:
                 logger.debug("Deferring on_peer_relation_changed: failed to remove raft member")
                 return False
-            self._remove_from_members_ips(ip_to_remove)
+            if ip_to_remove in self.members_ips:
+                self._remove_from_members_ips(ip_to_remove)
         self._add_members(event)
         return True
 
@@ -752,9 +794,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.info("Cluster topology changed")
         if self.primary_endpoint:
             self._update_relation_endpoints()
-        if self.is_blocked and self.unit.status.message == NO_PRIMARY_MESSAGE:
-            if self.primary_endpoint:
-                self.unit.status = ActiveStatus()
+            self.unit.status = ActiveStatus()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -807,6 +847,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Remove departing units when the leader changes.
         for ip in self._get_ips_to_remove():
+            logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
 
         self.update_config()
@@ -823,19 +864,34 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
         else:
-            self.unit.status = BlockedStatus(NO_PRIMARY_MESSAGE)
+            self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
-    def _on_config_changed(self, _) -> None:
+    def _on_config_changed(self, event) -> None:
         """Handle configuration changes, like enabling plugins."""
         if not self.is_cluster_initialised:
-            logger.debug("Early exit on_config_changed: cluster not initialised yet")
+            logger.debug("Defer on_config_changed: cluster not initialised yet")
+            event.defer()
             return
 
         if not self.upgrade.idle:
-            logger.debug("Early exit on_config_changed: upgrade in progress")
+            logger.debug("Defer on_config_changed: upgrade in progress")
+            event.defer()
             return
-        # update config on every run
-        self.update_config()
+        try:
+            self._validate_config_options()
+            # update config on every run
+            self.update_config()
+        except psycopg2.OperationalError:
+            logger.debug("Defer on_config_changed: Cannot connect to database")
+            event.defer()
+            return
+        except ValueError as e:
+            self.unit.status = BlockedStatus("Configuration Error. Please check the logs")
+            logger.error("Invalid configuration: %s", str(e))
+            return
+
+        if self.is_blocked and "Configuration Error" in self.unit.status.message:
+            self.unit.status = ActiveStatus()
 
         if not self.unit.is_leader():
             return
@@ -977,12 +1033,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
 
-        postgres_snap.set(
-            {
-                "exporter.user": MONITORING_USER,
-                "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-            }
-        )
+        postgres_snap.set({
+            "exporter.user": MONITORING_USER,
+            "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
+        })
         if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
@@ -1024,6 +1078,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
+            return
+        except PostgreSQLListUsersError:
+            logger.warning("Deferriing on_start: Unable to list users")
+            event.defer()
             return
 
         self.postgresql.set_up_database()
@@ -1370,6 +1428,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return charmed_postgresql_snap.services["patroni"]["active"]
 
+    @property
+    def _can_connect_to_postgresql(self) -> bool:
+        try:
+            for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
+                with attempt:
+                    assert self.postgresql.get_postgresql_timezones()
+        except RetryError:
+            logger.debug("Cannot connect to database")
+            return False
+        return True
+
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         if (
@@ -1413,29 +1482,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
 
-        self._validate_config_options()
+        # Try to connect
+        if not self._can_connect_to_postgresql:
+            logger.warning("Early exit update_config: Cannot connect to Postgresql")
+            return False
 
-        self._patroni.bulk_update_parameters_controller_by_patroni(
-            {
-                "max_connections": max(4 * os.cpu_count(), 100),
-                "max_prepared_transactions": self.config.memory_max_prepared_transactions,
-            }
-        )
+        self._patroni.bulk_update_parameters_controller_by_patroni({
+            "max_connections": max(4 * os.cpu_count(), 100),
+            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+        })
 
-        restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
-        self._patroni.reload_patroni_configuration()
-        # Sleep the same time as Patroni's loop_wait default value, which tells how much time
-        # Patroni will wait before checking the configuration file again to reload it.
-        time.sleep(10)
-        restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
-
-        # Restart PostgreSQL if TLS configuration has changed
-        # (so the both old and new connections use the configuration).
-        if restart_postgresql:
-            logger.info("PostgreSQL restart required")
-            self._peers.data[self.unit].pop("postgresql_restarted", None)
-            self.on[self.restart_manager.name].acquire_lock.emit()
+        self._handle_postgresql_restart_need(enable_tls)
 
         # Restart the monitoring service if the password was rotated
         cache = snap.SnapCache()
@@ -1456,24 +1513,43 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _validate_config_options(self) -> None:
         """Validates specific config options that need access to the database or to the TLS status."""
         if (
-            self.config.instance_default_text_search_config is not None
-            and self.config.instance_default_text_search_config
+            self.config.instance_default_text_search_config
             not in self.postgresql.get_postgresql_text_search_configs()
         ):
-            raise Exception(
+            raise ValueError(
                 "instance_default_text_search_config config option has an invalid value"
             )
 
-        if self.config.request_date_style is not None and not self.postgresql.validate_date_style(
-            self.config.request_date_style
-        ):
-            raise Exception("request_date_style config option has an invalid value")
+        if not self.postgresql.validate_date_style(self.config.request_date_style):
+            raise ValueError("request_date_style config option has an invalid value")
 
-        if (
-            self.config.request_time_zone is not None
-            and self.config.request_time_zone not in self.postgresql.get_postgresql_timezones()
-        ):
-            raise Exception("request_time_zone config option has an invalid value")
+        if self.config.request_time_zone not in self.postgresql.get_postgresql_timezones():
+            raise ValueError("request_time_zone config option has an invalid value")
+
+    def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
+        """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
+        restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+        self._patroni.reload_patroni_configuration()
+        # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
+        # which tells how much time Patroni will wait before checking the configuration
+        # file again to reload it.
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+                with attempt:
+                    restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
+                    if not restart_postgresql:
+                        raise Exception
+        except RetryError:
+            # Ignore the error, as it happens only to indicate that the configuration has not changed.
+            pass
+        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+
+        # Restart PostgreSQL if TLS configuration has changed
+        # (so the both old and new connections use the configuration).
+        if restart_postgresql:
+            logger.info("PostgreSQL restart required")
+            self._peers.data[self.unit].pop("postgresql_restarted", None)
+            self.on[self.restart_manager.name].acquire_lock.emit()
 
     def _update_relation_endpoints(self) -> None:
         """Updates endpoints and read-only endpoint in all relations."""

@@ -32,7 +32,6 @@ logger = logging.getLogger(__name__)
 UNIT_IDS = [0, 1, 2]
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
@@ -170,13 +169,11 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
 @pytest.mark.group(1)
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(
-        {
-            "memory_max_prepared_transactions": "100",
-            "memory_shared_buffers": "128",
-            "response_lc_monetary": "en_GB.utf8",
-        }
-    )
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "memory_max_prepared_transactions": "100",
+        "memory_shared_buffers": "128",
+        "response_lc_monetary": "en_GB.utf8",
+    })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     password = await get_password(ops_test, any_unit_name)
@@ -313,7 +310,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
 
     # Add the unit again.
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
 
     # Testing write occurred to every postgres instance by reading from them
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:

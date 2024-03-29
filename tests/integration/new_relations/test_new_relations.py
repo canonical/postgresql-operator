@@ -12,7 +12,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
-from ..helpers import CHARM_SERIES, scale_application
+from ..helpers import CHARM_SERIES, assert_sync_standbys, get_leader_unit, scale_application
 from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
@@ -36,7 +36,6 @@ NO_DATABASE_RELATION_NAME = "no-database"
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 
-@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_charms(ops_test: OpsTest, charm):
@@ -345,6 +344,7 @@ async def test_an_application_can_request_multiple_databases(ops_test: OpsTest):
 
 
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
     # Retrieve the list of current database unit names.
@@ -357,10 +357,21 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
         )
 
+        assert_sync_standbys(
+            ops_test.model.applications[DATABASE_APP_NAME].units[0].public_address, 2
+        )
+
         # Remove the original units.
-        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*units_to_remove)
+        leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*[
+            unit for unit in units_to_remove if unit != leader_unit.name
+        ])
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=3000, wait_for_exact_units=2
+            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=3
+        )
+        await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=2
         )
 
         # Get the updated connection data and assert it can be used
@@ -436,12 +447,10 @@ async def test_admin_role(ops_test: OpsTest):
     async with ops_test.fast_forward():
         await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
-        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config(
-            {
-                "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-                "extra-user-roles": "admin",
-            }
-        )
+        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
+            "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
+            "extra-user-roles": "admin",
+        })
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
         await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
@@ -531,17 +540,15 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
             apps=[another_data_integrator_app_name], status="blocked"
         )
         for app in data_integrator_apps_names:
-            await ops_test.model.applications[app].set_config(
-                {
-                    "database-name": app.replace("-", "_"),
-                    "extra-user-roles": "test",
-                }
-            )
+            await ops_test.model.applications[app].set_config({
+                "database-name": app.replace("-", "_"),
+                "extra-user-roles": "test",
+            })
         await ops_test.model.wait_for_idle(apps=data_integrator_apps_names, status="blocked")
         for app in data_integrator_apps_names:
             await ops_test.model.add_relation(f"{app}:postgresql", f"{DATABASE_APP_NAME}:database")
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
-        ops_test.model.block_until(
+        await ops_test.model.block_until(
             lambda: any(
                 unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
                 for unit in ops_test.model.applications[DATABASE_APP_NAME].units
@@ -569,6 +576,33 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
         )
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME],
+            status="active",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
+
+
+@pytest.mark.group(1)
+async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
+    async with ops_test.fast_forward():
+        # Deploy Nextcloud.
+        await ops_test.model.deploy(
+            "nextcloud",
+            channel="edge",
+            application_name="nextcloud",
+            num_units=1,
+        )
+        await ops_test.model.wait_for_idle(
+            apps=["nextcloud"],
+            status="blocked",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
+
+        await ops_test.model.relate("nextcloud:database", f"{DATABASE_APP_NAME}:database")
+
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, "nextcloud"],
             status="active",
             raise_on_blocked=False,
             timeout=1000,
