@@ -1,0 +1,148 @@
+[32mINFO    [0m integration.test_backups:test_backups.py:389 configuring S3 integrator for an invalid cloud
+[32mINFO    [0m integration.test_backups:test_backups.py:404 waiting for the database charm to become blocked
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  new-postgresql/0 [executing] blocked: the S3 repository has backups from another cluster
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  s3-integrator/0 [executing] active: 
+[32mINFO    [0m integration.test_backups:test_backups.py:414 configuring S3 integrator for a valid cloud, but with the path of another cluster repository
+[32mINFO    [0m integration.test_backups:test_backups.py:423 waiting for the database charm to become blocked
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  s3-integrator/0 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  new-postgresql/0 [executing] blocked: failed to access/create the bucket, check your S3 settings
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  new-postgresql/0 [idle] blocked: the S3 repository has backups from another cluster
+[32mINFO    [0m integration.test_backups:test_backups.py:433 configuring S3 integrator for a valid cloud
+[32mINFO    [0m integration.test_backups:test_backups.py:437 waiting for the database charm to become active
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  new-postgresql/0 [idle] blocked: the S3 repository has backups from another cluster
+  s3-integrator/0 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2957 Waiting for model:
+  new-postgresql/0 [executing] maintenance: checking stanza
+[32mINFO    [0m integration.test_backups:test_backups.py:77 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  02:33:48Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  14.11    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable   13  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  active    idle   8        10.8.5.203      5432/tcp  
+s3-integrator/0*   active    idle   0        10.8.5.205                
+
+Machine  State    Address     Inst id        Base          AZ  Message
+0        started  10.8.5.205  juju-bc7fcb-0  ubuntu@22.04      Running
+8        started  10.8.5.203  juju-bc7fcb-8  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-0: 01:31:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:46 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:47 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-s3-integrator-0: 01:31:47 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:31:49 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:31:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:31:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:32:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:32:08 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:32:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-1: 01:32:08 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:32:08 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:32:08 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:08 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-0: 01:32:08 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-aws-1: 01:34:56 ERROR unit.postgresql-aws/1.juju-log database-peers:3: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing secret cauth was attempted to be removed.
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Can't update secret for relation 3
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing field 'cauth' was attempted to be removed from the databag (relation ID: 3)
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing secret cert was attempted to be removed.
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Can't update secret for relation 3
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing field 'cert' was attempted to be removed from the databag (relation ID: 3)
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing secret chain was attempted to be removed.
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Can't update secret for relation 3
+unit-postgresql-aws-0: 01:44:19 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing field 'chain' was attempted to be removed from the databag (relation ID: 3)
+machine-4: 01:49:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:49:07 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:49:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-2: 01:49:07 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:54:33 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-5: 01:54:33 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:54:33 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-0: 01:54:33 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:54:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:54:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:54:35 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-gcp-1: 01:54:35 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Non-existing secret cauth was attempted to be removed.
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Can't update secret for relation 6
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Non-existing field 'cauth' was attempted to be removed from the databag (relation ID: 6)
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Non-existing secret cert was attempted to be removed.
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Can't update secret for relation 6
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Non-existing field 'cert' was attempted to be removed from the databag (relation ID: 6)
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Non-existing secret chain was attempted to be removed.
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Can't update secret for relation 6
+unit-postgresql-gcp-1: 02:11:30 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Non-existing field 'chain' was attempted to be removed from the databag (relation ID: 6)
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Non-existing secret cauth was attempted to be removed.
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Can't update secret for relation 6
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Non-existing field 'cauth' was attempted to be removed from the databag (relation ID: 6)
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Non-existing secret cert was attempted to be removed.
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Can't update secret for relation 6
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Non-existing field 'cert' was attempted to be removed from the databag (relation ID: 6)
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Non-existing secret chain was attempted to be removed.
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Can't update secret for relation 6
+unit-postgresql-gcp-0: 02:15:35 ERROR unit.postgresql-gcp/0.juju-log certificates:10: Non-existing field 'chain' was attempted to be removed from the databag (relation ID: 6)
+machine-7: 02:17:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 02:17:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 02:17:25 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-gcp-2: 02:17:25 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-8: 02:17:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 02:17:36 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-8: 02:17:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-new-postgresql-0: 02:17:36 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-gcp-2: 02:23:13 ERROR unit.postgresql-gcp/2.juju-log s3-parameters:17: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-new-postgresql-0: 02:29:35 ERROR unit.new-postgresql/0.juju-log s3-parameters:18: Failed to create a session 'bucket' in region=region.
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/backups.py", line 220, in _create_bucket_if_not_exists
+    s3 = session.resource("s3", endpoint_url=self._construct_endpoint(s3_parameters))
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/session.py", line 446, in resource
+    client = self.client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/session.py", line 299, in client
+    return self._session.create_client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/session.py", line 997, in create_client
+    client = client_creator.create_client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 161, in create_client
+    client_args = self._get_client_args(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 520, in _get_client_args
+    return args_creator.get_client_args(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/args.py", line 137, in get_client_args
+    endpoint = endpoint_creator.create_endpoint(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/endpoint.py", line 402, in create_endpoint
+    raise ValueError("Invalid endpoint: %s" % endpoint_url)
+ValueError: Invalid endpoint: endpoint
+unit-new-postgresql-0: 02:29:36 ERROR unit.new-postgresql/0.juju-log s3-parameters:18: Failed to create a session 'bucket' in region=region.
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/backups.py", line 220, in _create_bucket_if_not_exists
+    s3 = session.resource("s3", endpoint_url=self._construct_endpoint(s3_parameters))
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/session.py", line 446, in resource
+    client = self.client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/session.py", line 299, in client
+    return self._session.create_client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/session.py", line 997, in create_client
+    client = client_creator.create_client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 161, in create_client
+    client_args = self._get_client_args(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 520, in _get_client_args
+    return args_creator.get_client_args(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/args.py", line 137, in get_client_args
+    endpoint = endpoint_creator.create_endpoint(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/endpoint.py", line 402, in create_endpoint
+    raise ValueError("Invalid endpoint: %s" % endpoint_url)
+ValueError: Invalid endpoint: endpoint
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...
