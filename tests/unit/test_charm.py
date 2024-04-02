@@ -46,110 +46,95 @@ CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 def harness():
     harness = Harness(PostgresqlOperatorCharm)
     harness.begin()
-    #rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    harness.add_relation(PEER, harness.charm.app.name)
     harness.add_relation("upgrade", harness.charm.app.name)
     yield harness
     harness.cleanup()
 
-@pytest.fixture
-def use_caplog(self, caplog):
-    self._caplog = caplog
+@patch_network_get(private_address="1.1.1.1")
+def test_on_install(harness):
+    with patch("charm.subprocess.check_call") as _check_call, patch(
+        "charm.snap.SnapCache"
+    ) as _snap_cache, patch(
+        "charm.PostgresqlOperatorCharm._install_snap_packages"
+    ) as _install_snap_packages, patch(
+        "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
+    ) as _reboot_on_detached_storage, patch(
+        "charm.PostgresqlOperatorCharm._is_storage_attached",
+        side_effect=[False, True, True],
+    ) as _is_storage_attached:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        # Test without storage.
+        harness.charm.on.install.emit()
+        _reboot_on_detached_storage.assert_called_once()
+        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+
+        # Test without adding Patroni resource.
+        harness.charm.on.install.emit()
+        # Assert that the needed calls were made.
+        _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES)
+        assert pg_snap.alias.call_count == 2
+        pg_snap.alias.assert_any_call("psql")
+        pg_snap.alias.assert_any_call("patronictl")
+
+        assert _check_call.call_count == 3
+        _check_call.assert_any_call("mkdir -p /home/snap_daemon".split())
+        _check_call.assert_any_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
+        _check_call.assert_any_call("usermod -d /home/snap_daemon snap_daemon".split())
+
+        # Assert the status set by the event handler.
+        assert (isinstance(harness.model.unit.status, WaitingStatus))
 
 @patch_network_get(private_address="1.1.1.1")
-@patch("charm.subprocess.check_call")
-@patch("charm.snap.SnapCache")
-@patch("charm.PostgresqlOperatorCharm._install_snap_packages")
-@patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
-@patch(
-    "charm.PostgresqlOperatorCharm._is_storage_attached",
-    side_effect=[False, True, True],
-)
-def test_on_install(
-    self,
-    _is_storage_attached,
-    _reboot_on_detached_storage,
-    _install_snap_packages,
-    _snap_cache,
-    _check_call,
-):
-    # Test without storage.
-    harness.charm.on.install.emit()
-    _reboot_on_detached_storage.assert_called_once()
-    pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+def test_on_install_failed_to_create_home(harness):
+    with patch("charm.subprocess.check_call") as _check_call, patch(
+        "charm.snap.SnapCache"
+    ) as _snap_cache, patch(
+        "charm.PostgresqlOperatorCharm._install_snap_packages"
+    ) as _install_snap_packages, patch(
+        "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
+    ) as _reboot_on_detached_storage, patch(
+        "charm.PostgresqlOperatorCharm._is_storage_attached",
+        side_effect=[False, True, True],
+    ) as _is_storage_attached, patch(
+        "charm.logger.exception"
+    ) as _logger_exception:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        # Test without storage.
+        harness.charm.on.install.emit()
+        _reboot_on_detached_storage.assert_called_once()
+        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+        _check_call.side_effect = [subprocess.CalledProcessError(-1, ["test"])]
 
-    # Test without adding Patroni resource.
-    harness.charm.on.install.emit()
-    # Assert that the needed calls were made.
-    _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES)
-    assert pg_snap.alias.call_count == 2
-    pg_snap.alias.assert_any_call("psql")
-    pg_snap.alias.assert_any_call("patronictl")
+        # Test without adding Patroni resource.
+        harness.charm.on.install.emit()
+        # Assert that the needed calls were made.
+        _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES)
+        assert pg_snap.alias.call_count == 2
+        pg_snap.alias.assert_any_call("psql")
+        pg_snap.alias.assert_any_call("patronictl")
 
-    assert _check_call.call_count == 3
-    _check_call.assert_any_call("mkdir -p /home/snap_daemon".split())
-    _check_call.assert_any_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-    _check_call.assert_any_call("usermod -d /home/snap_daemon snap_daemon".split())
+        _logger_exception.assert_called_once_with("Unable to create snap_daemon home dir")
 
-    # Assert the status set by the event handler.
-    assert (isinstance(harness.model.unit.status, WaitingStatus))
+        # Assert the status set by the event handler.
+        assert (isinstance(harness.model.unit.status, WaitingStatus))
 
 @patch_network_get(private_address="1.1.1.1")
-@patch("charm.logger.exception")
-@patch("charm.subprocess.check_call")
-@patch("charm.snap.SnapCache")
-@patch("charm.PostgresqlOperatorCharm._install_snap_packages")
-@patch("charm.PostgresqlOperatorCharm._reboot_on_detached_storage")
-@patch(
-    "charm.PostgresqlOperatorCharm._is_storage_attached",
-    side_effect=[False, True, True],
-)
-def test_on_install_failed_to_create_home(
-    self,
-    _is_storage_attached,
-    _reboot_on_detached_storage,
-    _install_snap_packages,
-    _snap_cache,
-    _check_call,
-    _logger_exception,
-):
-    # Test without storage.
-    harness.charm.on.install.emit()
-    _reboot_on_detached_storage.assert_called_once()
-    pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
-    _check_call.side_effect = [subprocess.CalledProcessError(-1, ["test"])]
-
-    # Test without adding Patroni resource.
-    harness.charm.on.install.emit()
-    # Assert that the needed calls were made.
-    _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES)
-    assert pg_snap.alias.call_count == 2
-    pg_snap.alias.assert_any_call("psql")
-    pg_snap.alias.assert_any_call("patronictl")
-
-    _logger_exception.assert_called_once_with("Unable to create snap_daemon home dir")
-
-    # Assert the status set by the event handler.
-    assert (isinstance(harness.model.unit.status, WaitingStatus))
+def test_on_install_snap_failure(harness):
+    with patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages, patch(
+        "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
+    ) as _is_storage_attached:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        # Mock the result of the call.
+        _install_snap_packages.side_effect = snap.SnapError
+        # Trigger the hook.
+        harness.charm.on.install.emit()
+        # Assert that the needed calls were made.
+        _install_snap_packages.assert_called_once()
+        assert (isinstance(harness.model.unit.status, BlockedStatus))
 
 @patch_network_get(private_address="1.1.1.1")
-@patch("charm.PostgresqlOperatorCharm._install_snap_packages")
-@patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
-def test_on_install_snap_failure(
-    self,
-    _is_storage_attached,
-    _install_snap_packages,
-):
-    # Mock the result of the call.
-    _install_snap_packages.side_effect = snap.SnapError
-    # Trigger the hook.
-    harness.charm.on.install.emit()
-    # Assert that the needed calls were made.
-    _install_snap_packages.assert_called_once()
-    assert (isinstance(harness.model.unit.status, BlockedStatus))
-
-@patch_network_get(private_address="1.1.1.1")
-def test_patroni_scrape_config_no_tls(self):
+def test_patroni_scrape_config_no_tls(harness):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     result = harness.charm.patroni_scrape_config()
 
     assert result == [
@@ -167,7 +152,8 @@ def test_patroni_scrape_config_no_tls(self):
     return_value=True,
     new_callable=PropertyMock,
 )
-def test_patroni_scrape_config_tls(self, _):
+def test_patroni_scrape_config_tls(harness, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     result = harness.charm.patroni_scrape_config()
 
     assert result == [
@@ -185,7 +171,8 @@ def test_patroni_scrape_config_tls(self, _):
     return_value={"1.1.1.1", "1.1.1.2"},
 )
 @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-def test_primary_endpoint(self, _patroni, _):
+def test_primary_endpoint(harness, _patroni, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
     _patroni.return_value.get_primary.return_value = sentinel.primary
     assert harness.charm.primary_endpoint == "1.1.1.1"
@@ -200,7 +187,8 @@ def test_primary_endpoint(self, _patroni, _):
     return_value={"1.1.1.1", "1.1.1.2"},
 )
 @patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-def test_primary_endpoint_no_peers(self, _patroni, _, __):
+def test_primary_endpoint_no_peers(harness, _patroni, _, __):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     assert harness.charm.primary_endpoint is None
 
     assert not _patroni.return_value.get_member_ip.called
@@ -214,8 +202,9 @@ def test_primary_endpoint_no_peers(self, _patroni, _, __):
 @patch("charm.PostgresqlOperatorCharm.update_config")
 @patch_network_get(private_address="1.1.1.1")
 def test_on_leader_elected(
-    self, _update_config, _primary_endpoint, _update_relation_endpoints
+    harness, _update_config, _primary_endpoint, _update_relation_endpoints
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Assert that there is no password in the peer relation.
     assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) == None
 
@@ -245,14 +234,15 @@ def test_on_leader_elected(
     _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
     assert (isinstance(harness.model.unit.status, WaitingStatus))
 
-def test_is_cluster_initialised(self):
+def test_is_cluster_initialised(harness):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the cluster was not initialised yet.
     assert not (harness.charm.is_cluster_initialised)
 
     # Test when the cluster was already initialised.
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
+            rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
         )
     assert (harness.charm.is_cluster_initialised)
 
@@ -262,13 +252,14 @@ def test_is_cluster_initialised(self):
 @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
 @patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
 def test_on_config_changed(
-    self,
+    harness,
     _is_cluster_initialised,
     _enable_disable_extensions,
     _set_up_relation,
     _update_config,
     _validate_config_options,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the cluster was not initialised yet.
     _is_cluster_initialised.return_value = False
     harness.charm.on.config_changed.emit()
@@ -334,7 +325,8 @@ def test_on_config_changed(
     _set_up_relation.assert_called_once()
 
 @patch("subprocess.check_output", return_value=b"C")
-def test_check_extension_dependencies(self, _):
+def test_check_extension_dependencies(harness, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as _:
         # Test when plugins dependencies exception is not caused
         config = {
@@ -360,11 +352,13 @@ def test_check_extension_dependencies(self, _):
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
 
 @patch("subprocess.check_output", return_value=b"C")
-def test_enable_disable_extensions(self, _):
+def test_enable_disable_extensions(harness, caplog, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
         # Test when all extensions install/uninstall succeed.
         postgresql_mock.enable_disable_extension.side_effect = None
-        with self.assertNoLogs("charm", "ERROR"):
+        with caplog.at_level(logging.ERROR):
+            assert len(caplog.records) == 0
             harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
 
@@ -373,16 +367,17 @@ def test_enable_disable_extensions(self, _):
         postgresql_mock.enable_disable_extensions.side_effect = (
             PostgreSQLEnableDisableExtensionError
         )
-        with self.assertLogs("charm", "ERROR") as logs:
+        with caplog.at_level(logging.ERROR):
             harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
-            assert "failed to change plugins" in logs.output
+            assert "failed to change plugins" in [rec.message for rec in caplog.records]
 
         # Test when one config option should be skipped (because it's not related
         # to a plugin/extension).
         postgresql_mock.reset_mock()
         postgresql_mock.enable_disable_extensions.side_effect = None
-        with self.assertNoLogs("charm", "ERROR"):
+        with caplog.at_level(logging.ERROR):
+            assert len(caplog.records) == 0
             config = """options:
 plugin_citext_enable:
 default: false
@@ -538,7 +533,7 @@ profile:
 default: production
 type: string"""
             harness = Harness(PostgresqlOperatorCharm, config=config)
-            self.addCleanup(harness.cleanup)
+            harness.cleanup()
             harness.begin()
             harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
@@ -566,7 +561,7 @@ type: string"""
     side_effect=[False, True, True, True, True],
 )
 def test_on_start(
-    self,
+    harness,
     _is_storage_attached,
     _idle,
     _reboot_on_detached_storage,
@@ -583,6 +578,7 @@ def test_on_start(
     _snap_cache,
     _enable_disable_extensions,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _get_postgresql_version.return_value = "14.0"
 
     # Test without storage.
@@ -650,7 +646,7 @@ def test_on_start(
     return_value=True,
 )
 def test_on_start_replica(
-    self,
+    harness,
     _is_storage_attached,
     _idle,
     _get_password,
@@ -662,6 +658,7 @@ def test_on_start_replica(
     _get_postgresql_version,
     _snap_cache,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _get_postgresql_version.return_value = "14.0"
 
     # Set the current unit to be a replica (non leader unit).
@@ -705,7 +702,7 @@ def test_on_start_replica(
 @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
 @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
 def test_on_start_no_patroni_member(
-    self,
+    harness,
     _is_storage_attached,
     _idle,
     _get_password,
@@ -714,6 +711,7 @@ def test_on_start_no_patroni_member(
     _snap_cache,
     _,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Mock the passwords.
     patroni.return_value.member_started = False
     _get_password.return_value = "fake-operator-password"
@@ -734,8 +732,9 @@ def test_on_start_no_patroni_member(
 @patch("charm.PostgresqlOperatorCharm._get_password")
 @patch("charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True)
 def test_on_start_after_blocked_state(
-    self, _is_storage_attached, _get_password, _replication_password, _bootstrap_cluster
+    harness, _is_storage_attached, _get_password, _replication_password, _bootstrap_cluster
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Set an initial blocked status (like after the install hook was triggered).
     initial_status = BlockedStatus("fake message")
     harness.model.unit.status = initial_status
@@ -750,12 +749,13 @@ def test_on_start_after_blocked_state(
 
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm.update_config")
-def test_on_get_password(self, _):
+def test_on_get_password(harness, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Create a mock event and set passwords in peer relation data.
     harness.set_leader(True)
     mock_event = MagicMock(params={})
     harness.update_relation_data(
-        self.rel_id,
+        rel_id,
         harness.charm.app.name,
         {
             "operator-password": "test-password",
@@ -788,13 +788,14 @@ def test_on_get_password(self, _):
 @patch("charm.Patroni.are_all_members_ready")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 def test_on_set_password(
-    self,
+    harness,
     _,
     _are_all_members_ready,
     _postgresql,
     _set_secret,
     __,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Create a mock event.
     mock_event = MagicMock(params={})
 
@@ -864,7 +865,7 @@ def test_on_set_password(
 @patch("charm.PostgreSQLProvider.oversee_users")
 @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
 def test_on_update_status(
-    self,
+    harness,
     _,
     _oversee_users,
     _primary_endpoint,
@@ -877,6 +878,7 @@ def test_on_update_status(
     _set_primary_status_message,
     _start_observer,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test before the cluster is initialised.
     harness.charm.on.update_status.emit()
     _set_primary_status_message.assert_not_called()
@@ -884,7 +886,7 @@ def test_on_update_status(
     # Test after the cluster was initialised, but with the unit in a blocked state.
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
+            rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
         )
     harness.charm.unit.status = BlockedStatus("fake blocked status")
     harness.charm.on.update_status.emit()
@@ -903,7 +905,7 @@ def test_on_update_status(
     _member_replication_lag.return_value = "unknown"
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.unit.name, {"postgresql_restarted": "True"}
+            rel_id, harness.charm.unit.name, {"postgresql_restarted": "True"}
         )
     harness.charm.on.update_status.emit()
     _reinitialize_postgresql.assert_called_once()
@@ -914,7 +916,7 @@ def test_on_update_status(
     _is_member_isolated.return_value = True
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.unit.name, {"postgresql_restarted": ""}
+            rel_id, harness.charm.unit.name, {"postgresql_restarted": ""}
         )
     harness.charm.on.update_status.emit()
     _restart_patroni.assert_called_once()
@@ -937,7 +939,7 @@ def test_on_update_status(
 @patch("charm.Patroni.get_member_status")
 @patch("upgrade.PostgreSQLUpgrade.idle", return_value=True)
 def test_on_update_status_after_restore_operation(
-    self,
+    harness,
     _,
     _get_member_status,
     _member_started,
@@ -951,11 +953,12 @@ def test_on_update_status_after_restore_operation(
     _set_primary_status_message,
     __,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the restore operation fails.
     with harness.hooks_disabled():
         harness.set_leader()
         harness.update_relation_data(
-            self.rel_id,
+            rel_id,
             harness.charm.app.name,
             {"cluster_initialised": "True", "restoring-backup": "2023-01-01T09:00:00Z"},
         )
@@ -983,7 +986,7 @@ def test_on_update_status_after_restore_operation(
     assert isinstance(harness.charm.unit.status, ActiveStatus)
 
     # Assert that the backup id is still in the application relation databag.
-    assert harness.get_relation_data(self.rel_id, harness.charm.app) == {"cluster_initialised": "True", "restoring-backup": "2023-01-01T09:00:00Z"}
+    assert harness.get_relation_data(rel_id, harness.charm.app) == {"cluster_initialised": "True", "restoring-backup": "2023-01-01T09:00:00Z"}
 
     # Test when the restore operation finished successfully.
     _member_started.return_value = True
@@ -1000,7 +1003,7 @@ def test_on_update_status_after_restore_operation(
     assert isinstance(harness.charm.unit.status, ActiveStatus)
 
     # Assert that the backup id is not in the application relation databag anymore.
-    assert harness.get_relation_data(self.rel_id, harness.charm.app) == {"cluster_initialised": "True"}
+    assert harness.get_relation_data(rel_id, harness.charm.app) == {"cluster_initialised": "True"}
 
     # Test when it's not possible to use the configured S3 repository.
     _update_config.reset_mock()
@@ -1011,7 +1014,7 @@ def test_on_update_status_after_restore_operation(
     _set_primary_status_message.reset_mock()
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id,
+            rel_id,
             harness.charm.app.name,
             {"restoring-backup": "2023-01-01T09:00:00Z"},
         )
@@ -1027,10 +1030,11 @@ def test_on_update_status_after_restore_operation(
     assert harness.charm.unit.status.message == "fake validation message"
 
     # Assert that the backup id is not in the application relation databag anymore.
-    assert harness.get_relation_data(self.rel_id, harness.charm.app) == {"cluster_initialised": "True"}
+    assert harness.get_relation_data(rel_id, harness.charm.app) == {"cluster_initialised": "True"}
 
 @patch("charm.snap.SnapCache")
-def test_install_snap_packages(self, _snap_cache):
+def test_install_snap_packages(harness, _snap_cache):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _snap_package = _snap_cache.return_value.__getitem__.return_value
     _snap_package.ensure.side_effect = snap.SnapError
     _snap_package.present = False
@@ -1120,7 +1124,8 @@ def test_install_snap_packages(self, _snap_cache):
     "subprocess.check_call",
     side_effect=[None, subprocess.CalledProcessError(1, "fake command")],
 )
-def test_is_storage_attached(self, _check_call):
+def test_is_storage_attached(harness, _check_call):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test with attached storage.
     is_storage_attached = harness.charm._is_storage_attached()
     _check_call.assert_called_once_with(["mountpoint", "-q", harness.charm._storage_path])
@@ -1131,7 +1136,8 @@ def test_is_storage_attached(self, _check_call):
     assert not (is_storage_attached)
 
 @patch("subprocess.check_call")
-def test_reboot_on_detached_storage(self, _check_call):
+def test_reboot_on_detached_storage(harness, _check_call):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     mock_event = MagicMock()
     harness.charm._reboot_on_detached_storage(mock_event)
     mock_event.defer.assert_called_once()
@@ -1141,7 +1147,8 @@ def test_reboot_on_detached_storage(self, _check_call):
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.Patroni.restart_postgresql")
 @patch("charm.Patroni.are_all_members_ready")
-def test_restart(self, _are_all_members_ready, _restart_postgresql):
+def test_restart(harness, _are_all_members_ready, _restart_postgresql):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _are_all_members_ready.side_effect = [False, True, True]
 
     # Test when not all members are ready.
@@ -1172,7 +1179,7 @@ def test_restart(self, _are_all_members_ready, _restart_postgresql):
 @patch("charm.Patroni.render_patroni_yml_file")
 @patch("charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock)
 def test_update_config(
-    self,
+    harness,
     _is_tls_enabled,
     _render_patroni_yml_file,
     _is_workload_running,
@@ -1182,6 +1189,7 @@ def test_update_config(
     __,
     ___,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
         # Mock some properties.
         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
@@ -1208,7 +1216,7 @@ def test_update_config(
         # Test without TLS files available.
         harness.update_config(unset={"profile-limit-memory", "profile_limit_memory"})
         with harness.hooks_disabled():
-            harness.update_relation_data(self.rel_id, harness.charm.unit.name, {"tls": ""})
+            harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
         _is_tls_enabled.return_value = False
         harness.charm.update_config()
         _render_patroni_yml_file.assert_called_once_with(
@@ -1221,12 +1229,12 @@ def test_update_config(
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
-        assert "tls" not in harness.get_relation_data(self.rel_id, harness.charm.unit.name)
+        assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
         # Test with TLS files available.
         _handle_postgresql_restart_need.reset_mock()
         harness.update_relation_data(
-            self.rel_id, harness.charm.unit.name, {"tls": ""}
+            rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it change.
         _is_tls_enabled.return_value = True
         _render_patroni_yml_file.reset_mock()
@@ -1241,28 +1249,29 @@ def test_update_config(
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once()
-        assert "tls" not in harness.get_relation_data(self.rel_id, harness.charm.unit.name) # The "tls" flag is set in handle_postgresql_restart_need.
+        assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name) # The "tls" flag is set in handle_postgresql_restart_need.
 
         # Test with workload not running yet.
         harness.update_relation_data(
-            self.rel_id, harness.charm.unit.name, {"tls": ""}
+            rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it change.
         _handle_postgresql_restart_need.reset_mock()
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
-        assert harness.get_relation_data(self.rel_id, harness.charm.unit.name)["tls"] == "enabled"
+        assert harness.get_relation_data(rel_id, harness.charm.unit.name)["tls"] == "enabled"
 
         # Test with member not started yet.
         harness.update_relation_data(
-            self.rel_id, harness.charm.unit.name, {"tls": ""}
+            rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it doesn't change.
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
-        assert "tls" not in harness.get_relation_data(self.rel_id, harness.charm.unit.name)
+        assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
 @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
 @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
-def test_on_cluster_topology_change(self, _primary_endpoint, _update_relation_endpoints):
+def test_on_cluster_topology_change(harness, _primary_endpoint, _update_relation_endpoints):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Mock the property value.
     _primary_endpoint.side_effect = [None, "1.1.1.1"]
 
@@ -1281,8 +1290,9 @@ def test_on_cluster_topology_change(self, _primary_endpoint, _update_relation_en
 )
 @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
 def test_on_cluster_topology_change_keep_blocked(
-    self, _update_relation_endpoints, _primary_endpoint
+    harness, _update_relation_endpoints, _primary_endpoint
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     harness.charm._on_cluster_topology_change(Mock())
@@ -1299,8 +1309,9 @@ def test_on_cluster_topology_change_keep_blocked(
 )
 @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
 def test_on_cluster_topology_change_clear_blocked(
-    self, _update_relation_endpoints, _primary_endpoint
+    harness, _update_relation_endpoints, _primary_endpoint
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
     harness.charm._on_cluster_topology_change(Mock())
@@ -1311,7 +1322,8 @@ def test_on_cluster_topology_change_clear_blocked(
 
 @patch("charm.PostgresqlOperatorCharm.postgresql", new_callable=PropertyMock)
 @patch("config.subprocess")
-def test_validate_config_options(self, _, _charm_lib):
+def test_validate_config_options(harness, _, _charm_lib):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _charm_lib.return_value.get_postgresql_text_search_configs.return_value = []
     _charm_lib.return_value.validate_date_style.return_value = []
     _charm_lib.return_value.get_postgresql_timezones.return_value = []
@@ -1370,7 +1382,7 @@ def test_validate_config_options(self, _, _charm_lib):
 @patch("charm.PostgresqlOperatorCharm._reconfigure_cluster")
 @patch("ops.framework.EventBase.defer")
 def test_on_peer_relation_changed(
-    self,
+    harness,
     _defer,
     _reconfigure_cluster,
     _update_member_ip,
@@ -1387,11 +1399,12 @@ def test_on_peer_relation_changed(
     _update_relation_endpoints,
     _,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test an uninitialized cluster.
     mock_event = Mock()
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.app.name, {"cluster_initialised": ""}
+            rel_id, harness.charm.app.name, {"cluster_initialised": ""}
         )
     harness.charm._on_peer_relation_changed(mock_event)
     mock_event.defer.assert_called_once()
@@ -1402,7 +1415,7 @@ def test_on_peer_relation_changed(
     mock_event.defer.reset_mock()
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id,
+            rel_id,
             harness.charm.app.name,
             {"cluster_initialised": "True", "members_ips": '["1.1.1.1"]'},
         )
@@ -1460,7 +1473,7 @@ def test_on_peer_relation_changed(
 
     # Test when Patroni has already started but this is a replica with a
     # huge or unknown lag.
-    self.relation = harness.model.get_relation(PEER, self.rel_id)
+    relation = harness.model.get_relation(PEER, rel_id)
     _member_started.return_value = True
     for values in itertools.product([True, False], ["0", "1000", "1001", "unknown"]):
         _defer.reset_mock()
@@ -1469,7 +1482,7 @@ def test_on_peer_relation_changed(
         _is_primary.return_value = values[0]
         _member_replication_lag.return_value = values[1]
         harness.charm.unit.status = ActiveStatus()
-        harness.charm.on.database_peers_relation_changed.emit(self.relation)
+        harness.charm.on.database_peers_relation_changed.emit(relation)
         if _is_primary.return_value == values[0] or int(values[1]) <= 1000:
             _defer.assert_not_called()
             _check_stanza.assert_called_once()
@@ -1482,13 +1495,13 @@ def test_on_peer_relation_changed(
             assert isinstance(harness.charm.unit.status, MaintenanceStatus)
 
     # Test when it was not possible to start the pgBackRest service yet.
-    self.relation = harness.model.get_relation(PEER, self.rel_id)
+    relation = harness.model.get_relation(PEER, rel_id)
     _member_started.return_value = True
     _defer.reset_mock()
     _coordinate_stanza_fields.reset_mock()
     _check_stanza.reset_mock()
     _start_stop_pgbackrest_service.return_value = False
-    harness.charm.on.database_peers_relation_changed.emit(self.relation)
+    harness.charm.on.database_peers_relation_changed.emit(relation)
     _defer.assert_called_once()
     _coordinate_stanza_fields.assert_not_called()
     _check_stanza.assert_not_called()
@@ -1497,7 +1510,7 @@ def test_on_peer_relation_changed(
     # pgBackRest service.
     _defer.reset_mock()
     _start_stop_pgbackrest_service.return_value = True
-    harness.charm.on.database_peers_relation_changed.emit(self.relation)
+    harness.charm.on.database_peers_relation_changed.emit(relation)
     _defer.assert_not_called()
     _coordinate_stanza_fields.assert_called_once()
     _check_stanza.assert_called_once()
@@ -1507,8 +1520,9 @@ def test_on_peer_relation_changed(
 @patch("charm.PostgresqlOperatorCharm._remove_from_members_ips")
 @patch("charm.Patroni.remove_raft_member")
 def test_reconfigure_cluster(
-    self, _remove_raft_member, _remove_from_members_ips, _add_members
+    harness, _remove_raft_member, _remove_from_members_ips, _add_members
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when no change is needed in the member IP.
     mock_event = Mock()
     mock_event.unit = harness.charm.unit
@@ -1546,7 +1560,7 @@ def test_reconfigure_cluster(
     mock_event.relation.data = relation_data
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.app.name, {"members_ips": '["' + ip_to_remove + '"]'}
+            rel_id, harness.charm.app.name, {"members_ips": '["' + ip_to_remove + '"]'}
         )
     assert (harness.charm._reconfigure_cluster(mock_event))
     _remove_raft_member.assert_called_once_with(ip_to_remove)
@@ -1555,7 +1569,8 @@ def test_reconfigure_cluster(
 
 @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=False)
-def test_update_certificate(self, _, _request_certificate):
+def test_update_certificate(harness, _, _request_certificate):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # If there is no current TLS files, _request_certificate should be called
     # only when the certificates relation is established.
     harness.charm._update_certificate()
@@ -1567,7 +1582,7 @@ def test_update_certificate(self, _, _request_certificate):
     key = private_key = "fake private key"
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id,
+            rel_id,
             harness.charm.unit.name,
             {
                 "ca": ca,
@@ -1586,7 +1601,8 @@ def test_update_certificate(self, _, _request_certificate):
 
 @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_update_certificate_secrets(self, _, _request_certificate):
+def test_update_certificate_secrets(harness, _, _request_certificate):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # If there is no current TLS files, _request_certificate should be called
     # only when the certificates relation is established.
     harness.charm._update_certificate()
@@ -1612,18 +1628,19 @@ def test_update_certificate_secrets(self, _, _request_certificate):
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._update_certificate")
 @patch("charm.Patroni.stop_patroni")
-def test_update_member_ip(self, _stop_patroni, _update_certificate):
+def test_update_member_ip(harness, _stop_patroni, _update_certificate):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the IP address of the unit hasn't changed.
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id,
+            rel_id,
             harness.charm.unit.name,
             {
                 "ip": "1.1.1.1",
             },
         )
     assert not (harness.charm._update_member_ip())
-    relation_data = harness.get_relation_data(self.rel_id, harness.charm.unit.name)
+    relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
     assert relation_data.get("ip-to-remove") == None
     _stop_patroni.assert_not_called()
     _update_certificate.assert_not_called()
@@ -1631,14 +1648,14 @@ def test_update_member_ip(self, _stop_patroni, _update_certificate):
     # Test when the IP address of the unit has changed.
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id,
+            rel_id,
             harness.charm.unit.name,
             {
                 "ip": "2.2.2.2",
             },
         )
     assert (harness.charm._update_member_ip())
-    relation_data = harness.get_relation_data(self.rel_id, harness.charm.unit.name)
+    relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
     assert relation_data.get("ip") == "1.1.1.1"
     assert relation_data.get("ip-to-remove") == "2.2.2.2"
     _stop_patroni.assert_called_once()
@@ -1648,7 +1665,8 @@ def test_update_member_ip(self, _stop_patroni, _update_certificate):
 @patch("charm.PostgresqlOperatorCharm.update_config")
 @patch("charm.Patroni.render_file")
 @patch("charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files")
-def test_push_tls_files_to_workload(self, _get_tls_files, _render_file, _update_config):
+def test_push_tls_files_to_workload(harness, _get_tls_files, _render_file, _update_config):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     _get_tls_files.side_effect = [
         ("key", "ca", "cert"),
         ("key", "ca", None),
@@ -1668,7 +1686,8 @@ def test_push_tls_files_to_workload(self, _get_tls_files, _render_file, _update_
         assert _render_file.call_count == 2
 
 @patch("charm.snap.SnapCache")
-def test_is_workload_running(self, _snap_cache):
+def test_is_workload_running(harness, _snap_cache):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
 
     pg_snap.present = False
@@ -1677,7 +1696,8 @@ def test_is_workload_running(self, _snap_cache):
     pg_snap.present = True
     assert (harness.charm._is_workload_running)
 
-def test_get_available_memory(self):
+def test_get_available_memory(harness):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     meminfo = (
         "MemTotal:       16089488 kB"
         "MemFree:          799284 kB"
@@ -1696,7 +1716,8 @@ def test_get_available_memory(self):
 
 @patch("charm.ClusterTopologyObserver")
 @patch("charm.JujuVersion")
-def test_juju_run_exec_divergence(self, _juju_version: Mock, _topology_observer: Mock):
+def test_juju_run_exec_divergence(harness, _juju_version: Mock, _topology_observer: Mock):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Juju 2
     _juju_version.from_environ.return_value.major = 2
     harness = Harness(PostgresqlOperatorCharm)
@@ -1710,7 +1731,8 @@ def test_juju_run_exec_divergence(self, _juju_version: Mock, _topology_observer:
     harness.begin()
     _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
 
-def test_client_relations(self):
+def test_client_relations(harness):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the charm has no relations.
     assert len(harness.charm.client_relations) == 0
 
@@ -1727,20 +1749,22 @@ def test_client_relations(self):
 # Secrets
 #
 
-def test_scope_obj(self):
+def test_scope_obj(harness):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     assert harness.charm._scope_obj("app") == harness.charm.framework.model.app
     assert harness.charm._scope_obj("unit") == harness.charm.framework.model.unit
     assert harness.charm._scope_obj("test") is None
 
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-def test_get_secret(self, _):
+def test_get_secret(harness, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # App level changes require leader privileges
     harness.set_leader()
     # Test application scope.
     assert harness.charm.get_secret("app", "password") is None
     harness.update_relation_data(
-        self.rel_id, harness.charm.app.name, {"password": "test-password"}
+        rel_id, harness.charm.app.name, {"password": "test-password"}
     )
     assert harness.charm.get_secret("app", "password") == "test-password"
 
@@ -1749,14 +1773,15 @@ def test_get_secret(self, _):
     # Test unit scope.
     assert harness.charm.get_secret("unit", "password") is None
     harness.update_relation_data(
-        self.rel_id, harness.charm.unit.name, {"password": "test-password"}
+        rel_id, harness.charm.unit.name, {"password": "test-password"}
     )
     assert harness.charm.get_secret("unit", "password") == "test-password"
 
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_on_get_password_secrets(self, mock1, mock2):
+def test_on_get_password_secrets(harness, mock1, mock2):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Create a mock event and set passwords in peer relation data.
     harness.set_leader()
     mock_event = MagicMock(params={})
@@ -1785,7 +1810,8 @@ def test_on_get_password_secrets(self, mock1, mock2):
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_get_secret_secrets(self, scope, _, __):
+def test_get_secret_secrets(harness, scope, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     harness.set_leader()
 
     assert harness.charm.get_secret(scope, "operator-password") is None
@@ -1794,28 +1820,29 @@ def test_get_secret_secrets(self, scope, _, __):
 
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-def test_set_secret(self, _):
+def test_set_secret(harness, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     harness.set_leader()
 
     # Test application scope.
-    assert "password" not in harness.get_relation_data(self.rel_id, harness.charm.app.name)
+    assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
     harness.charm.set_secret("app", "password", "test-password")
     assert (
-        harness.get_relation_data(self.rel_id, harness.charm.app.name)["password"]
+        harness.get_relation_data(rel_id, harness.charm.app.name)["password"]
         == "test-password"
     )
     harness.charm.set_secret("app", "password", None)
-    assert "password" not in harness.get_relation_data(self.rel_id, harness.charm.app.name)
+    assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
 
     # Test unit scope.
-    assert "password" not in harness.get_relation_data(self.rel_id, harness.charm.unit.name)
+    assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
     harness.charm.set_secret("unit", "password", "test-password")
     assert (
-        harness.get_relation_data(self.rel_id, harness.charm.unit.name)["password"]
+        harness.get_relation_data(rel_id, harness.charm.unit.name)["password"]
         == "test-password"
     )
     harness.charm.set_secret("unit", "password", None)
-    assert "password" not in harness.get_relation_data(self.rel_id, harness.charm.unit.name)
+    assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
     with pytest.raises(RuntimeError):
         harness.charm.set_secret("test", "password", "test")
@@ -1824,7 +1851,8 @@ def test_set_secret(self, _):
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_set_reset_new_secret(self, scope, is_leader, _, __):
+def test_set_reset_new_secret(harness, scope, is_leader, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     """NOTE: currently ops.testing seems to allow for non-leader to set secrets too!"""
     # App has to be leader, unit can be either
     harness.set_leader(is_leader)
@@ -1844,7 +1872,8 @@ def test_set_reset_new_secret(self, scope, is_leader, _, __):
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_invalid_secret(self, scope, is_leader, _, __):
+def test_invalid_secret(harness, scope, is_leader, _, __):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # App has to be leader, unit can be either
     harness.set_leader(is_leader)
 
@@ -1854,52 +1883,52 @@ def test_invalid_secret(self, scope, is_leader, _, __):
     harness.charm.set_secret(scope, "somekey", "")
     assert harness.charm.get_secret(scope, "somekey") is None
 
-@pytest.mark.usefixtures("use_caplog")
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-def test_delete_password(self, _):
+def test_delete_password(harness, caplog, _):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     """NOTE: currently ops.testing seems to allow for non-leader to remove secrets too!"""
     harness.set_leader(True)
     harness.update_relation_data(
-        self.rel_id, harness.charm.app.name, {"replication": "somepw"}
+        rel_id, harness.charm.app.name, {"replication": "somepw"}
     )
     harness.charm.remove_secret("app", "replication")
     assert harness.charm.get_secret("app", "replication") is None
 
     harness.set_leader(False)
     harness.update_relation_data(
-        self.rel_id, harness.charm.unit.name, {"somekey": "somevalue"}
+        rel_id, harness.charm.unit.name, {"somekey": "somevalue"}
     )
     harness.charm.remove_secret("unit", "somekey")
     assert harness.charm.get_secret("unit", "somekey") is None
 
     harness.set_leader(True)
-    with self._caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.ERROR):
         harness.charm.remove_secret("app", "replication")
         assert (
-            "Non-existing field 'replication' was attempted to be removed" in self._caplog.text
+            "Non-existing field 'replication' was attempted to be removed" in caplog.text
         )
 
         harness.charm.remove_secret("unit", "somekey")
-        assert "Non-existing field 'somekey' was attempted to be removed" in self._caplog.text
+        assert "Non-existing field 'somekey' was attempted to be removed" in caplog.text
 
         harness.charm.remove_secret("app", "non-existing-secret")
         assert (
             "Non-existing field 'non-existing-secret' was attempted to be removed"
-            in self._caplog.text
+            in caplog.text
         )
 
         harness.charm.remove_secret("unit", "non-existing-secret")
         assert (
             "Non-existing field 'non-existing-secret' was attempted to be removed"
-            in self._caplog.text
+            in caplog.text
         )
 
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
-@pytest.mark.usefixtures("use_caplog")
-def test_delete_existing_password_secrets(self, _, __):
+def test_delete_existing_password_secrets(harness, caplog, _, __):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     """NOTE: currently ops.testing seems to allow for non-leader to remove secrets too!"""
     harness.set_leader(True)
     harness.charm.set_secret("app", "operator-password", "somepw")
@@ -1912,43 +1941,44 @@ def test_delete_existing_password_secrets(self, _, __):
     assert harness.charm.get_secret("unit", "operator-password") is None
 
     harness.set_leader(True)
-    with self._caplog.at_level(logging.ERROR):
+    with caplog.at_level(logging.ERROR):
         harness.charm.remove_secret("app", "operator-password")
         assert (
             "Non-existing secret operator-password was attempted to be removed."
-            in self._caplog.text
+            in caplog.text
         )
 
         harness.charm.remove_secret("unit", "operator-password")
         assert (
             "Non-existing secret operator-password was attempted to be removed."
-            in self._caplog.text
+            in caplog.text
         )
 
         harness.charm.remove_secret("app", "non-existing-secret")
         assert (
             "Non-existing field 'non-existing-secret' was attempted to be removed"
-            in self._caplog.text
+            in caplog.text
         )
 
         harness.charm.remove_secret("unit", "non-existing-secret")
         assert (
             "Non-existing field 'non-existing-secret' was attempted to be removed"
-            in self._caplog.text
+            in caplog.text
         )
 
 @parameterized.expand([("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_migration_from_databag(self, scope, is_leader, _, __):
+def test_migration_from_databag(harness, scope, is_leader, _, __):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
     # App has to be leader, unit can be either
     harness.set_leader(is_leader)
 
     # Getting current password
     entity = getattr(harness.charm, scope)
-    harness.update_relation_data(self.rel_id, entity.name, {"operator-password": "bla"})
+    harness.update_relation_data(rel_id, entity.name, {"operator-password": "bla"})
     assert harness.charm.get_secret(scope, "operator-password") == "bla"
 
     # Reset new secret
@@ -1956,14 +1986,15 @@ def test_migration_from_databag(self, scope, is_leader, _, __):
     assert harness.charm.model.get_secret(label=f"postgresql.{scope}")
     assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
     assert "operator-password" not in harness.get_relation_data(
-        self.rel_id, getattr(harness.charm, scope).name
+        rel_id, getattr(harness.charm, scope).name
     )
 
 @parameterized.expand([("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
 @patch("charm.PostgresqlOperatorCharm._on_leader_elected")
 @patch("charm.JujuVersion.has_secrets", new_callable=PropertyMock, return_value=True)
-def test_migration_from_single_secret(self, scope, is_leader, _, __):
+def test_migration_from_single_secret(harness, scope, is_leader, _, __):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
     # App has to be leader, unit can be either
     harness.set_leader(is_leader)
@@ -1973,7 +2004,7 @@ def test_migration_from_single_secret(self, scope, is_leader, _, __):
     # Getting current password
     entity = getattr(harness.charm, scope)
     harness.update_relation_data(
-        self.rel_id, entity.name, {SECRET_INTERNAL_LABEL: secret.id}
+        rel_id, entity.name, {SECRET_INTERNAL_LABEL: secret.id}
     )
     assert harness.charm.get_secret(scope, "operator-password") == "bla"
 
@@ -1987,7 +2018,7 @@ def test_migration_from_single_secret(self, scope, is_leader, _, __):
     assert harness.charm.model.get_secret(label=f"postgresql.{scope}")
     assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
     assert SECRET_INTERNAL_LABEL not in harness.get_relation_data(
-        self.rel_id, getattr(harness.charm, scope).name
+        rel_id, getattr(harness.charm, scope).name
     )
 
 @patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock")
@@ -1996,8 +2027,9 @@ def test_migration_from_single_secret(self, scope, is_leader, _, __):
 @patch("charm.PostgresqlOperatorCharm._unit_ip")
 @patch("charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock)
 def test_handle_postgresql_restart_need(
-    self, _is_tls_enabled, _, _reload_patroni_configuration, __, _restart
+    harness, _is_tls_enabled, _, _reload_patroni_configuration, __, _restart
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
         for values in itertools.product(
             [True, False], [True, False], [True, False], [True, False], [True, False]
@@ -2006,10 +2038,10 @@ def test_handle_postgresql_restart_need(
             _restart.reset_mock()
             with harness.hooks_disabled():
                 harness.update_relation_data(
-                    self.rel_id, harness.charm.unit.name, {"tls": ""}
+                    rel_id, harness.charm.unit.name, {"tls": ""}
                 )
                 harness.update_relation_data(
-                    self.rel_id,
+                    rel_id,
                     harness.charm.unit.name,
                     {"postgresql_restarted": ("True" if values[4] else "")},
                 )
@@ -2020,20 +2052,19 @@ def test_handle_postgresql_restart_need(
 
             harness.charm._handle_postgresql_restart_need(values[0])
             _reload_patroni_configuration.assert_called_once()
-            (
-                assert "tls" in harness.get_relation_data(self.rel_id, harness.charm.unit)
-                if values[0]
-                else assert "tls" not in harness.get_relation_data(self.rel_id, harness.charm.unit)
-            )
+            if values[0]:
+                assert "tls" in harness.get_relation_data(rel_id, harness.charm.unit)
+            else:
+                assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit)
+            
             if (values[1] != values[2]) or values[3]:
-                assert "postgresql_restarted" not in harness.get_relation_data(self.rel_id, harness.charm.unit)
+                assert "postgresql_restarted" not in harness.get_relation_data(rel_id, harness.charm.unit)
                 _restart.assert_called_once()
             else:
-                (
-                    assert "postgresql_restarted" in harness.get_relation_data(self.rel_id, harness.charm.unit)
-                    if values[4]
-                    else assert "postgresql_restarted" not in harness.get_relation_data(self.rel_id, harness.charm.unit)
-                )
+                if values[4]:
+                    assert "postgresql_restarted" in harness.get_relation_data(rel_id, harness.charm.unit)
+                else:
+                    assert "postgresql_restarted" not in harness.get_relation_data(rel_id, harness.charm.unit)
                 _restart.assert_not_called()
 
 @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
@@ -2047,7 +2078,7 @@ def test_handle_postgresql_restart_need(
 @patch("charm.PostgresqlOperatorCharm._unit_ip")
 @patch("charm.Patroni.get_member_ip")
 def test_on_peer_relation_departed(
-    self,
+    harness,
     _get_member_ip,
     _unit_ip,
     _remove_raft_member,
@@ -2059,6 +2090,7 @@ def test_on_peer_relation_departed(
     _primary_endpoint,
     _update_relation_endpoints,
 ):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the current unit is the departing unit.
     harness.charm.unit.status = ActiveStatus()
     event = Mock()
@@ -2126,7 +2158,7 @@ def test_on_peer_relation_departed(
     _updated_synchronous_node_count.return_value = False
     with harness.hooks_disabled():
         harness.update_relation_data(
-            self.rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
+            rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
         )
     harness.charm._on_peer_relation_departed(event)
     _remove_raft_member.assert_called_once_with(mock_ip_address)
@@ -2142,7 +2174,7 @@ def test_on_peer_relation_departed(
     _remove_raft_member.reset_mock()
     event.defer.reset_mock()
     _updated_synchronous_node_count.reset_mock()
-    harness.add_relation_unit(self.rel_id, f"{harness.charm.app.name}/2")
+    harness.add_relation_unit(rel_id, f"{harness.charm.app.name}/2")
     harness.charm._on_peer_relation_departed(event)
     _remove_raft_member.assert_called_once_with(mock_ip_address)
     event.defer.assert_called_once()
@@ -2224,7 +2256,8 @@ def test_on_peer_relation_departed(
 
 @patch("charm.PostgresqlOperatorCharm._update_relation_endpoints")
 @patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock)
-def test_update_new_unit_status(self, _primary_endpoint, _update_relation_endpoints):
+def test_update_new_unit_status(harness, _primary_endpoint, _update_relation_endpoints):
+    rel_id = harness.add_relation(PEER, harness.charm.app.name)
     # Test when the charm is blocked.
     _primary_endpoint.return_value = "endpoint"
     harness.charm.unit.status = BlockedStatus("fake blocked status")
