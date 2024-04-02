@@ -1,0 +1,82 @@
+[32mINFO    [0m integration.test_backups:test_backups.py:77 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  02:18:51Z
+
+App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql-gcp            14.11    active      2  postgresql                                 1  no       
+s3-integrator                      active      1  s3-integrator             latest/stable   13  no       
+self-signed-certificates           active      1  self-signed-certificates  latest/stable   72  no       
+
+Unit                         Workload  Agent      Machine  Public address  Ports     Message
+postgresql-gcp/0*            active    idle       5        10.212.220.161  5432/tcp  
+postgresql-gcp/1             active    executing  6        10.212.220.129  5432/tcp  
+s3-integrator/0*             active    idle       0        10.212.220.251            
+self-signed-certificates/0*  active    idle       1        10.212.220.73             
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.212.220.251  juju-95d729-0  ubuntu@22.04      Running
+1        started  10.212.220.73   juju-95d729-1  ubuntu@22.04      Running
+5        started  10.212.220.161  juju-95d729-5  ubuntu@22.04      Running
+6        started  10.212.220.129  juju-95d729-6  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-0: 01:31:32 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:31:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-s3-integrator-0: 01:31:32 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:31:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:31:39 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:31:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:49 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-3: 01:31:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-1: 01:31:49 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:31:53 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:53 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:53 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-aws-0: 01:31:53 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing secret cauth was attempted to be removed.
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Can't update secret for relation 3
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing field 'cauth' was attempted to be removed from the databag (relation ID: 3)
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing secret cert was attempted to be removed.
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Can't update secret for relation 3
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing field 'cert' was attempted to be removed from the databag (relation ID: 3)
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing secret chain was attempted to be removed.
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Can't update secret for relation 3
+unit-postgresql-aws-0: 01:47:33 ERROR unit.postgresql-aws/0.juju-log certificates:5: Non-existing field 'chain' was attempted to be removed from the databag (relation ID: 3)
+machine-4: 01:53:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:53:13 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:53:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-2: 01:53:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:58:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:58:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:58:59 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-gcp-0: 01:58:59 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:59:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:59:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:59:00 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-gcp-1: 01:59:00 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-gcp-0: 02:16:39 ERROR unit.postgresql-gcp/0.juju-log RetryError[<Future at 0x7fa13a38a980 state=finished raised Exception>]
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/backups.py", line 447, in check_stanza
+    raise Exception(stderr)
+Exception: WARN: unable to check pg2: [HostConnectError] unable to connect to '10.212.220.129:8432': [111] Connection refused
+          [HostConnectError] on 12 retries from 100-60000ms: unable to connect to '10.212.220.129:8432': [111] Connection refused
+ERROR: [049]: unable to connect to '10.212.220.129:8432': [111] Connection refused
+           [HostConnectError] on 12 retries from 101-60000ms: unable to connect to '10.212.220.129:8432': [111] Connection refused
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/src/backups.py", line 436, in check_stanza
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/tenacity/__init__.py", line 347, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-0/charm/venv/tenacity/__init__.py", line 326, in iter
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7fa13a38a980 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...
