@@ -147,92 +147,95 @@ def test_patroni_scrape_config_no_tls(harness):
     ]
 
 @patch_network_get(private_address="1.1.1.1")
-@patch(
-    "charm.PostgresqlOperatorCharm.is_tls_enabled",
-    return_value=True,
-    new_callable=PropertyMock,
-)
-def test_patroni_scrape_config_tls(harness, _):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    result = harness.charm.patroni_scrape_config()
+def test_patroni_scrape_config_tls(harness):
+    with patch(
+        "charm.PostgresqlOperatorCharm.is_tls_enabled",
+        return_value=True,
+        new_callable=PropertyMock,
+    ):
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        result = harness.charm.patroni_scrape_config()
 
-    assert result == [
-        {
-            "metrics_path": "/metrics",
-            "scheme": "https",
-            "static_configs": [{"targets": ["1.1.1.1:8008"]}],
-            "tls_config": {"insecure_skip_verify": True},
-        },
-    ]
+        assert result == [
+            {
+                "metrics_path": "/metrics",
+                "scheme": "https",
+                "static_configs": [{"targets": ["1.1.1.1:8008"]}],
+                "tls_config": {"insecure_skip_verify": True},
+            },
+        ]
 
-@patch(
-    "charm.PostgresqlOperatorCharm._units_ips",
-    new_callable=PropertyMock,
-    return_value={"1.1.1.1", "1.1.1.2"},
-)
-@patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-def test_primary_endpoint(harness, _patroni, _):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
-    _patroni.return_value.get_primary.return_value = sentinel.primary
-    assert harness.charm.primary_endpoint == "1.1.1.1"
+def test_primary_endpoint(harness):
+    with patch(
+        "charm.PostgresqlOperatorCharm._units_ips",
+        new_callable=PropertyMock,
+        return_value={"1.1.1.1", "1.1.1.2"},
+    ), patch(
+        "charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock
+    ) as _patroni:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
+        _patroni.return_value.get_primary.return_value = sentinel.primary
+        assert harness.charm.primary_endpoint == "1.1.1.1"
 
-    _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
-    _patroni.return_value.get_primary.assert_called_once_with()
+        _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
+        _patroni.return_value.get_primary.assert_called_once_with()
 
-@patch("charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None)
-@patch(
-    "charm.PostgresqlOperatorCharm._units_ips",
-    new_callable=PropertyMock,
-    return_value={"1.1.1.1", "1.1.1.2"},
-)
-@patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock)
-def test_primary_endpoint_no_peers(harness, _patroni, _, __):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    assert harness.charm.primary_endpoint is None
+def test_primary_endpoint_no_peers(harness):
+    with patch(
+        "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None
+    ), patch(
+        "charm.PostgresqlOperatorCharm._units_ips",
+        new_callable=PropertyMock,
+        return_value={"1.1.1.1", "1.1.1.2"},
+    ), patch(
+        "charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock
+    ) as _patroni:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        assert harness.charm.primary_endpoint is None
 
-    assert not _patroni.return_value.get_member_ip.called
-    assert not _patroni.return_value.get_primary.called
+        assert not _patroni.return_value.get_member_ip.called
+        assert not _patroni.return_value.get_primary.called
 
-@patch("charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock)
-@patch(
-    "charm.PostgresqlOperatorCharm.primary_endpoint",
-    new_callable=PropertyMock,
-)
-@patch("charm.PostgresqlOperatorCharm.update_config")
 @patch_network_get(private_address="1.1.1.1")
-def test_on_leader_elected(
-    harness, _update_config, _primary_endpoint, _update_relation_endpoints
-):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    # Assert that there is no password in the peer relation.
-    assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) == None
+def test_on_leader_elected(harness):
+    with patch(
+        "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
+    ) as _update_relation_endpoints, patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock,
+    ) as _primary_endpoint, patch(
+        "charm.PostgresqlOperatorCharm.update_config"
+    ) as _update_config:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        # Assert that there is no password in the peer relation.
+        assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) == None
 
-    # Check that a new password was generated on leader election.
-    _primary_endpoint.return_value = "1.1.1.1"
-    harness.set_leader()
-    password = harness.charm._peers.data[harness.charm.app].get("operator-password", None)
-    _update_config.assert_called_once()
-    _update_relation_endpoints.assert_not_called()
-    assert password != None
+        # Check that a new password was generated on leader election.
+        _primary_endpoint.return_value = "1.1.1.1"
+        harness.set_leader()
+        password = harness.charm._peers.data[harness.charm.app].get("operator-password", None)
+        _update_config.assert_called_once()
+        _update_relation_endpoints.assert_not_called()
+        assert password != None
 
-    # Mark the cluster as initialised.
-    harness.charm._peers.data[harness.charm.app].update({"cluster_initialised": "True"})
+        # Mark the cluster as initialised.
+        harness.charm._peers.data[harness.charm.app].update({"cluster_initialised": "True"})
 
-    # Trigger a new leader election and check that the password is still the same
-    # and also that update_endpoints was called after the cluster was initialised.
-    harness.set_leader(False)
-    harness.set_leader()
-    assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) == password
-    _update_relation_endpoints.assert_called_once()
-    assert not (isinstance(harness.model.unit.status, BlockedStatus))
+        # Trigger a new leader election and check that the password is still the same
+        # and also that update_endpoints was called after the cluster was initialised.
+        harness.set_leader(False)
+        harness.set_leader()
+        assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) == password
+        _update_relation_endpoints.assert_called_once()
+        assert not (isinstance(harness.model.unit.status, BlockedStatus))
 
-    # Check for a WaitingStatus when the primary is not reachable yet.
-    _primary_endpoint.return_value = None
-    harness.set_leader(False)
-    harness.set_leader()
-    _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
-    assert (isinstance(harness.model.unit.status, WaitingStatus))
+        # Check for a WaitingStatus when the primary is not reachable yet.
+        _primary_endpoint.return_value = None
+        harness.set_leader(False)
+        harness.set_leader()
+        _update_relation_endpoints.assert_called_once()  # Assert it was not called again.
+        assert (isinstance(harness.model.unit.status, WaitingStatus))
 
 def test_is_cluster_initialised(harness):
     rel_id = harness.add_relation(PEER, harness.charm.app.name)
@@ -246,88 +249,88 @@ def test_is_cluster_initialised(harness):
         )
     assert (harness.charm.is_cluster_initialised)
 
-@patch("charm.PostgresqlOperatorCharm._validate_config_options")
-@patch("charm.PostgresqlOperatorCharm.update_config")
-@patch("relations.db.DbProvides.set_up_relation")
-@patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
-@patch("charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock)
-def test_on_config_changed(
-    harness,
-    _is_cluster_initialised,
-    _enable_disable_extensions,
-    _set_up_relation,
-    _update_config,
-    _validate_config_options,
-):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    # Test when the cluster was not initialised yet.
-    _is_cluster_initialised.return_value = False
-    harness.charm.on.config_changed.emit()
-    _enable_disable_extensions.assert_not_called()
-    _set_up_relation.assert_not_called()
+def test_on_config_changed(harness):
+    with patch(
+        "charm.PostgresqlOperatorCharm._validate_config_options"
+    ) as _validate_config_options, patch(
+        "charm.PostgresqlOperatorCharm.update_config"
+    ) as _update_config, patch(
+        "relations.db.DbProvides.set_up_relation"
+    ) as _set_up_relation, patch(
+        "charm.PostgresqlOperatorCharm.enable_disable_extensions"
+    ) as _enable_disable_extensions, patch(
+        "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
+    ) as _is_cluster_initialised:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
+        # Test when the cluster was not initialised yet.
+        _is_cluster_initialised.return_value = False
+        harness.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
 
-    # Test when the unit is not the leader.
-    _is_cluster_initialised.return_value = True
-    harness.charm.on.config_changed.emit()
-    _validate_config_options.assert_called_once()
-    _enable_disable_extensions.assert_not_called()
-    _set_up_relation.assert_not_called()
+        # Test when the unit is not the leader.
+        _is_cluster_initialised.return_value = True
+        harness.charm.on.config_changed.emit()
+        _validate_config_options.assert_called_once()
+        _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
 
-    # Test unable to connect to db
-    _update_config.reset_mock()
-    _validate_config_options.side_effect = OperationalError
-    harness.charm.on.config_changed.emit()
-    assert not _update_config.called
-    _validate_config_options.side_effect = None
+        # Test unable to connect to db
+        _update_config.reset_mock()
+        _validate_config_options.side_effect = OperationalError
+        harness.charm.on.config_changed.emit()
+        assert not _update_config.called
+        _validate_config_options.side_effect = None
 
-    # Test after the cluster was initialised.
-    with harness.hooks_disabled():
-        harness.set_leader()
-    harness.charm.on.config_changed.emit()
-    _enable_disable_extensions.assert_called_once()
-    _set_up_relation.assert_not_called()
+        # Test after the cluster was initialised.
+        with harness.hooks_disabled():
+            harness.set_leader()
+        harness.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_not_called()
 
-    # Test when the unit is in a blocked state due to extensions request,
-    # but there are no established legacy relations.
-    _enable_disable_extensions.reset_mock()
-    harness.charm.unit.status = BlockedStatus(
-        "extensions requested through relation, enable them through config options"
-    )
-    harness.charm.on.config_changed.emit()
-    _enable_disable_extensions.assert_called_once()
-    _set_up_relation.assert_not_called()
+        # Test when the unit is in a blocked state due to extensions request,
+        # but there are no established legacy relations.
+        _enable_disable_extensions.reset_mock()
+        harness.charm.unit.status = BlockedStatus(
+            "extensions requested through relation, enable them through config options"
+        )
+        harness.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_not_called()
 
-    # Test when the unit is in a blocked state due to extensions request,
-    # but there are established legacy relations.
-    _enable_disable_extensions.reset_mock()
-    _set_up_relation.return_value = False
-    db_relation_id = harness.add_relation("db", "application")
-    harness.charm.on.config_changed.emit()
-    _enable_disable_extensions.assert_called_once()
-    _set_up_relation.assert_called_once()
-    harness.remove_relation(db_relation_id)
+        # Test when the unit is in a blocked state due to extensions request,
+        # but there are established legacy relations.
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.return_value = False
+        db_relation_id = harness.add_relation("db", "application")
+        harness.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
+        harness.remove_relation(db_relation_id)
 
-    _enable_disable_extensions.reset_mock()
-    _set_up_relation.reset_mock()
-    harness.add_relation("db-admin", "application")
-    harness.charm.on.config_changed.emit()
-    _enable_disable_extensions.assert_called_once()
-    _set_up_relation.assert_called_once()
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.reset_mock()
+        harness.add_relation("db-admin", "application")
+        harness.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
 
-    # Test when  there are established legacy relations,
-    # but the charm fails to set up one of them.
-    _enable_disable_extensions.reset_mock()
-    _set_up_relation.reset_mock()
-    _set_up_relation.return_value = False
-    harness.add_relation("db", "application")
-    harness.charm.on.config_changed.emit()
-    _enable_disable_extensions.assert_called_once()
-    _set_up_relation.assert_called_once()
+        # Test when  there are established legacy relations,
+        # but the charm fails to set up one of them.
+        _enable_disable_extensions.reset_mock()
+        _set_up_relation.reset_mock()
+        _set_up_relation.return_value = False
+        harness.add_relation("db", "application")
+        harness.charm.on.config_changed.emit()
+        _enable_disable_extensions.assert_called_once()
+        _set_up_relation.assert_called_once()
 
-@patch("subprocess.check_output", return_value=b"C")
-def test_check_extension_dependencies(harness, _):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as _:
+def test_check_extension_dependencies(harness):
+    with patch("subprocess.check_output", return_value=b"C"), patch.object(
+        PostgresqlOperatorCharm, "postgresql", Mock()
+    ):
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
         # Test when plugins dependencies exception is not caused
         config = {
             "plugin_address_standardizer_enable": False,
@@ -351,10 +354,11 @@ def test_check_extension_dependencies(harness, _):
         assert (isinstance(harness.model.unit.status, BlockedStatus))
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
 
-@patch("subprocess.check_output", return_value=b"C")
-def test_enable_disable_extensions(harness, caplog, _):
-    rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+def test_enable_disable_extensions(harness, caplog):
+    with patch("subprocess.check_output", return_value=b"C"), patch.object(
+        PostgresqlOperatorCharm, "postgresql", Mock()
+    ) as postgresql_mock:
+        rel_id = harness.add_relation(PEER, harness.charm.app.name)
         # Test when all extensions install/uninstall succeed.
         postgresql_mock.enable_disable_extension.side_effect = None
         with caplog.at_level(logging.ERROR):
@@ -370,172 +374,171 @@ def test_enable_disable_extensions(harness, caplog, _):
         with caplog.at_level(logging.ERROR):
             harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
-            assert "failed to change plugins" in [rec.message for rec in caplog.records]
+            assert "failed to change plugins: " in caplog.text
 
         # Test when one config option should be skipped (because it's not related
         # to a plugin/extension).
         postgresql_mock.reset_mock()
         postgresql_mock.enable_disable_extensions.side_effect = None
         with caplog.at_level(logging.ERROR):
-            assert len(caplog.records) == 0
             config = """options:
-plugin_citext_enable:
-default: false
-type: boolean
-plugin_hstore_enable:
-default: false
-type: boolean
-plugin_pg_trgm_enable:
-default: false
-type: boolean
-plugin_plpython3u_enable:
-default: false
-type: boolean
-plugin_unaccent_enable:
-default: false
-type: boolean
-plugin_debversion_enable:
-default: false
-type: boolean
-plugin_bloom_enable:
-default: false
-type: boolean
-plugin_btree_gin_enable:
-default: false
-type: boolean
-plugin_btree_gist_enable:
-default: false
-type: boolean
-plugin_cube_enable:
-default: false
-type: boolean
-plugin_dict_int_enable:
-default: false
-type: boolean
-plugin_dict_xsyn_enable:
-default: false
-type: boolean
-plugin_earthdistance_enable:
-default: false
-type: boolean
-plugin_fuzzystrmatch_enable:
-default: false
-type: boolean
-plugin_intarray_enable:
-default: false
-type: boolean
-plugin_isn_enable:
-default: false
-type: boolean
-plugin_lo_enable:
-default: false
-type: boolean
-plugin_ltree_enable:
-default: false
-type: boolean
-plugin_old_snapshot_enable:
-default: false
-type: boolean
-plugin_pg_freespacemap_enable:
-default: false
-type: boolean
-plugin_pgrowlocks_enable:
-default: false
-type: boolean
-plugin_pgstattuple_enable:
-default: false
-type: boolean
-plugin_pg_visibility_enable:
-default: false
-type: boolean
-plugin_seg_enable:
-default: false
-type: boolean
-plugin_tablefunc_enable:
-default: false
-type: boolean
-plugin_tcn_enable:
-default: false
-type: boolean
-plugin_tsm_system_rows_enable:
-default: false
-type: boolean
-plugin_tsm_system_time_enable:
-default: false
-type: boolean
-plugin_uuid_ossp_enable:
-default: false
-type: boolean
-plugin_spi_enable:
-default: false
-type: boolean
-plugin_bool_plperl_enable:
-default: false
-type: boolean
-plugin_hll_enable:
-default: false
-type: boolean
-plugin_hypopg_enable:
-default: false
-type: boolean
-plugin_ip4r_enable:
-default: false
-type: boolean
-plugin_plperl_enable:
-default: false
-type: boolean
-plugin_jsonb_plperl_enable:
-default: false
-type: boolean
-plugin_orafce_enable:
-default: false
-type: boolean
-plugin_pg_similarity_enable:
-default: false
-type: boolean
-plugin_prefix_enable:
-default: false
-type: boolean
-plugin_rdkit_enable:
-default: false
-type: boolean
-plugin_tds_fdw_enable:
-default: false
-type: boolean
-plugin_icu_ext_enable:
-default: false
-type: boolean
-plugin_pltcl_enable:
-default: false
-type: boolean
-plugin_postgis_enable:
-default: false
-type: boolean
-plugin_postgis_raster_enable:
-default: false
-type: boolean
-plugin_address_standardizer_enable:
-default: false
-type: boolean
-plugin_address_standardizer_data_us_enable:
-default: false
-type: boolean
-plugin_postgis_tiger_geocoder_enable:
-default: false
-type: boolean
-plugin_postgis_topology_enable:
-default: false
-type: boolean
-plugin_vector_enable:
-default: false
-type: boolean
-profile:
-default: production
-type: string"""
-            harness = Harness(PostgresqlOperatorCharm, config=config)
-            harness.cleanup()
-            harness.begin()
-            harness.charm.enable_disable_extensions()
+  plugin_citext_enable:
+    default: false
+    type: boolean
+  plugin_hstore_enable:
+    default: false
+    type: boolean
+  plugin_pg_trgm_enable:
+    default: false
+    type: boolean
+  plugin_plpython3u_enable:
+    default: false
+    type: boolean
+  plugin_unaccent_enable:
+    default: false
+    type: boolean
+  plugin_debversion_enable:
+    default: false
+    type: boolean
+  plugin_bloom_enable:
+    default: false
+    type: boolean
+  plugin_btree_gin_enable:
+    default: false
+    type: boolean
+  plugin_btree_gist_enable:
+    default: false
+    type: boolean
+  plugin_cube_enable:
+    default: false
+    type: boolean
+  plugin_dict_int_enable:
+    default: false
+    type: boolean
+  plugin_dict_xsyn_enable:
+    default: false
+    type: boolean
+  plugin_earthdistance_enable:
+    default: false
+    type: boolean
+  plugin_fuzzystrmatch_enable:
+    default: false
+    type: boolean
+  plugin_intarray_enable:
+    default: false
+    type: boolean
+  plugin_isn_enable:
+    default: false
+    type: boolean
+  plugin_lo_enable:
+    default: false
+    type: boolean
+  plugin_ltree_enable:
+    default: false
+    type: boolean
+  plugin_old_snapshot_enable:
+    default: false
+    type: boolean
+  plugin_pg_freespacemap_enable:
+    default: false
+    type: boolean
+  plugin_pgrowlocks_enable:
+    default: false
+    type: boolean
+  plugin_pgstattuple_enable:
+    default: false
+    type: boolean
+  plugin_pg_visibility_enable:
+    default: false
+    type: boolean
+  plugin_seg_enable:
+    default: false
+    type: boolean
+  plugin_tablefunc_enable:
+    default: false
+    type: boolean
+  plugin_tcn_enable:
+    default: false
+    type: boolean
+  plugin_tsm_system_rows_enable:
+    default: false
+    type: boolean
+  plugin_tsm_system_time_enable:
+    default: false
+    type: boolean
+  plugin_uuid_ossp_enable:
+    default: false
+    type: boolean
+  plugin_spi_enable:
+    default: false
+    type: boolean
+  plugin_bool_plperl_enable:
+    default: false
+    type: boolean
+  plugin_hll_enable:
+    default: false
+    type: boolean
+  plugin_hypopg_enable:
+    default: false
+    type: boolean
+  plugin_ip4r_enable:
+    default: false
+    type: boolean
+  plugin_plperl_enable:
+    default: false
+    type: boolean
+  plugin_jsonb_plperl_enable:
+    default: false
+    type: boolean
+  plugin_orafce_enable:
+    default: false
+    type: boolean
+  plugin_pg_similarity_enable:
+    default: false
+    type: boolean
+  plugin_prefix_enable:
+    default: false
+    type: boolean
+  plugin_rdkit_enable:
+    default: false
+    type: boolean
+  plugin_tds_fdw_enable:
+    default: false
+    type: boolean
+  plugin_icu_ext_enable:
+    default: false
+    type: boolean
+  plugin_pltcl_enable:
+    default: false
+    type: boolean
+  plugin_postgis_enable:
+    default: false
+    type: boolean
+  plugin_postgis_raster_enable:
+    default: false
+    type: boolean
+  plugin_address_standardizer_enable:
+    default: false
+    type: boolean
+  plugin_address_standardizer_data_us_enable:
+    default: false
+    type: boolean
+  plugin_postgis_tiger_geocoder_enable:
+    default: false
+    type: boolean
+  plugin_postgis_topology_enable:
+    default: false
+    type: boolean
+  plugin_vector_enable:
+    default: false
+    type: boolean
+  profile:
+    default: production
+    type: string"""
+            new_harness = Harness(PostgresqlOperatorCharm, config=config)
+            new_harness.cleanup()
+            new_harness.begin()
+            new_harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
 
 @patch("charm.PostgresqlOperatorCharm.enable_disable_extensions")
