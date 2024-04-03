@@ -478,6 +478,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             # Update the members of the cluster in the Patroni configuration on this unit.
             self.update_config()
+            if self._patroni.cluster_system_id_mismatch(unit_name=self.unit.name):
+                self.unit.status = BlockedStatus(
+                    "Failed to start postgresql. The storage belongs to a third-party cluster"
+                )
+                return
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
             return

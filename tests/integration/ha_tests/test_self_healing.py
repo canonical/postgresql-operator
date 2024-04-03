@@ -57,6 +57,7 @@ from .helpers import (
     validate_test_data,
     wait_network_restore,
 )
+from .test_restore_cluster import SECOND_APPLICATION
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +80,15 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
-                num_units=3,
+                num_units=1,
+                series=CHARM_SERIES,
+                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+                config={"profile": "testing"},
+            )
+            await ops_test.model.deploy(
+                charm,
+                num_units=1,
+                application_name=SECOND_APPLICATION,
                 series=CHARM_SERIES,
                 storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
                 config={"profile": "testing"},
@@ -552,10 +561,9 @@ async def test_network_cut_without_ip_change(
 
 
 @pytest.mark.group(1)
-async def test_deploy_zero_units(ops_test: OpsTest):
+async def test_deploy_zero_units(ops_test: OpsTest, charm):
     """Scale the database to zero units and scale up again."""
     app = await app_name(ops_test)
-
     dbname = f"{APPLICATION_NAME.replace('-', '_')}_first_database"
     connection_string, _ = await get_db_connection(ops_test, dbname=dbname)
 
@@ -577,12 +585,20 @@ async def test_deploy_zero_units(ops_test: OpsTest):
         unit_ip_addresses.append(await get_unit_ip(ops_test, unit.name))
 
         # Save detached storage ID
-        if await unit.is_leader_from_status:
+        if await unit.is_leader_from_status():
             primary_storage = storage_id(ops_test, unit.name)
+
+    logger.info(f"get storage id app: {SECOND_APPLICATION}")
+    second_storage = ""
+    for unit in ops_test.model.applications[SECOND_APPLICATION].units:
+        if await unit.is_leader_from_status():
+            second_storage = storage_id(ops_test, unit.name)
+            break
 
     # Scale the database to zero units.
     logger.info("scaling database to zero units")
     await scale_application(ops_test, app, 0)
+    await scale_application(ops_test, SECOND_APPLICATION, 0)
 
     # Checking shutdown units.
     for unit_ip in unit_ip_addresses:
@@ -599,10 +615,25 @@ async def test_deploy_zero_units(ops_test: OpsTest):
     # Scale up to one unit.
     logger.info("scaling database to one unit")
     await add_unit_with_storage(ops_test, app=app, storage=primary_storage)
-    await ops_test.model.wait_for_idle(status="active", timeout=1500)
+    await ops_test.model.wait_for_idle(
+        apps=[APP_NAME, APPLICATION_NAME], status="active", timeout=1500
+    )
 
     connection_string, _ = await get_db_connection(ops_test, dbname=dbname)
     logger.info("checking whether writes are increasing")
+    await are_writes_increasing(ops_test)
+
+    logger.info("check test database data")
+    await validate_test_data(connection_string)
+
+    logger.info("database scaling up to two units using third-party cluster storage")
+    new_unit = await add_unit_with_storage(
+        ops_test, app=app, storage=second_storage, is_blocked=True
+    )
+
+    logger.info(f"remove unit {new_unit.name} with storage from application {SECOND_APPLICATION}")
+    await ops_test.model.destroy_units(new_unit.name)
+
     await are_writes_increasing(ops_test)
 
     logger.info("check test database data")

@@ -4,6 +4,7 @@
 
 """Helper class used to manage cluster lifecycle."""
 
+import glob
 import logging
 import os
 import pwd
@@ -647,3 +648,39 @@ class Patroni:
                 # Check whether the update was unsuccessful.
                 if r.status_code != 200:
                     raise UpdateSyncNodeCountError(f"received {r.status_code}")
+
+    def cluster_system_id_mismatch(self, unit_name: str) -> bool:
+        """Check if the Patroni service is down.
+
+        If there is the error storage belongs to third-party cluster in its logs.
+
+        Returns:
+            "True" if an error occurred due to the fact that the storage belongs to someone else's cluster.
+        """
+        last_log_file = self._last_patroni_log_file()
+        unit_name = unit_name.replace("/", "-")
+        if (
+            f" CRITICAL: system ID mismatch, node {unit_name} belongs to a different cluster:"
+            in last_log_file
+        ):
+            return True
+        return False
+
+    def _last_patroni_log_file(self) -> str:
+        """Get last log file content of Patroni service.
+
+        If there is no available log files, empty line will be returned.
+
+        Returns:
+            Content of last log file of Patroni service.
+        """
+        log_files = glob.glob(f"{PATRONI_LOGS_PATH}/*.log")
+        if len(log_files) == 0:
+            return ""
+        latest_file = max(log_files, key=os.path.getmtime)
+        try:
+            with open(latest_file) as last_log_file:
+                return last_log_file.read()
+        except OSError as e:
+            logger.exception("Failed to read last patroni log file", exc_info=e)
+            return ""
