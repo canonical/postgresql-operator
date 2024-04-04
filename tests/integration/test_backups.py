@@ -354,7 +354,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
             assert restore_status, "restore hasn't succeeded"
 
     # Wait for the restore to complete.
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval="60s"):
         await wait_for_idle_on_blocked(
             ops_test,
             database_app_name,
