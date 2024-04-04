@@ -1501,11 +1501,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
         })
 
-        try:
-            self._handle_postgresql_restart_need(enable_tls)
-        except RetryError:
-            logger.warning("Early exit update_config: Cannot handle restrt need")
-            return False
+        self._handle_postgresql_restart_need(enable_tls)
 
         # Restart the monitoring service if the password was rotated
         cache = snap.SnapCache()
