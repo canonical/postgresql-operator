@@ -9,6 +9,8 @@ import logging
 import os
 import platform
 import subprocess
+import sys
+from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, get_args
 
 import psycopg2
@@ -105,6 +107,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        # Support for disabling the operator.
+        disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
+        if disable_file.exists():
+            logger.warning(
+                f"\n\tDisable file `{disable_file.resolve()}` found, the charm will skip all events."
+                "\n\tTo resume normal operations, please remove the file."
+            )
+            self.unit.status = BlockedStatus("Disabled")
+            sys.exit(0)
 
         self.peer_relation_app = DataPeer(
             self,
@@ -1489,7 +1501,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
         })
 
-        self._handle_postgresql_restart_need(enable_tls)
+        try:
+            self._handle_postgresql_restart_need(enable_tls)
+        except RetryError:
+            logger.warning("Early exit update_config: Cannot handle restrt need")
+            return False
 
         # Restart the monitoring service if the password was rotated
         cache = snap.SnapCache()
