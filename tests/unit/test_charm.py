@@ -47,8 +47,8 @@ def harness():
     harness.cleanup()
 
 
-# This causes every test defined in this file will run 2 times, with
-# the patch of charm.JujuVersion.has_secrets set as True and as False
+# This causes every test defined in this file to run 2 times, each with
+# charm.JujuVersion.has_secrets set as True or as False
 @pytest.fixture(params=[True, False], autouse=True)
 def _has_secrets(request, monkeypatch):
     monkeypatch.setattr("charm.JujuVersion.has_secrets", PropertyMock(return_value=request.param))
