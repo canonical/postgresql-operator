@@ -92,11 +92,8 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
+async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
-    # Build the PostgreSQL charm.
-    charm = await ops_test.build_charm(".")
-
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME)
     await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL)
@@ -284,9 +281,8 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
 
 @pytest.mark.group(1)
-async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None:
+async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
-    charm = await ops_test.build_charm(".")
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(charm, application_name=previous_database_app_name)
