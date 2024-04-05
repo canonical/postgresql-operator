@@ -1390,7 +1390,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
-        return self.update_config()
+        try:
+            return self.update_config()
+        except Exception:
+            logger.exception("TLS files failed to push. Error in config update")
+            return False
 
     def _reboot_on_detached_storage(self, event: EventBase) -> None:
         """Reboot on detached storage.
