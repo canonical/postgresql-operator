@@ -16,11 +16,13 @@ from ..relations.helpers import get_legacy_db_connection_str
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-MAILMAN3_CORE_APP_NAME = "mailman3-core"
+# MAILMAN3_CORE_APP_NAME = "mailman3-core"
 DB_RELATION = "db"
 DATABASE_RELATION = "database"
 FIRST_DATABASE_RELATION = "first-database"
-APP_NAMES = [APP_NAME, APPLICATION_APP_NAME, MAILMAN3_CORE_APP_NAME]
+DATABASE_APP_NAME = "database-app"
+DB_APP_NAME = "db-app"
+APP_NAMES = [APP_NAME, DATABASE_APP_NAME, DB_APP_NAME]
 
 
 @pytest.mark.group(1)
@@ -33,7 +35,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
         await asyncio.gather(
             ops_test.model.deploy(
                 APPLICATION_APP_NAME,
-                application_name=APPLICATION_APP_NAME,
+                application_name=DATABASE_APP_NAME,
                 num_units=1,
                 series=CHARM_SERIES,
                 channel="edge",
@@ -43,14 +45,18 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 application_name=APP_NAME,
                 num_units=1,
                 series=CHARM_SERIES,
-                config={"profile": "testing"},
+                config={
+                    "profile": "testing",
+                    "plugin_unaccent_enable": "True",
+                    "plugin_pg_trgm_enable": "True",
+                },
             ),
             ops_test.model.deploy(
-                MAILMAN3_CORE_APP_NAME,
-                application_name=MAILMAN3_CORE_APP_NAME,
-                channel="stable",
-                series="focal",
-                config={"hostname": "example.org"},
+                APPLICATION_APP_NAME,
+                application_name=DB_APP_NAME,
+                num_units=1,
+                series=CHARM_SERIES,
+                channel="edge",
             ),
         )
 
@@ -59,8 +65,8 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
 
 @pytest.mark.group(1)
 async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest):
-    await ops_test.model.relate(MAILMAN3_CORE_APP_NAME, f"{APP_NAME}:{DB_RELATION}")
-    await ops_test.model.relate(APP_NAME, f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION}")
+    await ops_test.model.relate(f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}")
+    await ops_test.model.relate(APP_NAME, f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}")
 
     app = ops_test.model.applications[APP_NAME]
     await ops_test.model.block_until(
@@ -70,7 +76,7 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
 
     logger.info(" remove relation with  modern endpoints")
     await ops_test.model.applications[APP_NAME].remove_relation(
-        f"{APP_NAME}:{DATABASE_RELATION}", f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION}"
+        f"{APP_NAME}:{DATABASE_RELATION}", f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}"
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
@@ -80,7 +86,7 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
         )
 
     legacy_interface_connect = await get_legacy_db_connection_str(
-        ops_test, MAILMAN3_CORE_APP_NAME, DB_RELATION, remote_unit_name=f"{APP_NAME}/0"
+        ops_test, DB_APP_NAME, DB_RELATION, remote_unit_name=f"{APP_NAME}/0"
     )
     logger.info(f" check connect to = {legacy_interface_connect}")
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
@@ -88,10 +94,10 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
             with psycopg2.connect(legacy_interface_connect) as connection:
                 assert connection.status == psycopg2.extensions.STATUS_READY
 
-    logger.info(" remove relation mailman3-core")
+    logger.info(f" remove relation {DB_APP_NAME}:{DB_RELATION}")
     async with ops_test.fast_forward():
         await ops_test.model.applications[APP_NAME].remove_relation(
-            f"{APP_NAME}:{DB_RELATION}", f"{MAILMAN3_CORE_APP_NAME}:{DB_RELATION}"
+            f"{APP_NAME}:{DB_RELATION}", f"{DB_APP_NAME}:{DB_RELATION}"
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
         with pytest.raises(psycopg2.OperationalError):
@@ -99,8 +105,8 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
 
 
 async def test_modern_endpoint_with_multiple_related_endpoints(ops_test: OpsTest):
-    await ops_test.model.relate(MAILMAN3_CORE_APP_NAME, f"{APP_NAME}:{DB_RELATION}")
-    await ops_test.model.relate(APP_NAME, f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION}")
+    await ops_test.model.relate(f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}")
+    await ops_test.model.relate(APP_NAME, f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}")
 
     app = ops_test.model.applications[APP_NAME]
     await ops_test.model.block_until(
@@ -110,24 +116,24 @@ async def test_modern_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
 
     logger.info(" remove relation with legacy endpoints")
     await ops_test.model.applications[APP_NAME].remove_relation(
-        f"{MAILMAN3_CORE_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}"
+        f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}"
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(status="active", timeout=3000, raise_on_error=False)
 
     modern_interface_connect = await build_connection_string(
-        ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION
+        ops_test, DATABASE_APP_NAME, FIRST_DATABASE_RELATION
     )
-    logger.info(f" check connect to = {modern_interface_connect}")
+    logger.info(f"check connect to = {modern_interface_connect}")
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
         with attempt:
             with psycopg2.connect(modern_interface_connect) as connection:
                 assert connection.status == psycopg2.extensions.STATUS_READY
 
-    logger.info(f" remove relation {APPLICATION_APP_NAME}")
+    logger.info(f"remove relation {DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}")
     async with ops_test.fast_forward():
         await ops_test.model.applications[APP_NAME].remove_relation(
-            f"{APP_NAME}:{DATABASE_RELATION}", f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION}"
+            f"{APP_NAME}:{DATABASE_RELATION}", f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}"
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
         for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(10)):

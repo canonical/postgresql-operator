@@ -8,7 +8,6 @@ import logging
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
     DatabaseRequestedEvent,
-    diff,
 )
 from charms.postgresql_k8s.v0.postgresql import (
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
@@ -226,15 +225,6 @@ class PostgreSQLProvider(Object):
         if self._check_multiple_endpoints():
             self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
             return
-        # Check which data has changed to emit customs events.
-        _diff = diff(event, self.charm.unit)
-
-        # Emit a database requested event if the setup key (database name and optional
-        # extra user roles) was added to the relation databag by the application.
-        if "database" in _diff.added:
-            getattr(self.database_provides.on, "database_requested").emit(
-                event.relation, app=event.app, unit=event.unit
-            )
 
     def _update_unit_status_on_blocking_endpoint_simultaneously(self):
         """Clean up Blocked status if this is due related of multiple endpoints."""
