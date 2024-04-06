@@ -1,0 +1,64 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.7    unsupported  01:34:55Z
+
+App               Version  Status       Scale  Charm             Channel        Rev  Exposed  Message
+haproxy                    active           1  haproxy           stable          75  yes      Unit is ready
+landscape-client           unknown          0  landscape-client  latest/stable   69  no       
+landscape-server           error            1  landscape-server  stable         111  no       hook failed: "install"
+pg                         maintenance      3  postgresql                         0  no       installing PostgreSQL
+postgresql                 maintenance      1  postgresql        latest/stable  345  no       installing charm software
+rabbitmq-server            maintenance      1  rabbitmq-server   3.9/stable     183  no       Installing/upgrading RabbitMQ packages
+ubuntu-advantage           unknown          0  ubuntu-advantage  latest/stable   79  no       
+
+Unit                 Workload     Agent      Machine  Public address  Ports  Message
+haproxy/0*           active       idle       3        10.85.242.113          Unit is ready
+landscape-server/0*  error        idle       4        10.85.242.155          hook failed: "install"
+pg/0*                waiting      executing  0        10.85.242.114          waiting to start PostgreSQL
+pg/1                 maintenance  executing  1        10.85.242.239          (install) installing PostgreSQL
+pg/2                 maintenance  executing  2        10.85.242.16           (install) installing PostgreSQL
+postgresql/0*        maintenance  executing  5        10.85.242.123          (install) installing charm software
+rabbitmq-server/0*   maintenance  executing  6        10.85.242.221          (install) Installing/upgrading RabbitMQ packages
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.85.242.114  juju-8ecc38-0  ubuntu@22.04      Running
+1        started  10.85.242.239  juju-8ecc38-1  ubuntu@22.04      Running
+2        started  10.85.242.16   juju-8ecc38-2  ubuntu@22.04      Running
+3        started  10.85.242.113  juju-8ecc38-3  ubuntu@22.04      Running
+4        started  10.85.242.155  juju-8ecc38-4  ubuntu@22.04      Running
+5        started  10.85.242.123  juju-8ecc38-5  ubuntu@22.04      Running
+6        started  10.85.242.221  juju-8ecc38-6  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-0: 01:33:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:10 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:33:10 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-pg-0: 01:33:10 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:33:26 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:33:26 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:33:26 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-pg-1: 01:33:28 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:33:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:33:28 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-5: 01:33:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:33:29 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:33:30 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-6: 01:33:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:33:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-rabbitmq-server-0: 01:33:31 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:33:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:33:36 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:33:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-2: 01:33:37 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:33:41 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:33:41 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:33:41 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-haproxy-0: 01:33:42 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:33:43 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:33:43 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:33:43 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-landscape-server-0: 01:33:44 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...
