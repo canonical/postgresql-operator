@@ -274,6 +274,9 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
             assert backups, "backups not outputted"
             await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
+        # Remove the database app.
+        await ops_test.model.remove_application(database_app_name, block_until_done=True)
+
     # Remove the TLS operator.
     await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
@@ -283,11 +286,13 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
+    await ops_test.model.deploy(charm, application_name=previous_database_app_name)
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
         series=CHARM_SERIES,
     )
+    await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
     async with ops_test.fast_forward():
         logger.info(
