@@ -36,6 +36,7 @@ NO_DATABASE_RELATION_NAME = "no-database"
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_charms(ops_test: OpsTest, charm):

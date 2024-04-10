@@ -23,6 +23,7 @@ UBUNTU_PRO_APP_NAME = "ubuntu-advantage"
 logger = logging.getLogger(__name__)
 
 
+@pytest.mark.runner(["self-hosted", "linux", "X64", "jammy", "large"])
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
