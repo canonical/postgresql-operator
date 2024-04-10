@@ -47,16 +47,7 @@ jobs:
       cache: true
 
   integration-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        juju:
-          - agent: 2.9.46
-            libjuju: ^2
-            allure: false
-          - agent: 3.1.7
-            allure: true
-    name: Integration test charm | ${{ matrix.juju.agent }}
+    name: Integration test charm | 3.1.7
     needs:
       - lint
       - unit-test
@@ -65,9 +56,8 @@ jobs:
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       cloud: lxd
-      juju-agent-version: ${{ matrix.juju.agent }}
-      libjuju-version-constraint: ${{ matrix.juju.libjuju }}
-      _beta_allure_report: ${{ matrix.juju.allure }}
+      juju-agent-version: 3.1.7
+      _beta_allure_report: true
     secrets:
       integration-test: |
         {
