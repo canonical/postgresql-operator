@@ -104,6 +104,7 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
             psycopg2.connect(legacy_interface_connect)
 
 
+@pytest.mark.group(1)
 async def test_modern_endpoint_with_multiple_related_endpoints(ops_test: OpsTest):
     await ops_test.model.relate(f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}")
     await ops_test.model.relate(APP_NAME, f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}")
