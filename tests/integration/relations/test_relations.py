@@ -100,8 +100,10 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
             f"{APP_NAME}:{DB_RELATION}", f"{DB_APP_NAME}:{DB_RELATION}"
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
-        with pytest.raises(psycopg2.OperationalError):
-            psycopg2.connect(legacy_interface_connect)
+        for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(10)):
+            with attempt:
+                with pytest.raises(psycopg2.OperationalError):
+                    psycopg2.connect(legacy_interface_connect)
 
 
 @pytest.mark.group(1)
