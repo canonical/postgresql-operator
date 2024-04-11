@@ -41,15 +41,17 @@ tox                      # runs 'lint' and 'unit' environments
 ## Build charm
 
 The build environment assumes that there are preinstalled on the system:
-* [tox](https://tox.wiki/)
+* [tox](https://tox.wiki/) (version 4+ !!!)
 * [poetry](https://python-poetry.org/)
 * [charmcraft](https://snapcraft.io/charmcraft)
 * [charmcraftcache](https://pypi.org/project/charmcraftcache/)
 * [pipx](https://python.land/virtual-environments/pipx)
-* [libpq-dev](https://pypi.org/project/libpq-dev/)
+* [libpq-dev](https://www.postgresql.org/docs/current/libpq.html)
 
 To build the charm it is also necessary at least 5GB if free disk space and
 it is recommended to provide 4+ CPU cores and 8GB+ RAM for a decent build speed.
+
+
 
 To install all above build dependencies (assuming you are on Ubuntu 22.04 LTS):
 
@@ -61,6 +63,9 @@ lxd init --auto       # init LXD (if never used earlier)
 
 sudo apt update && sudo apt install --yes libpq-dev pipx
 
+sudo apt purge tox # if old tox version is installed from apt
+
+pipx install tox
 pipx install poetry
 pipx install charmcraftcache
 pipx ensurepath
@@ -69,13 +74,6 @@ pipx ensurepath
 Ensure local pip binaries are in your $PATH (otherwise re-login to your shell):
 ```shell
 charmcraftcache --help
-```
-
-Make sure the install tox version is 4+ (using `tox --version`), if missing OR
-the previos version installed as debian package (topical for Ubuntu 22.04 LTS):
-purge it and install from pip:
-```shell
-sudo apt purge tox && pipx install tox && tox --version
 ```
 
 Build the charm (inside this Git repository):
