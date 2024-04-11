@@ -1,7 +1,7 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>canonical/data-platform//renovate_presets/charm.json5"],
-  "reviewers": ["dragomirp", "marceloneppel", "taurus-forever"],
+  "reviewers": ["dragomirp", "lucasgameiroborges", "marceloneppel", "taurus-forever"],
   "packageRules": [
     // Later rules override earlier rules
     {
@@ -10,6 +10,66 @@
     }, {
       "matchPackageNames": ["python"],
       "allowedVersions": "<3.11"
+    },
+    {
+      "matchDepNames": ["Juju 2"],
+      "matchPackageNames": ["juju/juju"],
+      "allowedVersions": "<3.0.0",
+      "extractVersion": "^v(?<version>.*)$",
+      "groupName": "Juju 2"
+    },
+    {
+      "matchDepNames": ["Juju 3"],
+      "matchPackageNames": ["juju/juju"],
+      "allowedVersions": "<3.2.0",
+      "extractVersion": "^v(?<version>.*)$",
+      "groupName": "Juju 3"
+    },
+    {
+      "matchDepNames": ["libjuju 2"],
+      "matchPackageNames": ["juju"],
+      "matchManagers": ["regex"],
+      "matchDatasources": ["pypi"],
+      "versioning": "loose",
+      "allowedVersions": "<3",
+      "groupName": "Juju 2"
+    }
+  ],
+  "regexManagers": [
+    {
+      "customType": "regex",
+      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
+      "matchStrings": [
+        "(- agent: )(?<currentValue>.*?) +# renovate: latest juju 2"
+      ],
+      "depNameTemplate": "Juju 2",
+      "packageNameTemplate": "juju/juju",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "Juju release"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
+      "matchStrings": [
+        "(- agent: )(?<currentValue>.*?) +# renovate: latest juju 3"
+      ],
+      "depNameTemplate": "Juju 3",
+      "packageNameTemplate": "juju/juju",
+      "datasourceTemplate": "github-releases",
+      "versioningTemplate": "loose",
+      "extractVersionTemplate": "Juju release"
+    },
+    {
+      "customType": "regex",
+      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
+      "matchStrings": [
+        "(libjuju: )==(?<currentValue>.*?) +# renovate: latest libjuju 2"
+      ],
+      "depNameTemplate": "libjuju 2",
+      "packageNameTemplate": "juju",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "loose"
     }
   ]
 }
