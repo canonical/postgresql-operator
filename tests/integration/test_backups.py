@@ -55,21 +55,11 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
             "path": f"/postgresql-vm/{uuid.uuid1()}",
             "region": "us-east-1",
         },
-        GCP: {
-            "endpoint": "https://storage.googleapis.com",
-            "bucket": "data-charms-testing",
-            "path": f"/postgresql-vm/{uuid.uuid1()}",
-            "region": "",
-        },
     }
     credentials = {
         AWS: {
             "access-key": github_secrets["AWS_ACCESS_KEY"],
             "secret-key": github_secrets["AWS_SECRET_KEY"],
-        },
-        GCP: {
-            "access-key": github_secrets["GCP_ACCESS_KEY"],
-            "secret-key": github_secrets["GCP_SECRET_KEY"],
         },
     }
     yield configs, credentials
