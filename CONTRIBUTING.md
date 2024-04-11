@@ -8,8 +8,7 @@ this operator.
 - Generally, before developing enhancements to this charm, you should consider [opening an issue
   ](https://github.com/canonical/postgresql-operator/issues) explaining your use case.
 - If you would like to chat with us about your use-cases or proposed implementation, you can reach
-  us at [public Canonical Data Platform channel](https://chat.charmhub.io/charmhub/channels/data-platform)
-  or [Discourse](https://discourse.charmhub.io/).
+  us using any channel from our [Contacts](https://charmhub.io/postgresql/docs/r-contacts).
 - Familiarising yourself with the [Charmed Operator Framework](https://juju.is/docs/sdk) library
   will help you a lot when working on new features or bug fixes.
 - All enhancements require review before being merged. Code review typically examines
@@ -50,8 +49,6 @@ The build environment assumes that there are preinstalled on the system:
 
 To build the charm it is also necessary at least 5GB if free disk space and
 it is recommended to provide 4+ CPU cores and 8GB+ RAM for a decent build speed.
-
-
 
 To install all above build dependencies (assuming you are on Ubuntu 22.04 LTS):
 
