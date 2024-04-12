@@ -92,6 +92,7 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
+DIFFERENT_VERSIONS_PSQL_BLOCKING_MESSAGE = "Please select the correct version of postgresql to use. No need to use different versions of postgresql."
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -518,6 +519,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._start_stop_pgbackrest_service(event)
 
         self._update_new_unit_status()
+
+        self._validate_database_version()
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
@@ -1576,6 +1579,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for relation in self.model.relations.get(relation_name, []):
                 relations.append(relation)
         return relations
+
+    def _validate_database_version(self):
+        """Checking that only one version of Postgres is used."""
+        peer_db_version = self.app_peer_data.get("database-version")
+
+        if self.unit.is_leader() and peer_db_version is None:
+            self.app_peer_data.update({"database-version": self._patroni.get_postgresql_version()})
+            return
+
+        if peer_db_version != self._patroni.get_postgresql_version():
+            self.unit.status = BlockedStatus(DIFFERENT_VERSIONS_PSQL_BLOCKING_MESSAGE)
+        return
 
 
 if __name__ == "__main__":

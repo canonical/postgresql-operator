@@ -578,6 +578,10 @@ async def test_deploy_zero_units(ops_test: OpsTest, charm):
     logger.info("connect to DB and create test table")
     await create_test_data(connection_string)
 
+    # Test to check the use of different versions postgresql.
+    # Release of a new version of charm with another version of postgresql,
+    # it is necessary to implement a test that will check the use of different versions of postgresql.
+
     unit_ip_addresses = []
     primary_storage = ""
     for unit in ops_test.model.applications[app].units:
