@@ -1,6 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
+import json
 import os
 import random
 import subprocess
@@ -23,6 +24,7 @@ from tenacity import (
 
 from ..helpers import (
     APPLICATION_NAME,
+    execute_query_on_unit,
     db_connect,
     get_patroni_cluster,
     get_unit_address,
@@ -869,7 +871,7 @@ async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
     
     Checks juju storage output
     """
-    complete_command = ["show-storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", storage_id]
+    complete_command = ["show-storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", storage_id, "--format=json"]
     print(f"command: {complete_command}")
     return_code, stdout, _ = await ops_test.juju(*complete_command)
     if return_code != 0:
@@ -878,8 +880,7 @@ async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
         raise Exception(
             "Expected command %s to succeed instead it failed: %s with code: ", complete_command, stdout, return_code
         )
-    
-    return storage_id in stdout
+    return storage_id in str(stdout)
 
 
 async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
@@ -918,3 +919,27 @@ async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
         )
 
     return db in query
+
+async def get_any_deatached_storage(ops_test: OpsTest) -> str:
+    """Returns any of the current avaliable deatached storage
+    
+    """
+    return_code, storages_list, stderr = await ops_test.juju("storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", "--format=json")
+    if return_code != 0:
+        raise Exception(f"failed to get charm info with error: {stderr}")
+    
+    parsed_storages_list = json.loads(storages_list)
+    for storage_name, storage in parsed_storages_list['storage'].items():
+        if (str(storage['status']['current']) == 'detached') and (str(storage['life'] == 'alive')):
+            return storage_name
+        
+    return None
+
+
+async def check_password_auth(ops_test: OpsTest, unit_name) -> bool:
+    stdout = await run_command_on_unit(
+        ops_test,
+        unit_name,
+        """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
+    )
+    return 'password authentication failed for user "operator"' not in stdout
