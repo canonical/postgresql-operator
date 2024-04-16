@@ -736,6 +736,35 @@ async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
         return False
 
 
+async def check_tls_replication(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
+    """Returns whether TLS is enabled on the replica PostgreSQL instance.
+
+    Args:
+        ops_test: The ops test framework instance.
+        unit_name: The name of the replica of the PostgreSQL instance.
+        enabled: check if TLS is enabled/disabled
+
+    Returns:
+        Whether TLS is enabled/disabled.
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    password = await get_password(ops_test, unit_name)
+
+    # Check for the all replicas using encrypted connection
+    output = await execute_query_on_unit(
+        unit_address,
+        password,
+        "SELECT pg_ssl.ssl, pg_sa.client_addr FROM pg_stat_ssl pg_ssl"
+        " JOIN pg_stat_activity pg_sa ON pg_ssl.pid = pg_sa.pid"
+        " AND pg_sa.usename = 'replication';",
+    )
+
+    for i in range(0, len(output), 2):
+        if output[i] != enabled:
+            return False
+    return True
+
+
 async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
     """Returns whether TLS is enabled on Patroni REST API.
 
