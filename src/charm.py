@@ -10,6 +10,8 @@ import os
 import platform
 import re
 import subprocess
+import sys
+from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
 
 import psycopg2
@@ -106,6 +108,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def __init__(self, *args):
         super().__init__(*args)
+
+        # Support for disabling the operator.
+        disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
+        if disable_file.exists():
+            logger.warning(
+                f"\n\tDisable file `{disable_file.resolve()}` found, the charm will skip all events."
+                "\n\tTo resume normal operations, please remove the file."
+            )
+            self.unit.status = BlockedStatus("Disabled")
+            sys.exit(0)
 
         self.peer_relation_app = DataPeer(
             self,
@@ -1399,7 +1411,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
 
-        return self.update_config()
+        try:
+            return self.update_config()
+        except Exception:
+            logger.exception("TLS files failed to push. Error in config update")
+            return False
 
     def _reboot_on_detached_storage(self, event: EventBase) -> None:
         """Reboot on detached storage.
