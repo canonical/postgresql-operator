@@ -693,29 +693,29 @@ Stderr:
 
         backup_id = event.params.get("backup-id")
         restore_to_time = event.params.get("restore-to-time")
-        if restore_to_time:
-            logger.info(
-                f"A restore with backup-id {backup_id} to time point {restore_to_time} has been requested on "
-                f"unit"
-            )
-        else:
-            logger.info(f"A restore with backup-id {backup_id} has been requested on unit")
+        logger.info(
+            f"A restore"
+            f"{' with backup-id ' + backup_id if backup_id else ''}"
+            f"{' to time point ' + restore_to_time if restore_to_time else ''}"
+            f" has been requested on the unit"
+        )
 
-        # Validate the provided backup id.
-        logger.info("Validating provided backup-id")
-        try:
-            backups = self._list_backups(show_failed=False)
-            if backup_id not in backups.keys():
-                error_message = f"Invalid backup-id: {backup_id}"
+        if backup_id:
+            # Validate the provided backup id.
+            logger.info("Validating provided backup-id")
+            try:
+                backups = self._list_backups(show_failed=False)
+                if backup_id not in backups.keys():
+                    error_message = f"Invalid backup-id: {backup_id}"
+                    logger.error(f"Restore failed: {error_message}")
+                    event.fail(error_message)
+                    return
+            except ListBackupsError as e:
+                logger.exception(e)
+                error_message = "Failed to retrieve backup id"
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
                 return
-        except ListBackupsError as e:
-            logger.exception(e)
-            error_message = "Failed to retrieve backup id"
-            logger.error(f"Restore failed: {error_message}")
-            event.fail(error_message)
-            return
 
         if restore_to_time and not re.match("^[0-9-:.+ ]+$", restore_to_time):
             error_message = "Bad restore-to-time format"
@@ -750,8 +750,12 @@ Stderr:
         # Mark the cluster as in a restoring backup state and update the Patroni configuration.
         logger.info("Configuring Patroni to restore the backup")
         self.charm.app_peer_data.update({
-            "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F",
-            "restore-stanza": backups[backup_id],
+            "restoring-backup": f"{datetime.strftime(datetime.strptime(backup_id, BACKUP_ID_FORMAT), PGBACKREST_BACKUP_ID_FORMAT)}F"
+            if backup_id
+            else "",
+            "restore-stanza": backups[backup_id]
+            if backup_id
+            else self.charm.app_peer_data.get("stanza", self.stanza_name),
             "restore-to-time": restore_to_time or "",
         })
         self.charm.update_config()
@@ -793,8 +797,10 @@ Stderr:
             event.fail(validation_message)
             return False
 
-        if not event.params.get("backup-id"):
-            error_message = "Missing backup-id to restore"
+        if not event.params.get("backup-id") and not event.params.get("restore-to-time"):
+            error_message = (
+                "Missing backup-id or/and restore-to-time parameter to be able to do restore"
+            )
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
@@ -863,7 +869,7 @@ Stderr:
 
     def _restart_database(self) -> None:
         """Removes the restoring backup flag and restart the database."""
-        self.charm.app_peer_data.update({"restoring-backup": ""})
+        self.charm.app_peer_data.update({"restoring-backup": "", "restore-to-time": ""})
         self.charm.update_config()
         self.charm._patroni.start_patroni()
 

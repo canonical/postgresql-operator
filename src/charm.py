@@ -501,9 +501,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         # If PITR restore failed, then wait it for resolve.
-        if "restoring-backup" in self.app_peer_data and isinstance(
-            self.unit.status, BlockedStatus
-        ):
+        if (
+            "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data
+        ) and isinstance(self.unit.status, BlockedStatus):
             event.defer()
             return
 
@@ -1203,7 +1203,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_run_on_update_status():
             return
 
-        if "restoring-backup" in self.app_peer_data:
+        if "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data:
             if "failed" in self._patroni.get_member_status(self._member_name):
                 logger.error("Restore failed: database service failed to start")
                 self.unit.status = BlockedStatus("Failed to restore backup")
