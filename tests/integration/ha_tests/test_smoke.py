@@ -109,7 +109,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
-    """Test charm deploy in dirty enviroment with garbadge storage"""
+    """Test charm deploy in dirty environment with garbage storage"""
     async with ops_test.fast_forward():
         garbadge_storage = None
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3)):
@@ -144,7 +144,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_app_recoures_conflicts(ops_test: OpsTest, charm: str):
-    """Test application deploy in dirty enviroment with garbadge storage from another application"""
+    """Test application deploy in dirty environment with garbage storage from another application """
     async with ops_test.fast_forward():
         garbadge_storage = None
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3)):
