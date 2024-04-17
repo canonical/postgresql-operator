@@ -1372,7 +1372,7 @@ class TestCharm(unittest.TestCase):
             self.harness.update_relation_data(
                 self.rel_id,
                 self.charm.app.name,
-                {"cluster_initialised": "True", "members_ips": '["1.1.1.1"]'},
+                {"cluster_initialised": "True", "members_ips": '["1.1.1.1"]', "database_version": "14"},
             )
             self.harness.set_leader()
         _reconfigure_cluster.return_value = False
