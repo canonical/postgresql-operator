@@ -1403,7 +1403,11 @@ def test_on_peer_relation_changed(harness):
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"cluster_initialised": "True", "members_ips": '["1.1.1.1"]', "database_version": "14"},
+                {
+                    "cluster_initialised": "True",
+                    "members_ips": '["1.1.1.1"]',
+                    "database_version": "14",
+                },
             )
             harness.set_leader()
         _reconfigure_cluster.return_value = False
