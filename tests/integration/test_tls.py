@@ -15,6 +15,7 @@ from .helpers import (
     change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
+    check_tls_replication,
     db_connect,
     get_password,
     get_primary,
@@ -84,6 +85,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             for unit in ops_test.model.applications[DATABASE_APP_NAME].units
             if unit.name != primary
         ][0]
+
+        # Check if TLS enabled for replication
+        assert await check_tls_replication(ops_test, primary, enabled=True)
 
         # Enable additional logs on the PostgreSQL instance to check TLS
         # being used in a later step and make the fail-over to happens faster.

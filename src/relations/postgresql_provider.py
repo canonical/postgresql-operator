@@ -169,7 +169,8 @@ class PostgreSQLProvider(Object):
         relations = [event.relation] if event else self.model.relations[self.relation_name]
 
         # If there are no replicas, remove the read-only endpoint.
-        replicas_endpoint = self.charm.members_ips - {self.charm.primary_endpoint}
+        replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
+        replicas_endpoint.sort()
         read_only_endpoints = (
             ",".join(f"{x}:{DATABASE_PORT}" for x in replicas_endpoint)
             if len(replicas_endpoint) > 0

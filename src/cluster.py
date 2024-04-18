@@ -314,7 +314,7 @@ class Patroni:
                     timeout=API_REQUEST_TIMEOUT,
                 )
 
-        return r.json()
+                return r.json()
 
     @property
     def is_creating_backup(self) -> bool:

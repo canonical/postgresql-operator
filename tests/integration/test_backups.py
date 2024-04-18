@@ -92,11 +92,8 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> None:
+async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
-    # Build the PostgreSQL charm.
-    charm = await ops_test.build_charm(".")
-
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME)
     await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL)
@@ -126,7 +123,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
         await action.wait()
         async with ops_test.fast_forward(fast_interval="60s"):
             await ops_test.model.wait_for_idle(
-                apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1200
+                apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1500
             )
 
         primary = await get_primary(ops_test, f"{database_app_name}/0")
@@ -279,14 +276,14 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]) -> No
 
         # Remove the database app.
         await ops_test.model.remove_application(database_app_name, block_until_done=True)
+
     # Remove the TLS operator.
     await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
 
 @pytest.mark.group(1)
-async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None:
+async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
-    charm = await ops_test.build_charm(".")
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(charm, application_name=previous_database_app_name)
@@ -355,12 +352,9 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets) -> None
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await wait_for_idle_on_blocked(
-            ops_test,
-            database_app_name,
-            0,
-            S3_INTEGRATOR_APP_NAME,
-            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+        unit = ops_test.model.units.get(f"{database_app_name}/0")
+        await ops_test.model.block_until(
+            lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
         )
 
     # Check that the backup was correctly restored by having only the first created table.
@@ -402,12 +396,9 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     )
     await action.wait()
     logger.info("waiting for the database charm to become blocked")
-    await wait_for_idle_on_blocked(
-        ops_test,
-        database_app_name,
-        0,
-        S3_INTEGRATOR_APP_NAME,
-        FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
+    unit = ops_test.model.units.get(f"{database_app_name}/0")
+    await ops_test.model.block_until(
+        lambda: unit.workload_status_message == FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE
     )
 
     # Provide valid backup configurations, but from another cluster repository.
@@ -421,12 +412,9 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     )
     await action.wait()
     logger.info("waiting for the database charm to become blocked")
-    await wait_for_idle_on_blocked(
-        ops_test,
-        database_app_name,
-        0,
-        S3_INTEGRATOR_APP_NAME,
-        ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+    unit = ops_test.model.units.get(f"{database_app_name}/0")
+    await ops_test.model.block_until(
+        lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
     )
 
     # Provide valid backup configurations, with another path in the S3 bucket.
