@@ -875,7 +875,6 @@ async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
         storage_id,
         "--format=json",
     ]
-    print(f"command: {complete_command}")
     return_code, stdout, _ = await ops_test.juju(*complete_command)
     if return_code != 0:
         if return_code == 1:
@@ -904,7 +903,7 @@ async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
 
 
 async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
-    """Returns True if database with specified name is already exists."""
+    """Returns True if database with specified name already exists."""
     unit = ops_test.model.applications[app].units[0]
     unit_address = await unit.get_public_address()
     password = await get_password(ops_test, app)
@@ -934,10 +933,10 @@ async def get_any_deatached_storage(ops_test: OpsTest) -> str:
         if (str(storage["status"]["current"]) == "detached") and (str(storage["life"] == "alive")):
             return storage_name
 
-    return None
+    raise Exception("failed to get deatached storage")
 
 
-async def check_password_auth(ops_test: OpsTest, unit_name) -> bool:
+async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
     """Checks if "operator" password is valid for current postgresql db."""
     stdout = await run_command_on_unit(
         ops_test,
@@ -945,3 +944,20 @@ async def check_password_auth(ops_test: OpsTest, unit_name) -> bool:
         """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
     )
     return 'password authentication failed for user "operator"' not in stdout
+
+
+async def remove_unit_force(ops_test: OpsTest, unit_name: str):
+    """Removes unit with --force --no-wait."""
+    app_name = unit_name.split("/")[0]
+    complete_command = ["remove-unit", f"{unit_name}", "--force", "--no-wait", "--no-prompt"]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
+
+    for unit in ops_test.model.applications[app_name].units:
+        assert unit != unit_name
