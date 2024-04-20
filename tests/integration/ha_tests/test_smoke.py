@@ -28,7 +28,6 @@ from .helpers import (
     storage_id,
 )
 
-TEST_garbage_STORAGE_NAME = "test_pgdata"
 TEST_DATABASE_RELATION_NAME = "test_database"
 DUP_APPLICATION_NAME = "postgres-test-dup"
 
