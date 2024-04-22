@@ -856,6 +856,11 @@ def test_on_update_status(harness):
         patch("charm.Patroni.last_postgresql_logs") as _last_postgresql_logs,
         patch("charm.Patroni.patroni_logs") as _patroni_logs,
         patch("charm.Patroni.get_member_status") as _get_member_status,
+        patch(
+            "charm.PostgreSQLBackups.can_use_s3_repository", return_value=(True, None)
+        ) as _can_use_s3_repository,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test before the cluster is initialised.
@@ -864,6 +869,7 @@ def test_on_update_status(harness):
 
         # Test after the cluster was initialised, but with the unit in a blocked state.
         with harness.hooks_disabled():
+            harness.set_leader()
             harness.update_relation_data(
                 rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
             )
@@ -883,9 +889,7 @@ def test_on_update_status(harness):
                 },
             )
         harness.charm.unit.status = ActiveStatus()
-        _patroni_logs.return_value = (
-            "patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
-        )
+        _patroni_logs.return_value = "2022-02-24 02:00:00 UTC patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
         assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
