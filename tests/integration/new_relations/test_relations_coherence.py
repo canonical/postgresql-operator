@@ -26,7 +26,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
             ops_test.model.deploy(
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
-                num_units=2,
+                num_units=1,
                 series=CHARM_SERIES,
                 channel="edge",
             ),
@@ -47,25 +47,6 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
 async def test_relations(ops_test: OpsTest, charm):
     """Test that check relation data."""
     async with ops_test.fast_forward():
-        await asyncio.gather(
-            ops_test.model.deploy(
-                APPLICATION_APP_NAME,
-                application_name=APPLICATION_APP_NAME,
-                num_units=1,
-                series=CHARM_SERIES,
-                channel="edge",
-            ),
-            ops_test.model.deploy(
-                charm,
-                application_name=DATABASE_APP_NAME,
-                num_units=1,
-                series=CHARM_SERIES,
-                config={"profile": "testing"},
-            ),
-        )
-
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
-
         # Relate the charms and wait for them exchanging some connection data.
         await ops_test.model.add_relation(
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
