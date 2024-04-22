@@ -451,6 +451,7 @@ class Patroni:
         enable_tls: bool = False,
         stanza: str = None,
         restore_stanza: Optional[str] = None,
+        disable_pgbackrest_archiving: bool = False,
         backup_id: Optional[str] = None,
         pitr_target: Optional[str] = None,
         parameters: Optional[dict[str, str]] = None,
@@ -463,6 +464,7 @@ class Patroni:
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
+            disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
             backup_id: id of the backup that is being restored.
             pitr_target: point-in-time-recovery target for the backup.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
@@ -489,7 +491,8 @@ class Patroni:
             replication_password=self.replication_password,
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
-            enable_pgbackrest=stanza is not None,
+            enable_pgbackrest_archiving=stanza is not None
+            and disable_pgbackrest_archiving is False,
             restoring_backup=backup_id is not None or pitr_target is not None,
             backup_id=backup_id,
             pitr_target=pitr_target,

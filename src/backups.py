@@ -47,6 +47,7 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
+MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET = "Move restored cluster to another S3 bucket"
 
 S3_BLOCK_MESSAGES = [
     ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
@@ -518,6 +519,8 @@ class PostgreSQLBackups(Object):
         if not self.charm.is_primary:
             return
 
+        self.charm.app_peer_data.pop("require-change-bucket-after-restore", None)
+
         try:
             self._create_bucket_if_not_exists()
         except (ClientError, ValueError):
@@ -533,7 +536,11 @@ class PostgreSQLBackups(Object):
 
     def _on_s3_credential_gone(self, _) -> None:
         if self.charm.unit.is_leader():
-            self.charm.app_peer_data.update({"stanza": "", "init-pgbackrest": ""})
+            self.charm.app_peer_data.update({
+                "stanza": "",
+                "init-pgbackrest": "",
+                "require-change-bucket-after-restore": "",
+            })
         self.charm.unit_peer_data.update({"stanza": "", "init-pgbackrest": ""})
         if self.charm.is_blocked and self.charm.unit.status.message in S3_BLOCK_MESSAGES:
             self.charm.unit.status = ActiveStatus()
@@ -757,6 +764,7 @@ Stderr:
             if backup_id
             else self.charm.app_peer_data.get("stanza", self.stanza_name),
             "restore-to-time": restore_to_time or "",
+            "require-change-bucket-after-restore": "True",
         })
         self.charm.update_config()
 
@@ -806,11 +814,11 @@ Stderr:
             return False
 
         logger.info("Checking if cluster is in blocked state")
-        if (
-            self.charm.is_blocked
-            and self.charm.unit.status.message != ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
-            and self.charm.unit.status.message != CANNOT_RESTORE_PITR
-        ):
+        if self.charm.is_blocked and self.charm.unit.status.message not in [
+            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
+            CANNOT_RESTORE_PITR,
+            MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+        ]:
             error_message = "Cluster or unit is in a blocking state"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)

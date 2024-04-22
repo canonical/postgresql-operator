@@ -60,7 +60,7 @@ bootstrap:
       remove_data_directory_on_diverged_timelines: true
       parameters:
         synchronous_standby_names: "*"
-        {%- if enable_pgbackrest %}
+        {%- if enable_pgbackrest_archiving %}
         archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
         {% else %}
         archive_command: /bin/true
@@ -116,7 +116,7 @@ postgresql:
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
   data_dir: {{ data_path }}
   parameters:
-    {%- if enable_pgbackrest %}
+    {%- if enable_pgbackrest_archiving %}
     archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
     archive_command: /bin/true
