@@ -1216,6 +1216,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "Restore failed: database service failed to reach point-in-time-recovery target. "
                     "You can launch another restore with different parameters"
                 )
+                self.log_pitr_last_transaction_time()
                 self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
                 return
 
@@ -1676,6 +1677,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data["last_pitr_fail_id"] = patroni_exceptions[-1]
             return True, patroni_exceptions[-1] != old_pitr_fail_id
         return False, False
+
+    def log_pitr_last_transaction_time(self) -> None:
+        """Log to user last completed transaction time acquired from postgresql logs."""
+        postgresql_logs = self._patroni.last_postgresql_logs()
+        log_time = re.findall(
+            r"last completed transaction was at log time (.*)$",
+            postgresql_logs,
+            re.MULTILINE,
+        )
+        if len(log_time) > 0:
+            logger.error(f"Last completed transaction was at {log_time[-1]}")
+        else:
+            logger.error("Can't tell last completed transaction time")
 
 
 if __name__ == "__main__":

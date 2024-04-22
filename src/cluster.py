@@ -538,7 +538,7 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return ""
 
-    def _last_postgresql_logs(self) -> str:
+    def last_postgresql_logs(self) -> str:
         """Get last log file content of Postgresql service.
 
         If there is no available log files, empty line will be returned.
