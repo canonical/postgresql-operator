@@ -8,8 +8,7 @@ this operator.
 - Generally, before developing enhancements to this charm, you should consider [opening an issue
   ](https://github.com/canonical/postgresql-operator/issues) explaining your use case.
 - If you would like to chat with us about your use-cases or proposed implementation, you can reach
-  us at [public Canonical Data Platform channel](https://chat.charmhub.io/charmhub/channels/data-platform)
-  or [Discourse](https://discourse.charmhub.io/).
+  us using any channel from our [Contacts](https://charmhub.io/postgresql/docs/r-contacts).
 - Familiarising yourself with the [Charmed Operator Framework](https://juju.is/docs/sdk) library
   will help you a lot when working on new features or bug fixes.
 - All enhancements require review before being merged. Code review typically examines
@@ -40,13 +39,45 @@ tox                      # runs 'lint' and 'unit' environments
 
 ## Build charm
 
-Build the charm in this git repository using:
+The build environment assumes that there are preinstalled on the system:
+* [tox](https://tox.wiki/) (version 4+ !!!)
+* [poetry](https://python-poetry.org/)
+* [charmcraft](https://snapcraft.io/charmcraft)
+* [charmcraftcache](https://github.com/canonical/charmcraftcache)
+* [pipx](https://pipx.pypa.io/stable/installation/)
+* [libpq-dev](https://www.postgresql.org/docs/current/libpq.html)
+
+To build the charm it is also necessary at least 5GB of free disk space and
+it is recommended to provide 4+ CPU cores and 8GB+ RAM for a decent build speed.
+
+To install all above build dependencies (assuming you are on Ubuntu 22.04 LTS):
+
+```shell
+sudo snap install charmcraft --classic
+
+sudo snap install lxd # should be pre-installed on 22.04
+lxd init --auto       # init LXD (if never used earlier)
+
+sudo apt update && sudo apt install --yes libpq-dev pipx
+
+sudo apt purge tox # if old tox version is installed from apt
+
+pipx ensurepath
+pipx install tox
+pipx install poetry
+pipx install charmcraftcache
+```
+
+Ensure local pip binaries are in your $PATH (otherwise re-login to your shell):
+```shell
+charmcraftcache --help
+```
+
+Build the charm (inside this Git repository):
 
 ```shell
 tox run -e build-dev
 ```
-
-The tox build environment assumes that there is a preinstalled [poetry](https://python-poetry.org/) on the system.
 
 ### Deploy
 
