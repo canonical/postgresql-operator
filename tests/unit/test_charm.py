@@ -853,8 +853,8 @@ def test_on_update_status(harness):
         ) as _primary_endpoint,
         patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True),
-        patch("charm.Patroni._last_postgresql_logs") as _last_postgresql_logs,
-        patch("charm.Patroni._patroni_logs") as _patroni_logs,
+        patch("charm.Patroni.last_postgresql_logs") as _last_postgresql_logs,
+        patch("charm.Patroni.patroni_logs") as _patroni_logs,
         patch("charm.Patroni.get_member_status") as _get_member_status,
     ):
         rel_id = harness.model.get_relation(PEER).id

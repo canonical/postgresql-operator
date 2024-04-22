@@ -1343,6 +1343,7 @@ Juju Version: test-juju-version
             {
                 "restoring-backup": "20230101-090000F",
                 "restore-stanza": f"{self.charm.model.name}.{self.charm.cluster_name}",
+                "require-change-bucket-after-restore": "True",
             },
         )
         _execute_command.assert_called_once_with(
