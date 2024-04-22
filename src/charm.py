@@ -86,6 +86,7 @@ from constants import (
     USER,
     USER_PASSWORD_KEY,
 )
+from relations.async_replication import PostgreSQLAsyncReplication
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -179,6 +180,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.legacy_db_admin_relation = DbProvides(self, admin=True)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.tls = PostgreSQLTLS(self, PEER)
+        self.async_replication = PostgreSQLAsyncReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
@@ -321,6 +323,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     primary = self._patroni.get_primary()
+                    if primary is None and (standby_leader := self._patroni.get_standby_leader()):
+                        primary = standby_leader
                     primary_endpoint = self._patroni.get_member_ip(primary)
                     # Force a retry if there is no primary or the member that was
                     # returned is not in the list of the current cluster members
@@ -420,6 +424,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
                 return
 
+        # Update the sync-standby endpoint in the async replication data.
+        self.async_replication.update_async_replication_data()
+
     def _on_pgdata_storage_detaching(self, _) -> None:
         # Change the primary if it's the unit that is being removed.
         try:
@@ -513,9 +520,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
-        if not self.is_primary and (
-            self._patroni.member_replication_lag == "unknown"
-            or int(self._patroni.member_replication_lag) > 1000
+        if (
+            not self.is_primary
+            and not self.is_standby_leader
+            and (
+                self._patroni.member_replication_lag == "unknown"
+                or int(self._patroni.member_replication_lag) > 1000
+            )
         ):
             self._patroni.reinitialize_postgresql()
             logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
@@ -551,8 +562,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # a failed switchover, so wait until the primary is elected.
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            if not self.is_blocked:
-                self.unit.status = ActiveStatus()
+            self.async_replication.handle_read_only_mode()
         else:
             self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
@@ -688,6 +698,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
+            self,
             self._unit_ip,
             self.cluster_name,
             self._member_name,
@@ -703,6 +714,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def is_primary(self) -> bool:
         """Return whether this unit is the primary instance."""
         return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
+
+    @property
+    def is_standby_leader(self) -> bool:
+        """Return whether this unit is the standby leader instance."""
+        return self.unit.name == self._patroni.get_standby_leader(unit_name_pattern=True)
 
     @property
     def is_tls_enabled(self) -> bool:
@@ -902,6 +918,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.unit.status = ActiveStatus()
 
+        # Update the sync-standby endpoint in the async replication data.
+        self.async_replication.update_async_replication_data()
+
         if not self.unit.is_leader():
             return
 
@@ -929,6 +948,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Args:
             database: optional database where to enable/disable the extension.
         """
+        if self._patroni.get_primary() is None:
+            logger.debug("Early exit enable_disable_extensions: standby cluster")
+            return
         spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
         plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
         original_status = self.unit.status
@@ -1188,6 +1210,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
 
+        # Update the password in the async replication data.
+        self.async_replication.update_async_replication_data()
+
         event.set_results({"password": password})
 
     def _on_update_status(self, _) -> None:
@@ -1224,6 +1249,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self._handle_workload_failures():
             return
+
+        # Update the sync-standby endpoint in the async replication data.
+        self.async_replication.update_async_replication_data()
 
         self._set_primary_status_message()
 
@@ -1270,8 +1298,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             a bool indicating whether the charm performed any action.
         """
         # Restart the workload if it's stuck on the starting state after a restart.
+        try:
+            is_primary = self.is_primary
+            is_standby_leader = self.is_standby_leader
+        except RetryError:
+            return False
+
         if (
-            not self._patroni.member_started
+            not is_primary
+            and not is_standby_leader
+            and not self._patroni.member_started
             and "postgresql_restarted" in self._peers.data[self.unit]
             and self._patroni.member_replication_lag == "unknown"
         ):
@@ -1291,6 +1327,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
+            elif self.is_standby_leader:
+                self.unit.status = ActiveStatus("Standby Leader")
             elif self._patroni.member_started:
                 self.unit.status = ActiveStatus()
         except (RetryError, ConnectionError) as e:
