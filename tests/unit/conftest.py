@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import pytest
 from unittest.mock import PropertyMock
+
+import pytest
+
 
 # This causes every test defined in this file to run 2 times, each with
 # charm.JujuVersion.has_secrets set as True or as False

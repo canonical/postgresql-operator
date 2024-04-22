@@ -1,10 +1,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import pytest
+from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
-from unittest import TestCase as tc
 
+import pytest
 import requests as requests
 import tenacity as tenacity
 from charms.operator_libs_linux.v2 import snap
@@ -50,6 +50,7 @@ def peers_ips():
     peers_ips = {"2.2.2.2", "3.3.3.3"}
     yield peers_ips
 
+
 @pytest.fixture(autouse=True)
 def patroni(peers_ips):
     patroni = Patroni(
@@ -65,6 +66,7 @@ def patroni(peers_ips):
     )
     yield patroni
 
+
 def test_get_alternative_patroni_url(peers_ips, patroni):
     # Mock tenacity attempt.
     retry = tenacity.Retrying()
@@ -73,15 +75,14 @@ def test_get_alternative_patroni_url(peers_ips, patroni):
 
     # Test the first URL that is returned (it should have the current unit IP).
     url = patroni._get_alternative_patroni_url(attempt)
-    tc().assertEqual(url, f"http://{patroni.unit_ip}:8008")
+    TestCase().assertEqual(url, f"http://{patroni.unit_ip}:8008")
 
     # Test returning the other servers URLs.
-    for attempt_number in range(
-        attempt.retry_state.attempt_number + 1, len(peers_ips) + 2
-    ):
+    for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
         attempt.retry_state.attempt_number = attempt_number
         url = patroni._get_alternative_patroni_url(attempt)
-        tc().assertIn(url.split("http://")[1].split(":8008")[0], peers_ips)
+        TestCase().assertIn(url.split("http://")[1].split(":8008")[0], peers_ips)
+
 
 def test_get_member_ip(peers_ips, patroni):
     with (
@@ -90,7 +91,7 @@ def test_get_member_ip(peers_ips, patroni):
     ):
         # Test error on trying to get the member IP.
         _get_alternative_patroni_url.side_effect = "http://server2"
-        with tc().assertRaises(tenacity.RetryError):
+        with TestCase().assertRaises(tenacity.RetryError):
             patroni.get_member_ip(patroni.member_name)
 
         # Test using an alternative Patroni URL.
@@ -100,17 +101,18 @@ def test_get_member_ip(peers_ips, patroni):
             "http://server1",
         ]
         ip = patroni.get_member_ip(patroni.member_name)
-        tc().assertEqual(ip, "1.1.1.1")
+        TestCase().assertEqual(ip, "1.1.1.1")
 
         # Test using the current Patroni URL.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip(patroni.member_name)
-        tc().assertEqual(ip, "1.1.1.1")
+        TestCase().assertEqual(ip, "1.1.1.1")
 
         # Test when not having that specific member in the cluster.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
-        tc().assertIsNone(ip)
+        TestCase().assertIsNone(ip)
+
 
 def test_get_postgresql_version(peers_ips, patroni):
     with patch("charm.snap.SnapClient") as _snap_client:
@@ -122,9 +124,10 @@ def test_get_postgresql_version(peers_ips, patroni):
         ]
         version = patroni.get_postgresql_version()
 
-        tc().assertEqual(version, "14.0")
+        TestCase().assertEqual(version, "14.0")
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
+
 
 def test_get_primary(peers_ips, patroni):
     with (
@@ -133,7 +136,7 @@ def test_get_primary(peers_ips, patroni):
     ):
         # Test error on trying to get the member IP.
         _get_alternative_patroni_url.side_effect = "http://server2"
-        with tc().assertRaises(tenacity.RetryError):
+        with TestCase().assertRaises(tenacity.RetryError):
             patroni.get_primary(patroni.member_name)
 
         # Test using an alternative Patroni URL.
@@ -143,17 +146,18 @@ def test_get_primary(peers_ips, patroni):
             "http://server1",
         ]
         primary = patroni.get_primary()
-        tc().assertEqual(primary, "postgresql-0")
+        TestCase().assertEqual(primary, "postgresql-0")
 
         # Test using the current Patroni URL.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = patroni.get_primary()
-        tc().assertEqual(primary, "postgresql-0")
+        TestCase().assertEqual(primary, "postgresql-0")
 
         # Test requesting the primary in the unit name pattern.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = patroni.get_primary(unit_name_pattern=True)
-        tc().assertEqual(primary, "postgresql/0")
+        TestCase().assertEqual(primary, "postgresql/0")
+
 
 def test_is_creating_backup(peers_ips, patroni):
     with patch("requests.get") as _get:
@@ -165,13 +169,14 @@ def test_is_creating_backup(peers_ips, patroni):
                 {"name": "postgresql-1", "tags": {"is_creating_backup": True}},
             ]
         }
-        tc().assertTrue(patroni.is_creating_backup)
+        TestCase().assertTrue(patroni.is_creating_backup)
 
         # Test when no member is creating a backup.
         response.json.return_value = {
             "members": [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         }
-        tc().assertFalse(patroni.is_creating_backup)
+        TestCase().assertFalse(patroni.is_creating_backup)
+
 
 def test_is_replication_healthy(peers_ips, patroni):
     with (
@@ -181,7 +186,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     ):
         # Test when replication is healthy.
         _get.return_value.status_code = 200
-        tc().assertTrue(patroni.is_replication_healthy)
+        TestCase().assertTrue(patroni.is_replication_healthy)
 
         # Test when replication is not healthy.
         _get.side_effect = [
@@ -189,7 +194,8 @@ def test_is_replication_healthy(peers_ips, patroni):
             MagicMock(status_code=200),
             MagicMock(status_code=503),
         ]
-        tc().assertFalse(patroni.is_replication_healthy)
+        TestCase().assertFalse(patroni.is_replication_healthy)
+
 
 def test_is_member_isolated(peers_ips, patroni):
     with (
@@ -200,15 +206,16 @@ def test_is_member_isolated(peers_ips, patroni):
     ):
         # Test when it wasn't possible to connect to the Patroni API.
         _patroni_url.return_value = "http://server3"
-        tc().assertFalse(patroni.is_member_isolated)
+        TestCase().assertFalse(patroni.is_member_isolated)
 
         # Test when the member isn't isolated from the cluster.
         _patroni_url.return_value = "http://server1"
-        tc().assertFalse(patroni.is_member_isolated)
+        TestCase().assertFalse(patroni.is_member_isolated)
 
         # Test when the member is isolated from the cluster.
         _patroni_url.return_value = "http://server4"
-        tc().assertTrue(patroni.is_member_isolated)
+        TestCase().assertTrue(patroni.is_member_isolated)
+
 
 def test_render_file(peers_ips, patroni):
     with (
@@ -231,13 +238,14 @@ def test_render_file(peers_ips, patroni):
             patroni.render_file(filename, "rendered-content", 0o640)
 
         # Check the rendered file is opened with "w+" mode.
-        tc().assertEqual(mock.call_args_list[0][0], (filename, "w+"))
+        TestCase().assertEqual(mock.call_args_list[0][0], (filename, "w+"))
         # Ensure that the correct user is lookup up.
         _pwnam.assert_called_with("snap_daemon")
         # Ensure the file is chmod'd correctly.
         _chmod.assert_called_with(filename, 0o640)
         # Ensure the file is chown'd correctly.
         _chown.assert_called_with(filename, uid=35, gid=35)
+
 
 def test_render_patroni_yml_file(peers_ips, patroni):
     with (
@@ -286,13 +294,14 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
-        tc().assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
+        TestCase().assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
             0o600,
         )
+
 
 def test_start_patroni(peers_ips, patroni):
     with (
@@ -310,6 +319,7 @@ def test_start_patroni(peers_ips, patroni):
 
         # Test a fail scenario.
         assert not patroni.start_patroni()
+
 
 def test_stop_patroni(peers_ips, patroni):
     with (
@@ -331,6 +341,7 @@ def test_stop_patroni(peers_ips, patroni):
 
         # Test a fail scenario.
         assert not patroni.stop_patroni()
+
 
 def test_member_replication_lag(peers_ips, patroni):
     with (
@@ -357,9 +368,8 @@ def test_member_replication_lag(peers_ips, patroni):
 def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
-        _post.assert_called_once_with(
-            f"http://{patroni.unit_ip}:8008/reinitialize", verify=True
-        )
+        _post.assert_called_once_with(f"http://{patroni.unit_ip}:8008/reinitialize", verify=True)
+
 
 def test_switchover(peers_ips, patroni):
     with (
@@ -374,6 +384,7 @@ def test_switchover(peers_ips, patroni):
         _post.assert_called_once_with(
             "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
         )
+
 
 def test_update_synchronous_node_count(peers_ips, patroni):
     with patch("requests.patch") as _patch:
@@ -412,6 +423,7 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
             "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
         )
 
+
 def test_member_started_true(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
@@ -423,6 +435,7 @@ def test_member_started_true(peers_ips, patroni):
         assert patroni.member_started
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
 
 def test_member_started_false(peers_ips, patroni):
     with (
@@ -436,6 +449,7 @@ def test_member_started_false(peers_ips, patroni):
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
 
+
 def test_member_started_error(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
@@ -447,6 +461,7 @@ def test_member_started_error(peers_ips, patroni):
         assert not patroni.member_started
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
 
 def test_member_inactive_true(peers_ips, patroni):
     with (
@@ -460,6 +475,7 @@ def test_member_inactive_true(peers_ips, patroni):
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
 
+
 def test_member_inactive_false(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
@@ -471,6 +487,7 @@ def test_member_inactive_false(peers_ips, patroni):
         assert not patroni.member_inactive
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
 
 def test_member_inactive_error(peers_ips, patroni):
     with (

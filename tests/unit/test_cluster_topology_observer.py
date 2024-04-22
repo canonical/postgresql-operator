@@ -1,10 +1,10 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import signal
-import pytest
 from typing import Optional
 from unittest.mock import Mock, PropertyMock, patch
 
+import pytest
 from ops.charm import CharmBase
 from ops.model import ActiveStatus, Relation, WaitingStatus
 from ops.testing import Harness
@@ -63,6 +63,7 @@ def harness():
     yield harness
     harness.cleanup()
 
+
 def test_start_observer(harness):
     with (
         patch("builtins.open") as _open,
@@ -92,6 +93,7 @@ def test_start_observer(harness):
         harness.charm.observer.start_observer()
         _popen.assert_called_once()
 
+
 def test_stop_observer(harness):
     with (
         patch("os.kill") as _kill,
@@ -109,6 +111,7 @@ def test_stop_observer(harness):
         _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
         harness.charm.observer.stop_observer()
         _kill.assert_called_once_with(1, signal.SIGINT)
+
 
 def test_dispatch(harness):
     with patch("subprocess.run") as _run:

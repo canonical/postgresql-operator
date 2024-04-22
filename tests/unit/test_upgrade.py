@@ -1,9 +1,9 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import pytest
+from unittest import TestCase
 from unittest.mock import MagicMock, PropertyMock, patch
-from unittest import TestCase as tc
 
+import pytest
 import tenacity
 from charms.data_platform_libs.v0.upgrade import ClusterNotReadyError
 from ops.testing import Harness
@@ -11,7 +11,6 @@ from ops.testing import Harness
 from charm import PostgresqlOperatorCharm
 from constants import SNAP_PACKAGES
 from tests.helpers import patch_network_get
-
 
 
 @pytest.fixture(autouse=True)
@@ -24,11 +23,10 @@ def harness():
     for rel_id in (upgrade_relation_id, peer_relation_id):
         harness.add_relation_unit(rel_id, "postgresql/1")
     with harness.hooks_disabled():
-        harness.update_relation_data(
-            upgrade_relation_id, "postgresql/1", {"state": "idle"}
-        )
+        harness.update_relation_data(upgrade_relation_id, "postgresql/1", {"state": "idle"})
     yield harness
     harness.cleanup()
+
 
 @patch_network_get(private_address="1.1.1.1")
 def test_build_upgrade_stack(harness):
@@ -44,8 +42,9 @@ def test_build_upgrade_stack(harness):
         for rel_id in (upgrade_relation_id, peer_relation_id):
             harness.add_relation_unit(rel_id, "postgresql/2")
 
-        tc().assertEqual(harness.charm.upgrade.build_upgrade_stack(), [0, 1, 2])
-        tc().assertEqual(harness.charm.upgrade.build_upgrade_stack(), [1, 2, 0])
+        TestCase().assertEqual(harness.charm.upgrade.build_upgrade_stack(), [0, 1, 2])
+        TestCase().assertEqual(harness.charm.upgrade.build_upgrade_stack(), [1, 2, 0])
+
 
 def test_log_rollback(harness):
     with (
@@ -57,18 +56,29 @@ def test_log_rollback(harness):
             "Run `juju refresh --revision <previous-revision> postgresql` to initiate the rollback"
         )
 
+
 @patch_network_get(private_address="1.1.1.1")
 def test_on_upgrade_granted(harness):
     with (
         patch("charm.Patroni.get_postgresql_version"),
-        patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.on_upgrade_changed") as _on_upgrade_changed,
-        patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_failed") as _set_unit_failed,
-        patch("charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_completed") as _set_unit_completed,
-        patch("charm.Patroni.is_replication_healthy", new_callable=PropertyMock) as _is_replication_healthy,
+        patch(
+            "charms.data_platform_libs.v0.upgrade.DataUpgrade.on_upgrade_changed"
+        ) as _on_upgrade_changed,
+        patch(
+            "charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_failed"
+        ) as _set_unit_failed,
+        patch(
+            "charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_completed"
+        ) as _set_unit_completed,
+        patch(
+            "charm.Patroni.is_replication_healthy", new_callable=PropertyMock
+        ) as _is_replication_healthy,
         patch("charm.Patroni.cluster_members", new_callable=PropertyMock) as _cluster_members,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("upgrade.wait_fixed", return_value=tenacity.wait_fixed(0)),
-        patch("charm.PostgreSQLBackups.start_stop_pgbackrest_service") as _start_stop_pgbackrest_service,
+        patch(
+            "charm.PostgreSQLBackups.start_stop_pgbackrest_service"
+        ) as _start_stop_pgbackrest_service,
         patch("charm.PostgresqlOperatorCharm._setup_exporter") as _setup_exporter,
         patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
@@ -91,7 +101,7 @@ def test_on_upgrade_granted(harness):
         _start_patroni.return_value = True
         _member_started.return_value = False
         harness.charm.upgrade._on_upgrade_granted(mock_event)
-        tc().assertEqual(_member_started.call_count, 6)
+        TestCase().assertEqual(_member_started.call_count, 6)
         _cluster_members.assert_not_called()
         mock_event.defer.assert_called_once()
         _set_unit_completed.assert_not_called()
@@ -104,8 +114,8 @@ def test_on_upgrade_granted(harness):
         _member_started.return_value = True
         _cluster_members.return_value = ["postgresql-1"]
         harness.charm.upgrade._on_upgrade_granted(mock_event)
-        tc().assertEqual(_member_started.call_count, 6)
-        tc().assertEqual(_cluster_members.call_count, 6)
+        TestCase().assertEqual(_member_started.call_count, 6)
+        TestCase().assertEqual(_cluster_members.call_count, 6)
         mock_event.defer.assert_called_once()
         _set_unit_completed.assert_not_called()
         _set_unit_failed.assert_not_called()
@@ -152,10 +162,13 @@ def test_on_upgrade_granted(harness):
         _set_unit_failed.assert_not_called()
         _on_upgrade_changed.assert_called_once()
 
+
 @patch_network_get(private_address="1.1.1.1")
 def test_pre_upgrade_check(harness):
     with (
-        patch("charm.Patroni.is_creating_backup", new_callable=PropertyMock) as _is_creating_backup,
+        patch(
+            "charm.Patroni.is_creating_backup", new_callable=PropertyMock
+        ) as _is_creating_backup,
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
     ):
         with harness.hooks_disabled():
@@ -166,11 +179,11 @@ def test_pre_upgrade_check(harness):
         _is_creating_backup.side_effect = [True, False, False]
 
         # Test when not all members are ready.
-        with tc().assertRaises(ClusterNotReadyError):
+        with TestCase().assertRaises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
 
         # Test when a backup is being created.
-        with tc().assertRaises(ClusterNotReadyError):
+        with TestCase().assertRaises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
 
         # Test when everything is ok to start the upgrade.

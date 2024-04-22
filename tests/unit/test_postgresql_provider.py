@@ -1,10 +1,10 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import pytest
+from unittest import TestCase
 from unittest.mock import Mock, PropertyMock, patch
-from unittest import TestCase as tc
 
+import pytest
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
@@ -46,6 +46,7 @@ def harness():
     yield harness
     harness.cleanup()
 
+
 def request_database(_harness):
     # Reset the charm status.
     rel_id = _harness.model.get_relation(RELATION_NAME).id
@@ -72,13 +73,16 @@ def request_database(_harness):
         {"database": DATABASE, "extra-user-roles": EXTRA_USER_ROLES},
     )
 
+
 @patch_network_get(private_address="1.1.1.1")
 def test_on_database_requested(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.PostgreSQLProvider.update_endpoints") as _update_endpoints,
-        patch("relations.postgresql_provider.new_password", return_value="test-password") as _new_password,
+        patch(
+            "relations.postgresql_provider.new_password", return_value="test-password"
+        ) as _new_password,
         patch.object(EventBase, "defer") as _defer,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -115,7 +119,7 @@ def test_on_database_requested(harness):
 
         # Request a database before primary endpoint is available.
         request_database(harness)
-        tc().assertEqual(_defer.call_count, 2)
+        TestCase().assertEqual(_defer.call_count, 2)
 
         # Request it again when the database is ready.
         request_database(harness)
@@ -134,7 +138,7 @@ def test_on_database_requested(harness):
         _update_endpoints.assert_called_once()
 
         # Assert that the relation data was updated correctly.
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {
                 "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
@@ -146,13 +150,13 @@ def test_on_database_requested(harness):
         )
 
         # Assert no BlockedStatus was set.
-        tc().assertFalse(isinstance(harness.model.unit.status, BlockedStatus))
+        TestCase().assertFalse(isinstance(harness.model.unit.status, BlockedStatus))
 
         # BlockedStatus due to a PostgreSQLCreateUserError.
         request_database(harness)
-        tc().assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
+        TestCase().assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
         # No data is set in the databag by the database.
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {
                 "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
@@ -161,9 +165,9 @@ def test_on_database_requested(harness):
 
         # BlockedStatus due to a PostgreSQLCreateDatabaseError.
         request_database(harness)
-        tc().assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
+        TestCase().assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
         # No data is set in the databag by the database.
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {
                 "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
@@ -172,7 +176,8 @@ def test_on_database_requested(harness):
 
         # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
         request_database(harness)
-        tc().assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
+        TestCase().assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
+
 
 @patch_network_get(private_address="1.1.1.1")
 def test_oversee_users(harness):
@@ -213,6 +218,7 @@ def test_oversee_users(harness):
         harness.charm.postgresql_client_relation.oversee_users()
         postgresql_mock.delete_user.assert_called_once()  # Only the previous call.
 
+
 @patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_with_event(harness):
     with (
@@ -245,25 +251,26 @@ def test_update_endpoints_with_event(harness):
         # Update the endpoints with the event and check that it updated
         # only the right relation databag (the one from the event).
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {"endpoints": "1.1.1.1:5432", "read-only-endpoints": "2.2.2.2:5432"},
         )
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(another_rel_id, harness.charm.app.name),
             {},
         )
 
         # Also test with only a primary instance.
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {"endpoints": "1.1.1.1:5432"},
         )
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(another_rel_id, harness.charm.app.name),
             {},
         )
+
 
 @patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_without_event(harness):
@@ -290,22 +297,22 @@ def test_update_endpoints_without_event(harness):
         # Test with both a primary and a replica.
         # Update the endpoints and check that all relations' databags are updated.
         harness.charm.postgresql_client_relation.update_endpoints()
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {"endpoints": "1.1.1.1:5432", "read-only-endpoints": "2.2.2.2:5432"},
         )
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(another_rel_id, harness.charm.app.name),
             {"endpoints": "1.1.1.1:5432", "read-only-endpoints": "2.2.2.2:5432"},
         )
 
         # Also test with only a primary instance.
         harness.charm.postgresql_client_relation.update_endpoints()
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(rel_id, harness.charm.app.name),
             {"endpoints": "1.1.1.1:5432"},
         )
-        tc().assertEqual(
+        TestCase().assertEqual(
             harness.get_relation_data(another_rel_id, harness.charm.app.name),
             {"endpoints": "1.1.1.1:5432"},
         )
