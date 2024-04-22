@@ -23,6 +23,9 @@ from constants import (
 PATRONI_SERVICE = "patroni"
 CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/etc/postgresql/postgresql.conf"
 
+# used for assert functions
+tc = TestCase()
+
 
 # This method will be used by the mock to replace requests.get
 def mocked_requests_get(*args, **kwargs):
@@ -75,13 +78,13 @@ def test_get_alternative_patroni_url(peers_ips, patroni):
 
     # Test the first URL that is returned (it should have the current unit IP).
     url = patroni._get_alternative_patroni_url(attempt)
-    TestCase().assertEqual(url, f"http://{patroni.unit_ip}:8008")
+    tc.assertEqual(url, f"http://{patroni.unit_ip}:8008")
 
     # Test returning the other servers URLs.
     for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
         attempt.retry_state.attempt_number = attempt_number
         url = patroni._get_alternative_patroni_url(attempt)
-        TestCase().assertIn(url.split("http://")[1].split(":8008")[0], peers_ips)
+        tc.assertIn(url.split("http://")[1].split(":8008")[0], peers_ips)
 
 
 def test_get_member_ip(peers_ips, patroni):
@@ -91,7 +94,7 @@ def test_get_member_ip(peers_ips, patroni):
     ):
         # Test error on trying to get the member IP.
         _get_alternative_patroni_url.side_effect = "http://server2"
-        with TestCase().assertRaises(tenacity.RetryError):
+        with tc.assertRaises(tenacity.RetryError):
             patroni.get_member_ip(patroni.member_name)
 
         # Test using an alternative Patroni URL.
@@ -101,17 +104,17 @@ def test_get_member_ip(peers_ips, patroni):
             "http://server1",
         ]
         ip = patroni.get_member_ip(patroni.member_name)
-        TestCase().assertEqual(ip, "1.1.1.1")
+        tc.assertEqual(ip, "1.1.1.1")
 
         # Test using the current Patroni URL.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip(patroni.member_name)
-        TestCase().assertEqual(ip, "1.1.1.1")
+        tc.assertEqual(ip, "1.1.1.1")
 
         # Test when not having that specific member in the cluster.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
-        TestCase().assertIsNone(ip)
+        tc.assertIsNone(ip)
 
 
 def test_get_postgresql_version(peers_ips, patroni):
@@ -124,7 +127,7 @@ def test_get_postgresql_version(peers_ips, patroni):
         ]
         version = patroni.get_postgresql_version()
 
-        TestCase().assertEqual(version, "14.0")
+        tc.assertEqual(version, "14.0")
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
@@ -136,7 +139,7 @@ def test_get_primary(peers_ips, patroni):
     ):
         # Test error on trying to get the member IP.
         _get_alternative_patroni_url.side_effect = "http://server2"
-        with TestCase().assertRaises(tenacity.RetryError):
+        with tc.assertRaises(tenacity.RetryError):
             patroni.get_primary(patroni.member_name)
 
         # Test using an alternative Patroni URL.
@@ -146,17 +149,17 @@ def test_get_primary(peers_ips, patroni):
             "http://server1",
         ]
         primary = patroni.get_primary()
-        TestCase().assertEqual(primary, "postgresql-0")
+        tc.assertEqual(primary, "postgresql-0")
 
         # Test using the current Patroni URL.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = patroni.get_primary()
-        TestCase().assertEqual(primary, "postgresql-0")
+        tc.assertEqual(primary, "postgresql-0")
 
         # Test requesting the primary in the unit name pattern.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = patroni.get_primary(unit_name_pattern=True)
-        TestCase().assertEqual(primary, "postgresql/0")
+        tc.assertEqual(primary, "postgresql/0")
 
 
 def test_is_creating_backup(peers_ips, patroni):
@@ -169,13 +172,13 @@ def test_is_creating_backup(peers_ips, patroni):
                 {"name": "postgresql-1", "tags": {"is_creating_backup": True}},
             ]
         }
-        TestCase().assertTrue(patroni.is_creating_backup)
+        tc.assertTrue(patroni.is_creating_backup)
 
         # Test when no member is creating a backup.
         response.json.return_value = {
             "members": [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         }
-        TestCase().assertFalse(patroni.is_creating_backup)
+        tc.assertFalse(patroni.is_creating_backup)
 
 
 def test_is_replication_healthy(peers_ips, patroni):
@@ -186,7 +189,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     ):
         # Test when replication is healthy.
         _get.return_value.status_code = 200
-        TestCase().assertTrue(patroni.is_replication_healthy)
+        tc.assertTrue(patroni.is_replication_healthy)
 
         # Test when replication is not healthy.
         _get.side_effect = [
@@ -194,7 +197,7 @@ def test_is_replication_healthy(peers_ips, patroni):
             MagicMock(status_code=200),
             MagicMock(status_code=503),
         ]
-        TestCase().assertFalse(patroni.is_replication_healthy)
+        tc.assertFalse(patroni.is_replication_healthy)
 
 
 def test_is_member_isolated(peers_ips, patroni):
@@ -206,15 +209,15 @@ def test_is_member_isolated(peers_ips, patroni):
     ):
         # Test when it wasn't possible to connect to the Patroni API.
         _patroni_url.return_value = "http://server3"
-        TestCase().assertFalse(patroni.is_member_isolated)
+        tc.assertFalse(patroni.is_member_isolated)
 
         # Test when the member isn't isolated from the cluster.
         _patroni_url.return_value = "http://server1"
-        TestCase().assertFalse(patroni.is_member_isolated)
+        tc.assertFalse(patroni.is_member_isolated)
 
         # Test when the member is isolated from the cluster.
         _patroni_url.return_value = "http://server4"
-        TestCase().assertTrue(patroni.is_member_isolated)
+        tc.assertTrue(patroni.is_member_isolated)
 
 
 def test_render_file(peers_ips, patroni):
@@ -238,7 +241,7 @@ def test_render_file(peers_ips, patroni):
             patroni.render_file(filename, "rendered-content", 0o640)
 
         # Check the rendered file is opened with "w+" mode.
-        TestCase().assertEqual(mock.call_args_list[0][0], (filename, "w+"))
+        tc.assertEqual(mock.call_args_list[0][0], (filename, "w+"))
         # Ensure that the correct user is lookup up.
         _pwnam.assert_called_with("snap_daemon")
         # Ensure the file is chmod'd correctly.
@@ -294,7 +297,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
-        TestCase().assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
+        tc.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",

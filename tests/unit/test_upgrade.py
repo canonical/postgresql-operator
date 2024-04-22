@@ -12,6 +12,9 @@ from charm import PostgresqlOperatorCharm
 from constants import SNAP_PACKAGES
 from tests.helpers import patch_network_get
 
+# used for assert functions
+tc = TestCase()
+
 
 @pytest.fixture(autouse=True)
 def harness():
@@ -42,8 +45,8 @@ def test_build_upgrade_stack(harness):
         for rel_id in (upgrade_relation_id, peer_relation_id):
             harness.add_relation_unit(rel_id, "postgresql/2")
 
-        TestCase().assertEqual(harness.charm.upgrade.build_upgrade_stack(), [0, 1, 2])
-        TestCase().assertEqual(harness.charm.upgrade.build_upgrade_stack(), [1, 2, 0])
+        tc.assertEqual(harness.charm.upgrade.build_upgrade_stack(), [0, 1, 2])
+        tc.assertEqual(harness.charm.upgrade.build_upgrade_stack(), [1, 2, 0])
 
 
 def test_log_rollback(harness):
@@ -101,7 +104,7 @@ def test_on_upgrade_granted(harness):
         _start_patroni.return_value = True
         _member_started.return_value = False
         harness.charm.upgrade._on_upgrade_granted(mock_event)
-        TestCase().assertEqual(_member_started.call_count, 6)
+        tc.assertEqual(_member_started.call_count, 6)
         _cluster_members.assert_not_called()
         mock_event.defer.assert_called_once()
         _set_unit_completed.assert_not_called()
@@ -114,8 +117,8 @@ def test_on_upgrade_granted(harness):
         _member_started.return_value = True
         _cluster_members.return_value = ["postgresql-1"]
         harness.charm.upgrade._on_upgrade_granted(mock_event)
-        TestCase().assertEqual(_member_started.call_count, 6)
-        TestCase().assertEqual(_cluster_members.call_count, 6)
+        tc.assertEqual(_member_started.call_count, 6)
+        tc.assertEqual(_cluster_members.call_count, 6)
         mock_event.defer.assert_called_once()
         _set_unit_completed.assert_not_called()
         _set_unit_failed.assert_not_called()
@@ -179,11 +182,11 @@ def test_pre_upgrade_check(harness):
         _is_creating_backup.side_effect = [True, False, False]
 
         # Test when not all members are ready.
-        with TestCase().assertRaises(ClusterNotReadyError):
+        with tc.assertRaises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
 
         # Test when a backup is being created.
-        with TestCase().assertRaises(ClusterNotReadyError):
+        with tc.assertRaises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
 
         # Test when everything is ok to start the upgrade.
