@@ -507,7 +507,6 @@ def test_update_endpoints_with_relation(harness):
 
             # Check that the unit relation databag contains (or not) the endpoints.
             unit_relation_data = harness.get_relation_data(rel, harness.charm.unit.name)
-            print(f"unit_relation_data: {unit_relation_data}")
             assert_based_on_relation(
                 "master" in unit_relation_data
                 and master + user == unit_relation_data["master"]
