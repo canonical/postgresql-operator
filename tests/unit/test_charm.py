@@ -1234,6 +1234,7 @@ def test_update_config(harness):
             stanza=None,
             restore_stanza=None,
             pitr_target=None,
+            disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
