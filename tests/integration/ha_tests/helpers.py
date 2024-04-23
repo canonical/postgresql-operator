@@ -25,10 +25,10 @@ from tenacity import (
 from ..helpers import (
     APPLICATION_NAME,
     db_connect,
+    execute_query_on_unit,
     get_patroni_cluster,
     get_unit_address,
     run_command_on_unit,
-    execute_query_on_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -864,6 +864,7 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
+
 
 async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
     """Returns True if storage exists by provided storage ID."""
