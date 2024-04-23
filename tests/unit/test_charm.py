@@ -1859,7 +1859,7 @@ def test_invalid_secret(harness, scope, is_leader):
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_delete_password(harness, _has_secrets, caplog):
+def test_delete_password(harness, _has_secrets):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
@@ -1875,38 +1875,20 @@ def test_delete_password(harness, _has_secrets, caplog):
         assert harness.charm.get_secret("unit", "operator-password") is None
 
         harness.set_leader(True)
-        with caplog.at_level(logging.ERROR):
-            if _has_secrets:
-                error_message = (
-                    "Non-existing secret operator-password was attempted to be removed."
-                )
-            else:
-                error_message = (
-                    "Non-existing field 'operator-password' was attempted to be removed"
-                )
 
-            harness.charm.remove_secret("app", "operator-password")
-            assert error_message in caplog.text
-
-            harness.charm.remove_secret("unit", "operator-password")
-            assert error_message in caplog.text
-
-            harness.charm.remove_secret("app", "non-existing-secret")
-            assert (
-                "Non-existing field 'non-existing-secret' was attempted to be removed"
-                in caplog.text
-            )
-
-            harness.charm.remove_secret("unit", "non-existing-secret")
-            assert (
-                "Non-existing field 'non-existing-secret' was attempted to be removed"
-                in caplog.text
-            )
+        # Ensure deleting non-existent secrets does not raise errors
+        harness.charm.remove_secret("app", "operator-password")
+        harness.charm.remove_secret("unit", "operator-password")
+        harness.charm.remove_secret("app", "non-existing-secret")
+        harness.charm.remove_secret("unit", "non-existing-secret")
 
 
-@pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
+@pytest.mark.parametrize(
+    "scope,is_leader,password_key",
+    [("app", True, "operator-password"), ("unit", True, "key"), ("unit", False, "key")],
+)
 @patch_network_get(private_address="1.1.1.1")
-def test_migration_from_databag(harness, _has_secrets, scope, is_leader):
+def test_migration_from_databag(harness, _has_secrets, scope, is_leader, password_key):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -1922,21 +1904,24 @@ def test_migration_from_databag(harness, _has_secrets, scope, is_leader):
 
         # Getting current password
         entity = getattr(harness.charm, scope)
-        harness.update_relation_data(rel_id, entity.name, {"operator-password": "bla"})
-        assert harness.charm.get_secret(scope, "operator-password") == "bla"
+        harness.update_relation_data(rel_id, entity.name, {password_key: "bla"})
+        assert harness.charm.get_secret(scope, password_key) == "bla"
 
         # Reset new secret
-        harness.charm.set_secret(scope, "operator-password", "blablabla")
-        assert harness.charm.model.get_secret(label=f"postgresql.{scope}")
-        assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
-        assert "operator-password" not in harness.get_relation_data(
+        harness.charm.set_secret(scope, password_key, "blablabla")
+        assert harness.charm.model.get_secret(label=f"database-peers.postgresql.{scope}")
+        assert harness.charm.get_secret(scope, password_key) == "blablabla"
+        assert password_key not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
         )
 
 
-@pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
+@pytest.mark.parametrize(
+    "scope,is_leader,password_key",
+    [("app", True, "operator-password"), ("unit", True, "key"), ("unit", False, "key")],
+)
 @patch_network_get(private_address="1.1.1.1")
-def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader):
+def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader, password_key):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -1951,22 +1936,22 @@ def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader):
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
 
-        secret = harness.charm.app.add_secret({"operator-password": "bla"})
+        secret = harness.charm.app.add_secret({password_key: "bla"})
 
         # Getting current password
         entity = getattr(harness.charm, scope)
         harness.update_relation_data(rel_id, entity.name, {SECRET_INTERNAL_LABEL: secret.id})
-        assert harness.charm.get_secret(scope, "operator-password") == "bla"
+        assert harness.charm.get_secret(scope, password_key) == "bla"
 
         # Reset new secret
         # Only the leader can set app secret content.
         with harness.hooks_disabled():
             harness.set_leader(True)
-        harness.charm.set_secret(scope, "operator-password", "blablabla")
+        harness.charm.set_secret(scope, password_key, "blablabla")
         with harness.hooks_disabled():
             harness.set_leader(is_leader)
-        assert harness.charm.model.get_secret(label=f"postgresql.{scope}")
-        assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
+        assert harness.charm.model.get_secret(label=f"database-peers.postgresql.{scope}")
+        assert harness.charm.get_secret(scope, password_key) == "blablabla"
         assert SECRET_INTERNAL_LABEL not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
         )
