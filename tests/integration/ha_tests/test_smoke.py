@@ -63,7 +63,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         )
 
         logger.info("waiting for postgresql")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_postgresql_ready(ops_test, primary_name)
 
@@ -72,7 +72,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
 
         # Check if storage exists after application deployed
         logger.info("werifing is storage exists")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_storage_exists(ops_test, storage_id_str)
 
@@ -91,7 +91,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
 
         # Storage should remain
         logger.info("werifing is storage exists")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_storage_exists(ops_test, storage_id_str)
 
@@ -103,7 +103,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
     async with ops_test.fast_forward():
         logger.info("checking garbage storage")
         garbage_storage = None
-        for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 garbage_storage = await get_any_deatached_storage(ops_test)
 
@@ -119,7 +119,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
         )
 
         logger.info("waiting for postgresql")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_postgresql_ready(ops_test, primary_name)
 
@@ -130,7 +130,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
 
         # Check if storage exists after application deployed
         logger.info("werifing is storage exists")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_storage_exists(ops_test, storage_id_str)
 
@@ -150,7 +150,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
     async with ops_test.fast_forward():
         logger.info("checking garbage storage")
         garbage_storage = None
-        for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 garbage_storage = await get_any_deatached_storage(ops_test)
 
@@ -190,7 +190,7 @@ async def test_app_resources_conflicts_v2(ops_test: OpsTest, charm: str):
     async with ops_test.fast_forward():
         logger.info("checking garbage storage")
         garbage_storage = None
-        for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 garbage_storage = await get_any_deatached_storage(ops_test)
 
