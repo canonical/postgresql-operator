@@ -8,8 +8,10 @@ import requests as requests
 import tenacity as tenacity
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from ops.testing import Harness
 from tenacity import stop_after_delay
 
+from charm import PostgresqlOperatorCharm
 from cluster import Patroni
 from constants import (
     PATRONI_CONF_PATH,
@@ -47,9 +49,15 @@ def mocked_requests_get(*args, **kwargs):
 class TestCluster(unittest.TestCase):
     def setUp(self):
         # Setup a cluster.
+        self.harness = Harness(PostgresqlOperatorCharm)
+        self.addCleanup(self.harness.cleanup)
+        self.harness.begin()
+        self.charm = self.harness.charm
+
         self.peers_ips = {"2.2.2.2", "3.3.3.3"}
 
         self.patroni = Patroni(
+            self.charm,
             "1.1.1.1",
             "postgresql",
             "postgresql-0",
@@ -225,10 +233,16 @@ class TestCluster(unittest.TestCase):
         # Ensure the file is chown'd correctly.
         _chown.assert_called_with(filename, uid=35, gid=35)
 
+    @patch(
+        "relations.async_replication.PostgreSQLAsyncReplication.get_partner_addresses",
+        return_value=["2.2.2.2", "3.3.3.3"],
+    )
     @patch("charm.Patroni.get_postgresql_version")
     @patch("charm.Patroni.render_file")
     @patch("charm.Patroni._create_directory")
-    def test_render_patroni_yml_file(self, _, _render_file, _get_postgresql_version):
+    def test_render_patroni_yml_file(
+        self, _, _render_file, _get_postgresql_version, _get_partner_addresses
+    ):
         _get_postgresql_version.return_value = "14.7"
 
         # Define variables to render in the template.
@@ -248,6 +262,7 @@ class TestCluster(unittest.TestCase):
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
+            partner_addrs=["2.2.2.2", "3.3.3.3"],
             peers_ips=self.peers_ips,
             scope=scope,
             self_ip=self.patroni.unit_ip,
@@ -275,7 +290,7 @@ class TestCluster(unittest.TestCase):
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
-            0o600,
+            0o644,
         )
 
     @patch("charm.snap.SnapCache")
