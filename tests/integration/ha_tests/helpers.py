@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 import logging
 import os
 import random
@@ -24,6 +25,7 @@ from tenacity import (
 from ..helpers import (
     APPLICATION_NAME,
     db_connect,
+    execute_query_on_unit,
     get_patroni_cluster,
     get_unit_address,
     run_command_on_unit,
@@ -288,7 +290,7 @@ def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
     subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority=10"
+    limit_set_command = f"lxc config set {machine_name} limits.network.priority=10"
     subprocess.check_call(limit_set_command.split())
 
 
@@ -627,7 +629,7 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress="
     subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority="
+    limit_set_command = f"lxc config set {machine_name} limits.network.priority="
     subprocess.check_call(limit_set_command.split())
 
 
@@ -862,3 +864,100 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
+
+
+async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
+    """Returns True if storage exists by provided storage ID."""
+    complete_command = [
+        "show-storage",
+        "-m",
+        f"{ops_test.controller_name}:{ops_test.model.info.name}",
+        storage_id,
+        "--format=json",
+    ]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        if return_code == 1:
+            return storage_id in stdout
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
+    return storage_id in str(stdout)
+
+
+async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
+    """Creates database with specified name."""
+    unit = ops_test.model.applications[app].units[0]
+    unit_address = await unit.get_public_address()
+    password = await get_password(ops_test, app)
+
+    conn = db_connect(unit_address, password)
+    conn.autocommit = True
+    cursor = conn.cursor()
+    cursor.execute(f"CREATE DATABASE {db};")
+    cursor.close()
+    conn.close()
+
+
+async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
+    """Returns True if database with specified name already exists."""
+    unit = ops_test.model.applications[app].units[0]
+    unit_address = await unit.get_public_address()
+    password = await get_password(ops_test, app)
+
+    query = await execute_query_on_unit(
+        unit_address,
+        password,
+        "select datname from pg_catalog.pg_database where datname = '{db}';",
+    )
+
+    if "ERROR" in query:
+        raise Exception(f"Database check is failed with postgresql err: {query}")
+
+    return db in query
+
+
+async def get_any_deatached_storage(ops_test: OpsTest) -> str:
+    """Returns any of the current available deatached storage."""
+    return_code, storages_list, stderr = await ops_test.juju(
+        "storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", "--format=json"
+    )
+    if return_code != 0:
+        raise Exception(f"failed to get charm info with error: {stderr}")
+
+    parsed_storages_list = json.loads(storages_list)
+    for storage_name, storage in parsed_storages_list["storage"].items():
+        if (str(storage["status"]["current"]) == "detached") and (str(storage["life"] == "alive")):
+            return storage_name
+
+    raise Exception("failed to get deatached storage")
+
+
+async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
+    """Checks if "operator" password is valid for current postgresql db."""
+    stdout = await run_command_on_unit(
+        ops_test,
+        unit_name,
+        """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
+    )
+    return 'password authentication failed for user "operator"' not in stdout
+
+
+async def remove_unit_force(ops_test: OpsTest, unit_name: str):
+    """Removes unit with --force --no-wait."""
+    app_name = unit_name.split("/")[0]
+    complete_command = ["remove-unit", f"{unit_name}", "--force", "--no-wait", "--no-prompt"]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
+
+    for unit in ops_test.model.applications[app_name].units:
+        assert unit != unit_name
