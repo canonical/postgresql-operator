@@ -8,6 +8,7 @@ import logging
 import os
 import pwd
 import shutil
+import subprocess
 from datetime import datetime
 from pathlib import Path
 from subprocess import PIPE, run
@@ -194,9 +195,7 @@ class PostgreSQLAsyncReplication(Object):
             # Store current data in a ZIP file, clean folder and generate configuration.
             logger.info("Creating backup of pgdata folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
-            self.container.exec(
-                f"tar -zcf {filename} {POSTGRESQL_DATA_PATH}".split()
-            ).wait_output()
+            subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_PATH}".split())
             logger.warning("Please review the backup file %s and handle its removal", filename)
         return True
 
