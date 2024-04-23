@@ -25,10 +25,10 @@ from tenacity import (
 from ..helpers import (
     APPLICATION_NAME,
     db_connect,
-    execute_query_on_unit,
     get_patroni_cluster,
     get_unit_address,
     run_command_on_unit,
+    execute_query_on_unit,
 )
 
 logger = logging.getLogger(__name__)
@@ -290,7 +290,7 @@ def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
     subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config set {machine_name} limits.network.priority=10"
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority=10"
     subprocess.check_call(limit_set_command.split())
 
 
@@ -629,7 +629,7 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress="
     subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config set {machine_name} limits.network.priority="
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority="
     subprocess.check_call(limit_set_command.split())
 
 
@@ -864,7 +864,6 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
-
 
 async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
     """Returns True if storage exists by provided storage ID."""
