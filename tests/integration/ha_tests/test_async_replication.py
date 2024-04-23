@@ -19,6 +19,7 @@ from ..helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    scale_application,
     wait_for_relation_removed_between,
 )
 from .helpers import (
@@ -473,6 +474,56 @@ async def test_async_replication_failover_in_secondary_cluster(
 
     logger.info("Ensure continuous_writes after the crashed unit")
     await are_writes_increasing(ops_test)
+
+    # Verify that no writes to the database were missed after stopping the writes
+    # (check that all the units have all the writes).
+    logger.info("checking whether no writes were lost")
+    await check_writes(ops_test, extra_model=second_model)
+
+
+@pytest.mark.group(1)
+@pytest.mark.juju3
+@pytest.mark.abort_on_fail
+async def test_scaling(
+    ops_test: OpsTest, first_model: Model, second_model: Model, continuous_writes
+) -> None:
+    """Test that async replication works when scaling the clusters."""
+    logger.info("starting continuous writes to the database")
+    await start_continuous_writes(ops_test, DATABASE_APP_NAME)
+
+    logger.info("checking whether writes are increasing")
+    await are_writes_increasing(ops_test)
+
+    async with ops_test.fast_forward(FAST_INTERVAL), fast_forward(second_model, FAST_INTERVAL):
+        logger.info("scaling out the first cluster")
+        first_cluster_original_size = len(first_model.applications[DATABASE_APP_NAME].units)
+        await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1)
+
+        logger.info("checking whether writes are increasing")
+        await are_writes_increasing(ops_test, extra_model=second_model)
+
+        logger.info("scaling out the second cluster")
+        second_cluster_original_size = len(second_model.applications[DATABASE_APP_NAME].units)
+        await scale_application(
+            ops_test, DATABASE_APP_NAME, second_cluster_original_size + 1, model=second_model
+        )
+
+        logger.info("checking whether writes are increasing")
+        await are_writes_increasing(ops_test, extra_model=second_model)
+
+        logger.info("scaling in the first cluster")
+        await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size)
+
+        logger.info("checking whether writes are increasing")
+        await are_writes_increasing(ops_test, extra_model=second_model)
+
+        logger.info("scaling in the second cluster")
+        await scale_application(
+            ops_test, DATABASE_APP_NAME, second_cluster_original_size, model=second_model
+        )
+
+        logger.info("checking whether writes are increasing")
+        await are_writes_increasing(ops_test, extra_model=second_model)
 
     # Verify that no writes to the database were missed after stopping the writes
     # (check that all the units have all the writes).
