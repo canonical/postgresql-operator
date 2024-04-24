@@ -3,12 +3,15 @@
 # See LICENSE file for licensing details.
 import asyncio
 import logging
+import secrets
+import string
 
+import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import CHARM_SERIES, DATABASE_APP_NAME
-from .helpers import check_relation_data_existence
+from .helpers import build_connection_string
 
 logger = logging.getLogger(__name__)
 
@@ -47,58 +50,78 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
 async def test_relations(ops_test: OpsTest, charm):
     """Test that check relation data."""
     async with ops_test.fast_forward():
-        # Relate the charms and wait for them exchanging some connection data.
+        # Relate with client-app, wait-for-ready, check relation data, remove-relation
         await ops_test.model.add_relation(
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
         )
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=False,
+        primary_connection_string = await build_connection_string(
+            ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME
         )
 
-        # Remove relation, relate 2nd time and check relation data
+        with psycopg2.connect(primary_connection_string) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                # Check that it's possible to write and read data from the database that
+                # was created for the application.
+                cursor.execute("DROP TABLE IF EXISTS test;")
+                cursor.execute("CREATE TABLE test(data TEXT);")
+                cursor.execute("INSERT INTO test(data) VALUES('some data');")
+                cursor.execute("SELECT data FROM test;")
+                data = cursor.fetchone()
+                assert data[0] == "some data"
+        connection.close()
+
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:database",
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 
+        # Relate with client-app 2nd time, wait-for-ready, check relation data
         await ops_test.model.add_relation(
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
         )
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=False,
-        )
 
-        # Repeat re-relation using relation options and check relation data
+        primary_connection_string = await build_connection_string(
+            ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME
+        )
+        with psycopg2.connect(primary_connection_string) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT data FROM test;")
+                data = cursor.fetchone()
+                assert data[0] == "some data"
+        connection.close()
+
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:database",
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 
+        # Repeat re-relation using all available relation options (e.g. legacy_roles)
         await ops_test.model.applications[APPLICATION_APP_NAME].set_config({
-            # "database-name": APPLICATION_APP_NAME.replace("-", "_"),
             "legacy_roles": "true",
         })
-        await ops_test.model.wait_for_idle(apps=[APPLICATION_APP_NAME], status="blocked")
-        await ops_test.model.add_relation(APPLICATION_APP_NAME, DATABASE_APP_NAME)
+        await ops_test.model.wait_for_idle(
+            apps=[APPLICATION_APP_NAME], status="active", timeout=1000
+        )
+
+        await ops_test.model.add_relation(
+            f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}", DATABASE_APP_NAME
+        )
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=True,
+        primary_connection_string = await build_connection_string(
+            ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME
         )
+        connection = psycopg2.connect(primary_connection_string)
+        connection.autocommit = True
+        cursor = connection.cursor()
+        random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+        cursor.execute(f"CREATE DATABASE {random_name};")
+        cursor.execute(f"DROP DATABASE {random_name};")
+        connection.close()
