@@ -17,11 +17,16 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent
+from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
-from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT
+from constants import (
+    ALL_CLIENT_RELATIONS,
+    APP_SCOPE,
+    DATABASE_PORT,
+    ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -48,7 +53,10 @@ class PostgreSQLProvider(Object):
         self.framework.observe(
             charm.on[self.relation_name].relation_broken, self._on_relation_broken
         )
-
+        self.framework.observe(
+            charm.on[self.relation_name].relation_changed,
+            self._on_relation_changed_event,
+        )
         self.charm = charm
 
         # Charm events defined in the database provides charm library.
@@ -190,6 +198,13 @@ class PostgreSQLProvider(Object):
                 read_only_endpoints,
             )
 
+    def _check_multiple_endpoints(self) -> bool:
+        """Checks if there are relations with other endpoints."""
+        relation_names = {relation.name for relation in self.charm.client_relations}
+        if "database" in relation_names and len(relation_names) > 1:
+            return True
+        return False
+
     def _update_unit_status(self, relation: Relation) -> None:
         """# Clean up Blocked status if it's due to extensions request."""
         if (
@@ -197,6 +212,27 @@ class PostgreSQLProvider(Object):
             and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ):
             if not self.check_for_invalid_extra_user_roles(relation.id):
+                self.charm.unit.status = ActiveStatus()
+
+        self._update_unit_status_on_blocking_endpoint_simultaneously()
+
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
+        """Event emitted when the relation has changed."""
+        # Leader only
+        if not self.charm.unit.is_leader():
+            return
+
+        if self._check_multiple_endpoints():
+            self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
+            return
+
+    def _update_unit_status_on_blocking_endpoint_simultaneously(self):
+        """Clean up Blocked status if this is due related of multiple endpoints."""
+        if (
+            self.charm.is_blocked
+            and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+        ):
+            if not self._check_multiple_endpoints():
                 self.charm.unit.status = ActiveStatus()
 
     def check_for_invalid_extra_user_roles(self, relation_id: int) -> bool:
