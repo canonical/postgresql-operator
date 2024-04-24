@@ -1,0 +1,35 @@
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:397 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:402 Cutting network for postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:408 checking for no connectivity between postgresql/1 and postgresql/2
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:408 checking for no connectivity between postgresql/1 and postgresql/3
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:415 checking for no connectivity between postgresql/1 and the controller
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:422 checking whether the connectivity to the database is not working
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:428 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:431 checking whether a new primary was elected
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:438 Restoring network for postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:443 waiting for cluster to become idle after updating member IP
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+  postgresql/3 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [executing] maintenance: reconfiguring cluster
+  postgresql/3 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [executing] maintenance: reconfiguring cluster
+  postgresql/3 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [executing] active: 
+  postgresql/3 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  postgresql/2 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:454 waiting for IP address to be updated on Juju unit
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:458 waiting for the database service to be ready on postgresql/1
+[32mINFO    [0m integration.ha_tests.test_self_healing:test_self_healing.py:462 checking whether the connectivity to the database is working
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:178 checking that the former primary is now a replica
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:184 checking that all units are part of the same cluster
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:198 checking that no writes to the database were missed after stopping the writes
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:202 checking that the former primary is up to date with the cluster after restarting
