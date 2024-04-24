@@ -1,10 +1,10 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import signal
-import unittest
 from typing import Optional
 from unittest.mock import Mock, PropertyMock, patch
 
+import pytest
 from ops.charm import CharmBase
 from ops.model import ActiveStatus, Relation, WaitingStatus
 from ops.testing import Harness
@@ -56,63 +56,71 @@ class MockCharm(CharmBase):
         return None
 
 
-class TestClusterTopologyChange(unittest.TestCase):
-    def setUp(self) -> None:
-        self.harness = Harness(MockCharm, meta="name: test-charm")
-        self.harness.begin()
-        self.charm = self.harness.charm
+@pytest.fixture(autouse=True)
+def harness():
+    harness = Harness(MockCharm, meta="name: test-charm")
+    harness.begin()
+    yield harness
+    harness.cleanup()
 
-    @patch("builtins.open")
-    @patch("subprocess.Popen")
-    @patch.object(MockCharm, "_peers", new_callable=PropertyMock)
-    def test_start_observer(self, _peers, _popen, _open):
+
+def test_start_observer(harness):
+    with (
+        patch("builtins.open") as _open,
+        patch("subprocess.Popen") as _popen,
+        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+    ):
         # Test that nothing is done if there is already a running process.
-        _peers.return_value = Mock(data={self.charm.unit: {"observer-pid": "1"}})
-        self.charm.observer.start_observer()
+        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
+        harness.charm.observer.start_observer()
         _popen.assert_not_called()
 
         # Test that nothing is done if the charm is not in an active status.
-        self.charm.unit.status = WaitingStatus()
-        _peers.return_value = Mock(data={self.charm.unit: {}})
-        self.charm.observer.start_observer()
+        harness.charm.unit.status = WaitingStatus()
+        _peers.return_value = Mock(data={harness.charm.unit: {}})
+        harness.charm.observer.start_observer()
         _popen.assert_not_called()
 
         # Test that nothing is done if peer relation is not available yet.
-        self.charm.unit.status = ActiveStatus()
+        harness.charm.unit.status = ActiveStatus()
         _peers.return_value = None
-        self.charm.observer.start_observer()
+        harness.charm.observer.start_observer()
         _popen.assert_not_called()
 
         # Test that nothing is done if there is already a running process.
-        _peers.return_value = Mock(data={self.charm.unit: {}})
+        _peers.return_value = Mock(data={harness.charm.unit: {}})
         _popen.return_value = Mock(pid=1)
-        self.charm.observer.start_observer()
+        harness.charm.observer.start_observer()
         _popen.assert_called_once()
 
-    @patch("os.kill")
-    @patch.object(MockCharm, "_peers", new_callable=PropertyMock)
-    def test_stop_observer(self, _peers, _kill):
+
+def test_stop_observer(harness):
+    with (
+        patch("os.kill") as _kill,
+        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+    ):
         # Test that nothing is done if there is no process running.
-        self.charm.observer.stop_observer()
+        harness.charm.observer.stop_observer()
         _kill.assert_not_called()
 
-        _peers.return_value = Mock(data={self.charm.unit: {}})
-        self.charm.observer.stop_observer()
+        _peers.return_value = Mock(data={harness.charm.unit: {}})
+        harness.charm.observer.stop_observer()
         _kill.assert_not_called()
 
         # Test that the process is killed.
-        _peers.return_value = Mock(data={self.charm.unit: {"observer-pid": "1"}})
-        self.charm.observer.stop_observer()
+        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
+        harness.charm.observer.stop_observer()
         _kill.assert_called_once_with(1, signal.SIGINT)
 
-    @patch("subprocess.run")
-    def test_dispatch(self, _run):
+
+def test_dispatch(harness):
+    with patch("subprocess.run") as _run:
         command = "test-command"
         charm_dir = "/path"
-        dispatch(command, self.charm.unit.name, charm_dir)
+        dispatch(command, harness.charm.unit.name, charm_dir)
         _run.assert_called_once_with([
             command,
             "-u",
-            self.charm.unit.name,
+            harness.charm.unit.name,
             f"JUJU_DISPATCH_PATH=hooks/cluster_topology_change {charm_dir}/dispatch",
         ])
