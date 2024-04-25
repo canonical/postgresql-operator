@@ -1729,7 +1729,6 @@ def test_get_secret(harness):
         harness.update_relation_data(
             rel_id, harness.charm.app.name, {"operator_password": "test-password"}
         )
-        # import pdb; pdb.set_trace()
         assert harness.charm.get_secret("app", "operator_password") == "test-password"
 
         # Unit level changes don't require leader privileges
