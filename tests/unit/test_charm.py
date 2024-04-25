@@ -1726,8 +1726,10 @@ def test_get_secret(harness):
         harness.set_leader()
         # Test application scope.
         assert harness.charm.get_secret("app", "operator_password") is None
-        harness.update_relation_data(rel_id, harness.charm.app.name, {"operator_password": "test-password"})
-        #import pdb; pdb.set_trace()
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"operator_password": "test-password"}
+        )
+        # import pdb; pdb.set_trace()
         assert harness.charm.get_secret("app", "operator_password") == "test-password"
 
         # Unit level changes don't require leader privileges
@@ -1789,7 +1791,7 @@ def test_set_secret(harness, _has_secrets):
     # should not go to the databag, but to juju secrets instead.
     if _has_secrets:
         return
-    
+
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
@@ -1805,14 +1807,18 @@ def test_set_secret(harness, _has_secrets):
         assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
 
         # Test unit scope.
-        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        assert "operator_password" not in harness.get_relation_data(
+            rel_id, harness.charm.unit.name
+        )
         harness.charm.set_secret("unit", "operator_password", "test-password")
         assert (
             harness.get_relation_data(rel_id, harness.charm.unit.name)["operator_password"]
             == "test-password"
         )
         harness.charm.set_secret("unit", "operator_password", None)
-        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        assert "operator_password" not in harness.get_relation_data(
+            rel_id, harness.charm.unit.name
+        )
         with pytest.raises(RuntimeError):
             harness.charm.set_secret("test", "operator_password", "test")
 
