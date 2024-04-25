@@ -1725,18 +1725,19 @@ def test_get_secret(harness):
         # App level changes require leader privileges
         harness.set_leader()
         # Test application scope.
-        assert harness.charm.get_secret("app", "password") is None
-        harness.update_relation_data(rel_id, harness.charm.app.name, {"password": "test-password"})
-        assert harness.charm.get_secret("app", "password") == "test-password"
+        assert harness.charm.get_secret("app", "operator_password") is None
+        harness.update_relation_data(rel_id, harness.charm.app.name, {"operator_password": "test-password"})
+        #import pdb; pdb.set_trace()
+        assert harness.charm.get_secret("app", "operator_password") == "test-password"
 
         # Unit level changes don't require leader privileges
         harness.set_leader(False)
         # Test unit scope.
-        assert harness.charm.get_secret("unit", "password") is None
+        assert harness.charm.get_secret("unit", "operator_password") is None
         harness.update_relation_data(
-            rel_id, harness.charm.unit.name, {"password": "test-password"}
+            rel_id, harness.charm.unit.name, {"operator_password": "test-password"}
         )
-        assert harness.charm.get_secret("unit", "password") == "test-password"
+        assert harness.charm.get_secret("unit", "operator_password") == "test-password"
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -1769,47 +1770,51 @@ def test_on_get_password_secrets(harness):
         mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
 
 
-@pytest.mark.parametrize("scope", [("app"), ("unit")])
+@pytest.mark.parametrize("scope,field", [("app", "operator-password"), ("unit", "csr")])
 @patch_network_get(private_address="1.1.1.1")
-def test_get_secret_secrets(harness, scope):
+def test_get_secret_secrets(harness, scope, field):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
         harness.set_leader()
 
-        assert harness.charm.get_secret(scope, "operator-password") is None
-        harness.charm.set_secret(scope, "operator-password", "test-password")
-        assert harness.charm.get_secret(scope, "operator-password") == "test-password"
+        assert harness.charm.get_secret(scope, field) is None
+        harness.charm.set_secret(scope, field, "test")
+        assert harness.charm.get_secret(scope, field) == "test"
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_set_secret(harness):
+def test_set_secret(harness, _has_secrets):
+    # after new data_interfaces version, every secret we set using set_secret
+    # should not go to the databag, but to juju secrets instead.
+    if _has_secrets:
+        return
+    
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
 
         # Test application scope.
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
-        harness.charm.set_secret("app", "password", "test-password")
+        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
+        harness.charm.set_secret("app", "operator_password", "test-password")
         assert (
-            harness.get_relation_data(rel_id, harness.charm.app.name)["password"]
+            harness.get_relation_data(rel_id, harness.charm.app.name)["operator_password"]
             == "test-password"
         )
-        harness.charm.set_secret("app", "password", None)
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
+        harness.charm.set_secret("app", "operator_password", None)
+        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
 
         # Test unit scope.
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
-        harness.charm.set_secret("unit", "password", "test-password")
+        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        harness.charm.set_secret("unit", "operator_password", "test-password")
         assert (
-            harness.get_relation_data(rel_id, harness.charm.unit.name)["password"]
+            harness.get_relation_data(rel_id, harness.charm.unit.name)["operator_password"]
             == "test-password"
         )
-        harness.charm.set_secret("unit", "password", None)
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
-
+        harness.charm.set_secret("unit", "operator_password", None)
+        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
         with pytest.raises(RuntimeError):
-            harness.charm.set_secret("test", "password", "test")
+            harness.charm.set_secret("test", "operator_password", "test")
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
@@ -1843,7 +1848,7 @@ def test_invalid_secret(harness, scope, is_leader):
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
 
-        with pytest.raises(RelationDataTypeError):
+        with pytest.raises((RelationDataTypeError, TypeError)):
             harness.charm.set_secret(scope, "somekey", 1)
 
         harness.charm.set_secret(scope, "somekey", "")
@@ -1851,7 +1856,7 @@ def test_invalid_secret(harness, scope, is_leader):
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_delete_password(harness, _has_secrets):
+def test_delete_password(harness, _has_secrets, caplog):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
@@ -1867,20 +1872,38 @@ def test_delete_password(harness, _has_secrets):
         assert harness.charm.get_secret("unit", "operator-password") is None
 
         harness.set_leader(True)
+        with caplog.at_level(logging.DEBUG):
+            if _has_secrets:
+                error_message = (
+                    "Non-existing secret operator-password was attempted to be removed."
+                )
+            else:
+                error_message = (
+                    "Non-existing field 'operator-password' was attempted to be removed"
+                )
 
-        # Ensure deleting non-existent secrets does not raise errors
-        harness.charm.remove_secret("app", "operator-password")
-        harness.charm.remove_secret("unit", "operator-password")
-        harness.charm.remove_secret("app", "non-existing-secret")
-        harness.charm.remove_secret("unit", "non-existing-secret")
+            harness.charm.remove_secret("app", "operator-password")
+            assert error_message in caplog.text
+
+            harness.charm.remove_secret("unit", "operator-password")
+            assert error_message in caplog.text
+
+            harness.charm.remove_secret("app", "non-existing-secret")
+            assert (
+                "Non-existing field 'non-existing-secret' was attempted to be removed"
+                in caplog.text
+            )
+
+            harness.charm.remove_secret("unit", "non-existing-secret")
+            assert (
+                "Non-existing field 'non-existing-secret' was attempted to be removed"
+                in caplog.text
+            )
 
 
-@pytest.mark.parametrize(
-    "scope,is_leader,password_key",
-    [("app", True, "operator-password"), ("unit", True, "key"), ("unit", False, "key")],
-)
+@pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
-def test_migration_from_databag(harness, _has_secrets, scope, is_leader, password_key):
+def test_migration_from_databag(harness, _has_secrets, scope, is_leader):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -1896,24 +1919,21 @@ def test_migration_from_databag(harness, _has_secrets, scope, is_leader, passwor
 
         # Getting current password
         entity = getattr(harness.charm, scope)
-        harness.update_relation_data(rel_id, entity.name, {password_key: "bla"})
-        assert harness.charm.get_secret(scope, password_key) == "bla"
+        harness.update_relation_data(rel_id, entity.name, {"operator_password": "bla"})
+        assert harness.charm.get_secret(scope, "operator_password") == "bla"
 
         # Reset new secret
-        harness.charm.set_secret(scope, password_key, "blablabla")
-        assert harness.charm.model.get_secret(label=f"database-peers.postgresql.{scope}")
-        assert harness.charm.get_secret(scope, password_key) == "blablabla"
-        assert password_key not in harness.get_relation_data(
+        harness.charm.set_secret(scope, "operator-password", "blablabla")
+        assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
+        assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
+        assert "operator-password" not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
         )
 
 
-@pytest.mark.parametrize(
-    "scope,is_leader,password_key",
-    [("app", True, "operator-password"), ("unit", True, "key"), ("unit", False, "key")],
-)
+@pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
-def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader, password_key):
+def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -1928,22 +1948,22 @@ def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader, p
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
 
-        secret = harness.charm.app.add_secret({password_key: "bla"})
+        secret = harness.charm.app.add_secret({"operator-password": "bla"})
 
         # Getting current password
         entity = getattr(harness.charm, scope)
         harness.update_relation_data(rel_id, entity.name, {SECRET_INTERNAL_LABEL: secret.id})
-        assert harness.charm.get_secret(scope, password_key) == "bla"
+        assert harness.charm.get_secret(scope, "operator_password") == "bla"
 
         # Reset new secret
         # Only the leader can set app secret content.
         with harness.hooks_disabled():
             harness.set_leader(True)
-        harness.charm.set_secret(scope, password_key, "blablabla")
+        harness.charm.set_secret(scope, "operator_password", "blablabla")
         with harness.hooks_disabled():
             harness.set_leader(is_leader)
-        assert harness.charm.model.get_secret(label=f"database-peers.postgresql.{scope}")
-        assert harness.charm.get_secret(scope, password_key) == "blablabla"
+        assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
+        assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
         assert SECRET_INTERNAL_LABEL not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
         )

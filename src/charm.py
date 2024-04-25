@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, get_args
 
 import psycopg2
-from charms.data_platform_libs.v0.data_interfaces import DataPeer, DataPeerUnit
+from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
@@ -118,28 +118,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = BlockedStatus("Disabled")
             sys.exit(0)
 
-        self.peer_relation_app = DataPeer(
-            self,
+        self.peer_relation_app = DataPeerData(
+            self.model,
             relation_name=PEER,
-            additional_secret_fields=[
-                "monitoring-password",
-                "operator-password",
-                "replication-password",
-                "rewind-password",
-            ],
             secret_field_name=SECRET_INTERNAL_LABEL,
             deleted_label=SECRET_DELETED_LABEL,
         )
-        self.peer_relation_unit = DataPeerUnit(
-            self,
+        self.peer_relation_unit = DataPeerUnitData(
+            self.model,
             relation_name=PEER,
-            additional_secret_fields=[
-                "key",
-                "csr",
-                "cauth",
-                "cert",
-                "chain",
-            ],
             secret_field_name=SECRET_INTERNAL_LABEL,
             deleted_label=SECRET_DELETED_LABEL,
         )
@@ -246,6 +233,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if scope == UNIT_SCOPE:
             return self.unit
 
+    def peer_relation_data(self, scope: Scopes) -> DataPeerData:
+        """Returns the peer relation data per scope."""
+        if scope == APP_SCOPE:
+            return self.peer_relation_app
+        elif scope == UNIT_SCOPE:
+            return self.peer_relation_unit
+
     def _translate_field_to_secret_key(self, key: str) -> str:
         """Change 'key' to secrets-compatible key field."""
         if not JujuVersion.from_environ().has_secrets:
@@ -261,11 +255,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         peers = self.model.get_relation(PEER)
         secret_key = self._translate_field_to_secret_key(key)
-        if scope == APP_SCOPE:
-            value = self.peer_relation_app.fetch_my_relation_field(peers.id, secret_key)
-        else:
-            value = self.peer_relation_unit.fetch_my_relation_field(peers.id, secret_key)
-        return value
+        # Old translation in databag is to be taken
+        if key != secret_key and (
+            result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key)
+        ):
+            return result
+
+        return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
 
     def set_secret(self, scope: Scopes, key: str, value: Optional[str]) -> Optional[str]:
         """Set secret from the secret storage."""
@@ -277,10 +273,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         peers = self.model.get_relation(PEER)
         secret_key = self._translate_field_to_secret_key(key)
-        if scope == APP_SCOPE:
-            self.peer_relation_app.update_relation_data(peers.id, {secret_key: value})
-        else:
-            self.peer_relation_unit.update_relation_data(peers.id, {secret_key: value})
+        # Old translation in databag is to be deleted
+        if key != secret_key and self.peer_relation_data(scope).fetch_my_relation_field(
+            peers.id, key
+        ):
+            self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
+        self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
 
     def remove_secret(self, scope: Scopes, key: str) -> None:
         """Removing a secret."""
