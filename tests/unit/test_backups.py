@@ -1272,8 +1272,12 @@ def test_on_restore_action(harness):
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
         patch("charm.PostgreSQLBackups._list_backups") as _list_backups,
         patch("charm.PostgreSQLBackups._pre_restore_checks") as _pre_restore_checks,
-        patch("charm.PostgresqlOperatorCharm.override_patroni_restart_condition") as _override_patroni_restart_condition,
-        patch("charm.PostgresqlOperatorCharm.restore_patroni_restart_condition") as _restore_patroni_restart_condition
+        patch(
+            "charm.PostgresqlOperatorCharm.override_patroni_restart_condition"
+        ) as _override_patroni_restart_condition,
+        patch(
+            "charm.PostgresqlOperatorCharm.restore_patroni_restart_condition"
+        ) as _restore_patroni_restart_condition,
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
         # Test when pre restore checks fail.
