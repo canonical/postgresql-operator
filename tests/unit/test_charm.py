@@ -1786,11 +1786,6 @@ def test_get_secret_secrets(harness, scope, field):
 
 @patch_network_get(private_address="1.1.1.1")
 def test_set_secret(harness, _has_secrets):
-    # after new data_interfaces version, every secret we set using set_secret
-    # should not go to the databag, but to juju secrets instead.
-    if _has_secrets:
-        return
-
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
@@ -1798,20 +1793,14 @@ def test_set_secret(harness, _has_secrets):
         # Test application scope.
         assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
         harness.charm.set_secret("app", "password", "test-password")
-        assert (
-            harness.get_relation_data(rel_id, harness.charm.app.name)["password"]
-            == "test-password"
-        )
+        assert harness.charm.get_secret("app", "password") == "test-password"
         harness.charm.set_secret("app", "password", None)
         assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
 
         # Test unit scope.
         assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
         harness.charm.set_secret("unit", "password", "test-password")
-        assert (
-            harness.get_relation_data(rel_id, harness.charm.unit.name)["password"]
-            == "test-password"
-        )
+        assert harness.charm.get_secret("unit", "password") == "test-password"
         harness.charm.set_secret("unit", "password", None)
         assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
         with pytest.raises(RuntimeError):
