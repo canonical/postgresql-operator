@@ -1796,30 +1796,26 @@ def test_set_secret(harness, _has_secrets):
         harness.set_leader()
 
         # Test application scope.
-        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
-        harness.charm.set_secret("app", "operator_password", "test-password")
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
+        harness.charm.set_secret("app", "password", "test-password")
         assert (
-            harness.get_relation_data(rel_id, harness.charm.app.name)["operator_password"]
+            harness.get_relation_data(rel_id, harness.charm.app.name)["password"]
             == "test-password"
         )
-        harness.charm.set_secret("app", "operator_password", None)
-        assert "operator_password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
+        harness.charm.set_secret("app", "password", None)
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
 
         # Test unit scope.
-        assert "operator_password" not in harness.get_relation_data(
-            rel_id, harness.charm.unit.name
-        )
-        harness.charm.set_secret("unit", "operator_password", "test-password")
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        harness.charm.set_secret("unit", "password", "test-password")
         assert (
-            harness.get_relation_data(rel_id, harness.charm.unit.name)["operator_password"]
+            harness.get_relation_data(rel_id, harness.charm.unit.name)["password"]
             == "test-password"
         )
-        harness.charm.set_secret("unit", "operator_password", None)
-        assert "operator_password" not in harness.get_relation_data(
-            rel_id, harness.charm.unit.name
-        )
+        harness.charm.set_secret("unit", "password", None)
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
         with pytest.raises(RuntimeError):
-            harness.charm.set_secret("test", "operator_password", "test")
+            harness.charm.set_secret("test", "password", "test")
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
