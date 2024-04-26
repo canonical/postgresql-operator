@@ -254,6 +254,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             raise RuntimeError("Unknown secret scope.")
 
         peers = self.model.get_relation(PEER)
+        if not peers:
+            return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be taken
         if key != secret_key and (
