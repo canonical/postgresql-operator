@@ -1,0 +1,89 @@
+[32mINFO    [0m integration.test_charm:test_charm.py:301 connecting to primary postgresql/1 on 10.236.32.27
+[32mINFO    [0m pytest_operator.plugin:plugin.py:834 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.8    unsupported  02:02:42Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.11    active      3  postgresql             0  no       
+
+Unit           Workload  Agent      Machine  Public address  Ports     Message
+postgresql/1   error     idle       1        10.236.32.27    5432/tcp  hook failed: "database-peers-relation-changed"
+postgresql/5*  active    executing  5        10.236.32.80    5432/tcp  (leader-elected) 
+postgresql/6   active    executing  6        10.236.32.20    5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ  Message
+1        started  10.236.32.27   juju-f78590-1  ubuntu@22.04      Running
+3        stopped  10.236.32.191  juju-f78590-3  ubuntu@22.04      Running
+5        started  10.236.32.80   juju-f78590-5  ubuntu@22.04      Running
+6        started  10.236.32.20   juju-f78590-6  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:840 Juju error logs:
+
+machine-0: 01:34:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:59 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:34:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:34:59 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:34:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:34:59 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-2: 01:34:59 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:35:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:35:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:35:15 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-1: 01:35:15 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:43:48 ERROR unit.postgresql/0.juju-log Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-2: 01:44:13 ERROR unit.postgresql/2.juju-log Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-1: 01:44:29 ERROR unit.postgresql/1.juju-log restart:1: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+machine-4: 01:48:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:48:16 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:48:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-4: 01:48:16 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:48:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:48:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:48:17 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-3: 01:48:17 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:54:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:54:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:54:54 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-5: 01:54:54 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:54:54 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-6: 01:54:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:54:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-6: 01:54:55 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 02:02:37 ERROR unit.postgresql/1.juju-log database-peers:0: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/./src/charm.py", line 1601, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/main.py", line 544, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/main.py", line 520, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/main.py", line 509, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/main.py", line 143, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/framework.py", line 352, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/framework.py", line 851, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/venv/ops/framework.py", line 941, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-1/charm/./src/charm.py", line 518, in _on_peer_relation_changed
+    or int(self._patroni.member_replication_lag) > 1000
+ValueError: invalid literal for int() with base 10: 'unknown'
+unit-postgresql-1: 02:02:37 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:904 Forgetting main...
