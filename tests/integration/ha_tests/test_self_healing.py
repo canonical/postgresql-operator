@@ -56,8 +56,8 @@ from .helpers import (
     update_restart_condition,
     validate_test_data,
     wait_network_restore,
+    SECOND_APPLICATION,
 )
-from .test_restore_cluster import SECOND_APPLICATION
 
 logger = logging.getLogger(__name__)
 

@@ -20,10 +20,10 @@ from .helpers import (
     add_unit_with_storage,
     reused_full_cluster_recovery_storage,
     storage_id,
+    SECOND_APPLICATION,
 )
 
 FIRST_APPLICATION = "first-cluster"
-SECOND_APPLICATION = "second-cluster"
 
 logger = logging.getLogger(__name__)
 

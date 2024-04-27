@@ -35,7 +35,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
-FIRST_DATABASE_RELATION_NAME = "first-database"
 
 
 async def build_connection_string(

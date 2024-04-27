@@ -71,6 +71,7 @@ from constants import (
     MONITORING_USER,
     PATRONI_CONF_PATH,
     PEER,
+    UPGRADE_RELATION,
     POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
@@ -95,7 +96,9 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
-DIFFERENT_VERSIONS_PSQL_BLOCKING_MESSAGE = "Please select the correct version of postgresql to use. No need to use different versions of postgresql."
+DIFFERENT_VERSIONS_PSQL_BLOCKING_MESSAGE = (
+    "Please select the correct version of postgresql to use. You cannot use different versions of postgresql!"
+)
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -157,6 +160,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
+        self.framework.observe(self.on[UPGRADE_RELATION].relation_changed, self._on_upgrade_relation_changed)
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_remove, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
@@ -534,6 +538,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._update_new_unit_status()
 
         self._validate_database_version()
+
+    def _on_upgrade_relation_changed(self, event: HookEvent):
+        if not self.unit.is_leader():
+            return
+
+        if self.upgrade.idle:
+            logger.debug("Defer _on_upgrade_relation_changed: upgrade in progress")
+            event.defer()
+            return
+
+        self._set_workload_version(self._patroni.get_postgresql_version())
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
@@ -1020,7 +1035,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
 
-        self.unit.set_workload_version(self._patroni.get_postgresql_version())
+        self._set_workload_version(self._patroni.get_postgresql_version())
 
         # Open port
         try:
@@ -1595,6 +1610,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for relation in self.model.relations.get(relation_name, []):
                 relations.append(relation)
         return relations
+
+    def _set_workload_version(self, psql_version):
+        """Record the version of the software running as the workload. Also writes the version into the databags"""
+        self.unit.set_workload_version(psql_version)
+        if self.unit.is_leader():
+            self.app_peer_data.update({"database-version": psql_version})
 
     def _validate_database_version(self):
         """Checking that only one version of Postgres is used."""
