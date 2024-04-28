@@ -1687,7 +1687,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             re.MULTILINE,
         )
         if len(log_time) > 0:
-            logger.error(f"Last completed transaction was at {log_time[-1]}")
+            logger.info(f"Last completed transaction was at {log_time[-1]}")
         else:
             logger.error("Can't tell last completed transaction time")
 
