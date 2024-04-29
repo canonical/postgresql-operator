@@ -559,7 +559,7 @@ class Patroni:
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
         )
-        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o644)
+        self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
     def start_patroni(self) -> bool:
         """Start Patroni service using snap.

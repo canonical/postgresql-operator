@@ -22,7 +22,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v13.1.1
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v13.1.2
 
   unit-test:
     name: Unit test charm
@@ -42,7 +42,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v13.1.1
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v13.1.2
     with:
       cache: true
 
@@ -54,14 +54,14 @@ jobs:
           - agent: 2.9.49  # renovate: latest juju 2
             libjuju: ==2.9.46.1  # renovate: latest libjuju 2
             allure: false
-          - agent: 3.1.7  # renovate: latest juju 3
+          - agent: 3.1.8  # renovate: latest juju 3
             allure: true
     name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v13.1.1
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v13.1.2
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       cloud: lxd
