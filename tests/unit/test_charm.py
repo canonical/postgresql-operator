@@ -876,8 +876,8 @@ def test_on_update_status(harness):
                 harness.charm.app.name,
                 {
                     "cluster_initialised": "True",
-                    "restoring-backup": "True",
-                    "restore-to-time": "True",
+                    "restoring-backup": "valid",
+                    "restore-to-time": "valid",
                 },
             )
         harness.charm.unit.status = ActiveStatus()
