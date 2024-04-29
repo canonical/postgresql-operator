@@ -1428,6 +1428,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = BlockedStatus(error_message)
             return
 
+        try:
+            for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+                with attempt:
+                    if not self._can_connect_to_postgresql:
+                        assert False
+        except Exception:
+            logger.exception("Unable to reconnect to postgresql")
+
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         self.backup.start_stop_pgbackrest_service()
 
