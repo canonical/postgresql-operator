@@ -745,7 +745,12 @@ Stderr:
         # on restore, therefore during cluster bootstrapping process. In this case, we need be able to check patroni
         # service status and logs. Disabling auto-restart feature is essential to prevent wrong status indicated
         # and logs reading race condition (as logs cleared / moved with service restarts).
-        self.charm.override_patroni_restart_condition("no")
+        if not self.charm.override_patroni_restart_condition("no", "restore-backup"):
+            error_message = "Failed to override Patroni restart condition"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            self._restart_database()
+            return
 
         logger.info("Removing the contents of the data directory")
         if not self._empty_data_files():

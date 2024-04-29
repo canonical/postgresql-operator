@@ -2278,8 +2278,8 @@ def test_update_new_unit_status(harness):
     ):
         get_restart_condition.return_value = "always"
 
-        # Do override
-        self.charm.override_patroni_restart_condition("no")
+        # Do override without repeat_cause
+        assert self.charm.override_patroni_restart_condition("no") is True
         get_restart_condition.assert_called_once()
         update_restart_condition.assert_called_once_with("no")
         get_restart_condition.reset_mock()
@@ -2287,8 +2287,8 @@ def test_update_new_unit_status(harness):
 
         get_restart_condition.return_value = "no"
 
-        # Must not be overridden twice
-        self.charm.override_patroni_restart_condition("on-failure")
+        # Must not be overridden twice without repeat_cause
+        assert self.charm.override_patroni_restart_condition("on-failure") is False
         get_restart_condition.assert_called_once()
         update_restart_condition.assert_not_called()
         get_restart_condition.reset_mock()
@@ -2302,4 +2302,38 @@ def test_update_new_unit_status(harness):
         # Must not be reset twice
         self.charm.restore_patroni_restart_condition()
         update_restart_condition.assert_not_called()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "always"
+
+        # Do override with repeat_cause
+        assert self.charm.override_patroni_restart_condition("no", "test_charm") is True
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_called_once_with("no")
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "no"
+
+        # Do re-override with repeat_cause
+        assert self.charm.override_patroni_restart_condition("on-success", "test_charm") is True
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_called_once_with("on-success")
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "on-success"
+
+        # Must not be re-overridden with different repeat_cause
+        assert (
+            self.charm.override_patroni_restart_condition("on-failure", "test_not_charm") is False
+        )
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_not_called()
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        # Reset override
+        self.charm.restore_patroni_restart_condition()
+        update_restart_condition.assert_called_once_with("always")
         update_restart_condition.reset_mock()

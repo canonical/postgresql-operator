@@ -1619,27 +1619,55 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 relations.append(relation)
         return relations
 
-    def override_patroni_restart_condition(self, new_condition: str) -> None:
+    def override_patroni_restart_condition(
+        self, new_condition: str, repeat_cause: str | None
+    ) -> bool:
         """Temporary override Patroni systemd service restart condition.
 
-        Will do nothing if already overridden. Executes only on current unit.
+        Executes only on current unit.
 
         Args:
             new_condition: new Patroni systemd service restart condition.
+            repeat_cause: whether this field is equal to the last success override operation repeat cause, Patroni
+                restart condition will be overridden (keeping the original restart condition reference untouched) and
+                success code will be returned. But if this field is distinct from previous repeat cause or None,
+                repeated operation will cause failure code will be returned.
         """
         current_condition = self._patroni.get_patroni_restart_condition()
         if "overridden-patroni-restart-condition" in self.unit_peer_data:
-            already_overridden_condition = self.unit_peer_data[
-                "overridden-patroni-restart-condition"
-            ]
-            logger.warning(
-                f"trying to override patroni restart condition to {new_condition}"
-                f"while already overridden from {already_overridden_condition} to {current_condition},"
-                "so ignoring this operation"
+            original_condition = self.unit_peer_data["overridden-patroni-restart-condition"]
+            if repeat_cause is None:
+                logger.error(
+                    f"failure trying to override patroni restart condition to {new_condition}"
+                    f"as it already overridden from {original_condition} to {current_condition}"
+                )
+                return False
+            previous_repeat_cause = self.unit_peer_data.get(
+                "overridden-patroni-restart-condition-repeat-cause", None
             )
-            return None
+            if previous_repeat_cause != repeat_cause:
+                logger.error(
+                    f"failure trying to override patroni restart condition to {new_condition}"
+                    f"as it already overridden from {original_condition} to {current_condition}"
+                    f"and repeat cause is not equal: {previous_repeat_cause} != {repeat_cause}"
+                )
+                return False
+            # There repeat cause is equal
+            self._patroni.update_patroni_restart_condition(new_condition)
+            logger.debug(
+                f"Patroni restart condition re-overridden to {new_condition} within repeat cause {repeat_cause}"
+                f"(original restart condition reference is untouched and is {original_condition})"
+            )
+            return True
         self._patroni.update_patroni_restart_condition(new_condition)
         self.unit_peer_data["overridden-patroni-restart-condition"] = current_condition
+        if repeat_cause is not None:
+            self.unit_peer_data["overridden-patroni-restart-condition-repeat-cause"] = repeat_cause
+        logger.debug(
+            f"Patroni restart condition overridden from {current_condition} to {new_condition}"
+            f"{' with repeat cause ' + repeat_cause if repeat_cause is not None else ''}"
+        )
+        return True
 
     def restore_patroni_restart_condition(self) -> None:
         """Restore Patroni systemd service restart condition that was before overriding.
@@ -1647,10 +1675,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Will do nothing if not overridden. Executes only on current unit.
         """
         if "overridden-patroni-restart-condition" in self.unit_peer_data:
-            self._patroni.update_patroni_restart_condition(
-                self.unit_peer_data["overridden-patroni-restart-condition"]
-            )
-            self.unit_peer_data.pop("overridden-patroni-restart-condition")
+            original_condition = self.unit_peer_data["overridden-patroni-restart-condition"]
+            self._patroni.update_patroni_restart_condition(original_condition)
+            self.unit_peer_data.update({
+                "overridden-patroni-restart-condition": "",
+                "overridden-patroni-restart-condition-repeat-cause": "",
+            })
+            logger.debug(f"Restored Patroni restart condition to {original_condition}")
         else:
             logger.warning("not restoring patroni restart condition as it's not overridden")
 
