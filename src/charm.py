@@ -1681,7 +1681,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "overridden-patroni-restart-condition": "",
                 "overridden-patroni-restart-condition-repeat-cause": "",
             })
-            logger.debug(f"Restored Patroni restart condition to {original_condition}")
+            logger.debug(f"restored Patroni restart condition to {original_condition}")
         else:
             logger.warning("not restoring patroni restart condition as it's not overridden")
 
