@@ -71,7 +71,6 @@ from constants import (
     MONITORING_USER,
     PATRONI_CONF_PATH,
     PEER,
-    UPGRADE_RELATION,
     POSTGRESQL_SNAP_NAME,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
@@ -84,6 +83,7 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     UNIT_SCOPE,
+    UPGRADE_RELATION,
     USER,
     USER_PASSWORD_KEY,
 )
@@ -96,9 +96,7 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
-DIFFERENT_VERSIONS_PSQL_BLOCKING_MESSAGE = (
-    "Please select the correct version of postgresql to use. You cannot use different versions of postgresql!"
-)
+DIFFERENT_VERSIONS_PSQL_BLOCKING_MESSAGE = "Please select the correct version of postgresql to use. You cannot use different versions of postgresql!"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -160,7 +158,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.config_changed, self._on_config_changed)
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
-        self.framework.observe(self.on[UPGRADE_RELATION].relation_changed, self._on_upgrade_relation_changed)
+        self.framework.observe(
+            self.on[UPGRADE_RELATION].relation_changed, self._on_upgrade_relation_changed
+        )
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_remove, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
@@ -1620,7 +1620,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return relations
 
     def _set_workload_version(self, psql_version):
-        """Record the version of the software running as the workload. Also writes the version into the databags"""
+        """Record the version of the software running as the workload. Also writes the version into the databags."""
         self.unit.set_workload_version(psql_version)
         if self.unit.is_leader():
             self.app_peer_data.update({"database-version": psql_version})

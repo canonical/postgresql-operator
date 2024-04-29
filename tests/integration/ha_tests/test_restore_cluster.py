@@ -17,10 +17,10 @@ from ..helpers import (
     set_password,
 )
 from .helpers import (
+    SECOND_APPLICATION,
     add_unit_with_storage,
     reused_full_cluster_recovery_storage,
     storage_id,
-    SECOND_APPLICATION,
 )
 
 FIRST_APPLICATION = "first-cluster"

@@ -875,15 +875,15 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
 async def get_db_connection(ops_test, dbname, is_primary=True, replica_unit_name=""):
     """Returns a PostgreSQL connection string.
 
-       Args:
-           ops_test: The ops test framework instance
-           dbname: The name of the database
-           is_primary: Whether to use a primary unit (default is True, so it uses the primary
-           replica_unit_name: The name of the replica unit
+    Args:
+        ops_test: The ops test framework instance
+        dbname: The name of the database
+        is_primary: Whether to use a primary unit (default is True, so it uses the primary
+        replica_unit_name: The name of the replica unit
 
-       Returns:
-           a PostgreSQL connection string
-       """
+    Returns:
+        a PostgreSQL connection string
+    """
     unit_name = await get_primary(ops_test, APP_NAME)
     password = await get_password(ops_test, APP_NAME)
     address = get_unit_address(ops_test, unit_name)
@@ -900,9 +900,9 @@ async def get_db_connection(ops_test, dbname, is_primary=True, replica_unit_name
 async def validate_test_data(connection_string):
     """Checking test data.
 
-        Args:
-          connection_string: Database connection string
-        """
+    Args:
+      connection_string: Database connection string
+    """
     with psycopg2.connect(connection_string) as connection:
         connection.autocommit = True
         with connection.cursor() as cursor:
@@ -915,9 +915,9 @@ async def validate_test_data(connection_string):
 async def create_test_data(connection_string):
     """Creating test data in the database.
 
-        Args:
-          connection_string: Database connection string
-        """
+    Args:
+      connection_string: Database connection string
+    """
     with psycopg2.connect(connection_string) as connection:
         connection.autocommit = True
         with connection.cursor() as cursor:
@@ -935,14 +935,14 @@ async def create_test_data(connection_string):
 async def get_last_added_unit(ops_test, app, prev_units):
     """Returns a unit.
 
-        Args:
-          ops_test: The ops test framework instance
-          app: The name of the application
-          prev_units: List of unit names before adding the last unit
+    Args:
+      ops_test: The ops test framework instance
+      app: The name of the application
+      prev_units: List of unit names before adding the last unit
 
-        Returns:
-          last added unit
-        """
+    Returns:
+      last added unit
+    """
     curr_units = [unit.name for unit in ops_test.model.applications[app].units]
     new_unit = list(set(curr_units) - set(prev_units))[0]
     for unit in ops_test.model.applications[app].units:

@@ -22,6 +22,7 @@ from .conftest import APPLICATION_NAME
 from .helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
+    SECOND_APPLICATION,
     add_unit_with_storage,
     app_name,
     are_all_db_processes_down,
@@ -56,7 +57,6 @@ from .helpers import (
     update_restart_condition,
     validate_test_data,
     wait_network_restore,
-    SECOND_APPLICATION,
 )
 
 logger = logging.getLogger(__name__)
