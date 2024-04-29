@@ -336,8 +336,8 @@ class DbProvides(Object):
             # Retrieve some data from the relation.
             unit_relation_databag = relation.data[self.charm.unit]
             user = f"relation-{relation.id}"
-            password = self.charm._peers.data[self.charm.app].get(user)
-            database = self.charm._peers.data[self.charm.app].get(f"{user}-database")
+            password = self.charm.get_secret(APP_SCOPE, user)
+            database = self.charm.get_secret(APP_SCOPE, f"{user}-database")
 
             # If the relation data is not complete, the relations was not initialised yet.
             if not database or not user or not password:

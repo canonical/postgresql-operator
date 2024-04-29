@@ -443,7 +443,6 @@ def test_update_endpoints_with_relation(harness):
             side_effect="postgresql/0",
         ) as _get_state,
     ):
-        peer_rel_id = harness.model.get_relation(PEER).id
         # Set some side effects to test multiple situations.
         postgresql_mock.get_postgresql_version = PropertyMock(
             side_effect=[
@@ -477,23 +476,8 @@ def test_update_endpoints_with_relation(harness):
         # Set some required data before update_endpoints is called.
         for rel in [rel_id, another_rel_id]:
             user = f"relation-{rel}"
-            harness.update_relation_data(
-                rel,
-                harness.charm.app.name,
-                {
-                    "user": user,
-                    "password": password,
-                    "database": DATABASE,
-                },
-            )
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.app.name,
-                {
-                    user: password,
-                    f"{user}-database": DATABASE,
-                },
-            )
+            harness.charm.set_secret("app", user, password)
+            harness.charm.set_secret("app", f"{user}-database", DATABASE)
 
         # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
         harness.charm.legacy_db_relation.update_endpoints(relation)
@@ -560,7 +544,6 @@ def test_update_endpoints_without_relation(harness):
         ) as _get_state,
     ):
         # Set some side effects to test multiple situations.
-        peer_rel_id = harness.model.get_relation(PEER).id
         postgresql_mock.get_postgresql_version = PropertyMock(
             side_effect=[
                 PostgreSQLGetPostgreSQLVersionError,
@@ -590,23 +573,8 @@ def test_update_endpoints_without_relation(harness):
         # Set some required data before update_endpoints is called.
         for rel in [rel_id, another_rel_id]:
             user = f"relation-{rel}"
-            harness.update_relation_data(
-                rel,
-                harness.charm.app.name,
-                {
-                    "user": user,
-                    "password": password,
-                    "database": DATABASE,
-                },
-            )
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.app.name,
-                {
-                    user: password,
-                    f"{user}-database": DATABASE,
-                },
-            )
+            harness.charm.set_secret("app", user, password)
+            harness.charm.set_secret("app", f"{user}-database", DATABASE)
 
         # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
         harness.charm.legacy_db_relation.update_endpoints()
