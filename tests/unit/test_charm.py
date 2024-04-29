@@ -1818,7 +1818,6 @@ def test_set_secret_in_databag(harness, _has_secrets):
             harness.charm.set_secret("test", "password", "test")
 
 
-
 @patch_network_get(private_address="1.1.1.1")
 def test_set_secret_with_juju_secret(harness):
     # this test is the juju3 version of the previous test, but it can run on both versions
