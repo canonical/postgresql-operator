@@ -318,7 +318,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
             expected_content,
-            0o644,
+            0o600,
         )
 
 
