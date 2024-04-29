@@ -1785,7 +1785,44 @@ def test_get_secret_secrets(harness, scope, field):
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_set_secret(harness, _has_secrets):
+def test_set_secret_in_databag(harness, _has_secrets):
+    # As this test set secrets using set_secret and checks if they end up
+    # inside the relation databag, this is meant to run on juju2 only
+    if _has_secrets:
+        return
+    with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
+        rel_id = harness.model.get_relation(PEER).id
+        harness.set_leader()
+
+        # Test application scope.
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
+        harness.charm.set_secret("app", "password", "test-password")
+        assert (
+            harness.get_relation_data(rel_id, harness.charm.app.name)["password"]
+            == "test-password"
+        )
+        harness.charm.set_secret("app", "password", None)
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
+
+        # Test unit scope.
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+        harness.charm.set_secret("unit", "password", "test-password")
+        assert (
+            harness.get_relation_data(rel_id, harness.charm.unit.name)["password"]
+            == "test-password"
+        )
+        harness.charm.set_secret("unit", "password", None)
+        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
+
+        with pytest.raises(RuntimeError):
+            harness.charm.set_secret("test", "password", "test")
+
+
+
+@patch_network_get(private_address="1.1.1.1")
+def test_set_secret_with_juju_secret(harness):
+    # this test is the juju3 version of the previous test, but it can run on both versions
+    # as it is backwards compatible behavior (usage of set_secret/get_secret)
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
@@ -1943,13 +1980,13 @@ def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader):
         # Getting current password
         entity = getattr(harness.charm, scope)
         harness.update_relation_data(rel_id, entity.name, {SECRET_INTERNAL_LABEL: secret.id})
-        assert harness.charm.get_secret(scope, "operator_password") == "bla"
+        assert harness.charm.get_secret(scope, "operator-password") == "bla"
 
         # Reset new secret
         # Only the leader can set app secret content.
         with harness.hooks_disabled():
             harness.set_leader(True)
-        harness.charm.set_secret(scope, "operator_password", "blablabla")
+        harness.charm.set_secret(scope, "operator-password", "blablabla")
         with harness.hooks_disabled():
             harness.set_leader(is_leader)
         assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
