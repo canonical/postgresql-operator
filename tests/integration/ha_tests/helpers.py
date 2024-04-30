@@ -928,7 +928,7 @@ async def get_any_deatached_storage(ops_test: OpsTest) -> str:
         "storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", "--format=json"
     )
     if return_code != 0:
-        raise Exception(f"failed to get charm info with error: {stderr}")
+        raise Exception(f"failed to get storages info with error: {stderr}")
 
     parsed_storages_list = json.loads(storages_list)
     for storage_name, storage in parsed_storages_list["storage"].items():
