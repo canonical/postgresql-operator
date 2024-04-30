@@ -13,7 +13,6 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from ..helpers import (
     APPLICATION_NAME,
     CHARM_SERIES,
-    get_primary,
 )
 from ..juju_ import juju_major_version
 from .helpers import (
