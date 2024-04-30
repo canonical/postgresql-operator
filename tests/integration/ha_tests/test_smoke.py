@@ -28,7 +28,7 @@ from .helpers import (
     storage_id,
 )
 
-TEST_DATABASE_RELATION_NAME = "test_database"
+TEST_DATABASE_NAME = "test_database"
 DUP_APPLICATION_NAME = "postgres-test-dup"
 
 logger = logging.getLogger(__name__)
@@ -50,17 +50,11 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             config={"profile": "testing"},
         )
 
-        # Reducing the update status frequency to speed up the triggering of deferred events.
-        await ops_test.model.set_config({"update-status-hook-interval": "10s"})
-
         logger.info("waiting for idle")
         await ops_test.model.wait_for_idle(apps=[APPLICATION_NAME], status="active", timeout=1500)
         assert ops_test.model.applications[APPLICATION_NAME].units[0].workload_status == "active"
 
-        logger.info("getting primary")
-        primary_name = await get_primary(
-            ops_test, ops_test.model.applications[APPLICATION_NAME].units[0].name
-        )
+        primary_name = ops_test.model.applications[APPLICATION_NAME].units[0].name
 
         logger.info("waiting for postgresql")
         for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
@@ -78,7 +72,11 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
 
         # Create test database to check there is no resources conflicts
         logger.info("creating db")
-        await create_db(ops_test, APPLICATION_NAME, TEST_DATABASE_RELATION_NAME)
+        await create_db(ops_test, APPLICATION_NAME, TEST_DATABASE_NAME)
+
+        # Check that test database is not exists for new unit
+        logger.info("checking db")
+        assert await check_db(ops_test, APPLICATION_NAME, TEST_DATABASE_NAME)
 
         # Destroy charm
         logger.info("force removing charm")
@@ -107,16 +105,10 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
             with attempt:
                 garbage_storage = await get_any_deatached_storage(ops_test)
 
-        # Reducing the update status frequency to speed up the triggering of deferred events.
-        await ops_test.model.set_config({"update-status-hook-interval": "10s"})
-
         logger.info("add unit with attached storage")
         await add_unit_with_storage(ops_test, APPLICATION_NAME, garbage_storage)
 
-        logger.info("getting primary")
-        primary_name = await get_primary(
-            ops_test, ops_test.model.applications[APPLICATION_NAME].units[0].name
-        )
+        primary_name = ops_test.model.applications[APPLICATION_NAME].units[0].name
 
         logger.info("waiting for postgresql")
         for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
@@ -134,9 +126,9 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
             with attempt:
                 assert await is_storage_exists(ops_test, storage_id_str)
 
-        # Check that test database is not exists for new unit
+        # Check that test database exists for new unit
         logger.info("checking db")
-        assert not await check_db(ops_test, APPLICATION_NAME, TEST_DATABASE_RELATION_NAME)
+        assert await check_db(ops_test, APPLICATION_NAME, TEST_DATABASE_NAME)
 
         logger.info("removing charm")
         await ops_test.model.destroy_unit(primary_name)
@@ -203,9 +195,6 @@ async def test_app_resources_conflicts_v2(ops_test: OpsTest, charm: str):
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-
-        # Reducing the update status frequency to speed up the triggering of deferred events.
-        await ops_test.model.set_config({"update-status-hook-interval": "10s"})
 
         logger.info("force removing charm")
         await remove_unit_force(

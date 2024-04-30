@@ -908,10 +908,12 @@ async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
     unit_address = await unit.get_public_address()
     password = await get_password(ops_test, app)
 
+    assert password is not None
+
     query = await execute_query_on_unit(
         unit_address,
         password,
-        "select datname from pg_catalog.pg_database where datname = '{db}';",
+        f"select datname from pg_catalog.pg_database where datname = '{db}';",
     )
 
     if "ERROR" in query:
