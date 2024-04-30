@@ -1720,6 +1720,10 @@ def test_scope_obj(harness):
 
 @patch_network_get(private_address="1.1.1.1")
 def test_get_secret_from_databag(harness):
+    """Asserts that get_secret method can read secrets from databag.
+
+    This must be backwards-compatible so it runs on both juju2 and juju3.
+    """
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         # App level changes require leader privileges
@@ -1786,6 +1790,10 @@ def test_get_secret_secrets(harness, scope, field):
 
 @patch_network_get(private_address="1.1.1.1")
 def test_set_secret_in_databag(harness, only_without_juju_secrets):
+    """Asserts that set_secret method writes to relation databag.
+
+    This is juju2 specific. In juju3, set_secret writes to juju secrets.
+    """
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
@@ -1901,7 +1909,10 @@ def test_delete_password(harness, _has_secrets, caplog):
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
 def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leader):
-    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
+    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
+
+    Since it checks for a migration from databag to juju secrets, it's specific to juju3.
+    """
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
@@ -1926,7 +1937,10 @@ def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leade
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
 def test_migration_from_single_secret(harness, only_with_juju_secrets, scope, is_leader):
-    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
+    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
+
+    Since it checks for a migration from databag to juju secrets, it's specific to juju3.
+    """
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
