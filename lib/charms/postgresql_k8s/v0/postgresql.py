@@ -619,3 +619,16 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
             return True
         except psycopg2.Error:
             return False
+
+    def get_last_archived_wal(self) -> str | None:
+        """
+        Returns:
+            Name of the last archived wal for the current PostgreSQL cluster. None, if there is no information available.
+        """
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT last_archived_wal FROM pg_stat_archiver;")
+                return cursor.fetchone()[0]
+        except psycopg2.Error as e:
+            logger.error(f"Failed to get PostgreSQL version: {e}")
+            raise PostgreSQLGetPostgreSQLVersionError()

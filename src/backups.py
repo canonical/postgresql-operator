@@ -176,7 +176,27 @@ class PostgreSQLBackups(Object):
                     if self.charm._patroni.member_started:
                         self.charm._patroni.reload_patroni_configuration()
                     return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+                return self._is_s3_wal_compatible(stanza)
 
+        return True, None
+
+    def _is_s3_wal_compatible(self, stanza) -> Tuple[bool, Optional[str]]:
+        """Returns whether the S3 stanza is compatible with current PostgreSQL cluster by WAL parity."""
+        charm_last_archived_wal = self.charm.postgresql.get_last_archived_wal()
+        logger.debug(f"last archived wal: {charm_last_archived_wal}")
+        s3_archive = stanza.get("archive", [])
+        if len(s3_archive) > 0:
+            s3_last_archived_wal = s3_archive[0].get("max")
+            logger.debug(f"last s3 wal: {str(s3_last_archived_wal)}")
+            if (
+                charm_last_archived_wal
+                and s3_last_archived_wal
+                and charm_last_archived_wal.split(".", 1)[0] != str(s3_last_archived_wal)
+            ):
+                if bool(self.charm.app_peer_data.get("require-change-bucket-after-restore", None)):
+                    return False, MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
+                else:
+                    return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
         return True, None
 
     def _change_connectivity_to_database(self, connectivity: bool) -> None:
