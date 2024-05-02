@@ -44,6 +44,7 @@ from cluster import ClusterNotPromotedError, NotReadyError, StandbyClusterAlread
 from constants import (
     APP_SCOPE,
     PATRONI_CONF_PATH,
+    PEER,
     POSTGRESQL_DATA_PATH,
 )
 
@@ -288,7 +289,7 @@ class PostgreSQLAsyncReplication(Object):
             logger.debug("Secret not found, creating a new one")
             pass
 
-        app_secret = self.charm.model.get_secret(label=f"{self.model.app.name}.app")
+        app_secret = self.charm.model.get_secret(label=f"{PEER}.{self.model.app.name}.app")
         content = app_secret.peek_content()
 
         # Filter out unnecessary secrets.
