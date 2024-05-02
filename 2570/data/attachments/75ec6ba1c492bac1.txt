@@ -1,0 +1,196 @@
+[32mINFO    [0m integration.test_backups:test_backups.py:383 configuring S3 integrator for an invalid cloud
+[32mINFO    [0m integration.test_backups:test_backups.py:398 waiting for the database charm to become blocked
+[32mINFO    [0m integration.test_backups:test_backups.py:405 configuring S3 integrator for a valid cloud, but with the path of another cluster repository
+[32mINFO    [0m integration.test_backups:test_backups.py:414 waiting for the database charm to become blocked
+[32mINFO    [0m integration.test_backups:test_backups.py:421 configuring S3 integrator for a valid cloud
+[32mINFO    [0m integration.test_backups:test_backups.py:425 waiting for the database charm to become active
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  new-postgresql/0 [executing] blocked: the S3 repository has backups from another cluster
+  s3-integrator/0 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  new-postgresql/0 [executing] maintenance: initialising stanza
+[32mINFO    [0m juju.model:model.py:2958 Waiting for model:
+  new-postgresql/0 [idle] active:
+[32mINFO    [0m integration.test_backups:test_backups.py:77 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.8    unsupported  02:33:55Z
+
+App             Version  Status  Scale  Charm          Channel        Rev  Exposed  Message
+new-postgresql  14.11    active      1  postgresql                      2  no       
+s3-integrator            active      1  s3-integrator  latest/stable   17  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+new-postgresql/0*  active    idle   8        10.105.73.68    5432/tcp  
+s3-integrator/0*   active    idle   0        10.105.73.243             
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.105.73.243  juju-54cef4-0  ubuntu@22.04      Running
+8        started  10.105.73.68   juju-54cef4-8  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-0: 01:31:42 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:31:42 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-0: 01:31:42 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-s3-integrator-0: 01:31:43 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:31:44 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:31:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:31:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:31:44 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:31:56 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:31:56 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:31:57 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:57 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:31:57 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-aws-0: 01:31:57 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-aws-1: 01:31:57 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-aws-0: 01:37:39 ERROR unit.postgresql-aws/0.juju-log certificates:5: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-aws-0: 01:49:44 ERROR unit.postgresql-aws/0.juju-log certificates:5: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+machine-4: 01:51:11 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-4: 01:51:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:51:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-2: 01:51:11 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:56:19 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:56:19 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:56:19 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-gcp-1: 01:56:19 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:56:58 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-5: 01:56:58 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:56:58 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-0: 01:56:58 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-gcp-1: 02:02:46 ERROR unit.postgresql-gcp/1.juju-log certificates:10: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-gcp-1: 02:17:04 ERROR unit.postgresql-gcp/1.juju-log database-peers:7: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/model.py", line 3022, in _run
+    result = subprocess.run(args, **kwargs)  # type: ignore
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('/var/lib/juju/tools/unit-postgresql-gcp-1/secret-get', '--label', 'database-peers.postgresql-gcp.unit', '--refresh', '--format=json')' returned non-zero exit status 1.
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/model.py", line 3370, in secret_get
+    result = self._run('secret-get', *args, return_output=True, use_json=True)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/model.py", line 3024, in _run
+    raise ModelError(e.stderr) from e
+ops.model.ModelError: ERROR secret "secret:copf858hnqj3t5fi8m6g" not found
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 1601, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/main.py", line 544, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/main.py", line 520, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/main.py", line 509, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/main.py", line 143, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 352, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 851, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 941, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 493, in _on_peer_relation_changed
+    self.update_config()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 1473, in update_config
+    enable_tls = self.is_tls_enabled
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 710, in is_tls_enabled
+    return all(self.tls.get_tls_files())
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/postgresql_k8s/v0/postgresql_tls.py", line 214, in get_tls_files
+    ca = self.charm.get_secret(SCOPE, "ca")
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 262, in get_secret
+    result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1256, in fetch_my_relation_field
+    if relation_data := self.fetch_my_relation_data([relation_id], [field], relation_name):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1245, in fetch_my_relation_data
+    data[relation.id] = self._fetch_my_specific_relation_data(relation, fields)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 534, in wrapper
+    return f(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2079, in _fetch_my_specific_relation_data
+    self.component, self.secret_fields, relation, fields
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1813, in secret_fields
+    self.static_secret_fields if self.static_secret_fields else self.current_secret_fields
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 1832, in current_secret_fields
+    if content := self._get_group_secret_contents(relation, group):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 2066, in _get_group_secret_contents
+    result = super()._get_group_secret_contents(relation, group, secret_fields)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 997, in _get_group_secret_contents
+    secret_data := secret.get_content()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/data_platform_libs/v0/data_interfaces.py", line 623, in get_content
+    self._secret_content = self.meta.get_content(refresh=True)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/model.py", line 1318, in get_content
+    self._content = self._backend.secret_get(
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/model.py", line 3373, in secret_get
+    raise SecretNotFoundError() from e
+ops.model.SecretNotFoundError
+unit-postgresql-gcp-1: 02:17:05 ERROR juju.worker.uniter.operation hook "database-peers-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+unit-postgresql-gcp-1: 02:17:25 ERROR unit.postgresql-gcp/1.juju-log database-peers:7: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 1432, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+machine-7: 02:18:50 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 02:18:50 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-7: 02:18:50 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-2: 02:18:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-8: 02:19:00 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-8: 02:19:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 02:19:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-new-postgresql-0: 02:19:00 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-gcp-2: 02:24:33 ERROR unit.postgresql-gcp/2.juju-log s3-parameters:17: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-new-postgresql-0: 02:30:19 ERROR unit.new-postgresql/0.juju-log s3-parameters:18: Failed to create a session 'bucket' in region=region.
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/backups.py", line 220, in _create_bucket_if_not_exists
+    s3 = session.resource("s3", endpoint_url=self._construct_endpoint(s3_parameters))
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/session.py", line 446, in resource
+    client = self.client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/session.py", line 299, in client
+    return self._session.create_client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/session.py", line 997, in create_client
+    client = client_creator.create_client(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 161, in create_client
+    client_args = self._get_client_args(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 520, in _get_client_args
+    return args_creator.get_client_args(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/args.py", line 137, in get_client_args
+    endpoint = endpoint_creator.create_endpoint(
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/endpoint.py", line 402, in create_endpoint
+    raise ValueError("Invalid endpoint: %s" % endpoint_url)
+ValueError: Invalid endpoint: endpoint
+unit-new-postgresql-0: 02:30:21 ERROR unit.new-postgresql/0.juju-log s3-parameters:18: Couldn't create bucket named 'data-charms-testing' in region=us-east-1.
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/src/backups.py", line 242, in _create_bucket_if_not_exists
+    bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/resources/factory.py", line 581, in do_action
+    response = action(self, *args, **kwargs)
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/boto3/resources/action.py", line 88, in __call__
+    response = getattr(parent.meta.client, operation_name)(*args, **params)
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 565, in _api_call
+    return self._make_api_call(operation_name, kwargs)
+  File "/var/lib/juju/agents/unit-new-postgresql-0/charm/venv/botocore/client.py", line 1021, in _make_api_call
+    raise error_class(parsed_response, operation_name)
+botocore.exceptions.ClientError: An error occurred (InvalidAccessKeyId) when calling the CreateBucket operation: The AWS Access Key Id you provided does not exist in our records.
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...
