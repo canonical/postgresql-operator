@@ -258,7 +258,7 @@ class Patroni:
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
-    ) -> str:
+    ) -> Optional[str]:
         """Get standby leader instance.
 
         Args:
