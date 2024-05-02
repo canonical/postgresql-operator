@@ -377,6 +377,10 @@ class PostgreSQLAsyncReplication(Object):
 
                 self.charm._set_primary_status_message()
             elif not self.charm.unit.is_leader():
+                try:
+                    self.charm._patroni.reload_patroni_configuration()
+                except RetryError:
+                    pass
                 raise NotReadyError()
             else:
                 self.charm.unit.status = WaitingStatus(
