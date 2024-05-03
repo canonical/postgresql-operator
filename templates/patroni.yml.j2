@@ -37,11 +37,11 @@ ctl:
 raft:
   data_dir: {{ conf_path }}/raft
   self_addr: '{{ self_ip }}:2222'
-  {% if peers_ips -%}
+  {% if partner_addrs -%}
   partner_addrs:
   {% endif -%}
-  {% for peer_ip in peers_ips -%}
-  - {{ peer_ip }}:2222
+  {% for partner_addr in partner_addrs -%}
+  - {{ partner_addr }}:2222
   {% endfor %}
 
 bootstrap:
@@ -103,6 +103,11 @@ bootstrap:
     command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --type=immediate --target-action=promote restore
     no_params: True
     keep_existing_recovery_conf: True
+  {% elif primary_cluster_endpoint %}
+    standby_cluster:
+      host: {{ primary_cluster_endpoint }}
+      port: 5432
+      create_replica_methods: ["basebackup"]
   {% else %}
   initdb:
   - encoding: UTF8
@@ -146,6 +151,9 @@ postgresql:
     {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 md5
     # Allow replications connections from other cluster members.
+    {%- for endpoint in extra_replication_endpoints %}
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 md5
+    {%- endfor %}
     {%- for peer_ip in peers_ips %}
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
     {% endfor %}
