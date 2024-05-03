@@ -17,6 +17,12 @@ list-backups:
   description: Lists backups in s3 storage.
 pre-upgrade-check:
   description: Run necessary pre-upgrade checks and preparations before executing a charm refresh.
+promote-cluster:
+  description: Promotes the cluster of choice to a primary cluster. Must be ran against the leader unit.
+  params:
+    force-promotion:
+      type: boolean
+      description: Force the promotion of a cluster when there is already a primary cluster.
 restore:
   description: Restore a database backup using pgBackRest.
     S3 credentials are retrieved from a relation with the S3 integrator charm.

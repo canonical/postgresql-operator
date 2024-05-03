@@ -9,8 +9,10 @@ import requests as requests
 import tenacity as tenacity
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from ops.testing import Harness
 from tenacity import stop_after_delay
 
+from charm import PostgresqlOperatorCharm
 from cluster import Patroni
 from constants import (
     PATRONI_CONF_PATH,
@@ -54,9 +56,18 @@ def peers_ips():
     yield peers_ips
 
 
+@pytest.fixture()
+def harness():
+    harness = Harness(PostgresqlOperatorCharm)
+    harness.begin()
+    yield harness
+    harness.cleanup()
+
+
 @pytest.fixture(autouse=True)
-def patroni(peers_ips):
+def patroni(harness, peers_ips):
     patroni = Patroni(
+        harness.charm,
         "1.1.1.1",
         "postgresql",
         "postgresql-0",
@@ -252,6 +263,10 @@ def test_render_file(peers_ips, patroni):
 
 def test_render_patroni_yml_file(peers_ips, patroni):
     with (
+        patch(
+            "relations.async_replication.PostgreSQLAsyncReplication.get_partner_addresses",
+            return_value=["2.2.2.2", "3.3.3.3"],
+        ) as _get_partner_addresses,
         patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.Patroni._create_directory"),
@@ -275,6 +290,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
+            partner_addrs=["2.2.2.2", "3.3.3.3"],
             peers_ips=peers_ips,
             scope=scope,
             self_ip=patroni.unit_ip,
