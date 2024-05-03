@@ -72,7 +72,7 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_instance_graceful_restart(ops_test: OpsTest, charm: str):
+async def test_instance_graceful_restart(ops_test: OpsTest, charm: str) -> None:
     """Test graceful restart of a service."""
     async with ops_test.fast_forward():
         # Deploy the charm.
@@ -121,7 +121,7 @@ async def test_instance_graceful_restart(ops_test: OpsTest, charm: str):
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_instance_forceful_restart(ops_test: OpsTest, charm: str):
+async def test_instance_forceful_restart(ops_test: OpsTest, charm: str) -> None:
     """Test forceful restart of a service."""
     async with ops_test.fast_forward():
         # Deploy the charm.
@@ -169,7 +169,7 @@ async def test_instance_forceful_restart(ops_test: OpsTest, charm: str):
 @pytest.mark.abort_on_fail
 async def test_instance_backup_with_restart(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
-):
+) -> None:
     """Test instance backup after recovery."""
     async with ops_test.fast_forward():
         logger.info("deploying s3")
