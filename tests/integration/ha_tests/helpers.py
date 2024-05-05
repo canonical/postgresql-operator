@@ -903,6 +903,8 @@ async def lxc_restart_service(machine_name: str, force: bool = False):
     restart_command = f"lxc restart {machine_name}"
     if force:
         restart_command = restart_command + " --force"
+    else:
+        restart_command = restart_command + " --timeout=1500"
     subprocess.check_call(restart_command.split())
 
 
@@ -911,9 +913,10 @@ async def check_graceful_shutdown(ops_test: OpsTest, unit_name: str) -> bool:
     stdout = await run_command_on_unit(
         ops_test,
         unit_name,
-        f"""grep -E '{log_str}' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
+         f'cat /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*',
     )
-    return log_str in stdout
+
+    return log_str in str(stdout)
 
 
 async def check_success_recovery(ops_test: OpsTest, unit_name: str) -> bool:
@@ -923,4 +926,4 @@ async def check_success_recovery(ops_test: OpsTest, unit_name: str) -> bool:
         unit_name,
         f"""grep -E '{log_str}' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
     )
-    return log_str in stdout
+    return log_str in str(stdout)

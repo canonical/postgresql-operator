@@ -109,14 +109,16 @@ async def test_instance_graceful_restart(ops_test: OpsTest, charm: str) -> None:
         )
         assert ops_test.model.applications[APPLICATION_NAME].units[0].workload_status == "active"
 
-        logger.info("graceful shutdown")
+        logger.info("check graceful shutdown")
         assert await check_graceful_shutdown(ops_test, primary_name)
 
         logger.info("check success recovery")
         assert await check_success_recovery(ops_test, primary_name)
 
         logger.info("remove application")
-        await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
 
 
 @pytest.mark.group(1)
@@ -158,12 +160,16 @@ async def test_instance_forceful_restart(ops_test: OpsTest, charm: str) -> None:
         )
         assert ops_test.model.applications[APPLICATION_NAME].units[0].workload_status == "active"
 
+        logger.info("check forceful shutdown")
+        assert not await check_graceful_shutdown(ops_test, primary_name)
+
         logger.info("check success recovery")
         assert await check_success_recovery(ops_test, primary_name)
 
         logger.info("remove application")
-        await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
-
+        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
@@ -245,6 +251,12 @@ async def test_instance_backup_with_restart(
                 ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
             )
 
+            logger.info("check forceful shutdown")
+            assert not await check_graceful_shutdown(ops_test, primary_name)
+
+            logger.info("check success recovery")
+            assert await check_success_recovery(ops_test, primary_name)
+
             # Run the "restore backup" action.
             for attempt in Retrying(
                 stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -260,12 +272,13 @@ async def test_instance_backup_with_restart(
 
             # Wait for the restore to complete.
             logger.info("wait for restore")
-            async with ops_test.fast_forward():
-                await ops_test.model.wait_for_idle(status="active", timeout=1500)
+            await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
             logger.info("checking data consistency")
             assert await check_db(ops_test, DATABASE_APP_NAME, TEST_DATABASE_NAME)
             assert not await check_db(ops_test, DATABASE_APP_NAME, TEST_DATABASE_NAME + "_dup")
 
             logger.info("remove application")
-            await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+            for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
+                with attempt:
+                    await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
