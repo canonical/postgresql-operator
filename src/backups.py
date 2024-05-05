@@ -745,7 +745,11 @@ Stderr:
                 return
 
         # Quick check for timestamp format
-        if restore_to_time and not re.match("^[0-9-]+ [0-9:.+]+$", restore_to_time):
+        if (
+            restore_to_time
+            and restore_to_time != "latest"
+            and not re.match("^[0-9-]+ [0-9:.+]+$", restore_to_time)
+        ):
             error_message = "Bad restore-to-time format"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)

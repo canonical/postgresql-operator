@@ -1552,6 +1552,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
+            restore_to_latest=self.app_peer_data.get("restore-to-time", None) == "latest",
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             disable_pgbackrest_archiving=bool(
