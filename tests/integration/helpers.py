@@ -16,6 +16,7 @@ import botocore
 import psycopg2
 import requests
 import yaml
+from juju.model import Model
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 from tenacity import (
@@ -571,9 +572,12 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> List[str]:
     return output
 
 
-async def get_leader_unit(ops_test: OpsTest, app: str) -> Optional[Unit]:
+async def get_leader_unit(ops_test: OpsTest, app: str, model: Model = None) -> Optional[Unit]:
+    if model is None:
+        model = ops_test.model
+
     leader_unit = None
-    for unit in ops_test.model.applications[app].units:
+    for unit in model.applications[app].units:
         if await unit.is_leader_from_status():
             leader_unit = unit
             break
@@ -658,17 +662,20 @@ async def get_tls_ca(
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
 
 
-def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
+def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Get unit IP address.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        model: Optional model to use to get the unit address
 
     Returns:
         IP address of the unit
     """
-    return ops_test.model.units.get(unit_name).public_address
+    if model is None:
+        model = ops_test.model
+    return model.units.get(unit_name).public_address
 
 
 async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
@@ -806,6 +813,18 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     return False
 
 
+def has_relation_exited(
+    ops_test: OpsTest, endpoint_one: str, endpoint_two: str, model: Model = None
+) -> bool:
+    """Returns true if the relation between endpoint_one and endpoint_two has been removed."""
+    relations = model.relations if model is not None else ops_test.model.relations
+    for rel in relations:
+        endpoints = [endpoint.name for endpoint in rel.endpoints]
+        if endpoint_one in endpoints and endpoint_two in endpoints:
+            return False
+    return True
+
+
 def remove_chown_workaround(original_charm_filename: str, patched_charm_filename: str) -> None:
     """Remove the chown workaround from the charm."""
     with zipfile.ZipFile(original_charm_filename, "r") as charm_file, zipfile.ZipFile(
@@ -896,23 +915,26 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
     return stdout
 
 
-async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
+async def scale_application(
+    ops_test: OpsTest, application_name: str, count: int, model: Model = None
+) -> None:
     """Scale a given application to a specific unit count.
 
     Args:
         ops_test: The ops test framework instance
         application_name: The name of the application
         count: The desired number of units to scale to
+        model: The model to scale the application in
     """
-    change = count - len(ops_test.model.applications[application_name].units)
+    if model is None:
+        model = ops_test.model
+    change = count - len(model.applications[application_name].units)
     if change > 0:
-        await ops_test.model.applications[application_name].add_units(change)
+        await model.applications[application_name].add_units(change)
     elif change < 0:
-        units = [
-            unit.name for unit in ops_test.model.applications[application_name].units[0:-change]
-        ]
-        await ops_test.model.applications[application_name].destroy_units(*units)
-    await ops_test.model.wait_for_idle(
+        units = [unit.name for unit in model.applications[application_name].units[0:-change]]
+        await model.applications[application_name].destroy_units(*units)
+    await model.wait_for_idle(
         apps=[application_name], status="active", timeout=2000, wait_for_exact_units=count
     )
 
@@ -1019,3 +1041,23 @@ async def wait_for_idle_on_blocked(
         ),
         ops_test.model.block_until(lambda: unit.workload_status_message == status_message),
     )
+
+
+def wait_for_relation_removed_between(
+    ops_test: OpsTest, endpoint_one: str, endpoint_two: str, model: Model = None
+) -> None:
+    """Wait for relation to be removed before checking if it's waiting or idle.
+
+    Args:
+        ops_test: running OpsTest instance
+        endpoint_one: one endpoint of the relation. Doesn't matter if it's provider or requirer.
+        endpoint_two: the other endpoint of the relation.
+        model: optional model to check for the relation.
+    """
+    try:
+        for attempt in Retrying(stop=stop_after_delay(3 * 60), wait=wait_fixed(3)):
+            with attempt:
+                if has_relation_exited(ops_test, endpoint_one, endpoint_two, model):
+                    break
+    except RetryError:
+        assert False, "Relation failed to exit after 3 minutes."
