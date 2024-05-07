@@ -1244,6 +1244,7 @@ def test_update_config(harness):
             stanza=None,
             restore_stanza=None,
             pitr_target=None,
+            restore_to_latest=False,
             disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
@@ -1266,6 +1267,7 @@ def test_update_config(harness):
             stanza=None,
             restore_stanza=None,
             pitr_target=None,
+            restore_to_latest=False,
             disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
