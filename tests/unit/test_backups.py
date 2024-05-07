@@ -173,6 +173,10 @@ def test_can_use_s3_repository(harness):
         patch(
             "charm.Patroni.get_postgresql_version", return_value="14.10"
         ) as _get_postgresql_version,
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch(
+            "charms.postgresql_k8s.v0.postgresql.PostgreSQL.get_last_archived_wal"
+        ) as _get_last_archived_wal,
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
         # Define the stanza name inside the unit relation data.
