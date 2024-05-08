@@ -56,18 +56,21 @@ jobs:
             allure: false
           - agent: 3.1.8  # renovate: latest juju 3
             allure: true
+        architecture:
+          - amd64
+          - arm64  # allure disabled
     name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v13.1.2
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@arm-integration
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       cloud: lxd
       juju-agent-version: ${{ matrix.juju.agent }}
       libjuju-version-constraint: ${{ matrix.juju.libjuju }}
-      _beta_allure_report: ${{ matrix.juju.allure }}
+      _beta_allure_report: ${{ matrix.juju.allure && matrix.architecture == 'amd64' }}
     secrets:
       integration-test: |
         {
