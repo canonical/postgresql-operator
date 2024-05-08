@@ -53,12 +53,12 @@ jobs:
         juju:
           - agent: 2.9.49  # renovate: latest juju 2
             libjuju: ==2.9.49.0  # renovate: latest libjuju 2
-            allure: false
+            allure_on_amd64: false
           - agent: 3.1.8  # renovate: latest juju 3
-            allure: true
+            allure_on_amd64: true
         architecture:
           - amd64
-          - arm64  # allure disabled
+          - arm64
     name: Integration test charm | ${{ matrix.juju.agent }}
     needs:
       - lint
@@ -70,7 +70,7 @@ jobs:
       cloud: lxd
       juju-agent-version: ${{ matrix.juju.agent }}
       libjuju-version-constraint: ${{ matrix.juju.libjuju }}
-      _beta_allure_report: ${{ matrix.juju.allure && matrix.architecture == 'amd64' }}
+      _beta_allure_report: ${{ matrix.juju.allure_on_amd64 && matrix.architecture == 'amd64' }}
     secrets:
       integration-test: |
         {
