@@ -2,9 +2,9 @@
 # See LICENSE file for licensing details.
 
 
-import architecture
 import pytest
 
+from . import architecture
 from .juju_ import juju_major_version
 
 juju2 = pytest.mark.skipif(juju_major_version != 2, reason="Requires juju 2")
