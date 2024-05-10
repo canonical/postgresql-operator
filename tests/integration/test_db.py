@@ -193,6 +193,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
 
 
 @pytest.mark.group(1)
+@markers.amd64_only  # sentry snap not available for arm64
 async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         # Deploy Sentry and its dependencies.
