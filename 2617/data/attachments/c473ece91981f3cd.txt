@@ -1,0 +1,67 @@
+[32mINFO    [0m integration.test_backups:test_backups.py:77 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.1.8    unsupported  01:57:33Z
+
+App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql-aws            14.11    active      2  postgresql                                 0  no       
+s3-integrator                      active      1  s3-integrator             latest/stable   17  no       
+self-signed-certificates           active      1  self-signed-certificates  latest/stable   72  no       
+
+Unit                         Workload  Agent      Machine  Public address  Ports     Message
+postgresql-aws/0*            active    executing  2        10.55.148.77    5432/tcp  
+postgresql-aws/1             active    idle       3        10.55.148.24    5432/tcp  
+s3-integrator/0*             active    idle       0        10.55.148.101             
+self-signed-certificates/0*  active    idle       1        10.55.148.125             
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.55.148.101  juju-f8511d-0  ubuntu@22.04      Running
+1        started  10.55.148.125  juju-f8511d-1  ubuntu@22.04      Running
+2        started  10.55.148.77   juju-f8511d-2  ubuntu@22.04      Running
+3        started  10.55.148.24   juju-f8511d-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-0: 01:32:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:32:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:32:25 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-s3-integrator-0: 01:32:25 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:32:40 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-2: 01:32:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:32:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-0: 01:32:40 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:32:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:32:47 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+unit-postgresql-aws-1: 01:32:47 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:33:46 ERROR juju.worker.dependency "broker-tracker" manifold worker returned unexpected error: no container types determined
+machine-1: 01:33:46 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:33:46 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:33:47 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-aws-0: 01:41:58 ERROR unit.postgresql-aws/0.juju-log certificates:5: Unable to reconnect to postgresql
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/./src/charm.py", line 1470, in _restart
+    for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+TypeError: BaseRetrying.__init__() got an unexpected keyword argument 'stop_after_delay'
+unit-postgresql-aws-0: 01:54:05 ERROR unit.postgresql-aws/0.juju-log RetryError[<Future at 0x7f1a3a5b6650 state=finished raised Exception>]
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/src/backups.py", line 447, in check_stanza
+    raise Exception(stderr)
+Exception: WARN: unable to check pg2: [HostConnectError] unable to connect to '10.55.148.24:8432': [111] Connection refused
+          [HostConnectError] on 12 retries from 100-60000ms: unable to connect to '10.55.148.24:8432': [111] Connection refused
+ERROR: [049]: unable to connect to '10.55.148.24:8432': [111] Connection refused
+           [HostConnectError] on 12 retries from 100-60000ms: unable to connect to '10.55.148.24:8432': [111] Connection refused
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/src/backups.py", line 436, in check_stanza
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/tenacity/__init__.py", line 347, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-aws-0/charm/venv/tenacity/__init__.py", line 326, in iter
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f1a3a5b6650 state=finished raised Exception>]
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...
