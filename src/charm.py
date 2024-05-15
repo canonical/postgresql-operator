@@ -972,6 +972,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             extensions[extension] = enable
         if self.is_blocked and self.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE:
             self.unit.status = ActiveStatus()
+            original_status = self.unit.status
         self.unit.status = WaitingStatus("Updating extensions")
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
