@@ -173,6 +173,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         "memory_max_prepared_transactions": "100",
         "memory_shared_buffers": "128",
         "response_lc_monetary": "en_GB.utf8",
+        "experimental_max_connections": "200",
     })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -186,7 +187,12 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
             with psycopg2.connect(
                 f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
             ) as connection, connection.cursor() as cursor:
-                settings_names = ["max_prepared_transactions", "shared_buffers", "lc_monetary"]
+                settings_names = [
+                    "max_prepared_transactions",
+                    "shared_buffers",
+                    "lc_monetary",
+                    "max_connections",
+                ]
                 cursor.execute(
                     sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
                         sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
@@ -200,6 +206,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
                 assert settings["max_prepared_transactions"] == "100"
                 assert settings["shared_buffers"] == "128"
                 assert settings["lc_monetary"] == "en_GB.utf8"
+                assert settings["max_connections"] == "200"
         finally:
             connection.close()
 
