@@ -1468,7 +1468,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+            for attempt in Retrying(wait=wait_fixed(3), stop=stop_after_delay(300)):
                 with attempt:
                     if not self._can_connect_to_postgresql:
                         assert False
