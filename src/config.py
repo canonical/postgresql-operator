@@ -98,6 +98,7 @@ class CharmConfig(BaseConfigModel):
     vacuum_autovacuum_vacuum_cost_delay: Optional[float]
     vacuum_autovacuum_vacuum_scale_factor: Optional[float]
     vacuum_vacuum_freeze_table_age: Optional[int]
+    experimental_max_connections: Optional[int]
 
     @classmethod
     def keys(cls) -> list[str]:
