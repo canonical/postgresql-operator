@@ -31,10 +31,11 @@ logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
 if juju_major_version < 3:
-    if architecture.architecture == "arm64":
-        pytest.skip(allow_module_level=True)
     tls_certificates_app_name = "tls-certificates-operator"
-    tls_channel = "legacy/stable"
+    if architecture.architecture == "arm64":
+        tls_channel = "legacy/edge"
+    else:
+        tls_channel = "legacy/stable"
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
