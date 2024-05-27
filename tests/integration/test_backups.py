@@ -32,10 +32,11 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
-    if architecture.architecture == "arm64":
-        pytest.skip(allow_module_level=True)
     tls_certificates_app_name = "tls-certificates-operator"
-    tls_channel = "legacy/stable"
+    if architecture.architecture == "arm64":
+        tls_channel = "legacy/edge"
+    else:
+        tls_channel = "legacy/stable"
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
