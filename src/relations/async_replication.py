@@ -51,9 +51,9 @@ from constants import (
 logger = logging.getLogger(__name__)
 
 
-ASYNC_PRIMARY_RELATION = "async-primary"
-ASYNC_REPLICA_RELATION = "async-replica"
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Cluster in read-only mode"
+REPLICATION_CONSUMER_RELATION = "replication"
+REPLICATION_OFFER_RELATION = "replication-offer"
 
 
 class PostgreSQLAsyncReplication(Object):
@@ -64,36 +64,47 @@ class PostgreSQLAsyncReplication(Object):
         super().__init__(charm, "postgresql")
         self.charm = charm
         self.framework.observe(
-            self.charm.on[ASYNC_PRIMARY_RELATION].relation_joined, self._on_async_relation_joined
+            self.charm.on[REPLICATION_OFFER_RELATION].relation_joined,
+            self._on_async_relation_joined,
         )
         self.framework.observe(
-            self.charm.on[ASYNC_REPLICA_RELATION].relation_joined, self._on_async_relation_joined
+            self.charm.on[REPLICATION_CONSUMER_RELATION].relation_joined,
+            self._on_async_relation_joined,
         )
         self.framework.observe(
-            self.charm.on[ASYNC_PRIMARY_RELATION].relation_changed, self._on_async_relation_changed
+            self.charm.on[REPLICATION_OFFER_RELATION].relation_changed,
+            self._on_async_relation_changed,
         )
         self.framework.observe(
-            self.charm.on[ASYNC_REPLICA_RELATION].relation_changed, self._on_async_relation_changed
+            self.charm.on[REPLICATION_CONSUMER_RELATION].relation_changed,
+            self._on_async_relation_changed,
         )
 
         # Departure events
         self.framework.observe(
-            self.charm.on[ASYNC_PRIMARY_RELATION].relation_departed,
+            self.charm.on[REPLICATION_OFFER_RELATION].relation_departed,
             self._on_async_relation_departed,
         )
         self.framework.observe(
-            self.charm.on[ASYNC_REPLICA_RELATION].relation_departed,
+            self.charm.on[REPLICATION_CONSUMER_RELATION].relation_departed,
             self._on_async_relation_departed,
         )
         self.framework.observe(
-            self.charm.on[ASYNC_PRIMARY_RELATION].relation_broken, self._on_async_relation_broken
+            self.charm.on[REPLICATION_OFFER_RELATION].relation_broken,
+            self._on_async_relation_broken,
         )
         self.framework.observe(
-            self.charm.on[ASYNC_REPLICA_RELATION].relation_broken, self._on_async_relation_broken
+            self.charm.on[REPLICATION_CONSUMER_RELATION].relation_broken,
+            self._on_async_relation_broken,
         )
 
         # Actions
-        self.framework.observe(self.charm.on.promote_cluster_action, self._on_promote_cluster)
+        self.framework.observe(
+            self.charm.on.create_replication_action, self._on_create_replication
+        )
+        self.framework.observe(
+            self.charm.on.promote_to_primary_action, self._on_promote_to_primary
+        )
 
     def _can_promote_cluster(self, event: ActionEvent) -> bool:
         """Check if the cluster can be promoted."""
@@ -180,7 +191,7 @@ class PostgreSQLAsyncReplication(Object):
     def _configure_standby_cluster(self, event: RelationChangedEvent) -> bool:
         """Configure the standby cluster."""
         relation = self._relation
-        if relation.name == ASYNC_REPLICA_RELATION:
+        if relation.name == REPLICATION_CONSUMER_RELATION:
             # Update the secrets between the clusters.
             primary_cluster_info = relation.data[relation.app].get("primary-cluster-data")
             secret_id = (
@@ -214,8 +225,8 @@ class PostgreSQLAsyncReplication(Object):
         """Return the highest promoted cluster counter."""
         promoted_cluster_counter = "0"
         for async_relation in [
-            self.model.get_relation(ASYNC_PRIMARY_RELATION),
-            self.model.get_relation(ASYNC_REPLICA_RELATION),
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
         ]:
             if async_relation is None:
                 continue
@@ -249,8 +260,8 @@ class PostgreSQLAsyncReplication(Object):
         primary_cluster = None
         promoted_cluster_counter = "0"
         for async_relation in [
-            self.model.get_relation(ASYNC_PRIMARY_RELATION),
-            self.model.get_relation(ASYNC_REPLICA_RELATION),
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
         ]:
             if async_relation is None:
                 continue
@@ -307,8 +318,8 @@ class PostgreSQLAsyncReplication(Object):
         return [
             relation.data[unit].get("unit-address")
             for relation in [
-                self.model.get_relation(ASYNC_PRIMARY_RELATION),
-                self.model.get_relation(ASYNC_REPLICA_RELATION),
+                self.model.get_relation(REPLICATION_OFFER_RELATION),
+                self.model.get_relation(REPLICATION_CONSUMER_RELATION),
             ]
             if relation is not None
             for unit in relation.units
@@ -408,6 +419,42 @@ class PostgreSQLAsyncReplication(Object):
         ):
             self.charm.unit.status = BlockedStatus(READ_ONLY_MODE_BLOCKING_MESSAGE)
 
+    def _handle_replication_change(self, event: ActionEvent) -> bool:
+        if not self._can_promote_cluster(event):
+            return False
+
+        relation = self._relation
+
+        # Check if all units from the other cluster  published their pod IPs in the relation data.
+        # If not, fail the action telling that all units must publish their pod addresses in the
+        # relation data.
+        for unit in relation.units:
+            if "unit-address" not in relation.data[unit]:
+                event.fail(
+                    "All units from the other cluster must publish their pod addresses in the relation data."
+                )
+                return False
+
+        system_identifier, error = self.get_system_identifier()
+        if error is not None:
+            logger.exception(error)
+            event.fail("Failed to get system identifier")
+            return False
+
+        # Increment the current cluster counter in this application side based on the highest counter value.
+        promoted_cluster_counter = int(self._get_highest_promoted_cluster_counter_value())
+        promoted_cluster_counter += 1
+        logger.debug("Promoted cluster counter: %s", promoted_cluster_counter)
+
+        self._update_primary_cluster_data(promoted_cluster_counter, system_identifier)
+
+        # Emit an async replication changed event for this unit (to promote this cluster before demoting the
+        # other if this one is a standby cluster, which is needed to correctly set up the async replication
+        # when performing a switchover).
+        self._re_emit_async_relation_changed_event()
+
+        return True
+
     def _is_following_promoted_cluster(self) -> bool:
         """Return True if this unit is following the promoted cluster."""
         if self._get_primary_cluster() is None:
@@ -501,43 +548,24 @@ class PostgreSQLAsyncReplication(Object):
                 "unit-promoted-cluster-counter": highest_promoted_cluster_counter
             })
 
-    def _on_promote_cluster(self, event: ActionEvent) -> None:
-        """Promote this cluster to the primary cluster."""
-        if not self._can_promote_cluster(event):
+    def _on_create_replication(self, event: ActionEvent) -> None:
+        """Set up asynchronous replication between two clusters."""
+        if not self._handle_replication_change(event):
             return
 
-        relation = self._relation
-
-        # Check if all units from the other cluster  published their pod IPs in the relation data.
-        # If not, fail the action telling that all units must publish their pod addresses in the
-        # relation data.
-        for unit in relation.units:
-            if "unit-address" not in relation.data[unit]:
-                event.fail(
-                    "All units from the other cluster must publish their pod addresses in the relation data."
-                )
-                return
-
-        system_identifier, error = self.get_system_identifier()
-        if error is not None:
-            logger.exception(error)
-            event.fail("Failed to get system identifier")
-            return
-
-        # Increment the current cluster counter in this application side based on the highest counter value.
-        promoted_cluster_counter = int(self._get_highest_promoted_cluster_counter_value())
-        promoted_cluster_counter += 1
-        logger.debug("Promoted cluster counter: %s", promoted_cluster_counter)
-
-        self._update_primary_cluster_data(promoted_cluster_counter, system_identifier)
-
-        # Emit an async replication changed event for this unit (to promote this cluster before demoting the
-        # other if this one is a standby cluster, which is needed to correctly setup the async replication
-        # when performing a switchover).
-        self._re_emit_async_relation_changed_event()
+        # Set the replication name in the relation data.
+        self._relation.data[self.charm.app].update({"name": event.params["name"]})
 
         # Set the status.
-        self.charm.unit.status = MaintenanceStatus("Promoting cluster...")
+        self.charm.unit.status = MaintenanceStatus("Creating replication...")
+
+    def _on_promote_to_primary(self, event: ActionEvent) -> None:
+        """Promote this cluster to the primary cluster."""
+        if not self._handle_replication_change(event):
+            return
+
+        # Set the status.
+        self.charm.unit.status = MaintenanceStatus("Creating replication...")
 
     @property
     def _primary_cluster_endpoint(self) -> str:
@@ -576,8 +604,8 @@ class PostgreSQLAsyncReplication(Object):
     def _relation(self) -> Relation:
         """Return the relation object."""
         for relation in [
-            self.model.get_relation(ASYNC_PRIMARY_RELATION),
-            self.model.get_relation(ASYNC_REPLICA_RELATION),
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
         ]:
             if relation is not None:
                 return relation
@@ -661,7 +689,7 @@ class PostgreSQLAsyncReplication(Object):
         primary_cluster_data = {"endpoint": self._primary_cluster_endpoint}
 
         # Retrieve the secrets that will be shared between the clusters.
-        if async_relation.name == ASYNC_PRIMARY_RELATION:
+        if async_relation.name == REPLICATION_OFFER_RELATION:
             secret = self._get_secret()
             secret.grant(async_relation)
             primary_cluster_data["secret-id"] = secret.id
