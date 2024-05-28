@@ -72,3 +72,4 @@ SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
     "Please choose one endpoint to use. No need to relate all of them simultaneously!"
 )
+BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}

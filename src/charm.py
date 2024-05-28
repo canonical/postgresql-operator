@@ -145,7 +145,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.get_primary_action, self._on_get_primary)
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
-        self.framework.observe(self.on.secret_remove, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
         self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
