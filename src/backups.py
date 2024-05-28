@@ -96,6 +96,22 @@ class PostgreSQLBackups(Object):
 
         return True, None
 
+    @property
+    def _can_initialise_stanza(self) -> bool:
+        """Validates whether this unit can initialise a stanza."""
+        # Don't allow stanza initialisation if this unit hasn't started the database
+        # yet and either hasn't joined the peer relation yet or hasn't configured TLS
+        # yet while other unit already has TLS enabled.
+        if not self.charm._patroni.member_started and (
+            (len(self.charm._peers.data.keys()) == 2)
+            or (
+                "tls" not in self.charm.unit_peer_data
+                and any("tls" in unit_data for _, unit_data in self.charm._peers.data.items())
+            )
+        ):
+            return False
+        return True
+
     def _can_unit_perform_backup(self) -> Tuple[bool, Optional[str]]:
         """Validates whether this unit can perform a backup."""
         if self.charm.is_blocked:
@@ -510,6 +526,11 @@ class PostgreSQLBackups(Object):
 
         if not self._render_pgbackrest_conf_file():
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
+            return
+
+        if not self._can_initialise_stanza:
+            logger.debug("Cannot initialise stanza yet.")
+            event.defer()
             return
 
         # Verify the s3 relation only on the primary.
