@@ -980,6 +980,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             extensions[extension] = enable
         if self.is_blocked and self.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE:
             self.unit.status = ActiveStatus()
+            original_status = self.unit.status
         self.unit.status = WaitingStatus("Updating extensions")
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
@@ -1494,7 +1495,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            for attempt in Retrying(wait=wait_fixed(3), stop_after_delay=stop_after_delay(300)):
+            for attempt in Retrying(wait=wait_fixed(3), stop=stop_after_delay(300)):
                 with attempt:
                     if not self._can_connect_to_postgresql:
                         assert False
@@ -1578,8 +1579,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
+        # Use config value if set, calculate otherwise
+        if self.config.experimental_max_connections:
+            max_connections = self.config.experimental_max_connections
+        else:
+            max_connections = max(4 * os.cpu_count(), 100)
+
         self._patroni.bulk_update_parameters_controller_by_patroni({
-            "max_connections": max(4 * os.cpu_count(), 100),
+            "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
         })
 

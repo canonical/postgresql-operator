@@ -1464,6 +1464,7 @@ def test_render_pgbackrest_conf_file(harness):
                 "path": "test-path/",
                 "region": "us-east-1",
                 "s3-uri-style": "path",
+                "delete-older-than-days": "30",
             },
             [],
         )
@@ -1487,6 +1488,7 @@ def test_render_pgbackrest_conf_file(harness):
             stanza=harness.charm.backup.stanza_name,
             storage_path=harness.charm._storage_path,
             user="backup",
+            retention_full=30,
         )
 
         # Patch the `open` method with our mock.
@@ -1550,6 +1552,7 @@ def test_retrieve_s3_parameters(harness):
                 {
                     "access-key": "test-access-key",
                     "bucket": "test-bucket",
+                    "delete-older-than-days": "9999999",
                     "endpoint": "https://s3.amazonaws.com",
                     "path": "/",
                     "region": None,
@@ -1569,6 +1572,7 @@ def test_retrieve_s3_parameters(harness):
             "path": " test-path/ ",
             "region": " us-east-1 ",
             "s3-uri-style": " path ",
+            "delete-older-than-days": "30",
         }
         tc.assertEqual(
             harness.charm.backup._retrieve_s3_parameters(),
@@ -1581,6 +1585,7 @@ def test_retrieve_s3_parameters(harness):
                     "region": "us-east-1",
                     "s3-uri-style": "path",
                     "secret-key": "test-secret-key",
+                    "delete-older-than-days": "30",
                 },
                 [],
             ),

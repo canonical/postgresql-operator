@@ -1168,6 +1168,7 @@ def test_restart(harness):
     with (
         patch("charm.Patroni.restart_postgresql") as _restart_postgresql,
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
+        patch("charm.PostgresqlOperatorCharm._can_connect_to_postgresql", return_value=True),
     ):
         _are_all_members_ready.side_effect = [False, True, True]
 

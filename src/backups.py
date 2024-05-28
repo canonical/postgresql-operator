@@ -899,6 +899,7 @@ Stderr:
             stanza=self.stanza_name,
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
+            retention_full=s3_parameters["delete-older-than-days"],
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
@@ -933,6 +934,7 @@ Stderr:
         s3_parameters.setdefault("region")
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
+        s3_parameters.setdefault("delete-older-than-days", "9999999")
 
         # Strip whitespaces from all parameters.
         for key, value in s3_parameters.items():
