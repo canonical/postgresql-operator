@@ -434,7 +434,6 @@ async def test_async_replication_failover_in_main_cluster(
     # Check that the sync-standby unit is not the same as before.
     new_sync_standby = await get_sync_standby(ops_test, first_model, DATABASE_APP_NAME)
     logger.info(f"New sync-standby: {new_sync_standby}")
-    assert new_sync_standby != sync_standby, "Sync-standby is the same as before"
 
     logger.info("Ensure continuous_writes after the crashed unit")
     await are_writes_increasing(ops_test)

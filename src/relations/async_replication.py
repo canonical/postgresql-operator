@@ -487,7 +487,7 @@ class PostgreSQLAsyncReplication(Object):
     def _on_async_relation_departed(self, event: RelationDepartedEvent) -> None:
         """Set a flag to avoid setting a wrong status message on relation broken event handler."""
         # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
-        if event.departing_unit == self.charm.unit:
+        if event.departing_unit == self.charm.unit or self.charm._peers is None:
             self.charm._peers.data[self.charm.unit].update({"departing": "True"})
 
     def _on_async_relation_joined(self, _) -> None:
