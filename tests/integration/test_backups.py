@@ -226,7 +226,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
         # Check that the backup was correctly restored by having only the first created table.
         logger.info("checking that the backup was correctly restored")
         primary = await get_primary(ops_test, remaining_unit.name)
-        address = await get_unit_address(ops_test, primary)
+        address = get_unit_address(ops_test, primary)
         with db_connect(
             host=address, password=password
         ) as connection, connection.cursor() as cursor:
