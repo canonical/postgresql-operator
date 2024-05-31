@@ -495,7 +495,7 @@ class PostgreSQLAsyncReplication(Object):
         if self.charm._patroni.get_standby_leader() is not None:
             if self.charm.unit.is_leader():
                 self.charm._peers.data[self.charm.app].update({"promoted-cluster-counter": "0"})
-            self._set_app_status()
+                self._set_app_status()
         else:
             if self.charm.unit.is_leader():
                 self.charm._peers.data[self.charm.app].update({"promoted-cluster-counter": ""})
