@@ -1357,7 +1357,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:
-                self.unit.status = ActiveStatus("Standby Leader")
+                self.unit.status = ActiveStatus("Standby")
             elif self._patroni.member_started:
                 self.unit.status = ActiveStatus()
         except (RetryError, ConnectionError) as e:
