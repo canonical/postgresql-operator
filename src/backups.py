@@ -82,6 +82,14 @@ class PostgreSQLBackups(Object):
         """Stanza name, composed by model and cluster name."""
         return f"{self.model.name}.{self.charm.cluster_name}"
 
+    @property
+    def _tls_ca_chain_filename(self) -> str:
+        """Returns the path to the TLS CA chain file."""
+        s3_parameters, _ = self._retrieve_s3_parameters()
+        if s3_parameters.get("tls-ca-chain") is not None:
+            return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
+        return ""
+
     def _are_backup_settings_ok(self) -> Tuple[bool, Optional[str]]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
@@ -233,7 +241,11 @@ class PostgreSQLBackups(Object):
         )
 
         try:
-            s3 = session.resource("s3", endpoint_url=self._construct_endpoint(s3_parameters))
+            s3 = session.resource(
+                "s3",
+                endpoint_url=self._construct_endpoint(s3_parameters),
+                verify=(self._tls_ca_chain_filename or None),
+            )
         except ValueError as e:
             logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
             raise e
@@ -835,6 +847,11 @@ Stderr:
             )
             return False
 
+        if self._tls_ca_chain_filename != "":
+            self.charm._patroni.render_file(
+                self._tls_ca_chain_filename, "\n".join(s3_parameters["tls-ca-chain"]), 0o644
+            )
+
         with open("templates/pgbackrest.conf.j2", "r") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
@@ -848,6 +865,7 @@ Stderr:
             endpoint=s3_parameters["endpoint"],
             bucket=s3_parameters["bucket"],
             s3_uri_style=s3_parameters["s3-uri-style"],
+            tls_ca_chain=self._tls_ca_chain_filename,
             access_key=s3_parameters["access-key"],
             secret_key=s3_parameters["secret-key"],
             stanza=self.stanza_name,
@@ -968,7 +986,11 @@ Stderr:
                 region_name=s3_parameters["region"],
             )
 
-            s3 = session.resource("s3", endpoint_url=self._construct_endpoint(s3_parameters))
+            s3 = session.resource(
+                "s3",
+                endpoint_url=self._construct_endpoint(s3_parameters),
+                verify=(self._tls_ca_chain_filename or None),
+            )
             bucket = s3.Bucket(bucket_name)
 
             with tempfile.NamedTemporaryFile() as temp_file:

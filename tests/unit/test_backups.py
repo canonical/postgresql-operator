@@ -50,6 +50,33 @@ def test_stanza_name(harness):
     )
 
 
+def test_tls_ca_chain_filename(harness):
+    # Test when the TLS CA chain is not available.
+    tc.assertEqual(
+        harness.charm.backup._tls_ca_chain_filename,
+        "",
+    )
+
+    # Test when the TLS CA chain is available.
+    with harness.hooks_disabled():
+        remote_application = "s3-integrator"
+        s3_rel_id = harness.add_relation(S3_PARAMETERS_RELATION, remote_application)
+        harness.update_relation_data(
+            s3_rel_id,
+            remote_application,
+            {
+                "bucket": "fake-bucket",
+                "access-key": "fake-access-key",
+                "secret-key": "fake-secret-key",
+                "tls-ca-chain": '["fake-tls-ca-chain"]',
+            },
+        )
+    tc.assertEqual(
+        harness.charm.backup._tls_ca_chain_filename,
+        "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt",
+    )
+
+
 def test_are_backup_settings_ok(harness):
     # Test without S3 relation.
     tc.assertEqual(
@@ -401,9 +428,17 @@ def test_construct_endpoint(harness):
     )
 
 
-def test_create_bucket_if_not_exists(harness):
+@pytest.mark.parametrize(
+    "tls_ca_chain_filename",
+    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+)
+def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
     with (
         patch("boto3.session.Session.resource") as _resource,
+        patch(
+            "charm.PostgreSQLBackups._tls_ca_chain_filename",
+            new_callable=PropertyMock(return_value=tls_ca_chain_filename),
+        ) as _tls_ca_chain_filename,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
     ):
         # Test when there are missing S3 parameters.
@@ -427,11 +462,15 @@ def test_create_bucket_if_not_exists(harness):
             harness.charm.backup._create_bucket_if_not_exists()
 
         # Test when the bucket already exists.
+        _resource.reset_mock()
         _resource.side_effect = None
         head_bucket = _resource.return_value.Bucket.return_value.meta.client.head_bucket
         create = _resource.return_value.Bucket.return_value.create
         wait_until_exists = _resource.return_value.Bucket.return_value.wait_until_exists
         harness.charm.backup._create_bucket_if_not_exists()
+        _resource.assert_called_once_with(
+            "s3", endpoint_url="test-endpoint", verify=(tls_ca_chain_filename or None)
+        )
         head_bucket.assert_called_once()
         create.assert_not_called()
         wait_until_exists.assert_not_called()
@@ -1470,9 +1509,17 @@ def test_pre_restore_checks(harness):
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_render_pgbackrest_conf_file(harness):
+@pytest.mark.parametrize(
+    "tls_ca_chain_filename",
+    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+)
+def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
     with (
         patch("charm.Patroni.render_file") as _render_file,
+        patch(
+            "charm.PostgreSQLBackups._tls_ca_chain_filename",
+            new_callable=PropertyMock(return_value=tls_ca_chain_filename),
+        ) as _tls_ca_chain_filename,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
     ):
         # Set up a mock for the `open` method, set returned data to postgresql.conf template.
@@ -1501,6 +1548,7 @@ def test_render_pgbackrest_conf_file(harness):
                 "region": "us-east-1",
                 "s3-uri-style": "path",
                 "delete-older-than-days": "30",
+                "tls-ca-chain": (["fake-tls-ca-chain"] if tls_ca_chain_filename != "" else ""),
             },
             [],
         )
@@ -1519,6 +1567,7 @@ def test_render_pgbackrest_conf_file(harness):
             endpoint="https://storage.googleapis.com",
             bucket="test-bucket",
             s3_uri_style="path",
+            tls_ca_chain=(tls_ca_chain_filename or ""),
             access_key="test-access-key",
             secret_key="test-secret-key",
             stanza=harness.charm.backup.stanza_name,
@@ -1536,11 +1585,16 @@ def test_render_pgbackrest_conf_file(harness):
         tc.assertEqual(mock.call_args_list[0][0], ("templates/pgbackrest.conf.j2", "r"))
 
         # Ensure the correct rendered template is sent to _render_file method.
-        _render_file.assert_called_once_with(
-            "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
-            expected_content,
-            0o644,
-        )
+        calls = [
+            call(
+                "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
+                expected_content,
+                0o644,
+            )
+        ]
+        if tls_ca_chain_filename != "":
+            calls.insert(0, call(tls_ca_chain_filename, "fake-tls-ca-chain", 0o644))
+        _render_file.assert_has_calls(calls)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -1725,11 +1779,19 @@ def test_start_stop_pgbackrest_service(harness):
         restart.assert_called_once()
 
 
-def test_upload_content_to_s3(harness):
+@pytest.mark.parametrize(
+    "tls_ca_chain_filename",
+    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+)
+def test_upload_content_to_s3(harness, tls_ca_chain_filename):
     with (
         patch("tempfile.NamedTemporaryFile") as _named_temporary_file,
         patch("charm.PostgreSQLBackups._construct_endpoint") as _construct_endpoint,
         patch("boto3.session.Session.resource") as _resource,
+        patch(
+            "charm.PostgreSQLBackups._tls_ca_chain_filename",
+            new_callable=PropertyMock(return_value=tls_ca_chain_filename),
+        ) as _tls_ca_chain_filename,
     ):
         # Set some parameters.
         content = "test-content"
@@ -1752,7 +1814,11 @@ def test_upload_content_to_s3(harness):
             harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters),
             False,
         )
-        _resource.assert_called_once_with("s3", endpoint_url="https://s3.us-east-1.amazonaws.com")
+        _resource.assert_called_once_with(
+            "s3",
+            endpoint_url="https://s3.us-east-1.amazonaws.com",
+            verify=(tls_ca_chain_filename or None),
+        )
         _named_temporary_file.assert_not_called()
         upload_file.assert_not_called()
 
@@ -1763,7 +1829,11 @@ def test_upload_content_to_s3(harness):
             harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters),
             False,
         )
-        _resource.assert_called_once_with("s3", endpoint_url="https://s3.us-east-1.amazonaws.com")
+        _resource.assert_called_once_with(
+            "s3",
+            endpoint_url="https://s3.us-east-1.amazonaws.com",
+            verify=(tls_ca_chain_filename or None),
+        )
         _named_temporary_file.assert_called_once()
         upload_file.assert_called_once_with("/tmp/test-file", "test-path/test-file.")
 
@@ -1776,6 +1846,10 @@ def test_upload_content_to_s3(harness):
             harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters),
             True,
         )
-        _resource.assert_called_once_with("s3", endpoint_url="https://s3.us-east-1.amazonaws.com")
+        _resource.assert_called_once_with(
+            "s3",
+            endpoint_url="https://s3.us-east-1.amazonaws.com",
+            verify=(tls_ca_chain_filename or None),
+        )
         _named_temporary_file.assert_called_once()
         upload_file.assert_called_once_with("/tmp/test-file", "test-path/test-file.")
