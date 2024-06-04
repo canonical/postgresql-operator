@@ -73,6 +73,39 @@ def test_are_backup_settings_ok(harness):
         )
 
 
+def test_can_initialise_stanza(harness):
+    with patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started:
+        # Test when Patroni or PostgreSQL hasn't started yet
+        # and the unit hasn't joined the peer relation yet.
+        _member_started.return_value = False
+        tc.assertEqual(
+            harness.charm.backup._can_initialise_stanza,
+            False,
+        )
+
+        # Test when the unit hasn't configured TLS yet while other unit already has TLS enabled.
+        harness.add_relation_unit(
+            harness.model.get_relation(PEER).id, f"{harness.charm.app.name}/1"
+        )
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                f"{harness.charm.app.name}/1",
+                {"tls": "enabled"},
+            )
+        tc.assertEqual(
+            harness.charm.backup._can_initialise_stanza,
+            False,
+        )
+
+        # Test when everything is ok to initialise the stanza.
+        _member_started.return_value = True
+        tc.assertEqual(
+            harness.charm.backup._can_initialise_stanza,
+            True,
+        )
+
+
 @patch_network_get(private_address="1.1.1.1")
 def test_can_unit_perform_backup(harness):
     with (
@@ -927,6 +960,9 @@ def test_on_s3_credential_changed(harness):
             "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
         ) as _is_primary,
         patch(
+            "charm.PostgreSQLBackups._can_initialise_stanza", new_callable=PropertyMock
+        ) as _can_initialise_stanza,
+        patch(
             "charm.PostgreSQLBackups._render_pgbackrest_conf_file"
         ) as _render_pgbackrest_conf_file,
         patch("ops.framework.EventBase.defer") as _defer,
@@ -953,31 +989,42 @@ def test_on_s3_credential_changed(harness):
                 {"cluster_initialised": "True"},
             )
         _render_pgbackrest_conf_file.return_value = False
-        _is_primary.return_value = False
         harness.charm.backup.s3_client.on.credentials_changed.emit(
             relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
         )
         _defer.assert_not_called()
         _render_pgbackrest_conf_file.assert_called_once()
+        _can_initialise_stanza.assert_not_called()
         _create_bucket_if_not_exists.assert_not_called()
         _can_use_s3_repository.assert_not_called()
         _initialise_stanza.assert_not_called()
 
+        # Test when it's not possible to initialise the stanza in this unit.
+        _render_pgbackrest_conf_file.return_value = True
+        _can_initialise_stanza.return_value = False
+        harness.charm.backup.s3_client.on.credentials_changed.emit(
+            relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
+        )
+        _defer.assert_called_once()
+        _can_initialise_stanza.assert_called_once()
+        _is_primary.assert_not_called()
+
         # Test that followers will not initialise the bucket
         harness.charm.unit.status = ActiveStatus()
         _render_pgbackrest_conf_file.reset_mock()
+        _can_initialise_stanza.return_value = True
+        _is_primary.return_value = False
         with harness.hooks_disabled():
             harness.update_relation_data(
                 peer_rel_id,
                 harness.charm.app.name,
                 {"cluster_initialised": "True"},
             )
-        _render_pgbackrest_conf_file.return_value = True
-
         harness.charm.backup.s3_client.on.credentials_changed.emit(
             relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
         )
         _render_pgbackrest_conf_file.assert_called_once()
+        _is_primary.assert_called_once()
         _create_bucket_if_not_exists.assert_not_called()
         tc.assertIsInstance(harness.charm.unit.status, ActiveStatus)
         _can_use_s3_repository.assert_not_called()
