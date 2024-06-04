@@ -79,6 +79,7 @@ class CharmConfig(BaseConfigModel):
     plugin_icu_ext_enable: bool
     plugin_pltcl_enable: bool
     plugin_postgis_enable: bool
+    plugin_timescaledb_enable: bool
     plugin_address_standardizer_enable: bool
     plugin_address_standardizer_data_us_enable: bool
     plugin_postgis_tiger_geocoder_enable: bool
