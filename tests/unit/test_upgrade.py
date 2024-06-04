@@ -65,13 +65,13 @@ def test_on_upgrade_granted(harness):
     with (
         patch("charm.Patroni.get_postgresql_version"),
         patch(
-            "charms.data_platform_libs.v0.upgrade.DataUpgrade.on_upgrade_changed"
+            "charm.PostgreSQLUpgrade.on_upgrade_changed"
         ) as _on_upgrade_changed,
         patch(
-            "charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_failed"
+            "charm.PostgreSQLUpgrade.set_unit_failed"
         ) as _set_unit_failed,
         patch(
-            "charms.data_platform_libs.v0.upgrade.DataUpgrade.set_unit_completed"
+            "charm.PostgreSQLUpgrade.set_unit_completed"
         ) as _set_unit_completed,
         patch(
             "charm.Patroni.is_replication_healthy", new_callable=PropertyMock
