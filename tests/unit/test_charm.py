@@ -195,12 +195,13 @@ def test_primary_endpoint_no_peers(harness):
 def test_on_leader_elected(harness):
     with (
         patch(
-        "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
-    ) as _update_relation_endpoints,
+            "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
+        ) as _update_relation_endpoints,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
-        ) as _primary_endpoint, patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        ) as _primary_endpoint,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         # Assert that there is no password in the peer relation.
