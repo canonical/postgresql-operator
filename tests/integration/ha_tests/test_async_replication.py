@@ -75,6 +75,7 @@ async def second_model(ops_test: OpsTest, first_model, request) -> Model:
         subprocess.run(
             ["juju", "set-model-constraints", f"arch={architecture.architecture}"], check=True
         )
+        subprocess.run(["juju", "switch", first_model.info.name], check=True)
     second_model = Model()
     await second_model.connect(model_name=second_model_name)
     yield second_model

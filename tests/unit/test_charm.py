@@ -531,6 +531,9 @@ def test_enable_disable_extensions(harness, caplog):
   plugin_vector_enable:
     default: false
     type: boolean
+  plugin_timescaledb_enable:
+    default: false
+    type: boolean
   profile:
     default: production
     type: string"""
