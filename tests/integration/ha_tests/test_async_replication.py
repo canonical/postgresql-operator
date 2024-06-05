@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import contextlib
 import logging
+import subprocess
 from asyncio import gather
 from typing import Optional
 
@@ -12,7 +13,7 @@ from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .. import markers
+from .. import architecture, markers
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
@@ -70,6 +71,11 @@ async def second_model(ops_test: OpsTest, first_model, request) -> Model:
     second_model_name = f"{first_model.info.name}-other"
     if second_model_name not in await ops_test._controller.list_models():
         await ops_test._controller.add_model(second_model_name)
+        subprocess.run(["juju", "switch", second_model_name], check=True)
+        subprocess.run(
+            ["juju", "set-model-constraints", f"arch={architecture.architecture}"], check=True
+        )
+        subprocess.run(["juju", "switch", first_model.info.name], check=True)
     second_model = Model()
     await second_model.connect(model_name=second_model_name)
     yield second_model

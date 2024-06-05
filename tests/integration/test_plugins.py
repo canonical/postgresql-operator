@@ -78,11 +78,14 @@ POSTGIS_EXTENSION_STATEMENT = "SELECT PostGIS_Full_Version();"
 ADDRESS_STANDARDIZER_EXTENSION_STATEMENT = "SELECT num, street, city, zip, zipplus FROM parse_address('1 Devonshire Place, Boston, MA 02109-1234');"
 ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT = "SELECT house_num, name, suftype, city, country, state, unit  FROM standardize_address('us_lex', 'us_gaz', 'us_rules', 'One Devonshire Place, PH 301, Boston, MA 02109');"
 POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT = "SELECT *  FROM standardize_address('tiger.pagc_lex', 'tiger.pagc_gaz', 'tiger.pagc_rules', 'One Devonshire Place, PH 301, Boston, MA 02109-1234');"
-POSTGIS_TOPOLOGY_STATEMENT = "SELECT topology.CreateTopology('nyc_topo', 26918, 0.5);"
-POSTGIS_RASTER_STATEMENT = "CREATE TABLE test_postgis_raster (name varchar, rast raster);"
+POSTGIS_TOPOLOGY_EXTENSION_STATEMENT = "SELECT topology.CreateTopology('nyc_topo', 26918, 0.5);"
+POSTGIS_RASTER_EXTENSION_STATEMENT = (
+    "CREATE TABLE test_postgis_raster (name varchar, rast raster);"
+)
 VECTOR_EXTENSION_STATEMENT = (
     "CREATE TABLE vector_test (id bigserial PRIMARY KEY, embedding vector(3));"
 )
+TIMESCALEDB_EXTENSION_STATEMENT = "CREATE TABLE test_timescaledb (time TIMESTAMPTZ NOT NULL); SELECT create_hypertable('test_timescaledb', 'time');"
 
 
 @pytest.mark.group(1)
@@ -153,9 +156,10 @@ async def test_plugins(ops_test: OpsTest) -> None:
         "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
         "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
         "plugin_postgis_tiger_geocoder_enable": POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT,
-        "plugin_postgis_raster_enable": POSTGIS_RASTER_STATEMENT,
-        "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_STATEMENT,
+        "plugin_postgis_raster_enable": POSTGIS_RASTER_EXTENSION_STATEMENT,
+        "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
+        "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):
