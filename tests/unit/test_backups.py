@@ -568,15 +568,15 @@ def test_format_backup_list(harness):
 
     # Test when there are backups.
     backup_list = [
-        ("2023-01-01T09:00:00Z", "physical", "failed: fake error"),
-        ("2023-01-01T10:00:00Z", "physical", "finished"),
+        ("2023-01-01T09:00:00Z", "full", "failed: fake error"),
+        ("2023-01-01T10:00:00Z", "full", "finished"),
     ]
     tc.assertEqual(
         harness.charm.backup._format_backup_list(backup_list),
         """backup-id             | backup-type  | backup-status
 ----------------------------------------------------
-2023-01-01T09:00:00Z  | physical     | failed: fake error
-2023-01-01T10:00:00Z  | physical     | finished""",
+2023-01-01T09:00:00Z  | full         | failed: fake error
+2023-01-01T10:00:00Z  | full         | finished""",
     )
 
 
@@ -600,8 +600,8 @@ def test_generate_backup_list_output(harness):
             harness.charm.backup._generate_backup_list_output(),
             """backup-id             | backup-type  | backup-status
 ----------------------------------------------------
-2023-01-01T09:00:00Z  | physical     | failed: fake error
-2023-01-01T10:00:00Z  | physical     | finished""",
+2023-01-01T09:00:00Z  | full         | failed: fake error
+2023-01-01T10:00:00Z  | full         | finished""",
         )
 
 
@@ -1139,8 +1139,16 @@ def test_on_create_backup_action(harness):
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
         patch("charm.PostgreSQLBackups._can_unit_perform_backup") as _can_unit_perform_backup,
     ):
-        # Test when the unit cannot perform a backup.
+        # Test when the unit cannot perform a backup because of type.
         mock_event = MagicMock()
+        mock_event.params = {"type": "wrong"}
+        harness.charm.backup._on_create_backup_action(mock_event)
+        mock_event.fail.assert_called_once()
+        mock_event.set_results.assert_not_called()
+
+        # Test when the unit cannot perform a backup because of preflight check.
+        mock_event = MagicMock()
+        mock_event.params = {"type": "full"}
         _can_unit_perform_backup.return_value = (False, "fake validation message")
         harness.charm.backup._on_create_backup_action(mock_event)
         mock_event.fail.assert_called_once()
@@ -1295,15 +1303,15 @@ def test_on_list_backups_action(harness):
         _generate_backup_list_output.side_effect = None
         _generate_backup_list_output.return_value = """backup-id             | backup-type  | backup-status
     ----------------------------------------------------
-    2023-01-01T09:00:00Z  | physical     | failed: fake error
-    2023-01-01T10:00:00Z  | physical     | finished"""
+    2023-01-01T09:00:00Z  | full         | failed: fake error
+    2023-01-01T10:00:00Z  | full         | finished"""
         harness.charm.backup._on_list_backups_action(mock_event)
         _generate_backup_list_output.assert_called_once()
         mock_event.set_results.assert_called_once_with({
             "backups": """backup-id             | backup-type  | backup-status
     ----------------------------------------------------
-    2023-01-01T09:00:00Z  | physical     | failed: fake error
-    2023-01-01T10:00:00Z  | physical     | finished"""
+    2023-01-01T09:00:00Z  | full         | failed: fake error
+    2023-01-01T10:00:00Z  | full         | finished"""
         })
         mock_event.fail.assert_not_called()
 
@@ -1318,6 +1326,7 @@ def test_on_restore_action(harness):
         patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
         patch("charm.PostgreSQLBackups._list_backups") as _list_backups,
+        patch("charm.PostgreSQLBackups._fetch_backup_from_id") as _fetch_backup_from_id,
         patch("charm.PostgreSQLBackups._pre_restore_checks") as _pre_restore_checks,
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
@@ -1344,6 +1353,7 @@ def test_on_restore_action(harness):
         harness.charm.unit.status = ActiveStatus()
         harness.charm.backup._on_restore_action(mock_event)
         _list_backups.assert_called_once_with(show_failed=False)
+        _fetch_backup_from_id.assert_not_called()
         mock_event.fail.assert_called_once()
         _stop_patroni.assert_not_called()
         _execute_command.assert_not_called()
@@ -1386,6 +1396,7 @@ def test_on_restore_action(harness):
         _restart_database.reset_mock()
         _empty_data_files.return_value = True
         _execute_command.return_value = (1, "", "fake stderr")
+        _fetch_backup_from_id.return_value = "20230101-090000F"
         tc.assertEqual(harness.get_relation_data(peer_rel_id, harness.charm.app), {})
         harness.charm.backup._on_restore_action(mock_event)
         tc.assertEqual(
@@ -1416,6 +1427,7 @@ def test_on_restore_action(harness):
         mock_event.reset_mock()
         _restart_database.reset_mock()
         _execute_command.return_value = (0, "fake stdout", "")
+        _fetch_backup_from_id.return_value = "20230101-090000F"
         harness.charm.backup._on_restore_action(mock_event)
         _restart_database.assert_not_called()
         mock_event.fail.assert_not_called()
