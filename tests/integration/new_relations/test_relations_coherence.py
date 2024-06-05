@@ -54,10 +54,12 @@ async def test_relations(ops_test: OpsTest, charm):
         connection.autocommit = True
         cursor = connection.cursor()
         try:
-            random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+            random_name = (
+                f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+            )
             cursor.execute(f"CREATE DATABASE {random_name};")
             assert False, "user role was able to create database"
-        except psycopg2.errors.InsufficientPrivilege as e:
+        except psycopg2.errors.InsufficientPrivilege:
             pass
         finally:
             connection.close()
@@ -135,15 +137,17 @@ async def test_relations(ops_test: OpsTest, charm):
         connection.autocommit = True
         cursor = connection.cursor()
         try:
-            random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+            random_name = (
+                f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+            )
             cursor.execute(f"CREATE DATABASE {random_name};")
             assert False, "user role was able to create database"
-        except psycopg2.errors.InsufficientPrivilege as e:
+        except psycopg2.errors.InsufficientPrivilege:
             pass
         try:
             cursor.execute("SET schema 'test_schema';")
             assert False, "user role was able to create database"
-        except psycopg2.errors.InsufficientPrivilege as e:
+        except psycopg2.errors.InsufficientPrivilege:
             pass
         cursor.execute("SELECT data FROM test;")
         data = cursor.fetchone()
