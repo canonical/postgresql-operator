@@ -106,7 +106,6 @@ async def test_relations(ops_test: OpsTest, charm):
             cursor.execute(f"CREATE DATABASE {random_name};")
             cursor.execute(f"DROP DATABASE {random_name};")
             cursor.execute("CREATE SCHEMA test_schema;")
-            cursor.execute("SET schema 'test_schema';")
         except psycopg2.errors.InsufficientPrivilege:
             assert (
                 False
@@ -122,6 +121,7 @@ async def test_relations(ops_test: OpsTest, charm):
         # Re-relation again with user role and checking write data
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
+            "extra-user-roles": "",
         })
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
@@ -146,7 +146,7 @@ async def test_relations(ops_test: OpsTest, charm):
             pass
         try:
             cursor.execute("SET schema 'test_schema';")
-            assert False, "user role was able to create database"
+            assert False, "user role was able to change schema"
         except psycopg2.errors.InsufficientPrivilege:
             pass
         cursor.execute("SELECT data FROM test;")
