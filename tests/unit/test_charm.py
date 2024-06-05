@@ -193,17 +193,12 @@ def test_primary_endpoint_no_peers(harness):
 
 @patch_network_get(private_address="1.1.1.1")
 def test_on_leader_elected(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
-        ) as _update_relation_endpoints,
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock,
-        ) as _primary_endpoint,
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
-    ):
+    with patch(
+        "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
+    ) as _update_relation_endpoints, patch(
+        "charm.PostgresqlOperatorCharm.primary_endpoint",
+        new_callable=PropertyMock,
+    ) as _primary_endpoint, patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
         # Assert that there is no password in the peer relation.
         assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) is None
 
@@ -535,6 +530,9 @@ def test_enable_disable_extensions(harness, caplog):
   plugin_vector_enable:
     default: false
     type: boolean
+  plugin_timescaledb_enable:
+    default: false
+    type: boolean
   profile:
     default: production
     type: string"""
@@ -575,7 +573,6 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True],
         ) as _is_storage_attached,
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         _get_postgresql_version.return_value = "14.0"
 
@@ -696,7 +693,6 @@ def test_on_start_no_patroni_member(harness):
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -738,10 +734,7 @@ def test_on_start_after_blocked_state(harness):
 
 @patch_network_get(private_address="1.1.1.1")
 def test_on_get_password(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
-    ):
+    with patch("charm.PostgresqlOperatorCharm.update_config"):
         rel_id = harness.model.get_relation(PEER).id
         # Create a mock event and set passwords in peer relation data.
         harness.set_leader(True)
@@ -782,7 +775,6 @@ def test_on_set_password(harness):
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         # Create a mock event.
         mock_event = MagicMock(params={})
@@ -1749,10 +1741,7 @@ def test_get_secret_from_databag(harness):
 
     This must be backwards-compatible so it runs on both juju2 and juju3.
     """
-    with (
-        patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
-    ):
+    with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         # App level changes require leader privileges
         harness.set_leader()
@@ -1777,7 +1766,6 @@ def test_get_secret_from_databag(harness):
 def test_on_get_password_secrets(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         # Create a mock event and set passwords in peer relation data.
         harness.set_leader()
@@ -1809,7 +1797,6 @@ def test_on_get_password_secrets(harness):
 def test_get_secret_secrets(harness, scope, field):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         harness.set_leader()
 
@@ -1824,10 +1811,7 @@ def test_set_secret_in_databag(harness, only_without_juju_secrets):
 
     This is juju2 specific. In juju3, set_secret writes to juju secrets.
     """
-    with (
-        patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
-    ):
+    with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
 
@@ -1860,7 +1844,6 @@ def test_set_secret_in_databag(harness, only_without_juju_secrets):
 def test_set_reset_new_secret(harness, scope, is_leader):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         """NOTE: currently ops.testing seems to allow for non-leader to set secrets too!"""
         # App has to be leader, unit can be either
@@ -1883,7 +1866,6 @@ def test_set_reset_new_secret(harness, scope, is_leader):
 def test_invalid_secret(harness, scope, is_leader):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
@@ -1899,7 +1881,6 @@ def test_invalid_secret(harness, scope, is_leader):
 def test_delete_password(harness, _has_secrets, caplog):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         """NOTE: currently ops.testing seems to allow for non-leader to remove secrets too!"""
         harness.set_leader(True)
@@ -1951,7 +1932,6 @@ def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leade
     """
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # App has to be leader, unit can be either
@@ -1980,7 +1960,6 @@ def test_migration_from_single_secret(harness, only_with_juju_secrets, scope, is
     """
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-        patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_process_locks"),
     ):
         rel_id = harness.model.get_relation(PEER).id
 
