@@ -11,6 +11,7 @@ LEGACY_DB = "db"
 LEGACY_DB_ADMIN = "db-admin"
 PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE, LEGACY_DB, LEGACY_DB_ADMIN]
+ALL_LEGACY_RELATIONS = [LEGACY_DB, LEGACY_DB_ADMIN]
 API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
@@ -35,7 +36,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "105", "x86_64": "104"}, "channel": "14/stable"},
+        {"revision": {"aarch64": "114", "x86_64": "115"}, "channel": "14/stable"},
     )
 ]
 
@@ -67,3 +68,8 @@ APP_SCOPE = "app"
 UNIT_SCOPE = "unit"
 
 SECRET_KEY_OVERRIDES = {"ca": "cauth"}
+
+ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
+    "Please choose one endpoint to use. No need to relate all of them simultaneously!"
+)
+BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}

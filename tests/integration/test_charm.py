@@ -173,6 +173,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         "memory_max_prepared_transactions": "100",
         "memory_shared_buffers": "128",
         "response_lc_monetary": "en_GB.utf8",
+        "experimental_max_connections": "200",
     })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -182,9 +183,16 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     for unit_id in UNIT_IDS:
         host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
         logger.info("connecting to the database host: %s", host)
-        with db_connect(host, password) as connection:
-            settings_names = ["max_prepared_transactions", "shared_buffers", "lc_monetary"]
-            with connection.cursor() as cursor:
+        try:
+            with psycopg2.connect(
+                f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
+            ) as connection, connection.cursor() as cursor:
+                settings_names = [
+                    "max_prepared_transactions",
+                    "shared_buffers",
+                    "lc_monetary",
+                    "max_connections",
+                ]
                 cursor.execute(
                     sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
                         sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
@@ -193,12 +201,14 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
                 )
                 records = cursor.fetchall()
                 settings = convert_records_to_dict(records)
-        connection.close()
 
-        # Validate each configuration set by Patroni on PostgreSQL.
-        assert settings["max_prepared_transactions"] == "100"
-        assert settings["shared_buffers"] == "128"
-        assert settings["lc_monetary"] == "en_GB.utf8"
+                # Validate each configuration set by Patroni on PostgreSQL.
+                assert settings["max_prepared_transactions"] == "100"
+                assert settings["shared_buffers"] == "128"
+                assert settings["lc_monetary"] == "en_GB.utf8"
+                assert settings["max_connections"] == "200"
+        finally:
+            connection.close()
 
 
 @pytest.mark.group(1)

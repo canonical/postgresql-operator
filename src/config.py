@@ -79,6 +79,7 @@ class CharmConfig(BaseConfigModel):
     plugin_icu_ext_enable: bool
     plugin_pltcl_enable: bool
     plugin_postgis_enable: bool
+    plugin_timescaledb_enable: bool
     plugin_address_standardizer_enable: bool
     plugin_address_standardizer_data_us_enable: bool
     plugin_postgis_tiger_geocoder_enable: bool
@@ -98,6 +99,7 @@ class CharmConfig(BaseConfigModel):
     vacuum_autovacuum_vacuum_cost_delay: Optional[float]
     vacuum_autovacuum_vacuum_scale_factor: Optional[float]
     vacuum_vacuum_freeze_table_age: Optional[int]
+    experimental_max_connections: Optional[int]
 
     @classmethod
     def keys(cls) -> list[str]:
