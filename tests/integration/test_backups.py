@@ -34,19 +34,19 @@ CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET = "Move restored cluster to another S3 bucket"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
-    tls_certificates_app_name = "tls-certificates-operator"
+    TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
     if architecture.architecture == "arm64":
-        tls_channel = "legacy/edge"
+        TLS_CHANNEL = "legacy/edge"
     else:
-        tls_channel = "legacy/stable"
-    tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
+        TLS_CHANNEL = "legacy/stable"
+    TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
-    tls_certificates_app_name = "self-signed-certificates"
+    TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
     if architecture.architecture == "arm64":
-        tls_channel = "latest/edge"
+        TLS_CHANNEL = "latest/edge"
     else:
-        tls_channel = "latest/stable"
-    tls_config = {"ca-common-name": "Test CA"}
+        TLS_CHANNEL = "latest/stable"
+    TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -105,7 +105,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
     """Build and deploy two units of PostgreSQL and then test the backup and restore actions."""
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME)
-    await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
+    await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL)
 
     for cloud, config in cloud_configs[0].items():
         # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
@@ -120,7 +120,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
             config={"profile": "testing"},
         )
         await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
-        await ops_test.model.relate(database_app_name, tls_certificates_app_name)
+        await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
 
         # Configure and set access and secret keys.
         logger.info(f"configuring S3 integrator for {cloud}")
@@ -232,7 +232,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
         if cloud == list(cloud_configs[0].keys())[0]:
             # Remove the relation to the TLS certificates operator.
             await ops_test.model.applications[database_app_name].remove_relation(
-                f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+                f"{database_app_name}:certificates", f"{TLS_CERTIFICATES_APP_NAME}:certificates"
             )
             await ops_test.model.wait_for_idle(
                 apps=[database_app_name], status="active", timeout=1000
@@ -287,7 +287,7 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
         await ops_test.model.remove_application(database_app_name, block_until_done=True)
 
     # Remove the TLS operator.
-    await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
+    await ops_test.model.remove_application(TLS_CERTIFICATES_APP_NAME, block_until_done=True)
 
 
 @pytest.mark.group(1)
