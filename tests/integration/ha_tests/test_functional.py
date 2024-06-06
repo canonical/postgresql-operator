@@ -171,6 +171,7 @@ async def test_instance_forceful_restart(ops_test: OpsTest, charm: str) -> None:
             with attempt:
                 await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
 
+
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_instance_backup_with_restart(
@@ -279,6 +280,10 @@ async def test_instance_backup_with_restart(
             assert not await check_db(ops_test, DATABASE_APP_NAME, TEST_DATABASE_NAME + "_dup")
 
             logger.info("remove application")
-            for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
+            for attempt in Retrying(
+                stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
+            ):
                 with attempt:
-                    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
+                    await ops_test.model.remove_application(
+                        DATABASE_APP_NAME, block_until_done=True
+                    )

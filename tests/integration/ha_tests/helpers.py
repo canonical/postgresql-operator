@@ -1024,7 +1024,7 @@ async def check_graceful_shutdown(ops_test: OpsTest, unit_name: str) -> bool:
     stdout = await run_command_on_unit(
         ops_test,
         unit_name,
-         f'cat /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*',
+        "cat /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*",
     )
 
     return log_str in str(stdout)
