@@ -147,7 +147,7 @@ LIBAPI = 1
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 6
+LIBPATCH = 7
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -540,11 +540,13 @@ def _trace_callable(callable: _F, qualifier: str, static: bool = False) -> _F:
         name = getattr(callable, "__qualname__", getattr(callable, "__name__", str(callable)))
         with _span(f"{'(static) ' if static else ''}{qualifier} call: {name}"):  # type: ignore
             if static:
-                # fixme: do we or don't we need [1:]?
-                #  The _trace_callable decorator doesn't always play nice with @staticmethods.
-                #  Sometimes it will receive 'self', sometimes it won't.
-                # return callable(*args, **kwargs)  # type: ignore
-                return callable(*args[1:], **kwargs)  # type: ignore
+                # The _trace_callable decorator doesn't play super nice with @staticmethods.
+                # if you call MyObj().mystaticmethod we'll receive the MyObj instance as first argument,
+                # if you call MyObj.mystaticmethod we won't.
+                try:
+                    inspect.signature(callable).bind(*args, **kwargs)
+                except TypeError:
+                    return callable(*args[1:], **kwargs)  # type: ignore
             return callable(*args, **kwargs)  # type: ignore
 
     # wrapped_function.__signature__ = sig
