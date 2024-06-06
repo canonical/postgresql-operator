@@ -281,4 +281,4 @@ async def test_instance_backup_with_restart(
             logger.info("remove application")
             for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
                 with attempt:
-                    await ops_test.model.remove_application(APPLICATION_NAME, block_until_done=True)
+                    await ops_test.model.remove_application(DATABASE_APP_NAME, block_until_done=True)
