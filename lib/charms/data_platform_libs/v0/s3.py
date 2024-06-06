@@ -137,7 +137,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 logger = logging.getLogger(__name__)
 
@@ -212,7 +212,7 @@ class S3CredentialEvents(CharmEvents):
 class S3Provider(Object):
     """A provider handler for communicating S3 credentials to consumers."""
 
-    on = S3CredentialEvents()  # pyright: ignore [reportGeneralTypeIssues]
+    on = S3CredentialEvents()  # pyright: ignore [reportAssignmentType]
 
     def __init__(
         self,
@@ -481,6 +481,18 @@ class S3Provider(Object):
         """
         self.update_connection_info(relation_id, {"s3-api-version": s3_api_version})
 
+    def set_delete_older_than_days(self, relation_id: int, days: int) -> None:
+        """Sets the retention days for full backups in application databag.
+
+        This function writes in the application data bag, therefore,
+        only the leader unit can call it.
+
+        Args:
+            relation_id: the identifier for a particular relation.
+            days: the value.
+        """
+        self.update_connection_info(relation_id, {"delete-older-than-days": str(days)})
+
     def set_attributes(self, relation_id: int, attributes: List[str]) -> None:
         """Sets the connection attributes in application databag.
 
@@ -581,6 +593,17 @@ class S3Event(RelationEvent):
         return self.relation.data[self.relation.app].get("s3-api-version")
 
     @property
+    def delete_older_than_days(self) -> Optional[int]:
+        """Returns the retention days for full backups."""
+        if not self.relation.app:
+            return None
+
+        days = self.relation.data[self.relation.app].get("delete-older-than-days")
+        if days is None:
+            return None
+        return int(days)
+
+    @property
     def attributes(self) -> Optional[List[str]]:
         """Returns the attributes."""
         if not self.relation.app:
@@ -613,7 +636,7 @@ S3_REQUIRED_OPTIONS = ["access-key", "secret-key"]
 class S3Requirer(Object):
     """Requires-side of the s3 relation."""
 
-    on = S3CredentialRequiresEvents()  # pyright: ignore[reportGeneralTypeIssues]
+    on = S3CredentialRequiresEvents()  # pyright: ignore[reportAssignmentType]
 
     def __init__(
         self, charm: ops.charm.CharmBase, relation_name: str, bucket_name: Optional[str] = None

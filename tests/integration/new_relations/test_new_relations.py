@@ -12,6 +12,7 @@ import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
+from .. import markers
 from ..helpers import CHARM_SERIES, assert_sync_standbys, get_leader_unit, scale_application
 from ..juju_ import juju_major_version
 from .helpers import (
@@ -583,6 +584,7 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
 
 
 @pytest.mark.group(1)
+@markers.amd64_only  # nextcloud charm not available for arm64
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     async with ops_test.fast_forward():
         # Deploy Nextcloud.
