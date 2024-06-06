@@ -320,9 +320,11 @@ def test_on_config_changed(harness):
 
 
 def test_check_extension_dependencies(harness):
-    with patch("subprocess.check_output", return_value=b"C"), patch.object(
-        PostgresqlOperatorCharm, "postgresql", Mock()
-    ):
+    with patch("charm.Patroni.get_primary") as _get_primary, patch(
+        "subprocess.check_output", return_value=b"C"
+    ), patch.object(PostgresqlOperatorCharm, "postgresql", Mock()):
+        _get_primary.return_value = harness.charm.unit
+
         # Test when plugins dependencies exception is not caused
         config = {
             "plugin_address_standardizer_enable": False,
@@ -348,9 +350,13 @@ def test_check_extension_dependencies(harness):
 
 
 def test_enable_disable_extensions(harness, caplog):
-    with patch("subprocess.check_output", return_value=b"C"), patch.object(
-        PostgresqlOperatorCharm, "postgresql", Mock()
-    ) as postgresql_mock:
+    with patch("charm.Patroni.get_primary") as _get_primary, patch(
+        "charm.PostgresqlOperatorCharm._unit_ip"
+    ), patch("charm.PostgresqlOperatorCharm._patroni"), patch(
+        "subprocess.check_output", return_value=b"C"
+    ), patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+        _get_primary.return_value = harness.charm.unit
+
         # Test when all extensions install/uninstall succeed.
         postgresql_mock.enable_disable_extension.side_effect = None
         with caplog.at_level(logging.ERROR):
@@ -836,6 +842,12 @@ def test_on_update_status(harness):
         ) as _member_replication_lag,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
+            "charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock
+        ) as _is_standby_leader,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
+        ) as _is_primary,
+        patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
         patch(
@@ -867,6 +879,8 @@ def test_on_update_status(harness):
         # Test the reinitialisation of the replica when its lag is unknown
         # after a restart.
         _set_primary_status_message.reset_mock()
+        _is_primary.return_value = False
+        _is_standby_leader.return_value = False
         _member_started.return_value = False
         _is_member_isolated.return_value = False
         _member_replication_lag.return_value = "unknown"
@@ -1354,9 +1368,7 @@ def test_validate_config_options(harness):
 def test_on_peer_relation_changed(harness):
     with (
         patch("charm.snap.SnapCache"),
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
+        patch("charm.PostgresqlOperatorCharm._update_new_unit_status") as _update_new_unit_status,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
@@ -1369,6 +1381,7 @@ def test_on_peer_relation_changed(harness):
         patch(
             "charm.Patroni.member_replication_lag", new_callable=PropertyMock
         ) as _member_replication_lag,
+        patch("charm.PostgresqlOperatorCharm.is_standby_leader") as _is_standby_leader,
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.start_patroni") as _start_patroni,
@@ -1417,20 +1430,19 @@ def test_on_peer_relation_changed(harness):
         _update_member_ip.assert_called_once()
         _update_config.assert_called_once()
         _start_patroni.assert_called_once()
-        _update_relation_endpoints.assert_called_once()
-        assert isinstance(harness.model.unit.status, ActiveStatus)
+        _update_new_unit_status.assert_called_once()
 
         # Test when the cluster member updates its IP.
         _update_member_ip.reset_mock()
         _update_config.reset_mock()
         _start_patroni.reset_mock()
-        _update_relation_endpoints.reset_mock()
         _update_member_ip.return_value = True
+        _update_new_unit_status.reset_mock()
         harness.charm._on_peer_relation_changed(mock_event)
         _update_member_ip.assert_called_once()
         _update_config.assert_not_called()
         _start_patroni.assert_not_called()
-        _update_relation_endpoints.assert_not_called()
+        _update_new_unit_status.assert_not_called()
 
         # Test when the unit fails to update the Patroni configuration.
         _update_member_ip.return_value = False
@@ -1438,7 +1450,7 @@ def test_on_peer_relation_changed(harness):
         harness.charm._on_peer_relation_changed(mock_event)
         _update_config.assert_called_once()
         _start_patroni.assert_not_called()
-        _update_relation_endpoints.assert_not_called()
+        _update_new_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
         # Test when Patroni hasn't started yet in the unit.
@@ -1446,7 +1458,7 @@ def test_on_peer_relation_changed(harness):
         _member_started.return_value = False
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_called_once()
-        _update_relation_endpoints.assert_not_called()
+        _update_new_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
         # Test when Patroni has already started but this is a replica with a
@@ -1458,6 +1470,7 @@ def test_on_peer_relation_changed(harness):
             _check_stanza.reset_mock()
             _start_stop_pgbackrest_service.reset_mock()
             _is_primary.return_value = values[0]
+            _is_standby_leader.return_value = values[0]
             _member_replication_lag.return_value = values[1]
             harness.charm.unit.status = ActiveStatus()
             harness.charm.on.database_peers_relation_changed.emit(relation)
@@ -1719,24 +1732,30 @@ def test_scope_obj(harness):
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_get_secret(harness):
+def test_get_secret_from_databag(harness):
+    """Asserts that get_secret method can read secrets from databag.
+
+    This must be backwards-compatible so it runs on both juju2 and juju3.
+    """
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         # App level changes require leader privileges
         harness.set_leader()
         # Test application scope.
-        assert harness.charm.get_secret("app", "password") is None
-        harness.update_relation_data(rel_id, harness.charm.app.name, {"password": "test-password"})
-        assert harness.charm.get_secret("app", "password") == "test-password"
+        assert harness.charm.get_secret("app", "operator_password") is None
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"operator_password": "test-password"}
+        )
+        assert harness.charm.get_secret("app", "operator_password") == "test-password"
 
         # Unit level changes don't require leader privileges
         harness.set_leader(False)
         # Test unit scope.
-        assert harness.charm.get_secret("unit", "password") is None
+        assert harness.charm.get_secret("unit", "operator_password") is None
         harness.update_relation_data(
-            rel_id, harness.charm.unit.name, {"password": "test-password"}
+            rel_id, harness.charm.unit.name, {"operator_password": "test-password"}
         )
-        assert harness.charm.get_secret("unit", "password") == "test-password"
+        assert harness.charm.get_secret("unit", "operator_password") == "test-password"
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -1769,21 +1788,25 @@ def test_on_get_password_secrets(harness):
         mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
 
 
-@pytest.mark.parametrize("scope", [("app"), ("unit")])
+@pytest.mark.parametrize("scope,field", [("app", "operator-password"), ("unit", "csr")])
 @patch_network_get(private_address="1.1.1.1")
-def test_get_secret_secrets(harness, scope):
+def test_get_secret_secrets(harness, scope, field):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
         harness.set_leader()
 
-        assert harness.charm.get_secret(scope, "operator-password") is None
-        harness.charm.set_secret(scope, "operator-password", "test-password")
-        assert harness.charm.get_secret(scope, "operator-password") == "test-password"
+        assert harness.charm.get_secret(scope, field) is None
+        harness.charm.set_secret(scope, field, "test")
+        assert harness.charm.get_secret(scope, field) == "test"
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_set_secret(harness):
+def test_set_secret_in_databag(harness, only_without_juju_secrets):
+    """Asserts that set_secret method writes to relation databag.
+
+    This is juju2 specific. In juju3, set_secret writes to juju secrets.
+    """
     with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
         rel_id = harness.model.get_relation(PEER).id
         harness.set_leader()
@@ -1843,7 +1866,7 @@ def test_invalid_secret(harness, scope, is_leader):
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
 
-        with pytest.raises(RelationDataTypeError):
+        with pytest.raises((RelationDataTypeError, TypeError)):
             harness.charm.set_secret(scope, "somekey", 1)
 
         harness.charm.set_secret(scope, "somekey", "")
@@ -1867,7 +1890,7 @@ def test_delete_password(harness, _has_secrets, caplog):
         assert harness.charm.get_secret("unit", "operator-password") is None
 
         harness.set_leader(True)
-        with caplog.at_level(logging.ERROR):
+        with caplog.at_level(logging.DEBUG):
             if _has_secrets:
                 error_message = (
                     "Non-existing secret operator-password was attempted to be removed."
@@ -1898,28 +1921,26 @@ def test_delete_password(harness, _has_secrets, caplog):
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
-def test_migration_from_databag(harness, _has_secrets, scope, is_leader):
-    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
+def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leader):
+    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
+
+    Since it checks for a migration from databag to juju secrets, it's specific to juju3.
+    """
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
-        # as this test checks for a migration from databag to secrets,
-        # there's no need for this test when secrets are not enabled.
-        if not _has_secrets:
-            return
-
         rel_id = harness.model.get_relation(PEER).id
         # App has to be leader, unit can be either
         harness.set_leader(is_leader)
 
         # Getting current password
         entity = getattr(harness.charm, scope)
-        harness.update_relation_data(rel_id, entity.name, {"operator-password": "bla"})
-        assert harness.charm.get_secret(scope, "operator-password") == "bla"
+        harness.update_relation_data(rel_id, entity.name, {"operator_password": "bla"})
+        assert harness.charm.get_secret(scope, "operator_password") == "bla"
 
         # Reset new secret
         harness.charm.set_secret(scope, "operator-password", "blablabla")
-        assert harness.charm.model.get_secret(label=f"postgresql.{scope}")
+        assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
         assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
         assert "operator-password" not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
@@ -1928,16 +1949,14 @@ def test_migration_from_databag(harness, _has_secrets, scope, is_leader):
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 @patch_network_get(private_address="1.1.1.1")
-def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader):
-    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage."""
+def test_migration_from_single_secret(harness, only_with_juju_secrets, scope, is_leader):
+    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
+
+    Since it checks for a migration from databag to juju secrets, it's specific to juju3.
+    """
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
-        # as this test checks for a migration from databag to secrets,
-        # there's no need for this test when secrets are not enabled.
-        if not _has_secrets:
-            return
-
         rel_id = harness.model.get_relation(PEER).id
 
         # App has to be leader, unit can be either
@@ -1957,7 +1976,7 @@ def test_migration_from_single_secret(harness, _has_secrets, scope, is_leader):
         harness.charm.set_secret(scope, "operator-password", "blablabla")
         with harness.hooks_disabled():
             harness.set_leader(is_leader)
-        assert harness.charm.model.get_secret(label=f"postgresql.{scope}")
+        assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
         assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
         assert SECRET_INTERNAL_LABEL not in harness.get_relation_data(
             rel_id, getattr(harness.charm, scope).name
@@ -2206,29 +2225,81 @@ def test_on_peer_relation_departed(harness):
 def test_update_new_unit_status(harness):
     with (
         patch(
+            "relations.async_replication.PostgreSQLAsyncReplication.handle_read_only_mode"
+        ) as handle_read_only_mode,
+        patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
     ):
-        # Test when the charm is blocked.
+        # Test when the primary endpoint is reachable.
         _primary_endpoint.return_value = "endpoint"
-        harness.charm.unit.status = BlockedStatus("fake blocked status")
+        harness.charm.unit.status = MaintenanceStatus("fake status")
         harness.charm._update_new_unit_status()
         _update_relation_endpoints.assert_called_once()
-        assert isinstance(harness.charm.unit.status, BlockedStatus)
-
-        # Test when the charm is not blocked.
-        _update_relation_endpoints.reset_mock()
-        harness.charm.unit.status = WaitingStatus()
-        harness.charm._update_new_unit_status()
-        _update_relation_endpoints.assert_called_once()
-        assert isinstance(harness.charm.unit.status, ActiveStatus)
+        handle_read_only_mode.assert_called_once()
+        assert not isinstance(harness.charm.unit.status, WaitingStatus)
 
         # Test when the primary endpoint is not reachable yet.
         _update_relation_endpoints.reset_mock()
+        handle_read_only_mode.reset_mock()
         _primary_endpoint.return_value = None
         harness.charm._update_new_unit_status()
         _update_relation_endpoints.assert_not_called()
+        handle_read_only_mode.assert_not_called()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
+
+    @patch("charm.Patroni.member_started", new_callable=PropertyMock)
+    @patch("charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock)
+    @patch("charm.Patroni.get_primary")
+    def test_set_active_status(self, _get_primary, _is_standby_leader, _member_started):
+        for values in itertools.product(
+            [
+                RetryError(last_attempt=1),
+                ConnectionError,
+                self.charm.unit.name,
+                f"{self.charm.app.name}/2",
+            ],
+            [
+                RetryError(last_attempt=1),
+                ConnectionError,
+                True,
+                False,
+            ],
+            [True, False],
+        ):
+            self.charm.unit.status = MaintenanceStatus("fake status")
+            _member_started.return_value = values[2]
+            if isinstance(values[0], str):
+                _get_primary.side_effect = None
+                _get_primary.return_value = values[0]
+                if values[0] != self.charm.unit.name and not isinstance(values[1], bool):
+                    _is_standby_leader.side_effect = values[1]
+                    _is_standby_leader.return_value = None
+                    self.charm._set_active_status()
+                    self.assertIsInstance(self.charm.unit.status, MaintenanceStatus)
+                else:
+                    _is_standby_leader.side_effect = None
+                    _is_standby_leader.return_value = values[1]
+                    self.charm._set_active_status()
+                    self.assertIsInstance(
+                        self.charm.unit.status,
+                        ActiveStatus
+                        if values[0] == self.charm.unit.name or values[1] or values[2]
+                        else MaintenanceStatus,
+                    )
+                    self.assertEqual(
+                        self.charm.unit.status.message,
+                        "Primary"
+                        if values[0] == self.charm.unit.name
+                        else (
+                            "Standby Leader" if values[1] else ("" if values[2] else "fake status")
+                        ),
+                    )
+            else:
+                _get_primary.side_effect = values[0]
+                _get_primary.return_value = None
+                self.charm._set_active_status()
+                self.assertIsInstance(self.charm.unit.status, MaintenanceStatus)
