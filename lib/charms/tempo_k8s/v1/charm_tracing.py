@@ -147,7 +147,7 @@ LIBAPI = 1
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 7
+LIBPATCH = 8
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -509,18 +509,20 @@ def trace_type(cls: _T) -> _T:
             logger.info(f"skipping {method} (dunder)")
             continue
 
-        isstatic = isinstance(inspect.getattr_static(cls, method.__name__), staticmethod)
-        setattr(cls, name, trace_method(method, static=isstatic))
+        new_method = trace_method(method)
+        if isinstance(inspect.getattr_static(cls, method.__name__), staticmethod):
+            new_method = staticmethod(new_method)
+        setattr(cls, name, new_method)
 
     return cls
 
 
-def trace_method(method: _F, static: bool = False) -> _F:
+def trace_method(method: _F) -> _F:
     """Trace this method.
 
     A span will be opened when this method is called and closed when it returns.
     """
-    return _trace_callable(method, "method", static=static)
+    return _trace_callable(method, "method")
 
 
 def trace_function(function: _F) -> _F:
@@ -531,22 +533,14 @@ def trace_function(function: _F) -> _F:
     return _trace_callable(function, "function")
 
 
-def _trace_callable(callable: _F, qualifier: str, static: bool = False) -> _F:
+def _trace_callable(callable: _F, qualifier: str) -> _F:
     logger.info(f"instrumenting {callable}")
 
     # sig = inspect.signature(callable)
     @functools.wraps(callable)
     def wrapped_function(*args, **kwargs):  # type: ignore
         name = getattr(callable, "__qualname__", getattr(callable, "__name__", str(callable)))
-        with _span(f"{'(static) ' if static else ''}{qualifier} call: {name}"):  # type: ignore
-            if static:
-                # The _trace_callable decorator doesn't play super nice with @staticmethods.
-                # if you call MyObj().mystaticmethod we'll receive the MyObj instance as first argument,
-                # if you call MyObj.mystaticmethod we won't.
-                try:
-                    inspect.signature(callable).bind(*args, **kwargs)
-                except TypeError:
-                    return callable(*args[1:], **kwargs)  # type: ignore
+        with _span(f"{qualifier} call: {name}"):  # type: ignore
             return callable(*args, **kwargs)  # type: ignore
 
     # wrapped_function.__signature__ = sig
