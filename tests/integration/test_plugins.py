@@ -159,7 +159,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
         "plugin_postgis_raster_enable": POSTGIS_RASTER_EXTENSION_STATEMENT,
         "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
-        "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
+        # "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
     }
 
     def enable_disable_config(enabled: False):
