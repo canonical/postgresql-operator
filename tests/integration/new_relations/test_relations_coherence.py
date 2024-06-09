@@ -96,19 +96,20 @@ async def test_relations(ops_test: OpsTest, charm):
             "postgresql",
             database=DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
         )
-        database_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
         try:
             connection = psycopg2.connect(connection_string)
             connection.autocommit = True
             cursor = connection.cursor()
-            cursor.execute(f"CREATE DATABASE {database_name};")
+            random_name = (
+                f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
+            )
+            cursor.execute(f"CREATE DATABASE {random_name};")
         except psycopg2.errors.InsufficientPrivilege:
             assert (
                 False
-            ), f"failed connect to {database_name} or run a statement in the following database"
+            ), f"failed connect to {random_name} or run a statement in the following database"
         finally:
-            if connection is not None:
-                connection.close()
+            connection.close()
 
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
@@ -125,33 +126,36 @@ async def test_relations(ops_test: OpsTest, charm):
 
         for database in [
             DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-            database_name,
+            "postgres",
         ]:
             logger.info(f"connecting to the following database: {database}")
             connection_string = await build_connection_string(
                 ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=database
             )
             connection = None
-            should_fail = False
+            should_fail = database == "postgres"
             try:
-                with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+                with psycopg2.connect(
+                    connection_string
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute("SELECT data FROM test;")
                     data = cursor.fetchone()
                     assert data[0] == "some data"
 
-                    random_name = (
-                        f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
-                    )
-                    should_fail = database == database_name
+                    # Write some data (it should fail in the "postgres" database).
+                    random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                     cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
+                    if should_fail:
+                        assert (
+                            False
+                        ), f"failed to run a statement in the following database: {database}"
             except psycopg2.errors.InsufficientPrivilege as e:
                 if not should_fail:
                     logger.exception(e)
-                    assert (
-                        False
-                    ), f"failed to connect to or run a statement in the following database: {database}"
+                    assert False, f"failed to connect to or run a statement in the following database: {database}"
             except psycopg2.OperationalError as e:
-                logger.exception(e)
+                if not should_fail:
+                    logger.exception(e)
             finally:
                 if connection is not None:
                     connection.close()
