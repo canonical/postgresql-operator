@@ -36,7 +36,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "112", "x86_64": "113"}, "channel": "14/stable"},
+        {"revision": {"aarch64": "114", "x86_64": "115"}, "channel": "14/stable"},
     )
 ]
 
@@ -72,3 +72,4 @@ SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
     "Please choose one endpoint to use. No need to relate all of them simultaneously!"
 )
+BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
