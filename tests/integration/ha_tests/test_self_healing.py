@@ -65,6 +65,9 @@ APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
 POSTGRESQL_PROCESS = "postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
+ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
+    "Please choose one endpoint to use. No need to relate all of them simultaneously!"
+)
 
 
 @pytest.mark.group(1)
@@ -632,7 +635,11 @@ async def test_deploy_zero_units(ops_test: OpsTest, charm):
 
     logger.info("database scaling up to two units using third-party cluster storage")
     new_unit = await add_unit_with_storage(
-        ops_test, app=app, storage=second_storage, is_blocked=True
+        ops_test,
+        app=app,
+        storage=second_storage,
+        is_blocked=True,
+        blocked_message=ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
     )
 
     logger.info(f"remove unit {new_unit.name} with storage from application {SECOND_APPLICATION}")

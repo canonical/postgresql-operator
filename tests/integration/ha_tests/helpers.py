@@ -898,11 +898,20 @@ def storage_id(ops_test, unit_name):
             return line.split()[1]
 
 
-async def add_unit_with_storage(ops_test, app, storage, is_blocked: bool = False):
+async def add_unit_with_storage(
+    ops_test, app, storage, is_blocked: bool = False, blocked_message: str = ""
+):
     """Adds unit with storage.
 
     Note: this function exists as a temporary solution until this issue is resolved:
     https://github.com/juju/python-libjuju/issues/695
+
+    Args:
+        ops_test: The ops test framework instance
+        app: The name of the application
+        storage: Unique storage identifier
+        is_blocked: Checking blocked status
+        blocked_message: Check message in blocked status
     """
     expected_units = len(ops_test.model.applications[app].units) + 1
     prev_units = [unit.name for unit in ops_test.model.applications[app].units]
@@ -912,9 +921,17 @@ async def add_unit_with_storage(ops_test, app, storage, is_blocked: bool = False
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
         if is_blocked:
+            assert (
+                is_blocked and blocked_message != ""
+            ), "The blocked status check should be checked along with the message"
             application = ops_test.model.applications[app]
             await ops_test.model.block_until(
-                lambda: "blocked" in {unit.workload_status for unit in application.units},
+                lambda: any(
+                    unit.workload_status == "blocked"
+                    and unit.workload_status_message == blocked_message
+                    for unit in application.units
+                ),
+                # "blocked" in {unit.workload_status for unit in application.units},
                 timeout=1500,
             )
         else:
