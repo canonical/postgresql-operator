@@ -285,7 +285,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 16
+LIBPATCH = 17
 
 PYDEPS = ["pydantic>=1.10,<2", "poetry-core"]
 
@@ -906,6 +906,17 @@ class DataUpgrade(Object, ABC):
                 except VersionError as e:  # not ready if not passed check
                     logger.error(e)
                     self.set_unit_failed()
+                    return
+                top_unit_id = self.upgrade_stack[-1]
+                top_unit = self.charm.model.get_unit(f"{self.charm.app.name}/{top_unit_id}")
+                if (
+                    top_unit == self.charm.unit
+                    and self.peer_relation.data[self.charm.unit].get("state") == "recovery"
+                ):
+                    # While in a rollback and the Juju leader unit is the top unit in the upgrade stack, emit the event
+                    # for this unit to start the rollback.
+                    self.peer_relation.data[self.charm.unit].update({"state": "ready"})
+                    self.on_upgrade_changed(event)
                     return
             self.charm.unit.status = WaitingStatus("other units upgrading first...")
             self.peer_relation.data[self.charm.unit].update({"state": "ready"})
