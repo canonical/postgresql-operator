@@ -44,6 +44,7 @@ def harness():
     harness.begin()
     harness.add_relation("upgrade", harness.charm.app.name)
     harness.add_relation(PEER, harness.charm.app.name)
+    harness.add_relation("restart", harness.charm.app.name)
     yield harness
     harness.cleanup()
 
