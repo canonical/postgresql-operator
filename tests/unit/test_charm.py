@@ -164,7 +164,9 @@ def test_patroni_scrape_config_tls(harness):
 
 
 def test_primary_endpoint(harness):
-    with patch(
+    with patch("charm.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay, patch(
+        "charm.wait_fixed", new_callable=PropertyMock
+    ) as _wait_fixed, patch(
         "charm.PostgresqlOperatorCharm._units_ips",
         new_callable=PropertyMock,
         return_value={"1.1.1.1", "1.1.1.2"},
@@ -172,6 +174,10 @@ def test_primary_endpoint(harness):
         _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
         _patroni.return_value.get_primary.return_value = sentinel.primary
         assert harness.charm.primary_endpoint == "1.1.1.1"
+
+        # Check needed to ensure a fast charm deployment.
+        _stop_after_delay.assert_called_once_with(5)
+        _wait_fixed.assert_called_once_with(3)
 
         _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
         _patroni.return_value.get_primary.assert_called_once_with()
