@@ -95,7 +95,7 @@ def test_get_alternative_patroni_url(peers_ips, patroni):
     for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
         attempt.retry_state.attempt_number = attempt_number
         url = patroni._get_alternative_patroni_url(attempt)
-        tc.assertIn(url.split("http://")[1].split(":8008")[0], peers_ips)
+        assert url.split("http://")[1].split(":8008")[0] in peers_ips
 
 
 def test_get_member_ip(peers_ips, patroni):
