@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 27
+LIBPATCH = 28
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -230,7 +230,10 @@ class PostgreSQL:
                 user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
                 if privileges:
                     user_definition += f' {" ".join(privileges)}'
+                cursor.execute(sql.SQL("BEGIN;"))
+                cursor.execute(sql.SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(sql.SQL(f"{user_definition};").format(sql.Identifier(user)))
+                cursor.execute(sql.SQL("COMMIT;"))
 
                 # Add extra user roles to the new user.
                 if roles:
@@ -519,11 +522,14 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user
             with self._connect_to_database(
                 database_host=database_host
             ) as connection, connection.cursor() as cursor:
+                cursor.execute(sql.SQL("BEGIN;"))
+                cursor.execute(sql.SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
                     sql.SQL("ALTER USER {} WITH ENCRYPTED PASSWORD '" + password + "';").format(
                         sql.Identifier(username)
                     )
                 )
+                cursor.execute(sql.SQL("COMMIT;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to update user password: {e}")
             raise PostgreSQLUpdateUserPasswordError()

@@ -28,6 +28,8 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
+from charms.tempo_k8s.v1.charm_tracing import trace_charm
+from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
 from ops import JujuVersion
 from ops.charm import (
     ActionEvent,
@@ -82,6 +84,8 @@ from constants import (
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
+    TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     USER,
     USER_PASSWORD_KEY,
@@ -104,6 +108,22 @@ EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check t
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
 
+@trace_charm(
+    tracing_endpoint="tracing_endpoint",
+    extra_types=(
+        ClusterTopologyObserver,
+        COSAgentProvider,
+        DbProvides,
+        Patroni,
+        PostgreSQL,
+        PostgreSQLAsyncReplication,
+        PostgreSQLBackups,
+        PostgreSQLProvider,
+        PostgreSQLTLS,
+        PostgreSQLUpgrade,
+        RollingOpsManager,
+    ),
+)
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -186,6 +206,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ],
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
         )
+        self._tracing = TracingEndpointRequirer(
+            self, relation_name=TRACING_RELATION_NAME, protocols=[TRACING_PROTOCOL]
+        )
 
     def patroni_scrape_config(self) -> List[Dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -223,6 +246,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return {}
 
         return relation.data[self.unit]
+
+    @property
+    def tracing_endpoint(self) -> Optional[str]:
+        """Otlp http endpoint for charm instrumentation."""
+        if self._tracing.is_ready():
+            return self._tracing.get_endpoint(TRACING_PROTOCOL)
 
     def _peer_data(self, scope: Scopes) -> Dict:
         """Return corresponding databag for app/unit."""
