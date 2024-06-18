@@ -90,7 +90,11 @@ from constants import (
     USER,
     USER_PASSWORD_KEY,
 )
-from relations.async_replication import PostgreSQLAsyncReplication
+from relations.async_replication import (
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+    PostgreSQLAsyncReplication,
+)
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -1222,15 +1226,42 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
 
-        # Update the password in the PostgreSQL instance.
-        try:
-            self.postgresql.update_user_password(username, password)
-        except PostgreSQLUpdateUserPasswordError as e:
-            logger.exception(e)
+        replication_offer_relation = self.model.get_relation(REPLICATION_OFFER_RELATION)
+        if (
+            replication_offer_relation is not None
+            and not self.async_replication.is_primary_cluster()
+        ):
+            # Update the password in the other cluster PostgreSQL primary instance.
+            other_cluster_endpoints = self.async_replication.get_all_primary_cluster_endpoints()
+            other_cluster_primary = self._patroni.get_primary(
+                alternative_endpoints=other_cluster_endpoints
+            )
+            other_cluster_primary_ip = [
+                replication_offer_relation.data[unit].get("private-address")
+                for unit in replication_offer_relation.units
+                if unit.name.replace("/", "-") == other_cluster_primary
+            ][0]
+            try:
+                self.postgresql.update_user_password(
+                    username, password, database_host=other_cluster_primary_ip
+                )
+            except PostgreSQLUpdateUserPasswordError as e:
+                logger.exception(e)
+                event.fail("Failed changing the password.")
+                return
+        elif self.model.get_relation(REPLICATION_CONSUMER_RELATION) is not None:
             event.fail(
-                "Failed changing the password: Not all members healthy or finished initial sync."
+                "Failed changing the password: This action can be ran only in the cluster from the offer side."
             )
             return
+        else:
+            # Update the password in this cluster PostgreSQL primary instance.
+            try:
+                self.postgresql.update_user_password(username, password)
+            except PostgreSQLUpdateUserPasswordError as e:
+                logger.exception(e)
+                event.fail("Failed changing the password.")
+                return
 
         # Update the password in the secret store.
         self.set_secret(APP_SCOPE, f"{username}-password", password)
@@ -1238,9 +1269,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
-
-        # Update the password in the async replication data.
-        self.async_replication.update_async_replication_data()
 
         event.set_results({"password": password})
 
@@ -1357,7 +1385,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:
-                self.unit.status = ActiveStatus("Standby Leader")
+                self.unit.status = ActiveStatus("Standby")
             elif self._patroni.member_started:
                 self.unit.status = ActiveStatus()
         except (RetryError, ConnectionError) as e:

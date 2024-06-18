@@ -230,11 +230,12 @@ class Patroni:
                         return member["state"]
         return ""
 
-    def get_primary(self, unit_name_pattern=False) -> str:
+    def get_primary(self, unit_name_pattern=False, alternative_endpoints: List[str] = None) -> str:
         """Get primary instance.
 
         Args:
             unit_name_pattern: whether to convert pod name to unit name
+            alternative_endpoints: list of alternative endpoints to check for the primary.
 
         Returns:
             primary pod or unit name.
@@ -242,7 +243,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
+                url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
@@ -301,12 +302,18 @@ class Patroni:
                         sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
         return sync_standbys
 
-    def _get_alternative_patroni_url(self, attempt: AttemptManager) -> str:
+    def _get_alternative_patroni_url(
+        self, attempt: AttemptManager, alternative_endpoints: List[str] = None
+    ) -> str:
         """Get an alternative REST API URL from another member each time.
 
         When the Patroni process is not running in the current unit it's needed
         to use a URL from another cluster member REST API to do some operations.
         """
+        if alternative_endpoints is not None:
+            return self._patroni_url.replace(
+                self.unit_ip, alternative_endpoints[attempt.retry_state.attempt_number - 1]
+            )
         attempt_number = attempt.retry_state.attempt_number
         if attempt_number > 1:
             url = self._patroni_url
