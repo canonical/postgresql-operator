@@ -54,7 +54,7 @@ S3_BLOCK_MESSAGES = [
     ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
     FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
-    CANNOT_RESTORE_PITR,
+    MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
 ]
 
 
@@ -446,11 +446,7 @@ class PostgreSQLBackups(Object):
 
         # Enable stanza initialisation if the backup settings were fixed after being invalid
         # or pointing to a repository where there are backups from another cluster.
-        if self.charm.is_blocked and self.charm.unit.status.message not in [
-            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
-            FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
-            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
-        ]:
+        if self.charm.is_blocked and self.charm.unit.status.message not in S3_BLOCK_MESSAGES:
             logger.warning("couldn't initialize stanza due to a blocked status")
             return
 
@@ -574,6 +570,18 @@ class PostgreSQLBackups(Object):
         """Call the stanza initialization when the credentials or the connection info change."""
         if "cluster_initialised" not in self.charm.app_peer_data:
             logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
+            event.defer()
+            return
+
+        # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
+        if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
+            logger.info("Cannot change S3 configuration in bad PITR restore status")
+            event.defer()
+            return
+
+        # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
+        if "restoring-backup" in self.charm.app_peer_data:
+            logger.info("Cannot change S3 configuration during restore")
             event.defer()
             return
 
@@ -806,6 +814,11 @@ Stderr:
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
                 return
+        elif not self._list_backups(show_failed=False):
+            error_message = "Cannot restore PITR without any backups created"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return
 
         # Quick check for timestamp format
         if (

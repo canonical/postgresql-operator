@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 28
+LIBPATCH = 29
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -641,5 +641,5 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user
                 cursor.execute("SELECT last_archived_wal FROM pg_stat_archiver;")
                 return cursor.fetchone()[0]
         except psycopg2.Error as e:
-            logger.error(f"Failed to get PostgreSQL version: {e}")
+            logger.error(f"Failed to get PostgreSQL last archived WAL: {e}")
             raise PostgreSQLGetPostgreSQLVersionError()

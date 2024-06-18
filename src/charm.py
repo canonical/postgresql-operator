@@ -1260,11 +1260,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data:
-            if "failed" in self._patroni.get_member_status(self._member_name):
-                logger.error("Restore failed: database service failed to start")
-                self.unit.status = BlockedStatus("Failed to restore backup")
-                return
-
             if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
                 logger.error(
                     "Restore failed: database service failed to reach point-in-time-recovery target. "
@@ -1272,6 +1267,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 )
                 self.log_pitr_last_transaction_time()
                 self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+                return
+
+            if "failed" in self._patroni.get_member_status(self._member_name):
+                logger.error("Restore failed: database service failed to start")
+                self.unit.status = BlockedStatus("Failed to restore backup")
                 return
 
             if not self._patroni.member_started:
