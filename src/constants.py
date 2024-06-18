@@ -74,3 +74,8 @@ SECRET_KEY_OVERRIDES = {"ca": "cauth"}
 ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
     "Please choose one endpoint to use. No need to relate all of them simultaneously!"
 )
+
+TRACING_RELATION_NAME = "tracing"
+TRACING_PROTOCOL = "otlp_http"
+
+BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
