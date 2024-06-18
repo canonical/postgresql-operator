@@ -798,24 +798,23 @@ Stderr:
             f" has been requested on the unit"
         )
 
-        if backup_id:
-            # Validate the provided backup id.
-            logger.info("Validating provided backup-id")
-            try:
-                backups = self._list_backups(show_failed=False)
-                if backup_id not in backups.keys():
-                    error_message = f"Invalid backup-id: {backup_id}"
-                    logger.error(f"Restore failed: {error_message}")
-                    event.fail(error_message)
-                    return
-            except ListBackupsError as e:
-                logger.exception(e)
-                error_message = "Failed to retrieve backup id"
+        # Validate the provided backup id and restore to time.
+        logger.info("Validating provided backup-id and restore-to-time")
+        try:
+            backups = self._list_backups(show_failed=False)
+            if backup_id and backup_id not in backups.keys():
+                error_message = f"Invalid backup-id: {backup_id}"
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
                 return
-        elif not self._list_backups(show_failed=False):
-            error_message = "Cannot restore PITR without any backups created"
+            if not backup_id and restore_to_time and not backups:
+                error_message = "Cannot restore PITR without any backups created"
+                logger.error(f"Restore failed: {error_message}")
+                event.fail(error_message)
+                return
+        except ListBackupsError as e:
+            logger.exception(e)
+            error_message = "Failed to retrieve backups list"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
@@ -863,9 +862,7 @@ Stderr:
         # Mark the cluster as in a restoring backup state and update the Patroni configuration.
         logger.info("Configuring Patroni to restore the backup")
         self.charm.app_peer_data.update({
-            "restoring-backup": self._fetch_backup_from_id(backup_id)
-            if backup_id
-            else "",
+            "restoring-backup": self._fetch_backup_from_id(backup_id) if backup_id else "",
             "restore-stanza": backups[backup_id]
             if backup_id
             else self.charm.app_peer_data.get("stanza", self.stanza_name),

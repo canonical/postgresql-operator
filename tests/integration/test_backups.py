@@ -277,7 +277,8 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
         # Wait for the restore to complete.
         async with ops_test.fast_forward():
             await ops_test.model.block_until(
-                lambda: remaining_unit.workload_status_message == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+                lambda: remaining_unit.workload_status_message
+                == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
                 timeout=1000,
             )
 
