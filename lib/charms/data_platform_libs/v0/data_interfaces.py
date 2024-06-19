@@ -331,7 +331,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 36
+LIBPATCH = 37
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -656,6 +656,10 @@ class CachedSecret:
     def set_content(self, content: Dict[str, str]) -> None:
         """Setting cached secret content."""
         if not self.meta:
+            return
+
+        # DPE-4182: do not create new revision if the content stay the same
+        if content == self.get_content():
             return
 
         if content:

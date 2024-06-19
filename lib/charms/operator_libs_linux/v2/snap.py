@@ -83,7 +83,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 6
+LIBPATCH = 7
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -319,7 +319,10 @@ class Snap(object):
                 Default is to return a string.
         """
         if typed:
-            config = json.loads(self._snap("get", ["-d", key]))
+            args = ["-d"]
+            if key:
+                args.append(key)
+            config = json.loads(self._snap("get", args))
             if key:
                 return config.get(key)
             return config

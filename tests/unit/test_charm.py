@@ -44,6 +44,7 @@ def harness():
     harness.begin()
     harness.add_relation("upgrade", harness.charm.app.name)
     harness.add_relation(PEER, harness.charm.app.name)
+    harness.add_relation("restart", harness.charm.app.name)
     yield harness
     harness.cleanup()
 
@@ -2304,9 +2305,7 @@ def test_update_new_unit_status(harness):
                         self.charm.unit.status.message,
                         "Primary"
                         if values[0] == self.charm.unit.name
-                        else (
-                            "Standby Leader" if values[1] else ("" if values[2] else "fake status")
-                        ),
+                        else ("Standby" if values[1] else ("" if values[2] else "fake status")),
                     )
             else:
                 _get_primary.side_effect = values[0]

@@ -28,6 +28,8 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
+from charms.tempo_k8s.v1.charm_tracing import trace_charm
+from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
 from ops import JujuVersion
 from ops.charm import (
     ActionEvent,
@@ -82,11 +84,17 @@ from constants import (
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
+    TRACING_PROTOCOL,
+    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     USER,
     USER_PASSWORD_KEY,
 )
-from relations.async_replication import PostgreSQLAsyncReplication
+from relations.async_replication import (
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
+    PostgreSQLAsyncReplication,
+)
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -100,6 +108,22 @@ EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check t
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
 
+@trace_charm(
+    tracing_endpoint="tracing_endpoint",
+    extra_types=(
+        ClusterTopologyObserver,
+        COSAgentProvider,
+        DbProvides,
+        Patroni,
+        PostgreSQL,
+        PostgreSQLAsyncReplication,
+        PostgreSQLBackups,
+        PostgreSQLProvider,
+        PostgreSQLTLS,
+        PostgreSQLUpgrade,
+        RollingOpsManager,
+    ),
+)
 class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     """Charmed Operator for the PostgreSQL database."""
 
@@ -182,6 +206,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ],
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
         )
+        self._tracing = TracingEndpointRequirer(
+            self, relation_name=TRACING_RELATION_NAME, protocols=[TRACING_PROTOCOL]
+        )
 
     def patroni_scrape_config(self) -> List[Dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -219,6 +246,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return {}
 
         return relation.data[self.unit]
+
+    @property
+    def tracing_endpoint(self) -> Optional[str]:
+        """Otlp http endpoint for charm instrumentation."""
+        if self._tracing.is_ready():
+            return self._tracing.get_endpoint(TRACING_PROTOCOL)
 
     def _peer_data(self, scope: Scopes) -> Dict:
         """Return corresponding databag for app/unit."""
@@ -1193,15 +1226,42 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             return
 
-        # Update the password in the PostgreSQL instance.
-        try:
-            self.postgresql.update_user_password(username, password)
-        except PostgreSQLUpdateUserPasswordError as e:
-            logger.exception(e)
+        replication_offer_relation = self.model.get_relation(REPLICATION_OFFER_RELATION)
+        if (
+            replication_offer_relation is not None
+            and not self.async_replication.is_primary_cluster()
+        ):
+            # Update the password in the other cluster PostgreSQL primary instance.
+            other_cluster_endpoints = self.async_replication.get_all_primary_cluster_endpoints()
+            other_cluster_primary = self._patroni.get_primary(
+                alternative_endpoints=other_cluster_endpoints
+            )
+            other_cluster_primary_ip = [
+                replication_offer_relation.data[unit].get("private-address")
+                for unit in replication_offer_relation.units
+                if unit.name.replace("/", "-") == other_cluster_primary
+            ][0]
+            try:
+                self.postgresql.update_user_password(
+                    username, password, database_host=other_cluster_primary_ip
+                )
+            except PostgreSQLUpdateUserPasswordError as e:
+                logger.exception(e)
+                event.fail("Failed changing the password.")
+                return
+        elif self.model.get_relation(REPLICATION_CONSUMER_RELATION) is not None:
             event.fail(
-                "Failed changing the password: Not all members healthy or finished initial sync."
+                "Failed changing the password: This action can be ran only in the cluster from the offer side."
             )
             return
+        else:
+            # Update the password in this cluster PostgreSQL primary instance.
+            try:
+                self.postgresql.update_user_password(username, password)
+            except PostgreSQLUpdateUserPasswordError as e:
+                logger.exception(e)
+                event.fail("Failed changing the password.")
+                return
 
         # Update the password in the secret store.
         self.set_secret(APP_SCOPE, f"{username}-password", password)
@@ -1209,9 +1269,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
         self.update_config()
-
-        # Update the password in the async replication data.
-        self.async_replication.update_async_replication_data()
 
         event.set_results({"password": password})
 
@@ -1328,7 +1385,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:
-                self.unit.status = ActiveStatus("Standby Leader")
+                self.unit.status = ActiveStatus("Standby")
             elif self._patroni.member_started:
                 self.unit.status = ActiveStatus()
         except (RetryError, ConnectionError) as e:

@@ -26,8 +26,8 @@ peers:
     interface: upgrade
 
 provides:
-  async-primary:
-    interface: async_replication
+  replication-offer:
+    interface: postgresql_async
     limit: 1
     optional: true
   database:
@@ -41,8 +41,8 @@ provides:
     limit: 1
 
 requires:
-  async-replica:
-    interface: async_replication
+  replication:
+    interface: postgresql_async
     limit: 1
     optional: true
   certificates:
@@ -51,6 +51,10 @@ requires:
     optional: true
   s3-parameters:
     interface: s3
+    limit: 1
+    optional: true
+  tracing:
+    interface: tracing
     limit: 1
     optional: true
 
