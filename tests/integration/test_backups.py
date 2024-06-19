@@ -229,7 +229,11 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
 
         # Wait for the restore to complete.
         async with ops_test.fast_forward():
-            await ops_test.model.wait_for_idle(status="active", timeout=1000)
+            await ops_test.model.block_until(
+                lambda: remaining_unit.workload_status_message
+                == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+                timeout=1000,
+            )
 
         # Check that the backup was correctly restored by having only the first created table.
         logger.info("checking that the backup was correctly restored")
