@@ -150,6 +150,7 @@ async def test_async_replication(
     continuous_writes,
 ) -> None:
     """Test async replication between two PostgreSQL clusters."""
+    raise Exception("Fail fast.")
     logger.info("starting continuous writes to the database")
     await start_continuous_writes(ops_test, DATABASE_APP_NAME)
 
