@@ -67,12 +67,12 @@ class PostgreSQLAsyncReplication(Object):
         super().__init__(charm, "postgresql")
         self.charm = charm
         self.framework.observe(
-            self.charm.on[REPLICATION_OFFER_RELATION].relation_joined,
-            self._on_async_relation_joined,
+            self.charm.on[REPLICATION_OFFER_RELATION].relation_created,
+            self._on_async_relation_created,
         )
         self.framework.observe(
-            self.charm.on[REPLICATION_CONSUMER_RELATION].relation_joined,
-            self._on_async_relation_joined,
+            self.charm.on[REPLICATION_CONSUMER_RELATION].relation_created,
+            self._on_async_relation_created,
         )
         self.framework.observe(
             self.charm.on[REPLICATION_OFFER_RELATION].relation_changed,
@@ -546,13 +546,7 @@ class PostgreSQLAsyncReplication(Object):
 
         self._handle_database_start(event)
 
-    def _on_async_relation_departed(self, event: RelationDepartedEvent) -> None:
-        """Set a flag to avoid setting a wrong status message on relation broken event handler."""
-        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
-        if event.departing_unit == self.charm.unit and self.charm._peers is not None:
-            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
-
-    def _on_async_relation_joined(self, _) -> None:
+    def _on_async_relation_created(self, _) -> None:
         """Publish this unit address in the relation data."""
         self._relation.data[self.charm.unit].update({"unit-address": self.charm._unit_ip})
 
@@ -562,6 +556,12 @@ class PostgreSQLAsyncReplication(Object):
             self.charm._peers.data[self.charm.unit].update({
                 "unit-promoted-cluster-counter": highest_promoted_cluster_counter
             })
+
+    def _on_async_relation_departed(self, event: RelationDepartedEvent) -> None:
+        """Set a flag to avoid setting a wrong status message on relation broken event handler."""
+        # This is needed because of https://bugs.launchpad.net/juju/+bug/1979811.
+        if event.departing_unit == self.charm.unit and self.charm._peers is not None:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
 
     def _on_create_replication(self, event: ActionEvent) -> None:
         """Set up asynchronous replication between two clusters."""
