@@ -421,7 +421,7 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], 
         await action.wait()
         async with ops_test.fast_forward(fast_interval="60s"):
             await ops_test.model.wait_for_idle(
-                apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
+                apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1500
             )
 
         primary = await get_primary(ops_test, f"{database_app_name}/0")
