@@ -157,7 +157,7 @@ async def test_kill_db_process(
     await send_signal_to_process(ops_test, primary_name, process, "SIGKILL")
 
     async with ops_test.fast_forward():
-        await are_writes_increasing(ops_test, primary_name)
+        await are_writes_increasing(ops_test, down_unit=primary_name)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await is_postgresql_ready(ops_test, primary_name)
@@ -190,7 +190,7 @@ async def test_freeze_db_process(
         # considered to trigger a fail-over after primary_start_timeout is changed, and also
         # when freezing the DB process it take some more time to trigger the fail-over).
         try:
-            await are_writes_increasing(ops_test, primary_name)
+            await are_writes_increasing(ops_test, down_unit=primary_name)
 
             # Verify that a new primary gets elected (ie old primary is secondary).
             for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
@@ -223,7 +223,7 @@ async def test_restart_db_process(
     await send_signal_to_process(ops_test, primary_name, process, "SIGTERM")
 
     async with ops_test.fast_forward():
-        await are_writes_increasing(ops_test, primary_name)
+        await are_writes_increasing(ops_test, down_unit=primary_name)
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await is_postgresql_ready(ops_test, primary_name)
@@ -304,7 +304,6 @@ async def test_full_cluster_restart(
 
 
 @pytest.mark.group(1)
-@pytest.mark.unstable
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
@@ -343,7 +342,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
                 assert new_primary_name is not None
                 assert new_primary_name != primary_name
 
-        await are_writes_increasing(ops_test, primary_name)
+        await are_writes_increasing(ops_test, down_unit=primary_name)
 
         # Change some settings to enable WAL rotation.
         for unit in ops_test.model.applications[app].units:
@@ -367,8 +366,14 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         # Check that the WAL was correctly rotated.
         for unit_name in files:
             assert not files[unit_name].intersection(
-                new_files
+                new_files[unit_name]
             ), "WAL segments weren't correctly rotated"
+            for file in files[unit_name]:
+                run_command_on_unit(
+                    ops_test,
+                    unit_name,
+                    f"rm -rf /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/{file}",
+                )
 
         # Start the systemd service in the old primary.
         await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
@@ -426,7 +431,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     async with ops_test.fast_forward():
         logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, primary_name)
+        await are_writes_increasing(ops_test, down_unit=primary_name)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
@@ -515,7 +520,7 @@ async def test_network_cut_without_ip_change(
 
     async with ops_test.fast_forward():
         logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, primary_name, use_ip_from_inside=True)
+        await are_writes_increasing(ops_test, down_unit=primary_name, use_ip_from_inside=True)
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
