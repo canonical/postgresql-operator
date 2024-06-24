@@ -10,6 +10,7 @@ import os
 import platform
 import subprocess
 import sys
+from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, get_args
 
@@ -855,6 +856,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
+        logger.debug("Install start time: %s", datetime.now())
         if not self._is_storage_attached():
             self._reboot_on_detached_storage(event)
             return
@@ -1162,7 +1164,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # was fully initialised.
         self.enable_disable_extensions()
 
-        self.unit.status = ActiveStatus()
+        logger.debug("Active workload time: %s", datetime.now())
+        self._set_primary_status_message()
 
     def _start_replica(self, event) -> None:
         """Configure the replica if the cluster was already initialised."""

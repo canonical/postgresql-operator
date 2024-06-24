@@ -554,6 +554,9 @@ def test_enable_disable_extensions(harness, caplog):
 def test_on_start(harness):
     with (
         patch(
+            "charm.PostgresqlOperatorCharm._set_primary_status_message"
+        ) as _set_primary_status_message,
+        patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
         patch("charm.snap.SnapCache") as _snap_cache,
@@ -628,7 +631,7 @@ def test_on_start(harness):
         assert _postgresql.create_user.call_count == 4  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
-        assert isinstance(harness.model.unit.status, ActiveStatus)
+        _set_primary_status_message.assert_called_once()
 
 
 @patch_network_get(private_address="1.1.1.1")
