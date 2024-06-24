@@ -31,7 +31,7 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
 )
-from cluster import RemoveRaftMemberFailedError
+from cluster import NotReadyError, RemoveRaftMemberFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 from tests.helpers import patch_network_get
 
@@ -1727,7 +1727,9 @@ def test_client_relations(harness):
 
 def test_on_pgdata_storage_detaching(harness):
     with (
-        patch("charm.PostgresqlOperatorCharm._update_relation_endpoints") as _update_relation_endpoints,
+        patch(
+            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
+        ) as _update_relation_endpoints,
         patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock),
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
         patch("charm.Patroni.get_primary", return_value="primary") as _get_primary,
@@ -1744,6 +1746,36 @@ def test_on_pgdata_storage_detaching(harness):
         _switchover.assert_called_once_with()
         _primary_changed.assert_called_once_with("primary")
         _update_relation_endpoints.assert_called_once_with()
+
+
+def test_add_cluster_member(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.PostgresqlOperatorCharm._get_unit_ip", return_value="1.1.1.1"),
+        patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
+        patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
+    ):
+        harness.charm.add_cluster_member("postgresql/0")
+
+        _add_to_members_ips.assert_called_once_with("1.1.1.1")
+        _update_config.assert_called_once_with()
+        _update_config.reset_mock()
+
+        # Charm blocks when update_config fails
+        _update_config.side_effect = RetryError(last_attempt=None)
+        harness.charm.add_cluster_member("postgresql/0")
+        _update_config.assert_called_once_with()
+        assert isinstance(harness.charm.unit.status, BlockedStatus)
+        assert harness.charm.unit.status.message == "failed to update cluster members on member"
+        _update_config.reset_mock()
+
+        # Not ready error if not all members are ready
+        _are_all_members_ready.return_value = False
+        try:
+            harness.charm.add_cluster_member("postgresql/0")
+            assert False
+        except NotReadyError:
+            pass
 
 
 #
