@@ -94,6 +94,28 @@ def test_start_observer(harness):
         _popen.assert_called_once()
 
 
+def test_start_observer_already_running(harness):
+    with (
+        patch("builtins.open") as _open,
+        patch("subprocess.Popen") as _popen,
+        patch("os.kill") as _kill,
+        patch.object(MockCharm, "_peers", new_callable=PropertyMock) as _peers,
+    ):
+        harness.charm.unit.status = ActiveStatus()
+        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1234"}})
+        harness.charm.observer.start_observer()
+        _kill.assert_called_once_with(1234, 0)
+        assert not _popen.called
+        _kill.reset_mock()
+
+        #If process is already dead, it should restart
+        _kill.side_effect = OSError
+        harness.charm.observer.start_observer()
+        _kill.assert_called_once_with(1234, 0)
+        _popen.assert_called_once()
+        _kill.reset_mock()
+
+
 def test_stop_observer(harness):
     with (
         patch("os.kill") as _kill,
@@ -111,6 +133,14 @@ def test_stop_observer(harness):
         _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
         harness.charm.observer.stop_observer()
         _kill.assert_called_once_with(1, signal.SIGINT)
+        _kill.reset_mock()
+
+        # Dead process doesn't break the script
+        _peers.return_value = Mock(data={harness.charm.unit: {"observer-pid": "1"}})
+        _kill.side_effect = OSError
+        harness.charm.observer.stop_observer()
+        _kill.assert_called_once_with(1, signal.SIGINT)
+        _kill.reset_mock()
 
 
 def test_dispatch(harness):
