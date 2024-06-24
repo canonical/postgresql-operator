@@ -137,6 +137,10 @@ class PostgreSQLProvider(Object):
         if not self.charm.unit.is_leader():
             return
 
+        if "suppress-oversee-users" in self.charm.app_peer_data:
+            logger.debug("Oversee users is suppressed by peer data")
+            return
+
         # Retrieve database users.
         try:
             database_users = {
