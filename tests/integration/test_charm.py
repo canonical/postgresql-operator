@@ -171,7 +171,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
         "memory_max_prepared_transactions": "100",
-        "memory_shared_buffers": "128",
+        "memory_shared_buffers": "32768",  # 2 * 128MB. Patroni may refuse the config if < 128MB
         "response_lc_monetary": "en_GB.utf8",
         "experimental_max_connections": "200",
     })
@@ -204,7 +204,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
 
                 # Validate each configuration set by Patroni on PostgreSQL.
                 assert settings["max_prepared_transactions"] == "100"
-                assert settings["shared_buffers"] == "128"
+                ssert settings["shared_buffers"] == "32768"
                 assert settings["lc_monetary"] == "en_GB.utf8"
                 assert settings["max_connections"] == "200"
         finally:

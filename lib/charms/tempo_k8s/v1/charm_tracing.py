@@ -126,15 +126,14 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import Span, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import INVALID_SPAN, Tracer
+from opentelemetry.trace import get_current_span as otlp_get_current_span
 from opentelemetry.trace import (
-    INVALID_SPAN,
-    Tracer,
     get_tracer,
     get_tracer_provider,
     set_span_in_context,
     set_tracer_provider,
 )
-from opentelemetry.trace import get_current_span as otlp_get_current_span
 from ops.charm import CharmBase
 from ops.framework import Framework
 
@@ -147,7 +146,7 @@ LIBAPI = 1
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 8
+LIBPATCH = 10
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -295,16 +294,17 @@ def _setup_root_span_initializer(
         # self.handle = Handle(None, self.handle_kind, None)
 
         original_event_context = framework._event_context
+        # default service name isn't just app name because it could conflict with the workload service name
+        _service_name = service_name or f"{self.app.name}-charm"
 
-        _service_name = service_name or self.app.name
-
+        unit_name = self.unit.name
         resource = Resource.create(
             attributes={
                 "service.name": _service_name,
                 "compose_service": _service_name,
                 "charm_type": type(self).__name__,
                 # juju topology
-                "juju_unit": self.unit.name,
+                "juju_unit": unit_name,
                 "juju_application": self.app.name,
                 "juju_model": self.model.name,
                 "juju_model_uuid": self.model.uuid,
@@ -342,16 +342,18 @@ def _setup_root_span_initializer(
         _tracer = get_tracer(_service_name)  # type: ignore
         _tracer_token = tracer.set(_tracer)
 
-        dispatch_path = os.getenv("JUJU_DISPATCH_PATH", "")
+        dispatch_path = os.getenv("JUJU_DISPATCH_PATH", "")  # something like hooks/install
+        event_name = dispatch_path.split("/")[1] if "/" in dispatch_path else dispatch_path
+        root_span_name = f"{unit_name}: {event_name} event"
+        span = _tracer.start_span(root_span_name, attributes={"juju.dispatch_path": dispatch_path})
 
         # all these shenanigans are to work around the fact that the opentelemetry tracing API is built
         # on the assumption that spans will be used as contextmanagers.
         # Since we don't (as we need to close the span on framework.commit),
         # we need to manually set the root span as current.
-        span = _tracer.start_span("charm exec", attributes={"juju.dispatch_path": dispatch_path})
         ctx = set_span_in_context(span)
 
-        # log a trace id so we can look it up in tempo.
+        # log a trace id, so we can pick it up from the logs (and jhack) to look it up in tempo.
         root_trace_id = hex(span.get_span_context().trace_id)[2:]  # strip 0x prefix
         logger.debug(f"Starting root trace with id={root_trace_id!r}.")
 
