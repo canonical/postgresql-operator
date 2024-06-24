@@ -181,7 +181,7 @@ def test_primary_endpoint(harness):
         assert harness.charm.primary_endpoint == "1.1.1.1"
 
         # Check needed to ensure a fast charm deployment.
-        _stop_after_delay.assert_called_once_with(5)
+        _stop_after_delay.assert_called_once_with(60)
         _wait_fixed.assert_called_once_with(3)
 
         _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
