@@ -324,6 +324,11 @@ async def test_data_integrator_creds_keep_on_working(
 
     async with ops_test.fast_forward():
         await sleep(20)
+    second_model.wait_for_idle(
+        apps=[DATABASE_APP_NAME],
+        status="active",
+        timeout=TIMEOUT,
+    )
     try:
         with psycopg2.connect(connstr) as connection:
             assert False
