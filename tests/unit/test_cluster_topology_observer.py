@@ -108,7 +108,7 @@ def test_start_observer_already_running(harness):
         assert not _popen.called
         _kill.reset_mock()
 
-        #If process is already dead, it should restart
+        # If process is already dead, it should restart
         _kill.side_effect = OSError
         harness.charm.observer.start_observer()
         _kill.assert_called_once_with(1234, 0)

@@ -1725,6 +1725,27 @@ def test_client_relations(harness):
     assert harness.charm.client_relations == [database_relation, db_relation, db_admin_relation]
 
 
+def test_on_pgdata_storage_detaching(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm._update_relation_endpoints") as _update_relation_endpoints,
+        patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock),
+        patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
+        patch("charm.Patroni.get_primary", return_value="primary") as _get_primary,
+        patch("charm.Patroni.switchover") as _switchover,
+        patch("charm.Patroni.primary_changed") as _primary_changed,
+    ):
+        # Early exit if not primary
+        event = Mock()
+        harness.charm._on_pgdata_storage_detaching(event)
+        assert not _are_all_members_ready.called
+
+        _get_primary.side_effect = [harness.charm.unit.name, "primary"]
+        harness.charm._on_pgdata_storage_detaching(event)
+        _switchover.assert_called_once_with()
+        _primary_changed.assert_called_once_with("primary")
+        _update_relation_endpoints.assert_called_once_with()
+
+
 #
 # Secrets
 #
