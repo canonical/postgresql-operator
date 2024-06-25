@@ -137,6 +137,8 @@ class PostgreSQLProvider(Object):
         if not self.charm.unit.is_leader():
             return
 
+        delete_user = "suppress-oversee-users" not in self.charm.app_peer_data
+
         # Retrieve database users.
         try:
             database_users = {
@@ -159,13 +161,16 @@ class PostgreSQLProvider(Object):
 
         # Delete that users that exist in the database but not in the active relations.
         for user in database_users - relation_users:
-            try:
-                logger.info("Remove relation user: %s", user)
-                self.charm.set_secret(APP_SCOPE, user, None)
-                self.charm.set_secret(APP_SCOPE, f"{user}-database", None)
-                self.charm.postgresql.delete_user(user)
-            except PostgreSQLDeleteUserError:
-                logger.error(f"Failed to delete user {user}")
+            if delete_user:
+                try:
+                    logger.info("Remove relation user: %s", user)
+                    self.charm.set_secret(APP_SCOPE, user, None)
+                    self.charm.set_secret(APP_SCOPE, f"{user}-database", None)
+                    self.charm.postgresql.delete_user(user)
+                except PostgreSQLDeleteUserError:
+                    logger.error("Failed to delete user %s", user)
+            else:
+                logger.info("Stale relation user detected: %s", user)
 
     def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""

@@ -56,6 +56,41 @@ def test_log_rollback(harness):
         )
 
 
+@pytest.mark.parametrize(
+    "unit_states,is_cluster_initialised,call",
+    [
+        (["ready"], False, False),
+        (["ready", "ready"], True, False),
+        (["idle"], False, False),
+        (["idle"], True, False),
+        (["ready"], True, True),
+    ],
+)
+def test_on_upgrade_charm_check_legacy(harness, unit_states, is_cluster_initialised, call):
+    with (
+        patch(
+            "charms.data_platform_libs.v0.upgrade.DataUpgrade.state",
+            new_callable=PropertyMock(return_value=None),
+        ) as _state,
+        patch(
+            "charms.data_platform_libs.v0.upgrade.DataUpgrade.unit_states",
+            new_callable=PropertyMock(return_value=unit_states),
+        ) as _unit_states,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_cluster_initialised",
+            new_callable=PropertyMock(return_value=is_cluster_initialised),
+        ) as _is_cluster_initialised,
+        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch(
+            "upgrade.PostgreSQLUpgrade._prepare_upgrade_from_legacy"
+        ) as _prepare_upgrade_from_legacy,
+    ):
+        with harness.hooks_disabled():
+            harness.set_leader(True)
+        harness.charm.upgrade._on_upgrade_charm_check_legacy()
+        _member_started.assert_called_once() if call else _member_started.assert_not_called()
+
+
 @patch_network_get(private_address="1.1.1.1")
 def test_on_upgrade_granted(harness):
     with (
