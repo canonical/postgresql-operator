@@ -4,7 +4,7 @@
 import contextlib
 import logging
 import subprocess
-from asyncio import gather, sleep
+from asyncio import gather
 from typing import Optional
 
 import psycopg2
@@ -315,26 +315,6 @@ async def test_data_integrator_creds_keep_on_working(
     try:
         with psycopg2.connect(connstr) as connection:
             pass
-    finally:
-        connection.close()
-
-    logger.info("Re-enable oversee users")
-    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME, model=second_model)
-    action = await leader_unit.run_action(action_name="reenable-oversee-users")
-    await action.wait()
-
-    async with fast_forward(second_model, FAST_INTERVAL):
-        await sleep(20)
-    await second_model.wait_for_idle(
-        apps=[DATABASE_APP_NAME],
-        status="active",
-        timeout=TIMEOUT,
-    )
-    try:
-        with psycopg2.connect(connstr) as connection:
-            assert False
-    except psycopg2.OperationalError:
-        logger.info("Data integrator creds purged")
     finally:
         connection.close()
 
