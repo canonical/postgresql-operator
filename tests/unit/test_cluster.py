@@ -42,6 +42,7 @@ def mocked_requests_get(*args, **kwargs):
         "http://server1/cluster": {
             "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
         },
+        "http://server1/health": {"state": "running"},
         "http://server4/cluster": {"members": []},
     }
     if args[0] in data:
@@ -126,6 +127,28 @@ def test_get_member_ip(peers_ips, patroni):
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
         tc.assertIsNone(ip)
+
+
+def test_get_patroni_health(peers_ips, patroni):
+    with patch("cluster.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay, patch(
+        "cluster.wait_fixed", new_callable=PropertyMock
+    ) as _wait_fixed, patch(
+        "charm.Patroni._patroni_url", new_callable=PropertyMock
+    ) as _patroni_url, patch("requests.get", side_effect=mocked_requests_get) as _get:
+        # Test when the Patroni API is reachable.
+        _patroni_url.return_value = "http://server1"
+        health = patroni.get_patroni_health()
+
+        # Check needed to ensure a fast charm deployment.
+        _stop_after_delay.assert_called_once_with(60)
+        _wait_fixed.assert_called_once_with(7)
+
+        tc.assertEqual(health, {"state": "running"})
+
+        # Test when the Patroni API is not reachable.
+        _patroni_url.return_value = "http://server2"
+        with tc.assertRaises(tenacity.RetryError):
+            patroni.get_patroni_health()
 
 
 def test_get_postgresql_version(peers_ips, patroni):
