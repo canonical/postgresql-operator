@@ -117,8 +117,13 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
+
         await ops_test.model.relate(database_app_name, tls_certificates_app_name)
+        async with ops_test.fast_forward(fast_interval="60s"):
+            await ops_test.model.wait_for_idle(
+                apps=[database_app_name], status="active", timeout=1000
+            )
+        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
 
         # Configure and set access and secret keys.
         logger.info(f"configuring S3 integrator for {cloud}")
@@ -160,7 +165,9 @@ async def test_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm
             apps=[database_app_name, S3_INTEGRATOR_APP_NAME], status="active", timeout=1000
         )
 
-        # Run the "list backups" action.
+        # With a stable cluster, Run the "create backup" action
+        async with ops_test.fast_forward():
+            await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
         logger.info("listing the available backups")
         action = await ops_test.model.units.get(replica).run_action("list-backups")
         await action.wait()
