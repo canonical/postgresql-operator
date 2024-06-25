@@ -308,8 +308,8 @@ async def test_data_integrator_creds_keep_on_working(
     database = data_integrator_credentials["postgresql"]["database"]
 
     any_unit = second_model.applications[DATABASE_APP_NAME].units[0].name
-    primary = await get_primary(ops_test, any_unit)
-    address = get_unit_address(ops_test, primary)
+    primary = await get_primary(ops_test, any_unit, second_model)
+    address = second_model.units.get(primary).public_address
 
     connstr = f"dbname='{database}' user='{user}' host='{address}' port='5432' password='{password}' connect_timeout=1"
     try:
@@ -319,12 +319,13 @@ async def test_data_integrator_creds_keep_on_working(
         connection.close()
 
     logger.info("Re-enable oversee users")
-    action = await primary.run_action(action_name="reenable-oversee-users")
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME, model=second_model)
+    action = await leader_unit.run_action(action_name="reenable-oversee-users")
     await action.wait()
 
     async with ops_test.fast_forward():
         await sleep(20)
-    second_model.wait_for_idle(
+    await second_model.wait_for_idle(
         apps=[DATABASE_APP_NAME],
         status="active",
         timeout=TIMEOUT,
