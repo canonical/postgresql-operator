@@ -323,7 +323,7 @@ async def test_data_integrator_creds_keep_on_working(
     action = await leader_unit.run_action(action_name="reenable-oversee-users")
     await action.wait()
 
-    async with ops_test.fast_forward():
+    async with fast_forward(second_model, FAST_INTERVAL):
         await sleep(20)
     await second_model.wait_for_idle(
         apps=[DATABASE_APP_NAME],
@@ -333,7 +333,7 @@ async def test_data_integrator_creds_keep_on_working(
     try:
         with psycopg2.connect(connstr) as connection:
             assert False
-    except psycopg2.errors.InsufficientPrivilege:
+    except psycopg2.OperationalError:
         logger.info("Data integrator creds purged")
     finally:
         connection.close()
