@@ -193,6 +193,7 @@ class PostgreSQLAsyncReplication(Object):
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
             subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_PATH}".split())
             logger.warning("Please review the backup file %s and handle its removal", filename)
+        self.charm.app_peer_data["suppress-oversee-users"] = "true"
         return True
 
     def get_all_primary_cluster_endpoints(self) -> List[str]:
@@ -481,7 +482,7 @@ class PostgreSQLAsyncReplication(Object):
         return self.charm.app == self._get_primary_cluster()
 
     def _on_async_relation_broken(self, _) -> None:
-        if "departing" in self.charm._peers.data[self.charm.unit]:
+        if not self.charm._peers or "departing" in self.charm._peers.data[self.charm.unit]:
             logger.debug("Early exit on_async_relation_broken: Skipping departing unit.")
             return
 

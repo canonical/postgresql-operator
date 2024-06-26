@@ -362,7 +362,7 @@ class Patroni:
 
     def get_patroni_health(self) -> Dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
-        for attempt in Retrying(stop=stop_after_delay(90), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
             with attempt:
                 r = requests.get(
                     f"{self._patroni_url}/health",
