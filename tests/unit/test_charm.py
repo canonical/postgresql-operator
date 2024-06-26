@@ -1525,32 +1525,27 @@ def test_on_peer_relation_changed(harness, caplog):
         _coordinate_stanza_fields.assert_called_once()
         _check_stanza.assert_called_once()
 
-        # Test cluster not initialised
+        # Test when cluster is not initialised
         with caplog.at_level(logging.DEBUG):
-            # Unit is leader and _start_primary call returns true
-            mock_event.defer.reset_mock()
             with harness.hooks_disabled():
                 harness.update_relation_data(
                     rel_id, harness.charm.app.name, {"cluster_initialised": ""}
                 )
-                harness.set_leader()
-            _start_primary.return_value = True
+            # Unit is leader, should call _start_primary and defer
+            mock_event.defer.reset_mock()
+            harness.set_leader()
             harness.charm._on_peer_relation_changed(mock_event)
-            assert "Deferring on_peer_relation_changed: Leader initialized cluster" in caplog.text
+            assert "Deferring on_peer_relation_changed: Leader initializing cluster" in caplog.text
+            _start_primary.assert_called_once()
             mock_event.defer.assert_called_once()
 
-            # Unit is leader and _start_primary call returns false
+            # Unit is not leader, should just defer
             mock_event.defer.reset_mock()
-            _start_primary.return_value = False
-            harness.charm._on_peer_relation_changed(mock_event)
-            assert "_start_primary failed on _peer_relation_changed" in caplog.text
-            mock_event.defer.assert_not_called()
-
-            # Unit is not leader
-            mock_event.defer.reset_mock()
+            _start_primary.reset_mock()
             harness.set_leader(False)
             harness.charm._on_peer_relation_changed(mock_event)
             assert "Deferring on_peer_relation_changed: Cluster must be initialized" in caplog.text
+            _start_primary.assert_not_called()
             mock_event.defer.assert_called_once()
 
 
