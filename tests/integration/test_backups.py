@@ -102,8 +102,9 @@ async def cloud_configs(ops_test: OpsTest, github_secrets) -> None:
 @pytest.mark.abort_on_fail
 async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in AWS, test backup and restore actions."""
-    config = cloud_configs[0].get(AWS)
+    config = cloud_configs[0][AWS]
     credentials = cloud_configs[1][AWS]
+
     await backup_operations(
         ops_test,
         S3_INTEGRATOR_APP_NAME,
@@ -179,9 +180,9 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
 @pytest.mark.abort_on_fail
 async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in GCP, test backup and restore actions."""
-    config = cloud_configs[0].get(GCP)
-
+    config = cloud_configs[0][GCP]
     credentials = cloud_configs[1][GCP]
+
     await backup_operations(
         ops_test,
         S3_INTEGRATOR_APP_NAME,
@@ -340,7 +341,7 @@ async def test_invalid_config_and_recovery_after_fixing_it(
 
     # Provide valid backup configurations, with another path in the S3 bucket.
     logger.info("configuring S3 integrator for a valid cloud")
-    config = cloud_configs[0][AWS].copy()
+    config = cloud_configs[0][GCP].copy()
     config["path"] = f"/postgresql/{uuid.uuid1()}"
     await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(config)
     logger.info("waiting for the database charm to become active")

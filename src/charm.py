@@ -511,10 +511,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
             if self.unit.is_leader():
-                if self._initialize_cluster(event):
+                if self._start_primary(event):
                     logger.debug("Deferring on_peer_relation_changed: Leader initialized cluster")
                 else:
-                    logger.debug("_initialized_cluster failed on _peer_relation_changed")
+                    logger.debug("_start_primary failed on _peer_relation_changed")
                     return
             else:
                 logger.debug(
