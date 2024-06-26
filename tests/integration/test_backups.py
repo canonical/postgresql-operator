@@ -116,8 +116,6 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
         charm,
     )
     database_app_name = f"{DATABASE_APP_NAME}-aws"
-    primary = await get_primary(ops_test, f"{database_app_name}/0")
-    password = await get_password(ops_test, primary)
 
     # Remove the relation to the TLS certificates operator.
     await ops_test.model.applications[database_app_name].remove_relation(
@@ -132,6 +130,7 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     # Ensure replication is working correctly.
     new_unit_name = f"{database_app_name}/2"
     address = get_unit_address(ops_test, new_unit_name)
+    password = await get_password(ops_test, new_unit_name)
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
@@ -149,7 +148,8 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
         ], f"replication isn't working correctly: table 'backup_table_2' exists in {new_unit_name}"
     connection.close()
 
-    switchover(ops_test, primary, new_unit_name)
+    old_primary = await get_primary(ops_test, new_unit_name)
+    switchover(ops_test, old_primary, new_unit_name)
 
     # Get the new primary unit.
     primary = await get_primary(ops_test, new_unit_name)
