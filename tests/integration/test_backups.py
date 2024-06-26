@@ -202,7 +202,7 @@ async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
-@pytest.mark.group(3)
+@pytest.mark.group(2)
 async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
@@ -273,9 +273,12 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        unit = ops_test.model.units.get(f"{database_app_name}/0")
-        await ops_test.model.block_until(
-            lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+        await wait_for_idle_on_blocked(
+            ops_test,
+            database_app_name,
+            0,
+            S3_INTEGRATOR_APP_NAME,
+            ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
         )
 
     # Check that the backup was correctly restored by having only the first created table.
@@ -293,7 +296,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     connection.close()
 
 
-@pytest.mark.group(3)
+@pytest.mark.group(2)
 async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:
@@ -317,9 +320,12 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     )
     await action.wait()
     logger.info("waiting for the database charm to become blocked")
-    unit = ops_test.model.units.get(f"{database_app_name}/0")
-    await ops_test.model.block_until(
-        lambda: unit.workload_status_message == FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE
+    await wait_for_idle_on_blocked(
+        ops_test,
+        database_app_name,
+        0,
+        S3_INTEGRATOR_APP_NAME,
+        FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     )
 
     # Provide valid backup configurations, but from another cluster repository.
@@ -333,9 +339,12 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     )
     await action.wait()
     logger.info("waiting for the database charm to become blocked")
-    unit = ops_test.model.units.get(f"{database_app_name}/0")
-    await ops_test.model.block_until(
-        lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+    await wait_for_idle_on_blocked(
+        ops_test,
+        database_app_name,
+        0,
+        S3_INTEGRATOR_APP_NAME,
+        ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
     )
 
     # Provide valid backup configurations, with another path in the S3 bucket.
