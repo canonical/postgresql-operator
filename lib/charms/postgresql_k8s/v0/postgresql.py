@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 28
+LIBPATCH = 29
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -604,12 +604,11 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user
                 # Use 25% of the available memory for shared_buffers.
                 # and the remaining as cache memory.
                 shared_buffers = int(available_memory * 0.25)
+                parameters["shared_buffers"] = f"{int(shared_buffers * 128 / 10**6)}"
             effective_cache_size = int(available_memory - shared_buffers)
-            parameters.setdefault("shared_buffers", f"{int(shared_buffers / 10**6)}MB")
-            parameters.update({"effective_cache_size": f"{int(effective_cache_size / 10**6)}MB"})
-        else:
-            # Return default
-            parameters.setdefault("shared_buffers", "128MB")
+            parameters.update({
+                "effective_cache_size": f"{int(effective_cache_size / 10**6) * 128}"
+            })
         return parameters
 
     def validate_date_style(self, date_style: str) -> bool:
