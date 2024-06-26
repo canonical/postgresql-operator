@@ -1080,6 +1080,7 @@ async def backup_operations(
     config,
     charm,
 ) -> None:
+    """Basic set of operations for backup testing in different cloud providers."""
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(s3_integrator_app_name)
     await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
