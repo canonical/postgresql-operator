@@ -621,17 +621,20 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
     stop=stop_after_attempt(10),
     wait=wait_exponential(multiplier=1, min=2, max=30),
 )
-async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
+async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     """Get the primary unit.
 
     Args:
         ops_test: ops_test instance.
         unit_name: the name of the unit.
+        model: Model to use.
 
     Returns:
         the current primary unit.
     """
-    action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+    if not model:
+        model = ops_test.model
+    action = await model.units.get(unit_name).run_action("get-primary")
     action = await action.wait()
     return action.results["primary"]
 
