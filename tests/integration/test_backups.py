@@ -202,7 +202,7 @@ async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
-@pytest.mark.group(3)
+@pytest.mark.group(2)
 async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
@@ -293,7 +293,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     connection.close()
 
 
-@pytest.mark.group(3)
+@pytest.mark.group(2)
 async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:
@@ -326,10 +326,10 @@ async def test_invalid_config_and_recovery_after_fixing_it(
     logger.info(
         "configuring S3 integrator for a valid cloud, but with the path of another cluster repository"
     )
-    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(cloud_configs[0][AWS])
+    await ops_test.model.applications[S3_INTEGRATOR_APP_NAME].set_config(cloud_configs[0][GCP])
     action = await ops_test.model.units.get(f"{S3_INTEGRATOR_APP_NAME}/0").run_action(
         "sync-s3-credentials",
-        **cloud_configs[1][AWS],
+        **cloud_configs[1][GCP],
     )
     await action.wait()
     logger.info("waiting for the database charm to become blocked")
