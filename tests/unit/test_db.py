@@ -1,7 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from unittest import TestCase
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
@@ -21,9 +20,6 @@ from tests.helpers import patch_network_get
 DATABASE = "test_database"
 RELATION_NAME = "db"
 POSTGRESQL_VERSION = "12"
-
-# used for assert functions
-tc = TestCase()
 
 
 @pytest.fixture(autouse=True)
@@ -121,7 +117,7 @@ def test_on_relation_changed(harness):
 
         # Request a database before primary endpoint is available.
         request_database(harness)
-        tc.assertEqual(_defer.call_count, 2)
+        assert _defer.call_count == 2
         _set_up_relation.assert_not_called()
 
         # Request it again when the database is ready.
@@ -136,7 +132,7 @@ def test_get_extensions(harness):
     # Test when there are no extensions in the relation databags.
     rel_id = harness.model.get_relation(RELATION_NAME).id
     relation = harness.model.get_relation(RELATION_NAME, rel_id)
-    tc.assertEqual(harness.charm.legacy_db_relation._get_extensions(relation), ([], set()))
+    assert harness.charm.legacy_db_relation._get_extensions(relation) == ([], set())
 
     # Test when there are extensions in the application relation databag.
     extensions = ["", "citext:public", "debversion"]
@@ -146,9 +142,9 @@ def test_get_extensions(harness):
             "application",
             {"extensions": ",".join(extensions)},
         )
-    tc.assertEqual(
-        harness.charm.legacy_db_relation._get_extensions(relation),
-        ([extensions[1], extensions[2]], {extensions[1].split(":")[0], extensions[2]}),
+    assert harness.charm.legacy_db_relation._get_extensions(relation) == (
+        [extensions[1], extensions[2]],
+        {extensions[1].split(":")[0], extensions[2]},
     )
 
     # Test when there are extensions in the unit relation databag.
@@ -163,9 +159,9 @@ def test_get_extensions(harness):
             "application/0",
             {"extensions": ",".join(extensions)},
         )
-    tc.assertEqual(
-        harness.charm.legacy_db_relation._get_extensions(relation),
-        ([extensions[1], extensions[2]], {extensions[1].split(":")[0], extensions[2]}),
+    assert harness.charm.legacy_db_relation._get_extensions(relation) == (
+        [extensions[1], extensions[2]],
+        {extensions[1].split(":")[0], extensions[2]},
     )
 
     # Test when one of the plugins/extensions is enabled.
@@ -179,9 +175,9 @@ def test_get_extensions(harness):
     harness = Harness(PostgresqlOperatorCharm, config=config)
     harness.cleanup()
     harness.begin()
-    tc.assertEqual(
-        harness.charm.legacy_db_relation._get_extensions(relation),
-        ([extensions[1], extensions[2]], {extensions[2]}),
+    assert harness.charm.legacy_db_relation._get_extensions(relation) == (
+        [extensions[1], extensions[2]],
+        {extensions[2]},
     )
 
 
@@ -217,7 +213,7 @@ def test_set_up_relation(harness):
         # Assert no operation is done when at least one of the requested extensions
         # is disabled.
         relation = harness.model.get_relation(RELATION_NAME, rel_id)
-        tc.assertFalse(harness.charm.legacy_db_relation.set_up_relation(relation))
+        assert not harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_user.assert_not_called()
         postgresql_mock.create_database.assert_not_called()
         postgresql_mock.get_postgresql_version.assert_not_called()
@@ -232,7 +228,7 @@ def test_set_up_relation(harness):
                 "application",
                 {"database": DATABASE},
             )
-        tc.assertTrue(harness.charm.legacy_db_relation.set_up_relation(relation))
+        assert harness.charm.legacy_db_relation.set_up_relation(relation)
         user = f"relation-{rel_id}"
         postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
         postgresql_mock.create_database.assert_called_once_with(
@@ -240,7 +236,7 @@ def test_set_up_relation(harness):
         )
         _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
-        tc.assertNotIsInstance(harness.model.unit.status, BlockedStatus)
+        assert not isinstance(harness.model.unit.status, BlockedStatus)
 
         # Assert that the correct calls were made when the database name is not
         # provided in both application and unit databags.
@@ -260,14 +256,14 @@ def test_set_up_relation(harness):
                 "application/0",
                 {"database": DATABASE},
             )
-        tc.assertTrue(harness.charm.legacy_db_relation.set_up_relation(relation))
+        assert harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
         postgresql_mock.create_database.assert_called_once_with(
             DATABASE, user, plugins=[], client_relations=[relation]
         )
         _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
-        tc.assertNotIsInstance(harness.model.unit.status, BlockedStatus)
+        assert not isinstance(harness.model.unit.status, BlockedStatus)
 
         # Assert that the correct calls were made when the database name is not provided.
         postgresql_mock.create_user.reset_mock()
@@ -281,32 +277,32 @@ def test_set_up_relation(harness):
                 "application/0",
                 {"database": ""},
             )
-        tc.assertTrue(harness.charm.legacy_db_relation.set_up_relation(relation))
+        assert harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
         postgresql_mock.create_database.assert_called_once_with(
             "application", user, plugins=[], client_relations=[relation]
         )
         _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
-        tc.assertNotIsInstance(harness.model.unit.status, BlockedStatus)
+        assert not isinstance(harness.model.unit.status, BlockedStatus)
 
         # BlockedStatus due to a PostgreSQLCreateUserError.
         postgresql_mock.create_database.reset_mock()
         postgresql_mock.get_postgresql_version.reset_mock()
         _update_endpoints.reset_mock()
         _update_unit_status.reset_mock()
-        tc.assertFalse(harness.charm.legacy_db_relation.set_up_relation(relation))
+        assert not harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_database.assert_not_called()
         _update_endpoints.assert_not_called()
         _update_unit_status.assert_not_called()
-        tc.assertIsInstance(harness.model.unit.status, BlockedStatus)
+        assert isinstance(harness.model.unit.status, BlockedStatus)
 
         # BlockedStatus due to a PostgreSQLCreateDatabaseError.
         harness.charm.unit.status = ActiveStatus()
-        tc.assertFalse(harness.charm.legacy_db_relation.set_up_relation(relation))
+        assert not harness.charm.legacy_db_relation.set_up_relation(relation)
         _update_endpoints.assert_not_called()
         _update_unit_status.assert_not_called()
-        tc.assertIsInstance(harness.model.unit.status, BlockedStatus)
+        assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -325,14 +321,14 @@ def test_update_unit_status(harness):
         _is_blocked.return_value = False
         harness.charm.legacy_db_relation._update_unit_status(relation)
         _check_for_blocking_relations.assert_not_called()
-        tc.assertNotIsInstance(harness.charm.unit.status, ActiveStatus)
+        assert not isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Test when the charm is blocked but not due to extensions request.
         _is_blocked.return_value = True
         harness.charm.unit.status = BlockedStatus("fake message")
         harness.charm.legacy_db_relation._update_unit_status(relation)
         _check_for_blocking_relations.assert_not_called()
-        tc.assertNotIsInstance(harness.charm.unit.status, ActiveStatus)
+        assert not isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Test when there are relations causing the blocked status.
         harness.charm.unit.status = BlockedStatus(
@@ -341,14 +337,14 @@ def test_update_unit_status(harness):
         _check_for_blocking_relations.return_value = True
         harness.charm.legacy_db_relation._update_unit_status(relation)
         _check_for_blocking_relations.assert_called_once_with(relation.id)
-        tc.assertNotIsInstance(harness.charm.unit.status, ActiveStatus)
+        assert not isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Test when there are no relations causing the blocked status anymore.
         _check_for_blocking_relations.reset_mock()
         _check_for_blocking_relations.return_value = False
         harness.charm.legacy_db_relation._update_unit_status(relation)
         _check_for_blocking_relations.assert_called_once_with(relation.id)
-        tc.assertIsInstance(harness.charm.unit.status, ActiveStatus)
+        assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -381,7 +377,7 @@ def test_on_relation_broken_extensions_unblock(harness):
 
         # Break the relation that blocked the charm.
         harness.remove_relation(rel_id)
-        tc.assertTrue(isinstance(harness.model.unit.status, ActiveStatus))
+        assert isinstance(harness.model.unit.status, ActiveStatus)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -422,7 +418,7 @@ def test_on_relation_broken_extensions_keep_block(harness):
         event.relation.id = first_rel_id
         # Break one of the relations that block the charm.
         harness.charm.legacy_db_relation._on_relation_broken(event)
-        tc.assertTrue(isinstance(harness.model.unit.status, BlockedStatus))
+        assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -481,8 +477,8 @@ def test_update_endpoints_with_relation(harness):
 
         # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
         harness.charm.legacy_db_relation.update_endpoints(relation)
-        tc.assertIsInstance(harness.model.unit.status, BlockedStatus)
-        tc.assertEqual(harness.get_relation_data(rel_id, harness.charm.unit.name), {})
+        assert isinstance(harness.model.unit.status, BlockedStatus)
+        assert harness.get_relation_data(rel_id, harness.charm.unit.name) == {}
 
         # Test with both a primary and a replica.
         # Update the endpoints with the event and check that it updated only
@@ -492,18 +488,26 @@ def test_update_endpoints_with_relation(harness):
             # Set the expected username based on the relation id.
             user = f"relation-{rel}"
 
-            # Set the assert function based on each relation (whether it should have data).
-            assert_based_on_relation = tc.assertTrue if rel == rel_id else tc.assertFalse
-
             # Check that the unit relation databag contains (or not) the endpoints.
             unit_relation_data = harness.get_relation_data(rel, harness.charm.unit.name)
-            assert_based_on_relation(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            assert_based_on_relation(
-                "standbys" in unit_relation_data
-                and standbys + user == unit_relation_data["standbys"]
-            )
+            if rel == rel_id:
+                assert (
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                assert (
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
+            else:
+                assert not (
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                assert not (
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
 
         # Also test with only a primary instance.
         harness.charm.legacy_db_relation.update_endpoints(relation)
@@ -511,18 +515,26 @@ def test_update_endpoints_with_relation(harness):
             # Set the expected username based on the relation id.
             user = f"relation-{rel}"
 
-            # Set the assert function based on each relation (whether it should have data).
-            assert_based_on_relation = tc.assertTrue if rel == rel_id else tc.assertFalse
-
             # Check that the unit relation databag contains the endpoints.
             unit_relation_data = harness.get_relation_data(rel, harness.charm.unit.name)
-            assert_based_on_relation(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            assert_based_on_relation(
-                "standbys" in unit_relation_data
-                and standbys + user == unit_relation_data["standbys"]
-            )
+            if rel == rel_id:
+                assert (
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                assert (
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
+            else:
+                assert not (
+                    "master" in unit_relation_data
+                    and master + user == unit_relation_data["master"]
+                )
+                assert not (
+                    "standbys" in unit_relation_data
+                    and standbys + user == unit_relation_data["standbys"]
+                )
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -578,8 +590,8 @@ def test_update_endpoints_without_relation(harness):
 
         # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
         harness.charm.legacy_db_relation.update_endpoints()
-        tc.assertIsInstance(harness.model.unit.status, BlockedStatus)
-        tc.assertEqual(harness.get_relation_data(rel_id, harness.charm.unit.name), {})
+        assert isinstance(harness.model.unit.status, BlockedStatus)
+        assert harness.get_relation_data(rel_id, harness.charm.unit.name) == {}
 
         # Test with both a primary and a replica.
         # Update the endpoints and check that all relations' databags are updated.
@@ -590,10 +602,8 @@ def test_update_endpoints_without_relation(harness):
 
             # Check that the unit relation databag contains the endpoints.
             unit_relation_data = harness.get_relation_data(rel, harness.charm.unit.name)
-            tc.assertTrue(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            tc.assertTrue(
+            assert "master" in unit_relation_data and master + user == unit_relation_data["master"]
+            assert (
                 "standbys" in unit_relation_data
                 and standbys + user == unit_relation_data["standbys"]
             )
@@ -606,10 +616,8 @@ def test_update_endpoints_without_relation(harness):
 
             # Check that the unit relation databag contains the endpoints.
             unit_relation_data = harness.get_relation_data(rel, harness.charm.unit.name)
-            tc.assertTrue(
-                "master" in unit_relation_data and master + user == unit_relation_data["master"]
-            )
-            tc.assertTrue(
+            assert "master" in unit_relation_data and master + user == unit_relation_data["master"]
+            assert (
                 "standbys" in unit_relation_data
                 and standbys + user == unit_relation_data["standbys"]
             )
@@ -621,12 +629,12 @@ def test_get_allowed_units(harness):
     peer_rel_id = harness.model.get_relation(PEER).id
     rel_id = harness.model.get_relation(RELATION_NAME).id
     peer_relation = harness.model.get_relation(PEER, peer_rel_id)
-    tc.assertEqual(harness.charm.legacy_db_relation._get_allowed_units(peer_relation), "")
+    assert harness.charm.legacy_db_relation._get_allowed_units(peer_relation) == ""
 
     # List of space separated allowed units from the other application.
     harness.add_relation_unit(rel_id, "application/1")
     db_relation = harness.model.get_relation(RELATION_NAME, rel_id)
-    tc.assertEqual(
-        harness.charm.legacy_db_relation._get_allowed_units(db_relation),
-        "application/0 application/1",
+    assert (
+        harness.charm.legacy_db_relation._get_allowed_units(db_relation)
+        == "application/0 application/1"
     )
