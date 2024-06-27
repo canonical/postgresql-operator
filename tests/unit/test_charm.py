@@ -1383,7 +1383,7 @@ def test_validate_config_options(harness):
 
 
 @patch_network_get(private_address="1.1.1.1")
-def test_on_peer_relation_changed(harness, caplog):
+def test_on_peer_relation_changed(harness):
     with (
         patch("charm.snap.SnapCache"),
         patch("charm.PostgresqlOperatorCharm._update_new_unit_status") as _update_new_unit_status,
@@ -1407,7 +1407,6 @@ def test_on_peer_relation_changed(harness, caplog):
         patch("charm.PostgresqlOperatorCharm._update_member_ip") as _update_member_ip,
         patch("charm.PostgresqlOperatorCharm._reconfigure_cluster") as _reconfigure_cluster,
         patch("ops.framework.EventBase.defer") as _defer,
-        patch("charm.PostgresqlOperatorCharm._start_primary") as _start_primary,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test an uninitialized cluster.
@@ -1524,29 +1523,6 @@ def test_on_peer_relation_changed(harness, caplog):
         _defer.assert_not_called()
         _coordinate_stanza_fields.assert_called_once()
         _check_stanza.assert_called_once()
-
-        # Test when cluster is not initialised
-        with caplog.at_level(logging.DEBUG):
-            with harness.hooks_disabled():
-                harness.update_relation_data(
-                    rel_id, harness.charm.app.name, {"cluster_initialised": ""}
-                )
-            # Unit is leader, should call _start_primary and defer
-            mock_event.defer.reset_mock()
-            harness.set_leader()
-            harness.charm._on_peer_relation_changed(mock_event)
-            assert "Deferring on_peer_relation_changed: Leader initializing cluster" in caplog.text
-            _start_primary.assert_called_once()
-            mock_event.defer.assert_called_once()
-
-            # Unit is not leader, should just defer
-            mock_event.defer.reset_mock()
-            _start_primary.reset_mock()
-            harness.set_leader(False)
-            harness.charm._on_peer_relation_changed(mock_event)
-            assert "Deferring on_peer_relation_changed: Cluster must be initialized" in caplog.text
-            _start_primary.assert_not_called()
-            mock_event.defer.assert_called_once()
 
 
 @patch_network_get(private_address="1.1.1.1")
