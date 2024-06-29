@@ -7,67 +7,22 @@
     {
       "matchPackageNames": ["pydantic"],
       "allowedVersions": "<2.0.0"
-    }, {
-      "matchPackageNames": ["python"],
-      "allowedVersions": "<3.11"
     },
     {
-      "matchDepNames": ["Juju 2"],
-      "matchPackageNames": ["juju/juju"],
-      "allowedVersions": "<3.0.0",
-      "extractVersion": "^v(?<version>.*)$",
-      "groupName": "Juju 2"
-    },
-    {
-      "matchDepNames": ["Juju 3"],
-      "matchPackageNames": ["juju/juju"],
-      "allowedVersions": "<3.2.0",
-      "extractVersion": "^v(?<version>.*)$",
-      "groupName": "Juju 3"
-    },
-    {
-      "matchDepNames": ["libjuju 2"],
-      "matchPackageNames": ["juju"],
       "matchManagers": ["regex"],
+      "matchDepNames": ["juju"],
       "matchDatasources": ["pypi"],
-      "versioning": "loose",
       "allowedVersions": "<3",
-      "groupName": "Juju 2"
+      "groupName": "Juju agents"
     }
   ],
   "regexManagers": [
     {
-      "customType": "regex",
-      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
-      "matchStrings": [
-        "(- agent: )(?<currentValue>.*?) +# renovate: latest juju 2"
-      ],
-      "depNameTemplate": "Juju 2",
-      "packageNameTemplate": "juju/juju",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "Juju release"
-    },
-    {
-      "customType": "regex",
-      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
-      "matchStrings": [
-        "(- agent: )(?<currentValue>.*?) +# renovate: latest juju 3"
-      ],
-      "depNameTemplate": "Juju 3",
-      "packageNameTemplate": "juju/juju",
-      "datasourceTemplate": "github-releases",
-      "versioningTemplate": "loose",
-      "extractVersionTemplate": "Juju release"
-    },
-    {
-      "customType": "regex",
-      "fileMatch": ["^(workflow-templates|\\.github/workflows)/[^/]+\\.ya?ml$"],
+      "fileMatch": ["^\\.github/workflows/[^/]+\\.ya?ml$"],
       "matchStrings": [
         "(libjuju: )==(?<currentValue>.*?) +# renovate: latest libjuju 2"
       ],
-      "depNameTemplate": "libjuju 2",
-      "packageNameTemplate": "juju",
+      "depNameTemplate": "juju",
       "datasourceTemplate": "pypi",
       "versioningTemplate": "loose"
     }
