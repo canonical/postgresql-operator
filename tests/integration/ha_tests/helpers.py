@@ -68,7 +68,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         pgrep_cmd = ("pgrep", "-x", process)
 
     try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(400), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
                     _, processes, _ = await ops_test.juju("ssh", unit.name, *pgrep_cmd)
@@ -79,6 +79,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
 
                     # If something was returned, there is a running process.
                     if len(processes) > 0:
+                        logger.info("Unit %s not yey down" % unit.name)
                         raise ProcessRunningError
     except RetryError:
         return False
