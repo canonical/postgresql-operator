@@ -79,7 +79,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
 
                     # If something was returned, there is a running process.
                     if len(processes) > 0:
-                        logger.info("Unit %s not yey down" % unit.name)
+                        logger.info("Unit %s not yet down" % unit.name)
                         raise ProcessRunningError
     except RetryError:
         return False
