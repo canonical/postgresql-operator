@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 import logging
 
 import pytest
@@ -16,13 +17,13 @@ from ..helpers import (
     set_password,
 )
 from .helpers import (
+    SECOND_APPLICATION,
     add_unit_with_storage,
     reused_full_cluster_recovery_storage,
     storage_id,
 )
 
 FIRST_APPLICATION = "first-cluster"
-SECOND_APPLICATION = "second-cluster"
 
 logger = logging.getLogger(__name__)
 
@@ -37,24 +38,23 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
-        await ops_test.model.deploy(
-            charm,
-            application_name=FIRST_APPLICATION,
-            num_units=3,
-            series=CHARM_SERIES,
-            storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
-            config={"profile": "testing"},
+        await asyncio.gather(
+            ops_test.model.deploy(
+                charm,
+                application_name=FIRST_APPLICATION,
+                num_units=3,
+                series=CHARM_SERIES,
+                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+                config={"profile": "testing"},
+            ),
+            ops_test.model.deploy(
+                charm,
+                application_name=SECOND_APPLICATION,
+                num_units=1,
+                series=CHARM_SERIES,
+                config={"profile": "testing"},
+            ),
         )
-
-        # Deploy the second cluster
-        await ops_test.model.deploy(
-            charm,
-            application_name=SECOND_APPLICATION,
-            num_units=1,
-            series=CHARM_SERIES,
-            config={"profile": "testing"},
-        )
-
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
         # TODO have a better way to bootstrap clusters with existing storage

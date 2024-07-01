@@ -41,6 +41,7 @@ SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{SERVICE_NAME}"
 RESTART_CONDITION = "no"
 ORIGINAL_RESTART_CONDITION = "always"
+SECOND_APPLICATION = "second-cluster"
 
 
 class MemberNotListedOnClusterError(Exception):
@@ -897,11 +898,20 @@ def storage_id(ops_test, unit_name):
             return line.split()[1]
 
 
-async def add_unit_with_storage(ops_test, app, storage):
+async def add_unit_with_storage(
+    ops_test, app, storage, is_blocked: bool = False, blocked_message: str = ""
+):
     """Adds unit with storage.
 
     Note: this function exists as a temporary solution until this issue is resolved:
     https://github.com/juju/python-libjuju/issues/695
+
+    Args:
+        ops_test: The ops test framework instance
+        app: The name of the application
+        storage: Unique storage identifier
+        is_blocked: Checking blocked status
+        blocked_message: Check message in blocked status
     """
     expected_units = len(ops_test.model.applications[app].units) + 1
     prev_units = [unit.name for unit in ops_test.model.applications[app].units]
@@ -910,7 +920,22 @@ async def add_unit_with_storage(ops_test, app, storage):
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=2000)
+        if is_blocked:
+            assert (
+                is_blocked and blocked_message != ""
+            ), "The blocked status check should be checked along with the message"
+            application = ops_test.model.applications[app]
+            await ops_test.model.block_until(
+                lambda: any(
+                    unit.workload_status == "blocked"
+                    and unit.workload_status_message == blocked_message
+                    for unit in application.units
+                ),
+                # "blocked" in {unit.workload_status for unit in application.units},
+                timeout=1500,
+            )
+        else:
+            await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1500)
     assert (
         len(ops_test.model.applications[app].units) == expected_units
     ), "New unit not added to model"
@@ -952,6 +977,84 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
+
+
+async def get_db_connection(ops_test, dbname, is_primary=True, replica_unit_name=""):
+    """Returns a PostgreSQL connection string.
+
+    Args:
+        ops_test: The ops test framework instance
+        dbname: The name of the database
+        is_primary: Whether to use a primary unit (default is True, so it uses the primary
+        replica_unit_name: The name of the replica unit
+
+    Returns:
+        a PostgreSQL connection string
+    """
+    unit_name = await get_primary(ops_test, APP_NAME)
+    password = await get_password(ops_test, APP_NAME)
+    address = get_unit_address(ops_test, unit_name)
+    if not is_primary and replica_unit_name != "":
+        unit_name = replica_unit_name
+        address = ops_test.model.applications[APP_NAME].units[unit_name].public_address
+    connection_string = (
+        f"dbname='{dbname}' user='operator'"
+        f" host='{address}' password='{password}' connect_timeout=10"
+    )
+    return connection_string, unit_name
+
+
+async def validate_test_data(connection_string):
+    """Checking test data.
+
+    Args:
+      connection_string: Database connection string
+    """
+    with psycopg2.connect(connection_string) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("SELECT data FROM test;")
+            data = cursor.fetchone()
+            assert data[0] == "some data"
+    connection.close()
+
+
+async def create_test_data(connection_string):
+    """Creating test data in the database.
+
+    Args:
+      connection_string: Database connection string
+    """
+    with psycopg2.connect(connection_string) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            # Check that it's possible to write and read data from the database that
+            # was created for the application.
+            cursor.execute("DROP TABLE IF EXISTS test;")
+            cursor.execute("CREATE TABLE test(data TEXT);")
+            cursor.execute("INSERT INTO test(data) VALUES('some data');")
+            cursor.execute("SELECT data FROM test;")
+            data = cursor.fetchone()
+            assert data[0] == "some data"
+    connection.close()
+
+
+async def get_last_added_unit(ops_test, app, prev_units):
+    """Returns a unit.
+
+    Args:
+      ops_test: The ops test framework instance
+      app: The name of the application
+      prev_units: List of unit names before adding the last unit
+
+    Returns:
+      last added unit
+    """
+    curr_units = [unit.name for unit in ops_test.model.applications[app].units]
+    new_unit = list(set(curr_units) - set(prev_units))[0]
+    for unit in ops_test.model.applications[app].units:
+        if new_unit == unit.name:
+            return unit
 
 
 async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
