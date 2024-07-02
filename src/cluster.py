@@ -4,9 +4,11 @@
 
 """Helper class used to manage cluster lifecycle."""
 
+import glob
 import logging
 import os
 import pwd
+import re
 import subprocess
 from typing import Any, Dict, List, Optional, Set
 
@@ -30,6 +32,7 @@ from constants import (
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
+    PATRONI_SERVICE_DEFAULT_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
@@ -518,7 +521,10 @@ class Patroni:
         enable_tls: bool = False,
         stanza: str = None,
         restore_stanza: Optional[str] = None,
+        disable_pgbackrest_archiving: bool = False,
         backup_id: Optional[str] = None,
+        pitr_target: Optional[str] = None,
+        restore_to_latest: bool = False,
         parameters: Optional[dict[str, str]] = None,
     ) -> None:
         """Render the Patroni configuration file.
@@ -529,7 +535,10 @@ class Patroni:
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
+            disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
             backup_id: id of the backup that is being restored.
+            pitr_target: point-in-time-recovery target for the backup.
+            restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
         """
         # Open the template patroni.yml file.
@@ -555,9 +564,12 @@ class Patroni:
             replication_password=self.replication_password,
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
-            enable_pgbackrest=stanza is not None,
-            restoring_backup=backup_id is not None,
+            enable_pgbackrest_archiving=stanza is not None
+            and disable_pgbackrest_archiving is False,
+            restoring_backup=backup_id is not None or pitr_target is not None,
             backup_id=backup_id,
+            pitr_target=pitr_target if not restore_to_latest else None,
+            restore_to_latest=restore_to_latest,
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
@@ -583,6 +595,44 @@ class Patroni:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
             return False
+
+    def patroni_logs(self, num_lines: int | None = 10) -> str:
+        """Get Patroni snap service logs. Executes only on current unit.
+
+        Args:
+            num_lines: number of log last lines being returned.
+
+        Returns:
+            Multi-line logs string.
+        """
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            return selected_snap.logs(services=["patroni"], num_lines=num_lines)
+        except snap.SnapError as e:
+            error_message = "Failed to get logs from patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return ""
+
+    def last_postgresql_logs(self) -> str:
+        """Get last log file content of Postgresql service.
+
+        If there is no available log files, empty line will be returned.
+
+        Returns:
+            Content of last log file of Postgresql service.
+        """
+        log_files = glob.glob(f"{POSTGRESQL_LOGS_PATH}/*.log")
+        if len(log_files) == 0:
+            return ""
+        log_files.sort(reverse=True)
+        try:
+            with open(log_files[0], "r") as last_log_file:
+                return last_log_file.read()
+        except OSError as e:
+            error_message = "Failed to read last postgresql log file"
+            logger.exception(error_message, exc_info=e)
+            return ""
 
     def stop_patroni(self) -> bool:
         """Stop Patroni service using systemd.
@@ -720,3 +770,34 @@ class Patroni:
                 # Check whether the update was unsuccessful.
                 if r.status_code != 200:
                     raise UpdateSyncNodeCountError(f"received {r.status_code}")
+
+    def get_patroni_restart_condition(self) -> str:
+        """Get current restart condition for Patroni systemd service. Executes only on current unit.
+
+        Returns:
+            Patroni systemd service restart condition.
+        """
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+            patroni_service = patroni_service_file.read()
+            found_restart = re.findall(r"Restart=(\w+)", patroni_service)
+            if len(found_restart) == 1:
+                return str(found_restart[0])
+        raise RuntimeError("failed to find patroni service restart condition")
+
+    def update_patroni_restart_condition(self, new_condition: str) -> None:
+        """Override restart condition for Patroni systemd service by rewriting service file and doing daemon-reload.
+
+        Executes only on current unit.
+
+        Args:
+            new_condition: new Patroni systemd service restart condition.
+        """
+        logger.info(f"setting restart-condition to {new_condition} for patroni service")
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+            patroni_service = patroni_service_file.read()
+        logger.debug(f"patroni service file: {patroni_service}")
+        new_patroni_service = re.sub(r"Restart=\w+", f"Restart={new_condition}", patroni_service)
+        logger.debug(f"new patroni service file: {new_patroni_service}")
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
+            patroni_service_file.write(new_patroni_service)
+        subprocess.run(["/bin/systemctl", "daemon-reload"])

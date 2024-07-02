@@ -27,6 +27,7 @@ from ops.testing import Harness
 from psycopg2 import OperationalError
 from tenacity import RetryError, wait_fixed
 
+from backups import CANNOT_RESTORE_PITR
 from charm import (
     EXTENSIONS_DEPENDENCY_MESSAGE,
     PRIMARY_NOT_REACHABLE_MESSAGE,
@@ -873,6 +874,14 @@ def test_on_update_status(harness):
         ) as _primary_endpoint,
         patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True),
+        patch("charm.Patroni.last_postgresql_logs") as _last_postgresql_logs,
+        patch("charm.Patroni.patroni_logs") as _patroni_logs,
+        patch("charm.Patroni.get_member_status") as _get_member_status,
+        patch(
+            "charm.PostgreSQLBackups.can_use_s3_repository", return_value=(True, None)
+        ) as _can_use_s3_repository,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test before the cluster is initialised.
@@ -881,6 +890,7 @@ def test_on_update_status(harness):
 
         # Test after the cluster was initialised, but with the unit in a blocked state.
         with harness.hooks_disabled():
+            harness.set_leader()
             harness.update_relation_data(
                 rel_id, harness.charm.app.name, {"cluster_initialised": "True"}
             )
@@ -888,7 +898,30 @@ def test_on_update_status(harness):
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
 
+        # Test the point-in-time-recovery fail.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "valid",
+                    "restore-to-time": "valid",
+                },
+            )
+        harness.charm.unit.status = ActiveStatus()
+        _patroni_logs.return_value = "2022-02-24 02:00:00 UTC patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
+        harness.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
+
         # Test with the unit in a status different that blocked.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"cluster_initialised": "True", "restoring-backup": "", "restore-to-time": ""},
+            )
         harness.charm.unit.status = ActiveStatus()
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
@@ -1228,6 +1261,9 @@ def test_update_config(harness):
             backup_id=None,
             stanza=None,
             restore_stanza=None,
+            pitr_target=None,
+            restore_to_latest=False,
+            disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
@@ -1248,6 +1284,9 @@ def test_update_config(harness):
             backup_id=None,
             stanza=None,
             restore_stanza=None,
+            pitr_target=None,
+            restore_to_latest=False,
+            disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once()
@@ -2377,3 +2416,71 @@ def test_set_primary_status_message(harness):
                 _get_primary.return_value = None
                 harness.charm._set_primary_status_message()
                 tc.assertIsInstance(harness.charm.unit.status, MaintenanceStatus)
+
+    @patch("charm.Patroni.update_patroni_restart_condition")
+    @patch("charm.Patroni.get_patroni_restart_condition")
+    @patch("charm.PostgresqlOperatorCharm._unit_ip")
+    def test_override_patroni_restart_condition(
+        self, _unit_ip, get_restart_condition, update_restart_condition
+    ):
+        get_restart_condition.return_value = "always"
+
+        # Do override without repeat_cause
+        assert self.charm.override_patroni_restart_condition("no") is True
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_called_once_with("no")
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "no"
+
+        # Must not be overridden twice without repeat_cause
+        assert self.charm.override_patroni_restart_condition("on-failure") is False
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_not_called()
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        # Reset override
+        self.charm.restore_patroni_restart_condition()
+        update_restart_condition.assert_called_once_with("always")
+        update_restart_condition.reset_mock()
+
+        # Must not be reset twice
+        self.charm.restore_patroni_restart_condition()
+        update_restart_condition.assert_not_called()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "always"
+
+        # Do override with repeat_cause
+        assert self.charm.override_patroni_restart_condition("no", "test_charm") is True
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_called_once_with("no")
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "no"
+
+        # Do re-override with repeat_cause
+        assert self.charm.override_patroni_restart_condition("on-success", "test_charm") is True
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_called_once_with("on-success")
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        get_restart_condition.return_value = "on-success"
+
+        # Must not be re-overridden with different repeat_cause
+        assert (
+            self.charm.override_patroni_restart_condition("on-failure", "test_not_charm") is False
+        )
+        get_restart_condition.assert_called_once()
+        update_restart_condition.assert_not_called()
+        get_restart_condition.reset_mock()
+        update_restart_condition.reset_mock()
+
+        # Reset override
+        self.charm.restore_patroni_restart_condition()
+        update_restart_condition.assert_called_once_with("always")
+        update_restart_condition.reset_mock()
