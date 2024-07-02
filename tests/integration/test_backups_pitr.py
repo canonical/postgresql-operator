@@ -111,8 +111,11 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], 
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
+
         await ops_test.model.relate(database_app_name, TLS_CERTIFICATES_APP_NAME)
+        async with ops_test.fast_forward(fast_interval="60s"):
+            await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
+        await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
 
         # Configure and set access and secret keys.
         logger.info(f"configuring S3 integrator for {cloud}")
