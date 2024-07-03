@@ -70,7 +70,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             MAILMAN3_CORE_APP_NAME,
             APPLICATION_UNITS,
             config,
-            series=CHARM_SERIES,
+            series="focal",
         )
         await check_databases_creation(ops_test, ["mailman3"])
 
