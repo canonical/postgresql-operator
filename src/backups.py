@@ -342,11 +342,43 @@ class PostgreSQLBackups(Object):
 
     def _format_backup_list(self, backup_list) -> str:
         """Formats provided list of backups as a table."""
-        backups = ["{:<21s} | {:<12s} | {:s}".format("backup-id", "backup-type", "backup-status")]
-        backups.append("-" * len(backups[0]))
-        for backup_id, backup_type, backup_status in backup_list:
+        s3_parameters, _ = self._retrieve_s3_parameters()
+        backups = [
+            "Storage bucket name: {:s}".format(s3_parameters["bucket"]),
+            "Backups base path: {:s}/backup/\n".format(s3_parameters["path"]),
+            "{:<20s} | {:<12s} | {:<8s} | {:<20s} | {:<23s} | {:<20s} | {:<20s} | {:s}".format(
+                "backup-id",
+                "type",
+                "status",
+                "reference-backup-id",
+                "LSN start/stop",
+                "start-time",
+                "finish-time",
+                "backup-path",
+            ),
+        ]
+        backups.append("-" * len(backups[2]))
+        for (
+            backup_id,
+            backup_type,
+            backup_status,
+            reference,
+            lsn_start_stop,
+            start,
+            stop,
+            path,
+        ) in backup_list:
             backups.append(
-                "{:<21s} | {:<12s} | {:s}".format(backup_id, backup_type, backup_status)
+                "{:<20s} | {:<12s} | {:<8s} | {:<20s} | {:<23s} | {:<20s} | {:<20s} | {:s}".format(
+                    backup_id,
+                    backup_type,
+                    backup_status,
+                    reference,
+                    lsn_start_stop,
+                    start,
+                    stop,
+                    path,
+                )
             )
         return "\n".join(backups)
 
@@ -368,11 +400,29 @@ class PostgreSQLBackups(Object):
         backups = json.loads(output)[0]["backup"]
         for backup in backups:
             backup_id, backup_type = self._parse_backup_id(backup["label"])
+            backup_reference = "None"
+            if backup["reference"]:
+                backup_reference, _ = self._parse_backup_id(backup["reference"][-1])
+            lsn_start_stop = f'{backup["lsn"]["start"]} / {backup["lsn"]["stop"]}'
+            time_start, time_stop = (
+                datetime.strftime(datetime.fromtimestamp(stamp), "%Y-%m-%dT%H:%M:%SZ")
+                for stamp in backup["timestamp"].values()
+            )
+            backup_path = f'/{self.stanza_name}/{backup["label"]}'
             error = backup["error"]
             backup_status = "finished"
             if error:
                 backup_status = f"failed: {error}"
-            backup_list.append((backup_id, backup_type, backup_status))
+            backup_list.append((
+                backup_id,
+                backup_type,
+                backup_status,
+                backup_reference,
+                lsn_start_stop,
+                time_start,
+                time_stop,
+                backup_path,
+            ))
         return self._format_backup_list(backup_list)
 
     def _list_backups(self, show_failed: bool, parse=True) -> OrderedDict[str, str]:
@@ -629,6 +679,17 @@ class PostgreSQLBackups(Object):
         backup_type = event.params.get("type", "full")
         if backup_type not in BACKUP_TYPE_OVERRIDES:
             error_message = f"Invalid backup type: {backup_type}. Possible values: {', '.join(BACKUP_TYPE_OVERRIDES.keys())}."
+            logger.error(f"Backup failed: {error_message}")
+            event.fail(error_message)
+            return
+
+        if (
+            backup_type in ["differential", "incremental"]
+            and len(self._list_backups(show_failed=False)) == 0
+        ):
+            error_message = (
+                f"Invalid backup type: {backup_type}. No previous full backup to reference."
+            )
             logger.error(f"Backup failed: {error_message}")
             event.fail(error_message)
             return
