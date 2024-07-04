@@ -693,7 +693,7 @@ Backups base path: /test-path/backup/
 
 backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
 -----------------------------------------------------------------------------------------------------------------------------------------------------------
-2023-01-01T09:00:00Z | full         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2024-07-01T17:45:11Z | 2024-07-01T17:45:14Z | /None.postgresql/20230101-090000F"""
+2023-01-01T09:00:00Z | full         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2024-07-01T20:45:11Z | 2024-07-01T20:45:14Z | /None.postgresql/20230101-090000F"""
         )
 
 
