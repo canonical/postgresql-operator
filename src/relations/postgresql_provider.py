@@ -115,12 +115,6 @@ class PostgreSQLProvider(Object):
             # Set the database name
             self.database_provides.set_database(event.relation.id, database)
 
-            # Set connection string URI.
-            self.database_provides.set_uris(
-                event.relation.id,
-                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
-            )
-
             self._update_unit_status(event.relation)
         except (
             PostgreSQLCreateDatabaseError,
