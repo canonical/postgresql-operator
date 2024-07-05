@@ -62,7 +62,7 @@ def request_database(_harness):
     _harness.update_relation_data(
         rel_id,
         _harness.charm.app.name,
-        {"data": "", "username": "", "password": "", "version": "", "database": ""},
+        {"data": "", "username": "", "password": "", "uris": "", "version": "", "database": ""},
     )
 
     # Simulate the request of a new database plus extra user roles.
@@ -94,10 +94,11 @@ def test_on_database_requested(harness):
         _member_started.side_effect = [False, True, True, True, True, True]
         _primary_endpoint.side_effect = [
             None,
-            {"1.1.1.1"},
-            {"1.1.1.1"},
-            {"1.1.1.1"},
-            {"1.1.1.1"},
+            "1.1.1.1",
+            "1.1.1.1",
+            "1.1.1.1",
+            "1.1.1.1",
+            "1.1.1.1",
         ]
         postgresql_mock.create_user = PropertyMock(
             side_effect=[None, PostgreSQLCreateUserError, None, None]
@@ -141,6 +142,7 @@ def test_on_database_requested(harness):
             "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
             "username": user,
             "password": "test-password",
+            "uris": f"postgresql://{user}:test-password@1.1.1.1:5432/{DATABASE}",
             "version": POSTGRESQL_VERSION,
             "database": f"{DATABASE}",
         }
