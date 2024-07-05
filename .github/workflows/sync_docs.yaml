@@ -1,0 +1,19 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Sync docs from Discourse
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 00 01 * * *
+
+jobs:
+  sync-docs:
+    name: Sync docs from Discourse
+    uses: canonical/data-platform-workflows/.github/workflows/_sync_docs.yaml@main
+    secrets:
+      discourse-api-user: ${{ secrets.DISCOURSE_API_USERNAME }}
+      discourse-api-key: ${{ secrets.DISCOURSE_API_KEY }}
+    permissions:
+      contents: write  # Needed to push branch & tag
+      pull-requests: write  # Needed to create PR
