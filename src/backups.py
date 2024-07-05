@@ -219,11 +219,6 @@ class PostgreSQLBackups(Object):
                 and charm_last_archived_wal.split(".", 1)[0] != str(s3_last_archived_wal)
             ):
                 if bool(self.charm.app_peer_data.get("require-change-bucket-after-restore", None)):
-                    self.charm.app_peer_data.update({
-                        "restoring-backup": "",
-                        "restore-stanza": "",
-                        "restore-to-time": "",
-                    })
                     return False, MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
                 else:
                     return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
