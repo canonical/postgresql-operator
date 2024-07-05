@@ -219,6 +219,11 @@ class PostgreSQLBackups(Object):
                 and charm_last_archived_wal.split(".", 1)[0] != str(s3_last_archived_wal)
             ):
                 if bool(self.charm.app_peer_data.get("require-change-bucket-after-restore", None)):
+                    self.charm.app_peer_data.update({
+                        "restoring-backup": "",
+                        "restore-stanza": "",
+                        "restore-to-time": "",
+                    })
                     return False, MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
                 else:
                     return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
@@ -594,11 +599,12 @@ class PostgreSQLBackups(Object):
             event.defer()
             return
 
+        if self.charm.unit.is_leader():
+            self.charm.app_peer_data.pop("require-change-bucket-after-restore", None)
+
         # Verify the s3 relation only on the primary.
         if not self.charm.is_primary:
             return
-
-        self.charm.app_peer_data.pop("require-change-bucket-after-restore", None)
 
         try:
             self._create_bucket_if_not_exists()
