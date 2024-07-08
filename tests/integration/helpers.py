@@ -1153,8 +1153,8 @@ async def backup_operations(
     action = await ops_test.model.units.get(replica).run_action("list-backups")
     await action.wait()
     backups = action.results.get("backups")
-    # 2 lines for header output, 1 backup line ==> 3 total lines
-    assert len(backups.split("\n")) == 3, "full backup is not outputted"
+    # 5 lines for header output, 1 backup line ==> 6 total lines
+    assert len(backups.split("\n")) == 6, "full backup is not outputted"
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Write some data.
@@ -1180,8 +1180,8 @@ async def backup_operations(
     action = await ops_test.model.units.get(replica).run_action("list-backups")
     await action.wait()
     backups = action.results.get("backups")
-    # 2 lines for header output, 2 backup lines ==> 4 total lines
-    assert len(backups.split("\n")) == 4, "differential backup is not outputted"
+    # 5 lines for header output, 2 backup lines ==> 7 total lines
+    assert len(backups.split("\n")) == 7, "differential backup is not outputted"
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Write some data.

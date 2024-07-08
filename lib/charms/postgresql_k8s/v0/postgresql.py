@@ -79,6 +79,10 @@ class PostgreSQLEnableDisableExtensionError(Exception):
     """Exception raised when enabling/disabling an extension fails."""
 
 
+class PostgreSQLGetLastArchivedWALError(Exception):
+    """Exception raised when retrieving last archived WAL fails."""
+
+
 class PostgreSQLGetPostgreSQLVersionError(Exception):
     """Exception raised when retrieving PostgreSQL version fails."""
 
@@ -391,7 +395,7 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user
                 return cursor.fetchone()[0]
         except psycopg2.Error as e:
             logger.error(f"Failed to get PostgreSQL last archived WAL: {e}")
-            raise PostgreSQLGetPostgreSQLVersionError()
+            raise PostgreSQLGetLastArchivedWALError()
 
     def get_postgresql_text_search_configs(self) -> Set[str]:
         """Returns the PostgreSQL available text search configs.
