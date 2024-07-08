@@ -589,3 +589,16 @@ def test_last_postgresql_logs(patroni):
         _open.assert_called_with(
             "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
         )
+
+
+def test_get_patroni_restart_condition(patroni):
+    mock = mock_open()
+    with patch("builtins.open", mock) as _open:
+        # Test when there is a restart condition set.
+        _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
+        assert patroni.get_patroni_restart_condition() == "always"
+
+        # Test when there is no restart condition set.
+        _open.return_value.__enter__.return_value.read.return_value = ""
+        with tc.assertRaises(RuntimeError):
+            patroni.get_patroni_restart_condition()
