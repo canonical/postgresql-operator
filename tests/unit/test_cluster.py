@@ -542,3 +542,16 @@ def test_member_inactive_error(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+
+def test_patroni_logs(harness, patroni):
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+    ):
+        _cache = _snap_cache.return_value
+        _selected_snap = _cache.__getitem__.return_value
+        _selected_snap.logs.return_value = sentinel.logs
+
+        assert patroni.patroni_logs() == sentinel.logs
+
+        _selected_snap.logs.assert_called_once_with(services=["patroni"], num_lines=10)
