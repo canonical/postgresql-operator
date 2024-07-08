@@ -10,7 +10,7 @@ import tenacity as tenacity
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.testing import Harness
-from tenacity import stop_after_delay
+from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import PostgresqlOperatorCharm
 from cluster import Patroni
@@ -429,7 +429,9 @@ def test_switchover(peers_ips, patroni):
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):
-    with patch("requests.patch") as _patch:
+    with patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed, patch(
+        "cluster.wait_fixed", return_value=wait_fixed(0)
+    ) as _wait_fixed, patch("requests.patch") as _patch:
         response = _patch.return_value
         response.status_code = 200
 
@@ -438,6 +440,11 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         _patch.assert_called_once_with(
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
+
+        # Test when the request fails.
+        response.status_code = 500
+        with tc.assertRaises(RetryError):
+            patroni.update_synchronous_node_count()
 
 
 def test_configure_patroni_on_unit(peers_ips, patroni):
