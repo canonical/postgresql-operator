@@ -1052,7 +1052,15 @@ def test_on_s3_credential_changed(harness):
         _can_initialise_stanza.assert_called_once()
         _is_primary.assert_not_called()
 
-        # Test that followers will not initialise the bucket
+        # Test that followers will not initialise the bucket (and that only the leader will
+        # remove the "require-change-bucket-after-restore" flag from the application databag).
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                peer_rel_id,
+                harness.charm.app.name,
+                {"require-change-bucket-after-restore": "True"},
+            )
         harness.charm.unit.status = ActiveStatus()
         _render_pgbackrest_conf_file.reset_mock()
         _can_initialise_stanza.return_value = True
@@ -1067,6 +1075,10 @@ def test_on_s3_credential_changed(harness):
             relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
         )
         _render_pgbackrest_conf_file.assert_called_once()
+        tc.assertNotIn(
+            "require-change-bucket-after-restore",
+            harness.get_relation_data(peer_rel_id, harness.charm.app),
+        )
         _is_primary.assert_called_once()
         _create_bucket_if_not_exists.assert_not_called()
         tc.assertIsInstance(harness.charm.unit.status, ActiveStatus)
@@ -1074,7 +1086,9 @@ def test_on_s3_credential_changed(harness):
         _initialise_stanza.assert_not_called()
 
         # Test when the charm render the pgBackRest configuration file, but fails to
-        # access or create the S3 bucket.
+        # access or create the S3 bucket  (and assert that a non-leader unit won't
+        # remove the "require-change-bucket-after-restore" flag from the application
+        # databag).
         _is_primary.return_value = True
         for error in [
             ClientError(
@@ -1083,6 +1097,13 @@ def test_on_s3_credential_changed(harness):
             ),
             ValueError,
         ]:
+            with harness.hooks_disabled():
+                harness.set_leader(False)
+                harness.update_relation_data(
+                    peer_rel_id,
+                    harness.charm.app.name,
+                    {"require-change-bucket-after-restore": "True"},
+                )
             _render_pgbackrest_conf_file.reset_mock()
             _create_bucket_if_not_exists.reset_mock()
             _create_bucket_if_not_exists.side_effect = error
@@ -1090,6 +1111,12 @@ def test_on_s3_credential_changed(harness):
                 relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
             )
             _render_pgbackrest_conf_file.assert_called_once()
+            tc.assertEqual(
+                harness.get_relation_data(peer_rel_id, harness.charm.app)[
+                    "require-change-bucket-after-restore"
+                ],
+                "True",
+            )
             _create_bucket_if_not_exists.assert_called_once()
             tc.assertIsInstance(harness.charm.unit.status, BlockedStatus)
             tc.assertEqual(
