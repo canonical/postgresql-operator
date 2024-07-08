@@ -1,24 +1,23 @@
-# Charmed PostgreSQL tutorial
-The Charmed PostgreSQL Operator delivers automated operations management from [day 0 to day 2](https://codilime.com/blog/day-0-day-1-day-2-the-software-lifecycle-in-the-cloud-age/) on the [PostgreSQL](https://www.postgresql.org/) relational database. It is an open source, end-to-end, production-ready data platform on top of Juju. As a first step this tutorial shows you how to get Charmed PostgreSQL up and running, but the tutorial does not stop there. Through this tutorial you will learn a variety of operations, everything from adding replicas to advanced operations such as enabling Transport Layer Security (TLS). In this tutorial we will walk through how to:
-- Set up an environment using [Multipass](https://multipass.run/) with [LXD](https://ubuntu.com/lxd) and [Juju](https://juju.is/).
-- Deploy PostgreSQL using a single command.
-- Access the database directly.
-- Add high availability with PostgreSQL Patroni-based cluster.
-- Request and change passwords.
-- Automatically create PostgreSQL users via Juju relations.
-- Reconfigure TLS certificate in one command.
+# Charmed PostgreSQL VM Tutorial
 
-While this tutorial intends to guide and teach you as you deploy Charmed PostgreSQL, it will be most beneficial if you already have a familiarity with:
-- Basic terminal commands.
-- PostgreSQL concepts such as replication and users.
+This section of our documentation contains comprehensive, hands-on tutorials to help you learn how to deploy Charmed PostgreSQL K8s and become familiar with its available operations.
 
-## Step-by-step guide
+## Prerequisites
 
-Here’s an overview of the steps required with links to our separate tutorials that deal with each individual step:
-* [Set up the environment](/t/charmed-postgresql-tutorial-setup-environment/9709?channel=14/stable)
-* [Deploy PostgreSQL](/t/charmed-postgresql-tutorial-deploy-postgresql/9697?channel=14/stable)
-* [Managing your units](/t/charmed-postgresql-tutorial-managing-units/9705?channel=14/stable)
-* [Manage passwords](/t/charmed-postgresql-tutorial-manage-passwords/9703?channel=14/stable)
-* [Relate your PostgreSQL to other applications](/t/charmed-postgresql-tutorial-integrations/9701?channel=14/stable)
-* [Enable security](/t/charmed-postgresql-tutorial-enable-security/9699?channel=14/stable)
-* [Cleanup your environment](/t/charmed-postgresql-tutorial-cleanup-environment/9695?channel=14/stable)
+While this tutorial intends to guide you as you deploy Charmed PostgreSQL K8s for the first time, it will be most beneficial if:
+- You have some experience using a Linux-based CLI
+- You are familiar with PostgreSQL concepts such as replication and users.
+- Your computer fulfills the [minimum system requirements](/t/11743)
+
+## Tutorial contents
+This Charmed PostgreSQL tutorial has the following parts:
+
+| Step | Details |
+| ------- | ---------- |
+| 1. [**Set up the environment**](/t/9709) | Set up a cloud environment for your deployment using [Multipass](https://multipass.run/) with [LXD](https://ubuntu.com/lxd) and [Juju](https://juju.is/).
+| 2. [**Deploy PostgreSQL**](/t/9697) | Learn to deploy Charmed PostgreSQL K8s using a single command and access the database directly.
+| 3. [**Scale the amount of replicas**](/t/9705) | Learn how to enable high availability with a [Patroni](https://patroni.readthedocs.io/en/latest/)-based cluster.
+| 4. [**Manage passwords**](/t/9703) | Learn how to request and change passwords.
+| 5. [**Integrate PostgreSQL with other applications**](/t/9701) | Learn how to integrate with other applications using the Data Integrator Charm, access the integrated database, and manage users.
+| 6. [**Enable TLS encryption**](/t/9699) | Learn how to enable security in your PostgreSQL deployment via TLS.
+| 7. [**Clean-up your environment**](/t/9695) | Free up your machine's resources.

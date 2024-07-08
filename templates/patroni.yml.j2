@@ -60,7 +60,7 @@ bootstrap:
       remove_data_directory_on_diverged_timelines: true
       parameters:
         synchronous_standby_names: "*"
-        {%- if enable_pgbackrest %}
+        {%- if enable_pgbackrest_archiving %}
         archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
         {% else %}
         archive_command: /bin/true
@@ -101,7 +101,13 @@ bootstrap:
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
-    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    command: >
+      pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }}
+      {%- if backup_id %} --set={{ backup_id }} {%- endif %}
+      {%- if restore_to_latest %} --type=default {%- else %}
+      --target-action=promote {%- if pitr_target %} --target="{{ pitr_target }}" --type=time {%- else %} --type=immediate {%- endif %}
+      {%- endif %}
+      restore
     no_params: True
     keep_existing_recovery_conf: True
   {% elif primary_cluster_endpoint %}
@@ -122,7 +128,7 @@ postgresql:
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
   data_dir: {{ data_path }}
   parameters:
-    {%- if enable_pgbackrest %}
+    {%- if enable_pgbackrest_archiving %}
     archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
     archive_command: /bin/true
