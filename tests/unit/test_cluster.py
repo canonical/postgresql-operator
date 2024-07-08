@@ -598,3 +598,23 @@ def test_primary_changed(harness, patroni):
         assert patroni.primary_changed("old_primary")
 
         _get_primary.assert_called_once_with()
+
+
+def test_restart_patroni(harness, patroni):
+    with (
+        patch("charm.snap.SnapCache") as _snap_cache,
+    ):
+        _cache = _snap_cache.return_value
+        _selected_snap = _cache.__getitem__.return_value
+        _selected_snap.services = {
+            "patroni": {"active": sentinel.restart},
+        }
+
+        assert patroni.restart_patroni() == sentinel.restart
+
+        _selected_snap.restart.assert_called_once_with(services=["patroni"])
+
+        # Snap error
+        _selected_snap.restart.side_effect = snap.SnapError
+
+        assert not patroni.restart_patroni()
