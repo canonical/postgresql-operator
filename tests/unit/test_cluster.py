@@ -602,3 +602,16 @@ def test_get_patroni_restart_condition(patroni):
         _open.return_value.__enter__.return_value.read.return_value = ""
         with tc.assertRaises(RuntimeError):
             patroni.get_patroni_restart_condition()
+
+
+@pytest.mark.parametrize("new_restart_condition", ["on-success", "on-failure"])
+def test_update_patroni_restart_condition(patroni, new_restart_condition):
+    with patch("builtins.open", mock_open(read_data="Restart=always")) as _open, patch(
+        "subprocess.run"
+    ) as _run:
+        _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
+        patroni.update_patroni_restart_condition(new_restart_condition)
+        _open.return_value.__enter__.return_value.write.assert_called_once_with(
+            f"Restart={new_restart_condition}"
+        )
+        _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])
