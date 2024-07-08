@@ -542,3 +542,15 @@ def test_member_inactive_error(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+
+def test_patroni_logs(patroni):
+    with patch("charm.snap.SnapCache") as _snap_cache:
+        # Test when the logs are returned successfully.
+        logs = _snap_cache.return_value.__getitem__.return_value.logs
+        logs.return_value = "fake-logs"
+        assert patroni.patroni_logs() == "fake-logs"
+
+        # Test the charm fails to get the logs.
+        logs.side_effect = snap.SnapError
+        assert patroni.patroni_logs() == ""
