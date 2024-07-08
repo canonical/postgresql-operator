@@ -2370,6 +2370,23 @@ def test_set_primary_status_message(harness):
         ) as _is_standby_leader,
         patch("charm.Patroni.get_primary") as _get_primary,
     ):
+        # Test scenario when it's needed to move to another S3 bucket after a restore.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"require-change-bucket-after-restore": "True"},
+            )
+        harness.charm._set_primary_status_message()
+        tc.assertIsInstance(harness.charm.unit.status, BlockedStatus)
+
+        # Test other scenarios.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"require-change-bucket-after-restore": ""},
+            )
         for values in itertools.product(
             [
                 RetryError(last_attempt=1),
