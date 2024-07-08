@@ -554,3 +554,31 @@ def test_patroni_logs(patroni):
         # Test the charm fails to get the logs.
         logs.side_effect = snap.SnapError
         assert patroni.patroni_logs() == ""
+
+
+def test_last_postgresql_logs(patroni):
+    with patch("glob.glob") as _glob, patch(
+        "builtins.open", mock_open(read_data="fake-logs")
+    ) as _open:
+        # Test when there are no files to read.
+        assert patroni.last_postgresql_logs() == ""
+        _open.assert_not_called()
+
+        # Test when there are multiple files in the logs directory.
+        _glob.return_value = [
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.1",
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.2",
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3",
+        ]
+        assert patroni.last_postgresql_logs() == "fake-logs"
+        _open.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+        )
+
+        # Test when the charm fails to read the logs.
+        _open.reset_mock()
+        _open.side_effect = OSError
+        assert patroni.last_postgresql_logs() == ""
+        _open.assert_called_with(
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+        )
