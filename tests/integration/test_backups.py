@@ -287,7 +287,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     async with ops_test.fast_forward():
         unit = ops_test.model.units.get(f"{database_app_name}/0")
         await ops_test.model.block_until(
-            lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+            lambda: unit.workload_status_message == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
         )
 
     # Check that the backup was correctly restored by having only the first created table.
