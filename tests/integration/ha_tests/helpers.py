@@ -59,7 +59,7 @@ class ProcessRunningError(Exception):
     """Raised when a process is running when it is not expected to be."""
 
 
-async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
     if "/" in process:
@@ -80,6 +80,8 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
                     # If something was returned, there is a running process.
                     if len(processes) > 0:
                         logger.info("Unit %s not yet down" % unit.name)
+                        # Try to rekill the unit
+                        await send_signal_to_process(ops_test, unit.name, process, signal)
                         raise ProcessRunningError
     except RetryError:
         return False
