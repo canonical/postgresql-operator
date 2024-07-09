@@ -276,10 +276,9 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     try:
-        (
-            await are_all_db_processes_down(ops_test, process, signal),
-            "Not all units down at the same time.",
-        )
+        assert await are_all_db_processes_down(
+            ops_test, process, signal
+        ), "Not all units down at the same time."
     finally:
         if process == PATRONI_PROCESS:
             awaits = []
