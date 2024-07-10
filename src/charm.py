@@ -1410,6 +1410,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Display 'Primary' in the unit status message if the current unit is the primary."""
         try:
             if "require-change-bucket-after-restore" in self.app_peer_data:
+                if self.unit.is_leader():
+                    self.app_peer_data.update({
+                        "restoring-backup": "",
+                        "restore-stanza": "",
+                        "restore-to-time": "",
+                    })
                 self.unit.status = BlockedStatus(MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET)
                 return
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:

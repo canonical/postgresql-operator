@@ -602,49 +602,98 @@ def test_execute_command(harness):
 
 
 def test_format_backup_list(harness):
-    # Test when there are no backups.
-    tc.assertEqual(
-        harness.charm.backup._format_backup_list([]),
-        """backup-id             | backup-type  | backup-status
-----------------------------------------------------""",
-    )
+    with patch(
+        "charms.data_platform_libs.v0.s3.S3Requirer.get_s3_connection_info"
+    ) as _get_s3_connection_info:
+        # Test when there are no backups.
+        _get_s3_connection_info.return_value = {
+            "bucket": " /test-bucket/ ",
+            "access-key": " test-access-key ",
+            "secret-key": " test-secret-key ",
+            "path": " test-path/ ",
+        }
+        assert (
+            harness.charm.backup._format_backup_list([])
+            == """Storage bucket name: test-bucket
+Backups base path: /test-path/backup/
 
-    # Test when there are backups.
-    backup_list = [
-        ("2023-01-01T09:00:00Z", "full", "failed: fake error"),
-        ("2023-01-01T10:00:00Z", "full", "finished"),
-    ]
-    tc.assertEqual(
-        harness.charm.backup._format_backup_list(backup_list),
-        """backup-id             | backup-type  | backup-status
-----------------------------------------------------
-2023-01-01T09:00:00Z  | full         | failed: fake error
-2023-01-01T10:00:00Z  | full         | finished""",
-    )
+backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------"""
+        )
+
+        # Test when there are backups.
+        backup_list = [
+            (
+                "2023-01-01T09:00:00Z",
+                "full",
+                "failed: fake error",
+                "None",
+                "0/3000000 / 0/5000000",
+                "2023-01-01T09:00:00Z",
+                "2023-01-01T09:00:05Z",
+                "a/b/c",
+            ),
+            (
+                "2023-01-01T10:00:00Z",
+                "full",
+                "finished",
+                "None",
+                "0/5000000 / 0/7000000",
+                "2023-01-01T10:00:00Z",
+                "2023-01-01T010:00:07Z",
+                "a/b/d",
+            ),
+        ]
+        assert (
+            harness.charm.backup._format_backup_list(backup_list)
+            == """Storage bucket name: test-bucket
+Backups base path: /test-path/backup/
+
+backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+2023-01-01T09:00:00Z | full         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2023-01-01T09:00:00Z | 2023-01-01T09:00:05Z | a/b/c
+2023-01-01T10:00:00Z | full         | finished | None                 | 0/5000000 / 0/7000000   | 2023-01-01T10:00:00Z | 2023-01-01T010:00:07Z | a/b/d"""
+        )
 
 
 def test_generate_backup_list_output(harness):
-    with patch("charm.PostgreSQLBackups._execute_command") as _execute_command:
+    with (
+        patch(
+            "charms.data_platform_libs.v0.s3.S3Requirer.get_s3_connection_info"
+        ) as _get_s3_connection_info,
+        patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
+    ):
+        _get_s3_connection_info.return_value = {
+            "bucket": " /test-bucket/ ",
+            "access-key": " test-access-key ",
+            "secret-key": " test-secret-key ",
+            "path": " test-path/ ",
+        }
         # Test when no backups are returned.
         _execute_command.return_value = (0, '[{"backup":[]}]', "")
-        tc.assertEqual(
-            harness.charm.backup._generate_backup_list_output(),
-            """backup-id             | backup-type  | backup-status
-----------------------------------------------------""",
+        assert (
+            harness.charm.backup._generate_backup_list_output()
+            == """Storage bucket name: test-bucket
+Backups base path: /test-path/backup/
+
+backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------"""
         )
 
         # Test when backups are returned.
         _execute_command.return_value = (
             0,
-            '[{"backup":[{"label":"20230101-090000F","error":"fake error"},{"label":"20230101-100000F","error":null}]}]',
+            '[{"backup":[{"label":"20230101-090000F","error":"fake error","reference":null,"lsn":{"start":"0/3000000","stop":"0/5000000"},"timestamp":{"start":1719866711,"stop":1719866714}}]}]',
             "",
         )
-        tc.assertEqual(
-            harness.charm.backup._generate_backup_list_output(),
-            """backup-id             | backup-type  | backup-status
-----------------------------------------------------
-2023-01-01T09:00:00Z  | full         | failed: fake error
-2023-01-01T10:00:00Z  | full         | finished""",
+        assert (
+            harness.charm.backup._generate_backup_list_output()
+            == """Storage bucket name: test-bucket
+Backups base path: /test-path/backup/
+
+backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------
+2023-01-01T09:00:00Z | full         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2024-07-01T20:45:11Z | 2024-07-01T20:45:14Z | /None.postgresql/20230101-090000F"""
         )
 
 
@@ -1230,8 +1279,18 @@ Juju Version: test-juju-version
         mock_event.fail.assert_called_once()
         mock_event.set_results.assert_not_called()
 
+        # Test when the backup is of type diff/incr when there's no previous full backup.
+        mock_event.reset_mock()
+        mock_event.params = {"type": "differential"}
+        _upload_content_to_s3.return_value = True
+        _is_primary.return_value = True
+        harness.charm.backup._on_create_backup_action(mock_event)
+        mock_event.fail.assert_called_once()
+        mock_event.set_results.assert_not_called()
+
         # Test when the backup fails.
         mock_event.reset_mock()
+        mock_event.params = {"type": "full"}
         _upload_content_to_s3.return_value = True
         _is_primary.return_value = True
         _execute_command.return_value = (1, "", "fake error")
