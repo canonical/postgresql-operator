@@ -10,7 +10,7 @@ import tenacity as tenacity
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.testing import Harness
-from tenacity import stop_after_delay
+from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import PostgresqlOperatorCharm
 from cluster import Patroni
@@ -429,7 +429,9 @@ def test_switchover(peers_ips, patroni):
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):
-    with patch("requests.patch") as _patch:
+    with patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed, patch(
+        "cluster.wait_fixed", return_value=wait_fixed(0)
+    ) as _wait_fixed, patch("requests.patch") as _patch:
         response = _patch.return_value
         response.status_code = 200
 
@@ -438,6 +440,11 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         _patch.assert_called_once_with(
             "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
         )
+
+        # Test when the request fails.
+        response.status_code = 500
+        with tc.assertRaises(RetryError):
+            patroni.update_synchronous_node_count()
 
 
 def test_configure_patroni_on_unit(peers_ips, patroni):
@@ -542,3 +549,69 @@ def test_member_inactive_error(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+
+
+def test_patroni_logs(patroni):
+    with patch("charm.snap.SnapCache") as _snap_cache:
+        # Test when the logs are returned successfully.
+        logs = _snap_cache.return_value.__getitem__.return_value.logs
+        logs.return_value = "fake-logs"
+        assert patroni.patroni_logs() == "fake-logs"
+
+        # Test the charm fails to get the logs.
+        logs.side_effect = snap.SnapError
+        assert patroni.patroni_logs() == ""
+
+
+def test_last_postgresql_logs(patroni):
+    with patch("glob.glob") as _glob, patch(
+        "builtins.open", mock_open(read_data="fake-logs")
+    ) as _open:
+        # Test when there are no files to read.
+        assert patroni.last_postgresql_logs() == ""
+        _open.assert_not_called()
+
+        # Test when there are multiple files in the logs directory.
+        _glob.return_value = [
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.1",
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.2",
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3",
+        ]
+        assert patroni.last_postgresql_logs() == "fake-logs"
+        _open.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+        )
+
+        # Test when the charm fails to read the logs.
+        _open.reset_mock()
+        _open.side_effect = OSError
+        assert patroni.last_postgresql_logs() == ""
+        _open.assert_called_with(
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+        )
+
+
+def test_get_patroni_restart_condition(patroni):
+    mock = mock_open()
+    with patch("builtins.open", mock) as _open:
+        # Test when there is a restart condition set.
+        _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
+        assert patroni.get_patroni_restart_condition() == "always"
+
+        # Test when there is no restart condition set.
+        _open.return_value.__enter__.return_value.read.return_value = ""
+        with tc.assertRaises(RuntimeError):
+            patroni.get_patroni_restart_condition()
+
+
+@pytest.mark.parametrize("new_restart_condition", ["on-success", "on-failure"])
+def test_update_patroni_restart_condition(patroni, new_restart_condition):
+    with patch("builtins.open", mock_open(read_data="Restart=always")) as _open, patch(
+        "subprocess.run"
+    ) as _run:
+        _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
+        patroni.update_patroni_restart_condition(new_restart_condition)
+        _open.return_value.__enter__.return_value.write.assert_called_once_with(
+            f"Restart={new_restart_condition}"
+        )
+        _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])

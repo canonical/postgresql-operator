@@ -2362,7 +2362,8 @@ def test_update_new_unit_status(harness):
         assert isinstance(harness.charm.unit.status, WaitingStatus)
 
 
-def test_set_primary_status_message(harness):
+@pytest.mark.parametrize("is_leader", [True, False])
+def test_set_primary_status_message(harness, is_leader):
     with (
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
@@ -2370,6 +2371,35 @@ def test_set_primary_status_message(harness):
         ) as _is_standby_leader,
         patch("charm.Patroni.get_primary") as _get_primary,
     ):
+        # Test scenario when it's needed to move to another S3 bucket after a restore.
+        databag_containing_restore_data = {
+            "require-change-bucket-after-restore": "True",
+            "restoring-backup": "2024-01-01T09:00:00Z",
+            "restore-stanza": "fake-stanza",
+            "restore-to-time": "",
+        }
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                databag_containing_restore_data,
+            )
+            harness.set_leader(is_leader)
+        harness.charm._set_primary_status_message()
+        harness.get_relation_data(harness.model.get_relation(PEER).id, harness.charm.app.name) == (
+            {"require-change-bucket-after-restore": "True"}
+            if is_leader
+            else databag_containing_restore_data
+        )
+        tc.assertIsInstance(harness.charm.unit.status, BlockedStatus)
+
+        # Test other scenarios.
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"require-change-bucket-after-restore": ""},
+            )
         for values in itertools.product(
             [
                 RetryError(last_attempt=1),
