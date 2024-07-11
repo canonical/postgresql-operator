@@ -1091,10 +1091,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
             self._start_replica(event)
+            self._restart_services_after_reboot()
             return
 
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
+        self._restart_services_after_reboot()
+
+    def _restart_services_after_reboot(self):
+        """Restart the Patroni and pgBackRest after a reboot."""
+        if self._unit_ip in self.members_ips:
+            self._patroni.start_patroni()
+            self.backup.start_stop_pgbackrest_service()
 
     def _setup_exporter(self) -> None:
         """Set up postgresql_exporter options."""
