@@ -35,6 +35,9 @@ APPLICATION_UNITS = 1
 DATABASE_UNITS = 2
 RELATION_NAME = "db"
 
+EXTENSIONS_BLOCKING_MESSAGE = (
+    "extensions requested through relation, enable them through config options"
+)
 ROLES_BLOCKING_MESSAGE = (
     "roles requested through relation, use postgresql_client interface instead"
 )
@@ -232,10 +235,7 @@ async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
         except JujuUnitError:
             pass
 
-        assert (
-            leader_unit.workload_status_message
-            == "extensions requested through relation, enable them through config options"
-        )
+        assert leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE
 
         # Verify that the charm unblocks when the extensions are enabled after being blocked
         # due to disabled extensions.
@@ -330,6 +330,48 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
         apps=[DATABASE_APP_NAME],
         status="active",
         timeout=1000,
+    )
+
+
+@markers.juju3  # As the Sentry test  already checks Juju 2.
+@pytest.mark.group(1)
+async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
+    await asyncio.gather(
+        ops_test.model.applications[APPLICATION_NAME].set_config({"legacy_roles": "False"}),
+        ops_test.model.applications[f"{APPLICATION_NAME}2"].set_config({"legacy_roles": "False"}),
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APPLICATION_NAME, f"{APPLICATION_NAME}2"],
+        status="active",
+        timeout=1000,
+    )
+
+    await asyncio.gather(
+        ops_test.model.relate(f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}:db"),
+        ops_test.model.relate(f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"),
+    )
+
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    await ops_test.model.block_until(
+        lambda: leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE, timeout=1000
+    )
+
+    assert leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE
+
+    logger.info("Verify that the charm remains blocked if there are other blocking relations")
+    await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+        f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}:db"
+    )
+
+    await ops_test.model.block_until(
+        lambda: leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE, timeout=1000
+    )
+
+    assert leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE
+
+    logger.info("Verify that active status is restored when all blocking relations are gone")
+    await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+        f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"
     )
 
 
