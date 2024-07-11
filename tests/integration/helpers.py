@@ -37,6 +37,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET = "Move restored cluster to another S3 bucket"
 
 logger = logging.getLogger(__name__)
 
@@ -1149,8 +1150,8 @@ async def backup_operations(
     action = await ops_test.model.units.get(replica).run_action("list-backups")
     await action.wait()
     backups = action.results.get("backups")
-    # 2 lines for header output, 1 backup line ==> 3 total lines
-    assert len(backups.split("\n")) == 3, "full backup is not outputted"
+    # 5 lines for header output, 1 backup line ==> 6 total lines
+    assert len(backups.split("\n")) == 6, "full backup is not outputted"
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Write some data.
@@ -1176,8 +1177,8 @@ async def backup_operations(
     action = await ops_test.model.units.get(replica).run_action("list-backups")
     await action.wait()
     backups = action.results.get("backups")
-    # 2 lines for header output, 2 backup lines ==> 4 total lines
-    assert len(backups.split("\n")) == 4, "differential backup is not outputted"
+    # 5 lines for header output, 2 backup lines ==> 7 total lines
+    assert len(backups.split("\n")) == 7, "differential backup is not outputted"
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Write some data.
@@ -1212,7 +1213,11 @@ async def backup_operations(
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await ops_test.model.block_until(
+            lambda: remaining_unit.workload_status_message
+            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+            timeout=1000,
+        )
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
@@ -1257,7 +1262,11 @@ async def backup_operations(
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await ops_test.model.block_until(
+            lambda: remaining_unit.workload_status_message
+            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+            timeout=1000,
+        )
 
     # Check that the backup was correctly restored by having only the first created table.
     primary = await get_primary(ops_test, remaining_unit.name)
