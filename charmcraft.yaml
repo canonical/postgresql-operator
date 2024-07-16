@@ -18,14 +18,17 @@ parts:
           echo 'ERROR: Use "tox run -e build" instead of calling "charmcraft pack" directly' >&2
           exit 1
       fi
+    override-build: |
+      rustup default stable
+      craftctl default
+    charm-strict-dependencies: true
+    build-snaps:
+      - rustup/latest/stable
     build-packages:
       - libffi-dev
       - libssl-dev
-      - rustc
-      - cargo
       - pkg-config
       - libpq-dev
-    charm-strict-dependencies: true
   libpq:
     build-packages:
       - libpq-dev
