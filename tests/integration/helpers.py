@@ -294,6 +294,7 @@ async def deploy_and_relate_application_with_postgresql(
     config: dict = None,
     channel: str = "stable",
     relation: str = "db",
+    series: str = None,
 ) -> int:
     """Helper function to deploy and relate application with PostgreSQL.
 
@@ -306,6 +307,7 @@ async def deploy_and_relate_application_with_postgresql(
         channel: The channel to use for the charm.
         relation: Name of the PostgreSQL relation to relate
             the application to.
+        series: Series of the charm to deploy.
 
     Returns:
         the id of the created relation.
@@ -317,6 +319,7 @@ async def deploy_and_relate_application_with_postgresql(
         application_name=application_name,
         num_units=number_of_units,
         config=config,
+        series=series,
     )
     await ops_test.model.wait_for_idle(
         apps=[application_name],
