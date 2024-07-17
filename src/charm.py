@@ -294,9 +294,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be taken
-        if key != secret_key and (
-            result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key)
-        ):
+        if result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key):
             return result
 
         return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
@@ -312,10 +310,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         peers = self.model.get_relation(PEER)
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be deleted
-        if key != secret_key and self.peer_relation_data(scope).fetch_my_relation_field(
-            peers.id, key
-        ):
-            self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
+        self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
         self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
 
     def remove_secret(self, scope: Scopes, key: str) -> None:
