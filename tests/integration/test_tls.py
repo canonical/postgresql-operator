@@ -111,8 +111,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         change_primary_start_timeout(ops_test, primary, 0)
 
         # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
-        initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
-        await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True)
+        initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait", tls=True)
+        await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True, tls=True)
 
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -174,7 +174,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             )
         finally:
             await change_patroni_setting(
-                ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
+                ops_test, "loop_wait", initial_loop_wait, use_random_unit=True, tls=True
             )
 
         # Remove the relation.
