@@ -9,6 +9,10 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
 
 from . import architecture
+from .ha_tests.helpers import (
+    change_patroni_setting,
+    get_patroni_setting,
+)
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -106,6 +110,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         )
         change_primary_start_timeout(ops_test, primary, 0)
 
+        # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
+        initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
+        await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True)
+
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
@@ -158,11 +166,16 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-        )
+        try:
+            await run_command_on_unit(
+                ops_test,
+                primary,
+                "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+            )
+        finally:
+            await change_patroni_setting(
+                ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
+            )
 
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
