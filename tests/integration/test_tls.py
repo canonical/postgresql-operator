@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import logging
 import os
+from asyncio import sleep
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
@@ -113,6 +114,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
         initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait", tls=True)
         await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True, tls=True)
+
+        await sleep(2 * initial_loop_wait)
 
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
