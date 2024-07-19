@@ -151,6 +151,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
                 cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
         connection.close()
 
+        await change_patroni_setting(
+            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True, tls=True
+        )
+
         # Stop the initial primary by killing both Patroni and PostgreSQL OS processes.
         await run_command_on_unit(
             ops_test,
@@ -169,16 +173,11 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        try:
-            await run_command_on_unit(
-                ops_test,
-                primary,
-                "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-            )
-        finally:
-            await change_patroni_setting(
-                ops_test, "loop_wait", initial_loop_wait, use_random_unit=True, tls=True
-            )
+        await run_command_on_unit(
+            ops_test,
+            primary,
+            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+        )
 
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
