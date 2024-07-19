@@ -11,50 +11,63 @@ To deploy on Kubernetes, please use [Charmed PostgreSQL K8s Operator](https://ch
 
 This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions distributed by Ubuntu Jammy series and adding [Patroni](https://github.com/zalando/patroni) on top of it, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
 
-## Usage
+## README contents
+* [Basic usage](#basic-usage): Deploy and scale Charmerd PostgreSQL
+* [Integrations](#integrations-relations): Supported interfaces for integrations
+* [Contributing](#contributing)
+* [Licensing and trademark](#licensing-and-trademark)
+  
+## Basic usage
 
+### Deployment
 Bootstrap a [lxd controller](https://juju.is/docs/olm/lxd#heading--create-a-controller) and create a new Juju model:
 
 ```shell
-juju add-model postgresql
+juju add-model sample-model
 ```
 
-### Basic Usage
-To deploy a single unit of PostgreSQL using its default configuration.
+To deploy a single unit of PostgreSQL using its [default configuration](config.yaml), run the following command:
 
 ```shell
-juju deploy postgresql --channel edge
+juju deploy postgresql --channel 14/stable
 ```
 
-It is customary to use PostgreSQL with replication. Hence usually more than one unit (preferably an odd number to prohibit a "split-brain" scenario) is deployed. To deploy PostgreSQL with multiple replicas, specify the number of desired units with the `-n` option.
+It is customary to use PostgreSQL with replication to ensure high availability. A replica is equivalent to a juju unit.
+
+To deploy PostgreSQL with multiple replicas, specify the number of desired units with the `-n` option:
 
 ```shell
-juju deploy postgresql --channel edge -n <number_of_units>
+juju deploy postgresql --channel 14/stable -n <number_of_units>
 ```
 
-To retrieve primary replica one can use the action `get-primary` on any of the units running PostgreSQL.
+To add replicas to an existing deployment, see the [Add replicas](#add-replicas) section.
+
+>[!TIP]
+>It is generally recommended to have an odd number of units to avoid a "[split-brain](https://en.wikipedia.org/wiki/Split-brain_(computing))" scenario
+
+### Primary replica
+To retrieve the primary replica, use the action `get-primary` on any of the units running PostgreSQL.
 ```shell
-juju run-action postgresql/leader get-primary --wait
+juju run postgresql/leader get-primary
 ```
 
-Similarly, the primary replica is displayed as a status message in `juju status`, however one
-should note that this hook gets called on regular time intervals and the primary may be outdated if
-the status hook has not been called recently.
+Similarly, the primary replica is displayed as a status message in `juju status`. Note that this hook gets called at regular time intervals, so the primary may be outdated if the status hook has not been called recently.
 
 ### Replication
-#### Adding Replicas
+
+#### Add replicas
 
 To add more replicas one can use the `juju add-unit` functionality i.e.
 ```shell
 juju add-unit postgresql -n <number_of_units_to_add>
 ```
-The implementation of `add-unit` allows the operator to add more than one unit, but functions internally by adding one replica at a time, avoiding multiple replicas syncing from the primary at the same time.
+The implementation of `add-unit` allows the operator to add more than one unit, but functions internally by adding one replica at a time. This is done to avoid multiple replicas syncing from the primary at the same time.
 
-#### Removing Replicas
+#### Remove replicas
 
-Similarly to scale down the number of replicas the `juju remove-unit` functionality may be used i.e.
+To scale down the number of replicas the `juju remove-unit` functionality may be used i.e.
 ```shell
-juju remove-unit postgresql <name_of_unit1> <name_of_unit2>
+juju remove-unit postgresql <name_of_unit_1> <name_of_unit_2>
 ```
 The implementation of `remove-unit` allows the operator to remove more than one unit. The functionality of `remove-unit` functions by removing one replica at a time to avoid downtime.
 
@@ -62,19 +75,20 @@ The implementation of `remove-unit` allows the operator to remove more than one 
 
 #### Charm users
 
-For users used internally by the Charmed PostgreSQL Operator an action can be used to rotate their passwords.
+To rotate the password of users internal to the Charmed PostgreSQL operator, use the `set-password` action as follows:
 ```shell
-juju run-action postgresql/leader set-password username=<username> password=<password> --wait
+juju run postgresql/leader set-password username=<user> password=<password>
 ```
-Note: currently, the users used by the operator are `operator`, `replication`, `backup` and `rewind`. Those users should not be used outside the operator.
+>[!NOTE]
+>Currently, internal users are `operator`, `replication`, `backup` and `rewind`. These users should not be used outside the operator.
 
-#### Related applications users
+#### Integrated (related) applications users
 
-To rotate the passwords of users created for related applications the relation should be removed and the application should be related again to the Charmed PostgreSQL Operator. That process will generate a new user and password for the application (removing the old user).
+To rotate the passwords of users created for integrated applications, the integration to Charmed PostgreSQL should be removed and re-created. This process will generate a new user and password for the application (and remove the old user).
 
 ## Integrations (Relations)
 
-Supported [relations](https://juju.is/docs/olm/relations):
+Supported [integrations](https://juju.is/docs/olm/relations):
 
 #### New `postgresql_client` interface:
 
@@ -92,23 +106,23 @@ Please read usage documentation about
 more information about how to enable PostgreSQL interface in your application.
 
 Relations to new applications are supported via the `postgresql_client` interface. To create a
-relation:
+relation to another application:
 
-juju v2.x:
+juju `v2.x`:
 
 ```shell
-juju relate postgresql application
+juju relate postgresql <application_name>
 ```
 
-juju v3.x
+juju `v3.x`:
 
 ```shell
-juju integrate postgresql application
+juju integrate postgresql <application_name>
 ```
 
 To remove a relation:
 ```shell
-juju remove-relation postgresql application
+juju remove-relation postgresql <application_name>
 ```
 
 #### Legacy `pgsql` interface:
@@ -120,29 +134,31 @@ juju relate postgresql:db-admin landscape-server
 
 #### `tls-certificates` interface:
 
-The Charmed PostgreSQL Operator also supports TLS encryption on internal and external connections. To enable TLS:
+The Charmed PostgreSQL Operator also supports TLS encryption on internal and external connections. Below is an example of enabling TLS with the [self-signed certificates charm](https://charmhub.io/self-signed-certificates).
 
 ```shell
-# Deploy the TLS Certificates Operator. 
-juju deploy tls-certificates-operator --channel=edge
-# Add the necessary configurations for TLS.
-juju config tls-certificates-operator generate-self-signed-certificates="true" ca-common-name="Test CA" 
-# Enable TLS via relation.
-juju relate postgresql tls-certificates-operator
-# Disable TLS by removing relation.
-juju remove-relation postgresql tls-certificates-operator
-```
+# Deploy the self-signed certificates TLS operator. 
+juju deploy self-signed-certificates --config ca-common-name="Example CA"
 
-Note: The TLS settings shown here are for self-signed-certificates, which are not recommended for production clusters. The TLS Certificates Operator offers a variety of configurations. Read more on the TLS Certificates Operator [here](https://charmhub.io/tls-certificates-operator).
+# Enable TLS via relation.
+juju integrate postgresql self-signed-certificates
+
+# Disable TLS by removing relation.
+juju remove-relation postgresql self-signed-certificates
+```
+>[!WARNING]
+>The TLS settings shown here are for self-signed-certificates, which are not recommended for production clusters. See the guide [Security with X.509 certificates](https://charmhub.io/topics/security-with-x-509-certificates) for an overview of available certificates charms.
 
 ## Security
-Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not file GitHub issues about security issues.
+Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not use GitHub to submit security issues.
 
 ## Contributing
-Please see the [Juju SDK docs](https://juju.is/docs/sdk) for guidelines on enhancements to this charm following best practice guidelines, and [CONTRIBUTING.md](https://github.com/canonical/postgresql-operator/blob/main/CONTRIBUTING.md) for developer guidance.
+* For best practices on how to write and contribute to charms, see the [Juju SDK docs](https://juju.is/docs/sdk/how-to)
+* For more specific developer guidance for contributions to Charmed PostgreSQL, see the file [CONTRIBUTING.md](CONTRIBUTING.md)
+* Report security issues for the Charmed PostgreSQL Operator through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File).
+* Report technical issues, bug reports and feature requests through the [GitHub Issues tab](https://github.com/canonical/postgresql-operator/issues).
 
-## License
-The Charmed PostgreSQL Operator [is distributed](https://github.com/canonical/postgresql-operator/blob/main/LICENSE) under the Apache Software License, version 2.0. It installs/operates/depends on [PostgreSQL](https://www.postgresql.org/ftp/source/), which [is licensed](https://www.postgresql.org/about/licence/) under PostgreSQL License, a liberal Open Source license, similar to the BSD or MIT licenses.
+## Licensing and trademark
+The Charmed PostgreSQL Operator is distributed under the [Apache Software License, version 2.0](https://github.com/canonical/postgresql-operator/blob/main/LICENSE). It installs, operates and depends on [PostgreSQL](https://www.postgresql.org/ftp/source/), which is licensed under the [PostgreSQL License](https://www.postgresql.org/about/licence/), a liberal Open Source license similar to the BSD or MIT licenses.
 
-## Trademark Notice
 PostgreSQL is a trademark or registered trademark of PostgreSQL Global Development Group. Other trademarks are property of their respective owners.
