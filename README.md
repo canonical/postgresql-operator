@@ -82,7 +82,7 @@ juju run postgresql/leader set-password username=<user> password=<password>
 >[!NOTE]
 >Currently, internal users are `operator`, `replication`, `backup` and `rewind`. These users should not be used outside the operator.
 
-#### Integrated (related) applications users
+#### Integrated (related) application users
 
 To rotate the passwords of users created for integrated applications, the integration to Charmed PostgreSQL should be removed and re-created. This process will generate a new user and password for the application (and remove the old user).
 
@@ -101,9 +101,9 @@ requires:
     interface: postgresql_client
 ```
 
-Please read usage documentation about
+Please read the usage documentation of the
 [data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces) library for
-more information about how to enable PostgreSQL interface in your application.
+more information about how to enable a PostgreSQL interface in your application.
 
 Relations to new applications are supported via the `postgresql_client` interface. To create a
 relation to another application:
