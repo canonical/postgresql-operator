@@ -294,9 +294,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be taken
-        if key != secret_key and (
-            result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key)
-        ):
+        if result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key):
             return result
 
         return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
@@ -312,10 +310,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         peers = self.model.get_relation(PEER)
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be deleted
-        if key != secret_key and self.peer_relation_data(scope).fetch_my_relation_field(
-            peers.id, key
-        ):
-            self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
+        self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
         self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
 
     def remove_secret(self, scope: Scopes, key: str) -> None:
@@ -1091,10 +1086,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # On replicas, only prepare for starting the instance later.
         if not self.unit.is_leader():
             self._start_replica(event)
+            self._restart_services_after_reboot()
             return
 
         # Bootstrap the cluster in the leader unit.
         self._start_primary(event)
+        self._restart_services_after_reboot()
+
+    def _restart_services_after_reboot(self):
+        """Restart the Patroni and pgBackRest after a reboot."""
+        if self._unit_ip in self.members_ips:
+            self._patroni.start_patroni()
+            self.backup.start_stop_pgbackrest_service()
 
     def _setup_exporter(self) -> None:
         """Set up postgresql_exporter options."""
