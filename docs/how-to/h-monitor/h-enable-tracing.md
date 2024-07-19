@@ -48,7 +48,7 @@ Integrate `tempo-k8s` with the COS charms as follows:
 ```shell
 juju integrate tempo-k8s:grafana-dashboard grafana:grafana-dashboard
 juju integrate tempo-k8s:grafana-source grafana:grafana-source
-juju integrate tempo-k8s:ingress traefik:traefik
+juju integrate tempo-k8s:ingress traefik:traefik-route
 juju integrate tempo-k8s:metrics-endpoint prometheus:metrics-endpoint
 juju integrate tempo-k8s:logging loki:logging
 ```
