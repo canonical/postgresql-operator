@@ -68,6 +68,7 @@ async def test_deploy_active(ops_test: OpsTest):
 
 
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
