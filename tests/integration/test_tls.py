@@ -113,76 +113,79 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Pause Patroni so it doesn't wipe the custom changes
         await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
 
-        for attempt in Retrying(
-            stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
-        ):
-            with attempt:
-                # Promote the replica to primary.
-                await run_command_on_unit(
-                    ops_test,
-                    replica,
-                    "sudo -u snap_daemon charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/var/lib/postgresql/ promote",
-                )
+        async with ops_test.fast_forward("20m"):
+            for attempt in Retrying(
+                stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
+            ):
+                with attempt:
+                    # Promote the replica to primary.
+                    await run_command_on_unit(
+                        ops_test,
+                        replica,
+                        "sudo -u snap_daemon charmed-postgresql.pg-ctl -D /var/snap/charmed-postgresql/common/var/lib/postgresql/ promote",
+                    )
 
-                # Check that the replica was promoted.
-                host = get_unit_address(ops_test, replica)
-                password = await get_password(ops_test, replica)
-                with db_connect(host, password) as connection:
-                    connection.autocommit = True
-                    with connection.cursor() as cursor:
-                        cursor.execute("SELECT pg_is_in_recovery();")
-                        in_recovery = cursor.fetchone()[0]
-                        print(f"in_recovery: {in_recovery}")
-                        assert not in_recovery
-                connection.close()
+                    # Check that the replica was promoted.
+                    host = get_unit_address(ops_test, replica)
+                    password = await get_password(ops_test, replica)
+                    with db_connect(host, password) as connection:
+                        connection.autocommit = True
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT pg_is_in_recovery();")
+                            in_recovery = cursor.fetchone()[0]
+                            print(f"in_recovery: {in_recovery}")
+                            assert not in_recovery
+                    connection.close()
 
-        # Write some data to the initial primary (this causes a divergence
-        # in the instances' timelines).
-        host = get_unit_address(ops_test, primary)
-        password = await get_password(ops_test, primary)
-        with db_connect(host, password) as connection:
-            connection.autocommit = True
-            with connection.cursor() as cursor:
-                cursor.execute("CREATE TABLE IF NOT EXISTS pgrewindtest (testcol INT);")
-                cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
-        connection.close()
+            # Write some data to the initial primary (this causes a divergence
+            # in the instances' timelines).
+            host = get_unit_address(ops_test, primary)
+            password = await get_password(ops_test, primary)
+            with db_connect(host, password) as connection:
+                connection.autocommit = True
+                with connection.cursor() as cursor:
+                    cursor.execute("CREATE TABLE IF NOT EXISTS pgrewindtest (testcol INT);")
+                    cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
+            connection.close()
 
-        # Stop the initial primary by killing both Patroni and PostgreSQL OS processes.
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
-        )
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/[0-9]*/usr/bin/patroni",
-        )
+            # Stop the initial primary by killing both Patroni and PostgreSQL OS processes.
+            await run_command_on_unit(
+                ops_test,
+                primary,
+                "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
+            )
+            await run_command_on_unit(
+                ops_test,
+                primary,
+                "pkill --signal SIGKILL -f /snap/charmed-postgresql/[0-9]*/usr/bin/patroni",
+            )
 
-        # Check that the primary changed.
-        assert await primary_changed(ops_test, primary), "primary not changed"
-        change_primary_start_timeout(ops_test, primary, 300)
+            # Check that the primary changed.
+            assert await primary_changed(ops_test, primary), "primary not changed"
+            change_primary_start_timeout(ops_test, primary, 300)
 
-        # Check the logs to ensure TLS is being used by pg_rewind.
-        primary = await get_primary(ops_test, primary)
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-        )
+            # Check the logs to ensure TLS is being used by pg_rewind.
+            primary = await get_primary(ops_test, primary)
+            await run_command_on_unit(
+                ops_test,
+                primary,
+                "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+            )
 
-        await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
+            await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
 
-        # Remove the relation.
-        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
-        )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+            # Remove the relation.
+            await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+                f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
+            )
+            await ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME], status="active", timeout=1000
+            )
 
-        # Wait for all units disabling TLS.
-        for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-            assert await check_tls(ops_test, unit.name, enabled=False)
-            assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
+            # Wait for all units disabling TLS.
+            for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+                assert await check_tls(ops_test, unit.name, enabled=False)
+                assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
 
 
 @pytest.mark.group(1)
