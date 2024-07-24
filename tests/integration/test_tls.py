@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import logging
 import os
-from asyncio import sleep
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
@@ -12,7 +11,6 @@ from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_expone
 from . import architecture
 from .ha_tests.helpers import (
     change_patroni_setting,
-    get_patroni_setting,
 )
 from .helpers import (
     CHARM_SERIES,
@@ -111,11 +109,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         )
         change_primary_start_timeout(ops_test, primary, 0)
 
-        # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
-        initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait", tls=True)
-        await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True, tls=True)
-
-        await sleep(2 * initial_loop_wait)
+        # Pause Patroni so it doesn't wipe the custom changes
+        await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
 
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
@@ -151,10 +146,6 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
                 cursor.execute("INSERT INTO pgrewindtest SELECT generate_series(1,1000);")
         connection.close()
 
-        await change_patroni_setting(
-            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True, tls=True
-        )
-
         # Stop the initial primary by killing both Patroni and PostgreSQL OS processes.
         await run_command_on_unit(
             ops_test,
@@ -178,6 +169,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             primary,
             "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
         )
+
+        await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
 
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
