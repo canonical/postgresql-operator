@@ -110,8 +110,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         )
         change_primary_start_timeout(ops_test, primary, 0)
 
-    # Pause Patroni so it doesn't wipe the custom changes
-    await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
+        # Pause Patroni so it doesn't wipe the custom changes
+        await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
 
     async with ops_test.fast_forward("24h"):
         for attempt in Retrying(
@@ -164,6 +164,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         assert await primary_changed(ops_test, primary), "primary not changed"
         change_primary_start_timeout(ops_test, primary, 300)
 
+    async with ops_test.fast_forward():
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
         await run_command_on_unit(
