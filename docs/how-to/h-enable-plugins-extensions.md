@@ -1,10 +1,16 @@
 # How to enable plugins/extensions
 
-## Prerequisites
-* A deployed [Charmed PostgreSQL operator](/t/charmed-postgresql-tutorial-deploy-postgresql/9697?channel=14/edge)
+This guide outlines the steps for enabling an extension in a Charmed PostgreSQL deployment. 
 
-## Enable plugin/extension
-Enable the plugin/extension by setting `True` as the value of its respective config option, like in the following example:
+For a list of available extensions, see the page [Supported plugins/extensions](/t/10946). The words "plugin" and "extension" will be used interchangeably.
+
+## Prerequisites
+* A deployed [Charmed PostgreSQL operator](/t/9697) from [a revision that supports the desired plugin](/t/10946)
+
+
+## Enable extension
+Enable the extension by setting `True` as the value of its respective config option, like in the following example:
+
 ```shell
 juju config postgresql plugin_<plugin name>_enable=True
 ```
