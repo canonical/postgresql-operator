@@ -113,7 +113,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Pause Patroni so it doesn't wipe the custom changes
         await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
 
-        async with ops_test.fast_forward("20m"):
+        async with ops_test.fast_forward("24h"):
             for attempt in Retrying(
                 stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
             ):
