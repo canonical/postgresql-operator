@@ -166,8 +166,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5)):
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5), reraise=True):
             with attempt:
+                logger.info("Trying to grep for rewind logs.")
                 await run_command_on_unit(
                     ops_test,
                     primary,
