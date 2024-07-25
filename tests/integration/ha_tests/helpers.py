@@ -7,7 +7,7 @@ import random
 import subprocess
 from pathlib import Path
 from tempfile import mkstemp
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Optional, Set, Tuple, Union
 
 import psycopg2
 import requests
@@ -137,7 +137,11 @@ async def app_name(
 
 
 async def change_patroni_setting(
-    ops_test: OpsTest, setting: str, value: int, use_random_unit: bool = False, tls: bool = False
+    ops_test: OpsTest,
+    setting: str,
+    value: Union[int, bool],
+    use_random_unit: bool = False,
+    tls: bool = False,
 ) -> None:
     """Change the value of one of the Patroni settings.
 
@@ -146,8 +150,8 @@ async def change_patroni_setting(
         setting: the name of the setting.
         value: the value to assign to the setting.
         use_random_unit: whether to use a random unit (default is False,
-            so it uses the primary)
-        tls: if Patroni is serving using tls
+            so it uses the primary).
+        tls: if Patroni is serving using tls.
     """
     if tls:
         schema = "https"
@@ -411,7 +415,7 @@ async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False
     Args:
         ops_test: ops_test instance.
         setting: the name of the setting.
-        tls: if Patroni is serving using tls
+        tls: if Patroni is serving using tls.
 
     Returns:
         the value of the configuration or None if it's using the default value.
