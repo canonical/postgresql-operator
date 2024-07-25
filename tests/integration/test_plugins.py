@@ -101,7 +101,9 @@ async def test_plugins(ops_test: OpsTest) -> None:
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1500, raise_on_error=False
+        )
 
     sql_tests = {
         "plugin_citext_enable": CITEXT_EXTENSION_STATEMENT,

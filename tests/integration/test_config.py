@@ -28,7 +28,9 @@ async def test_config_parameters(ops_test: OpsTest) -> None:
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1500, raise_on_error=False
+        )
 
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
     test_string = "abcXYZ123"

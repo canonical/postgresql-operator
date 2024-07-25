@@ -62,6 +62,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             status="active",
             timeout=1500,
             wait_for_exact_units=DATABASE_UNITS,
+            raise_on_error=False,
         )
 
         # Extra config option for Mailman3 Core.

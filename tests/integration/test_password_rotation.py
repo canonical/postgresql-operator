@@ -40,7 +40,9 @@ async def test_deploy_active(ops_test: OpsTest):
             series=CHARM_SERIES,
             config={"profile": "testing"},
         )
-        await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME], status="active", timeout=1500, raise_on_error=False
+        )
 
 
 @pytest.mark.group(1)

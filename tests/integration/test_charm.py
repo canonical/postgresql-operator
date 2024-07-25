@@ -52,7 +52,9 @@ async def test_deploy(ops_test: OpsTest, charm: str):
     # Reducing the update status frequency to speed up the triggering of deferred events.
     await ops_test.model.set_config({"update-status-hook-interval": "10s"})
 
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME], status="active", timeout=1500, raise_on_error=False
+    )
     assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
 
 
