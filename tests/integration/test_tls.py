@@ -6,7 +6,7 @@ import os
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
+from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential, wait_fixed
 
 from . import architecture
 from .ha_tests.helpers import (
@@ -164,17 +164,19 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         assert await primary_changed(ops_test, primary), "primary not changed"
         change_primary_start_timeout(ops_test, primary, 300)
 
-    async with ops_test.fast_forward():
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-        )
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5)):
+            with attempt:
+                await run_command_on_unit(
+                    ops_test,
+                    primary,
+                    "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+                )
 
         await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
 
+    async with ops_test.fast_forward():
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
