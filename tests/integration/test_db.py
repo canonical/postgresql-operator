@@ -206,7 +206,7 @@ async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
             ops_test.model.deploy(
                 "omnivector-sentry", application_name="sentry1", series="bionic"
             ),
-            ops_test.model.deploy("haproxy", series="focal"),
+            ops_test.model.deploy("haproxy", series="jammy"),
             ops_test.model.deploy("omnivector-redis", application_name="redis", series="bionic"),
         )
         await ops_test.model.wait_for_idle(
