@@ -6,7 +6,6 @@ import logging
 
 import psycopg2 as psycopg2
 import pytest as pytest
-from juju.errors import JujuUnitError
 from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -22,7 +21,6 @@ from .helpers import (
     check_databases_creation,
     deploy_and_relate_application_with_postgresql,
     deploy_and_relate_bundle_with_postgresql,
-    find_unit,
     get_leader_unit,
     run_command_on_unit,
 )
