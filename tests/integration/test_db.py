@@ -252,7 +252,6 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
 
-@markers.juju3  # As the Sentry test  already checks Juju 2.
 @pytest.mark.group(1)
 async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
     await asyncio.gather(
