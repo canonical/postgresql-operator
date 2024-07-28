@@ -293,7 +293,9 @@ async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
 
+@markers.juju2
 @pytest.mark.group(1)
+@pytest.mark.unstable
 @markers.amd64_only  # canonical-livepatch-server charm (in bundle) not available for arm64
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
