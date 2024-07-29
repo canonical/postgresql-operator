@@ -107,7 +107,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 7
+LIBPATCH = 8
 
 PYDEPS = ["pydantic"]
 
@@ -116,14 +116,13 @@ logger = logging.getLogger(__name__)
 DEFAULT_RELATION_NAME = "tracing"
 RELATION_INTERFACE_NAME = "tracing"
 
+# Supported list rationale https://github.com/canonical/tempo-coordinator-k8s-operator/issues/8
 ReceiverProtocol = Literal[
     "zipkin",
-    "kafka",
-    "opencensus",
-    "tempo_http",
-    "tempo_grpc",
     "otlp_grpc",
     "otlp_http",
+    "jaeger_grpc",
+    "jaeger_thrift_http",
 ]
 
 RawReceiver = Tuple[ReceiverProtocol, str]
@@ -141,14 +140,12 @@ class TransportProtocolType(str, enum.Enum):
     grpc = "grpc"
 
 
-receiver_protocol_to_transport_protocol = {
+receiver_protocol_to_transport_protocol: Dict[ReceiverProtocol, TransportProtocolType] = {
     "zipkin": TransportProtocolType.http,
-    "kafka": TransportProtocolType.http,
-    "opencensus": TransportProtocolType.http,
-    "tempo_http": TransportProtocolType.http,
-    "tempo_grpc": TransportProtocolType.grpc,
     "otlp_grpc": TransportProtocolType.grpc,
     "otlp_http": TransportProtocolType.http,
+    "jaeger_thrift_http": TransportProtocolType.http,
+    "jaeger_grpc": TransportProtocolType.grpc,
 }
 """A mapping between telemetry protocols and their corresponding transport protocol.
 """

@@ -21,6 +21,7 @@ from ops.model import (
     ActiveStatus,
     BlockedStatus,
     MaintenanceStatus,
+    ModelError,
     RelationDataTypeError,
     WaitingStatus,
 )
@@ -590,7 +591,7 @@ def test_on_start(harness):
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True) as _idle,
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
-            side_effect=[False, True, True, True, True],
+            side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
     ):
         _get_postgresql_version.return_value = "14.0"
@@ -606,7 +607,14 @@ def test_on_start(harness):
         _bootstrap_cluster.assert_not_called()
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
+        # ModelError in get password
+        _get_password.side_effect = ModelError
+        harness.charm.on.start.emit()
+        _bootstrap_cluster.assert_not_called()
+        assert isinstance(harness.model.unit.status, WaitingStatus)
+
         # Mock the passwords.
+        _get_password.side_effect = None
         _get_password.return_value = "fake-operator-password"
         _replication_password.return_value = "fake-replication-password"
 
