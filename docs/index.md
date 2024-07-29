@@ -53,6 +53,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
   1. [Set up](how-to/h-set-up)
     1. [Deploy on LXD](how-to/h-set-up/h-deploy-lxd.md)
     1. [Deploy on MAAS](how-to/h-set-up/h-deploy-maas.md)
+    1. [Deploy via Terraform](how-to/h-set-up/h-deploy-terraform.md)
     1. [Scale units](how-to/h-set-up/h-scale.md)
     1. [Enable TLS](how-to/h-set-up/h-enable-tls.md)
     1. [Manage client applications](how-to/h-set-up/h-manage-client.md)
