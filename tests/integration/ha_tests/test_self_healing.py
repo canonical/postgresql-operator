@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import asyncio
 import logging
+from time import sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -58,6 +59,7 @@ APP_NAME = METADATA["name"]
 PATRONI_PROCESS = "/snap/charmed-postgresql/[0-9]*/usr/bin/patroni"
 POSTGRESQL_PROCESS = "postgres"
 DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
+MEDIAN_ELECTION_TIME = 10
 
 
 @pytest.mark.group(1)
@@ -158,6 +160,9 @@ async def test_kill_db_process(
     # Kill the database process.
     await send_signal_to_process(ops_test, primary_name, process, "SIGKILL")
 
+    # Wait some time to elect a new primary.
+    sleep(MEDIAN_ELECTION_TIME * 6)
+
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test, primary_name)
 
@@ -186,6 +191,9 @@ async def test_freeze_db_process(
 
     # Freeze the database process.
     await send_signal_to_process(ops_test, primary_name, process, "SIGSTOP")
+
+    # Wait some time to elect a new primary.
+    sleep(MEDIAN_ELECTION_TIME * 6)
 
     async with ops_test.fast_forward():
         # Verify new writes are continuing by counting the number of writes before and after a
@@ -225,6 +233,9 @@ async def test_restart_db_process(
 
     # Restart the database process.
     await send_signal_to_process(ops_test, primary_name, process, "SIGTERM")
+
+    # Wait some time to elect a new primary.
+    sleep(MEDIAN_ELECTION_TIME * 6)
 
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test, primary_name)
@@ -345,6 +356,9 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         "/tmp/clean-data-dir.sh",
     )
     assert return_code == 0, "Failed to remove data directory"
+
+    # Wait some time to elect a new primary.
+    sleep(MEDIAN_ELECTION_TIME * 2)
 
     async with ops_test.fast_forward():
         # Verify that a new primary gets elected (ie old primary is secondary).
