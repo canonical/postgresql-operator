@@ -331,7 +331,7 @@ async def test_promote_standby(
     """Test promoting the standby cluster."""
     logger.info("breaking the relations")
     await first_model.applications[DATABASE_APP_NAME].remove_relation(
-        "database", f"{APPLICATION_NAME}:first-database"
+        "database", f"{APPLICATION_NAME}:database"
     )
     await second_model.applications[DATABASE_APP_NAME].remove_relation(
         "replication", "replication-offer"

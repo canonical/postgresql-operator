@@ -788,10 +788,10 @@ async def start_continuous_writes(ops_test: OpsTest, app: str, model: Model = No
         for relation in model.applications[app].relations
         if not relation.is_peer
         and f"{relation.requires.application_name}:{relation.requires.name}"
-        == f"{APPLICATION_NAME}:first-database"
+        == f"{APPLICATION_NAME}:database"
     ]
     if not relations:
-        await model.relate(app, f"{APPLICATION_NAME}:first-database")
+        await model.relate(app, f"{APPLICATION_NAME}:database")
         await model.wait_for_idle(status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
         with attempt:
