@@ -443,7 +443,8 @@ async def deploy_and_relate_bundle_with_postgresql(
         if status_message:
             awaits.append(
                 ops_test.model.block_until(
-                    lambda: unit.workload_status_message == status_message, timeout=timeout
+                    lambda: unit.workload_status_message == status_message,
+                    timeout=timeout,
                 )
             )
         await asyncio.gather(*awaits)
