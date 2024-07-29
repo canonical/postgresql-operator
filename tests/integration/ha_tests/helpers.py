@@ -298,7 +298,7 @@ def count_writes_on_members(members, password, down_ips) -> Tuple[Dict[str, int]
             host = member["host"]
 
             connection_string = (
-                f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
+                f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
                 f" host='{host}' password='{password}' connect_timeout=10"
             )
 
@@ -756,7 +756,7 @@ async def is_secondary_up_to_date(
         if unit.name == unit_name
     ][0]
     connection_string = (
-        f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
+        f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
     )
 
