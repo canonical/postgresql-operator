@@ -642,9 +642,13 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     """
     if not model:
         model = ops_test.model
-    action = await model.units.get(unit_name).run_action("get-primary")
-    action = await action.wait()
-    return action.results["primary"]
+    for unit in model.applications[DATABASE_APP_NAME].units:
+        action = await unit.run_action("get-primary")
+        action = await action.wait()
+        primary = action.results.get("primary", "None")
+        if primary == "None":
+            continue
+        return primary
 
 
 async def get_tls_ca(
@@ -946,7 +950,11 @@ async def scale_application(
         units = [unit.name for unit in model.applications[application_name].units[0:-change]]
         await model.applications[application_name].destroy_units(*units)
     await model.wait_for_idle(
-        apps=[application_name], status="active", timeout=2000, wait_for_exact_units=count
+        apps=[application_name],
+        status="active",
+        timeout=2000,
+        idle_period=30,
+        wait_for_exact_units=count,
     )
 
 
