@@ -24,7 +24,6 @@ from tenacity import (
     RetryError,
     Retrying,
     retry,
-    retry_if_exception,
     retry_if_result,
     stop_after_attempt,
     stop_after_delay,
@@ -625,9 +624,9 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
 
 
 @retry(
-    retry=retry_if_exception(KeyError),
     stop=stop_after_attempt(10),
     wait=wait_exponential(multiplier=1, min=2, max=30),
+    reraise=True,
 )
 async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     """Get the primary unit.
@@ -642,13 +641,11 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     """
     if not model:
         model = ops_test.model
-    for unit in model.applications[DATABASE_APP_NAME].units:
-        action = await unit.run_action("get-primary")
-        action = await action.wait()
-        primary = action.results.get("primary", "None")
-        if primary == "None":
-            continue
-        return primary
+    action = await model.units.get(unit_name).run_action("get-primary")
+    action = await action.wait()
+    if "primary" not in action.results or action.results["primary"] not in model.units:
+        raise Exception("Primary unit not found")
+    return action.results["primary"]
 
 
 async def get_tls_ca(
@@ -677,6 +674,11 @@ async def get_tls_ca(
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
 
 
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    reraise=True,
+)
 def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Get unit IP address.
 
