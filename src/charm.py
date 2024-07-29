@@ -1063,7 +1063,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_start(event):
             return
 
-        postgres_password = self._get_password()
+        try:
+            postgres_password = self._get_password()
+        except ModelError:
+            logger.debug("_on_start: secrets not yet available")
+            postgres_password = None
         # If the leader was not elected (and the needed passwords were not generated yet),
         # the cluster cannot be bootstrapped yet.
         if not postgres_password or not self._replication_password:
