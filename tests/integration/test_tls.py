@@ -6,9 +6,12 @@ import os
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
+from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential, wait_fixed
 
 from . import architecture
+from .ha_tests.helpers import (
+    change_patroni_setting,
+)
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -65,6 +68,7 @@ async def test_deploy_active(ops_test: OpsTest):
 
 
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
@@ -106,6 +110,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         )
         change_primary_start_timeout(ops_test, primary, 0)
 
+        # Pause Patroni so it doesn't wipe the custom changes
+        await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
+
+    async with ops_test.fast_forward("24h"):
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
@@ -158,12 +166,18 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-        )
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5), reraise=True):
+            with attempt:
+                logger.info("Trying to grep for rewind logs.")
+                await run_command_on_unit(
+                    ops_test,
+                    primary,
+                    "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+                )
 
+        await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
+
+    async with ops_test.fast_forward():
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
