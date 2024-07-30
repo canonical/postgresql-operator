@@ -4,6 +4,7 @@
 
 
 import logging
+from locale import SNAP_LOCALES
 
 import psycopg2
 import pytest
@@ -23,6 +24,7 @@ from .helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    run_command_on_unit,
     scale_application,
     switchover,
 )
@@ -164,6 +166,19 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert unit.data["port-ranges"][0]["from-port"] == 5432
     assert unit.data["port-ranges"][0]["to-port"] == 5432
     assert unit.data["port-ranges"][0]["protocol"] == "tcp"
+
+
+@pytest.mark.group(1)
+async def test_postgresql_locales(ops_test: OpsTest) -> None:
+    raw_locales = await run_command_on_unit(
+        ops_test,
+        ops_test.model.applications[DATABASE_APP_NAME].units[0],
+        "ls /snap/charmed-postgresql/current/usr/lib/locale",
+    )
+    locales = raw_locales.splitlines()
+    locales.append("C")
+    locales.sort()
+    assert locales == SNAP_LOCALES
 
 
 @pytest.mark.group(1)
