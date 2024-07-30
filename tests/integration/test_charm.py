@@ -179,6 +179,7 @@ async def test_postgresql_locales(ops_test: OpsTest) -> None:
     locales = raw_locales.splitlines()
     locales.append("C")
     locales.sort()
+    locales.remove("")
     assert locales == SNAP_LOCALES
 
 
