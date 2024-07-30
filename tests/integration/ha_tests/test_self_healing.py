@@ -64,7 +64,6 @@ MEDIAN_ELECTION_TIME = 10
 
 
 @pytest.mark.group(1)
-@pytest.mark.group(2)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy three unit of PostgreSQL."""
@@ -313,6 +312,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     wal_settings,
 ) -> None:
     """A forceful restart with deleted data and without transaction logs (forced clone)."""
+    await test_build_and_deploy(ops_test)
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
 
@@ -371,14 +371,24 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         # Check that the WAL was correctly rotated.
         for unit_name in files:
             assert not files[unit_name].intersection(
-                new_files
+                new_files[unit_name]
             ), "WAL segments weren't correctly rotated"
-
-        # Start the systemd service in the old primary.
-        await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
+            for file in files[unit_name]:
+                run_command_on_unit(
+                    ops_test,
+                    unit_name,
+                    f"rm -rf /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/{file}",
+                )
 
         # Verify that the database service got restarted and is ready in the old primary.
-        assert await is_postgresql_ready(ops_test, primary_name)
+        logger.info(f"starting database on {primary_name}")
+        for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                # Start the systemd service in the old primary.
+                await run_command_on_unit(
+                    ops_test, primary_name, "snap start charmed-postgresql.patroni"
+                )
+                assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)
 
