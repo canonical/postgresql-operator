@@ -224,87 +224,6 @@ async def test_freeze_db_process(
 
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-@pytest.mark.parametrize("process", DB_PROCESSES)
-@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
-async def test_full_cluster_restart(
-    ops_test: OpsTest,
-    process: str,
-    signal: str,
-    continuous_writes,
-    reset_restart_condition,
-    loop_wait,
-) -> None:
-    """This tests checks that a cluster recovers from a full cluster restart.
-
-    The test can be called a full cluster crash when the signal sent to the OS process
-    is SIGKILL.
-    """
-    # Locate primary unit.
-    app = await app_name(ops_test)
-
-    # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
-    initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
-    initial_ttl = await get_patroni_setting(ops_test, "ttl")
-    # loop_wait parameter is limited by ttl value, thus we should increase it first
-    await change_patroni_setting(ops_test, "ttl", 600, use_random_unit=True)
-    await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True)
-
-    # Start an application that continuously writes data to the database.
-    await start_continuous_writes(ops_test, app)
-
-    # Restart all units "simultaneously".
-    await asyncio.gather(*[
-        send_signal_to_process(ops_test, unit.name, process, signal)
-        for unit in ops_test.model.applications[app].units
-    ])
-
-    # This test serves to verify behavior when all replicas are down at the same time that when
-    # they come back online they operate as expected. This check verifies that we meet the criteria
-    # of all replicas being down at the same time.
-    try:
-        assert await are_all_db_processes_down(
-            ops_test, process, signal
-        ), "Not all units down at the same time."
-    finally:
-        if process == PATRONI_PROCESS:
-            awaits = []
-            for unit in ops_test.model.applications[app].units:
-                awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
-            await asyncio.gather(*awaits)
-        await change_patroni_setting(
-            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
-        )
-        await change_patroni_setting(ops_test, "ttl", initial_ttl, use_random_unit=True)
-
-    # Verify all units are up and running.
-    sleep(30)
-    for unit in ops_test.model.applications[app].units:
-        assert await is_postgresql_ready(
-            ops_test, unit.name
-        ), f"unit {unit.name} not restarted after cluster restart."
-
-    # Check if a primary is elected
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            new_primary_name = await get_primary(ops_test, app)
-            assert new_primary_name is not None, "Could not get primary from any unit"
-
-    async with ops_test.fast_forward("60s"):
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
-        await are_writes_increasing(ops_test)
-
-    # Verify that all units are part of the same cluster.
-    member_ips = await fetch_cluster_members(ops_test)
-    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
-    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
-
-    # Verify that no writes to the database were missed after stopping the writes.
-    async with ops_test.fast_forward():
-        await check_writes(ops_test)
-
-
-@pytest.mark.group(2)
-@pytest.mark.abort_on_fail
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
@@ -312,7 +231,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     wal_settings,
 ) -> None:
     """A forceful restart with deleted data and without transaction logs (forced clone)."""
-    await test_build_and_deploy(ops_test)
     app = await app_name(ops_test)
     primary_name = await get_primary(ops_test, app)
 
@@ -391,6 +309,87 @@ async def test_forceful_restart_without_data_and_transaction_logs(
                 assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)
+
+
+@pytest.mark.group(1)
+@pytest.mark.abort_on_fail
+@pytest.mark.parametrize("process", DB_PROCESSES)
+@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
+async def test_full_cluster_restart(
+    ops_test: OpsTest,
+    process: str,
+    signal: str,
+    continuous_writes,
+    reset_restart_condition,
+    loop_wait,
+) -> None:
+    """This tests checks that a cluster recovers from a full cluster restart.
+
+    The test can be called a full cluster crash when the signal sent to the OS process
+    is SIGKILL.
+    """
+    # Locate primary unit.
+    app = await app_name(ops_test)
+
+    # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
+    initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
+    initial_ttl = await get_patroni_setting(ops_test, "ttl")
+    # loop_wait parameter is limited by ttl value, thus we should increase it first
+    await change_patroni_setting(ops_test, "ttl", 600, use_random_unit=True)
+    await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True)
+
+    # Start an application that continuously writes data to the database.
+    await start_continuous_writes(ops_test, app)
+
+    # Restart all units "simultaneously".
+    await asyncio.gather(*[
+        send_signal_to_process(ops_test, unit.name, process, signal)
+        for unit in ops_test.model.applications[app].units
+    ])
+
+    # This test serves to verify behavior when all replicas are down at the same time that when
+    # they come back online they operate as expected. This check verifies that we meet the criteria
+    # of all replicas being down at the same time.
+    try:
+        assert await are_all_db_processes_down(
+            ops_test, process, signal
+        ), "Not all units down at the same time."
+    finally:
+        if process == PATRONI_PROCESS:
+            awaits = []
+            for unit in ops_test.model.applications[app].units:
+                awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
+            await asyncio.gather(*awaits)
+        await change_patroni_setting(
+            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
+        )
+        await change_patroni_setting(ops_test, "ttl", initial_ttl, use_random_unit=True)
+
+    # Verify all units are up and running.
+    sleep(30)
+    for unit in ops_test.model.applications[app].units:
+        assert await is_postgresql_ready(
+            ops_test, unit.name
+        ), f"unit {unit.name} not restarted after cluster restart."
+
+    # Check if a primary is elected
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+        with attempt:
+            new_primary_name = await get_primary(ops_test, app)
+            assert new_primary_name is not None, "Could not get primary from any unit"
+
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await are_writes_increasing(ops_test)
+
+    # Verify that all units are part of the same cluster.
+    member_ips = await fetch_cluster_members(ops_test)
+    ip_addresses = [unit.public_address for unit in ops_test.model.applications[app].units]
+    assert set(member_ips) == set(ip_addresses), "not all units are part of the same cluster."
+
+    # Verify that no writes to the database were missed after stopping the writes.
+    async with ops_test.fast_forward():
+        await check_writes(ops_test)
 
 
 @pytest.mark.group(1)
