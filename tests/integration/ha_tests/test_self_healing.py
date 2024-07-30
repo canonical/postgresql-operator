@@ -299,7 +299,6 @@ async def test_full_cluster_restart(
             for unit in ops_test.model.applications[app].units:
                 awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
             await asyncio.gather(*awaits)
-            await ops_test.model.wait_for_idle(status="active", timeout=1000)
         await change_patroni_setting(
             ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
         )
@@ -310,6 +309,7 @@ async def test_full_cluster_restart(
         assert await is_postgresql_ready(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
 
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test)
