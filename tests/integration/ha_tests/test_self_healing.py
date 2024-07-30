@@ -305,11 +305,12 @@ async def test_full_cluster_restart(
         await change_patroni_setting(ops_test, "ttl", initial_ttl, use_random_unit=True)
 
     # Verify all units are up and running.
+    await ops_test.model.wait_for_idle(status="active", timeout=1000)
     for unit in ops_test.model.applications[app].units:
         assert await is_postgresql_ready(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
-    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
+    sleep(30)
 
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test)
