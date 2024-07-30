@@ -4,7 +4,6 @@
 
 
 import logging
-from locale import SNAP_LOCALES
 
 import psycopg2
 import pytest
@@ -12,6 +11,8 @@ import requests
 from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
+
+from locales import SNAP_LOCALES
 
 from .helpers import (
     CHARM_SERIES,
