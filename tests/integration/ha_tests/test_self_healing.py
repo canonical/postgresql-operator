@@ -9,6 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from .. import markers
 from ..helpers import (
     CHARM_SERIES,
     db_connect,
@@ -147,8 +148,9 @@ async def test_storage_re_use(ops_test, continuous_writes):
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("process", DB_PROCESSES)
-async def test_kill_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
+@pytest.mark.parametrize("signal", ["SIGTERM", pytest.param("SIGKILL", marks=markers.juju2)])
+async def test_interruption_db_process(
+    ops_test: OpsTest, process: str, signal: str, continuous_writes, primary_start_timeout
 ) -> None:
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -157,8 +159,8 @@ async def test_kill_db_process(
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
 
-    # Kill the database process.
-    await send_signal_to_process(ops_test, primary_name, process, "SIGKILL")
+    # Interrupt the database process.
+    await send_signal_to_process(ops_test, primary_name, process, signal)
 
     # Wait some time to elect a new primary.
     sleep(MEDIAN_ELECTION_TIME * 6)
@@ -166,12 +168,14 @@ async def test_kill_db_process(
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test, primary_name)
 
+        # Verify that a new primary gets elected (ie old primary is secondary).
+        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
+            with attempt:
+                new_primary_name = await get_primary(ops_test, app)
+                assert new_primary_name != primary_name
+
         # Verify that the database service got restarted and is ready in the old primary.
         assert await is_postgresql_ready(ops_test, primary_name)
-
-    # Verify that a new primary gets elected (ie old primary is secondary).
-    new_primary_name = await get_primary(ops_test, app)
-    assert new_primary_name != primary_name
 
     await is_cluster_updated(ops_test, primary_name)
 
@@ -214,38 +218,6 @@ async def test_freeze_db_process(
 
         # Verify that the database service got restarted and is ready in the old primary.
         assert await is_postgresql_ready(ops_test, primary_name)
-
-    await is_cluster_updated(ops_test, primary_name)
-
-
-@pytest.mark.group(1)
-@pytest.mark.abort_on_fail
-@pytest.mark.parametrize("process", DB_PROCESSES)
-async def test_restart_db_process(
-    ops_test: OpsTest, process: str, continuous_writes, primary_start_timeout
-) -> None:
-    # Locate primary unit.
-    app = await app_name(ops_test)
-    primary_name = await get_primary(ops_test, app)
-
-    # Start an application that continuously writes data to the database.
-    await start_continuous_writes(ops_test, app)
-
-    # Restart the database process.
-    await send_signal_to_process(ops_test, primary_name, process, "SIGTERM")
-
-    # Wait some time to elect a new primary.
-    sleep(MEDIAN_ELECTION_TIME * 6)
-
-    async with ops_test.fast_forward():
-        await are_writes_increasing(ops_test, primary_name)
-
-        # Verify that the database service got restarted and is ready in the old primary.
-        assert await is_postgresql_ready(ops_test, primary_name)
-
-    # Verify that a new primary gets elected (ie old primary is secondary).
-    new_primary_name = await get_primary(ops_test, app)
-    assert new_primary_name != primary_name
 
     await is_cluster_updated(ops_test, primary_name)
 
@@ -305,12 +277,18 @@ async def test_full_cluster_restart(
         await change_patroni_setting(ops_test, "ttl", initial_ttl, use_random_unit=True)
 
     # Verify all units are up and running.
-    await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    sleep(30)
     for unit in ops_test.model.applications[app].units:
         assert await is_postgresql_ready(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
-    sleep(30)
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
+
+    # Check if a primary is elected
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            new_primary_name = await get_primary(ops_test, app)
+            assert new_primary_name is not None
 
     async with ops_test.fast_forward():
         await are_writes_increasing(ops_test)
