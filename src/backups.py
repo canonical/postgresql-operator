@@ -10,7 +10,7 @@ import pwd
 import re
 import shutil
 import tempfile
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from subprocess import PIPE, TimeoutExpired, run
 from typing import Dict, List, Optional, OrderedDict, Tuple
@@ -405,7 +405,9 @@ class PostgreSQLBackups(Object):
                 backup_reference, _ = self._parse_backup_id(backup["reference"][-1])
             lsn_start_stop = f'{backup["lsn"]["start"]} / {backup["lsn"]["stop"]}'
             time_start, time_stop = (
-                datetime.strftime(datetime.fromtimestamp(stamp), "%Y-%m-%dT%H:%M:%SZ")
+                datetime.strftime(
+                    datetime.fromtimestamp(stamp, timezone.utc), "%Y-%m-%dT%H:%M:%SZ"
+                )
                 for stamp in backup["timestamp"].values()
             )
             backup_path = f'/{self.stanza_name}/{backup["label"]}'
