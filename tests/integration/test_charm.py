@@ -173,7 +173,7 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
 async def test_postgresql_locales(ops_test: OpsTest) -> None:
     raw_locales = await run_command_on_unit(
         ops_test,
-        ops_test.model.applications[DATABASE_APP_NAME].units[0],
+        ops_test.model.applications[DATABASE_APP_NAME].units[0].name,
         "ls /snap/charmed-postgresql/current/usr/lib/locale",
     )
     locales = raw_locales.splitlines()
