@@ -5,11 +5,12 @@
 """Structured configuration for the PostgreSQL charm."""
 
 import logging
-import subprocess
-from typing import Optional
+from typing import Literal, Optional
 
 from charms.data_platform_libs.v0.data_models import BaseConfigModel
 from pydantic import validator
+
+from locales import SNAP_LOCALES
 
 logger = logging.getLogger(__name__)
 
@@ -90,9 +91,9 @@ class CharmConfig(BaseConfigModel):
     request_standard_conforming_strings: Optional[bool]
     request_time_zone: Optional[str]
     response_bytea_output: Optional[str]
-    response_lc_monetary: Optional[str]
-    response_lc_numeric: Optional[str]
-    response_lc_time: Optional[str]
+    response_lc_monetary: Optional[Literal[*SNAP_LOCALES]]
+    response_lc_numeric: Optional[Literal[*SNAP_LOCALES]]
+    response_lc_time: Optional[Literal[*SNAP_LOCALES]]
     vacuum_autovacuum_analyze_scale_factor: Optional[float]
     vacuum_autovacuum_analyze_threshold: Optional[int]
     vacuum_autovacuum_freeze_max_age: Optional[int]
@@ -236,18 +237,6 @@ class CharmConfig(BaseConfigModel):
         """Check response_bytea_output config option is one of `escape` or `hex`."""
         if value not in ["escape", "hex"]:
             raise ValueError("Value not one of 'escape' or 'hex'")
-
-        return value
-
-    @validator("response_lc_monetary", "response_lc_numeric", "response_lc_time")
-    @classmethod
-    def response_lc_values(cls, value: str) -> Optional[str]:
-        """Check if the requested locale is available in the system."""
-        output = subprocess.check_output(["ls", "/snap/charmed-postgresql/current/usr/lib/locale"])
-        locales = [locale.decode() for locale in output.splitlines()]
-        locales.append("C")
-        if value not in locales:
-            raise ValueError("Value not one of the locales available in the system")
 
         return value
 

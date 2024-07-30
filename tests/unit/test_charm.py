@@ -37,6 +37,7 @@ from charm import (
 )
 from cluster import NotReadyError, RemoveRaftMemberFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
+from locales import SNAP_LOCALES
 from tests.helpers import patch_network_get
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -1402,10 +1403,9 @@ def test_on_cluster_topology_change_clear_blocked(harness):
 def test_validate_config_options(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.postgresql", new_callable=PropertyMock) as _charm_lib,
-        patch("config.subprocess"),
     ):
         _charm_lib.return_value.get_postgresql_text_search_configs.return_value = []
-        _charm_lib.return_value.validate_date_style.return_value = []
+        _charm_lib.return_value.validate_date_style.return_value = False
         _charm_lib.return_value.get_postgresql_timezones.return_value = []
 
         # Test instance_default_text_search_config exception
@@ -1414,9 +1414,10 @@ def test_validate_config_options(harness):
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
-            assert (
-                e.msg == "instance_default_text_search_config config option has an invalid value"
-            )
+        assert (
+            str(e.value)
+            == "instance_default_text_search_config config option has an invalid value"
+        )
 
         _charm_lib.return_value.get_postgresql_text_search_configs.assert_called_once_with()
         _charm_lib.return_value.get_postgresql_text_search_configs.return_value = [
@@ -1429,10 +1430,10 @@ def test_validate_config_options(harness):
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
-            assert e.msg == "request_date_style config option has an invalid value"
+        assert str(e.value) == "request_date_style config option has an invalid value"
 
         _charm_lib.return_value.validate_date_style.assert_called_once_with("ISO, TEST")
-        _charm_lib.return_value.validate_date_style.return_value = ["ISO, TEST"]
+        _charm_lib.return_value.validate_date_style.return_value = True
 
         # Test request_time_zone exception
         with harness.hooks_disabled():
@@ -1440,10 +1441,23 @@ def test_validate_config_options(harness):
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
-            assert e.msg == "request_time_zone config option has an invalid value"
+        assert str(e.value) == "request_time_zone config option has an invalid value"
 
         _charm_lib.return_value.get_postgresql_timezones.assert_called_once_with()
         _charm_lib.return_value.get_postgresql_timezones.return_value = ["TEST_ZONE"]
+
+        # Test locales exception
+        with harness.hooks_disabled():
+            harness.update_config({"response_lc_monetary": "test_TEST"})
+
+        with pytest.raises(ValueError) as e:
+            harness.charm._validate_config_options()
+        message = (
+            "1 validation error for CharmConfig\n"
+            "response_lc_monetary\n"
+            "  unexpected value; permitted:"
+        )
+        assert str(e.value).startswith(message)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -1848,11 +1862,8 @@ def test_add_cluster_member(harness):
 
         # Not ready error if not all members are ready
         _are_all_members_ready.return_value = False
-        try:
+        with pytest.raises(NotReadyError):
             harness.charm.add_cluster_member("postgresql/0")
-            assert False
-        except NotReadyError:
-            pass
 
 
 #
