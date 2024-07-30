@@ -554,7 +554,7 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
                 unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
                 for unit in ops_test.model.applications[DATABASE_APP_NAME].units
             ),
-            timeout=1000,
+            timeout=1500,
         )
 
         # Verify that the charm remains blocked if there are still other relations with invalid

@@ -64,6 +64,7 @@ MEDIAN_ELECTION_TIME = 10
 
 
 @pytest.mark.group(1)
+@pytest.mark.group(2)
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy three unit of PostgreSQL."""
@@ -303,9 +304,8 @@ async def test_full_cluster_restart(
         await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
+@pytest.mark.group(2)
 @pytest.mark.abort_on_fail
-@pytest.mark.unstable
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
