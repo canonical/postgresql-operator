@@ -282,15 +282,15 @@ async def test_full_cluster_restart(
         assert await is_postgresql_ready(
             ops_test, unit.name
         ), f"unit {unit.name} not restarted after cluster restart."
-    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
 
     # Check if a primary is elected
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
         with attempt:
             new_primary_name = await get_primary(ops_test, app)
-            assert new_primary_name is not None
+            assert new_primary_name is not None, "Could not get primary from any unit"
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
         await are_writes_increasing(ops_test)
 
     # Verify that all units are part of the same cluster.
