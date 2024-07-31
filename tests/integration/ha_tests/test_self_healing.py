@@ -9,7 +9,6 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .. import markers
 from ..helpers import (
     CHARM_SERIES,
     db_connect,
@@ -148,7 +147,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
 @pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("process", DB_PROCESSES)
-@pytest.mark.parametrize("signal", ["SIGTERM", pytest.param("SIGKILL", marks=markers.juju2)])
+@pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
 async def test_interruption_db_process(
     ops_test: OpsTest, process: str, signal: str, continuous_writes, primary_start_timeout
 ) -> None:
