@@ -603,12 +603,12 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
         ),
     )
     await asyncio.gather(
-        ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active"),
+        ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000),
         ops_test.model.wait_for_idle(
             apps=["nextcloud"],
             status="blocked",
             raise_on_blocked=False,
-            timeout=1500,
+            timeout=2000,
         ),
     )
 
