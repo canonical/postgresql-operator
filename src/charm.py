@@ -21,6 +21,7 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
+    INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
     REQUIRED_PLUGINS,
     PostgreSQL,
     PostgreSQLCreateUserError,
@@ -106,6 +107,8 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
+
+KEEP_BLOCKING_MSGS = [EXTENSIONS_BLOCKING_MESSAGE, INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE]
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -1424,6 +1427,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         "restore-to-time": "",
                     })
                 self.unit.status = BlockedStatus(MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET)
+                return
+            if (
+                isinstance(self.unit.status, BlockedStatus)
+                and self.unit.status.message in KEEP_BLOCKING_MSGS
+            ):
                 return
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
