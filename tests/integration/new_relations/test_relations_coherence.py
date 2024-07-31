@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 APPLICATION_APP_NAME = "postgresql-test-app"
 APP_NAMES = [DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME]
-FIRST_DATABASE_RELATION_NAME = "first-database"
+FIRST_DATABASE_RELATION_NAME = "database"
 
 
 @pytest.mark.group(1)
