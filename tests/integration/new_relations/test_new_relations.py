@@ -583,29 +583,40 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
         )
 
 
-@pytest.mark.group(1)
+@pytest.mark.group(2)
 @markers.amd64_only  # nextcloud charm not available for arm64
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
-    async with ops_test.fast_forward():
-        # Deploy Nextcloud.
-        await ops_test.model.deploy(
+    # Deploy Database Charm and Nextcloud
+    await asyncio.gather(
+        ops_test.model.deploy(
+            charm,
+            application_name=DATABASE_APP_NAME,
+            num_units=1,
+            series=CHARM_SERIES,
+            config={"profile": "testing"},
+        ),
+        ops_test.model.deploy(
             "nextcloud",
             channel="edge",
             application_name="nextcloud",
             num_units=1,
-        )
-        await ops_test.model.wait_for_idle(
+        ),
+    )
+    await asyncio.gather(
+        ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active"),
+        ops_test.model.wait_for_idle(
             apps=["nextcloud"],
             status="blocked",
             raise_on_blocked=False,
             timeout=1500,
-        )
+        ),
+    )
 
-        await ops_test.model.relate("nextcloud:database", f"{DATABASE_APP_NAME}:database")
+    await ops_test.model.relate("nextcloud:database", f"{DATABASE_APP_NAME}:database")
 
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, "nextcloud"],
-            status="active",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME, "nextcloud"],
+        status="active",
+        raise_on_blocked=False,
+        timeout=1000,
+    )

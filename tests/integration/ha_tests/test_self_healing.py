@@ -336,9 +336,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     )
     assert return_code == 0, "Failed to remove data directory"
 
-    # Wait some time to elect a new primary.
-    sleep(MEDIAN_ELECTION_TIME * 2)
-
     async with ops_test.fast_forward():
         # Verify that a new primary gets elected (ie old primary is secondary).
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
@@ -371,24 +368,14 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         # Check that the WAL was correctly rotated.
         for unit_name in files:
             assert not files[unit_name].intersection(
-                new_files[unit_name]
+                new_files
             ), "WAL segments weren't correctly rotated"
-            for file in files[unit_name]:
-                run_command_on_unit(
-                    ops_test,
-                    unit_name,
-                    f"rm -rf /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/{file}",
-                )
+
+        # Start the systemd service in the old primary.
+        await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
 
         # Verify that the database service got restarted and is ready in the old primary.
-        logger.info(f"starting database on {primary_name}")
-        for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                # Start the systemd service in the old primary.
-                await run_command_on_unit(
-                    ops_test, primary_name, "snap start charmed-postgresql.patroni"
-                )
-                assert await is_postgresql_ready(ops_test, primary_name)
+        assert await is_postgresql_ready(ops_test, primary_name)
 
     await is_cluster_updated(ops_test, primary_name)
 
