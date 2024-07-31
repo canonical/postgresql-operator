@@ -209,10 +209,12 @@ def test_pre_upgrade_check(harness):
         # Test when not all members are ready.
         with pytest.raises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
+            assert False
 
         # Test when a backup is being created.
         with pytest.raises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
+            assert False
 
         # Test when everything is ok to start the upgrade.
         harness.charm.upgrade.pre_upgrade_check()
