@@ -213,9 +213,9 @@ async def test_plugins(ops_test: OpsTest) -> None:
 @pytest.mark.group(1)
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
-    primary = await get_primary(ops_test)
-    password = await get_password(ops_test)
-    address = await get_unit_address(ops_test, primary)
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    password = await get_password(ops_test, primary)
+    address = get_unit_address(ops_test, primary)
 
     logger.info("Creating an index object which depends on the pg_trgm config")
     with db_connect(host=address, password=password) as connection:
