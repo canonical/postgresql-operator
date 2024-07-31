@@ -132,8 +132,8 @@ async def test_deploy_async_replication_setup(
             num_units=CLUSTER_SIZE,
             config={"profile": "testing"},
         )
-    await ops_test.model.deploy(APPLICATION_NAME, num_units=1)
-    await second_model.deploy(APPLICATION_NAME, num_units=1)
+    await ops_test.model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
+    await second_model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
 
     async with ops_test.fast_forward(), fast_forward(second_model):
         await gather(
@@ -331,7 +331,7 @@ async def test_promote_standby(
     """Test promoting the standby cluster."""
     logger.info("breaking the relations")
     await first_model.applications[DATABASE_APP_NAME].remove_relation(
-        "database", f"{APPLICATION_NAME}:first-database"
+        "database", f"{APPLICATION_NAME}:database"
     )
     await second_model.applications[DATABASE_APP_NAME].remove_relation(
         "replication", "replication-offer"
@@ -375,7 +375,7 @@ async def test_promote_standby(
     primary = await get_primary(ops_test, any_unit)
     address = get_unit_address(ops_test, primary)
     password = await get_password(ops_test, primary)
-    database_name = f'{APPLICATION_NAME.replace("-", "_")}_first_database'
+    database_name = f'{APPLICATION_NAME.replace("-", "_")}_database'
     connection = None
     try:
         connection = psycopg2.connect(

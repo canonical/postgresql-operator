@@ -298,7 +298,7 @@ def count_writes_on_members(members, password, down_ips) -> Tuple[Dict[str, int]
             host = member["host"]
 
             connection_string = (
-                f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
+                f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
                 f" host='{host}' password='{password}' connect_timeout=10"
             )
 
@@ -756,7 +756,7 @@ async def is_secondary_up_to_date(
         if unit.name == unit_name
     ][0]
     connection_string = (
-        f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
+        f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
     )
 
@@ -788,10 +788,10 @@ async def start_continuous_writes(ops_test: OpsTest, app: str, model: Model = No
         for relation in model.applications[app].relations
         if not relation.is_peer
         and f"{relation.requires.application_name}:{relation.requires.name}"
-        == f"{APPLICATION_NAME}:first-database"
+        == f"{APPLICATION_NAME}:database"
     ]
     if not relations:
-        await model.relate(app, f"{APPLICATION_NAME}:first-database")
+        await model.relate(app, f"{APPLICATION_NAME}:database")
         await model.wait_for_idle(status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
         with attempt:
