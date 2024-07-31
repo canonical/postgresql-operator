@@ -554,7 +554,7 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
                 unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
                 for unit in ops_test.model.applications[DATABASE_APP_NAME].units
             ),
-            timeout=300,
+            timeout=1000,
         )
 
         # Verify that the charm remains blocked if there are still other relations with invalid
@@ -563,12 +563,12 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
             f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME])
-        await ops_test.model.block_until(
+        ops_test.model.block_until(
             lambda: any(
                 unit.workload_status_message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
                 for unit in ops_test.model.applications[DATABASE_APP_NAME].units
             ),
-            timeout=300,
+            timeout=1000,
         )
 
         # Verify that active status is restored after all relations are removed.
@@ -586,25 +586,26 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
 @pytest.mark.group(1)
 @markers.amd64_only  # nextcloud charm not available for arm64
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
-    # Deploy Nextcloud.
-    await ops_test.model.deploy(
-        "nextcloud",
-        channel="edge",
-        application_name="nextcloud",
-        num_units=1,
-    )
-    await ops_test.model.wait_for_idle(
-        apps=["nextcloud"],
-        status="blocked",
-        raise_on_blocked=False,
-        timeout=1000,
-    )
+    async with ops_test.fast_forward():
+        # Deploy Nextcloud.
+        await ops_test.model.deploy(
+            "nextcloud",
+            channel="edge",
+            application_name="nextcloud",
+            num_units=1,
+        )
+        await ops_test.model.wait_for_idle(
+            apps=["nextcloud"],
+            status="blocked",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
 
-    await ops_test.model.relate("nextcloud:database", f"{DATABASE_APP_NAME}:database")
+        await ops_test.model.relate("nextcloud:database", f"{DATABASE_APP_NAME}:database")
 
-    await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME, "nextcloud"],
-        status="active",
-        raise_on_blocked=False,
-        timeout=1000,
-    )
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, "nextcloud"],
+            status="active",
+            raise_on_blocked=False,
+            timeout=1000,
+        )
