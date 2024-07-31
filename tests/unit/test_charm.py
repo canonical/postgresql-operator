@@ -8,6 +8,7 @@ import subprocess
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
+import psycopg2
 import pytest
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -555,6 +556,18 @@ def test_enable_disable_extensions(harness, caplog):
             new_harness.begin()
             new_harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
+
+            # Block if extension-dependent object error is raised
+            postgresql_mock.reset_mock()
+            postgresql_mock.enable_disable_extensions.side_effect = [
+                psycopg2.errors.DependentObjectsStillExist,
+                None,
+            ]
+            harness.charm.enable_disable_extensions()
+            assert isinstance(harness.charm.unit.status, BlockedStatus)
+            # Should resolve afterwards
+            harness.charm.enable_disable_extensions()
+            assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
 @patch_network_get(private_address="1.1.1.1")
