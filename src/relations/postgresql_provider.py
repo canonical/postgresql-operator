@@ -259,7 +259,7 @@ class PostgreSQLProvider(Object):
             for data in relation.data.values():
                 extra_user_roles = data.get("extra-user-roles")
                 if extra_user_roles is None:
-                    break
+                    continue
                 extra_user_roles = extra_user_roles.lower().split(",")
                 for extra_user_role in extra_user_roles:
                     if (
