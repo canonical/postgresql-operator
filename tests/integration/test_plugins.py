@@ -208,3 +208,54 @@ async def test_plugins(ops_test: OpsTest) -> None:
             else:
                 connection.cursor().execute(query)
     connection.close()
+
+
+@pytest.mark.group(1)
+async def test_plugin_objects(ops_test: OpsTest) -> None:
+    """Checks if charm gets blocked when trying to disable a plugin in use."""
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    password = await get_password(ops_test, primary)
+    address = get_unit_address(ops_test, primary)
+
+    logger.info("Creating an index object which depends on the pg_trgm config")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("CREATE TABLE example (value VARCHAR(10));")
+        connection.cursor().execute(
+            "CREATE INDEX example_idx ON example USING gin(value gin_trgm_ops);"
+        )
+    connection.close()
+
+    logger.info("Disabling the plugin on charm config, waiting for blocked status")
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_pg_trgm_enable": "False"
+    })
+    await ops_test.model.block_until(
+        lambda: ops_test.model.units[primary].workload_status == "blocked",
+        timeout=100,
+    )
+
+    logger.info("Enabling the plugin back on charm config, status should resolve")
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_pg_trgm_enable": "True"
+    })
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+    logger.info("Re-disabling plugin, waiting for blocked status to come back")
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_pg_trgm_enable": "False"
+    })
+    await ops_test.model.block_until(
+        lambda: ops_test.model.units[primary].workload_status == "blocked",
+        timeout=100,
+    )
+
+    logger.info("Delete the object which depends on the plugin")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("DROP INDEX example_idx;")
+    connection.close()
+
+    logger.info("Waiting for status to resolve again")
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
