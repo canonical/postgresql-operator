@@ -711,7 +711,7 @@ class Patroni:
         if "SUCCESS" not in result:
             raise RemoveRaftMemberFailedError()
 
-    @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
         requests.post(f"{self._patroni_url}/reload", verify=self.verify)
