@@ -42,7 +42,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             application_name=FIRST_APPLICATION,
             num_units=3,
             series=CHARM_SERIES,
-            storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+            storage={"pgdata": "lxd,2M"},
             config={"profile": "testing"},
         )
 

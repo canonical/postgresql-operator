@@ -45,7 +45,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             application_name=APPLICATION_NAME,
             num_units=1,
             series=CHARM_SERIES,
-            storage={"pgdata": {"pool": "lxd-btrfs", "size": 8046}},
+            storage={"pgdata": "lxd,4M"},
             config={"profile": "testing"},
         )
 

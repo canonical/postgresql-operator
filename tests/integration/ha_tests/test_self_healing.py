@@ -77,7 +77,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
                 charm,
                 num_units=3,
                 series=CHARM_SERIES,
-                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+                storage={"pgdata": "lxd,2M"},
                 config={"profile": "testing"},
             )
     # Deploy the continuous writes application charm if it wasn't already deployed.
