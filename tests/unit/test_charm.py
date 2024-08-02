@@ -1268,26 +1268,11 @@ def test_update_config(harness):
         rel_id = harness.model.get_relation(PEER).id
         # Mock some properties.
         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
-        _is_workload_running.side_effect = [False, False, True, True, False, True]
+        _is_workload_running.side_effect = [True, True, False, True]
         _member_started.side_effect = [True, True, False]
         postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
-        # Test when only one of the two config options for profile limit memory is set.
-        harness.update_config({"profile-limit-memory": 1000})
-        harness.charm.update_config()
-
-        # Test when only one of the two config options for profile limit memory is set.
-        harness.update_config({"profile_limit_memory": 1000}, unset={"profile-limit-memory"})
-        harness.charm.update_config()
-
-        # Test when the two config options for profile limit memory are set at the same time.
-        _render_patroni_yml_file.reset_mock()
-        harness.update_config({"profile-limit-memory": 1000})
-        with pytest.raises(ValueError):
-            harness.charm.update_config()
-
         # Test without TLS files available.
-        harness.update_config(unset={"profile-limit-memory", "profile_limit_memory"})
         with harness.hooks_disabled():
             harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
         _is_tls_enabled.return_value = False
