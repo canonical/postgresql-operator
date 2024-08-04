@@ -1,0 +1,123 @@
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-test-app/0 [idle] active: 
+  postgresql-test-app/1 [idle] active: 
+  database/2 [executing] active: 
+  database/3 [executing] active: Primary
+  another-database/0 [idle] active: Primary
+  another-database/1 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2097 Deploying ch:amd64/jammy/data-integrator-27
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  another-data-integrator/0 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  data-integrator/0 [executing] blocked: Please relate the data-integrator with the desired product
+  another-data-integrator/0 [executing] blocked: Please specify either topic, index, or database name
+[33mWARNING [0m juju.model:model.py:1563 relate is deprecated and will be removed. Use integrate instead.
+[33mWARNING [0m juju.model:model.py:1563 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  database/2 [idle] active: 
+  database/3 [idle] active: Primary
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  database/2 [executing] active: 
+  database/3 [idle] blocked: invalid role(s) for extra user roles
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  database/2 [executing] active: 
+  database/3 [idle] blocked: invalid role(s) for extra user roles
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.5    unsupported  02:07:11Z
+
+App                      Version  Status   Scale  Charm                Channel        Rev  Exposed  Message
+another-application               active       1  postgresql-test-app  latest/edge    204  no       received database credentials of the first database
+another-data-integrator           blocked      1  data-integrator      latest/stable   27  no       Please relate the data-integrator with the desired product
+another-database         14.12    active       2  postgresql                            1  no       
+data-integrator                   blocked      1  data-integrator      latest/stable   27  no       Please relate the data-integrator with the desired product
+database                 14.12    active       2  postgresql                            0  no       
+postgresql-test-app               active       2  postgresql-test-app  latest/edge    204  no       
+
+Unit                        Workload  Agent  Machine  Public address  Ports     Message
+another-application/0*      active    idle   6        10.75.149.102             received database credentials of the first database
+another-data-integrator/0*  blocked   idle   10       10.75.149.156             Please relate the data-integrator with the desired product
+another-database/0*         active    idle   2        10.75.149.107   5432/tcp  Primary
+another-database/1          active    idle   3        10.75.149.210   5432/tcp  
+data-integrator/0*          blocked   idle   9        10.75.149.115             Please relate the data-integrator with the desired product
+database/2                  active    idle   7        10.75.149.78    5432/tcp  
+database/3*                 active    idle   8        10.75.149.199   5432/tcp  Primary
+postgresql-test-app/0*      active    idle   0        10.75.149.154             
+postgresql-test-app/1       active    idle   1        10.75.149.90              
+
+Machine  State    Address        Inst id         Base          AZ  Message
+0        started  10.75.149.154  juju-4f30ed-0   ubuntu@22.04      Running
+1        started  10.75.149.90   juju-4f30ed-1   ubuntu@22.04      Running
+2        started  10.75.149.107  juju-4f30ed-2   ubuntu@22.04      Running
+3        started  10.75.149.210  juju-4f30ed-3   ubuntu@22.04      Running
+6        started  10.75.149.102  juju-4f30ed-6   ubuntu@22.04      Running
+7        started  10.75.149.78   juju-4f30ed-7   ubuntu@22.04      Running
+8        started  10.75.149.199  juju-4f30ed-8   ubuntu@22.04      Running
+9        started  10.75.149.115  juju-4f30ed-9   ubuntu@22.04      Running
+10       started  10.75.149.156  juju-4f30ed-10  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-0: 01:38:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:38:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:38:53 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:39:02 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:39:02 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-1: 01:39:03 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:39:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:39:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-0: 01:39:21 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:39:25 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:39:25 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-database-1: 01:39:25 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:39:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:39:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-0: 01:39:27 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-database-0: 01:40:41 ERROR unit.database/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-5: 01:44:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:44:39 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-1: 01:44:39 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:49:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:49:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-application-0: 01:49:04 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-8: 01:52:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-8: 01:52:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-3: 01:52:40 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-7: 01:52:40 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-7: 01:52:40 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-database-2: 01:52:40 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-database-2: 02:01:16 ERROR juju.worker.dependency "uniter" manifold worker returned unexpected error: relation scope id "ace96d09-de8d-479e-8bd6-450fdd4f30ed:r#15#postgresql-test-app": settings ace96d09-de8d-479e-8bd6-450fdd4f30ed:r#15#postgresql-test-app not found (not found)
+machine-9: 02:02:55 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-9: 02:02:55 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-data-integrator-0: 02:02:55 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-10: 02:05:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-10: 02:05:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-another-data-integrator-0: 02:05:31 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-database-3: 02:06:12 ERROR unit.database/3.juju-log database:20: Invalid extra user roles: test
+unit-database-3: 02:06:12 ERROR unit.database/3.juju-log database:20: invalid role(s) for extra user roles
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-3/charm/src/relations/postgresql_provider.py", line 93, in _on_database_requested
+    self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+  File "/var/lib/juju/agents/unit-database-3/charm/lib/charms/tempo_k8s/v1/charm_tracing.py", line 647, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-database-3/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 225, in create_user
+    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+charms.postgresql_k8s.v0.postgresql.PostgreSQLCreateUserError: invalid role(s) for extra user roles
+unit-database-3: 02:06:13 ERROR unit.database/3.juju-log database:19: Invalid extra user roles: test
+unit-database-3: 02:06:13 ERROR unit.database/3.juju-log database:19: invalid role(s) for extra user roles
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-database-3/charm/src/relations/postgresql_provider.py", line 93, in _on_database_requested
+    self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+  File "/var/lib/juju/agents/unit-database-3/charm/lib/charms/tempo_k8s/v1/charm_tracing.py", line 647, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-database-3/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 225, in create_user
+    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+charms.postgresql_k8s.v0.postgresql.PostgreSQLCreateUserError: invalid role(s) for extra user roles
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...
