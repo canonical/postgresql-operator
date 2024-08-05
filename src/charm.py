@@ -1614,14 +1614,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
-        if (
-            self.model.config.get("profile-limit-memory") is not None
-            and self.model.config.get("profile_limit_memory") is not None
-        ):
-            raise ValueError(
-                "Both profile-limit-memory and profile_limit_memory are set. Please use only one of them."
-            )
-
         enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:
