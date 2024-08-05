@@ -7,6 +7,7 @@
 import json
 import logging
 import os
+import pathlib
 import platform
 import re
 import subprocess
@@ -873,6 +874,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except snap.SnapError:
             self.unit.status = BlockedStatus("failed to install snap packages")
             return
+        pathlib.Path("snap_installed").touch()
 
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
@@ -1596,7 +1598,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the workload is running (in an active state)."""
         snap_cache = snap.SnapCache()
         charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
+        if not pathlib.Path("snap_installed").exists():
             return False
 
         return charmed_postgresql_snap.services["patroni"]["active"]

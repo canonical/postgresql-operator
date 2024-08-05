@@ -6,6 +6,7 @@
 import json
 import logging
 import os
+import pathlib
 import pwd
 import re
 import shutil
@@ -1142,7 +1143,7 @@ Stderr:
 
         snap_cache = snap.SnapCache()
         charmed_postgresql_snap = snap_cache["charmed-postgresql"]
-        if not charmed_postgresql_snap.present:
+        if not pathlib.Path("snap_installed").exists():
             logger.error("Cannot start/stop service, snap is not yet installed.")
             return False
 
