@@ -207,18 +207,14 @@ def test_pre_upgrade_check(harness):
         _is_creating_backup.side_effect = [True, False, False]
 
         # Test when not all members are ready.
-        try:
+        with pytest.raises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
             assert False
-        except ClusterNotReadyError:
-            pass
 
         # Test when a backup is being created.
-        try:
+        with pytest.raises(ClusterNotReadyError):
             harness.charm.upgrade.pre_upgrade_check()
             assert False
-        except ClusterNotReadyError:
-            pass
 
         # Test when everything is ok to start the upgrade.
         harness.charm.upgrade.pre_upgrade_check()
