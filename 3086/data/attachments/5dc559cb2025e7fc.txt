@@ -1,0 +1,31 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:862 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.5    unsupported  02:12:57Z
+
+App                  Version  Status   Scale  Charm       Channel  Rev  Exposed  Message
+postgres-test-dup    14.12    waiting      1  postgresql             1  no       awaiting for member to start
+postgresql-test-app           active       0  postgresql             0  no       
+
+Unit                  Workload  Agent  Machine  Public address  Ports     Message
+postgres-test-dup/0*  waiting   idle   2        10.184.158.223  5432/tcp  awaiting for member to start
+
+Machine  State    Address         Inst id        Base          AZ  Message
+2        started  10.184.158.223  juju-39caa5-2  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:868 Juju error logs:
+
+machine-0: 01:49:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:49:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:49:28 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+controller-0: 01:51:07 ERROR juju.worker.provisioner failed to remove dead machine "0"
+machine-1: 01:52:03 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:52:03 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-1: 01:52:03 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-test-app-1: 01:55:15 ERROR unit.postgresql-test-app/1.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-2: 01:57:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:57:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgres-test-dup-0: 01:57:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:947 Forgetting model main...
