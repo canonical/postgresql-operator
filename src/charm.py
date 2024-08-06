@@ -106,6 +106,7 @@ logger = logging.getLogger(__name__)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
+EXTENSION_OBJECT_MESSAGE = "Cannot disable plugins: Existing objects depend on it. See logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 
@@ -1013,8 +1014,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.unit.status = WaitingStatus("Updating extensions")
         try:
             self.postgresql.enable_disable_extensions(extensions, database)
+        except psycopg2.errors.DependentObjectsStillExist as e:
+            logger.error(
+                "Failed to disable plugin: %s\nWas the plugin enabled manually? If so, update charm config with `juju config postgresql-k8s plugin_<plugin_name>_enable=True`",
+                str(e),
+            )
+            self.unit.status = BlockedStatus(EXTENSION_OBJECT_MESSAGE)
+            return
         except PostgreSQLEnableDisableExtensionError as e:
             logger.exception("failed to change plugins: %s", str(e))
+        if original_status.message == EXTENSION_OBJECT_MESSAGE:
+            self.unit.status = ActiveStatus()
+            return
         self.unit.status = original_status
 
     def _check_extension_dependencies(self, extension: str, enable: bool) -> bool:
@@ -1358,6 +1369,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if self.is_blocked:
+            # If charm was failing to disable plugin, try again (user may have removed the objects)
+            if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
+                self.enable_disable_extensions()
             logger.debug("on_update_status early exit: Unit is in Blocked status")
             return False
 
@@ -1600,14 +1614,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def update_config(self, is_creating_backup: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
-        if (
-            self.model.config.get("profile-limit-memory") is not None
-            and self.model.config.get("profile_limit_memory") is not None
-        ):
-            raise ValueError(
-                "Both profile-limit-memory and profile_limit_memory are set. Please use only one of them."
-            )
-
         enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:

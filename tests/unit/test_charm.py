@@ -8,6 +8,7 @@ import subprocess
 from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
+import psycopg2
 import pytest
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -555,6 +556,18 @@ def test_enable_disable_extensions(harness, caplog):
             new_harness.begin()
             new_harness.charm.enable_disable_extensions()
             assert postgresql_mock.enable_disable_extensions.call_count == 1
+
+            # Block if extension-dependent object error is raised
+            postgresql_mock.reset_mock()
+            postgresql_mock.enable_disable_extensions.side_effect = [
+                psycopg2.errors.DependentObjectsStillExist,
+                None,
+            ]
+            harness.charm.enable_disable_extensions()
+            assert isinstance(harness.charm.unit.status, BlockedStatus)
+            # Should resolve afterwards
+            harness.charm.enable_disable_extensions()
+            assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
 @patch_network_get(private_address="1.1.1.1")
@@ -1255,26 +1268,11 @@ def test_update_config(harness):
         rel_id = harness.model.get_relation(PEER).id
         # Mock some properties.
         postgresql_mock.is_tls_enabled = PropertyMock(side_effect=[False, False, False, False])
-        _is_workload_running.side_effect = [False, False, True, True, False, True]
+        _is_workload_running.side_effect = [True, True, False, True]
         _member_started.side_effect = [True, True, False]
         postgresql_mock.build_postgresql_parameters.return_value = {"test": "test"}
 
-        # Test when only one of the two config options for profile limit memory is set.
-        harness.update_config({"profile-limit-memory": 1000})
-        harness.charm.update_config()
-
-        # Test when only one of the two config options for profile limit memory is set.
-        harness.update_config({"profile_limit_memory": 1000}, unset={"profile-limit-memory"})
-        harness.charm.update_config()
-
-        # Test when the two config options for profile limit memory are set at the same time.
-        _render_patroni_yml_file.reset_mock()
-        harness.update_config({"profile-limit-memory": 1000})
-        with pytest.raises(ValueError):
-            harness.charm.update_config()
-
         # Test without TLS files available.
-        harness.update_config(unset={"profile-limit-memory", "profile_limit_memory"})
         with harness.hooks_disabled():
             harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
         _is_tls_enabled.return_value = False

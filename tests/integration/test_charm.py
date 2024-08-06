@@ -4,6 +4,7 @@
 
 
 import logging
+from time import sleep
 
 import psycopg2
 import pytest
@@ -303,8 +304,12 @@ async def test_scale_down_and_up(ops_test: OpsTest):
         apps=[DATABASE_APP_NAME],
         status="active",
         timeout=2000,
+        idle_period=30,
         wait_for_exact_units=initial_scale,
     )
+
+    # Wait some time to elect a new primary.
+    sleep(30)
 
     # Assert the correct members are part of the cluster.
     await check_cluster_members(ops_test, DATABASE_APP_NAME)

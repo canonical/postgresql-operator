@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 30
+LIBPATCH = 33
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -327,6 +327,8 @@ class PostgreSQL:
                         )
         except psycopg2.errors.UniqueViolation:
             pass
+        except psycopg2.errors.DependentObjectsStillExist:
+            raise
         except psycopg2.Error:
             raise PostgreSQLEnableDisableExtensionError()
         finally:
