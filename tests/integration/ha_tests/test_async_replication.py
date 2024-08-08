@@ -476,7 +476,11 @@ async def test_async_replication_failover_in_main_cluster(
     async with ops_test.fast_forward(FAST_INTERVAL), fast_forward(second_model, FAST_INTERVAL):
         await gather(
             first_model.wait_for_idle(
-                apps=[DATABASE_APP_NAME], status="active", idle_period=IDLE_PERIOD, timeout=TIMEOUT
+                apps=[DATABASE_APP_NAME],
+                status="active",
+                idle_period=IDLE_PERIOD,
+                timeout=TIMEOUT,
+                wait_for_exact_units=(CLUSTER_SIZE - 1),
             ),
             second_model.wait_for_idle(
                 apps=[DATABASE_APP_NAME], status="active", idle_period=IDLE_PERIOD, timeout=TIMEOUT
