@@ -427,6 +427,9 @@ def test_update_endpoints_with_relation(harness):
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.Patroni.get_primary") as _get_primary,
         patch(
+            "relations.db.logger",
+        ) as _logger,
+        patch(
             "charm.PostgresqlOperatorCharm.members_ips",
             new_callable=PropertyMock,
         ) as _members_ips,
@@ -442,9 +445,9 @@ def test_update_endpoints_with_relation(harness):
         # Set some side effects to test multiple situations.
         postgresql_mock.get_postgresql_version = PropertyMock(
             side_effect=[
+                POSTGRESQL_VERSION,
+                POSTGRESQL_VERSION,
                 PostgreSQLGetPostgreSQLVersionError,
-                POSTGRESQL_VERSION,
-                POSTGRESQL_VERSION,
             ]
         )
 
@@ -474,11 +477,6 @@ def test_update_endpoints_with_relation(harness):
             user = f"relation-{rel}"
             harness.charm.set_secret("app", user, password)
             harness.charm.set_secret("app", f"{user}-database", DATABASE)
-
-        # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
-        harness.charm.legacy_db_relation.update_endpoints(relation)
-        assert isinstance(harness.model.unit.status, BlockedStatus)
-        assert harness.get_relation_data(rel_id, harness.charm.unit.name) == {}
 
         # Test with both a primary and a replica.
         # Update the endpoints with the event and check that it updated only
@@ -536,12 +534,21 @@ def test_update_endpoints_with_relation(harness):
                     and standbys + user == unit_relation_data["standbys"]
                 )
 
+        # version is not updated due to a PostgreSQLGetPostgreSQLVersionError.
+        harness.charm.legacy_db_relation.update_endpoints()
+        _logger.exception.assert_called_once_with(
+            "Failed to retrieve the PostgreSQL version to initialise/update db relation"
+        )
+
 
 @patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_without_relation(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.Patroni.get_primary") as _get_primary,
+        patch(
+            "relations.db.logger",
+        ) as _logger,
         patch(
             "charm.PostgresqlOperatorCharm.members_ips",
             new_callable=PropertyMock,
@@ -558,9 +565,9 @@ def test_update_endpoints_without_relation(harness):
         # Set some side effects to test multiple situations.
         postgresql_mock.get_postgresql_version = PropertyMock(
             side_effect=[
+                POSTGRESQL_VERSION,
+                POSTGRESQL_VERSION,
                 PostgreSQLGetPostgreSQLVersionError,
-                POSTGRESQL_VERSION,
-                POSTGRESQL_VERSION,
             ]
         )
         _get_primary.return_value = harness.charm.unit.name
@@ -587,11 +594,6 @@ def test_update_endpoints_without_relation(harness):
             user = f"relation-{rel}"
             harness.charm.set_secret("app", user, password)
             harness.charm.set_secret("app", f"{user}-database", DATABASE)
-
-        # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.
-        harness.charm.legacy_db_relation.update_endpoints()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
-        assert harness.get_relation_data(rel_id, harness.charm.unit.name) == {}
 
         # Test with both a primary and a replica.
         # Update the endpoints and check that all relations' databags are updated.
@@ -621,6 +623,12 @@ def test_update_endpoints_without_relation(harness):
                 "standbys" in unit_relation_data
                 and standbys + user == unit_relation_data["standbys"]
             )
+
+        # version is not updated due to a PostgreSQLGetPostgreSQLVersionError.
+        harness.charm.legacy_db_relation.update_endpoints()
+        _logger.exception.assert_called_once_with(
+            "Failed to retrieve the PostgreSQL version to initialise/update db relation"
+        )
 
 
 @patch_network_get(private_address="1.1.1.1")
