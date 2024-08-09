@@ -319,14 +319,14 @@ class DbProvides(Object):
         if len(relations) == 0:
             return
 
+        postgresql_version = None
         try:
             postgresql_version = self.charm.postgresql.get_postgresql_version()
-        except PostgreSQLGetPostgreSQLVersionError as e:
-            logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
-                f"Failed to retrieve the PostgreSQL version to initialise/update {self.relation_name} relation"
+        except PostgreSQLGetPostgreSQLVersionError:
+            logger.exception(
+                "Failed to retrieve the PostgreSQL version to initialise/update %s relation"
+                % self.relation_name
             )
-            return
 
         # List the replicas endpoints.
         replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
@@ -383,7 +383,6 @@ class DbProvides(Object):
                 "port": DATABASE_PORT,
                 "user": user,
                 "schema_user": user,
-                "version": postgresql_version,
                 "password": password,
                 "schema_password": password,
                 "database": database,
@@ -392,6 +391,8 @@ class DbProvides(Object):
                 "state": self._get_state(),
                 "extensions": ",".join(required_extensions),
             }
+            if postgresql_version:
+                data["version"] = postgresql_version
 
             # Set the data only in the unit databag.
             unit_relation_databag.update(data)
