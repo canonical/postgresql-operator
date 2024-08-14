@@ -104,9 +104,6 @@ class PostgreSQLProvider(Object):
             # Share the credentials with the application.
             self.database_provides.set_credentials(event.relation.id, user, password)
 
-            # Update the read/write and read-only endpoints.
-            self.update_endpoints(event)
-
             # Set the database version.
             self.database_provides.set_version(
                 event.relation.id, self.charm.postgresql.get_postgresql_version()
@@ -115,11 +112,8 @@ class PostgreSQLProvider(Object):
             # Set the database name
             self.database_provides.set_database(event.relation.id, database)
 
-            # Set connection string URI.
-            self.database_provides.set_uris(
-                event.relation.id,
-                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
-            )
+            # Update the read/write and read-only endpoints.
+            self.update_endpoints(event)
 
             self._update_unit_status(event.relation)
         except (
@@ -185,7 +179,11 @@ class PostgreSQLProvider(Object):
 
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
-        relations = [event.relation] if event else self.model.relations[self.relation_name]
+        relations_ids = [event.relation.id] if event else None
+        rel_data = self.database_provides.fetch_relation_data(
+            relations_ids, ["external-node-connectivity", "database"]
+        )
+        secret_data = self.database_provides.fetch_my_relation_data(relations_ids, ["password"])
 
         # If there are no replicas, remove the read-only endpoint.
         replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
@@ -196,17 +194,27 @@ class PostgreSQLProvider(Object):
             else ""
         )
 
-        for relation in relations:
+        for relation_id in rel_data.keys():
+            user = f"relation-{relation_id}"
+            database = rel_data[relation_id].get("database")
+            password = secret_data.get(relation_id, {}).get("password")
+
             # Set the read/write endpoint.
             self.database_provides.set_endpoints(
-                relation.id,
+                relation_id,
                 f"{self.charm.primary_endpoint}:{DATABASE_PORT}",
             )
 
             # Set the read-only endpoint.
             self.database_provides.set_read_only_endpoints(
-                relation.id,
+                relation_id,
                 read_only_endpoints,
+            )
+
+            # Set connection string URI.
+            self.database_provides.set_uris(
+                relation_id,
+                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
             )
 
     def _check_multiple_endpoints(self) -> bool:
