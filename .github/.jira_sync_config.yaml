@@ -1,0 +1,21 @@
+# Sync GitHub issues to Jira issues
+
+# Configuration syntax:
+# https://github.com/canonical/gh-jira-sync-bot/blob/main/README.md#client-side-configuration
+settings:
+  # Repository specific settings
+  components: # Jira components that will be added to Jira issue
+    - postgresql-vm
+
+  # Settings shared across Data Platform repositories
+  label_mapping:
+    # If the GitHub issue does not have a label in this mapping, the Jira issue will be created as a Bug
+    enhancement: Story
+  jira_project_key: DPE  # https://warthogs.atlassian.net/browse/DPE
+  status_mapping:
+    opened: untriaged
+    closed: done  # GitHub issue closed as completed
+    not_planned: rejected  # GitHub issue closed as not planned
+  add_gh_comment: true
+  sync_description: false
+  sync_comments: false
