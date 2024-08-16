@@ -142,7 +142,6 @@ def test_on_database_requested(harness):
             "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
             "username": user,
             "password": "test-password",
-            "uris": f"postgresql://{user}:test-password@1.1.1.1:5432/{DATABASE}",
             "version": POSTGRESQL_VERSION,
             "database": f"{DATABASE}",
         }
@@ -223,7 +222,12 @@ def test_update_endpoints_with_event(harness):
             new_callable=PropertyMock,
         ) as _members_ips,
         patch("charm.Patroni.get_primary", new_callable=PropertyMock) as _get_primary,
+        patch(
+            "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
+        ) as _fetch_my_relation_data,
     ):
+        _fetch_my_relation_data.return_value.get().get.return_value = "test_password"
+
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
         rel_id = harness.model.get_relation(RELATION_NAME).id
@@ -232,6 +236,12 @@ def test_update_endpoints_with_event(harness):
         # Add two different relations.
         rel_id = harness.add_relation(RELATION_NAME, "application")
         another_rel_id = harness.add_relation(RELATION_NAME, "application")
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                "application",
+                {"database": "test_db", "extra-user-roles": ""},
+            )
 
         # Define a mock relation changed event to be used in the subsequent update endpoints calls.
         mock_event = Mock()
@@ -246,13 +256,16 @@ def test_update_endpoints_with_event(harness):
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "read-only-endpoints": "2.2.2.2:5432",
+            "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {}
+        _fetch_my_relation_data.assert_called_once_with([2], ["password"])
 
         # Also test with only a primary instance.
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
-            "endpoints": "1.1.1.1:5432"
+            "endpoints": "1.1.1.1:5432",
+            "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {}
 
@@ -269,7 +282,12 @@ def test_update_endpoints_without_event(harness):
             new_callable=PropertyMock,
         ) as _members_ips,
         patch("charm.Patroni.get_primary", new_callable=PropertyMock) as _get_primary,
+        patch(
+            "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
+        ) as _fetch_my_relation_data,
     ):
+        _fetch_my_relation_data.return_value.get().get.return_value = "test_password"
+
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
         _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
@@ -279,23 +297,40 @@ def test_update_endpoints_without_event(harness):
         rel_id = harness.add_relation(RELATION_NAME, "application")
         another_rel_id = harness.add_relation(RELATION_NAME, "application")
 
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                "application",
+                {"database": "test_db", "extra-user-roles": ""},
+            )
+            harness.update_relation_data(
+                another_rel_id,
+                "application",
+                {"database": "test_db2", "extra-user-roles": ""},
+            )
+
         # Test with both a primary and a replica.
         # Update the endpoints and check that all relations' databags are updated.
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "read-only-endpoints": "2.2.2.2:5432",
+            "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "read-only-endpoints": "2.2.2.2:5432",
+            "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
         }
+        _fetch_my_relation_data.assert_called_once_with(None, ["password"])
 
         # Also test with only a primary instance.
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
-            "endpoints": "1.1.1.1:5432"
+            "endpoints": "1.1.1.1:5432",
+            "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
-            "endpoints": "1.1.1.1:5432"
+            "endpoints": "1.1.1.1:5432",
+            "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
         }
