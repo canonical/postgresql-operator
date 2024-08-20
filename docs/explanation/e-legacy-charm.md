@@ -1,4 +1,4 @@
-## Charm types "legacy" vs "modern"
+## Charm types: "legacy" vs "modern"
 There are [two types of charms](https://juju.is/docs/sdk/charm-taxonomy#heading--charm-types-by-generation) stored under the same charm name `postgresql`:
 
 1. [Reactive](https://juju.is/docs/sdk/charm-taxonomy#heading--reactive)  charm in the channel `latest/stable` (called `legacy`)

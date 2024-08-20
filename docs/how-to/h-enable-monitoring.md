@@ -7,9 +7,8 @@ If you are using an earlier version, check the [Juju 3.0 Release Notes](https://
 # How to enable monitoring (COS)
 
 ## Prerequisites
-Enable monitoring requires that you:
-* A deployed [Charmed PostgreSQL VM operator](/t/charmed-postgresql-tutorial-deploy-postgresql/9697?channel=14/edge)
-* A deployed [`cos-lite` bundle in a Kubernetes environment](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
+* Charmed PostgreSQL [Revision 336 or greater](/t/11875)
+* [`cos-lite` bundle](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s) deployed in a Kubernetes environment
 
 ---
 
