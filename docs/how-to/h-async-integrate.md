@@ -1,9 +1,4 @@
 # Integrate with a client application
-[note type="caution"]
-This is an internal article. **Do not use it in production!** 
-
-Contact the [Canonical Data Platform team](https://chat.charmhub.io/charmhub/channels/data-platform) if you are interested in this topic.
-[/note]
 
 This guide will show you how to integrate a client application with a cross-regional async setup using an example PostgreSQL deployment with two servers: one in Rome and one in Lisbon.
 
@@ -13,13 +8,13 @@ This guide will show you how to integrate a client application with a cross-regi
   * Refer to the page [How to set up clusters](/t/13991)
 
 ## Summary
-* [Configure database endpoints](#heading--configure-endpoints)
-* [Internal client](#heading--internal-client)
-* [External client](#heading--external-client)
+* [Configure database endpoints](#configure-database-endpoints)
+* [Internal client](#internal-client)
+* [External client](#external-client)
 
 ---
 
-<a href="#heading--configure-endpoints"><h2 id="heading--configure-endpoints"> Configure database endpoints </h2></a>
+## Configure database endpoints
 
 To make your database available to a client application, you must first offer and consume database endpoints.
 
@@ -46,7 +41,7 @@ juju consume rome.db1database
 juju consume lisbon.db2database
 ```
 
-<a href="#heading--internal-client"><h2 id="heading--internal-client"> Internal client </h2></a>
+## Internal client
 
 If the client application is another charm, deploy them and connect them with `juju integrate`.
 
@@ -62,7 +57,7 @@ juju integrate postgresql-test-app:first-database pgbouncer
 juju integrate pgbouncer db1database
 ```
 
-<a href="#heading--external-client"><h2 id="heading--external-client"> External client </h2></a>
+## External client
 
 If the client application is external, they must be integrated via the [`data-integrator` charm](https://charmhub.io/data-integrator).
 

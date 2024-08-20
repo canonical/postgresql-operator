@@ -9,6 +9,7 @@ The charm follows [standard Juju applications statuses](https://juju.is/docs/olm
 | **active** | any | Normal charm operations | No actions required |
 | **waiting** | any | Charm is waiting for relations to be finished | No actions required |
 | **maintenance** | any | Charm is performing the internal maintenance (e.g. cluster re-configuration, upgrade, ...) | No actions required |
+| **blocked** | the S3 repository has backups from another cluster | The bucket contains foreign backup. To avoid accident DB corruption, use clean bucket. The cluster identified by Juju app name + DB UUID. | Chose/change the new S3 [bucket](https://charmhub.io/s3-integrator/configuration#bucket)/[path](https://charmhub.io/s3-integrator/configuration#path) OR clean the current one. |
 | **blocked** | failed to update cluster members on member | TODO: error/retry? | |
 | **blocked** | failed to install snap packages | There are issues with the network connection and/or the Snap Store | Check your internet connection and https://status.snapcraft.io/. Remove the application and when everything is ok, deploy the charm again |
 | **blocked** | failed to patch snap seccomp profile | The charm failed to patch one issue that happens when pgBackRest restores a backup (this blocked status should be removed when https://github.com/pgbackrest/pgbackrest/releases/tag/release%2F2.46 is added to the snap) | Remove the unit and add it back again |
