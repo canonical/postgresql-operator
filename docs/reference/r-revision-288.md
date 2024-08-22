@@ -45,8 +45,6 @@ Charmed PostgreSQL is an open source project that warmly welcomes community cont
 
 * Raise software issues or feature requests on [**GitHub**](https://github.com/canonical/postgresql-operator/issues/new/choose)
 * Report security issues through [**Launchpad**](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File)
-* Contact the Canonical Data Platform team through our [Matrix](https://matrix.to/#/#charmhub-data-platform:ubuntu.com) channel.
-
-
+* Contact the Canonical Data Platform team through our [Matrix](https://matrix.to/#/#charmhub-data-platform:ubuntu.com) channel!
 
 <!--The document was originally posted [here](https://discourse.charmhub.io/t/juju-operators-for-postgresql-and-mysql-are-now-stable/10223).-->
