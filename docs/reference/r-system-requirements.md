@@ -5,14 +5,20 @@ The following are the minimum software and hardware requirements to run Charmed 
 ## Software
 * Ubuntu 22.04 (Jammy) or later.
 
-The minimum supported Juju versions are:
+### Juju
 
-* 2.9.32+ (older versions are untested).
-* 3.1.7+ (Juju secrets were stabilized in `v.3.1.7`)
+The charm supports several Juju releases from [2.9 LTS](https://juju.is/docs/juju/roadmap#juju-juju-29) onwards. The table below shows which minor versions of each major Juju release are supported by the stable Charmhub releases of PostgreSQL.
 
-[note type="caution"]
-**Note**: Juju 3.1 is supported from the charm revision 315+
-[/note]
+| Juju major release | Supported minor versions | Compatible charm revisions |Comment |
+|:--------|:-----|:-----|:-----|
+| ![3.6 LTS] | `3.6.0-beta1` | [363]+ | No known issues, but still in beta. Not recommended for production. |
+| [![3.5]](https://juju.is/docs/juju/roadmap#juju-juju-35) | `3.5.1+` | [363]+  | [Known Juju issue](https://bugs.launchpad.net/juju/+bug/2066517) in `3.5.0` |
+| [![3.4]](https://juju.is/docs/juju/roadmap#juju-juju-34) | `3.4.3+` | [363]+ | Know Juju issues with previous minor versions |
+| [![3.3]](https://juju.is/docs/juju/roadmap#juju-juju-33) | `3.3.0+` | from [363] to [430] | No known issues |
+| [![3.2]](https://juju.is/docs/juju/roadmap#juju-juju-32) | `3.2.0+` | from [363] to [430]  | No known issues |
+| [![3.1]](https://juju.is/docs/juju/roadmap#juju-juju-31) | `3.1.7+` | from [336] to [430] | Juju secrets were stabilized in `3.1.7` |
+| [![2.9 LTS]](https://juju.is/docs/juju/roadmap#juju-juju-29)  | `2.9.49+` | [288]+ | |
+|  | `2.9.32+` | from [288] to [430] | No tests for older Juju versions. |
 
 ## Hardware
 
@@ -33,3 +39,19 @@ The charm is based on the [charmed-postgresql snap](https://snapcraft.io/charmed
 * Only IPv4 is supported at the moment
   * See more information about this limitation in [this Jira issue](https://warthogs.atlassian.net/browse/DPE-4695)
   * [Contact us](/t/11863) if you are interested in IPv6!
+
+<!-- BADGES -->
+
+[2.9 LTS]: https://img.shields.io/badge/2.9_LTS-%23E95420?label=Juju
+[3.1]: https://img.shields.io/badge/3.1-%23E95420?label=Juju
+[3.2]: https://img.shields.io/badge/3.2-%23E95420?label=Juju
+[3.3]: https://img.shields.io/badge/3.3-%23E95420?label=Juju
+[3.4]: https://img.shields.io/badge/3.4-%23E95420?label=Juju
+[3.5]: https://img.shields.io/badge/3.5-%23E95420?label=Juju
+[3.6 LTS]: https://img.shields.io/badge/3.6_LTS-%23E95420?label=Juju
+
+<!-- LINKS -->
+[288]: /t/11876
+[336]: /t/11877
+[363]: /t/13124
+[430]: /t/14067

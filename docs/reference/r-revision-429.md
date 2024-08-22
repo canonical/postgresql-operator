@@ -20,10 +20,6 @@ juju deploy postgresql --constraints arch=<arch>
 ```
 where `<arch>` can be `amd64` or `arm64`.
 
-[note]
-If you are jumping over several stable revisions, check [previous release notes](/t/11875) before upgrading.
-[/note]
-
 ---
 
 ## Highlights
@@ -63,6 +59,8 @@ For a full list of all changes in this revision, see the [GitHub Release](https:
 
 ## Technical details
 This section contains some technical details about the charm's contents and dependencies.  Make sure to also check the [system requirements](/t/11743).
+
+If you are jumping over several stable revisions, check [previous release notes](/t/11875) before upgrading.
 
 ### Packaging
 This charm is based on the [`charmed-postgresql` snap](https://snapcraft.io/charmed-postgresql) (pinned revision 113). It packages:
