@@ -19,6 +19,7 @@ from .helpers import (
     get_primary,
     get_unit_address,
     restart_patroni,
+    run_command_on_unit,
     set_password,
 )
 
@@ -178,3 +179,18 @@ async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None
     password2 = await get_password(ops_test, unit_name=leader, username="replication")
     # The password didn't change
     assert password1 == password2
+
+
+@pytest.mark.group(1)
+async def test_no_password_exposed_on_logs(ops_test: OpsTest) -> None:
+    """Test that passwords don't get exposed on postgresql logs."""
+    for unit in ops_test.model.applications[APP_NAME].units:
+        try:
+            logs = await run_command_on_unit(
+                ops_test,
+                unit.name,
+                "grep PASSWORD /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+            )
+        except Exception:
+            continue
+        assert len(logs) == 0, f"Sensitive information detected on {unit.name} logs"

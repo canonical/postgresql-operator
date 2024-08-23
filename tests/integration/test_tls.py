@@ -2,12 +2,15 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-import os
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential
+from tenacity import Retrying, stop_after_attempt, stop_after_delay, wait_exponential, wait_fixed
 
+from . import architecture
+from .ha_tests.helpers import (
+    change_patroni_setting,
+)
 from .helpers import (
     CHARM_SERIES,
     DATABASE_APP_NAME,
@@ -15,12 +18,12 @@ from .helpers import (
     change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
+    check_tls_replication,
     db_connect,
     get_password,
     get_primary,
     get_unit_address,
     primary_changed,
-    restart_machine,
     run_command_on_unit,
 )
 from .juju_ import juju_major_version
@@ -29,13 +32,19 @@ logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
 if juju_major_version < 3:
-    TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
-    TLS_CHANNEL = "legacy/stable"
-    TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
+    tls_certificates_app_name = "tls-certificates-operator"
+    if architecture.architecture == "arm64":
+        tls_channel = "legacy/edge"
+    else:
+        tls_channel = "legacy/stable"
+    tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
-    TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-    TLS_CHANNEL = "latest/stable"
-    TLS_CONFIG = {"ca-common-name": "Test CA"}
+    tls_certificates_app_name = "self-signed-certificates"
+    if architecture.architecture == "arm64":
+        tls_channel = "latest/edge"
+    else:
+        tls_channel = "latest/stable"
+    tls_config = {"ca-common-name": "Test CA"}
 
 
 @pytest.mark.group(1)
@@ -57,17 +66,18 @@ async def test_deploy_active(ops_test: OpsTest):
 
 
 @pytest.mark.group(1)
+@pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
         await ops_test.model.deploy(
-            TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL
+            tls_certificates_app_name, config=tls_config, channel=tls_channel
         )
 
         # Relate it to the PostgreSQL to enable TLS.
-        await ops_test.model.relate(DATABASE_APP_NAME, TLS_CERTIFICATES_APP_NAME)
-        await ops_test.model.wait_for_idle(status="active", timeout=1500)
+        await ops_test.model.relate(DATABASE_APP_NAME, tls_certificates_app_name)
+        await ops_test.model.wait_for_idle(status="active", timeout=1500, raise_on_error=False)
 
         # Wait for all units enabling TLS.
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
@@ -85,6 +95,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
             if unit.name != primary
         ][0]
 
+        # Check if TLS enabled for replication
+        assert await check_tls_replication(ops_test, primary, enabled=True)
+
         # Enable additional logs on the PostgreSQL instance to check TLS
         # being used in a later step and make the fail-over to happens faster.
         await ops_test.model.applications[DATABASE_APP_NAME].set_config({
@@ -95,6 +108,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         )
         change_primary_start_timeout(ops_test, primary, 0)
 
+        # Pause Patroni so it doesn't wipe the custom changes
+        await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
+
+    async with ops_test.fast_forward("24h"):
         for attempt in Retrying(
             stop=stop_after_delay(60 * 5), wait=wait_exponential(multiplier=1, min=2, max=30)
         ):
@@ -147,15 +164,21 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
-        await run_command_on_unit(
-            ops_test,
-            primary,
-            "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
-        )
+        for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(5), reraise=True):
+            with attempt:
+                logger.info("Trying to grep for rewind logs.")
+                await run_command_on_unit(
+                    ops_test,
+                    primary,
+                    "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
+                )
 
+        await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
+
+    async with ops_test.fast_forward():
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:certificates", f"{TLS_CERTIFICATES_APP_NAME}:certificates"
+            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 
@@ -163,50 +186,3 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
             assert await check_tls(ops_test, unit.name, enabled=False)
             assert await check_tls_patroni_api(ops_test, unit.name, enabled=False)
-
-
-@pytest.mark.group(1)
-@pytest.mark.skipif(
-    not os.environ.get("RESTART_MACHINE_TEST"),
-    reason="RESTART_MACHINE_TEST environment variable not set",
-)
-async def test_restart_machine(ops_test: OpsTest) -> None:
-    async with ops_test.fast_forward():
-        # Relate it to the PostgreSQL to enable TLS.
-        await ops_test.model.relate(DATABASE_APP_NAME, TLS_CERTIFICATES_APP_NAME)
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
-
-    # Wait for all units enabling TLS.
-    for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
-        assert await check_tls(ops_test, unit.name, enabled=True)
-        assert await check_tls_patroni_api(ops_test, unit.name, enabled=True)
-
-    unit_name = "postgresql/0"
-    issue_found = False
-    for attempt in Retrying(stop=stop_after_attempt(10)):
-        with attempt:
-            # Restart the machine of the unit.
-            logger.info(f"restarting {unit_name}")
-            await restart_machine(ops_test, unit_name)
-
-            # Check whether the issue happened (the storage wasn't mounted).
-            logger.info(
-                f"checking whether storage was mounted - attempt {attempt.retry_state.attempt_number}"
-            )
-            result = await run_command_on_unit(ops_test, unit_name, "lsblk")
-            if "/var/lib/postgresql/data" not in result:
-                issue_found = True
-
-            assert (
-                issue_found
-            ), "Couldn't reproduce the issue from https://bugs.launchpad.net/juju/+bug/1999758"
-
-    # Wait for the unit to be ready again. Some errors in the start hook may happen due
-    # to rebooting in the middle of a hook.
-    await ops_test.model.wait_for_idle(status="active", timeout=1000, raise_on_error=False)
-
-    # Wait for the unit enabling TLS again.
-    logger.info(f"checking TLS on {unit_name}")
-    assert await check_tls(ops_test, "postgresql/0", enabled=True)
-    logger.info(f"checking TLS on Patroni API from {unit_name}")
-    assert await check_tls_patroni_api(ops_test, "postgresql/0", enabled=True)

@@ -18,6 +18,7 @@ The `postgresql` module provides methods for interacting with the PostgreSQL ins
 
 Any charm using this library should import the `psycopg2` or `psycopg2-binary` dependency.
 """
+
 import logging
 from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Tuple
@@ -35,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 24
+LIBPATCH = 34
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -78,6 +79,10 @@ class PostgreSQLEnableDisableExtensionError(Exception):
     """Exception raised when enabling/disabling an extension fails."""
 
 
+class PostgreSQLGetLastArchivedWALError(Exception):
+    """Exception raised when retrieving last archived WAL fails."""
+
+
 class PostgreSQLGetPostgreSQLVersionError(Exception):
     """Exception raised when retrieving PostgreSQL version fails."""
 
@@ -110,20 +115,19 @@ class PostgreSQL:
         self.system_users = system_users
 
     def _connect_to_database(
-        self, database: str = None, connect_to_current_host: bool = False
+        self, database: str = None, database_host: str = None
     ) -> psycopg2.extensions.connection:
         """Creates a connection to the database.
 
         Args:
             database: database to connect to (defaults to the database
                 provided when the object for this class was created).
-            connect_to_current_host: whether to connect to the current host
-                instead of the primary host.
+            database_host: host to connect to instead of the primary host.
 
         Returns:
              psycopg2 connection object.
         """
-        host = self.current_host if connect_to_current_host else self.primary_host
+        host = database_host if database_host is not None else self.primary_host
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
             f"password='{self.password}' connect_timeout=1"
@@ -230,7 +234,10 @@ class PostgreSQL:
                 user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
                 if privileges:
                     user_definition += f' {" ".join(privileges)}'
+                cursor.execute(sql.SQL("BEGIN;"))
+                cursor.execute(sql.SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(sql.SQL(f"{user_definition};").format(sql.Identifier(user)))
+                cursor.execute(sql.SQL("COMMIT;"))
 
                 # Add extra user roles to the new user.
                 if roles:
@@ -320,6 +327,8 @@ class PostgreSQL:
                         )
         except psycopg2.errors.UniqueViolation:
             pass
+        except psycopg2.errors.DependentObjectsStillExist:
+            raise
         except psycopg2.Error:
             raise PostgreSQLEnableDisableExtensionError()
         finally:
@@ -358,9 +367,7 @@ END; $$;"""
             statements.append(
                 """UPDATE pg_catalog.pg_largeobject_metadata
 SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}')
-WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
-                    user, self.user
-                )
+WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user, self.user)
             )
         else:
             for schema in schemas:
@@ -382,6 +389,16 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
                 )
         return statements
 
+    def get_last_archived_wal(self) -> str:
+        """Get the name of the last archived wal for the current PostgreSQL cluster."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT last_archived_wal FROM pg_stat_archiver;")
+                return cursor.fetchone()[0]
+        except psycopg2.Error as e:
+            logger.error(f"Failed to get PostgreSQL last archived WAL: {e}")
+            raise PostgreSQLGetLastArchivedWALError()
+
     def get_postgresql_text_search_configs(self) -> Set[str]:
         """Returns the PostgreSQL available text search configs.
 
@@ -389,7 +406,7 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
             Set of PostgreSQL text search configs.
         """
         with self._connect_to_database(
-            connect_to_current_host=True
+            database_host=self.current_host
         ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
             text_search_configs = cursor.fetchall()
@@ -402,20 +419,26 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
             Set of PostgreSQL timezones.
         """
         with self._connect_to_database(
-            connect_to_current_host=True
+            database_host=self.current_host
         ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT name FROM pg_timezone_names;")
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
 
-    def get_postgresql_version(self) -> str:
+    def get_postgresql_version(self, current_host=True) -> str:
         """Returns the PostgreSQL version.
 
         Returns:
             PostgreSQL version number.
         """
+        if current_host:
+            host = self.current_host
+        else:
+            host = None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT version();")
                 # Split to get only the version number.
                 return cursor.fetchone()[0].split(" ")[1]
@@ -435,7 +458,7 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
         """
         try:
             with self._connect_to_database(
-                connect_to_current_host=check_current_host
+                database_host=self.current_host if check_current_host else None
             ) as connection, connection.cursor() as cursor:
                 cursor.execute("SHOW ssl;")
                 return "on" in cursor.fetchone()[0]
@@ -477,11 +500,11 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
         """Set up postgres database with the right permissions."""
         connection = None
         try:
-            self.create_user(
-                "admin",
-                extra_user_roles="pg_read_all_data,pg_write_all_data",
-            )
             with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='admin';")
+                if cursor.fetchone() is not None:
+                    return
+
                 # Allow access to the postgres database only to the system users.
                 cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
                 cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
@@ -491,6 +514,10 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
                             sql.Identifier(user)
                         )
                     )
+                self.create_user(
+                    "admin",
+                    extra_user_roles="pg_read_all_data,pg_write_all_data",
+                )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:
             logger.error(f"Failed to set up databases: {e}")
@@ -499,24 +526,32 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
             if connection is not None:
                 connection.close()
 
-    def update_user_password(self, username: str, password: str) -> None:
+    def update_user_password(
+        self, username: str, password: str, database_host: str = None
+    ) -> None:
         """Update a user password.
 
         Args:
             username: the user to update the password.
             password: the new password for the user.
+            database_host: the host to connect to.
 
         Raises:
             PostgreSQLUpdateUserPasswordError if the password couldn't be changed.
         """
         connection = None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
+            with self._connect_to_database(
+                database_host=database_host
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute(sql.SQL("BEGIN;"))
+                cursor.execute(sql.SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
                     sql.SQL("ALTER USER {} WITH ENCRYPTED PASSWORD '" + password + "';").format(
                         sql.Identifier(username)
                     )
                 )
+                cursor.execute(sql.SQL("COMMIT;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to update user password: {e}")
             raise PostgreSQLUpdateUserPasswordError()
@@ -562,18 +597,16 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
         parameters = {}
         for config, value in config_options.items():
             # Filter config option not related to PostgreSQL parameters.
-            if not config.startswith(
-                (
-                    "durability",
-                    "instance",
-                    "logging",
-                    "memory",
-                    "optimizer",
-                    "request",
-                    "response",
-                    "vacuum",
-                )
-            ):
+            if not config.startswith((
+                "durability",
+                "instance",
+                "logging",
+                "memory",
+                "optimizer",
+                "request",
+                "response",
+                "vacuum",
+            )):
                 continue
             parameter = "_".join(config.split("_")[1:])
             if parameter in ["date_style", "time_zone"]:
@@ -593,12 +626,11 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
                 # Use 25% of the available memory for shared_buffers.
                 # and the remaining as cache memory.
                 shared_buffers = int(available_memory * 0.25)
+                parameters["shared_buffers"] = f"{int(shared_buffers * 128 / 10**6)}"
             effective_cache_size = int(available_memory - shared_buffers)
-            parameters.setdefault("shared_buffers", f"{int(shared_buffers/10**6)}MB")
-            parameters.update({"effective_cache_size": f"{int(effective_cache_size/10**6)}MB"})
-        else:
-            # Return default
-            parameters.setdefault("shared_buffers", "128MB")
+            parameters.update({
+                "effective_cache_size": f"{int(effective_cache_size / 10**6) * 128}"
+            })
         return parameters
 
     def validate_date_style(self, date_style: str) -> bool:
@@ -609,7 +641,7 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(
         """
         try:
             with self._connect_to_database(
-                connect_to_current_host=True
+                database_host=self.current_host
             ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     sql.SQL(

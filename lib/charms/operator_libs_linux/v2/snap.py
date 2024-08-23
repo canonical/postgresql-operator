@@ -83,7 +83,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 7
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -319,7 +319,10 @@ class Snap(object):
                 Default is to return a string.
         """
         if typed:
-            config = json.loads(self._snap("get", ["-d", key]))
+            args = ["-d"]
+            if key:
+                args.append(key)
+            config = json.loads(self._snap("get", args))
             if key:
                 return config.get(key)
             return config
@@ -580,10 +583,20 @@ class Snap(object):
             # We are installing or refreshing a snap.
             if self._state not in (SnapState.Present, SnapState.Latest):
                 # The snap is not installed, so we install it.
+                logger.info(
+                    "Installing snap %s, revision %s, tracking %s", self._name, revision, channel
+                )
                 self._install(channel, cohort, revision)
-            else:
+                logger.info("The snap installation completed successfully")
+            elif revision is None or revision != self._revision:
                 # The snap is installed, but we are changing it (e.g., switching channels).
+                logger.info(
+                    "Refreshing snap %s, revision %s, tracking %s", self._name, revision, channel
+                )
                 self._refresh(channel=channel, cohort=cohort, revision=revision, devmode=devmode)
+                logger.info("The snap refresh completed successfully")
+            else:
+                logger.info("Refresh of snap %s was unnecessary", self._name)
 
         self._update_snap_apps()
         self._state = state

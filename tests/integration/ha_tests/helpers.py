@@ -1,16 +1,18 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import json
 import logging
 import os
 import random
 import subprocess
 from pathlib import Path
 from tempfile import mkstemp
-from typing import Dict, Optional, Set, Tuple
+from typing import Dict, Optional, Set, Tuple, Union
 
 import psycopg2
 import requests
 import yaml
+from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import (
     RetryError,
@@ -24,6 +26,7 @@ from tenacity import (
 from ..helpers import (
     APPLICATION_NAME,
     db_connect,
+    execute_query_on_unit,
     get_patroni_cluster,
     get_unit_address,
     run_command_on_unit,
@@ -56,7 +59,7 @@ class ProcessRunningError(Exception):
     """Raised when a process is running when it is not expected to be."""
 
 
-async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
+async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
     if "/" in process:
@@ -65,7 +68,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
         pgrep_cmd = ("pgrep", "-x", process)
 
     try:
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(400), wait=wait_fixed(3)):
             with attempt:
                 for unit in ops_test.model.applications[app].units:
                     _, processes, _ = await ops_test.juju("ssh", unit.name, *pgrep_cmd)
@@ -76,6 +79,9 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
 
                     # If something was returned, there is a running process.
                     if len(processes) > 0:
+                        logger.info("Unit %s not yet down" % unit.name)
+                        # Try to rekill the unit
+                        await send_signal_to_process(ops_test, unit.name, process, signal)
                         raise ProcessRunningError
     except RetryError:
         return False
@@ -84,22 +90,32 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str) -> bool:
 
 
 async def are_writes_increasing(
-    ops_test, down_unit: str = None, use_ip_from_inside: bool = False
+    ops_test, down_unit: str = None, use_ip_from_inside: bool = False, extra_model: Model = None
 ) -> None:
     """Verify new writes are continuing by counting the number of writes."""
     writes, _ = await count_writes(
-        ops_test, down_unit=down_unit, use_ip_from_inside=use_ip_from_inside
+        ops_test,
+        down_unit=down_unit,
+        use_ip_from_inside=use_ip_from_inside,
+        extra_model=extra_model,
     )
     for member, count in writes.items():
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes, _ = await count_writes(
-                    ops_test, down_unit=down_unit, use_ip_from_inside=use_ip_from_inside
+                    ops_test,
+                    down_unit=down_unit,
+                    use_ip_from_inside=use_ip_from_inside,
+                    extra_model=extra_model,
                 )
-                assert more_writes[member] > count, f"{member}: writes not continuing to DB"
+                assert (
+                    more_writes[member] > count
+                ), f"{member}: writes not continuing to DB (current writes: {more_writes[member]} - previous writes: {count})"
 
 
-async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> Optional[str]:
+async def app_name(
+    ops_test: OpsTest, application_name: str = "postgresql", model: Model = None
+) -> Optional[str]:
     """Returns the name of the cluster running PostgreSQL.
 
     This is important since not all deployments of the PostgreSQL charm have the application name
@@ -107,16 +123,25 @@ async def app_name(ops_test: OpsTest, application_name: str = "postgresql") -> O
 
     Note: if multiple clusters are running PostgreSQL this will return the one first found.
     """
-    status = await ops_test.model.get_status()
-    for app in ops_test.model.applications:
-        if application_name in status["applications"][app]["charm"]:
+    if model is None:
+        model = ops_test.model
+    status = await model.get_status()
+    for app in model.applications:
+        if (
+            application_name in status["applications"][app]["charm"]
+            and APPLICATION_NAME not in status["applications"][app]["charm"]
+        ):
             return app
 
     return None
 
 
 async def change_patroni_setting(
-    ops_test: OpsTest, setting: str, value: int, use_random_unit: bool = False
+    ops_test: OpsTest,
+    setting: str,
+    value: Union[int, bool],
+    use_random_unit: bool = False,
+    tls: bool = False,
 ) -> None:
     """Change the value of one of the Patroni settings.
 
@@ -125,8 +150,13 @@ async def change_patroni_setting(
         setting: the name of the setting.
         value: the value to assign to the setting.
         use_random_unit: whether to use a random unit (default is False,
-            so it uses the primary)
+            so it uses the primary).
+        tls: if Patroni is serving using tls.
     """
+    if tls:
+        schema = "https"
+    else:
+        schema = "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
@@ -137,8 +167,9 @@ async def change_patroni_setting(
                 primary_name = await get_primary(ops_test, app)
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
-                f"http://{unit_ip}:8008/config",
+                f"{schema}://{unit_ip}:8008/config",
                 json={setting: value},
+                verify=not tls,
             )
 
 
@@ -205,13 +236,18 @@ async def is_cluster_updated(
     ), "secondary not up to date with the cluster after restarting."
 
 
-async def check_writes(ops_test, use_ip_from_inside: bool = False) -> int:
+async def check_writes(
+    ops_test, use_ip_from_inside: bool = False, extra_model: Model = None
+) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
     actual_writes, max_number_written = await count_writes(
-        ops_test, use_ip_from_inside=use_ip_from_inside
+        ops_test, use_ip_from_inside=use_ip_from_inside, extra_model=extra_model
     )
     for member, count in actual_writes.items():
+        print(
+            f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}"
+        )
         assert (
             count == max_number_written[member]
         ), f"{member}: writes to the db were missed: count of actual writes different from the max number written."
@@ -220,44 +256,69 @@ async def check_writes(ops_test, use_ip_from_inside: bool = False) -> int:
 
 
 async def count_writes(
-    ops_test: OpsTest, down_unit: str = None, use_ip_from_inside: bool = False
+    ops_test: OpsTest,
+    down_unit: str = None,
+    use_ip_from_inside: bool = False,
+    extra_model: Model = None,
 ) -> Tuple[Dict[str, int], Dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
-    for unit in ops_test.model.applications[app].units:
-        if unit.name != down_unit:
-            cluster = get_patroni_cluster(
-                await (
-                    get_ip_from_inside_the_unit(ops_test, unit.name)
-                    if use_ip_from_inside
-                    else get_unit_ip(ops_test, unit.name)
-                )
-            )
-            break
+    members = []
+    for model in [ops_test.model, extra_model]:
+        if model is None:
+            continue
+        for unit in model.applications[app].units:
+            if unit.name != down_unit:
+                members_data = get_patroni_cluster(
+                    await (
+                        get_ip_from_inside_the_unit(ops_test, unit.name)
+                        if use_ip_from_inside
+                        else get_unit_ip(ops_test, unit.name)
+                    )
+                )["members"]
+                for index, member_data in enumerate(members_data):
+                    members_data[index]["model"] = model.info.name
+                members.extend(members_data)
+                break
     down_ips = []
     if down_unit:
         for unit in ops_test.model.applications[app].units:
             if unit.name == down_unit:
                 down_ips.append(unit.public_address)
                 down_ips.append(await get_unit_ip(ops_test, unit.name))
+    return count_writes_on_members(members, password, down_ips)
+
+
+def count_writes_on_members(members, password, down_ips) -> Tuple[Dict[str, int], Dict[str, int]]:
     count = {}
     maximum = {}
-    for member in cluster["members"]:
+    for member in members:
         if member["role"] != "replica" and member["host"] not in down_ips:
             host = member["host"]
 
             connection_string = (
-                f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
+                f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
                 f" host='{host}' password='{password}' connect_timeout=10"
             )
 
-            with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
-                results = cursor.fetchone()
-                count[member["name"]] = results[0]
-                maximum[member["name"]] = results[1]
-            connection.close()
+            member_name = f'{member["model"]}.{member["name"]}'
+            connection = None
+            try:
+                with psycopg2.connect(
+                    connection_string
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                    results = cursor.fetchone()
+                    count[member_name] = results[0]
+                    maximum[member_name] = results[1]
+            except psycopg2.Error:
+                # Error raised when the connection is not possible.
+                count[member_name] = -1
+                maximum[member_name] = -1
+            finally:
+                if connection is not None:
+                    connection.close()
     return count, maximum
 
 
@@ -288,7 +349,7 @@ def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
     subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config set {machine_name} limits.network.priority=10"
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority=10"
     subprocess.check_call(limit_set_command.split())
 
 
@@ -348,22 +409,27 @@ async def get_ip_from_inside_the_unit(ops_test: OpsTest, unit_name: str) -> str:
     return stdout.splitlines()[0].strip()
 
 
-async def get_patroni_setting(ops_test: OpsTest, setting: str) -> Optional[int]:
+async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False) -> Optional[int]:
     """Get the value of one of the integer Patroni settings.
 
     Args:
         ops_test: ops_test instance.
         setting: the name of the setting.
+        tls: if Patroni is serving using tls.
 
     Returns:
         the value of the configuration or None if it's using the default value.
     """
+    if tls:
+        schema = "https"
+    else:
+        schema = "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
-            configuration_info = requests.get(f"http://{unit_ip}:8008/config")
+            configuration_info = requests.get(f"{schema}://{unit_ip}:8008/config", verify=not tls)
             value = configuration_info.json().get(setting)
             return int(value) if value is not None else None
 
@@ -399,6 +465,42 @@ def get_random_unit(ops_test: OpsTest, app: str) -> str:
     return random.choice(ops_test.model.applications[app].units).name
 
 
+async def get_standby_leader(model: Model, application_name: str) -> str:
+    """Get the standby leader name.
+
+    Args:
+        model: the model instance.
+        application_name: the name of the application to get the value for.
+
+    Returns:
+        the name of the standby leader.
+    """
+    first_unit_ip = model.applications[application_name].units[0].public_address
+    cluster = get_patroni_cluster(first_unit_ip)
+    for member in cluster["members"]:
+        if member["role"] == "standby_leader":
+            return member["name"]
+
+
+async def get_sync_standby(ops_test: OpsTest, model: Model, application_name: str) -> str:
+    """Get the sync_standby name.
+
+    Args:
+        ops_test: the ops test instance.
+        model: the model instance.
+        application_name: the name of the application to get the value for.
+
+    Returns:
+        the name of the sync standby.
+    """
+    any_unit = model.applications[application_name].units[0].name
+    first_unit_ip = await get_unit_ip(ops_test, any_unit, model)
+    cluster = get_patroni_cluster(first_unit_ip)
+    for member in cluster["members"]:
+        if member["role"] == "sync_standby":
+            return member["name"]
+
+
 async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 
@@ -415,20 +517,24 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> st
     return action.results["password"]
 
 
-async def get_unit_ip(ops_test: OpsTest, unit_name: str) -> str:
+async def get_unit_ip(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Wrapper for getting unit ip.
 
     Args:
         ops_test: The ops test object passed into every test case
         unit_name: The name of the unit to get the address
+        model: Optional model instance to use
     Returns:
         The (str) ip of the unit
     """
-    application = unit_name.split("/")[0]
-    for unit in ops_test.model.applications[application].units:
-        if unit.name == unit_name:
-            break
-    return await instance_ip(ops_test, unit.machine.hostname)
+    if model is None:
+        application = unit_name.split("/")[0]
+        for unit in ops_test.model.applications[application].units:
+            if unit.name == unit_name:
+                break
+        return await instance_ip(ops_test, unit.machine.hostname)
+    else:
+        return get_unit_address(ops_test, unit_name)
 
 
 @retry(stop=stop_after_attempt(8), wait=wait_fixed(15), reraise=True)
@@ -536,15 +642,13 @@ async def get_primary(ops_test: OpsTest, app, down_unit: str = None) -> str:
     """
     for unit in ops_test.model.applications[app].units:
         if unit.name != down_unit:
-            break
-
-    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-        with attempt:
-            # Can retrieve from any unit running unit, so we pick the first.
             action = await unit.run_action("get-primary")
             action = await action.wait()
-            assert action.results["primary"] is not None and action.results["primary"] != "None"
-            return action.results["primary"]
+            primary = action.results.get("primary", "None")
+            if primary == "None":
+                continue
+            return primary
+    return None
 
 
 async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
@@ -627,7 +731,7 @@ def restore_network_for_unit_without_ip_change(machine_name: str) -> None:
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress="
     subprocess.check_call(limit_set_command.split())
-    limit_set_command = f"lxc config set {machine_name} limits.network.priority="
+    limit_set_command = f"lxc config device set {machine_name} eth0 limits.priority="
     subprocess.check_call(limit_set_command.split())
 
 
@@ -650,7 +754,7 @@ async def is_secondary_up_to_date(
         if unit.name == unit_name
     ][0]
     connection_string = (
-        f"dbname='{APPLICATION_NAME.replace('-', '_')}_first_database' user='operator'"
+        f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
     )
 
@@ -671,24 +775,26 @@ async def is_secondary_up_to_date(
     return True
 
 
-async def start_continuous_writes(ops_test: OpsTest, app: str) -> None:
+async def start_continuous_writes(ops_test: OpsTest, app: str, model: Model = None) -> None:
     """Start continuous writes to PostgreSQL."""
     # Start the process by relating the application to the database or
     # by calling the action if the relation already exists.
+    if model is None:
+        model = ops_test.model
     relations = [
         relation
-        for relation in ops_test.model.applications[app].relations
+        for relation in model.applications[app].relations
         if not relation.is_peer
         and f"{relation.requires.application_name}:{relation.requires.name}"
-        == f"{APPLICATION_NAME}:first-database"
+        == f"{APPLICATION_NAME}:database"
     ]
     if not relations:
-        await ops_test.model.relate(app, f"{APPLICATION_NAME}:first-database")
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        await model.relate(app, f"{APPLICATION_NAME}:database")
+        await model.wait_for_idle(status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
         with attempt:
             action = (
-                await ops_test.model.applications[APPLICATION_NAME]
+                await model.applications[APPLICATION_NAME]
                 .units[0]
                 .run_action("start-continuous-writes")
             )
@@ -862,3 +968,102 @@ async def reused_full_cluster_recovery_storage(ops_test: OpsTest, unit_name) -> 
         "/var/snap/charmed-postgresql/common/var/log/patroni/patroni.log*",
     )
     return True
+
+
+async def is_storage_exists(ops_test: OpsTest, storage_id: str) -> bool:
+    """Returns True if storage exists by provided storage ID."""
+    complete_command = [
+        "show-storage",
+        "-m",
+        f"{ops_test.controller_name}:{ops_test.model.info.name}",
+        storage_id,
+        "--format=json",
+    ]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        if return_code == 1:
+            return storage_id in stdout
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
+    return storage_id in str(stdout)
+
+
+async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
+    """Creates database with specified name."""
+    unit = ops_test.model.applications[app].units[0]
+    unit_address = await unit.get_public_address()
+    password = await get_password(ops_test, app)
+
+    conn = db_connect(unit_address, password)
+    conn.autocommit = True
+    cursor = conn.cursor()
+    cursor.execute(f"CREATE DATABASE {db};")
+    cursor.close()
+    conn.close()
+
+
+async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
+    """Returns True if database with specified name already exists."""
+    unit = ops_test.model.applications[app].units[0]
+    unit_address = await unit.get_public_address()
+    password = await get_password(ops_test, app)
+
+    assert password is not None
+
+    query = await execute_query_on_unit(
+        unit_address,
+        password,
+        f"select datname from pg_catalog.pg_database where datname = '{db}';",
+    )
+
+    if "ERROR" in query:
+        raise Exception(f"Database check is failed with postgresql err: {query}")
+
+    return db in query
+
+
+async def get_any_deatached_storage(ops_test: OpsTest) -> str:
+    """Returns any of the current available deatached storage."""
+    return_code, storages_list, stderr = await ops_test.juju(
+        "storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", "--format=json"
+    )
+    if return_code != 0:
+        raise Exception(f"failed to get storages info with error: {stderr}")
+
+    parsed_storages_list = json.loads(storages_list)
+    for storage_name, storage in parsed_storages_list["storage"].items():
+        if (str(storage["status"]["current"]) == "detached") and (str(storage["life"] == "alive")):
+            return storage_name
+
+    raise Exception("failed to get deatached storage")
+
+
+async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
+    """Checks if "operator" password is valid for current postgresql db."""
+    stdout = await run_command_on_unit(
+        ops_test,
+        unit_name,
+        """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
+    )
+    return 'password authentication failed for user "operator"' not in stdout
+
+
+async def remove_unit_force(ops_test: OpsTest, unit_name: str):
+    """Removes unit with --force --no-wait."""
+    app_name = unit_name.split("/")[0]
+    complete_command = ["remove-unit", f"{unit_name}", "--force", "--no-wait", "--no-prompt"]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
+
+    for unit in ops_test.model.applications[app_name].units:
+        assert unit != unit_name

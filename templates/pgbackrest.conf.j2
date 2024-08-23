@@ -2,15 +2,22 @@
 backup-standby=y
 lock-path=/tmp
 log-path={{ log_path }}
-repo1-retention-full=9999999
+repo1-retention-full-type=time
+repo1-retention-full={{ retention_full }}
+repo1-retention-history=365
 repo1-type=s3
 repo1-path={{ path }}
 repo1-s3-region={{ region }}
 repo1-s3-endpoint={{ endpoint }}
 repo1-s3-bucket={{ bucket }}
 repo1-s3-uri-style={{ s3_uri_style }}
+{%- if tls_ca_chain != '' %}
+repo1-s3-ca-file={{ tls_ca_chain }}
+{%- endif %}
 repo1-s3-key={{ access_key }}
 repo1-s3-key-secret={{ secret_key }}
+repo1-block=y
+repo1-bundle=y
 start-fast=y
 {%- if enable_tls %}
 tls-server-address=*

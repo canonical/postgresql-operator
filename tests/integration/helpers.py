@@ -4,6 +4,7 @@
 import asyncio
 import itertools
 import json
+import logging
 import os
 import subprocess
 import tempfile
@@ -16,13 +17,13 @@ import botocore
 import psycopg2
 import requests
 import yaml
+from juju.model import Model
 from juju.unit import Unit
 from pytest_operator.plugin import OpsTest
 from tenacity import (
     RetryError,
     Retrying,
     retry,
-    retry_if_exception,
     retry_if_result,
     stop_after_attempt,
     stop_after_delay,
@@ -35,6 +36,9 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET = "Move restored cluster to another S3 bucket"
+
+logger = logging.getLogger(__name__)
 
 
 async def build_connection_string(
@@ -289,6 +293,7 @@ async def deploy_and_relate_application_with_postgresql(
     config: dict = None,
     channel: str = "stable",
     relation: str = "db",
+    series: str = None,
 ) -> int:
     """Helper function to deploy and relate application with PostgreSQL.
 
@@ -301,6 +306,7 @@ async def deploy_and_relate_application_with_postgresql(
         channel: The channel to use for the charm.
         relation: Name of the PostgreSQL relation to relate
             the application to.
+        series: Series of the charm to deploy.
 
     Returns:
         the id of the created relation.
@@ -312,6 +318,7 @@ async def deploy_and_relate_application_with_postgresql(
         application_name=application_name,
         num_units=number_of_units,
         config=config,
+        series=series,
     )
     await ops_test.model.wait_for_idle(
         apps=[application_name],
@@ -435,7 +442,8 @@ async def deploy_and_relate_bundle_with_postgresql(
         if status_message:
             awaits.append(
                 ops_test.model.block_until(
-                    lambda: unit.workload_status_message == status_message, timeout=timeout
+                    lambda: unit.workload_status_message == status_message,
+                    timeout=timeout,
                 )
             )
         await asyncio.gather(*awaits)
@@ -571,9 +579,12 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> List[str]:
     return output
 
 
-async def get_leader_unit(ops_test: OpsTest, app: str) -> Optional[Unit]:
+async def get_leader_unit(ops_test: OpsTest, app: str, model: Model = None) -> Optional[Unit]:
+    if model is None:
+        model = ops_test.model
+
     leader_unit = None
-    for unit in ops_test.model.applications[app].units:
+    for unit in model.applications[app].units:
         if await unit.is_leader_from_status():
             leader_unit = unit
             break
@@ -613,22 +624,27 @@ async def get_password(ops_test: OpsTest, unit_name: str, username: str = "opera
 
 
 @retry(
-    retry=retry_if_exception(KeyError),
     stop=stop_after_attempt(10),
     wait=wait_exponential(multiplier=1, min=2, max=30),
+    reraise=True,
 )
-async def get_primary(ops_test: OpsTest, unit_name: str) -> str:
+async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     """Get the primary unit.
 
     Args:
         ops_test: ops_test instance.
         unit_name: the name of the unit.
+        model: Model to use.
 
     Returns:
         the current primary unit.
     """
-    action = await ops_test.model.units.get(unit_name).run_action("get-primary")
+    if not model:
+        model = ops_test.model
+    action = await model.units.get(unit_name).run_action("get-primary")
     action = await action.wait()
+    if "primary" not in action.results or action.results["primary"] not in model.units:
+        raise Exception("Primary unit not found")
     return action.results["primary"]
 
 
@@ -658,17 +674,25 @@ async def get_tls_ca(
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
 
 
-def get_unit_address(ops_test: OpsTest, unit_name: str) -> str:
+@retry(
+    stop=stop_after_attempt(10),
+    wait=wait_exponential(multiplier=1, min=2, max=30),
+    reraise=True,
+)
+def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Get unit IP address.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        model: Optional model to use to get the unit address
 
     Returns:
         IP address of the unit
     """
-    return ops_test.model.units.get(unit_name).public_address
+    if model is None:
+        model = ops_test.model
+    return model.units.get(unit_name).public_address
 
 
 async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
@@ -736,6 +760,35 @@ async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
         return False
 
 
+async def check_tls_replication(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
+    """Returns whether TLS is enabled on the replica PostgreSQL instance.
+
+    Args:
+        ops_test: The ops test framework instance.
+        unit_name: The name of the replica of the PostgreSQL instance.
+        enabled: check if TLS is enabled/disabled
+
+    Returns:
+        Whether TLS is enabled/disabled.
+    """
+    unit_address = get_unit_address(ops_test, unit_name)
+    password = await get_password(ops_test, unit_name)
+
+    # Check for the all replicas using encrypted connection
+    output = await execute_query_on_unit(
+        unit_address,
+        password,
+        "SELECT pg_ssl.ssl, pg_sa.client_addr FROM pg_stat_ssl pg_ssl"
+        " JOIN pg_stat_activity pg_sa ON pg_ssl.pid = pg_sa.pid"
+        " AND pg_sa.usename = 'replication';",
+    )
+
+    for i in range(0, len(output), 2):
+        if output[i] != enabled:
+            return False
+    return True
+
+
 async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
     """Returns whether TLS is enabled on Patroni REST API.
 
@@ -775,6 +828,18 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
     except RetryError:
         return False
     return False
+
+
+def has_relation_exited(
+    ops_test: OpsTest, endpoint_one: str, endpoint_two: str, model: Model = None
+) -> bool:
+    """Returns true if the relation between endpoint_one and endpoint_two has been removed."""
+    relations = model.relations if model is not None else ops_test.model.relations
+    for rel in relations:
+        endpoints = [endpoint.name for endpoint in rel.endpoints]
+        if endpoint_one in endpoints and endpoint_two in endpoints:
+            return False
+    return True
 
 
 def remove_chown_workaround(original_charm_filename: str, patched_charm_filename: str) -> None:
@@ -861,30 +926,38 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
     complete_command = ["exec", "--unit", unit_name, "--", *command.split()]
     return_code, stdout, _ = await ops_test.juju(*complete_command)
     if return_code != 0:
+        logger.error(stdout)
         raise Exception(
-            "Expected command %s to succeed instead it failed: %s", command, return_code
+            f"Expected command '{command}' to succeed instead it failed: {return_code}"
         )
     return stdout
 
 
-async def scale_application(ops_test: OpsTest, application_name: str, count: int) -> None:
+async def scale_application(
+    ops_test: OpsTest, application_name: str, count: int, model: Model = None
+) -> None:
     """Scale a given application to a specific unit count.
 
     Args:
         ops_test: The ops test framework instance
         application_name: The name of the application
         count: The desired number of units to scale to
+        model: The model to scale the application in
     """
-    change = count - len(ops_test.model.applications[application_name].units)
+    if model is None:
+        model = ops_test.model
+    change = count - len(model.applications[application_name].units)
     if change > 0:
-        await ops_test.model.applications[application_name].add_units(change)
+        await model.applications[application_name].add_units(change)
     elif change < 0:
-        units = [
-            unit.name for unit in ops_test.model.applications[application_name].units[0:-change]
-        ]
-        await ops_test.model.applications[application_name].destroy_units(*units)
-    await ops_test.model.wait_for_idle(
-        apps=[application_name], status="active", timeout=2000, wait_for_exact_units=count
+        units = [unit.name for unit in model.applications[application_name].units[0:-change]]
+        await model.applications[application_name].destroy_units(*units)
+    await model.wait_for_idle(
+        apps=[application_name],
+        status="active",
+        timeout=2000,
+        idle_period=30,
+        wait_for_exact_units=count,
     )
 
 
@@ -985,8 +1058,255 @@ async def wait_for_idle_on_blocked(
     unit = ops_test.model.units.get(f"{database_app_name}/{unit_number}")
     await asyncio.gather(
         ops_test.model.wait_for_idle(apps=[other_app_name], status="active"),
-        ops_test.model.wait_for_idle(
-            apps=[database_app_name], status="blocked", raise_on_blocked=False
+        ops_test.model.block_until(
+            lambda: unit.workload_status == "blocked"
+            and unit.workload_status_message == status_message
         ),
-        ops_test.model.block_until(lambda: unit.workload_status_message == status_message),
     )
+
+
+def wait_for_relation_removed_between(
+    ops_test: OpsTest, endpoint_one: str, endpoint_two: str, model: Model = None
+) -> None:
+    """Wait for relation to be removed before checking if it's waiting or idle.
+
+    Args:
+        ops_test: running OpsTest instance
+        endpoint_one: one endpoint of the relation. Doesn't matter if it's provider or requirer.
+        endpoint_two: the other endpoint of the relation.
+        model: optional model to check for the relation.
+    """
+    try:
+        for attempt in Retrying(stop=stop_after_delay(3 * 60), wait=wait_fixed(3)):
+            with attempt:
+                if has_relation_exited(ops_test, endpoint_one, endpoint_two, model):
+                    break
+    except RetryError:
+        assert False, "Relation failed to exit after 3 minutes."
+
+
+async def backup_operations(
+    ops_test: OpsTest,
+    s3_integrator_app_name: str,
+    tls_certificates_app_name: str,
+    tls_config,
+    tls_channel,
+    credentials,
+    cloud,
+    config,
+    charm,
+) -> None:
+    """Basic set of operations for backup testing in different cloud providers."""
+    # Deploy S3 Integrator and TLS Certificates Operator.
+    await ops_test.model.deploy(s3_integrator_app_name)
+    await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
+
+    # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
+    # as archive_mode is disabled after restoring the backup) and to TLS Certificates Operator
+    # (to be able to create backups from replicas).
+    database_app_name = f"{DATABASE_APP_NAME}-{cloud.lower()}"
+    await ops_test.model.deploy(
+        charm,
+        application_name=database_app_name,
+        num_units=2,
+        series=CHARM_SERIES,
+        config={"profile": "testing"},
+    )
+
+    await ops_test.model.relate(database_app_name, tls_certificates_app_name)
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
+    await ops_test.model.relate(database_app_name, s3_integrator_app_name)
+
+    # Configure and set access and secret keys.
+    logger.info(f"configuring S3 integrator for {cloud}")
+    await ops_test.model.applications[s3_integrator_app_name].set_config(config)
+    action = await ops_test.model.units.get(f"{s3_integrator_app_name}/0").run_action(
+        "sync-s3-credentials",
+        **credentials,
+    )
+    await action.wait()
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[database_app_name, s3_integrator_app_name], status="active", timeout=1500
+        )
+
+    primary = await get_primary(ops_test, f"{database_app_name}/0")
+    for unit in ops_test.model.applications[database_app_name].units:
+        if unit.name != primary:
+            replica = unit.name
+            break
+
+    # Write some data.
+    password = await get_password(ops_test, primary)
+    address = get_unit_address(ops_test, primary)
+    logger.info("creating a table in the database")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute(
+            "CREATE TABLE IF NOT EXISTS backup_table_1 (test_collumn INT );"
+        )
+    connection.close()
+
+    # Run the "create backup" action.
+    logger.info("creating a backup")
+    action = await ops_test.model.units.get(replica).run_action("create-backup")
+    await action.wait()
+    backup_status = action.results.get("backup-status")
+    assert backup_status, "backup hasn't succeeded"
+    await ops_test.model.wait_for_idle(
+        apps=[database_app_name, s3_integrator_app_name], status="active", timeout=1000
+    )
+
+    # With a stable cluster, Run the "create backup" action
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
+    logger.info("listing the available backups")
+    action = await ops_test.model.units.get(replica).run_action("list-backups")
+    await action.wait()
+    backups = action.results.get("backups")
+    # 5 lines for header output, 1 backup line ==> 6 total lines
+    assert len(backups.split("\n")) == 6, "full backup is not outputted"
+    await ops_test.model.wait_for_idle(status="active", timeout=1000)
+
+    # Write some data.
+    logger.info("creating a second table in the database")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("CREATE TABLE backup_table_2 (test_collumn INT );")
+    connection.close()
+
+    # Run the "create backup" action.
+    logger.info("creating a backup")
+    action = await ops_test.model.units.get(replica).run_action(
+        "create-backup", **{"type": "differential"}
+    )
+    await action.wait()
+    backup_status = action.results.get("backup-status")
+    assert backup_status, "backup hasn't succeeded"
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+
+    # Run the "list backups" action.
+    logger.info("listing the available backups")
+    action = await ops_test.model.units.get(replica).run_action("list-backups")
+    await action.wait()
+    backups = action.results.get("backups")
+    # 5 lines for header output, 2 backup lines ==> 7 total lines
+    assert len(backups.split("\n")) == 7, "differential backup is not outputted"
+    await ops_test.model.wait_for_idle(status="active", timeout=1000)
+
+    # Write some data.
+    logger.info("creating a second table in the database")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("CREATE TABLE backup_table_3 (test_collumn INT );")
+    connection.close()
+    # Scale down to be able to restore.
+    async with ops_test.fast_forward():
+        await ops_test.model.destroy_unit(replica)
+        await ops_test.model.block_until(
+            lambda: len(ops_test.model.applications[database_app_name].units) == 1
+        )
+
+    for unit in ops_test.model.applications[database_app_name].units:
+        remaining_unit = unit
+        break
+
+    # Run the "restore backup" action for differential backup.
+    for attempt in Retrying(
+        stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+    ):
+        with attempt:
+            logger.info("restoring the backup")
+            last_diff_backup = backups.split("\n")[-1]
+            backup_id = last_diff_backup.split()[0]
+            action = await remaining_unit.run_action("restore", **{"backup-id": backup_id})
+            await action.wait()
+            restore_status = action.results.get("restore-status")
+            assert restore_status, "restore hasn't succeeded"
+
+    # Wait for the restore to complete.
+    async with ops_test.fast_forward():
+        await ops_test.model.block_until(
+            lambda: remaining_unit.workload_status_message
+            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+            timeout=1000,
+        )
+
+    # Check that the backup was correctly restored by having only the first created table.
+    logger.info("checking that the backup was correctly restored")
+    primary = await get_primary(ops_test, remaining_unit.name)
+    address = get_unit_address(ops_test, primary)
+    with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_1');"
+        )
+        assert cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
+        )
+        assert cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_2' doesn't exist"
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_3');"
+        )
+        assert not cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_3' exists"
+    connection.close()
+
+    # Run the "restore backup" action for full backup.
+    for attempt in Retrying(
+        stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+    ):
+        with attempt:
+            logger.info("restoring the backup")
+            last_full_backup = backups.split("\n")[-2]
+            backup_id = last_full_backup.split()[0]
+            action = await remaining_unit.run_action("restore", **{"backup-id": backup_id})
+            await action.wait()
+            restore_status = action.results.get("restore-status")
+            assert restore_status, "restore hasn't succeeded"
+
+    # Wait for the restore to complete.
+    async with ops_test.fast_forward():
+        await ops_test.model.block_until(
+            lambda: remaining_unit.workload_status_message
+            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
+            timeout=1000,
+        )
+
+    # Check that the backup was correctly restored by having only the first created table.
+    primary = await get_primary(ops_test, remaining_unit.name)
+    address = get_unit_address(ops_test, primary)
+    logger.info("checking that the backup was correctly restored")
+    with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_1');"
+        )
+        assert cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
+        )
+        assert not cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_2' exists"
+        cursor.execute(
+            "SELECT EXISTS (SELECT FROM information_schema.tables"
+            " WHERE table_schema = 'public' AND table_name = 'backup_table_3');"
+        )
+        assert not cursor.fetchone()[
+            0
+        ], "backup wasn't correctly restored: table 'backup_table_3' exists"
+    connection.close()

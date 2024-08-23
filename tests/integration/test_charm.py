@@ -4,6 +4,7 @@
 
 
 import logging
+from time import sleep
 
 import psycopg2
 import pytest
@@ -11,6 +12,8 @@ import requests
 from psycopg2 import sql
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
+
+from locales import SNAP_LOCALES
 
 from .helpers import (
     CHARM_SERIES,
@@ -23,6 +26,7 @@ from .helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    run_command_on_unit,
     scale_application,
     switchover,
 )
@@ -167,12 +171,30 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
 
 
 @pytest.mark.group(1)
+async def test_postgresql_locales(ops_test: OpsTest) -> None:
+    raw_locales = await run_command_on_unit(
+        ops_test,
+        ops_test.model.applications[DATABASE_APP_NAME].units[0].name,
+        "ls /snap/charmed-postgresql/current/usr/lib/locale",
+    )
+    locales = raw_locales.splitlines()
+    locales.append("C")
+    locales.sort()
+
+    # Juju 2 has an extra empty element
+    if "" in locales:
+        locales.remove("")
+    assert locales == SNAP_LOCALES
+
+
+@pytest.mark.group(1)
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
         "memory_max_prepared_transactions": "100",
-        "memory_shared_buffers": "128",
+        "memory_shared_buffers": "32768",  # 2 * 128MB. Patroni may refuse the config if < 128MB
         "response_lc_monetary": "en_GB.utf8",
+        "experimental_max_connections": "200",
     })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
     any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -182,9 +204,16 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     for unit_id in UNIT_IDS:
         host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
         logger.info("connecting to the database host: %s", host)
-        with db_connect(host, password) as connection:
-            settings_names = ["max_prepared_transactions", "shared_buffers", "lc_monetary"]
-            with connection.cursor() as cursor:
+        try:
+            with psycopg2.connect(
+                f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
+            ) as connection, connection.cursor() as cursor:
+                settings_names = [
+                    "max_prepared_transactions",
+                    "shared_buffers",
+                    "lc_monetary",
+                    "max_connections",
+                ]
                 cursor.execute(
                     sql.SQL("SELECT name,setting FROM pg_settings WHERE name IN ({});").format(
                         sql.SQL(", ").join(sql.Placeholder() * len(settings_names))
@@ -193,12 +222,14 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
                 )
                 records = cursor.fetchall()
                 settings = convert_records_to_dict(records)
-        connection.close()
 
-        # Validate each configuration set by Patroni on PostgreSQL.
-        assert settings["max_prepared_transactions"] == "100"
-        assert settings["shared_buffers"] == "128"
-        assert settings["lc_monetary"] == "en_GB.utf8"
+                # Validate each configuration set by Patroni on PostgreSQL.
+                assert settings["max_prepared_transactions"] == "100"
+                assert settings["shared_buffers"] == "32768"
+                assert settings["lc_monetary"] == "en_GB.utf8"
+                assert settings["max_connections"] == "200"
+        finally:
+            connection.close()
 
 
 @pytest.mark.group(1)
@@ -273,8 +304,12 @@ async def test_scale_down_and_up(ops_test: OpsTest):
         apps=[DATABASE_APP_NAME],
         status="active",
         timeout=2000,
+        idle_period=30,
         wait_for_exact_units=initial_scale,
     )
+
+    # Wait some time to elect a new primary.
+    sleep(30)
 
     # Assert the correct members are part of the cluster.
     await check_cluster_members(ops_test, DATABASE_APP_NAME)

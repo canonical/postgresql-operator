@@ -299,6 +299,10 @@ options:
     default: false
     type: boolean
     description: Enable pgvector extension
+  plugin_timescaledb_enable:
+    default: false
+    type: boolean
+    description: Enable timescaledb extension
   profile:
    description: |
       Profile representing the scope of deployment, and used to tune resource allocation.
@@ -307,20 +311,12 @@ options:
       minimal running performance.
    type: string
    default: production
-  profile-limit-memory:
-    type: int
-    description: |
-      [DEPRECTATED] Use profile_limit_memory instead. Amount of memory in Megabytes to limit PostgreSQL
-      and associated process to. If unset, this will be decided according to the default memory limit
-      in the selected profile. Only comes into effect when the `production` profile is selected. This
-      config option cannot be set at the same time as profile_limit_memory.
   profile_limit_memory:
     type: int
     description: |
       Amount of memory in Megabytes to limit PostgreSQL and associated process to.
       If unset, this will be decided according to the default memory limit in the selected profile.
-      Only comes into effect when the `production` profile is selected. This config option cannot be
-      set at the same time as profile-limit-memory.
+      Only comes into effect when the `production` profile is selected.
   request_date_style:
     description: |
       Sets the display format for date and time values. Allowed formats are explained
@@ -402,3 +398,7 @@ options:
       Allowed values are: from 0 to 2000000000.
     type: int
     default: 150000000
+  experimental_max_connections:
+    type: int
+    description: |
+      [EXPERIMENTAL] Force set max_connections.

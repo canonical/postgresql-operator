@@ -37,11 +37,11 @@ ctl:
 raft:
   data_dir: {{ conf_path }}/raft
   self_addr: '{{ self_ip }}:2222'
-  {% if peers_ips -%}
+  {% if partner_addrs -%}
   partner_addrs:
   {% endif -%}
-  {% for peer_ip in peers_ips -%}
-  - {{ peer_ip }}:2222
+  {% for partner_addr in partner_addrs -%}
+  - {{ partner_addr }}:2222
   {% endfor %}
 
 bootstrap:
@@ -60,7 +60,7 @@ bootstrap:
       remove_data_directory_on_diverged_timelines: true
       parameters:
         synchronous_standby_names: "*"
-        {%- if enable_pgbackrest %}
+        {%- if enable_pgbackrest_archiving %}
         archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
         {% else %}
         archive_command: /bin/true
@@ -91,6 +91,7 @@ bootstrap:
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
+        shared_preload_libraries: 'timescaledb'
         {%- if pg_parameters %}
         {%- for key, value in pg_parameters.items() %}
         {{key}}: {{value}}
@@ -100,9 +101,20 @@ bootstrap:
   {%- if restoring_backup %}
   method: pgbackrest
   pgbackrest:
-    command: pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --set={{ backup_id }} --type=immediate --target-action=promote restore
+    command: >
+      pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }}
+      {%- if backup_id %} --set={{ backup_id }} {%- endif %}
+      {%- if restore_to_latest %} --type=default {%- else %}
+      --target-action=promote {%- if pitr_target %} --target="{{ pitr_target }}" --type=time {%- else %} --type=immediate {%- endif %}
+      {%- endif %}
+      restore
     no_params: True
     keep_existing_recovery_conf: True
+  {% elif primary_cluster_endpoint %}
+    standby_cluster:
+      host: {{ primary_cluster_endpoint }}
+      port: 5432
+      create_replica_methods: ["basebackup"]
   {% else %}
   initdb:
   - encoding: UTF8
@@ -116,7 +128,7 @@ postgresql:
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
   data_dir: {{ data_path }}
   parameters:
-    {%- if enable_pgbackrest %}
+    {%- if enable_pgbackrest_archiving %}
     archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
     archive_command: /bin/true
@@ -146,6 +158,9 @@ postgresql:
     {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 md5
     # Allow replications connections from other cluster members.
+    {%- for endpoint in extra_replication_endpoints %}
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 md5
+    {%- endfor %}
     {%- for peer_ip in peers_ips %}
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
     {% endfor %}

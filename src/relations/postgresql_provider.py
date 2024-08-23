@@ -17,11 +17,16 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent
+from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
-from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT
+from constants import (
+    ALL_CLIENT_RELATIONS,
+    APP_SCOPE,
+    DATABASE_PORT,
+    ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -48,7 +53,10 @@ class PostgreSQLProvider(Object):
         self.framework.observe(
             charm.on[self.relation_name].relation_broken, self._on_relation_broken
         )
-
+        self.framework.observe(
+            charm.on[self.relation_name].relation_changed,
+            self._on_relation_changed_event,
+        )
         self.charm = charm
 
         # Charm events defined in the database provides charm library.
@@ -96,9 +104,6 @@ class PostgreSQLProvider(Object):
             # Share the credentials with the application.
             self.database_provides.set_credentials(event.relation.id, user, password)
 
-            # Update the read/write and read-only endpoints.
-            self.update_endpoints(event)
-
             # Set the database version.
             self.database_provides.set_version(
                 event.relation.id, self.charm.postgresql.get_postgresql_version()
@@ -106,6 +111,9 @@ class PostgreSQLProvider(Object):
 
             # Set the database name
             self.database_provides.set_database(event.relation.id, database)
+
+            # Update the read/write and read-only endpoints.
+            self.update_endpoints(event)
 
             self._update_unit_status(event.relation)
         except (
@@ -129,6 +137,8 @@ class PostgreSQLProvider(Object):
         if not self.charm.unit.is_leader():
             return
 
+        delete_user = "suppress-oversee-users" not in self.charm.app_peer_data
+
         # Retrieve database users.
         try:
             database_users = {
@@ -151,13 +161,16 @@ class PostgreSQLProvider(Object):
 
         # Delete that users that exist in the database but not in the active relations.
         for user in database_users - relation_users:
-            try:
-                logger.info("Remove relation user: %s", user)
-                self.charm.set_secret(APP_SCOPE, user, None)
-                self.charm.set_secret(APP_SCOPE, f"{user}-database", None)
-                self.charm.postgresql.delete_user(user)
-            except PostgreSQLDeleteUserError:
-                logger.error(f"Failed to delete user {user}")
+            if delete_user:
+                try:
+                    logger.info("Remove relation user: %s", user)
+                    self.charm.set_secret(APP_SCOPE, user, None)
+                    self.charm.set_secret(APP_SCOPE, f"{user}-database", None)
+                    self.charm.postgresql.delete_user(user)
+                except PostgreSQLDeleteUserError:
+                    logger.error("Failed to delete user %s", user)
+            else:
+                logger.info("Stale relation user detected: %s", user)
 
     def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
         """Set the read/write and read-only endpoints."""
@@ -166,7 +179,11 @@ class PostgreSQLProvider(Object):
 
         # Get the current relation or all the relations
         # if this is triggered by another type of event.
-        relations = [event.relation] if event else self.model.relations[self.relation_name]
+        relations_ids = [event.relation.id] if event else None
+        rel_data = self.database_provides.fetch_relation_data(
+            relations_ids, ["external-node-connectivity", "database"]
+        )
+        secret_data = self.database_provides.fetch_my_relation_data(relations_ids, ["password"])
 
         # If there are no replicas, remove the read-only endpoint.
         replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
@@ -177,18 +194,35 @@ class PostgreSQLProvider(Object):
             else ""
         )
 
-        for relation in relations:
+        for relation_id in rel_data.keys():
+            user = f"relation-{relation_id}"
+            database = rel_data[relation_id].get("database")
+            password = secret_data.get(relation_id, {}).get("password")
+
             # Set the read/write endpoint.
             self.database_provides.set_endpoints(
-                relation.id,
+                relation_id,
                 f"{self.charm.primary_endpoint}:{DATABASE_PORT}",
             )
 
             # Set the read-only endpoint.
             self.database_provides.set_read_only_endpoints(
-                relation.id,
+                relation_id,
                 read_only_endpoints,
             )
+
+            # Set connection string URI.
+            self.database_provides.set_uris(
+                relation_id,
+                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
+            )
+
+    def _check_multiple_endpoints(self) -> bool:
+        """Checks if there are relations with other endpoints."""
+        relation_names = {relation.name for relation in self.charm.client_relations}
+        if "database" in relation_names and len(relation_names) > 1:
+            return True
+        return False
 
     def _update_unit_status(self, relation: Relation) -> None:
         """# Clean up Blocked status if it's due to extensions request."""
@@ -197,6 +231,27 @@ class PostgreSQLProvider(Object):
             and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ):
             if not self.check_for_invalid_extra_user_roles(relation.id):
+                self.charm.unit.status = ActiveStatus()
+
+        self._update_unit_status_on_blocking_endpoint_simultaneously()
+
+    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
+        """Event emitted when the relation has changed."""
+        # Leader only
+        if not self.charm.unit.is_leader():
+            return
+
+        if self._check_multiple_endpoints():
+            self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
+            return
+
+    def _update_unit_status_on_blocking_endpoint_simultaneously(self):
+        """Clean up Blocked status if this is due related of multiple endpoints."""
+        if (
+            self.charm.is_blocked
+            and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+        ):
+            if not self._check_multiple_endpoints():
                 self.charm.unit.status = ActiveStatus()
 
     def check_for_invalid_extra_user_roles(self, relation_id: int) -> bool:
@@ -212,7 +267,7 @@ class PostgreSQLProvider(Object):
             for data in relation.data.values():
                 extra_user_roles = data.get("extra-user-roles")
                 if extra_user_roles is None:
-                    break
+                    continue
                 extra_user_roles = extra_user_roles.lower().split(",")
                 for extra_user_role in extra_user_roles:
                     if (

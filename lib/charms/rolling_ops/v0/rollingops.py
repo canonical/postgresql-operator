@@ -49,7 +49,7 @@ class SomeCharm(...):
 
 To kick off the rolling restart, emit this library's AcquireLock event. The simplest way
 to do so would be with an action, though it might make sense to acquire the lock in
-response to another event. 
+response to another event.
 
 ```python
     def _on_trigger_restart(self, event):
@@ -88,7 +88,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 7
 
 
 class LockNoRelationError(Exception):
@@ -182,6 +182,7 @@ class Lock:
             # Active acquire request.
             return LockState.ACQUIRE
 
+        logger.debug("Lock state: %s %s", unit_state, app_state)
         return app_state  # Granted or unset/released
 
     @_state.setter
@@ -202,21 +203,27 @@ class Lock:
         if state is LockState.IDLE:
             self.relation.data[self.app].update({str(self.unit): state.value})
 
+        logger.debug("state: %s", state.value)
+
     def acquire(self):
         """Request that a lock be acquired."""
         self._state = LockState.ACQUIRE
+        logger.debug("Lock acquired.")
 
     def release(self):
         """Request that a lock be released."""
         self._state = LockState.RELEASE
+        logger.debug("Lock released.")
 
     def clear(self):
         """Unset a lock."""
         self._state = LockState.IDLE
+        logger.debug("Lock cleared.")
 
     def grant(self):
         """Grant a lock to a unit."""
         self._state = LockState.GRANTED
+        logger.debug("Lock granted.")
 
     def is_held(self):
         """This unit holds the lock."""
@@ -266,9 +273,11 @@ class AcquireLock(EventBase):
         self.callback_override = callback_override or ""
 
     def snapshot(self):
+        """Snapshot of lock event."""
         return {"callback_override": self.callback_override}
 
     def restore(self, snapshot):
+        """Restores lock event."""
         self.callback_override = snapshot["callback_override"]
 
 
@@ -288,7 +297,7 @@ class RollingOpsManager(Object):
             charm: the charm we are attaching this to.
             relation: an identifier, by convention based on the name of the relation in the
                 metadata.yaml, which identifies this instance of RollingOperatorsFactory,
-                distinct from other instances that may be hanlding other events.
+                distinct from other instances that may be handling other events.
             callback: a closure to run when we have a lock. (It must take a CharmBase object and
                 EventBase object as args.)
         """
@@ -309,6 +318,7 @@ class RollingOpsManager(Object):
         self.framework.observe(charm.on[self.name].acquire_lock, self._on_acquire_lock)
         self.framework.observe(charm.on[self.name].run_with_lock, self._on_run_with_lock)
         self.framework.observe(charm.on[self.name].process_locks, self._on_process_locks)
+        self.framework.observe(charm.on.leader_elected, self._on_process_locks)
 
     def _callback(self: CharmBase, event: EventBase) -> None:
         """Placeholder for the function that actually runs our event.
@@ -381,7 +391,7 @@ class RollingOpsManager(Object):
         """Request a lock."""
         try:
             Lock(self).acquire()  # Updates relation data
-            # emit relation changed event in the edge case where aquire does not
+            # emit relation changed event in the edge case where acquire does not
             relation = self.model.get_relation(self.name)
 
             # persist callback override for eventual run

@@ -21,7 +21,12 @@ from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
 from pgconnstr import ConnectionString
 
-from constants import APP_SCOPE, DATABASE_PORT
+from constants import (
+    ALL_LEGACY_RELATIONS,
+    APP_SCOPE,
+    DATABASE_PORT,
+    ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -87,6 +92,20 @@ class DbProvides(Object):
                         return True
         return False
 
+    def _check_exist_current_relation(self) -> bool:
+        for r in self.charm.client_relations:
+            if r in ALL_LEGACY_RELATIONS:
+                return True
+        return False
+
+    def _check_multiple_endpoints(self) -> bool:
+        """Checks if there are relations with other endpoints."""
+        is_exist = self._check_exist_current_relation()
+        for relation in self.charm.client_relations:
+            if relation.name not in ALL_LEGACY_RELATIONS and is_exist:
+                return True
+        return False
+
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle the legacy db/db-admin relation changed event.
 
@@ -94,6 +113,10 @@ class DbProvides(Object):
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.unit.is_leader():
+            return
+
+        if self._check_multiple_endpoints():
+            self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
             return
 
         if (
@@ -277,6 +300,16 @@ class DbProvides(Object):
         ]:
             if not self._check_for_blocking_relations(relation.id):
                 self.charm.unit.status = ActiveStatus()
+        self._update_unit_status_on_blocking_endpoint_simultaneously()
+
+    def _update_unit_status_on_blocking_endpoint_simultaneously(self):
+        """Clean up Blocked status if this is due related of multiple endpoints."""
+        if (
+            self.charm.is_blocked
+            and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+        ):
+            if not self._check_multiple_endpoints():
+                self.charm.unit.status = ActiveStatus()
 
     def update_endpoints(self, relation: Relation = None) -> None:
         """Set the read/write and read-only endpoints."""
@@ -286,14 +319,14 @@ class DbProvides(Object):
         if len(relations) == 0:
             return
 
+        postgresql_version = None
         try:
             postgresql_version = self.charm.postgresql.get_postgresql_version()
-        except PostgreSQLGetPostgreSQLVersionError as e:
-            logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
-                f"Failed to retrieve the PostgreSQL version to initialise/update {self.relation_name} relation"
+        except PostgreSQLGetPostgreSQLVersionError:
+            logger.exception(
+                "Failed to retrieve the PostgreSQL version to initialise/update %s relation"
+                % self.relation_name
             )
-            return
 
         # List the replicas endpoints.
         replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
@@ -350,7 +383,6 @@ class DbProvides(Object):
                 "port": DATABASE_PORT,
                 "user": user,
                 "schema_user": user,
-                "version": postgresql_version,
                 "password": password,
                 "schema_password": password,
                 "database": database,
@@ -359,6 +391,8 @@ class DbProvides(Object):
                 "state": self._get_state(),
                 "extensions": ",".join(required_extensions),
             }
+            if postgresql_version:
+                data["version"] = postgresql_version
 
             # Set the data only in the unit databag.
             unit_relation_databag.update(data)

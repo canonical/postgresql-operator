@@ -1,15 +1,30 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "extends": ["github>canonical/data-platform//renovate_presets/charm.json5"],
-  "reviewers": ["dragomirp", "marceloneppel", "taurus-forever"],
+  "reviewers": ["dragomirp", "lucasgameiroborges", "marceloneppel", "taurus-forever"],
   "packageRules": [
     // Later rules override earlier rules
     {
       "matchPackageNames": ["pydantic"],
       "allowedVersions": "<2.0.0"
-    }, {
-      "matchPackageNames": ["python"],
-      "allowedVersions": "<3.11"
+    },
+    {
+      "matchManagers": ["regex"],
+      "matchDepNames": ["juju"],
+      "matchDatasources": ["pypi"],
+      "allowedVersions": "<3",
+      "groupName": "Juju agents"
+    }
+  ],
+  "regexManagers": [
+    {
+      "fileMatch": ["^\\.github/workflows/[^/]+\\.ya?ml$"],
+      "matchStrings": [
+        "(libjuju: )==(?<currentValue>.*?) +# renovate: latest libjuju 2"
+      ],
+      "depNameTemplate": "juju",
+      "datasourceTemplate": "pypi",
+      "versioningTemplate": "loose"
     }
   ]
 }

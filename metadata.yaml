@@ -26,6 +26,10 @@ peers:
     interface: upgrade
 
 provides:
+  replication-offer:
+    interface: postgresql_async
+    limit: 1
+    optional: true
   database:
     interface: postgresql_client
   db:
@@ -37,12 +41,20 @@ provides:
     limit: 1
 
 requires:
+  replication:
+    interface: postgresql_async
+    limit: 1
+    optional: true
   certificates:
     interface: tls-certificates
     limit: 1
     optional: true
   s3-parameters:
     interface: s3
+    limit: 1
+    optional: true
+  tracing:
+    interface: tracing
     limit: 1
     optional: true
 
@@ -53,3 +65,13 @@ storage:
 
 assumes:
   - juju
+  - any-of:
+      - all-of:
+          - juju >= 2.9.49
+          - juju < 3
+      - all-of:
+          - juju >= 3.4.3
+          - juju < 3.5
+      - all-of:
+          - juju >= 3.5.1
+          - juju < 4

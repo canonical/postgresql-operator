@@ -4,9 +4,12 @@
 
 """Helper class used to manage cluster lifecycle."""
 
+import glob
 import logging
 import os
 import pwd
+import re
+import subprocess
 from typing import Any, Dict, List, Optional, Set
 
 import requests
@@ -30,6 +33,7 @@ from constants import (
     PATRONI_CLUSTER_STATUS_ENDPOINT,
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
+    PATRONI_SERVICE_DEFAULT_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
@@ -47,8 +51,20 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 
+class ClusterNotPromotedError(Exception):
+    """Raised when a cluster is not promoted."""
+
+
 class NotReadyError(Exception):
     """Raised when not all cluster members healthy or finished initial sync."""
+
+
+class EndpointNotReadyError(Exception):
+    """Raised when an endpoint is not ready."""
+
+
+class StandbyClusterAlreadyPromotedError(Exception):
+    """Raised when a standby cluster is already promoted."""
 
 
 class RemoveRaftMemberFailedError(Exception):
@@ -68,6 +84,7 @@ class Patroni:
 
     def __init__(
         self,
+        charm,
         unit_ip: str,
         cluster_name: str,
         member_name: str,
@@ -81,6 +98,7 @@ class Patroni:
         """Initialize the Patroni class.
 
         Args:
+            charm: PostgreSQL charm instance.
             unit_ip: IP address of the current unit
             cluster_name: name of the cluster
             member_name: name of the member inside the cluster
@@ -91,6 +109,7 @@ class Patroni:
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
         """
+        self.charm = charm
         self.unit_ip = unit_ip
         self.cluster_name = cluster_name
         self.member_name = member_name
@@ -215,11 +234,12 @@ class Patroni:
                         return member["state"]
         return ""
 
-    def get_primary(self, unit_name_pattern=False) -> str:
+    def get_primary(self, unit_name_pattern=False, alternative_endpoints: List[str] = None) -> str:
         """Get primary instance.
 
         Args:
             unit_name_pattern: whether to convert pod name to unit name
+            alternative_endpoints: list of alternative endpoints to check for the primary.
 
         Returns:
             primary pod or unit name.
@@ -227,7 +247,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
+                url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
@@ -240,6 +260,38 @@ class Patroni:
                             # Change the last dash to / in order to match unit name pattern.
                             primary = "/".join(primary.rsplit("-", 1))
                         return primary
+
+    def get_standby_leader(
+        self, unit_name_pattern=False, check_whether_is_running: bool = False
+    ) -> Optional[str]:
+        """Get standby leader instance.
+
+        Args:
+            unit_name_pattern: whether to convert pod name to unit name
+            check_whether_is_running: whether to check if the standby leader is running
+
+        Returns:
+            standby leader pod or unit name.
+        """
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                url = self._get_alternative_patroni_url(attempt)
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+                for member in cluster_status.json()["members"]:
+                    if member["role"] == "standby_leader":
+                        if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                            logger.warning(f"standby leader {member['name']} is not running")
+                            continue
+                        standby_leader = member["name"]
+                        if unit_name_pattern:
+                            # Change the last dash to / in order to match unit name pattern.
+                            standby_leader = "/".join(standby_leader.rsplit("-", 1))
+                        return standby_leader
 
     def get_sync_standby_names(self) -> List[str]:
         """Get the list of sync standby unit names."""
@@ -254,12 +306,18 @@ class Patroni:
                         sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
         return sync_standbys
 
-    def _get_alternative_patroni_url(self, attempt: AttemptManager) -> str:
+    def _get_alternative_patroni_url(
+        self, attempt: AttemptManager, alternative_endpoints: List[str] = None
+    ) -> str:
         """Get an alternative REST API URL from another member each time.
 
         When the Patroni process is not running in the current unit it's needed
         to use a URL from another cluster member REST API to do some operations.
         """
+        if alternative_endpoints is not None:
+            return self._patroni_url.replace(
+                self.unit_ip, alternative_endpoints[attempt.retry_state.attempt_number - 1]
+            )
         attempt_number = attempt.retry_state.attempt_number
         if attempt_number > 1:
             url = self._patroni_url
@@ -296,16 +354,19 @@ class Patroni:
         except RetryError:
             return False
 
-        # Check if all members are running and one of them is a leader (primary),
-        # because sometimes there may exist (for some period of time) only
-        # replicas after a failed switchover.
+        # Check if all members are running and one of them is a leader (primary) or
+        # a standby leader, because sometimes there may exist (for some period of time)
+        # only replicas after a failed switchover.
         return all(
             member["state"] in RUNNING_STATES for member in cluster_status.json()["members"]
-        ) and any(member["role"] == "leader" for member in cluster_status.json()["members"])
+        ) and any(
+            member["role"] in ["leader", "standby_leader"]
+            for member in cluster_status.json()["members"]
+        )
 
     def get_patroni_health(self) -> Dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
             with attempt:
                 r = requests.get(
                     f"{self._patroni_url}/health",
@@ -313,7 +374,7 @@ class Patroni:
                     timeout=API_REQUEST_TIMEOUT,
                 )
 
-        return r.json()
+                return r.json()
 
     @property
     def is_creating_backup(self) -> bool:
@@ -423,6 +484,19 @@ class Patroni:
 
         return len(cluster_status.json()["members"]) == 0
 
+    def promote_standby_cluster(self) -> None:
+        """Promote a standby cluster to be a regular cluster."""
+        config_response = requests.get(f"{self._patroni_url}/config", verify=self.verify)
+        if "standby_cluster" not in config_response.json():
+            raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
+        requests.patch(
+            f"{self._patroni_url}/config", verify=self.verify, json={"standby_cluster": None}
+        )
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+            with attempt:
+                if self.get_primary() is None:
+                    raise ClusterNotPromotedError("cluster not promoted")
+
     def render_file(self, path: str, content: str, mode: int) -> None:
         """Write a content rendered from a template to a file.
 
@@ -448,7 +522,10 @@ class Patroni:
         enable_tls: bool = False,
         stanza: str = None,
         restore_stanza: Optional[str] = None,
+        disable_pgbackrest_archiving: bool = False,
         backup_id: Optional[str] = None,
+        pitr_target: Optional[str] = None,
+        restore_to_latest: bool = False,
         parameters: Optional[dict[str, str]] = None,
     ) -> None:
         """Render the Patroni configuration file.
@@ -459,7 +536,10 @@ class Patroni:
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
+            disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
             backup_id: id of the backup that is being restored.
+            pitr_target: point-in-time-recovery target for the backup.
+            restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
         """
         # Open the template patroni.yml file.
@@ -475,6 +555,7 @@ class Patroni:
             data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,
             member_name=self.member_name,
+            partner_addrs=self.charm.async_replication.get_partner_addresses(),
             peers_ips=self.peers_ips,
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
@@ -484,14 +565,19 @@ class Patroni:
             replication_password=self.replication_password,
             rewind_user=REWIND_USER,
             rewind_password=self.rewind_password,
-            enable_pgbackrest=stanza is not None,
-            restoring_backup=backup_id is not None,
+            enable_pgbackrest_archiving=stanza is not None
+            and disable_pgbackrest_archiving is False,
+            restoring_backup=backup_id is not None or pitr_target is not None,
             backup_id=backup_id,
+            pitr_target=pitr_target if not restore_to_latest else None,
+            restore_to_latest=restore_to_latest,
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
             pg_parameters=parameters,
+            primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
+            extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
@@ -510,6 +596,44 @@ class Patroni:
             error_message = "Failed to start patroni snap service"
             logger.exception(error_message, exc_info=e)
             return False
+
+    def patroni_logs(self, num_lines: int | None = 10) -> str:
+        """Get Patroni snap service logs. Executes only on current unit.
+
+        Args:
+            num_lines: number of log last lines being returned.
+
+        Returns:
+            Multi-line logs string.
+        """
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            return selected_snap.logs(services=["patroni"], num_lines=num_lines)
+        except snap.SnapError as e:
+            error_message = "Failed to get logs from patroni snap service"
+            logger.exception(error_message, exc_info=e)
+            return ""
+
+    def last_postgresql_logs(self) -> str:
+        """Get last log file content of Postgresql service.
+
+        If there is no available log files, empty line will be returned.
+
+        Returns:
+            Content of last log file of Postgresql service.
+        """
+        log_files = glob.glob(f"{POSTGRESQL_LOGS_PATH}/*.log")
+        if len(log_files) == 0:
+            return ""
+        log_files.sort(reverse=True)
+        try:
+            with open(log_files[0], "r") as last_log_file:
+                return last_log_file.read()
+        except OSError as e:
+            error_message = "Failed to read last postgresql log file"
+            logger.exception(error_message, exc_info=e)
+            return ""
 
     def stop_patroni(self) -> bool:
         """Stop Patroni service using systemd.
@@ -647,3 +771,34 @@ class Patroni:
                 # Check whether the update was unsuccessful.
                 if r.status_code != 200:
                     raise UpdateSyncNodeCountError(f"received {r.status_code}")
+
+    def get_patroni_restart_condition(self) -> str:
+        """Get current restart condition for Patroni systemd service. Executes only on current unit.
+
+        Returns:
+            Patroni systemd service restart condition.
+        """
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+            patroni_service = patroni_service_file.read()
+            found_restart = re.findall(r"Restart=(\w+)", patroni_service)
+            if len(found_restart) == 1:
+                return str(found_restart[0])
+        raise RuntimeError("failed to find patroni service restart condition")
+
+    def update_patroni_restart_condition(self, new_condition: str) -> None:
+        """Override restart condition for Patroni systemd service by rewriting service file and doing daemon-reload.
+
+        Executes only on current unit.
+
+        Args:
+            new_condition: new Patroni systemd service restart condition.
+        """
+        logger.info(f"setting restart-condition to {new_condition} for patroni service")
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+            patroni_service = patroni_service_file.read()
+        logger.debug(f"patroni service file: {patroni_service}")
+        new_patroni_service = re.sub(r"Restart=\w+", f"Restart={new_condition}", patroni_service)
+        logger.debug(f"new patroni service file: {new_patroni_service}")
+        with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
+            patroni_service_file.write(new_patroni_service)
+        subprocess.run(["/bin/systemctl", "daemon-reload"])

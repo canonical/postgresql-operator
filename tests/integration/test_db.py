@@ -6,7 +6,6 @@ import logging
 
 import psycopg2 as psycopg2
 import pytest as pytest
-from juju.errors import JujuUnitError
 from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -22,7 +21,6 @@ from .helpers import (
     check_databases_creation,
     deploy_and_relate_application_with_postgresql,
     deploy_and_relate_bundle_with_postgresql,
-    find_unit,
     get_leader_unit,
     run_command_on_unit,
 )
@@ -35,6 +33,9 @@ APPLICATION_UNITS = 1
 DATABASE_UNITS = 2
 RELATION_NAME = "db"
 
+EXTENSIONS_BLOCKING_MESSAGE = (
+    "extensions requested through relation, enable them through config options"
+)
 ROLES_BLOCKING_MESSAGE = (
     "roles requested through relation, use postgresql_client interface instead"
 )
@@ -70,6 +71,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             MAILMAN3_CORE_APP_NAME,
             APPLICATION_UNITS,
             config,
+            series="focal",
         )
         await check_databases_creation(ops_test, ["mailman3"])
 
@@ -193,86 +195,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
 
 
 @pytest.mark.group(1)
-async def test_sentry_db_blocked(ops_test: OpsTest, charm: str) -> None:
-    async with ops_test.fast_forward():
-        # Deploy Sentry and its dependencies.
-        await asyncio.gather(
-            ops_test.model.deploy(
-                "omnivector-sentry", application_name="sentry1", series="bionic"
-            ),
-            ops_test.model.deploy("haproxy", series="focal"),
-            ops_test.model.deploy("omnivector-redis", application_name="redis", series="bionic"),
-        )
-        await ops_test.model.wait_for_idle(
-            apps=["sentry1"],
-            status="blocked",
-            raise_on_blocked=False,
-            timeout=1000,
-        )
-        await asyncio.gather(
-            ops_test.model.relate("sentry1", "redis"),
-            ops_test.model.relate("sentry1", f"{DATABASE_APP_NAME}:db"),
-            ops_test.model.relate("sentry1", "haproxy"),
-        )
-
-        # Only the leader will block
-        leader_unit = await find_unit(ops_test, DATABASE_APP_NAME, True)
-
-        try:
-            await ops_test.model.wait_for_idle(
-                apps=[DATABASE_APP_NAME],
-                status="blocked",
-                raise_on_blocked=True,
-                timeout=1000,
-            )
-            assert False, "Leader didn't block"
-        except JujuUnitError:
-            pass
-
-        assert (
-            leader_unit.workload_status_message
-            == "extensions requested through relation, enable them through config options"
-        )
-
-        # Verify that the charm unblocks when the extensions are enabled after being blocked
-        # due to disabled extensions.
-        logger.info("Verifying that the charm unblocks when the extensions are enabled")
-        config = {"plugin_citext_enable": "True"}
-        await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, "sentry1"],
-            status="active",
-            raise_on_blocked=False,
-            idle_period=15,
-        )
-
-        # Verify that the charm doesn't block when the extensions are enabled
-        # (another sentry deployment is used because it doesn't request a database
-        # again after the relation with the PostgreSQL charm is destroyed and reestablished).
-        logger.info("Verifying that the charm doesn't block when the extensions are enabled")
-        await asyncio.gather(
-            ops_test.model.remove_application("sentry1", block_until_done=True),
-            ops_test.model.deploy(
-                "omnivector-sentry", application_name="sentry2", series="bionic"
-            ),
-        )
-        await asyncio.gather(
-            ops_test.model.relate("sentry2", "redis"),
-            ops_test.model.relate("sentry2", f"{DATABASE_APP_NAME}:db"),
-            ops_test.model.relate("sentry2", "haproxy"),
-        )
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, "sentry2"], status="active", raise_on_blocked=False
-        )
-
-        await asyncio.gather(
-            ops_test.model.remove_application("redis", block_until_done=True),
-            ops_test.model.remove_application("sentry2", block_until_done=True),
-            ops_test.model.remove_application("haproxy", block_until_done=True),
-        )
-
-
-@pytest.mark.group(1)
 async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     await ops_test.model.deploy(
         APPLICATION_NAME,
@@ -330,8 +252,51 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
 
+@pytest.mark.group(1)
+async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
+    await asyncio.gather(
+        ops_test.model.applications[APPLICATION_NAME].set_config({"legacy_roles": "False"}),
+        ops_test.model.applications[f"{APPLICATION_NAME}2"].set_config({"legacy_roles": "False"}),
+    )
+    await ops_test.model.wait_for_idle(
+        apps=[APPLICATION_NAME, f"{APPLICATION_NAME}2"],
+        status="active",
+        timeout=1000,
+    )
+
+    await asyncio.gather(
+        ops_test.model.relate(f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}:db"),
+        ops_test.model.relate(f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"),
+    )
+
+    leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
+    await ops_test.model.block_until(
+        lambda: leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE, timeout=1000
+    )
+
+    assert leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE
+
+    logger.info("Verify that the charm remains blocked if there are other blocking relations")
+    await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+        f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}:db"
+    )
+
+    await ops_test.model.block_until(
+        lambda: leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE, timeout=1000
+    )
+
+    assert leader_unit.workload_status_message == EXTENSIONS_BLOCKING_MESSAGE
+
+    logger.info("Verify that active status is restored when all blocking relations are gone")
+    await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
+        f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"
+    )
+
+
 @markers.juju2
 @pytest.mark.group(1)
+@pytest.mark.unstable
+@markers.amd64_only  # canonical-livepatch-server charm (in bundle) not available for arm64
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
     # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).

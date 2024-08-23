@@ -2,28 +2,22 @@
 # See LICENSE file for licensing details.
 
 [tool.poetry]
-name = "postgresql"
-version = "0.0.1-dev.0"
-description = ""
-authors = []
-license = "Apache-2.0"
-readme = "README.md"
-homepage = "https://charmhub.io/postgresql"
-repository = "https://github.com/canonical/postgresql-operator"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.10"
-ops = "^2.11.0"
-cryptography = "^42.0.5"
-boto3 = "^1.34.72"
+ops = "^2.15.0"
+cryptography = "^43.0.0"
+boto3 = "^1.34.159"
 pgconnstr = "^1.0.1"
-requests = "^2.31.0"
-tenacity = "^8.2.3"
+requests = "^2.32.3"
+tenacity = "^9.0.0"
 psycopg2 = "^2.9.9"
-cosl = "^0.0.10"
-pydantic = "^1.10.14"
+cosl = "^0.0.20"
+pydantic = "^1.10.17"
 poetry-core = "^1.9.0"
-pyOpenSSL = "^24.1.0"
+pyOpenSSL = "^24.2.1"
+jinja2 = "^3.1.4"
 pysyncobj = "^0.3.12"
 
 [tool.poetry.group.charm-libs.dependencies]
@@ -38,46 +32,49 @@ pydantic = "^1.10, <2"
 cosl = "*"
 cryptography = "*"
 jsonschema = "*"
+# tempo_k8s/v1/charm_tracing.py
+opentelemetry-exporter-otlp-proto-http = "1.21.0"
 
 [tool.poetry.group.format]
 optional = true
 
 [tool.poetry.group.format.dependencies]
-ruff = "^0.3.4"
+ruff = "^0.5.7"
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-codespell = "^2.2.6"
+codespell = "^2.3.0"
 
 [tool.poetry.group.unit]
 optional = true
 
 [tool.poetry.group.unit.dependencies]
-coverage = {extras = ["toml"], version = "^7.4.4"}
-pytest = "^8.1.1"
+coverage = {extras = ["toml"], version = "^7.6.1"}
+pytest = "^8.3.2"
 pytest-asyncio = "*"
 parameterized = "^0.9.0"
-jsonschema = "^4.21.1"
-jinja2 = "^3.1.3"
+jsonschema = "^4.23.0"
 
 [tool.poetry.group.integration]
 optional = true
 
 [tool.poetry.group.integration.dependencies]
-pytest = "^8.1.1"
-pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v13.0.0", subdirectory = "python/pytest_plugins/github_secrets"}
-pytest-operator = "^0.34.0"
-pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v13.0.0", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
-pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v13.0.0", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
-juju = "^3.3.0.0"
+pytest = "^8.3.2"
+pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v20.0.2", subdirectory = "python/pytest_plugins/github_secrets"}
+pytest-operator = "^0.36.0"
+pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v20.0.2", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
+pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v20.0.2", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
+# renovate caret doesn't work: https://github.com/renovatebot/renovate/issues/26940
+juju = "<=3.5.2.0"
 boto3 = "*"
 tenacity = "*"
 landscape-api-py3 = "^0.9.0"
 mailmanclient = "^3.3.5"
 psycopg2-binary = "^2.9.9"
-allure-pytest = "^2.13.4"
+allure-pytest = "^2.13.5"
+allure-pytest-collection-report = {git = "https://github.com/canonical/data-platform-workflows", tag = "v20.0.2", subdirectory = "python/pytest_plugins/allure_pytest_collection_report"}
 
 # Testing tools configuration
 [tool.coverage.run]
