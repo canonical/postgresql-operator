@@ -50,18 +50,18 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | t-set-up | [1. Set up the environment](/t/9709) |
 | 2 | t-deploy | [2. Deploy PostgreSQL](/t/9697) |
 | 2 | t-scale | [3. Scale replicas](/t/9705) |
-| 2 | t-passwords | [4. Manage passwords](/t/9703) |
+| 2 | t-manage-passwords | [4. Manage passwords](/t/9703) |
 | 2 | t-integrate | [5. Integrate with other applications](/t/9701) |
-| 2 | t-enable-tls | [6. Enable TLS](/t/9699) |
+| 2 | t-enable-tls | [6. Enable TLS encryption](/t/9699) |
 | 2 | t-clean-up | [7. Clean up environment](/t/9695) |
 | 1 | how-to | [How-to guides]() |
 | 2 | h-set-up | [Set up]() |
 | 3 | h-deploy-lxd | [Deploy on LXD](/t/11861) |
 | 3 | h-deploy-maas | [Deploy on MAAS](/t/14293) |
 | 3 | h-deploy-terraform | [Deploy via Terraform](/t/14916) |
-| 3 | h-scale | [Scale units](/t/9689) |
+| 3 | h-scale | [Scale replicas](/t/9689) |
 | 3 | h-enable-tls | [Enable TLS](/t/9685) |
-| 3 | h-manage-client | [Manage client applications](/t/9687) |
+| 3 | h-manage-applications | [Manage client applications](/t/9687) |
 | 2 | h-backups | [Back up and restore]() |
 | 3 | h-configure-s3-aws | [Configure S3 AWS](/t/9681) |
 | 3 | h-configure-s3-radosgw | [Configure S3 RadosGW](/t/10313) |
@@ -79,10 +79,10 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-rollback-major | [Perform a major rollback](/t/12088) |
 | 3 | h-upgrade-minor | [Perform a minor upgrade](/t/12089) |
 | 3 | h-rollback-minor | [Perform a minor rollback](/t/12090) |
-| 2 | h-integrate-your-charm | [Integrate with your charm]() |Mig
+| 2 | h-integrate-your-charm | [Integrate with your charm]() |
 | 3 | h-integrate-db-with-your-charm | [Integrate a database with your charm](/t/11865) |
-| 3 | h-integrate-migrate-pgdump | [Migrate data via pg_dump](/t/12163) |
-| 3 | h-integrate-migrate-backup-restore | [Migrate data via backup/restore](/t/12164) |
+| 3 | h-migrate-pgdump | [Migrate data via pg_dump](/t/12163) |
+| 3 | h-migrate-backup-restore | [Migrate data via backup/restore](/t/12164) |
 | 2 | h-async | [Cross-regional async replication]() |
 | 3 | h-async-set-up | [Set up clusters](/t/13991) |
 | 3 | h-async-integrate | [Integrate with a client app](/t/13992) |
@@ -90,9 +90,9 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | h-enable-plugins-extensions | [Enable plugins/extensions](/t/10906) |
 | 1 | reference | [Reference]() |
 | 2 | r-overview | [Overview](/t/13976) |
-| 2 | r-releases-group | [Release Notes]() |
-| 3 | r-releases | [All releases](/t/11875) |
-| 3 | r-revision-429 | [Revision 429/430](/t/14067) |
+| 2 | r-releases | [Release Notes]() |
+| 3 | r-all-releases | [All releases](/t/11875) |
+| 3 | r-revision-429-430 | [Revision 429/430](/t/14067) |
 | 3 | r-revision-363 | [Revision 363](/t/13124) |
 | 3 | r-revision-351 | [Revision 351](/t/12823) |
 | 3 | r-revision-336 | [Revision 336](/t/11877) |
@@ -112,10 +112,5 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | e-juju-details | [Juju](/t/11985) |
 | 2 | e-legacy-charm | [Legacy charm](/t/10690) |
 | 1 | search | [Search](https://canonical.com/data/docs/postgresql/iaas) |
-[/details]
-# Redirects
 
-[details=Mapping table]
-| Path | Location |
-| ---- | -------- |
 [/details]
