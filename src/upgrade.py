@@ -93,6 +93,14 @@ class PostgreSQLUpgrade(DataUpgrade):
             logger.debug("Wait all units join the upgrade relation")
             return
 
+        if self.charm.unit.is_leader():
+            for key in (
+                RAFT_PASSWORD_KEY,
+                PATRONI_PASSWORD_KEY,
+            ):
+                if self.charm.get_secret(APP_SCOPE, key) is None:
+                    self.charm.set_secret(APP_SCOPE, key, new_password())
+
         if self.state:
             # If state set, upgrade is supported. Just set the snap information
             # in the dependencies, as it's missing in the first revisions that
@@ -131,12 +139,6 @@ class PostgreSQLUpgrade(DataUpgrade):
                 # All peers have set the state to ready
                 self.unit_upgrade_data.update({"state": "ready"})
                 self._prepare_upgrade_from_legacy()
-            for key in (
-                RAFT_PASSWORD_KEY,
-                PATRONI_PASSWORD_KEY,
-            ):
-                if self.charm.get_secret(APP_SCOPE, key) is None:
-                    self.charm.set_secret(APP_SCOPE, key, new_password())
             getattr(self.on, "upgrade_charm").emit()
 
     @override
