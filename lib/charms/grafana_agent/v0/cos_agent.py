@@ -22,7 +22,7 @@ this charm library.
 Using the `COSAgentProvider` object only requires instantiating it,
 typically in the `__init__` method of your charm (the one which sends telemetry).
 
-The constructor of `COSAgentProvider` has only one required and nine optional parameters:
+The constructor of `COSAgentProvider` has only one required and ten optional parameters:
 
 ```python
     def __init__(
@@ -36,6 +36,7 @@ The constructor of `COSAgentProvider` has only one required and nine optional pa
         log_slots: Optional[List[str]] = None,
         dashboard_dirs: Optional[List[str]] = None,
         refresh_events: Optional[List] = None,
+        tracing_protocols: Optional[List[str]] = None,
         scrape_configs: Optional[Union[List[Dict], Callable]] = None,
     ):
 ```
@@ -64,6 +65,8 @@ The constructor of `COSAgentProvider` has only one required and nine optional pa
 - `dashboard_dirs`: List of directories where the dashboards are stored in the Charmed Operator.
 
 - `refresh_events`: List of events on which to refresh relation data.
+
+- `tracing_protocols`: List of requested tracing protocols that the charm requires to send traces.
 
 - `scrape_configs`: List of standard scrape_configs dicts or a callable that returns the list in
     case the configs need to be generated dynamically. The contents of this list will be merged
@@ -108,6 +111,7 @@ class TelemetryProviderCharm(CharmBase):
             log_slots=["my-app:slot"],
             dashboard_dirs=["./src/dashboards_1", "./src/dashboards_2"],
             refresh_events=["update-status", "upgrade-charm"],
+            tracing_protocols=["otlp_http", "otlp_grpc"],
             scrape_configs=[
                 {
                     "job_name": "custom_job",
@@ -249,7 +253,7 @@ if TYPE_CHECKING:
 
 LIBID = "dc15fa84cef84ce58155fb84f6c6213a"
 LIBAPI = 0
-LIBPATCH = 10
+LIBPATCH = 11
 
 PYDEPS = ["cosl", "pydantic"]
 

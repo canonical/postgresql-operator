@@ -111,6 +111,7 @@ EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check t
 EXTENSION_OBJECT_MESSAGE = "Cannot disable plugins: Existing objects depend on it. See logs"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
+PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
 
 
 @trace_charm(
@@ -1224,10 +1225,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         If no user is provided, the password of the operator user is returned.
         """
         username = event.params.get("username", USER)
-        if username not in SYSTEM_USERS:
+        if username not in PASSWORD_USERS:
             event.fail(
                 f"The action can be run only for users used by the charm or Patroni:"
-                f" {', '.join(SYSTEM_USERS)} not {username}"
+                f" {', '.join(PASSWORD_USERS)} not {username}"
             )
             return
         event.set_results({"password": self.get_secret(APP_SCOPE, f"{username}-password")})
