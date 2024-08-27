@@ -74,8 +74,10 @@ from constants import (
     MONITORING_SNAP_SERVICE,
     MONITORING_USER,
     PATRONI_CONF_PATH,
+    PATRONI_PASSWORD_KEY,
     PEER,
     POSTGRESQL_SNAP_NAME,
+    RAFT_PASSWORD_KEY,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
     SECRET_DELETED_LABEL,
@@ -745,6 +747,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
             bool(self.unit_peer_data.get("tls")),
+            self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
+            self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
 
     @property
@@ -893,14 +897,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:
         """Handle the leader-elected event."""
         # The leader sets the needed passwords if they weren't set before.
-        if self.get_secret(APP_SCOPE, USER_PASSWORD_KEY) is None:
-            self.set_secret(APP_SCOPE, USER_PASSWORD_KEY, new_password())
-        if self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY) is None:
-            self.set_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY, new_password())
-        if self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY) is None:
-            self.set_secret(APP_SCOPE, REWIND_PASSWORD_KEY, new_password())
-        if self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY) is None:
-            self.set_secret(APP_SCOPE, MONITORING_PASSWORD_KEY, new_password())
+        for key in (
+            USER_PASSWORD_KEY,
+            REPLICATION_PASSWORD_KEY,
+            REWIND_PASSWORD_KEY,
+            MONITORING_PASSWORD_KEY,
+            RAFT_PASSWORD_KEY,
+            PATRONI_PASSWORD_KEY,
+        ):
+            if self.get_secret(APP_SCOPE, key) is None:
+                self.set_secret(APP_SCOPE, key, new_password())
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members

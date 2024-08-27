@@ -93,6 +93,8 @@ class Patroni:
         replication_password: str,
         rewind_password: str,
         tls_enabled: bool,
+        raft_password: str,
+        patroni_password: str,
     ):
         """Initialize the Patroni class.
 
@@ -107,6 +109,8 @@ class Patroni:
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
             tls_enabled: whether TLS is enabled
+            raft_password: password for raft
+            patroni_password: password for the user used on patroni
         """
         self.charm = charm
         self.unit_ip = unit_ip
@@ -117,11 +121,17 @@ class Patroni:
         self.superuser_password = superuser_password
         self.replication_password = replication_password
         self.rewind_password = rewind_password
+        self.raft_password = raft_password
+        self.patroni_password = patroni_password
         self.tls_enabled = tls_enabled
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
         self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
+
+    @property
+    def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
+        return requests.auth.HTTPBasicAuth("operator", self.patroni_password)
 
     @property
     def _patroni_url(self) -> str:
@@ -164,6 +174,7 @@ class Patroni:
             f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
             verify=self.verify,
             timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
         )
         return {member["name"] for member in cluster_status.json()["members"]}
 
@@ -204,6 +215,7 @@ class Patroni:
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
                 )
                 for member in cluster_status.json()["members"]:
                     if member["name"] == member_name:
@@ -227,6 +239,7 @@ class Patroni:
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
                 )
                 for member in cluster_status.json()["members"]:
                     if member["name"] == member_name:
@@ -251,6 +264,7 @@ class Patroni:
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
                 )
                 for member in cluster_status.json()["members"]:
                     if member["role"] == "leader":
@@ -280,6 +294,7 @@ class Patroni:
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
                 )
                 for member in cluster_status.json()["members"]:
                     if member["role"] == "standby_leader":
@@ -299,7 +314,7 @@ class Patroni:
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
-                r = requests.get(f"{url}/cluster", verify=self.verify)
+                r = requests.get(f"{url}/cluster", verify=self.verify, auth=self._patroni_auth)
                 for member in r.json()["members"]:
                     if member["role"] == "sync_standby":
                         sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
@@ -349,6 +364,7 @@ class Patroni:
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                         verify=self.verify,
                         timeout=API_REQUEST_TIMEOUT,
+                        auth=self._patroni_auth,
                     )
         except RetryError:
             return False
@@ -371,6 +387,7 @@ class Patroni:
                     f"{self._patroni_url}/health",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
                 )
 
                 return r.json()
@@ -384,7 +401,9 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    r = requests.get(f"{self._patroni_url}/cluster", verify=self.verify)
+                    r = requests.get(
+                        f"{self._patroni_url}/cluster", verify=self.verify, auth=self._patroni_auth
+                    )
         except RetryError:
             return False
 
@@ -406,7 +425,9 @@ class Patroni:
                     for members_ip in members_ips:
                         endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
-                        member_status = requests.get(f"{url}/{endpoint}", verify=self.verify)
+                        member_status = requests.get(
+                            f"{url}/{endpoint}", verify=self.verify, auth=self._patroni_auth
+                        )
                         if member_status.status_code != 200:
                             raise Exception
         except RetryError:
@@ -456,6 +477,7 @@ class Patroni:
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                         verify=self.verify,
                         timeout=API_REQUEST_TIMEOUT,
+                        auth=self._patroni_auth,
                     )
         except RetryError:
             return "unknown"
@@ -476,6 +498,7 @@ class Patroni:
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                         verify=self.verify,
                         timeout=API_REQUEST_TIMEOUT,
+                        auth=self._patroni_auth,
                     )
         except RetryError:
             # Return False if it was not possible to get the cluster info. Try again later.
@@ -485,11 +508,16 @@ class Patroni:
 
     def promote_standby_cluster(self) -> None:
         """Promote a standby cluster to be a regular cluster."""
-        config_response = requests.get(f"{self._patroni_url}/config", verify=self.verify)
+        config_response = requests.get(
+            f"{self._patroni_url}/config", verify=self.verify, auth=self._patroni_auth
+        )
         if "standby_cluster" not in config_response.json():
             raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
         requests.patch(
-            f"{self._patroni_url}/config", verify=self.verify, json={"standby_cluster": None}
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"standby_cluster": None},
+            auth=self._patroni_auth,
         )
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
@@ -577,6 +605,8 @@ class Patroni:
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
+            raft_password=self.raft_password,
+            patroni_password=self.patroni_password,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
@@ -660,6 +690,7 @@ class Patroni:
                     f"{self._patroni_url}/switchover",
                     json={"leader": current_primary},
                     verify=self.verify,
+                    auth=self._patroni_auth,
                 )
 
         # Check whether the switchover was unsuccessful.
@@ -714,7 +745,7 @@ class Patroni:
     @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(f"{self._patroni_url}/reload", verify=self.verify)
+        requests.post(f"{self._patroni_url}/reload", verify=self.verify, auth=self._patroni_auth)
 
     def restart_patroni(self) -> bool:
         """Restart Patroni.
@@ -735,12 +766,14 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
-        requests.post(f"{self._patroni_url}/restart", verify=self.verify)
+        requests.post(f"{self._patroni_url}/restart", verify=self.verify, auth=self._patroni_auth)
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
-        requests.post(f"{self._patroni_url}/reinitialize", verify=self.verify)
+        requests.post(
+            f"{self._patroni_url}/reinitialize", verify=self.verify, auth=self._patroni_auth
+        )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def bulk_update_parameters_controller_by_patroni(self, parameters: Dict[str, Any]) -> None:
@@ -752,6 +785,7 @@ class Patroni:
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"postgresql": {"parameters": parameters}},
+            auth=self._patroni_auth,
         )
 
     def update_synchronous_node_count(self, units: int = None) -> None:
@@ -765,6 +799,7 @@ class Patroni:
                     f"{self._patroni_url}/config",
                     json={"synchronous_node_count": units // 2},
                     verify=self.verify,
+                    auth=self._patroni_auth,
                 )
 
                 # Check whether the update was unsuccessful.
