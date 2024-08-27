@@ -723,6 +723,8 @@ class Patroni:
             "charmed-postgresql.syncobj-admin",
             "-conn",
             "127.0.0.1:2222",
+            "-pass",
+            self.raft_password,
             "-status",
         ]).decode("UTF-8")
 
@@ -735,6 +737,8 @@ class Patroni:
             "charmed-postgresql.syncobj-admin",
             "-conn",
             "127.0.0.1:2222",
+            "-pass",
+            self.raft_password,
             "-remove",
             f"{member_ip}:2222",
         ]).decode("UTF-8")
