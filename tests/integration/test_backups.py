@@ -137,6 +137,7 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     # Ensure replication is working correctly.
     address = get_unit_address(ops_test, new_unit_name)
     password = await get_password(ops_test, new_unit_name)
+    patroni_password = await get_password(ops_test, new_unit_name, "patroni")
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
@@ -155,7 +156,7 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     connection.close()
 
     old_primary = await get_primary(ops_test, new_unit_name)
-    switchover(ops_test, old_primary, new_unit_name)
+    switchover(ops_test, old_primary, patroni_password, new_unit_name)
 
     # Get the new primary unit.
     primary = await get_primary(ops_test, new_unit_name)
