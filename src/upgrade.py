@@ -93,7 +93,7 @@ class PostgreSQLUpgrade(DataUpgrade):
             logger.debug("Wait all units join the upgrade relation")
             return
 
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and self.charm._peers:
             for key in (
                 RAFT_PASSWORD_KEY,
                 PATRONI_PASSWORD_KEY,
