@@ -140,6 +140,7 @@ async def change_patroni_setting(
     ops_test: OpsTest,
     setting: str,
     value: Union[int, bool],
+    password: str,
     use_random_unit: bool = False,
     tls: bool = False,
 ) -> None:
@@ -149,6 +150,7 @@ async def change_patroni_setting(
         ops_test: ops_test instance.
         setting: the name of the setting.
         value: the value to assign to the setting.
+        password: Patroni password.
         use_random_unit: whether to use a random unit (default is False,
             so it uses the primary).
         tls: if Patroni is serving using tls.
@@ -170,11 +172,17 @@ async def change_patroni_setting(
                 f"{schema}://{unit_ip}:8008/config",
                 json={setting: value},
                 verify=not tls,
+                auth=requests.auth.HTTPBasicAuth("operator", password),
             )
 
 
 async def change_wal_settings(
-    ops_test: OpsTest, unit_name: str, max_wal_size: int, min_wal_size, wal_keep_segments
+    ops_test: OpsTest,
+    unit_name: str,
+    max_wal_size: int,
+    min_wal_size,
+    wal_keep_segments,
+    password: str,
 ) -> None:
     """Change WAL settings in the unit.
 
@@ -184,6 +192,7 @@ async def change_wal_settings(
         max_wal_size: maximum amount of WAL to keep (MB).
         min_wal_size: minimum amount of WAL to keep (MB).
         wal_keep_segments: number of WAL segments to keep.
+        password: Patroni password.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -199,6 +208,7 @@ async def change_wal_settings(
                         }
                     }
                 },
+                auth=requests.auth.HTTPBasicAuth("operator", password),
             )
 
 

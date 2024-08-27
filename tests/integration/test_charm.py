@@ -258,8 +258,10 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     leader_unit = await find_unit(ops_test, leader=True, application=DATABASE_APP_NAME)
 
     # Trigger a switchover if the primary and the leader are not the same unit.
+    patroni_password = await get_password(ops_test, primary, "patroni")
+
     if primary != leader_unit.name:
-        switchover(ops_test, primary, leader_unit.name)
+        switchover(ops_test, primary, patroni_password, leader_unit.name)
 
         # Get the new primary unit.
         primary = await get_primary(ops_test, any_unit_name)
@@ -288,7 +290,7 @@ async def test_scale_down_and_up(ops_test: OpsTest):
 
     # Trigger a switchover if the primary and the leader are the same unit.
     if primary == leader_unit.name:
-        switchover(ops_test, primary)
+        switchover(ops_test, primary, patroni_password)
 
         # Get the new primary unit.
         primary = await get_primary(ops_test, any_unit_name)

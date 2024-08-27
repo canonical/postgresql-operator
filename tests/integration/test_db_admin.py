@@ -20,6 +20,7 @@ from .helpers import (
     ensure_correct_relation_data,
     get_landscape_api_credentials,
     get_machine_from_unit,
+    get_password,
     get_primary,
     primary_changed,
     start_machine,
@@ -111,6 +112,8 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     logger.info("restarting primary")
     former_primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
     former_primary_machine = await get_machine_from_unit(ops_test, former_primary)
+    patroni_password = await get_password(ops_test, former_primary, "patroni")
+
     await stop_machine(ops_test, former_primary_machine)
 
     # Await for a new primary to be elected.
@@ -131,7 +134,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # Trigger a switchover.
     logger.info("triggering a switchover")
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    switchover(ops_test, primary)
+    switchover(ops_test, primary, patroni_password)
 
     # Await for a new primary to be elected.
     assert await primary_changed(ops_test, primary)
