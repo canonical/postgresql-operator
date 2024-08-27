@@ -18,7 +18,14 @@ from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
-from constants import APP_SCOPE, MONITORING_PASSWORD_KEY, MONITORING_USER, SNAP_PACKAGES
+from constants import (
+    APP_SCOPE,
+    MONITORING_PASSWORD_KEY,
+    MONITORING_USER,
+    PATRONI_PASSWORD_KEY,
+    RAFT_PASSWORD_KEY,
+    SNAP_PACKAGES,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -124,6 +131,12 @@ class PostgreSQLUpgrade(DataUpgrade):
                 # All peers have set the state to ready
                 self.unit_upgrade_data.update({"state": "ready"})
                 self._prepare_upgrade_from_legacy()
+            for key in (
+                RAFT_PASSWORD_KEY,
+                PATRONI_PASSWORD_KEY,
+            ):
+                if self.charm.get_secret(APP_SCOPE, key) is None:
+                    self.charm.set_secret(APP_SCOPE, key, new_password())
             getattr(self.on, "upgrade_charm").emit()
 
     @override
