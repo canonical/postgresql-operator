@@ -225,7 +225,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     ):
         # Test when replication is healthy.
         _get.return_value.status_code = 200
-        tc.assertTrue(patroni.is_replication_healthy)
+        assert patroni.is_replication_healthy()
 
         # Test when replication is not healthy.
         _get.side_effect = [
@@ -233,7 +233,12 @@ def test_is_replication_healthy(peers_ips, patroni):
             MagicMock(status_code=200),
             MagicMock(status_code=503),
         ]
-        tc.assertFalse(patroni.is_replication_healthy)
+        assert not patroni.is_replication_healthy()
+
+        # Test ignoring errors in case of raft encryption.
+        _get.side_effect = None
+        _get.return_value.status_code = 503
+        assert patroni.is_replication_healthy(True)
 
 
 def test_is_member_isolated(peers_ips, patroni):

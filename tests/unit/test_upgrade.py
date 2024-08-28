@@ -98,9 +98,7 @@ def test_on_upgrade_granted(harness):
         patch("charm.PostgreSQLUpgrade.on_upgrade_changed") as _on_upgrade_changed,
         patch("charm.PostgreSQLUpgrade.set_unit_failed") as _set_unit_failed,
         patch("charm.PostgreSQLUpgrade.set_unit_completed") as _set_unit_completed,
-        patch(
-            "charm.Patroni.is_replication_healthy", new_callable=PropertyMock
-        ) as _is_replication_healthy,
+        patch("charm.Patroni.is_replication_healthy") as _is_replication_healthy,
         patch("charm.Patroni.cluster_members", new_callable=PropertyMock) as _cluster_members,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("upgrade.wait_fixed", return_value=tenacity.wait_fixed(0)),
