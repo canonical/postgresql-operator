@@ -159,9 +159,11 @@ class PostgreSQLUpgrade(DataUpgrade):
         self.charm._setup_exporter()
         self.charm.backup.start_stop_pgbackrest_service()
         raft_encryption = (
-            json.loads(self.peer_relation.data[self.charm.app].get("dependencies", "{}"))
-            .get("charm", {})
-            .get("version", 0)
+            int(
+                json.loads(self.peer_relation.data[self.charm.app].get("dependencies", "{}"))
+                .get("charm", {})
+                .get("version", 0)
+            )
             < 3
         )
 
