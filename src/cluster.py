@@ -428,7 +428,12 @@ class Patroni:
                         member_status = requests.get(
                             f"{url}/{endpoint}", verify=self.verify, auth=self._patroni_auth
                         )
-                        if member_status.status_code != 200:
+                        if member_status.status_code == 503:
+                            logger.warning(
+                                "Failed replication check for %s with code %d"
+                                % (members_ip, member_status.status_code)
+                            )
+                        elif member_status.status_code != 200:
                             logger.debug(
                                 "Failed replication check for %s with code %d"
                                 % (members_ip, member_status.status_code)
