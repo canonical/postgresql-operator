@@ -133,7 +133,7 @@ def main():
     patroni_url, verify, run_cmd, unit, charm_dir, patroni_password = sys.argv[1:]
 
     previous_cluster_topology = {}
-    auth = requests.auth.HTTPBasicAuth("operator", patroni_password)
+    auth = requests.auth.HTTPBasicAuth("patroni", patroni_password)
     while True:
         cluster_status = requests.get(
             f"{patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",

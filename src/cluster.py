@@ -429,6 +429,10 @@ class Patroni:
                             f"{url}/{endpoint}", verify=self.verify, auth=self._patroni_auth
                         )
                         if member_status.status_code != 200:
+                            logger.debug(
+                                "Failed replication check for %s with code %d"
+                                % (members_ip, member_status.status_code)
+                            )
                             raise Exception
         except RetryError:
             logger.exception("replication is not healthy")
