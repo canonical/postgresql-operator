@@ -84,7 +84,6 @@ class ClusterTopologyObserver(Object):
                 self._run_cmd,
                 self._charm.unit.name,
                 self._charm.charm_dir,
-                self._charm._patroni.patroni_password,
             ],
             stdout=open(LOG_FILE_PATH, "a"),
             stderr=subprocess.STDOUT,
@@ -130,16 +129,14 @@ def main():
 
     Watch the Patroni API cluster info. When changes are detected, dispatch the change event.
     """
-    patroni_url, verify, run_cmd, unit, charm_dir, patroni_password = sys.argv[1:]
+    patroni_url, verify, run_cmd, unit, charm_dir = sys.argv[1:]
 
     previous_cluster_topology = {}
-    auth = requests.auth.HTTPBasicAuth("patroni", patroni_password)
     while True:
         cluster_status = requests.get(
             f"{patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
             verify=verify,
             timeout=API_REQUEST_TIMEOUT,
-            auth=auth,
         )
         current_cluster_topology = {
             member["name"]: member["role"] for member in cluster_status.json()["members"]
