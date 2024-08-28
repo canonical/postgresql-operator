@@ -105,7 +105,7 @@ def change_primary_start_timeout(
                 f"https://{unit_ip}:8008/config",
                 json={"primary_start_timeout": seconds},
                 verify=False,
-                auth=requests.auth.HTTPBasicAuth("operator", password),
+                auth=requests.auth.HTTPBasicAuth("patroni", password),
             )
 
 
@@ -973,7 +973,7 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     """
     unit_ip = get_unit_address(ops_test, unit_name)
     requests.post(
-        f"http://{unit_ip}:8008/restart", auth=requests.auth.HTTPBasicAuth("operator", password)
+        f"http://{unit_ip}:8008/restart", auth=requests.auth.HTTPBasicAuth("patroni", password)
     )
 
 
@@ -1041,7 +1041,7 @@ def switchover(
             "leader": current_primary.replace("/", "-"),
             "candidate": candidate.replace("/", "-") if candidate else None,
         },
-        auth=requests.auth.HTTPBasicAuth("operator", password),
+        auth=requests.auth.HTTPBasicAuth("patroni", password),
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]

@@ -131,7 +131,7 @@ class Patroni:
 
     @property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
-        return requests.auth.HTTPBasicAuth("operator", self.patroni_password)
+        return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
     @property
     def _patroni_url(self) -> str:

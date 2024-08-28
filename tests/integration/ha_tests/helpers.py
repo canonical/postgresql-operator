@@ -172,7 +172,7 @@ async def change_patroni_setting(
                 f"{schema}://{unit_ip}:8008/config",
                 json={setting: value},
                 verify=not tls,
-                auth=requests.auth.HTTPBasicAuth("operator", password),
+                auth=requests.auth.HTTPBasicAuth("patroni", password),
             )
 
 
@@ -208,7 +208,7 @@ async def change_wal_settings(
                         }
                     }
                 },
-                auth=requests.auth.HTTPBasicAuth("operator", password),
+                auth=requests.auth.HTTPBasicAuth("patroni", password),
             )
 
 
