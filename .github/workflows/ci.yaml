@@ -9,12 +9,12 @@ concurrency:
 on:
 # TODO: uncomment below before merging
   # pull_request:
-    paths-ignore:
-      - '.gitignore'
-      - '.jujuignore'
-      - 'LICENSE'
-      - '**.md'
-      - .github/renovate.json5
+  #   paths-ignore:
+  #     - '.gitignore'
+  #     - '.jujuignore'
+  #     - 'LICENSE'
+  #     - '**.md'
+  #     - .github/renovate.json5
   schedule:
     - cron: '53 0 * * *' # Daily at 00:53 UTC
   # Triggered on push to branch "main" by .github/workflows/release.yaml
@@ -76,7 +76,6 @@ jobs:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       architecture: ${{ matrix.architecture }}
       cloud: lxd
-      lxd-snap-channel: 5.21/stable
       juju-agent-version: ${{ matrix.juju.agent }}
       libjuju-version-constraint: ${{ matrix.juju.libjuju }}
       _beta_allure_report: ${{ matrix.juju.allure_on_amd64 && matrix.architecture == 'amd64' }}
