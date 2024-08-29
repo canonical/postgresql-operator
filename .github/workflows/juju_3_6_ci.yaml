@@ -1,0 +1,45 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Juju 3.6 CI tests
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+on:
+  pull_request: # TODO: remove once PR is approved and confirmed tests passing on 3.6
+
+jobs:
+  lint:
+    name: Lint
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v18.0.0
+
+  build:
+    name: Build charm
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v18.0.0
+    with:
+      cache: true
+
+  integration-test-3-6:
+    name: Integration | 3.6
+    needs:
+      - lint
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v18.0.0
+    with:
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+      architecture: amd64
+      cloud: lxd
+      juju-agent-version: 3.6-beta2
+      libjuju-version-constraint: 3.5.2.0
+    secrets:
+      # GitHub appears to redact each line of a multi-line secret
+      # Avoid putting `{` or `}` on a line by itself so that it doesn't get redacted in logs
+      integration-test: |
+        { "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
+          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
+          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
+          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
+          "UBUNTU_PRO_TOKEN" : "${{ secrets.UBUNTU_PRO_TOKEN }}",
+          "LANDSCAPE_ACCOUNT_NAME": "${{ secrets.LANDSCAPE_ACCOUNT_NAME }}",
+          "LANDSCAPE_REGISTRATION_KEY": "${{ secrets.LANDSCAPE_REGISTRATION_KEY }}", }
