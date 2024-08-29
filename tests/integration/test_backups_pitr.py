@@ -12,7 +12,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential
 
 from . import architecture
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
     MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
     construct_endpoint,
@@ -96,8 +96,10 @@ async def cloud_configs(github_secrets) -> None:
 async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
     # Deploy S3 Integrator and TLS Certificates Operator.
-    await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME)
-    await ops_test.model.deploy(TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL)
+    await ops_test.model.deploy(S3_INTEGRATOR_APP_NAME, base=CHARM_BASE)
+    await ops_test.model.deploy(
+        TLS_CERTIFICATES_APP_NAME, config=TLS_CONFIG, channel=TLS_CHANNEL, base=CHARM_BASE
+    )
 
     for cloud, config in cloud_configs[0].items():
         # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
@@ -108,7 +110,7 @@ async def test_pitr_backup(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], 
             charm,
             application_name=database_app_name,
             num_units=2,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 

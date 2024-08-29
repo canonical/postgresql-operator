@@ -16,7 +16,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 from locales import SNAP_LOCALES
 
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
     STORAGE_PATH,
     check_cluster_members,
@@ -49,7 +49,7 @@ async def test_deploy(ops_test: OpsTest, charm: str):
         charm,
         application_name=DATABASE_APP_NAME,
         num_units=3,
-        series=CHARM_SERIES,
+        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 
