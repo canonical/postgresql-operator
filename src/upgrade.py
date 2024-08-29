@@ -18,7 +18,14 @@ from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
-from constants import APP_SCOPE, MONITORING_PASSWORD_KEY, MONITORING_USER, SNAP_PACKAGES
+from constants import (
+    APP_SCOPE,
+    MONITORING_PASSWORD_KEY,
+    MONITORING_USER,
+    PATRONI_PASSWORD_KEY,
+    RAFT_PASSWORD_KEY,
+    SNAP_PACKAGES,
+)
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -86,6 +93,14 @@ class PostgreSQLUpgrade(DataUpgrade):
             logger.debug("Wait all units join the upgrade relation")
             return
 
+        if self.charm.unit.is_leader() and self.charm._peers:
+            for key in (
+                RAFT_PASSWORD_KEY,
+                PATRONI_PASSWORD_KEY,
+            ):
+                if self.charm.get_secret(APP_SCOPE, key) is None:
+                    self.charm.set_secret(APP_SCOPE, key, new_password())
+
         if self.state:
             # If state set, upgrade is supported. Just set the snap information
             # in the dependencies, as it's missing in the first revisions that
@@ -143,6 +158,14 @@ class PostgreSQLUpgrade(DataUpgrade):
 
         self.charm._setup_exporter()
         self.charm.backup.start_stop_pgbackrest_service()
+        raft_encryption = (
+            int(
+                json.loads(self.peer_relation.data[self.charm.app].get("dependencies", "{}"))
+                .get("charm", {})
+                .get("version", 0)
+            )
+            < 3
+        )
 
         try:
             self.charm.unit.set_workload_version(
@@ -162,7 +185,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                         not self.charm._patroni.member_started
                         or self.charm.unit.name.replace("/", "-")
                         not in self.charm._patroni.cluster_members
-                        or not self.charm._patroni.is_replication_healthy
+                        or not self.charm._patroni.is_replication_healthy(raft_encryption)
                     ):
                         logger.debug(
                             "Instance not yet back in the cluster."

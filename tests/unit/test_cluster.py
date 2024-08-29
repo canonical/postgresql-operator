@@ -81,6 +81,8 @@ def patroni(harness, peers_ips):
         "fake-replication-password",
         "fake-rewind-password",
         False,
+        "fake-raft-password",
+        "fake-patroni-password",
     )
     yield patroni
 
@@ -229,7 +231,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     ):
         # Test when replication is healthy.
         _get.return_value.status_code = 200
-        assert patroni.is_replication_healthy
+        assert patroni.is_replication_healthy()
 
         # Test when replication is not healthy.
         _get.side_effect = [
@@ -237,7 +239,12 @@ def test_is_replication_healthy(peers_ips, patroni):
             MagicMock(status_code=200),
             MagicMock(status_code=503),
         ]
-        assert not patroni.is_replication_healthy
+        assert not patroni.is_replication_healthy()
+
+        # Test ignoring errors in case of raft encryption.
+        _get.side_effect = None
+        _get.return_value.status_code = 503
+        assert patroni.is_replication_healthy(True)
 
 
 def test_is_member_isolated(peers_ips, patroni):
@@ -308,6 +315,8 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         superuser_password = "fake-superuser-password"
         replication_password = "fake-replication-password"
         rewind_password = "fake-rewind-password"
+        raft_password = "fake-raft-password"
+        patroni_password = "fake-patroni-password"
         postgresql_version = "14"
 
         # Get the expected content from a file.
@@ -330,6 +339,8 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             rewind_password=rewind_password,
             version=postgresql_version,
             minority_count=patroni.planned_units // 2,
+            raft_password=raft_password,
+            patroni_password=patroni_password,
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
@@ -416,7 +427,9 @@ def test_member_replication_lag(peers_ips, patroni):
 def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
-        _post.assert_called_once_with(f"http://{patroni.unit_ip}:8008/reinitialize", verify=True)
+        _post.assert_called_once_with(
+            f"http://{patroni.unit_ip}:8008/reinitialize", verify=True, auth=patroni._patroni_auth
+        )
 
 
 def test_switchover(peers_ips, patroni):
@@ -430,7 +443,10 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover()
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover", json={"leader": "primary"}, verify=True
+            "http://1.1.1.1:8008/switchover",
+            json={"leader": "primary"},
+            verify=True,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -444,7 +460,10 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         patroni.update_synchronous_node_count()
 
         _patch.assert_called_once_with(
-            "http://1.1.1.1:8008/config", json={"synchronous_node_count": 0}, verify=True
+            "http://1.1.1.1:8008/config",
+            json={"synchronous_node_count": 0},
+            verify=True,
+            auth=patroni._patroni_auth,
         )
 
         # Test when the request fails.
@@ -490,7 +509,9 @@ def test_member_started_true(peers_ips, patroni):
 
         assert patroni.member_started
 
-        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+        _get.assert_called_once_with(
+            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+        )
 
 
 def test_member_started_false(peers_ips, patroni):
@@ -503,7 +524,9 @@ def test_member_started_false(peers_ips, patroni):
 
         assert not patroni.member_started
 
-        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+        _get.assert_called_once_with(
+            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+        )
 
 
 def test_member_started_error(peers_ips, patroni):
@@ -516,7 +539,9 @@ def test_member_started_error(peers_ips, patroni):
 
         assert not patroni.member_started
 
-        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+        _get.assert_called_once_with(
+            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+        )
 
 
 def test_member_inactive_true(peers_ips, patroni):
@@ -529,7 +554,9 @@ def test_member_inactive_true(peers_ips, patroni):
 
         assert patroni.member_inactive
 
-        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+        _get.assert_called_once_with(
+            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+        )
 
 
 def test_member_inactive_false(peers_ips, patroni):
@@ -542,7 +569,9 @@ def test_member_inactive_false(peers_ips, patroni):
 
         assert not patroni.member_inactive
 
-        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+        _get.assert_called_once_with(
+            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+        )
 
 
 def test_member_inactive_error(peers_ips, patroni):
@@ -555,7 +584,9 @@ def test_member_inactive_error(peers_ips, patroni):
 
         assert patroni.member_inactive
 
-        _get.assert_called_once_with("http://1.1.1.1:8008/health", verify=True, timeout=5)
+        _get.assert_called_once_with(
+            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+        )
 
 
 def test_patroni_logs(patroni):
@@ -632,7 +663,7 @@ def test_remove_raft_member(patroni):
 
         patroni.remove_raft_member("1.2.3.4")
 
-        _tcp_utility.assert_called_once_with(timeout=3)
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
         _tcp_utility.return_value.executeCommand.assert_called_once_with(
             "127.0.0.1:2222", ["status"]
         )
@@ -646,7 +677,7 @@ def test_remove_raft_member(patroni):
 
         patroni.remove_raft_member("1.2.3.4")
 
-        _tcp_utility.assert_called_once_with(timeout=3)
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
         assert _tcp_utility.return_value.executeCommand.call_count == 2
         _tcp_utility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
         _tcp_utility.return_value.executeCommand.assert_any_call(

@@ -280,7 +280,7 @@ class PostgreSQLAsyncReplication(Object):
             return None
         return json.loads(primary_cluster_data).get("endpoint")
 
-    def _get_secret(self) -> Secret:
+    def _get_secret(self) -> Optional[Secret]:
         """Return async replication necessary secrets."""
         app_secret = self.charm.model.get_secret(label=f"{PEER}.{self.model.app.name}.app")
         content = app_secret.peek_content()
@@ -302,7 +302,8 @@ class PostgreSQLAsyncReplication(Object):
             logger.debug("Secret not found, creating a new one")
             pass
 
-        return self.charm.model.app.add_secret(content=shared_content, label=SECRET_LABEL)
+        if self.charm.unit.is_leader():
+            return self.charm.model.app.add_secret(content=shared_content, label=SECRET_LABEL)
 
     def get_standby_endpoints(self) -> List[str]:
         """Return the standby endpoints."""
@@ -612,7 +613,10 @@ class PostgreSQLAsyncReplication(Object):
             and event.secret.label == f"{PEER}.{self.model.app.name}.app"
         ):
             logger.info("Internal secret changed, updating relation secret")
-            secret = self._get_secret()
+            if not (secret := self._get_secret()):
+                logger.debug("Defer on_secret_changed: Secret not created yet")
+                event.defer()
+                return
             secret.grant(relation)
             primary_cluster_data = {
                 "endpoint": self._primary_cluster_endpoint,

@@ -21,6 +21,9 @@ log:
 restapi:
   listen: '{{ self_ip }}:8008'
   connect_address: '{{ self_ip }}:8008'
+  authentication:
+    username: patroni
+    password: {{ patroni_password }}
   {%- if enable_tls %}
   cafile: {{ conf_path }}/ca.pem
   certfile: {{ conf_path }}/cert.pem
@@ -37,6 +40,7 @@ ctl:
 raft:
   data_dir: {{ conf_path }}/raft
   self_addr: '{{ self_ip }}:2222'
+  password: {{ raft_password }}
   {% if partner_addrs -%}
   partner_addrs:
   {% endif -%}
