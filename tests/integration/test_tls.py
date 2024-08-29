@@ -98,6 +98,8 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Check if TLS enabled for replication
         assert await check_tls_replication(ops_test, primary, enabled=True)
 
+        patroni_password = await get_password(ops_test, primary, "patroni")
+
         # Enable additional logs on the PostgreSQL instance to check TLS
         # being used in a later step and make the fail-over to happens faster.
         await ops_test.model.applications[DATABASE_APP_NAME].set_config({
@@ -106,10 +108,12 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", idle_period=30
         )
-        change_primary_start_timeout(ops_test, primary, 0)
+        change_primary_start_timeout(ops_test, primary, 0, patroni_password)
 
         # Pause Patroni so it doesn't wipe the custom changes
-        await change_patroni_setting(ops_test, "pause", True, use_random_unit=True, tls=True)
+        await change_patroni_setting(
+            ops_test, "pause", True, patroni_password, use_random_unit=True, tls=True
+        )
 
     async with ops_test.fast_forward("24h"):
         for attempt in Retrying(
@@ -160,7 +164,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Check that the primary changed.
         assert await primary_changed(ops_test, primary), "primary not changed"
-        change_primary_start_timeout(ops_test, primary, 300)
+        change_primary_start_timeout(ops_test, primary, 300, patroni_password)
 
         # Check the logs to ensure TLS is being used by pg_rewind.
         primary = await get_primary(ops_test, primary)
@@ -173,7 +177,9 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
                     "grep 'connection authorized: user=rewind database=postgres SSL enabled' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
                 )
 
-        await change_patroni_setting(ops_test, "pause", False, use_random_unit=True, tls=True)
+        await change_patroni_setting(
+            ops_test, "pause", False, patroni_password, use_random_unit=True, tls=True
+        )
 
     async with ops_test.fast_forward():
         # Remove the relation.

@@ -224,7 +224,6 @@ def _remove_stale_otel_sdk_packages():
 
 _remove_stale_otel_sdk_packages()
 
-
 import functools
 import inspect
 import logging
@@ -271,7 +270,7 @@ LIBAPI = 1
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 14
+LIBPATCH = 15
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -280,7 +279,6 @@ dev_logger = logging.getLogger("tracing-dev")
 
 # set this to 0 if you are debugging/developing this library source
 dev_logger.setLevel(logging.CRITICAL)
-
 
 _CharmType = Type[CharmBase]  # the type CharmBase and any subclass thereof
 _C = TypeVar("_C", bound=_CharmType)
@@ -333,9 +331,22 @@ def _get_tracer() -> Optional[Tracer]:
     try:
         return tracer.get()
     except LookupError:
+        # fallback: this course-corrects for a user error where charm_tracing symbols are imported
+        # from different paths (typically charms.tempo_k8s... and lib.charms.tempo_k8s...)
         try:
             ctx: Context = copy_context()
             if context_tracer := _get_tracer_from_context(ctx):
+                logger.warning(
+                    "Tracer not found in `tracer` context var. "
+                    "Verify that you're importing all `charm_tracing` symbols from the same module path. \n"
+                    "For example, DO"
+                    ": `from charms.lib...charm_tracing import foo, bar`. \n"
+                    "DONT: \n"
+                    " \t - `from charms.lib...charm_tracing import foo` \n"
+                    " \t - `from lib...charm_tracing import bar` \n"
+                    "For more info: https://python-notes.curiousefficiency.org/en/latest/python"
+                    "_concepts/import_traps.html#the-double-import-trap"
+                )
                 return context_tracer.get()
             else:
                 return None

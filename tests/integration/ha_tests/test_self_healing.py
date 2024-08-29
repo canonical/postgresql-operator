@@ -240,13 +240,18 @@ async def test_full_cluster_restart(
     """
     # Locate primary unit.
     app = await app_name(ops_test)
+    patroni_password = await get_password(
+        ops_test, ops_test.model.applications[app].units[0].name, "patroni"
+    )
 
     # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
     initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
     initial_ttl = await get_patroni_setting(ops_test, "ttl")
     # loop_wait parameter is limited by ttl value, thus we should increase it first
-    await change_patroni_setting(ops_test, "ttl", 600, use_random_unit=True)
-    await change_patroni_setting(ops_test, "loop_wait", 300, use_random_unit=True)
+    await change_patroni_setting(ops_test, "ttl", 600, patroni_password, use_random_unit=True)
+    await change_patroni_setting(
+        ops_test, "loop_wait", 300, patroni_password, use_random_unit=True
+    )
 
     # Start an application that continuously writes data to the database.
     await start_continuous_writes(ops_test, app)
@@ -271,9 +276,11 @@ async def test_full_cluster_restart(
                 awaits.append(update_restart_condition(ops_test, unit, ORIGINAL_RESTART_CONDITION))
             await asyncio.gather(*awaits)
         await change_patroni_setting(
-            ops_test, "loop_wait", initial_loop_wait, use_random_unit=True
+            ops_test, "loop_wait", initial_loop_wait, patroni_password, use_random_unit=True
         )
-        await change_patroni_setting(ops_test, "ttl", initial_ttl, use_random_unit=True)
+        await change_patroni_setting(
+            ops_test, "ttl", initial_ttl, patroni_password, use_random_unit=True
+        )
 
     # Verify all units are up and running.
     sleep(30)

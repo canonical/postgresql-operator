@@ -53,6 +53,7 @@ async def test_password_rotation(ops_test: OpsTest):
     monitoring_password = await get_password(ops_test, any_unit_name, "monitoring")
     backup_password = await get_password(ops_test, any_unit_name, "backup")
     rewind_password = await get_password(ops_test, any_unit_name, "rewind")
+    patroni_password = await get_password(ops_test, any_unit_name, "patroni")
 
     # Get the leader unit name (because passwords can only be set through it).
     leader = None
@@ -114,7 +115,7 @@ async def test_password_rotation(ops_test: OpsTest):
     restart_time = time.time()
     for unit in ops_test.model.applications[APP_NAME].units:
         if not await unit.is_leader_from_status():
-            restart_patroni(ops_test, unit.name)
+            restart_patroni(ops_test, unit.name, patroni_password)
             assert check_patroni(ops_test, unit.name, restart_time)
 
 

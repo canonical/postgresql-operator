@@ -88,7 +88,7 @@ async def build_connection_string(
 
 
 def change_primary_start_timeout(
-    ops_test: OpsTest, unit_name: str, seconds: Optional[int]
+    ops_test: OpsTest, unit_name: str, seconds: Optional[int], password: str
 ) -> None:
     """Change primary start timeout configuration.
 
@@ -96,6 +96,7 @@ def change_primary_start_timeout(
         ops_test: ops_test instance.
         unit_name: the unit used to set the configuration.
         seconds: number of seconds to set in primary_start_timeout configuration.
+        password: Patroni password.
     """
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
@@ -104,6 +105,7 @@ def change_primary_start_timeout(
                 f"https://{unit_ip}:8008/config",
                 json={"primary_start_timeout": seconds},
                 verify=False,
+                auth=requests.auth.HTTPBasicAuth("patroni", password),
             )
 
 
@@ -961,15 +963,18 @@ async def scale_application(
     )
 
 
-def restart_patroni(ops_test: OpsTest, unit_name: str) -> None:
+def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     """Restart Patroni on a specific unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        password: patroni password
     """
     unit_ip = get_unit_address(ops_test, unit_name)
-    requests.post(f"http://{unit_ip}:8008/restart")
+    requests.post(
+        f"http://{unit_ip}:8008/restart", auth=requests.auth.HTTPBasicAuth("patroni", password)
+    )
 
 
 async def set_password(
@@ -1018,12 +1023,15 @@ async def stop_machine(ops_test: OpsTest, machine_name: str) -> None:
     subprocess.check_call(stop_machine_command.split())
 
 
-def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -> None:
+def switchover(
+    ops_test: OpsTest, current_primary: str, password: str, candidate: str = None
+) -> None:
     """Trigger a switchover.
 
     Args:
         ops_test: The ops test framework instance.
         current_primary: The current primary unit.
+        password: Patroni password.
         candidate: The unit that should be elected the new primary.
     """
     primary_ip = get_unit_address(ops_test, current_primary)
@@ -1033,6 +1041,7 @@ def switchover(ops_test: OpsTest, current_primary: str, candidate: str = None) -
             "leader": current_primary.replace("/", "-"),
             "candidate": candidate.replace("/", "-") if candidate else None,
         },
+        auth=requests.auth.HTTPBasicAuth("patroni", password),
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
