@@ -412,7 +412,7 @@ class Patroni:
             for member in r.json()["members"]
         )
 
-    def is_replication_healthy(self) -> bool:
+    def is_replication_healthy(self, raft_encryption: bool = False) -> bool:
         """Return whether the replication is healthy."""
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
@@ -427,6 +427,13 @@ class Patroni:
                         member_status = requests.get(
                             f"{url}/{endpoint}", verify=self.verify, auth=self._patroni_auth
                         )
+                        # If raft is getting encrypted some of the calls will fail
+                        if member_status.status_code == 503 and raft_encryption:
+                            logger.warning(
+                                "Failed replication check for %s during raft encryption"
+                                % members_ip
+                            )
+                            continue
                         if member_status.status_code != 200:
                             logger.debug(
                                 "Failed replication check for %s with code %d"
