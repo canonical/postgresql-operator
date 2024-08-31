@@ -240,6 +240,7 @@ def test_is_replication_healthy(peers_ips, patroni):
         _get.return_value.status_code = 503
         assert patroni.is_replication_healthy(True)
 
+
 def test_is_member_isolated(peers_ips, patroni):
     with (
         patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
