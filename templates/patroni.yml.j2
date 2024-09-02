@@ -21,9 +21,11 @@ log:
 restapi:
   listen: '{{ self_ip }}:8008'
   connect_address: '{{ self_ip }}:8008'
+  {%- if patroni_password %}
   authentication:
     username: patroni
     password: {{ patroni_password }}
+  {%- endif %}
   {%- if enable_tls %}
   cafile: {{ conf_path }}/ca.pem
   certfile: {{ conf_path }}/cert.pem

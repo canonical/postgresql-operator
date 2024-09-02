@@ -40,6 +40,7 @@ The charm is based on the [charmed-postgresql snap](https://snapcraft.io/charmed
   * See more information about this limitation in [this Jira issue](https://warthogs.atlassian.net/browse/DPE-4695)
   * [Contact us](/t/11863) if you are interested in IPv6!
 
+
 <!-- BADGES -->
 
 [2.9 LTS]: https://img.shields.io/badge/2.9_LTS-%23E95420?label=Juju
