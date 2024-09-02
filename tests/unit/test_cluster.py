@@ -1,19 +1,25 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
 
 import pytest
-import requests as requests
-import tenacity as tenacity
+import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.testing import Harness
-from tenacity import RetryError, stop_after_delay, wait_fixed
+from pysyncobj.utility import UtilityException
+from tenacity import (
+    AttemptManager,
+    RetryCallState,
+    RetryError,
+    Retrying,
+    stop_after_delay,
+    wait_fixed,
+)
 
 from charm import PostgresqlOperatorCharm
-from cluster import Patroni
+from cluster import Patroni, RemoveRaftMemberFailedError
 from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -24,9 +30,6 @@ from constants import (
 
 PATRONI_SERVICE = "patroni"
 CREATE_CLUSTER_CONF_PATH = "/var/snap/charmed-postgresql/current/etc/postgresql/postgresql.conf"
-
-# used for assert functions
-tc = TestCase()
 
 
 # This method will be used by the mock to replace requests.get
@@ -86,13 +89,13 @@ def patroni(harness, peers_ips):
 
 def test_get_alternative_patroni_url(peers_ips, patroni):
     # Mock tenacity attempt.
-    retry = tenacity.Retrying()
-    retry_state = tenacity.RetryCallState(retry, None, None, None)
-    attempt = tenacity.AttemptManager(retry_state)
+    retry = Retrying()
+    retry_state = RetryCallState(retry, None, None, None)
+    attempt = AttemptManager(retry_state)
 
     # Test the first URL that is returned (it should have the current unit IP).
     url = patroni._get_alternative_patroni_url(attempt)
-    tc.assertEqual(url, f"http://{patroni.unit_ip}:8008")
+    assert url == f"http://{patroni.unit_ip}:8008"
 
     # Test returning the other servers URLs.
     for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
@@ -108,8 +111,9 @@ def test_get_member_ip(peers_ips, patroni):
     ):
         # Test error on trying to get the member IP.
         _get_alternative_patroni_url.side_effect = "http://server2"
-        with tc.assertRaises(tenacity.RetryError):
+        with pytest.raises(RetryError):
             patroni.get_member_ip(patroni.member_name)
+            assert False
 
         # Test using an alternative Patroni URL.
         _get_alternative_patroni_url.side_effect = [
@@ -118,17 +122,17 @@ def test_get_member_ip(peers_ips, patroni):
             "http://server1",
         ]
         ip = patroni.get_member_ip(patroni.member_name)
-        tc.assertEqual(ip, "1.1.1.1")
+        assert ip == "1.1.1.1"
 
         # Test using the current Patroni URL.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip(patroni.member_name)
-        tc.assertEqual(ip, "1.1.1.1")
+        assert ip == "1.1.1.1"
 
         # Test when not having that specific member in the cluster.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
-        tc.assertIsNone(ip)
+        assert ip is None
 
 
 def test_get_patroni_health(peers_ips, patroni):
@@ -145,12 +149,13 @@ def test_get_patroni_health(peers_ips, patroni):
         _stop_after_delay.assert_called_once_with(60)
         _wait_fixed.assert_called_once_with(7)
 
-        tc.assertEqual(health, {"state": "running"})
+        assert health == {"state": "running"}
 
         # Test when the Patroni API is not reachable.
         _patroni_url.return_value = "http://server2"
-        with tc.assertRaises(tenacity.RetryError):
+        with pytest.raises(RetryError):
             patroni.get_patroni_health()
+            assert False
 
 
 def test_get_postgresql_version(peers_ips, patroni):
@@ -163,7 +168,7 @@ def test_get_postgresql_version(peers_ips, patroni):
         ]
         version = patroni.get_postgresql_version()
 
-        tc.assertEqual(version, "14.0")
+        assert version == "14.0"
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
@@ -175,8 +180,9 @@ def test_get_primary(peers_ips, patroni):
     ):
         # Test error on trying to get the member IP.
         _get_alternative_patroni_url.side_effect = "http://server2"
-        with tc.assertRaises(tenacity.RetryError):
+        with pytest.raises(RetryError):
             patroni.get_primary(patroni.member_name)
+            assert False
 
         # Test using an alternative Patroni URL.
         _get_alternative_patroni_url.side_effect = [
@@ -185,17 +191,17 @@ def test_get_primary(peers_ips, patroni):
             "http://server1",
         ]
         primary = patroni.get_primary()
-        tc.assertEqual(primary, "postgresql-0")
+        assert primary == "postgresql-0"
 
         # Test using the current Patroni URL.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = patroni.get_primary()
-        tc.assertEqual(primary, "postgresql-0")
+        assert primary == "postgresql-0"
 
         # Test requesting the primary in the unit name pattern.
         _get_alternative_patroni_url.side_effect = ["http://server1"]
         primary = patroni.get_primary(unit_name_pattern=True)
-        tc.assertEqual(primary, "postgresql/0")
+        assert primary == "postgresql/0"
 
 
 def test_is_creating_backup(peers_ips, patroni):
@@ -208,13 +214,13 @@ def test_is_creating_backup(peers_ips, patroni):
                 {"name": "postgresql-1", "tags": {"is_creating_backup": True}},
             ]
         }
-        tc.assertTrue(patroni.is_creating_backup)
+        assert patroni.is_creating_backup
 
         # Test when no member is creating a backup.
         response.json.return_value = {
             "members": [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         }
-        tc.assertFalse(patroni.is_creating_backup)
+        assert not patroni.is_creating_backup
 
 
 def test_is_replication_healthy(peers_ips, patroni):
@@ -238,22 +244,22 @@ def test_is_replication_healthy(peers_ips, patroni):
 
 def test_is_member_isolated(peers_ips, patroni):
     with (
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
         patch("requests.get", side_effect=mocked_requests_get) as _get,
         patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test when it wasn't possible to connect to the Patroni API.
         _patroni_url.return_value = "http://server3"
-        tc.assertFalse(patroni.is_member_isolated)
+        assert not patroni.is_member_isolated
 
         # Test when the member isn't isolated from the cluster.
         _patroni_url.return_value = "http://server1"
-        tc.assertFalse(patroni.is_member_isolated)
+        assert not patroni.is_member_isolated
 
         # Test when the member is isolated from the cluster.
         _patroni_url.return_value = "http://server4"
-        tc.assertTrue(patroni.is_member_isolated)
+        assert patroni.is_member_isolated
 
 
 def test_render_file(peers_ips, patroni):
@@ -277,7 +283,7 @@ def test_render_file(peers_ips, patroni):
             patroni.render_file(filename, "rendered-content", 0o640)
 
         # Check the rendered file is opened with "w+" mode.
-        tc.assertEqual(mock.call_args_list[0][0], (filename, "w+"))
+        assert mock.call_args_list[0][0] == (filename, "w+")
         # Ensure that the correct user is lookup up.
         _pwnam.assert_called_with("snap_daemon")
         # Ensure the file is chmod'd correctly.
@@ -342,7 +348,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
-        tc.assertEqual(mock.call_args_list[0][0], ("templates/patroni.yml.j2", "r"))
+        assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2", "r")
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
@@ -408,7 +414,7 @@ def test_member_replication_lag(peers_ips, patroni):
 
         # Test when the API call fails.
         _patroni_url.return_value = "http://server2"
-        with patch.object(tenacity.Retrying, "iter", Mock(side_effect=tenacity.RetryError(None))):
+        with patch.object(Retrying, "iter", Mock(side_effect=RetryError(None))):
             lag = patroni.member_replication_lag
             assert lag == "unknown"
 
@@ -457,8 +463,9 @@ def test_update_synchronous_node_count(peers_ips, patroni):
 
         # Test when the request fails.
         response.status_code = 500
-        with tc.assertRaises(RetryError):
+        with pytest.raises(RetryError):
             patroni.update_synchronous_node_count()
+            assert False
 
 
 def test_configure_patroni_on_unit(peers_ips, patroni):
@@ -490,8 +497,8 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
 def test_member_started_true(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
         _get.return_value.json.return_value = {"state": "running"}
 
@@ -505,8 +512,8 @@ def test_member_started_true(peers_ips, patroni):
 def test_member_started_false(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
         _get.return_value.json.return_value = {"state": "stopped"}
 
@@ -520,8 +527,8 @@ def test_member_started_false(peers_ips, patroni):
 def test_member_started_error(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
         _get.side_effect = Exception
 
@@ -535,8 +542,8 @@ def test_member_started_error(peers_ips, patroni):
 def test_member_inactive_true(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
         _get.return_value.json.return_value = {"state": "stopped"}
 
@@ -550,8 +557,8 @@ def test_member_inactive_true(peers_ips, patroni):
 def test_member_inactive_false(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
         _get.return_value.json.return_value = {"state": "starting"}
 
@@ -565,8 +572,8 @@ def test_member_inactive_false(peers_ips, patroni):
 def test_member_inactive_error(peers_ips, patroni):
     with (
         patch("cluster.requests.get") as _get,
-        patch("cluster.stop_after_delay", return_value=tenacity.stop_after_delay(0)),
-        patch("cluster.wait_fixed", return_value=tenacity.wait_fixed(0)),
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
     ):
         _get.side_effect = Exception
 
@@ -626,8 +633,9 @@ def test_get_patroni_restart_condition(patroni):
 
         # Test when there is no restart condition set.
         _open.return_value.__enter__.return_value.read.return_value = ""
-        with tc.assertRaises(RuntimeError):
+        with pytest.raises(RuntimeError):
             patroni.get_patroni_restart_condition()
+            assert False
 
 
 @pytest.mark.parametrize("new_restart_condition", ["on-success", "on-failure"])
@@ -641,3 +649,62 @@ def test_update_patroni_restart_condition(patroni, new_restart_condition):
             f"Restart={new_restart_condition}"
         )
         _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])
+
+
+def test_remove_raft_member(patroni):
+    with patch("cluster.TcpUtility") as _tcp_utility:
+        # Member already removed
+        _tcp_utility.return_value.executeCommand.return_value = ""
+
+        patroni.remove_raft_member("1.2.3.4")
+
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
+        _tcp_utility.return_value.executeCommand.assert_called_once_with(
+            "127.0.0.1:2222", ["status"]
+        )
+        _tcp_utility.reset_mock()
+
+        # Removing member
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            "partner_node_status_server_1.2.3.4:2222",
+            "SUCCESS",
+        ]
+
+        patroni.remove_raft_member("1.2.3.4")
+
+        _tcp_utility.assert_called_once_with(password="fake-raft-password", timeout=3)
+        assert _tcp_utility.return_value.executeCommand.call_count == 2
+        _tcp_utility.return_value.executeCommand.assert_any_call("127.0.0.1:2222", ["status"])
+        _tcp_utility.return_value.executeCommand.assert_any_call(
+            "127.0.0.1:2222", ["remove", "1.2.3.4:2222"]
+        )
+        _tcp_utility.reset_mock()
+
+        # Raises on failed status
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            "partner_node_status_server_1.2.3.4:2222",
+            "FAIL",
+        ]
+
+        with pytest.raises(RemoveRaftMemberFailedError):
+            patroni.remove_raft_member("1.2.3.4")
+            assert False
+
+        # Raises on remove error
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            "partner_node_status_server_1.2.3.4:2222",
+            UtilityException,
+        ]
+
+        with pytest.raises(RemoveRaftMemberFailedError):
+            patroni.remove_raft_member("1.2.3.4")
+            assert False
+
+        # Raises on status error
+        _tcp_utility.return_value.executeCommand.side_effect = [
+            UtilityException,
+        ]
+
+        with pytest.raises(RemoveRaftMemberFailedError):
+            patroni.remove_raft_member("1.2.3.4")
+            assert False
