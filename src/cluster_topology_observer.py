@@ -80,6 +80,7 @@ class ClusterTopologyObserver(Object):
                 "/usr/bin/python3",
                 "src/cluster_topology_observer.py",
                 self._charm._patroni._patroni_url,
+                ",".join([self._charm._patroni._get_alternative_patroni_url(number) for number in range(2 * len(self._charm._peer_members_ips) + 1)[1:]]),
                 f"{self._charm._patroni.verify}",
                 self._run_cmd,
                 self._charm.unit.name,
@@ -129,30 +130,43 @@ def main():
 
     Watch the Patroni API cluster info. When changes are detected, dispatch the change event.
     """
-    patroni_url, verify, run_cmd, unit, charm_dir = sys.argv[1:]
+    patroni_url, alternative_patroni_urls, verify, run_cmd, unit, charm_dir = sys.argv[1:]
 
     previous_cluster_topology = {}
+    urls = [patroni_url] + list(filter(None, alternative_patroni_urls.split(",")))
     while True:
-        cluster_status = requests.get(
-            f"{patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-            verify=verify,
-            timeout=API_REQUEST_TIMEOUT,
-        )
-        current_cluster_topology = {
-            member["name"]: member["role"] for member in cluster_status.json()["members"]
-        }
+        for url in urls:
+            try:
+                cluster_status = requests.get(
+                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                )
+            except Exception as e:
+                with open(LOG_FILE_PATH, "a") as log_file:
+                    log_file.write(f"Failed to get cluster status when using {url}: {e} - {type(e)}\n")
+                if url == urls[-1]:
+                    with open(LOG_FILE_PATH, "a") as log_file:
+                        log_file.write("No more peers to try to get the cluster status from.\n")
+                    break
+                else:
+                    continue
+            else:
+                current_cluster_topology = {
+                    member["name"]: member["role"] for member in cluster_status.json()["members"]
+                }
 
-        # If it's the first time the cluster topology was retrieved, then store it and use
-        # it for subsequent checks.
-        if not previous_cluster_topology:
-            previous_cluster_topology = current_cluster_topology
-        # If the cluster topology changed, dispatch a charm event to handle this change.
-        elif current_cluster_topology != previous_cluster_topology:
-            previous_cluster_topology = current_cluster_topology
-            dispatch(run_cmd, unit, charm_dir)
+                # If it's the first time the cluster topology was retrieved, then store it and use
+                # it for subsequent checks.
+                if not previous_cluster_topology:
+                    previous_cluster_topology = current_cluster_topology
+                # If the cluster topology changed, dispatch a charm event to handle this change.
+                elif current_cluster_topology != previous_cluster_topology:
+                    previous_cluster_topology = current_cluster_topology
+                    dispatch(run_cmd, unit, charm_dir)
 
-        # Wait some time before checking again for a cluster topology change.
-        sleep(30)
+                # Wait some time before checking again for a cluster topology change.
+                sleep(30)
 
 
 if __name__ == "__main__":

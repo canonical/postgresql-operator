@@ -210,7 +210,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
+                url = self._get_alternative_patroni_url(attempt.retry_state.attempt_number)
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
@@ -234,7 +234,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
+                url = self._get_alternative_patroni_url(attempt.retry_state.attempt_number)
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
@@ -259,7 +259,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
+                url = self._get_alternative_patroni_url(attempt.retry_state.attempt_number, alternative_endpoints)
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
@@ -289,7 +289,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
+                url = self._get_alternative_patroni_url(attempt.retry_state.attempt_number)
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
@@ -313,7 +313,7 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
+                url = self._get_alternative_patroni_url(attempt.retry_state.attempt_number)
                 r = requests.get(f"{url}/cluster", verify=self.verify, auth=self._patroni_auth)
                 for member in r.json()["members"]:
                     if member["role"] == "sync_standby":
@@ -321,7 +321,7 @@ class Patroni:
         return sync_standbys
 
     def _get_alternative_patroni_url(
-        self, attempt: AttemptManager, alternative_endpoints: List[str] = None
+        self, attempt_number: int, alternative_endpoints: List[str] = None
     ) -> str:
         """Get an alternative REST API URL from another member each time.
 
@@ -330,9 +330,9 @@ class Patroni:
         """
         if alternative_endpoints is not None:
             return self._patroni_url.replace(
-                self.unit_ip, alternative_endpoints[attempt.retry_state.attempt_number - 1]
+                self.unit_ip, alternative_endpoints[attempt_number - 1]
             )
-        attempt_number = attempt.retry_state.attempt_number
+        attempt_number = attempt_number
         if attempt_number > 1:
             url = self._patroni_url
             # Build the URL using http and later using https for each peer.
