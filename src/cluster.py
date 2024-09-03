@@ -9,7 +9,9 @@ import logging
 import os
 import pwd
 import re
+import shutil
 import subprocess
+from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
 import requests
@@ -49,6 +51,10 @@ logger = logging.getLogger(__name__)
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
 RUNNING_STATES = ["running", "streaming"]
+
+
+class RaftNotPromotedError(Exception):
+    """Raised when a cluster is not promoted."""
 
 
 class ClusterNotPromotedError(Exception):
@@ -558,6 +564,7 @@ class Patroni:
         pitr_target: Optional[str] = None,
         restore_to_latest: bool = False,
         parameters: Optional[dict[str, str]] = None,
+        no_peers: bool = False,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -572,6 +579,7 @@ class Patroni:
             pitr_target: point-in-time-recovery target for the backup.
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
+            no_peers: Don't include peers.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2", "r") as file:
@@ -587,7 +595,7 @@ class Patroni:
             enable_tls=enable_tls,
             member_name=self.member_name,
             partner_addrs=self.charm.async_replication.get_partner_addresses(),
-            peers_ips=self.peers_ips,
+            peers_ips=self.peers_ips if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
@@ -711,6 +719,53 @@ class Patroni:
         primary = self.get_primary()
         return primary != old_primary
 
+    def remove_raft_data(self) -> None:
+        """Stops Patroni and removes the raft journals."""
+        logger.info("Stopping postgresql")
+        self.stop_patroni()
+
+        logger.info("Removing raft data")
+        try:
+            path = Path(f"{PATRONI_CONF_PATH}/raft")
+            if path.exists() and path.is_dir():
+                shutil.rmtree(path)
+        except OSError as e:
+            raise Exception(f"Failed to remove previous cluster information with error: {str(e)}")
+        logger.info("Raft ready to reinitialise")
+
+    def reinitialise_raft_data(self) -> None:
+        """Reinitialise the raft journals and promoting the unit to leader. Should only be run on sync replicas."""
+        # TODO remove magic sleep
+        import time
+
+        time.sleep(30)
+
+        logger.info("Rerendering patroni config without peers")
+        self.render_patroni_yml_file(no_peers=True)
+        logger.info("Starting patroni")
+        self.start_patroni()
+
+        logger.info("Waiting for new raft cluster to initialise")
+        for attempt in Retrying(wait=wait_fixed(5)):
+            with attempt:
+                cluster_status = requests.get(
+                    f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
+                )
+                found_primary = False
+                # logger.error(f"@@@@@@@@@@@@@@@@@@@@@@2{cluster_status.json()}")
+                for member in cluster_status.json()["members"]:
+                    if member["role"] == "leader":
+                        if member["host"] != self.unit_ip:
+                            raise RaftNotPromotedError()
+                if not found_primary:
+                    raise RaftNotPromotedError()
+
+        logger.info("Restarting patroni")
+        self.restart_patroni()
+
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
 
@@ -736,6 +791,12 @@ class Patroni:
         if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
             return
 
+        # If there's no quorum and the leader left raft cluster is stuck
+        # logger.error(f"!!!!!!!!!!!!!!!!!!!!!11{raft_status}")
+        if not raft_status["has_quorum"] and raft_status["leader"].host == member_ip:
+            logger.warning("Remove raft member: Stuck raft cluster detected")
+            self.remove_raft_data()
+            self.reinitialise_raft_data()
         # Remove the member from the raft cluster.
         try:
             result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])

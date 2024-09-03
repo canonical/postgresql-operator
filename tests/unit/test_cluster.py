@@ -666,7 +666,7 @@ def test_remove_raft_member(patroni):
 
         # Removing member
         _tcp_utility.return_value.executeCommand.side_effect = [
-            "partner_node_status_server_1.2.3.4:2222",
+            {"partner_node_status_server_1.2.3.4:2222": 0, "has_quorum": True},
             "SUCCESS",
         ]
 
@@ -682,7 +682,7 @@ def test_remove_raft_member(patroni):
 
         # Raises on failed status
         _tcp_utility.return_value.executeCommand.side_effect = [
-            "partner_node_status_server_1.2.3.4:2222",
+            {"partner_node_status_server_1.2.3.4:2222": 0, "has_quorum": True},
             "FAIL",
         ]
 
@@ -692,7 +692,7 @@ def test_remove_raft_member(patroni):
 
         # Raises on remove error
         _tcp_utility.return_value.executeCommand.side_effect = [
-            "partner_node_status_server_1.2.3.4:2222",
+            {"partner_node_status_server_1.2.3.4:2222": 0, "has_quorum": True},
             UtilityException,
         ]
 
