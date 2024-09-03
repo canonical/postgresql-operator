@@ -997,7 +997,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit enable_disable_extensions: standby cluster")
             return
         spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
-        plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
+        plugins_exception = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
         original_status = self.unit.status
         extensions = {}
         # collect extensions
@@ -1497,24 +1497,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         for snap_name, snap_version in packages:
             try:
-                snap_cache = snap.SnapCache()
-                snap_package = snap_cache[snap_name]
-
-                if not snap_package.present or refresh:
-                    if revision := snap_version.get("revision"):
-                        try:
-                            revision = revision[platform.machine()]
-                        except Exception:
-                            logger.error("Unavailable snap architecture %s", platform.machine())
-                            raise
-                        channel = snap_version.get("channel", "")
-                        snap_package.ensure(
-                            snap.SnapState.Latest, revision=revision, channel=channel
-                        )
-                        snap_package.hold()
-                    else:
-                        snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
-
+                snap.install_local(
+                    f'/var/lib/juju/agents/unit-{self.unit.name.replace("/", "-")}/charm/snap/charmed-postgresql_14.12_amd64.snap',
+                    dangerous=True,
+                )
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
                     "An exception occurred when installing %s. Reason: %s", snap_name, str(e)

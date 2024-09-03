@@ -325,6 +325,15 @@ class PostgreSQL:
                             if enable
                             else f"DROP EXTENSION IF EXISTS {extension};"
                         )
+                        if extension == "pgaudit":
+                            if enable:
+                                cursor.execute(
+                                    f"ALTER DATABASE {database} SET pgaudit.log to 'DDL';"
+                                )
+                            else:
+                                cursor.execute(
+                                    f"ALTER DATABASE {database} RESET pgaudit.log;"
+                                )
         except psycopg2.errors.UniqueViolation:
             pass
         except psycopg2.errors.DependentObjectsStillExist:
