@@ -760,6 +760,7 @@ class Patroni:
                     if member["role"] == "leader":
                         if member["host"] != self.unit_ip:
                             raise RaftNotPromotedError()
+                        found_primary = True
                 if not found_primary:
                     raise RaftNotPromotedError()
 
