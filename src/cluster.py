@@ -53,6 +53,10 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 
+class RaftPostgresqlStillUpError(Exception):
+    """Raised when a cluster is not promoted."""
+
+
 class RaftNotPromotedError(Exception):
     """Raised when a cluster is not promoted."""
 
@@ -722,6 +726,18 @@ class Patroni:
     def remove_raft_data(self) -> None:
         """Stops Patroni and removes the raft journals."""
         logger.info("Stopping postgresql")
+        subprocess.run([
+            "sudo",
+            "-u",
+            "snap_daemon",
+            "charmed-postgresql.pg-ctl",
+            "stop",
+            "-m",
+            "f",
+            "-D",
+            POSTGRESQL_DATA_PATH,
+        ])
+        logger.info("Stopping patroni")
         self.stop_patroni()
 
         logger.info("Removing raft data")
@@ -735,11 +751,6 @@ class Patroni:
 
     def reinitialise_raft_data(self) -> None:
         """Reinitialise the raft journals and promoting the unit to leader. Should only be run on sync replicas."""
-        # TODO remove magic sleep
-        import time
-
-        time.sleep(30)
-
         logger.info("Rerendering patroni config without peers")
         self.render_patroni_yml_file(no_peers=True)
         logger.info("Starting patroni")
@@ -748,20 +759,17 @@ class Patroni:
         logger.info("Waiting for new raft cluster to initialise")
         for attempt in Retrying(wait=wait_fixed(5)):
             with attempt:
-                cluster_status = requests.get(
-                    f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                response = requests.get(
+                    f"{self._patroni_url}/health",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
                 )
-                found_primary = False
-                # logger.error(f"@@@@@@@@@@@@@@@@@@@@@@2{cluster_status.json()}")
-                for member in cluster_status.json()["members"]:
-                    if member["role"] == "leader":
-                        if member["host"] != self.unit_ip:
-                            raise RaftNotPromotedError()
-                        found_primary = True
-                if not found_primary:
+                health_status = response.json()
+                if (
+                    health_status["role"] not in ["leader", "master"]
+                    or health_status["state"] != "running"
+                ):
                     raise RaftNotPromotedError()
 
         logger.info("Restarting patroni")
@@ -793,7 +801,6 @@ class Patroni:
             return
 
         # If there's no quorum and the leader left raft cluster is stuck
-        # logger.error(f"!!!!!!!!!!!!!!!!!!!!!11{raft_status}")
         if not raft_status["has_quorum"] and raft_status["leader"].host == member_ip:
             logger.warning("Remove raft member: Stuck raft cluster detected")
             self.remove_raft_data()
