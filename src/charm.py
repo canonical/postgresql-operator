@@ -825,6 +825,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         elif ip_to_remove:
             ips.remove(ip_to_remove)
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
+        self._observer.restart_observer()
 
     @retry(
         stop=stop_after_delay(60),

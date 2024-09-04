@@ -16,7 +16,6 @@ import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from tenacity import (
-    AttemptManager,
     RetryError,
     Retrying,
     retry,
@@ -259,7 +258,9 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt.retry_state.attempt_number, alternative_endpoints)
+                url = self._get_alternative_patroni_url(
+                    attempt.retry_state.attempt_number, alternative_endpoints
+                )
                 cluster_status = requests.get(
                     f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
