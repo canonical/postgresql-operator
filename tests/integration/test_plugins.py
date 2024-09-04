@@ -103,166 +103,168 @@ async def test_plugins(ops_test: OpsTest) -> None:
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
-#     sql_tests = {
-#         "plugin_citext_enable": CITEXT_EXTENSION_STATEMENT,
-#         "plugin_debversion_enable": DEBVERSION_EXTENSION_STATEMENT,
-#         "plugin_hstore_enable": HSTORE_EXTENSION_STATEMENT,
-#         "plugin_pg_trgm_enable": PG_TRGM_EXTENSION_STATEMENT,
-#         "plugin_plpython3u_enable": PLPYTHON3U_EXTENSION_STATEMENT,
-#         "plugin_unaccent_enable": UNACCENT_EXTENSION_STATEMENT,
-#         "plugin_bloom_enable": BLOOM_EXTENSION_STATEMENT,
-#         "plugin_btree_gin_enable": BTREEGIN_EXTENSION_STATEMENT,
-#         "plugin_btree_gist_enable": BTREEGIST_EXTENSION_STATEMENT,
-#         "plugin_cube_enable": CUBE_EXTENSION_STATEMENT,
-#         "plugin_dict_int_enable": DICTINT_EXTENSION_STATEMENT,
-#         "plugin_dict_xsyn_enable": DICTXSYN_EXTENSION_STATEMENT,
-#         "plugin_earthdistance_enable": EARTHDISTANCE_EXTENSION_STATEMENT,
-#         "plugin_fuzzystrmatch_enable": FUZZYSTRMATCH_EXTENSION_STATEMENT,
-#         "plugin_intarray_enable": INTARRAY_EXTENSION_STATEMENT,
-#         "plugin_isn_enable": ISN_EXTENSION_STATEMENT,
-#         "plugin_lo_enable": LO_EXTENSION_STATEMENT,
-#         "plugin_ltree_enable": LTREE_EXTENSION_STATEMENT,
-#         "plugin_old_snapshot_enable": OLD_SNAPSHOT_EXTENSION_STATEMENT,
-#         "plugin_pg_freespacemap_enable": PG_FREESPACEMAP_EXTENSION_STATEMENT,
-#         "plugin_pgrowlocks_enable": PGROWLOCKS_EXTENSION_STATEMENT,
-#         "plugin_pgstattuple_enable": PGSTATTUPLE_EXTENSION_STATEMENT,
-#         "plugin_pg_visibility_enable": PG_VISIBILITY_EXTENSION_STATEMENT,
-#         "plugin_seg_enable": SEG_EXTENSION_STATEMENT,
-#         "plugin_tablefunc_enable": TABLEFUNC_EXTENSION_STATEMENT,
-#         "plugin_tcn_enable": TCN_EXTENSION_STATEMENT,
-#         "plugin_tsm_system_rows_enable": TSM_SYSTEM_ROWS_EXTENSION_STATEMENT,
-#         "plugin_tsm_system_time_enable": TSM_SYSTEM_TIME_EXTENSION_STATEMENT,
-#         "plugin_uuid_ossp_enable": UUID_OSSP_EXTENSION_STATEMENT,
-#         "plugin_spi_enable": [
-#             REFINT_EXTENSION_STATEMENT,
-#             AUTOINC_EXTENSION_STATEMENT,
-#             INSERT_USERNAME_EXTENSION_STATEMENT,
-#             MODDATETIME_EXTENSION_STATEMENT,
-#         ],
-#         "plugin_bool_plperl_enable": BOOL_PLPERL_EXTENSION_STATEMENT,
-#         "plugin_hll_enable": HLL_EXTENSION_STATEMENT,
-#         "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
-#         "plugin_hypopg_enable": HYPOPG_EXTENSION_STATEMENT,
-#         "plugin_ip4r_enable": IP4R_EXTENSION_STATEMENT,
-#         "plugin_plperl_enable": PLPERL_EXTENSION_STATEMENT,
-#         "plugin_jsonb_plperl_enable": JSONB_PLPERL_EXTENSION_STATEMENT,
-#         "plugin_orafce_enable": ORAFCE_EXTENSION_STATEMENT,
-#         "plugin_pg_similarity_enable": ORAFCE_EXTENSION_STATEMENT,
-#         "plugin_prefix_enable": PREFIX_EXTENSION_STATEMENT,
-#         "plugin_rdkit_enable": RDKIT_EXTENSION_STATEMENT,
-#         "plugin_tds_fdw_enable": TDS_FDW_EXTENSION_STATEMENT,
-#         "plugin_icu_ext_enable": ICU_EXT_EXTENSION_STATEMENT,
-#         "plugin_pltcl_enable": PLTCL_EXTENSION_STATEMENT,
-#         "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
-#         "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
-#         "plugin_postgis_tiger_geocoder_enable": POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT,
-#         "plugin_postgis_raster_enable": POSTGIS_RASTER_EXTENSION_STATEMENT,
-#         "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
-#         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
-#         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
-#     }
-#
-#     def enable_disable_config(enabled: False):
-#         config = {}
-#         for plugin in sql_tests.keys():
-#             config[plugin] = f"{enabled}"
-#         return config
-#
-#     # Check that the available plugins are disabled.
-#     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-#     password = await get_password(ops_test, primary)
-#     address = get_unit_address(ops_test, primary)
-#
-#     config = enable_disable_config(False)
-#     await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-#     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-#
-#     logger.info("checking that the plugins are disabled")
-#     with db_connect(host=address, password=password) as connection:
-#         connection.autocommit = True
-#         for query in sql_tests.values():
-#             if isinstance(query, list):
-#                 for test in query:
-#                     with pytest.raises(psycopg2.Error):
-#                         connection.cursor().execute(test)
-#             else:
-#                 with pytest.raises(psycopg2.Error):
-#                     connection.cursor().execute(query)
-#     connection.close()
-#
-#     # Enable the plugins.
-#     logger.info("enabling the plugins")
-#
-#     config = enable_disable_config(True)
-#     await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-#     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-#
-#     # Check that the available plugins are enabled.
-#     logger.info("checking that the plugins are enabled")
-#     with db_connect(host=address, password=password) as connection:
-#         connection.autocommit = True
-#         for query in sql_tests.values():
-#             if isinstance(query, list):
-#                 for test in query:
-#                     connection.cursor().execute(test)
-#             else:
-#                 connection.cursor().execute(query)
-#     connection.close()
-#
-#
-# @pytest.mark.group(1)
-# async def test_plugin_objects(ops_test: OpsTest) -> None:
-#     """Checks if charm gets blocked when trying to disable a plugin in use."""
-#     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-#     password = await get_password(ops_test, primary)
-#     address = get_unit_address(ops_test, primary)
-#
-#     logger.info("Creating an index object which depends on the pg_trgm config")
-#     with db_connect(host=address, password=password) as connection:
-#         connection.autocommit = True
-#         connection.cursor().execute("CREATE TABLE example (value VARCHAR(10));")
-#         connection.cursor().execute(
-#             "CREATE INDEX example_idx ON example USING gin(value gin_trgm_ops);"
-#         )
-#     connection.close()
-#
-#     logger.info("Disabling the plugin on charm config, waiting for blocked status")
-#     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-#         "plugin_pg_trgm_enable": "False"
-#     })
-#     await ops_test.model.block_until(
-#         lambda: ops_test.model.units[primary].workload_status == "blocked",
-#         timeout=100,
-#     )
-#
-#     logger.info("Enabling the plugin back on charm config, status should resolve")
-#     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-#         "plugin_pg_trgm_enable": "True"
-#     })
-#     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-#
-#     logger.info("Re-disabling plugin, waiting for blocked status to come back")
-#     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-#         "plugin_pg_trgm_enable": "False"
-#     })
-#     await ops_test.model.block_until(
-#         lambda: ops_test.model.units[primary].workload_status == "blocked",
-#         timeout=100,
-#     )
-#
-#     logger.info("Delete the object which depends on the plugin")
-#     with db_connect(host=address, password=password) as connection:
-#         connection.autocommit = True
-#         connection.cursor().execute("DROP INDEX example_idx;")
-#     connection.close()
-#
-#     logger.info("Waiting for status to resolve again")
-#     async with ops_test.fast_forward(fast_interval="60s"):
-#         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+    sql_tests = {
+        "plugin_citext_enable": CITEXT_EXTENSION_STATEMENT,
+        "plugin_debversion_enable": DEBVERSION_EXTENSION_STATEMENT,
+        "plugin_hstore_enable": HSTORE_EXTENSION_STATEMENT,
+        "plugin_pg_trgm_enable": PG_TRGM_EXTENSION_STATEMENT,
+        "plugin_plpython3u_enable": PLPYTHON3U_EXTENSION_STATEMENT,
+        "plugin_unaccent_enable": UNACCENT_EXTENSION_STATEMENT,
+        "plugin_bloom_enable": BLOOM_EXTENSION_STATEMENT,
+        "plugin_btree_gin_enable": BTREEGIN_EXTENSION_STATEMENT,
+        "plugin_btree_gist_enable": BTREEGIST_EXTENSION_STATEMENT,
+        "plugin_cube_enable": CUBE_EXTENSION_STATEMENT,
+        "plugin_dict_int_enable": DICTINT_EXTENSION_STATEMENT,
+        "plugin_dict_xsyn_enable": DICTXSYN_EXTENSION_STATEMENT,
+        "plugin_earthdistance_enable": EARTHDISTANCE_EXTENSION_STATEMENT,
+        "plugin_fuzzystrmatch_enable": FUZZYSTRMATCH_EXTENSION_STATEMENT,
+        "plugin_intarray_enable": INTARRAY_EXTENSION_STATEMENT,
+        "plugin_isn_enable": ISN_EXTENSION_STATEMENT,
+        "plugin_lo_enable": LO_EXTENSION_STATEMENT,
+        "plugin_ltree_enable": LTREE_EXTENSION_STATEMENT,
+        "plugin_old_snapshot_enable": OLD_SNAPSHOT_EXTENSION_STATEMENT,
+        "plugin_pg_freespacemap_enable": PG_FREESPACEMAP_EXTENSION_STATEMENT,
+        "plugin_pgrowlocks_enable": PGROWLOCKS_EXTENSION_STATEMENT,
+        "plugin_pgstattuple_enable": PGSTATTUPLE_EXTENSION_STATEMENT,
+        "plugin_pg_visibility_enable": PG_VISIBILITY_EXTENSION_STATEMENT,
+        "plugin_seg_enable": SEG_EXTENSION_STATEMENT,
+        "plugin_tablefunc_enable": TABLEFUNC_EXTENSION_STATEMENT,
+        "plugin_tcn_enable": TCN_EXTENSION_STATEMENT,
+        "plugin_tsm_system_rows_enable": TSM_SYSTEM_ROWS_EXTENSION_STATEMENT,
+        "plugin_tsm_system_time_enable": TSM_SYSTEM_TIME_EXTENSION_STATEMENT,
+        "plugin_uuid_ossp_enable": UUID_OSSP_EXTENSION_STATEMENT,
+        "plugin_spi_enable": [
+            REFINT_EXTENSION_STATEMENT,
+            AUTOINC_EXTENSION_STATEMENT,
+            INSERT_USERNAME_EXTENSION_STATEMENT,
+            MODDATETIME_EXTENSION_STATEMENT,
+        ],
+        "plugin_bool_plperl_enable": BOOL_PLPERL_EXTENSION_STATEMENT,
+        "plugin_hll_enable": HLL_EXTENSION_STATEMENT,
+        "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
+        "plugin_hypopg_enable": HYPOPG_EXTENSION_STATEMENT,
+        "plugin_ip4r_enable": IP4R_EXTENSION_STATEMENT,
+        "plugin_plperl_enable": PLPERL_EXTENSION_STATEMENT,
+        "plugin_jsonb_plperl_enable": JSONB_PLPERL_EXTENSION_STATEMENT,
+        "plugin_orafce_enable": ORAFCE_EXTENSION_STATEMENT,
+        "plugin_pg_similarity_enable": ORAFCE_EXTENSION_STATEMENT,
+        "plugin_prefix_enable": PREFIX_EXTENSION_STATEMENT,
+        "plugin_rdkit_enable": RDKIT_EXTENSION_STATEMENT,
+        "plugin_tds_fdw_enable": TDS_FDW_EXTENSION_STATEMENT,
+        "plugin_icu_ext_enable": ICU_EXT_EXTENSION_STATEMENT,
+        "plugin_pltcl_enable": PLTCL_EXTENSION_STATEMENT,
+        "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
+        "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
+        "plugin_postgis_tiger_geocoder_enable": POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT,
+        "plugin_postgis_raster_enable": POSTGIS_RASTER_EXTENSION_STATEMENT,
+        "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
+        "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
+        "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
+    }
+
+    def enable_disable_config(enabled: False):
+        config = {}
+        for plugin in sql_tests.keys():
+            config[plugin] = f"{enabled}"
+        return config
+
+    # Check that the available plugins are disabled.
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    password = await get_password(ops_test, primary)
+    address = get_unit_address(ops_test, primary)
+
+    config = enable_disable_config(False)
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+    logger.info("checking that the plugins are disabled")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        for query in sql_tests.values():
+            if isinstance(query, list):
+                for test in query:
+                    with pytest.raises(psycopg2.Error):
+                        connection.cursor().execute(test)
+            else:
+                with pytest.raises(psycopg2.Error):
+                    connection.cursor().execute(query)
+    connection.close()
+
+    # Enable the plugins.
+    logger.info("enabling the plugins")
+
+    config = enable_disable_config(True)
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+    # Check that the available plugins are enabled.
+    logger.info("checking that the plugins are enabled")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        for query in sql_tests.values():
+            if isinstance(query, list):
+                for test in query:
+                    connection.cursor().execute(test)
+            else:
+                connection.cursor().execute(query)
+    connection.close()
+
+
+@pytest.mark.group(1)
+async def test_plugin_objects(ops_test: OpsTest) -> None:
+    """Checks if charm gets blocked when trying to disable a plugin in use."""
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    password = await get_password(ops_test, primary)
+    address = get_unit_address(ops_test, primary)
+
+    logger.info("Creating an index object which depends on the pg_trgm config")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("CREATE TABLE example (value VARCHAR(10));")
+        connection.cursor().execute(
+            "CREATE INDEX example_idx ON example USING gin(value gin_trgm_ops);"
+        )
+    connection.close()
+
+    logger.info("Disabling the plugin on charm config, waiting for blocked status")
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_pg_trgm_enable": "False"
+    })
+    await ops_test.model.block_until(
+        lambda: ops_test.model.units[primary].workload_status == "blocked",
+        timeout=100,
+    )
+
+    logger.info("Enabling the plugin back on charm config, status should resolve")
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_pg_trgm_enable": "True"
+    })
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
+    logger.info("Re-disabling plugin, waiting for blocked status to come back")
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_pg_trgm_enable": "False"
+    })
+    await ops_test.model.block_until(
+        lambda: ops_test.model.units[primary].workload_status == "blocked",
+        timeout=100,
+    )
+
+    logger.info("Delete the object which depends on the plugin")
+    with db_connect(host=address, password=password) as connection:
+        connection.autocommit = True
+        connection.cursor().execute("DROP INDEX example_idx;")
+    connection.close()
+
+    logger.info("Waiting for status to resolve again")
+    async with ops_test.fast_forward(fast_interval="60s"):
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
 
 @pytest.mark.group(1)
 async def test_audit_plugin(ops_test: OpsTest) -> None:
     """Test the audit plugin."""
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"plugin_audit_enable": "True"})
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_audit_enable": "True"
+    })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
