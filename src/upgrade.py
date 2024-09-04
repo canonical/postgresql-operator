@@ -19,14 +19,8 @@ from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
 
 from constants import (
-    APP_SCOPE,
-    MONITORING_PASSWORD_KEY,
-    MONITORING_USER,
-    PATRONI_PASSWORD_KEY,
-    RAFT_PASSWORD_KEY,
     SNAP_PACKAGES,
 )
-from utils import new_password
 
 logger = logging.getLogger(__name__)
 
