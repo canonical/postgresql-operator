@@ -427,7 +427,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             event.defer()
             return
-        except ConnectionError:
+        except RetryError:
             logger.warning(
                 "Early on_peer_relation_departed: unable to connect to the departing unit"
             )
