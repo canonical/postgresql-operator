@@ -1619,7 +1619,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
-    def update_config(self, is_creating_backup: bool = False) -> bool:
+    def update_config(self, is_creating_backup: bool = False, no_peers: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = self.is_tls_enabled
         limit_memory = None
@@ -1645,7 +1645,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.app_peer_data.get("require-change-bucket-after-restore", None)
             ),
             parameters=pg_parameters,
+            no_peers=no_peers,
         )
+        if no_peers:
+            return True
+
         if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed

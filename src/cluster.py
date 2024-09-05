@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Set
 
+import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
@@ -598,7 +599,9 @@ class Patroni:
             data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,
             member_name=self.member_name,
-            partner_addrs=self.charm.async_replication.get_partner_addresses(),
+            partner_addrs=self.charm.async_replication.get_partner_addresses()
+            if not no_peers
+            else [],
             peers_ips=self.peers_ips if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
@@ -725,20 +728,15 @@ class Patroni:
 
     def remove_raft_data(self) -> None:
         """Stops Patroni and removes the raft journals."""
-        logger.info("Stopping postgresql")
-        subprocess.run([
-            "sudo",
-            "-u",
-            "snap_daemon",
-            "charmed-postgresql.pg-ctl",
-            "stop",
-            "-m",
-            "f",
-            "-D",
-            POSTGRESQL_DATA_PATH,
-        ])
         logger.info("Stopping patroni")
         self.stop_patroni()
+
+        logger.info("Wait for postgresql to stop")
+        for attempt in Retrying(wait=wait_fixed(5)):
+            with attempt:
+                for proc in psutil.process_iter(["name"]):
+                    if proc.name() == "postgres":
+                        raise RaftPostgresqlStillUpError()
 
         logger.info("Removing raft data")
         try:
@@ -752,7 +750,7 @@ class Patroni:
     def reinitialise_raft_data(self) -> None:
         """Reinitialise the raft journals and promoting the unit to leader. Should only be run on sync replicas."""
         logger.info("Rerendering patroni config without peers")
-        self.render_patroni_yml_file(no_peers=True)
+        self.charm.update_config(no_peers=True)
         logger.info("Starting patroni")
         self.start_patroni()
 
@@ -774,6 +772,7 @@ class Patroni:
 
         logger.info("Restarting patroni")
         self.restart_patroni()
+        logger.info("Raft should be unstuck")
 
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
@@ -805,6 +804,7 @@ class Patroni:
             logger.warning("Remove raft member: Stuck raft cluster detected")
             self.remove_raft_data()
             self.reinitialise_raft_data()
+
         # Remove the member from the raft cluster.
         try:
             result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])
