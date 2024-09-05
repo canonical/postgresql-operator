@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
 from asyncio import gather
@@ -74,7 +74,7 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
 
 @pytest.mark.group(1)
 @markers.juju3
-async def test_removing_stereo_sync_replica(ops_test: OpsTest, continuous_writes) -> None:
+async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     await start_continuous_writes(ops_test, app)
@@ -82,7 +82,7 @@ async def test_removing_stereo_sync_replica(ops_test: OpsTest, continuous_writes
     primary = await get_primary(ops_test, app)
     secondary = next(
         filter(lambda x: x.name != primary, ops_test.model.applications[DATABASE_APP_NAME].units)
-    )
+    ).name
     await ops_test.model.destroy_unit(secondary, force=True, destroy_storage=False, max_wait=1500)
 
     await ops_test.model.wait_for_idle(status="active", timeout=600)
