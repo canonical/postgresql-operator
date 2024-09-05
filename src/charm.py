@@ -427,6 +427,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             event.defer()
             return
+        except ConnectionError:
+            logger.warning(
+                "Early on_peer_relation_departed: unable to connect to the departing unit"
+            )
+            return
 
         # Allow leader to update the cluster members.
         if not self.unit.is_leader():
