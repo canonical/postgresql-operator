@@ -1288,6 +1288,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
+            no_peers=False,
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
@@ -1311,6 +1312,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
+            no_peers=False,
         )
         _handle_postgresql_restart_need.assert_called_once()
         assert "tls" not in harness.get_relation_data(
