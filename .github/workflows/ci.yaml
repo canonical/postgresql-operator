@@ -7,15 +7,14 @@ concurrency:
   cancel-in-progress: true
 
 on:
-# TODO: uncomment below before merging
-  # pull_request:
-  #   paths-ignore:
-  #     - '.gitignore'
-  #     - '.jujuignore'
-  #     - 'LICENSE'
-  #     - '**.md'
-  #     - .github/renovate.json5
-  #     - '.github/workflows/sync_docs.yaml'
+  pull_request:
+    paths-ignore:
+      - '.gitignore'
+      - '.jujuignore'
+      - 'LICENSE'
+      - '**.md'
+      - .github/renovate.json5
+      - '.github/workflows/sync_docs.yaml'
   schedule:
     - cron: '53 0 * * *' # Daily at 00:53 UTC
   # Triggered on push to branch "main" by .github/workflows/release.yaml
@@ -60,12 +59,18 @@ jobs:
             allure_on_amd64: false
           - agent: 3.4.5  # renovate: juju-agent-pin-minor
             allure_on_amd64: true
+          - snap_channel: 3.6/beta
+            allure_on_amd64: false
         architecture:
           - amd64
         include:
           - juju:
               agent: 3.4.5  # renovate: juju-agent-pin-minor
               allure_on_amd64: true
+            architecture: arm64
+          - juju:
+              snap_channel: 3.6/beta
+              allure_on_amd64: false
             architecture: arm64
     name: Integration | ${{ matrix.juju.agent }} | ${{ matrix.architecture }}
     needs:
@@ -78,6 +83,7 @@ jobs:
       architecture: ${{ matrix.architecture }}
       cloud: lxd
       juju-agent-version: ${{ matrix.juju.agent }}
+      juju-snap-channel: ${{ matrix.juju.snap_channel }}
       libjuju-version-constraint: ${{ matrix.juju.libjuju }}
       _beta_allure_report: ${{ matrix.juju.allure_on_amd64 && matrix.architecture == 'amd64' }}
     secrets:
