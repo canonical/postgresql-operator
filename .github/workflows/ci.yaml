@@ -72,7 +72,7 @@ jobs:
               snap_channel: 3.6/beta
               allure_on_amd64: false
             architecture: arm64
-    name: Integration | ${{ matrix.juju.agent }} | ${{ matrix.architecture }}
+    name: Integration | ${{ matrix.juju.agent || matrix.juju.snap_channel }} | ${{ matrix.architecture }}
     needs:
       - lint
       - unit-test
