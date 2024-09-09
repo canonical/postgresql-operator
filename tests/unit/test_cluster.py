@@ -85,19 +85,14 @@ def patroni(harness, peers_ips):
 
 
 def test_get_alternative_patroni_url(peers_ips, patroni):
-    # Mock tenacity attempt.
-    retry = tenacity.Retrying()
-    retry_state = tenacity.RetryCallState(retry, None, None, None)
-    attempt = tenacity.AttemptManager(retry_state)
-
     # Test the first URL that is returned (it should have the current unit IP).
-    url = patroni._get_alternative_patroni_url(attempt)
+    attempt_number = 1
+    url = patroni._get_alternative_patroni_url(attempt_number)
     tc.assertEqual(url, f"http://{patroni.unit_ip}:8008")
 
     # Test returning the other servers URLs.
-    for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
-        attempt.retry_state.attempt_number = attempt_number
-        url = patroni._get_alternative_patroni_url(attempt)
+    for attempt_number in range(attempt_number + 1, len(peers_ips) + 2):
+        url = patroni._get_alternative_patroni_url(attempt_number)
         assert url.split("http://")[1].split(":8008")[0] in peers_ips
 
 
