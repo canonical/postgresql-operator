@@ -292,7 +292,17 @@ def test_update_endpoints_without_event(harness):
         rel_id = harness.add_relation(RELATION_NAME, "application")
         another_rel_id = harness.add_relation(RELATION_NAME, "application")
 
+        relation_ids = [rel.id for rel in harness.charm.model.relations[RELATION_NAME]]
+        other_rel_ids = set(relation_ids) - set({rel_id, another_rel_id})
+
         with harness.hooks_disabled():
+            for relation_id in other_rel_ids:
+                harness.update_relation_data(
+                    relation_id,
+                    "application",
+                    {"database": "some_db", "extra-user-roles": ""},
+                )
+
             harness.update_relation_data(
                 rel_id,
                 "application",
