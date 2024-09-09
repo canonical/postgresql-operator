@@ -16,6 +16,7 @@ from .conftest import APPLICATION_NAME
 from .helpers import (
     app_name,
     are_writes_increasing,
+    check_writes,
     get_primary,
     start_continuous_writes,
 )
@@ -71,6 +72,8 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
+    await check_writes(ops_test)
+
 
 @pytest.mark.group(1)
 @markers.juju3
@@ -92,3 +95,5 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+    await check_writes(ops_test)
