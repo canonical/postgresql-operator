@@ -811,6 +811,7 @@ class Patroni:
             if health_status.get("role") in ("leader", "master") or health_status.get(
                 "sync_standby"
             ):
+                logger.info("%s is raft candidate" % self.charm.unit.name)
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
             return

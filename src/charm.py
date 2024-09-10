@@ -541,6 +541,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Stuck raft has no candidate")
             return True
 
+        logger.info("%s selected for new raft leader" % candidate.name)
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
@@ -565,7 +566,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             should_exit = True
             self._patroni.remove_raft_data()
             self.unit_peer_data.pop("raft_stopping", None)
-            if "candidate_raft" in self.unit_peer_data:
+            if "raft_candidate" in self.unit_peer_data:
                 self._patroni.reinitialise_raft_data()
                 self.unit_peer_data.pop("raft_candidate", None)
                 self.unit_peer_data["raft_primary"] = "True"
