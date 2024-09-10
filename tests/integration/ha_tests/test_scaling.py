@@ -56,6 +56,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
 @pytest.mark.group(1)
 @markers.juju3
+@pytest.mark.abort_on_fail
 async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
@@ -77,6 +78,7 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
 
 @pytest.mark.group(1)
 @markers.juju3
+@pytest.mark.abort_on_fail
 async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)

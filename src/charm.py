@@ -575,6 +575,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
             should_exit = True
+        self._update_relation_endpoints()
         return should_exit
 
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
