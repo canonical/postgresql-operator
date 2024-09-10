@@ -553,7 +553,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
         """Reconnect cluster to new raft."""
-        # TODO rejoin the cluster
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            if "raft_primary" in data:
+                # TODO remove other units' ips so they can rejoin
+                self._update_relation_endpoints()
+                return True
         return False
 
     def _raft_reinitialisation(self) -> bool:
@@ -575,7 +581,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
             should_exit = True
-        self._update_relation_endpoints()
         return should_exit
 
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
