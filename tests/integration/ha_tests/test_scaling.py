@@ -67,7 +67,7 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
 
     await ops_test.model.wait_for_idle(status="active", timeout=600)
 
-    await are_writes_increasing(ops_test)
+    await are_writes_increasing(ops_test, primary)
 
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
@@ -92,7 +92,7 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
 
     await ops_test.model.wait_for_idle(status="active", timeout=600)
 
-    await are_writes_increasing(ops_test)
+    await are_writes_increasing(ops_test, secondary)
 
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)

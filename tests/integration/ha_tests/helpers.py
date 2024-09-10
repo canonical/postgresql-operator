@@ -100,6 +100,8 @@ async def are_writes_increasing(
         extra_model=extra_model,
     )
     for member, count in writes.items():
+        if member == down_unit:
+            continue
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes, _ = await count_writes(
