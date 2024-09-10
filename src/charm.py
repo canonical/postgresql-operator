@@ -518,7 +518,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
-            if "stuck_raft" in data:
+            if "raft_stuck" in data:
                 raft_stuck = True
             else:
                 all_units_stuck = False
@@ -544,10 +544,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
-            data.pop("stuck_raft", None)
+            data.pop("raft_stuck", None)
             if key != candidate:
-                data.pop("candidate", None)
-            data["stopping_raft"] = "True"
+                data.pop("raft_candidate", None)
+            data["raft_stopping"] = "True"
         return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
@@ -561,14 +561,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.unit.is_leader() and self._stuck_raft_cluster_check():
             should_exit = True
 
-        if "stopping_raft" in self.unit_peer_data:
+        if "raft_stopping" in self.unit_peer_data:
             should_exit = True
             self._patroni.remove_raft_data()
-            self.unit_peer_data.pop("stopping_raft", None)
-            self.unit_peer_data["stopped_raft"] = "True"
-            if "candidate" in self.unit_peer_data:
+            self.unit_peer_data.pop("raft_stopping", None)
+            if "candidate_raft" in self.unit_peer_data:
                 self._patroni.reinitialise_raft_data()
-                self.unit_peer_data["candidate_raft_up"] = "True"
+                self.unit_peer_data.pop("raft_candidate", None)
+                self.unit_peer_data["raft_primary"] = "True"
+            else:
+                self.unit_peer_data["raft_stopped"] = "True"
 
         if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
             should_exit = True
@@ -986,6 +988,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             if self.get_secret(APP_SCOPE, key) is None:
                 self.set_secret(APP_SCOPE, key, new_password())
+
+        if self._raft_reinitialisation():
+            return
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members

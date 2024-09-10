@@ -802,19 +802,18 @@ class Patroni:
         # If there's no quorum and the leader left raft cluster is stuck
         if not raft_status["has_quorum"] and raft_status["leader"].host == member_ip:
             logger.warning("Remove raft member: Stuck raft cluster detected")
-            data_flags = {"stuck_raft": "True"}
+            data_flags = {"raft_stuck": "True"}
             try:
                 health_status = self.get_patroni_health()
             except Exception:
                 logger.warning("Remove raft member: Unable to get health status")
                 health_status = {}
-            if health_status.get("role") in ("leader", "master", "sync_standby"):
+            if health_status.get("role") in ("leader", "master") or health_status.get(
+                "sync_standby"
+            ):
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
             return
-
-            # self.remove_raft_data()
-            # self.reinitialise_raft_data()
 
         # Remove the member from the raft cluster.
         try:
