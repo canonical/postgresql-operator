@@ -114,6 +114,25 @@ class PostgreSQL:
         self.database = database
         self.system_users = system_users
 
+    def _configure_pgaudit(self, enable: bool) -> None:
+        connection = None
+        try:
+            connection = self._connect_to_database()
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                if enable:
+                    cursor.execute("ALTER SYSTEM SET pgaudit.log = 'ROLE,DDL,MISC,MISC_SET';")
+                    cursor.execute("ALTER SYSTEM SET pgaudit.log_client TO off;")
+                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off")
+                else:
+                    cursor.execute("ALTER SYSTEM RESET pgaudit.log;")
+                    cursor.execute("ALTER SYSTEM RESET pgaudit.log_client;")
+                    cursor.execute("ALTER SYSTEM RESET pgaudit.log_parameter;")
+                cursor.execute("SELECT pg_reload_conf();")
+        finally:
+            if connection is not None:
+                connection.close()
+
     def _connect_to_database(
         self, database: str = None, database_host: str = None
     ) -> psycopg2.extensions.connection:
@@ -325,15 +344,7 @@ class PostgreSQL:
                             if enable
                             else f"DROP EXTENSION IF EXISTS {extension};"
                         )
-                        if extension == "pgaudit":
-                            if enable:
-                                cursor.execute(
-                                    f"ALTER DATABASE {database} SET pgaudit.log to 'DDL';"
-                                )
-                            else:
-                                cursor.execute(
-                                    f"ALTER DATABASE {database} RESET pgaudit.log;"
-                                )
+            self._configure_pgaudit(ordered_extensions.get("pgaudit", False))
         except psycopg2.errors.UniqueViolation:
             pass
         except psycopg2.errors.DependentObjectsStillExist:

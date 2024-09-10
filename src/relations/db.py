@@ -201,11 +201,7 @@ class DbProvides(Object):
             self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
             self.charm.postgresql.create_user(user, password, self.admin)
-            plugins = [
-                "_".join(plugin.split("_")[1:-1])
-                for plugin in self.charm.config.plugin_keys()
-                if self.charm.config[plugin]
-            ]
+            plugins = self.charm.get_plugins()
 
             self.charm.postgresql.create_database(
                 database, user, plugins=plugins, client_relations=self.charm.client_relations

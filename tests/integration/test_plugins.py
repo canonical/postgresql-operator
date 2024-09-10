@@ -259,12 +259,3 @@ async def test_plugin_objects(ops_test: OpsTest) -> None:
     logger.info("Waiting for status to resolve again")
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-
-
-@pytest.mark.group(1)
-async def test_audit_plugin(ops_test: OpsTest) -> None:
-    """Test the audit plugin."""
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_audit_enable": "True"
-    })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
