@@ -1488,6 +1488,8 @@ def test_on_peer_relation_changed(harness):
         rel_id = harness.model.get_relation(PEER).id
         # Test an uninitialized cluster.
         mock_event = Mock()
+        mock_event.unit = None
+
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id, harness.charm.app.name, {"cluster_initialised": ""}

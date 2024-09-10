@@ -511,20 +511,93 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _on_peer_relation_changed(self, event: HookEvent):
-        """Reconfigure cluster members when something changes."""
+    def _collect_raft_cluster_state(self) -> (bool, bool, Optional[Unit]):
+        raft_stuck = False
+        all_units_stuck = True
+        candidate = None
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            if "stuck_raft" in data:
+                raft_stuck = True
+            else:
+                all_units_stuck = False
+            if not candidate and "raft_candidate" in data:
+                candidate = key
+        return raft_stuck, all_units_stuck, candidate
+
+    def _stuck_raft_cluster_check(self) -> bool:
+        """Check for stuck raft cluster and reinitialise if safe."""
+        raft_stuck, all_units_stuck, candidate = self._collect_raft_cluster_state()
+
+        if not raft_stuck:
+            return False
+
+        if not all_units_stuck:
+            logger.warning("Stuck raft not yet detected on all units")
+            return True
+
+        if not candidate:
+            logger.warning("Stuck raft has no candidate")
+            return True
+
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            data.pop("stuck_raft", None)
+            if key != candidate:
+                data.pop("candidate", None)
+            data["stopping_raft"] = "True"
+        return True
+
+    def _stuck_raft_cluster_rejoin(self) -> bool:
+        """Reconnect cluster to new raft."""
+        # TODO rejoin the cluster
+        return False
+
+    def _raft_reinitialisation(self) -> bool:
+        """Handle raft cluster loss of quorum."""
+        should_exit = False
+        if self.unit.is_leader() and self._stuck_raft_cluster_check():
+            should_exit = True
+
+        if "stopping_raft" in self.unit_peer_data:
+            should_exit = True
+            self._patroni.remove_raft_data()
+            self.unit_peer_data.pop("stopping_raft", None)
+            self.unit_peer_data["stopped_raft"] = "True"
+            if "candidate" in self.unit_peer_data:
+                self._patroni.reinitialise_raft_data()
+                self.unit_peer_data["candidate_raft_up"] = "True"
+
+        if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
+            should_exit = True
+        return should_exit
+
+    def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
+        """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
-            return
+            return False
+
+        # Check whether raft is stuck
+        if hasattr(event, "unit") and event.unit and self._raft_reinitialisation():
+            return False
 
         # If the unit is the leader, it can reconfigure the cluster.
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
             event.defer()
-            return
+            return False
 
         if self._update_member_ip():
+            return False
+        return True
+
+    def _on_peer_relation_changed(self, event: HookEvent):
+        """Reconfigure cluster members when something changes."""
+        if not self._peer_relation_changed_checks(event):
             return
 
         # Don't update this member before it's part of the members list.
