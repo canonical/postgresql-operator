@@ -111,8 +111,7 @@ async def are_writes_increasing(
             )
             logger.info(f"Retry writes {more_writes}")
             for member, count in writes.items():
-                print(member, down_unit)
-                if member == down_unit or member.split(".", 1)[-1] == down_unit:
+                if "/".join(member.split(".", 1)[-1].rsplit("-", 1)) == down_unit:
                     continue
                 assert (
                     more_writes[member] > count
