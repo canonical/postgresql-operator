@@ -15,7 +15,6 @@ from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
 from constants import DATABASE_PORT, PEER
-from tests.helpers import patch_network_get
 
 DATABASE = "test_database"
 RELATION_NAME = "db"
@@ -81,7 +80,6 @@ def request_database(_harness):
     )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_relation_changed(harness):
     with (
         patch("charm.DbProvides.set_up_relation") as _set_up_relation,
@@ -127,7 +125,6 @@ def test_on_relation_changed(harness):
         _set_up_relation.assert_called_once()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_get_extensions(harness):
     # Test when there are no extensions in the relation databags.
     rel_id = harness.model.get_relation(RELATION_NAME).id
@@ -181,7 +178,6 @@ def test_get_extensions(harness):
     )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_set_up_relation(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
@@ -305,7 +301,6 @@ def test_set_up_relation(harness):
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_unit_status(harness):
     with (
         patch(
@@ -347,7 +342,6 @@ def test_update_unit_status(harness):
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_relation_broken_extensions_unblock(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
@@ -380,7 +374,6 @@ def test_on_relation_broken_extensions_unblock(harness):
         assert isinstance(harness.model.unit.status, ActiveStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_relation_broken_extensions_keep_block(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
@@ -421,7 +414,6 @@ def test_on_relation_broken_extensions_keep_block(harness):
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_with_relation(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
@@ -541,7 +533,6 @@ def test_update_endpoints_with_relation(harness):
         )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_without_relation(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
@@ -631,7 +622,6 @@ def test_update_endpoints_without_relation(harness):
         )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_get_allowed_units(harness):
     # No allowed units from the current database application.
     peer_rel_id = harness.model.get_relation(PEER).id

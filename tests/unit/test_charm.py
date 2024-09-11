@@ -38,7 +38,6 @@ from charm import (
 )
 from cluster import NotReadyError, RemoveRaftMemberFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
-from tests.helpers import patch_network_get
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -57,7 +56,6 @@ def harness():
     harness.cleanup()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_install(harness):
     with patch("charm.subprocess.check_call") as _check_call, patch(
         "charm.snap.SnapCache"
@@ -91,7 +89,6 @@ def test_on_install(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_install_failed_to_create_home(harness):
     with patch("charm.subprocess.check_call") as _check_call, patch(
         "charm.snap.SnapCache"
@@ -123,7 +120,6 @@ def test_on_install_failed_to_create_home(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_install_snap_failure(harness):
     with patch(
         "charm.PostgresqlOperatorCharm._install_snap_packages"
@@ -139,7 +135,6 @@ def test_on_install_snap_failure(harness):
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_patroni_scrape_config_no_tls(harness):
     result = harness.charm.patroni_scrape_config()
 
@@ -147,13 +142,12 @@ def test_patroni_scrape_config_no_tls(harness):
         {
             "metrics_path": "/metrics",
             "scheme": "http",
-            "static_configs": [{"targets": ["1.1.1.1:8008"]}],
+            "static_configs": [{"targets": ["192.0.2.0:8008"]}],
             "tls_config": {"insecure_skip_verify": True},
         },
     ]
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_patroni_scrape_config_tls(harness):
     with patch(
         "charm.PostgresqlOperatorCharm.is_tls_enabled",
@@ -166,7 +160,7 @@ def test_patroni_scrape_config_tls(harness):
             {
                 "metrics_path": "/metrics",
                 "scheme": "https",
-                "static_configs": [{"targets": ["1.1.1.1:8008"]}],
+                "static_configs": [{"targets": ["192.0.2.0:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
             },
         ]
@@ -206,7 +200,6 @@ def test_primary_endpoint_no_peers(harness):
         assert not _patroni.return_value.get_primary.called
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_leader_elected(harness):
     with patch(
         "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
@@ -570,7 +563,6 @@ def test_enable_disable_extensions(harness, caplog):
             assert isinstance(harness.charm.unit.status, ActiveStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_start(harness):
     with (
         patch(
@@ -669,7 +661,6 @@ def test_on_start(harness):
         _restart_services_after_reboot.assert_called_once()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_start_replica(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
@@ -734,7 +725,6 @@ def test_on_start_replica(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_start_no_patroni_member(harness):
     with (
         patch("subprocess.check_output", return_value=b"C"),
@@ -785,7 +775,6 @@ def test_on_start_after_blocked_state(harness):
         assert harness.model.unit.status == initial_status
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_get_password(harness):
     with patch("charm.PostgresqlOperatorCharm.update_config"):
         rel_id = harness.model.get_relation(PEER).id
@@ -820,7 +809,6 @@ def test_on_get_password(harness):
         mock_event.set_results.assert_called_once_with({"password": "replication-test-password"})
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_set_password(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config"),
@@ -883,7 +871,6 @@ def test_on_set_password(harness):
         )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_update_status(harness):
     with (
         patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
@@ -992,7 +979,6 @@ def test_on_update_status(harness):
         _start_observer.assert_called_once()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_update_status_after_restore_operation(harness):
     with (
         patch("charm.ClusterTopologyObserver.start_observer"),
@@ -1218,7 +1204,6 @@ def test_reboot_on_detached_storage(harness):
         _check_call.assert_called_once_with(["systemctl", "reboot"])
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_restart(harness):
     with (
         patch("charm.Patroni.restart_postgresql") as _restart_postgresql,
@@ -1246,7 +1231,6 @@ def test_restart(harness):
         mock_event.defer.assert_not_called()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_config(harness):
     with (
         patch("subprocess.check_output", return_value=b"C"),
@@ -1457,7 +1441,6 @@ def test_validate_config_options(harness):
         assert str(e.value).startswith(message)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_peer_relation_changed(harness):
     with (
         patch("charm.snap.SnapCache"),
@@ -1501,7 +1484,7 @@ def test_on_peer_relation_changed(harness):
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"cluster_initialised": "True", "members_ips": '["1.1.1.1"]'},
+                {"cluster_initialised": "True", "members_ips": '["192.0.2.0"]'},
             )
             harness.set_leader()
         _reconfigure_cluster.return_value = False
@@ -1515,7 +1498,7 @@ def test_on_peer_relation_changed(harness):
         _reconfigure_cluster.return_value = True
         _update_member_ip.return_value = False
         _member_started.return_value = True
-        _primary_endpoint.return_value = "1.1.1.1"
+        _primary_endpoint.return_value = "192.0.2.0"
         harness.model.unit.status = WaitingStatus("awaiting for cluster to start")
         harness.charm._on_peer_relation_changed(mock_event)
         mock_event.defer.assert_not_called()
@@ -1600,7 +1583,6 @@ def test_on_peer_relation_changed(harness):
         _check_stanza.assert_called_once()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_reconfigure_cluster(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._add_members") as _add_members,
@@ -1684,7 +1666,6 @@ def test_update_certificate(harness):
         assert harness.charm.get_secret("unit", "private-key") == private_key
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_member_ip(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
@@ -1697,7 +1678,7 @@ def test_update_member_ip(harness):
                 rel_id,
                 harness.charm.unit.name,
                 {
-                    "ip": "1.1.1.1",
+                    "ip": "192.0.2.0",
                 },
             )
         assert not (harness.charm._update_member_ip())
@@ -1717,13 +1698,12 @@ def test_update_member_ip(harness):
             )
         assert harness.charm._update_member_ip()
         relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
-        assert relation_data.get("ip") == "1.1.1.1"
+        assert relation_data.get("ip") == "192.0.2.0"
         assert relation_data.get("ip-to-remove") == "2.2.2.2"
         _stop_patroni.assert_called_once()
         _update_certificate.assert_called_once()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_push_tls_files_to_workload(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
@@ -1874,7 +1854,6 @@ def test_scope_obj(harness):
     assert harness.charm._scope_obj("test") is None
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_get_secret_from_databag(harness):
     """Asserts that get_secret method can read secrets from databag.
 
@@ -1901,7 +1880,6 @@ def test_get_secret_from_databag(harness):
         assert harness.charm.get_secret("unit", "operator_password") == "test-password"
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_get_password_secrets(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -1932,7 +1910,6 @@ def test_on_get_password_secrets(harness):
 
 
 @pytest.mark.parametrize("scope,field", [("app", "operator-password"), ("unit", "csr")])
-@patch_network_get(private_address="1.1.1.1")
 def test_get_secret_secrets(harness, scope, field):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -1944,7 +1921,6 @@ def test_get_secret_secrets(harness, scope, field):
         assert harness.charm.get_secret(scope, field) == "test"
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_set_secret_in_databag(harness, only_without_juju_secrets):
     """Asserts that set_secret method writes to relation databag.
 
@@ -1979,7 +1955,6 @@ def test_set_secret_in_databag(harness, only_without_juju_secrets):
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
-@patch_network_get(private_address="1.1.1.1")
 def test_set_reset_new_secret(harness, scope, is_leader):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -2001,7 +1976,6 @@ def test_set_reset_new_secret(harness, scope, is_leader):
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
-@patch_network_get(private_address="1.1.1.1")
 def test_invalid_secret(harness, scope, is_leader):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -2016,7 +1990,6 @@ def test_invalid_secret(harness, scope, is_leader):
         assert harness.charm.get_secret(scope, "somekey") is None
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_delete_password(harness, _has_secrets, caplog):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -2063,7 +2036,6 @@ def test_delete_password(harness, _has_secrets, caplog):
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
-@patch_network_get(private_address="1.1.1.1")
 def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leader):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
 
@@ -2091,7 +2063,6 @@ def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leade
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
-@patch_network_get(private_address="1.1.1.1")
 def test_migration_from_single_secret(harness, only_with_juju_secrets, scope, is_leader):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
 
