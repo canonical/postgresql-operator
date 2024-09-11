@@ -12,7 +12,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential
 
 from . import architecture
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
     MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
     backup_operations,
@@ -220,11 +220,13 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
-    await ops_test.model.deploy(charm, application_name=previous_database_app_name)
+    await ops_test.model.deploy(
+        charm, application_name=previous_database_app_name, base=CHARM_BASE
+    )
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
-        series=CHARM_SERIES,
+        base=CHARM_BASE,
     )
     await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)

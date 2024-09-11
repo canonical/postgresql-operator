@@ -12,7 +12,7 @@ from .ha_tests.helpers import (
     change_patroni_setting,
 )
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
     METADATA,
     change_primary_start_timeout,
@@ -58,7 +58,7 @@ async def test_deploy_active(ops_test: OpsTest):
             charm,
             application_name=APP_NAME,
             num_units=3,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         # No wait between deploying charms, since we can't guarantee users will wait. Furthermore,
@@ -72,7 +72,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
         await ops_test.model.deploy(
-            tls_certificates_app_name, config=tls_config, channel=tls_channel
+            tls_certificates_app_name, config=tls_config, channel=tls_channel, base=CHARM_BASE
         )
 
         # Relate it to the PostgreSQL to enable TLS.
