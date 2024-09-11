@@ -12,10 +12,9 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from .helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
-    build_connection_string,
-    get_primary,
     run_command_on_unit,
 )
+from .new_relations.helpers import build_connection_string
 
 logger = logging.getLogger(__name__)
 
@@ -47,14 +46,13 @@ async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
             cursor.execute("CREATE TABLE test1(value TEXT);")
             cursor.execute("GRANT SELECT ON test1 TO PUBLIC;")
             cursor.execute("SET TIME ZONE 'Europe/Rome';")
-    except Exception:
+    finally:
         if connection is not None:
             connection.close()
     try:
-        primary = await get_primary(ops_test)
         logs = await run_command_on_unit(
             ops_test,
-            primary,
+            "postgresql/0",
             "sudo grep AUDIT /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
         )
     except Exception:
@@ -76,16 +74,15 @@ async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
             cursor.execute("CREATE TABLE test2(value TEXT);")
             cursor.execute("GRANT SELECT ON test2 TO PUBLIC;")
             cursor.execute("SET TIME ZONE 'Europe/Rome';")
-    except Exception:
+    finally:
         if connection is not None:
             connection.close()
     for attempt in Retrying(stop=stop_after_delay(90), wait=wait_fixed(10), reraise=True):
         with attempt:
             try:
-                primary = await get_primary(ops_test)
                 logs = await run_command_on_unit(
                     ops_test,
-                    primary,
+                    "postgresql/0",
                     "sudo grep AUDIT /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-*.log",
                 )
                 assert "MISC,BEGIN,,,BEGIN" in logs
