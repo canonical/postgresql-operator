@@ -9,7 +9,7 @@ from pytest_operator.plugin import OpsTest
 
 from .. import markers
 from ..helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
 )
 from .conftest import APPLICATION_NAME
@@ -40,13 +40,13 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=2,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 channel="edge",
             ),
         )

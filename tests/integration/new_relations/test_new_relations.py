@@ -13,7 +13,7 @@ import yaml
 from pytest_operator.plugin import OpsTest
 
 from .. import markers
-from ..helpers import CHARM_SERIES, assert_sync_standbys, get_leader_unit, scale_application
+from ..helpers import CHARM_BASE, assert_sync_standbys, get_leader_unit, scale_application
 from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
@@ -49,21 +49,21 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 channel="edge",
             ),
             ops_test.model.deploy(
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 charm,
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
         )
@@ -218,6 +218,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         APPLICATION_APP_NAME,
         application_name=another_application_app_name,
         channel="edge",
+        base=CHARM_BASE,
     )
     await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
 
@@ -446,7 +447,7 @@ async def test_admin_role(ops_test: OpsTest):
     all_app_names = [DATA_INTEGRATOR_APP_NAME]
     all_app_names.extend(APP_NAMES)
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
+        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
@@ -535,7 +536,9 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
         another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
         data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
         await ops_test.model.deploy(
-            DATA_INTEGRATOR_APP_NAME, application_name=another_data_integrator_app_name
+            DATA_INTEGRATOR_APP_NAME,
+            application_name=another_data_integrator_app_name,
+            base=CHARM_BASE,
         )
         await ops_test.model.wait_for_idle(
             apps=[another_data_integrator_app_name], status="blocked"
@@ -592,7 +595,7 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=1,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         ),
         ops_test.model.deploy(
@@ -600,6 +603,7 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
             channel="edge",
             application_name="nextcloud",
             num_units=1,
+            base=CHARM_BASE,
         ),
     )
     await asyncio.gather(

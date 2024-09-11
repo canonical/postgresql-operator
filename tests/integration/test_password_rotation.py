@@ -10,7 +10,7 @@ from pytest_operator.plugin import OpsTest
 
 from . import markers
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     METADATA,
     check_patroni,
     db_connect,
@@ -37,7 +37,7 @@ async def test_deploy_active(ops_test: OpsTest):
             charm,
             application_name=APP_NAME,
             num_units=3,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)

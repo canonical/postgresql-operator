@@ -9,7 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     scale_application,
 )
 
@@ -28,13 +28,14 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=3,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
         ),
         ops_test.model.deploy(
             UBUNTU_PRO_APP_NAME,
             config={"token": github_secrets["UBUNTU_PRO_TOKEN"]},
             channel="latest/edge",
             num_units=0,
+            base=CHARM_BASE,
         ),
         ops_test.model.deploy(
             LS_CLIENT,
@@ -45,6 +46,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             },
             channel="latest/edge",
             num_units=0,
+            base=CHARM_BASE,
         ),
     )
 
