@@ -2555,3 +2555,24 @@ def test_restart_services_after_reboot(harness):
         harness.charm._restart_services_after_reboot()
         _start_patroni.assert_called_once()
         _start_stop_pgbackrest_service.assert_called_once()
+
+
+def test_get_plugins(harness):
+    with patch("charm.PostgresqlOperatorCharm._on_config_changed"):
+        # Test when the charm has no plugins enabled.
+        assert harness.charm.get_plugins() == []
+
+        # Test when the charm has some plugins enabled.
+        harness.update_config({
+            "plugin_audit_enable": True,
+            "plugin_citext_enable": True,
+            "plugin_spi_enable": True,
+        })
+        assert harness.charm.get_plugins() == [
+            "pgaudit",
+            "citext",
+            "refint",
+            "autoinc",
+            "insert_username",
+            "moddatetime",
+        ]
