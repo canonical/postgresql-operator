@@ -18,7 +18,6 @@ from tenacity import RetryError, wait_fixed
 from backups import ListBackupsError
 from charm import PostgresqlOperatorCharm
 from constants import PEER
-from tests.helpers import patch_network_get
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
@@ -133,7 +132,6 @@ def test_can_initialise_stanza(harness):
         )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_can_unit_perform_backup(harness):
     with (
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
@@ -223,7 +221,6 @@ def test_can_unit_perform_backup(harness):
         )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_can_use_s3_repository(harness):
     with (
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
@@ -733,7 +730,6 @@ def test_list_backups(harness):
         )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_initialise_stanza(harness):
     with (
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
@@ -822,7 +818,6 @@ def test_initialise_stanza(harness):
         tc.assertIsInstance(harness.charm.unit.status, MaintenanceStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_check_stanza(harness):
     with (
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
@@ -1445,7 +1440,6 @@ def test_on_list_backups_action(harness):
         mock_event.fail.assert_not_called()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_restore_action(harness):
     with (
         patch("charm.Patroni.start_patroni") as _start_patroni,
@@ -1617,7 +1611,6 @@ def test_pre_restore_checks(harness):
         mock_event.fail.assert_not_called()
 
 
-@patch_network_get(private_address="1.1.1.1")
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
     ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
@@ -1706,7 +1699,6 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         _render_file.assert_has_calls(calls)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_restart_database(harness):
     with (
         patch("charm.Patroni.start_patroni") as _start_patroni,
