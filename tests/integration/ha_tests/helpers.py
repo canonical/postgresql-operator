@@ -100,8 +100,6 @@ async def are_writes_increasing(
         extra_model=extra_model,
     )
     for member, count in writes.items():
-        if member == down_unit:
-            continue
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
                 more_writes, _ = await count_writes(
@@ -281,6 +279,7 @@ async def count_writes(
         if model is None:
             continue
         for unit in model.applications[app].units:
+            print(unit.name, down_unit)
             if unit.name != down_unit:
                 members_data = get_patroni_cluster(
                     await (
