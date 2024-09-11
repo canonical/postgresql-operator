@@ -99,6 +99,7 @@ async def are_writes_increasing(
         use_ip_from_inside=use_ip_from_inside,
         extra_model=extra_model,
     )
+    logger.info(f"Initial writes {writes}")
     for member, count in writes.items():
         if member.split(".", 1)[-1] == down_unit:
             continue
@@ -111,6 +112,7 @@ async def are_writes_increasing(
                     use_ip_from_inside=use_ip_from_inside,
                     extra_model=extra_model,
                 )
+                logger.info(f"Retry writes {more_writes}")
                 assert (
                     more_writes[member] > count
                 ), f"{member}: writes not continuing to DB (current writes: {more_writes[member]} - previous writes: {count})"
