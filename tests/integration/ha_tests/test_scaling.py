@@ -61,6 +61,9 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
+    original_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
     await start_continuous_writes(ops_test, app)
     logger.info("Deleting primary")
     primary = await get_primary(ops_test, app)
@@ -74,6 +77,13 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
+    new_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    assert len(new_roles["primaries"]) == 1
+    assert len(new_roles["sync_standbys"]) == 1
+    assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
+
     await check_writes(ops_test)
 
 
@@ -83,6 +93,9 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
 async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
+    original_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
     await start_continuous_writes(ops_test, app)
     logger.info("Deleting sync replica")
     primary = await get_primary(ops_test, app)
@@ -98,6 +111,12 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
+    new_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    assert len(new_roles["primaries"]) == 1
+    assert len(new_roles["sync_standbys"]) == 1
+    assert new_roles["primaries"][0] == original_roles["primaries"][0]
 
     await check_writes(ops_test)
 
@@ -105,55 +124,46 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
 @pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
-async def test_deploy_quatro(ops_test: OpsTest) -> None:
-    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=2)
+async def test_scale_to_five_units(ops_test: OpsTest) -> None:
+    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=3)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
 @pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
-async def test_removing_quatro_primary_and_async_replica(
-    ops_test: OpsTest, continuous_writes
-) -> None:
+async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
-    roles = get_cluster_roles(
+    original_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
     await start_continuous_writes(ops_test, app)
     logger.info("Deleting primary")
     await gather(
         ops_test.model.destroy_unit(
-            roles["primary"], force=True, destroy_storage=False, max_wait=1500
+            original_roles["primaries"][0], force=True, destroy_storage=False, max_wait=1500
         ),
-        await ops_test.model.destroy_unit(
-            roles["replicas"][0], force=True, destroy_storage=False, max_wait=1500
+        ops_test.model.destroy_unit(
+            original_roles["replicas"][0], force=True, destroy_storage=False, max_wait=1500
+        ),
+        ops_test.model.destroy_unit(
+            original_roles["sync_standbys"][0], force=True, destroy_storage=False, max_wait=1500
         ),
     )
 
     await ops_test.model.wait_for_idle(status="active", timeout=600)
 
-    await are_writes_increasing(ops_test, roles["primary"])
+    await are_writes_increasing(ops_test, original_roles["primaries"][0])
 
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=2)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
     await check_writes(ops_test)
-
-
-@pytest.mark.group(1)
-@markers.juju3
-@pytest.mark.abort_on_fail
-async def test_removing_quatro_sync_and_async_replica(
-    ops_test: OpsTest, continuous_writes
-) -> None:
-    pass
-
-
-@pytest.mark.group(1)
-@markers.juju3
-@pytest.mark.abort_on_fail
-async def test_removing_quatro_both_async_replica(ops_test: OpsTest, continuous_writes) -> None:
-    pass
+    new_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    assert len(new_roles["primaries"]) == 1
+    assert len(new_roles["sync_standbys"]) == 2
+    assert new_roles["primaries"][0] == original_roles["sync_standbys"][1]

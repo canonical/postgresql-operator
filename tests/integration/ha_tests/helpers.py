@@ -637,13 +637,13 @@ async def get_cluster_roles(
         else get_unit_ip(ops_test, unit_name)
     )
 
-    members = {"replicas": [], "primary": None, "sync_standbys": []}
+    members = {"replicas": [], "primaries": [], "sync_standbys": []}
     cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
     for member in cluster_info.json()["members"]:
         role = member["role"]
         name = "/".join(member["name"].rsplit("-", 1))
         if role == "leader":
-            members["primary"] = name
+            members["primaries"].append(name)
         elif role == "sync_standby":
             members["sync_standbys"].append(name)
         else:
