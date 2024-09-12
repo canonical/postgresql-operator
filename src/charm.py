@@ -549,6 +549,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if key != candidate:
                 data.pop("raft_candidate", None)
             data["raft_stopping"] = "True"
+        self.app_peer_data.pop("cluster_initialised", None)
         return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
@@ -565,7 +566,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if primary:
             logger.info("Updating new primary endpoint")
             self.app_peer_data.pop("members_ips", None)
+            logger.error(f"!!!!!!!!!!!!!!!!!1{self._get_unit_ip(key)}")
             self._add_to_members_ips(self._get_unit_ip(key))
+            self.app_peer_data["cluster_initialised"] = "True"
             self._update_relation_endpoints()
             if all_units_down:
                 logger.info("Removing stuck raft peer data")
@@ -605,15 +608,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
+        # Check whether raft is stuck
+        if hasattr(event, "unit") and event.unit and self._raft_reinitialisation():
+            logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
+            return False
+
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
-            return False
-
-        # Check whether raft is stuck
-        if hasattr(event, "unit") and event.unit and self._raft_reinitialisation():
-            logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
         # If the unit is the leader, it can reconfigure the cluster.
