@@ -17,6 +17,7 @@ from .helpers import (
     app_name,
     are_writes_increasing,
     check_writes,
+    get_cluster_roles,
     get_primary,
     start_continuous_writes,
 )
@@ -99,3 +100,58 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
     await check_writes(ops_test)
+
+
+@pytest.mark.group(1)
+@markers.juju3
+@pytest.mark.abort_on_fail
+async def test_deploy_quatro(ops_test: OpsTest) -> None:
+    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=2)
+    await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+
+@pytest.mark.group(1)
+@markers.juju3
+@pytest.mark.abort_on_fail
+async def test_removing_quatro_primary_and_async_replica(
+    ops_test: OpsTest, continuous_writes
+) -> None:
+    # Start an application that continuously writes data to the database.
+    app = await app_name(ops_test)
+    roles = get_cluster_roles(ops_test.model.applications[DATABASE_APP_NAME].units[0])
+    await start_continuous_writes(ops_test, app)
+    logger.info("Deleting primary")
+    await gather(
+        ops_test.model.destroy_unit(
+            roles["primary"], force=True, destroy_storage=False, max_wait=1500
+        ),
+        await ops_test.model.destroy_unit(
+            roles["replicas"][0], force=True, destroy_storage=False, max_wait=1500
+        ),
+    )
+
+    await ops_test.model.wait_for_idle(status="active", timeout=600)
+
+    await are_writes_increasing(ops_test, roles["primary"])
+
+    logger.info("Scaling back up")
+    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=2)
+    await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+    await check_writes(ops_test)
+
+
+@pytest.mark.group(1)
+@markers.juju3
+@pytest.mark.abort_on_fail
+async def test_removing_quatro_sync_and_async_replica(
+    ops_test: OpsTest, continuous_writes
+) -> None:
+    pass
+
+
+@pytest.mark.group(1)
+@markers.juju3
+@pytest.mark.abort_on_fail
+async def test_removing_quatro_both_async_replica(ops_test: OpsTest, continuous_writes) -> None:
+    pass

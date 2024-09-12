@@ -627,6 +627,31 @@ async def is_replica(ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool
         return False
 
 
+async def get_cluster_roles(
+    ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool = False
+) -> Dict[str, Union[Optional[str], list[str]]]:
+    """Returns whether the unit a replica in the cluster."""
+    unit_ip = await (
+        get_ip_from_inside_the_unit(ops_test, unit_name)
+        if use_ip_from_inside
+        else get_unit_ip(ops_test, unit_name)
+    )
+
+    members = {"replicas": [], "primary": None, "sync_standbys": []}
+    cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+    for member in cluster_info.json()["members"]:
+        role = member["role"]
+        name = "/".join(member["name"].rsplit("-", 1))
+        if role == "leader":
+            members["primary"] = name
+        elif role == "sync_standby":
+            members["sync_standbys"].append(name)
+        else:
+            members["replicas"].append(name)
+
+    return members
+
+
 async def instance_ip(ops_test: OpsTest, instance: str) -> str:
     """Translate juju instance name to IP.
 
