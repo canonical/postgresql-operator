@@ -613,6 +613,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Check whether raft is stuck
         if hasattr(event, "unit") and event.unit and self._raft_reinitialisation():
+            logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
         # If the unit is the leader, it can reconfigure the cluster.
