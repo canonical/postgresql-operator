@@ -54,6 +54,10 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 
+class RaftPostgresqlNotUpError(Exception):
+    """Raised when a cluster is not promoted."""
+
+
 class RaftPostgresqlStillUpError(Exception):
     """Raised when a cluster is not promoted."""
 
@@ -772,6 +776,15 @@ class Patroni:
 
         logger.info("Restarting patroni")
         self.restart_patroni()
+        for attempt in Retrying(wait=wait_fixed(5)):
+            with attempt:
+                found_postgres = False
+                for proc in psutil.process_iter(["name"]):
+                    if proc.name() == "postgres":
+                        found_postgres = True
+                        break
+                if not found_postgres:
+                    raise RaftPostgresqlNotUpError()
         logger.info("Raft should be unstuck")
 
     def remove_raft_member(self, member_ip: str) -> None:
