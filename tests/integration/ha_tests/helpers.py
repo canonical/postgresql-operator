@@ -639,7 +639,9 @@ async def get_cluster_roles(
 
     members = {"replicas": [], "primaries": [], "sync_standbys": []}
     cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
-    for member in cluster_info.json()["members"]:
+    member_list = cluster_info.json()["members"]
+    logger.info(f"Cluster members are: {member_list}")
+    for member in member_list:
         role = member["role"]
         name = "/".join(member["name"].rsplit("-", 1))
         if role == "leader":
