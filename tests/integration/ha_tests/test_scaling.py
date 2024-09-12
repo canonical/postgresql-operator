@@ -118,7 +118,9 @@ async def test_removing_quatro_primary_and_async_replica(
 ) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
-    roles = get_cluster_roles(ops_test.model.applications[DATABASE_APP_NAME].units[0])
+    roles = get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
     await start_continuous_writes(ops_test, app)
     logger.info("Deleting primary")
     await gather(
