@@ -565,11 +565,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if primary:
             logger.info("Updating new primary endpoint")
             self.app_peer_data.pop("members_ips", None)
-            logger.error(f"!!!!!!!!!!!!!!!!!1{key}")
-            logger.error(f"!!!!!!!!!!!!!!!!!1{data}")
-            logger.error(f"!!!!!!!!!!!!!!!!!1{self._get_unit_ip(key)}")
-            logger.error(f"!!!!!!!!!!!!!!!!!1{data['private-address']}")
-            self._add_to_members_ips(data["private-address"])
+            logger.error(f"!!!!!!!!!!!!!!!!!1{primary}")
+            logger.error(f"!!!!!!!!!!!!!!!!!1{self._get_unit_ip(primary)}")
+            self._add_to_members_ips(self._get_unit_ip(primary))
             self._update_relation_endpoints()
             if all_units_down:
                 logger.info("Removing stuck raft peer data")
