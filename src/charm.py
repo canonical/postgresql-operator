@@ -549,7 +549,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if key != candidate:
                 data.pop("raft_candidate", None)
             data["raft_stopping"] = "True"
-        self.app_peer_data.pop("cluster_initialised", None)
         return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
@@ -566,9 +565,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if primary:
             logger.info("Updating new primary endpoint")
             self.app_peer_data.pop("members_ips", None)
+            logger.error(f"!!!!!!!!!!!!!!!!!1{key}")
             logger.error(f"!!!!!!!!!!!!!!!!!1{self._get_unit_ip(key)}")
-            self._add_to_members_ips(self._get_unit_ip(key))
-            self.app_peer_data["cluster_initialised"] = "True"
+            logger.error(f"!!!!!!!!!!!!!!!!!1{data['private-address']}")
+            self._add_to_members_ips(data["private-address"])
             self._update_relation_endpoints()
             if all_units_down:
                 logger.info("Removing stuck raft peer data")
