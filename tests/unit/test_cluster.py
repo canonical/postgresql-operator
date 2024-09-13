@@ -1,6 +1,7 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+from pathlib import Path
 from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, sentinel
 
 import pytest
@@ -136,11 +137,12 @@ def test_get_member_ip(peers_ips, patroni):
 
 
 def test_get_patroni_health(peers_ips, patroni):
-    with patch("cluster.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay, patch(
-        "cluster.wait_fixed", new_callable=PropertyMock
-    ) as _wait_fixed, patch(
-        "charm.Patroni._patroni_url", new_callable=PropertyMock
-    ) as _patroni_url, patch("requests.get", side_effect=mocked_requests_get) as _get:
+    with (
+        patch("cluster.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay,
+        patch("cluster.wait_fixed", new_callable=PropertyMock) as _wait_fixed,
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
+        patch("requests.get", side_effect=mocked_requests_get) as _get,
+    ):
         # Test when the Patroni API is reachable.
         _patroni_url.return_value = "http://server1"
         health = patroni.get_patroni_health()
@@ -708,3 +710,104 @@ def test_remove_raft_member(patroni):
         with pytest.raises(RemoveRaftMemberFailedError):
             patroni.remove_raft_member("1.2.3.4")
             assert False
+
+
+def test_remove_raft_member_no_quorum(patroni, harness):
+    with (
+        patch("cluster.TcpUtility") as _tcp_utility,
+        patch("cluster.Patroni.get_patroni_health") as _get_patroni_health,
+        patch(
+            "charm.PostgresqlOperatorCharm.unit_peer_data", new_callable=PropertyMock
+        ) as _unit_peer_data,
+    ):
+        # Async replica
+        _unit_peer_data.return_value = {}
+        _tcp_utility.return_value.executeCommand.return_value = {
+            "partner_node_status_server_1.2.3.4:2222": 0,
+            "has_quorum": False,
+            "leader": None,
+        }
+        _get_patroni_health.return_value = {"role": "replica", "sync_standby": False}
+
+        patroni.remove_raft_member("1.2.3.4")
+        assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
+
+        # No health
+        _unit_peer_data.return_value = {}
+        _tcp_utility.return_value.executeCommand.return_value = {
+            "partner_node_status_server_1.2.3.4:2222": 0,
+            "has_quorum": False,
+            "leader": None,
+        }
+        _get_patroni_health.side_effect = Exception
+
+        patroni.remove_raft_member("1.2.3.4")
+
+        assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
+
+        # Sync replica
+        _unit_peer_data.return_value = {}
+        leader_mock = Mock()
+        leader_mock.host = "1.2.3.4"
+        _tcp_utility.return_value.executeCommand.return_value = {
+            "partner_node_status_server_1.2.3.4:2222": 0,
+            "has_quorum": False,
+            "leader": leader_mock,
+        }
+        _get_patroni_health.side_effect = None
+        _get_patroni_health.return_value = {"role": "replica", "sync_standby": True}
+
+        patroni.remove_raft_member("1.2.3.4")
+
+        assert harness.charm.unit_peer_data == {"raft_candidate": "True", "raft_stuck": "True"}
+
+
+def test_remove_raft_data(patroni):
+    with (
+        patch("cluster.Patroni.stop_patroni") as _stop_patroni,
+        patch("cluster.psutil") as _psutil,
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("shutil.rmtree") as _rmtree,
+        patch("pathlib.Path.is_dir") as _is_dir,
+        patch("pathlib.Path.exists") as _exists,
+    ):
+        mock_proc_pg = Mock()
+        mock_proc_not_pg = Mock()
+        mock_proc_pg.name.return_value = "postgres"
+        mock_proc_not_pg.name.return_value = "something_else"
+        _psutil.process_iter.side_effect = [[mock_proc_not_pg, mock_proc_pg], [mock_proc_not_pg]]
+
+        patroni.remove_raft_data()
+
+        _stop_patroni.assert_called_once_with()
+        assert _psutil.process_iter.call_count == 2
+        _psutil.process_iter.assert_any_call(["name"])
+        _rmtree.assert_called_once_with(Path(f"{PATRONI_CONF_PATH}/raft"))
+
+
+def test_reinitialise_raft_data(patroni):
+    with (
+        patch("cluster.Patroni.get_patroni_health") as _get_patroni_health,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("cluster.Patroni.start_patroni") as _start_patroni,
+        patch("cluster.Patroni.restart_patroni") as _restart_patroni,
+        patch("cluster.psutil") as _psutil,
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+    ):
+        mock_proc_pg = Mock()
+        mock_proc_not_pg = Mock()
+        mock_proc_pg.name.return_value = "postgres"
+        mock_proc_not_pg.name.return_value = "something_else"
+        _psutil.process_iter.side_effect = [[mock_proc_not_pg], [mock_proc_not_pg, mock_proc_pg]]
+        _get_patroni_health.side_effect = [
+            {"role": "replica", "state": "streaming"},
+            {"role": "leader", "state": "running"},
+        ]
+
+        patroni.reinitialise_raft_data()
+
+        _update_config.assert_called_once_with(no_peers=True)
+        _start_patroni.assert_called_once_with()
+        _restart_patroni.assert_called_once_with()
+        assert _psutil.process_iter.call_count == 2
+        _psutil.process_iter.assert_any_call(["name"])

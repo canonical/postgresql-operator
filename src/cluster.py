@@ -761,13 +761,7 @@ class Patroni:
         logger.info("Waiting for new raft cluster to initialise")
         for attempt in Retrying(wait=wait_fixed(5)):
             with attempt:
-                response = requests.get(
-                    f"{self._patroni_url}/health",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                health_status = response.json()
+                health_status = self.get_patroni_health()
                 if (
                     health_status["role"] not in ["leader", "master"]
                     or health_status["state"] != "running"
