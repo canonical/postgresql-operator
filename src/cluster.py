@@ -813,7 +813,9 @@ class Patroni:
             return
 
         # If there's no quorum and the leader left raft cluster is stuck
-        if not raft_status["has_quorum"] and raft_status["leader"].host == member_ip:
+        if not raft_status["has_quorum"] and (
+            not raft_status["leader"] or raft_status["leader"].host == member_ip
+        ):
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
             try:
