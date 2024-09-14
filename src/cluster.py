@@ -824,7 +824,13 @@ class Patroni:
                 logger.info("%s is raft candidate" % self.charm.unit.name)
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
-            self.charm.on[PEER].relation_changed.emit()
+
+            if self.charm.unit.is_leader():
+                self.charm.on[PEER].relation_changed.emit(
+                    unit=self.charm.unit,
+                    app=self.charm.app,
+                    relation=self.charm.model.get_relation(PEER),
+                )
             return
 
         # Remove the member from the raft cluster.
