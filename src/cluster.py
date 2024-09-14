@@ -37,6 +37,7 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,
+    PEER,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
@@ -823,6 +824,7 @@ class Patroni:
                 logger.info("%s is raft candidate" % self.charm.unit.name)
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
+            self.charm.on[PEER].relation_changed.emit()
             return
 
         # Remove the member from the raft cluster.
