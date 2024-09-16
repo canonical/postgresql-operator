@@ -542,13 +542,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
 
         logger.info("%s selected for new raft leader" % candidate.name)
-        for key, data in self._peers.data.items():
-            if key == self.app:
-                continue
-            data.pop("raft_stuck", None)
-            if key != candidate:
-                data.pop("raft_candidate", None)
-            data["raft_stopping"] = "True"
+        self.app_peer_data["raft_candidate"] = candidate.name
         return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
@@ -591,6 +585,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Handle raft cluster loss of quorum."""
         should_exit = False
         if self.unit.is_leader() and self._stuck_raft_cluster_check():
+            should_exit = True
+
+        if candidate := self.app_peer_data.get("raft_candidate"):
+            self.unit_peer_data.pop("raft_stuck", None)
+            if self.unit.name != candidate:
+                self.unit_peer_data.pop("raft_candidate", None)
+            self.unit_peer_data["raft_stopping"] = "True"
             should_exit = True
 
         if "raft_stopping" in self.unit_peer_data:
