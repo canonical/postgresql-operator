@@ -511,7 +511,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _collect_raft_cluster_state(self) -> (bool, bool, Optional[Unit]):
+    def _stuck_raft_cluster_check(self) -> bool:
+        """Check for stuck raft cluster and reinitialise if safe."""
         raft_stuck = False
         all_units_stuck = True
         candidate = None
@@ -524,11 +525,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 all_units_stuck = False
             if not candidate and "raft_candidate" in data:
                 candidate = key
-        return raft_stuck, all_units_stuck, candidate
-
-    def _stuck_raft_cluster_check(self) -> bool:
-        """Check for stuck raft cluster and reinitialise if safe."""
-        raft_stuck, all_units_stuck, candidate = self._collect_raft_cluster_state()
 
         if not raft_stuck:
             return False
@@ -542,7 +538,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
 
         logger.info("%s selected for new raft leader" % candidate.name)
-        self.app_peer_data["raft_candidate"] = candidate.name
+        self.app_peer_data["raft_selected_candidate"] = candidate.name
         return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
@@ -579,7 +575,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.unit.is_leader() and rejoin and cleanup:
             logger.info("Cleaning up raft app data")
             self.app_peer_data.pop("raft_rejoin", None)
-            self.app_peer_data.pop("raft_candidate", None)
+            self.app_peer_data.pop("raft_selected_candidate", None)
         return ret
 
     def _raft_reinitialisation(self) -> bool:
@@ -589,7 +585,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             should_exit = True
 
         if (
-            candidate := self.app_peer_data.get("raft_candidate")
+            candidate := self.app_peer_data.get("raft_selected_candidate")
             and "raft_stuck" not in self.unit_peer_data
         ):
             should_exit = True
