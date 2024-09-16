@@ -228,7 +228,7 @@ def test_set_up_relation(harness):
         user = f"relation-{rel_id}"
         postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
         postgresql_mock.create_database.assert_called_once_with(
-            DATABASE, user, plugins=[], client_relations=[relation]
+            DATABASE, user, plugins=["pgaudit"], client_relations=[relation]
         )
         _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
@@ -255,7 +255,7 @@ def test_set_up_relation(harness):
         assert harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
         postgresql_mock.create_database.assert_called_once_with(
-            DATABASE, user, plugins=[], client_relations=[relation]
+            DATABASE, user, plugins=["pgaudit"], client_relations=[relation]
         )
         _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
@@ -276,7 +276,7 @@ def test_set_up_relation(harness):
         assert harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_user.assert_called_once_with(user, "test-password", False)
         postgresql_mock.create_database.assert_called_once_with(
-            "application", user, plugins=[], client_relations=[relation]
+            "application", user, plugins=["pgaudit"], client_relations=[relation]
         )
         _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
