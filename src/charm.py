@@ -586,7 +586,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if (
             candidate := self.app_peer_data.get("raft_selected_candidate")
-            and "raft_stuck" not in self.unit_peer_data
+            and "raft_stuck" in self.unit_peer_data
         ):
             should_exit = True
             self.unit_peer_data.pop("raft_stuck", None)
