@@ -589,6 +589,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _raft_reinitialisation(self) -> bool:
         """Handle raft cluster loss of quorum."""
+        should_exit = False
         if self.unit.is_leader() and self._stuck_raft_cluster_check():
             should_exit = True
 
