@@ -554,37 +554,41 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _stuck_raft_cluster_rejoin(self) -> bool:
         """Reconnect cluster to new raft."""
         primary = None
+        rejoin = False
         all_units_down = True
+        cleanup = True
+        ret = False
         for key, data in self._peers.data.items():
-            if key == self.app:
+            if key == self.app and "raft_rejoin" in data:
+                rejoin = True
                 continue
             if "raft_primary" in data:
                 primary = key
+                cleanup = False
             elif "raft_stopped" not in data:
                 all_units_down = False
-        if primary:
+            elif "raft_stopped" in data:
+                cleanup = False
+        if self.unit.is_leader() and primary:
             logger.info("Updating new primary endpoint")
             self.app_peer_data.pop("members_ips", None)
             self._add_to_members_ips(self._get_unit_ip(primary))
             self._update_relation_endpoints()
-            if all_units_down:
-                logger.info("Removing stuck raft peer data")
-                for key, data in self._peers.data.items():
-                    if key == self.app:
-                        continue
-                    data.pop("raft_primary", None)
-                    data.pop("raft_stopped", None)
-            return True
-        return False
+            if all_units_down and not rejoin:
+                logger.info("Notify units they can rejoin")
+                self.app_peer_data["raft_rejoin"] = "True"
+                ret = True
+        if rejoin:
+            logger.info("Cleaning up raft unit data")
+            self.unit_peer_data.pop("raft_primary", None)
+            self.unit_peer_data.pop("raft_stopped", None)
+        if self.unit.is_leader() and rejoin and cleanup:
+            logger.info("Cleaning up raft app data")
+            self.app_peer_data.pop("raft_rejoin", None)
+        return ret
 
     def _raft_reinitialisation(self) -> bool:
         """Handle raft cluster loss of quorum."""
-        should_exit = False
-        for key in self.unit_peer_data.keys():
-            if key.startswith("raft_"):
-                should_exit = True
-                break
-
         if self.unit.is_leader() and self._stuck_raft_cluster_check():
             should_exit = True
 
@@ -599,21 +603,30 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else:
                 self.unit_peer_data["raft_stopped"] = "True"
 
-        if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
+        if self._stuck_raft_cluster_rejoin():
             should_exit = True
         return should_exit
 
+    def _has_raft_keys(self):
+        if "raft_rejoin" in self.app_peer_data:
+            return True
+
+        for key in self.unit_peer_data.keys():
+            if key.startswith("raft_"):
+                return True
+        return False
+
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
-        # Check whether raft is stuck
-        if hasattr(event, "unit") and event.unit and self._raft_reinitialisation():
-            logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
-            return False
-
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
+            return False
+
+        # Check whether raft is stuck
+        if self._has_raft_keys() and self._raft_reinitialisation():
+            logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
         # If the unit is the leader, it can reconfigure the cluster.
@@ -1017,7 +1030,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.get_secret(APP_SCOPE, key) is None:
                 self.set_secret(APP_SCOPE, key, new_password())
 
-        if self._raft_reinitialisation():
+        if self._has_raft_keys() and self._raft_reinitialisation():
             return
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
