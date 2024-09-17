@@ -1921,7 +1921,6 @@ def test_stuck_raft_cluster_rejoin(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
-        patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
     ):
         # No data
         assert not harness.charm._stuck_raft_cluster_rejoin()
@@ -1931,14 +1930,11 @@ def test_stuck_raft_cluster_rejoin(harness):
             harness.update_relation_data(
                 rel_id, harness.charm.unit.name, {"raft_primary": "test_primary"}
             )
-            harness.update_relation_data(rel_id, harness.charm.app.name, {"members_ips": "values"})
 
         assert harness.charm._stuck_raft_cluster_rejoin()
 
         assert "raft_reset_primary" in harness.charm.app_peer_data
         assert "raft_rejoin" in harness.charm.app_peer_data
-        assert "members_ips" not in harness.charm.app_peer_data
-        _add_to_members_ips.assert_called_once_with("192.0.2.0")
         _update_relation_endpoints.assert_called_once_with()
 
 

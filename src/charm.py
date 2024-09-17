@@ -554,8 +554,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 all_units_down = False
         if primary and "raft_reset_primary" not in self.app_peer_data:
             logger.info("Updating new primary endpoint")
-            self.app_peer_data.pop("members_ips", None)
-            self._add_to_members_ips(self._get_unit_ip(primary))
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if all_units_down and "raft_rejoin" not in self.app_peer_data:
