@@ -544,22 +544,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _stuck_raft_cluster_rejoin(self) -> bool:
         """Reconnect cluster to new raft."""
         primary = None
-        rejoin = False
         all_units_down = True
-        cleanup = True
-        ret = False
         for key, data in self._peers.data.items():
             if key == self.app and "raft_rejoin" in data:
                 rejoin = True
                 continue
             if "raft_primary" in data:
                 primary = key
-                cleanup = False
             elif "raft_stopped" not in data:
                 all_units_down = False
-            elif "raft_stopped" in data:
-                cleanup = False
-        if self.unit.is_leader() and primary:
+        if primary:
             logger.info("Updating new primary endpoint")
             self.app_peer_data.pop("members_ips", None)
             self._add_to_members_ips(self._get_unit_ip(primary))
@@ -567,16 +561,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if all_units_down and not rejoin:
                 logger.info("Notify units they can rejoin")
                 self.app_peer_data["raft_rejoin"] = "True"
-                ret = True
-        if rejoin:
-            logger.info("Cleaning up raft unit data")
-            self.unit_peer_data.pop("raft_primary", None)
-            self.unit_peer_data.pop("raft_stopped", None)
-        if self.unit.is_leader() and rejoin and cleanup:
-            logger.info("Cleaning up raft app data")
-            self.app_peer_data.pop("raft_rejoin", None)
-            self.app_peer_data.pop("raft_selected_candidate", None)
-        return ret
+                return True
+        return False
+
+    def _stuck_raft_cluster_cleanup(self) -> None:
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            if "raft_primary" in data or "raft_stoppedi" in data:
+                return
+
+        logger.info("Cleaning up raft app data")
+        self.app_peer_data.pop("raft_rejoin", None)
+        self.app_peer_data.pop("raft_selected_candidate", None)
 
     def _raft_reinitialisation(self) -> bool:
         """Handle raft cluster loss of quorum."""
@@ -602,8 +599,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     logger.info("Stopping %s" % self.unit.name)
                     self.unit_peer_data["raft_stopped"] = "True"
 
-        if self._stuck_raft_cluster_rejoin():
+        if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
             should_exit = True
+
+        if "raft_rejoin" in self.app_peer_data:
+            should_exit = True
+            logger.info("Cleaning up raft unit data")
+            self.unit_peer_data.pop("raft_primary", None)
+            self.unit_peer_data.pop("raft_stopped", None)
+
+            if self.unit.is_leader() and "raft_rejoin":
+                self._stuck_raft_cluster_cleanup()
         return should_exit
 
     def _has_raft_keys(self):
