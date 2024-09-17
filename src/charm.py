@@ -552,15 +552,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 primary = key
             elif "raft_stopped" not in data:
                 all_units_down = False
-        if primary:
+        if primary and "raft_rejoin" not in self.app_peer_data:
             logger.info("Updating new primary endpoint")
             self.app_peer_data.pop("members_ips", None)
             self._add_to_members_ips(self._get_unit_ip(primary))
+            self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
-            if all_units_down and "raft_rejoin" not in self.app_peer_data:
-                logger.info("Notify units they can rejoin")
-                self.app_peer_data["raft_rejoin"] = "True"
-                return True
+        if all_units_down and "raft_rejoin" not in self.app_peer_data:
+            logger.info("Notify units they can rejoin")
+            self.app_peer_data["raft_rejoin"] = "True"
+            return True
         return False
 
     def _stuck_raft_cluster_cleanup(self) -> None:
@@ -572,6 +573,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         logger.info("Cleaning up raft app data")
         self.app_peer_data.pop("raft_rejoin", None)
+        self.app_peer_data.pop("raft_reset_primary", None)
         self.app_peer_data.pop("raft_selected_candidate", None)
 
     def _raft_reinitialisation(self) -> bool:
