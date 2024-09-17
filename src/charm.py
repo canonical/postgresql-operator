@@ -546,8 +546,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         primary = None
         all_units_down = True
         for key, data in self._peers.data.items():
-            if key == self.app and "raft_rejoin" in data:
-                rejoin = True
+            if key == self.app:
                 continue
             if "raft_primary" in data:
                 primary = key
@@ -558,7 +557,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.app_peer_data.pop("members_ips", None)
             self._add_to_members_ips(self._get_unit_ip(primary))
             self._update_relation_endpoints()
-            if all_units_down and not rejoin:
+            if all_units_down and "raft_rejoin" not in self.app_peer_data:
                 logger.info("Notify units they can rejoin")
                 self.app_peer_data["raft_rejoin"] = "True"
                 return True
@@ -568,7 +567,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
-            if "raft_primary" in data or "raft_stoppedi" in data:
+            if "raft_primary" in data or "raft_stopped" in data:
                 return
 
         logger.info("Cleaning up raft app data")
