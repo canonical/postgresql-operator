@@ -1847,6 +1847,34 @@ def test_add_cluster_member(harness):
             harness.charm.add_cluster_member("postgresql/0")
 
 
+def test_stuck_raft_cluster_check(harness):
+    # doesn't raise flags if there are no raft flags
+    assert not harness.charm._stuck_raft_cluster_check()
+
+    # Raft is stuck
+    rel_id = harness.model.get_relation(PEER).id
+    with harness.hooks_disabled():
+        harness.set_leader()
+        harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
+
+    assert harness.charm._stuck_raft_cluster_check()
+    assert "raft_selected_candidate" not in harness.charm.app_peer_data
+
+    # Raft candidate
+    with harness.hooks_disabled():
+        harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_candidate": "True"})
+    assert harness.charm._stuck_raft_cluster_check()
+    assert harness.charm.app_peer_data["raft_selected_candidate"] == harness.charm.unit.name
+
+    # Don't override existing candidate
+    with harness.hooks_disabled():
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"raft_selected_candidate": "something_else"}
+        )
+    assert harness.charm._stuck_raft_cluster_check()
+    assert harness.charm.app_peer_data["raft_selected_candidate"] != harness.charm.unit.name
+
+
 #
 # Secrets
 #

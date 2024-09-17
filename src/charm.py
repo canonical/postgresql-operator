@@ -536,9 +536,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not candidate:
             logger.warning("Stuck raft has no candidate")
             return True
-
-        logger.info("%s selected for new raft leader" % candidate.name)
-        self.app_peer_data["raft_selected_candidate"] = candidate.name
+        if "raft_selected_candidate" not in self.app_peer_data:
+            logger.info("%s selected for new raft leader" % candidate.name)
+            self.app_peer_data["raft_selected_candidate"] = candidate.name
         return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
