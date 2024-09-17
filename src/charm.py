@@ -584,34 +584,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.unit.is_leader() and self._stuck_raft_cluster_check():
             should_exit = True
 
-        if (
-            candidate := self.app_peer_data.get("raft_selected_candidate")
-            and "raft_stuck" in self.unit_peer_data
-        ):
+        if candidate := self.app_peer_data.get("raft_selected_candidate"):
             should_exit = True
-            self.unit_peer_data.pop("raft_stuck", None)
-            self.unit_peer_data.pop("raft_candidate", None)
-            self.unit_peer_data["raft_stopping"] = "True"
+            if "raft_stuck" in self.unit_peer_data:
+                self.unit_peer_data.pop("raft_stuck", None)
+                self.unit_peer_data.pop("raft_candidate", None)
+                self.unit_peer_data["raft_stopping"] = "True"
 
-        if "raft_stopping" in self.unit_peer_data:
-            should_exit = True
-            self._patroni.remove_raft_data()
-            self.unit_peer_data.pop("raft_stopping", None)
-            if candidate == self.unit.name:
-                logger.info("Reinitialising %s as primary" % self.unit.name)
-                self._patroni.reinitialise_raft_data()
-                self.unit_peer_data["raft_primary"] = "True"
-            else:
-                logger.info("Stopping %s" % self.unit.name)
-                self.unit_peer_data["raft_stopped"] = "True"
+            if "raft_stopping" in self.unit_peer_data:
+                self._patroni.remove_raft_data()
+                self.unit_peer_data.pop("raft_stopping", None)
+                if candidate == self.unit.name:
+                    logger.info("Reinitialising %s as primary" % self.unit.name)
+                    self._patroni.reinitialise_raft_data()
+                    self.unit_peer_data["raft_primary"] = "True"
+                else:
+                    logger.info("Stopping %s" % self.unit.name)
+                    self.unit_peer_data["raft_stopped"] = "True"
 
         if self._stuck_raft_cluster_rejoin():
             should_exit = True
         return should_exit
 
     def _has_raft_keys(self):
-        if "raft_rejoin" in self.app_peer_data:
-            return True
+        for key in self.app_peer_data.keys():
+            if key.startswith("raft_"):
+                return True
 
         for key in self.unit_peer_data.keys():
             if key.startswith("raft_"):
