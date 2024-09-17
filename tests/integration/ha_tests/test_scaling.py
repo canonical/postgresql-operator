@@ -159,7 +159,7 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
     await are_writes_increasing(ops_test, original_roles["primaries"][0])
 
     logger.info("Scaling back up")
-    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=2)
+    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=3)
     await ops_test.model.wait_for_idle(status="active", timeout=600)
 
     await check_writes(ops_test)

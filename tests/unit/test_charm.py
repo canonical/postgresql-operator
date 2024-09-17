@@ -1914,6 +1914,66 @@ def test_stuck_raft_cluster_cleanup(harness):
     assert "raft_selected_candidate" in harness.charm.app_peer_data
 
 
+def test_stuck_raft_cluster_rejoin(harness):
+    rel_id = harness.model.get_relation(PEER).id
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
+        ) as _update_relation_endpoints,
+        patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
+    ):
+        # No data
+        assert not harness.charm._stuck_raft_cluster_rejoin()
+
+        # Raises primary flag
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id, harness.charm.unit.name, {"raft_primary": "test_primary"}
+            )
+            harness.update_relation_data(rel_id, harness.charm.app.name, {"members_ips": "values"})
+
+        assert harness.charm._stuck_raft_cluster_rejoin()
+
+        assert "raft_reset_primary" in harness.charm.app_peer_data
+        assert "raft_rejoin" in harness.charm.app_peer_data
+        assert "members_ips" not in harness.charm.app_peer_data
+        _add_to_members_ips.assert_called_once_with("192.0.2.0")
+        _update_relation_endpoints.assert_called_once_with()
+
+
+def test_raft_reinitialisation(harness):
+    rel_id = harness.model.get_relation(PEER).id
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._stuck_raft_cluster_check"
+        ) as _stuck_raft_cluster_check,
+        patch(
+            "charm.PostgresqlOperatorCharm._stuck_raft_cluster_rejoin"
+        ) as _stuck_raft_cluster_rejoin,
+        patch(
+            "charm.PostgresqlOperatorCharm._stuck_raft_cluster_cleanup"
+        ) as _stuck_raft_cluster_cleanup,
+    ):
+        # No data
+        assert not harness.charm._raft_reinitialisation()
+
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id, harness.charm.unit.name, {"raft_primary": "True", "raft_stopped": "True"}
+            )
+            harness.update_relation_data(rel_id, harness.charm.app.name, {"raft_rejoin": "True"})
+
+        assert harness.charm._raft_reinitialisation()
+        _stuck_raft_cluster_rejoin.assert_called_once_with()
+        _stuck_raft_cluster_check.assert_called_once_with()
+        _stuck_raft_cluster_cleanup.assert_called_once_with()
+        assert "raft_stopped" not in harness.charm.unit_peer_data
+        assert "raft_primary" not in harness.charm.unit_peer_data
+
+
 #
 # Secrets
 #
