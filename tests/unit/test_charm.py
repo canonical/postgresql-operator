@@ -1875,6 +1875,45 @@ def test_stuck_raft_cluster_check(harness):
     assert harness.charm.app_peer_data["raft_selected_candidate"] != harness.charm.unit.name
 
 
+def test_stuck_raft_cluster_cleanup(harness):
+    rel_id = harness.model.get_relation(PEER).id
+
+    # Cleans up app data
+    with harness.hooks_disabled():
+        harness.update_relation_data(
+            rel_id,
+            harness.charm.app.name,
+            {
+                "raft_rejoin": "True",
+                "raft_reset_primary": "True",
+                "raft_selected_candidate": "unit_name",
+            },
+        )
+    harness.charm._stuck_raft_cluster_cleanup()
+
+    assert "raft_rejoin" not in harness.charm.app_peer_data
+    assert "raft_reset_primary" not in harness.charm.app_peer_data
+    assert "raft_selected_candidate" not in harness.charm.app_peer_data
+
+    # Don't clean up if there's unit data flags
+    with harness.hooks_disabled():
+        harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_primary": "True"})
+        harness.update_relation_data(
+            rel_id,
+            harness.charm.app.name,
+            {
+                "raft_rejoin": "True",
+                "raft_reset_primary": "True",
+                "raft_selected_candidate": "unit_name",
+            },
+        )
+    harness.charm._stuck_raft_cluster_cleanup()
+
+    assert "raft_rejoin" in harness.charm.app_peer_data
+    assert "raft_reset_primary" in harness.charm.app_peer_data
+    assert "raft_selected_candidate" in harness.charm.app_peer_data
+
+
 #
 # Secrets
 #

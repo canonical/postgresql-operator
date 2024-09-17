@@ -690,7 +690,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
         if (
-            not self.is_primary
+            not self._has_raft_keys()
+            and not self.is_primary
             and not self.is_standby_leader
             and (
                 self._patroni.member_replication_lag == "unknown"
@@ -1549,7 +1550,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            not is_primary
+            not self._has_raft_keys()
+            and not is_primary
             and not is_standby_leader
             and not self._patroni.member_started
             and "postgresql_restarted" in self._peers.data[self.unit]
