@@ -559,19 +559,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
         return False
 
-    def _stuck_raft_cluster_stopped(self) -> bool:
+    def _stuck_raft_cluster_stopped(self) -> None:
         """Check that the cluster is stopped."""
-        all_units_down = True
+        if "raft_followers_stopped" in self.app_peer_data:
+            return
+
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
             if "raft_stopped" not in data:
-                all_units_down = False
-        if all_units_down and "raft_followers_stopped" not in self.app_peer_data:
+                return
             logger.info("Cluster is shut down")
-            self.app_peer_data["raft_followers_stopped"] = "True"
-            return True
-        return False
+
+        self.app_peer_data["raft_followers_stopped"] = "True"
 
     def _stuck_raft_cluster_cleanup(self) -> None:
         for key, data in self._peers.data.items():
@@ -609,7 +609,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.unit.is_leader() and self._stuck_raft_cluster_stopped():
             should_exit = True
 
-        if candidate == self.unit.name and "raft_followers_stopped" in self.app_peer_data:
+        if (
+            candidate == self.unit.name
+            and "raft_primary" not in self.unit_peer_data
+            and "raft_followers_stopped" in self.app_peer_data
+        ):
             should_exit = True
             logger.info("Reinitialising %s as primary" % self.unit.name)
             self._patroni.reinitialise_raft_data()
