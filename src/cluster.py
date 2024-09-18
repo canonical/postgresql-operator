@@ -56,15 +56,15 @@ RUNNING_STATES = ["running", "streaming"]
 
 
 class RaftPostgresqlNotUpError(Exception):
-    """Raised when a cluster is not promoted."""
+    """Postgresql not yet started."""
 
 
 class RaftPostgresqlStillUpError(Exception):
-    """Raised when a cluster is not promoted."""
+    """Postgresql not yet down."""
 
 
 class RaftNotPromotedError(Exception):
-    """Raised when a cluster is not promoted."""
+    """Leader not yet set when reinitialising raft."""
 
 
 class ClusterNotPromotedError(Exception):
