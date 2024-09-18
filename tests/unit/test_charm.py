@@ -542,7 +542,7 @@ def test_enable_disable_extensions(harness, caplog):
     default: false
     type: boolean
   plugin_audit_enable:
-    default: false
+    default: true
     type: boolean
   profile:
     default: production
@@ -2570,6 +2570,16 @@ def test_get_plugins(harness):
         })
         assert harness.charm.get_plugins() == [
             "pgaudit",
+            "citext",
+            "refint",
+            "autoinc",
+            "insert_username",
+            "moddatetime",
+        ]
+
+        # Test when the charm has the pgAudit plugin disabled.
+        harness.update_config({"plugin_audit_enable": False})
+        assert harness.charm.get_plugins() == [
             "citext",
             "refint",
             "autoinc",
