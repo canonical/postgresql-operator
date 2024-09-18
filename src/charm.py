@@ -38,6 +38,7 @@ from ops.charm import (
     HookEvent,
     InstallEvent,
     LeaderElectedEvent,
+    RelationChangedEvent,
     RelationDepartedEvent,
     StartEvent,
 )
@@ -569,8 +570,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 continue
             if "raft_stopped" not in data:
                 return
-            logger.info("Cluster is shut down")
 
+        logger.info("Cluster is shut down")
         self.app_peer_data["raft_followers_stopped"] = "True"
 
     def _stuck_raft_cluster_cleanup(self) -> None:
@@ -653,7 +654,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Check whether raft is stuck
-        if self.has_raft_keys() and self._raft_reinitialisation():
+        if (
+            isinstance(event, RelationChangedEvent)
+            and self.has_raft_keys()
+            and self._raft_reinitialisation()
+        ):
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
