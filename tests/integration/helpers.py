@@ -31,7 +31,7 @@ from tenacity import (
     wait_fixed,
 )
 
-CHARM_SERIES = "jammy"
+CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
@@ -1118,7 +1118,7 @@ async def backup_operations(
         charm,
         application_name=database_app_name,
         num_units=2,
-        series=CHARM_SERIES,
+        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 

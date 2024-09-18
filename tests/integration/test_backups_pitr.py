@@ -12,7 +12,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential
 
 from . import architecture
 from .helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
     MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
     construct_endpoint,
@@ -114,7 +114,7 @@ async def pitr_backup_operations(
         charm,
         application_name=database_app_name,
         num_units=2,
-        series=CHARM_SERIES,
+        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 

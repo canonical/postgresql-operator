@@ -16,7 +16,6 @@ from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
 from constants import PEER
-from tests.helpers import patch_network_get
 
 DATABASE = "test_database"
 EXTRA_USER_ROLES = "CREATEDB,CREATEROLE"
@@ -73,7 +72,6 @@ def request_database(_harness):
     )
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_database_requested(harness):
     with (
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
@@ -170,7 +168,6 @@ def test_on_database_requested(harness):
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_oversee_users(harness):
     with patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
         # Create two relations and add the username in their databags.
@@ -210,7 +207,6 @@ def test_oversee_users(harness):
         postgresql_mock.delete_user.assert_called_once()  # Only the previous call.
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_with_event(harness):
     with (
         patch(
@@ -270,7 +266,6 @@ def test_update_endpoints_with_event(harness):
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {}
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_update_endpoints_without_event(harness):
     with (
         patch(

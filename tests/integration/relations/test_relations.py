@@ -9,7 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import CHARM_SERIES, METADATA
+from ..helpers import CHARM_BASE, METADATA
 from ..new_relations.test_new_relations import APPLICATION_APP_NAME, build_connection_string
 from ..relations.helpers import get_legacy_db_connection_str
 
@@ -37,14 +37,14 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 channel="edge",
             ),
             ops_test.model.deploy(
                 charm,
                 application_name=APP_NAME,
                 num_units=1,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 config={
                     "profile": "testing",
                     "plugin_unaccent_enable": "True",
@@ -55,7 +55,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=DB_APP_NAME,
                 num_units=1,
-                series=CHARM_SERIES,
+                base=CHARM_BASE,
                 channel="edge",
             ),
         )

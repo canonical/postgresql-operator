@@ -7,7 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
-    CHARM_SERIES,
+    CHARM_BASE,
     db_connect,
     get_password,
     get_patroni_cluster,
@@ -41,7 +41,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             charm,
             application_name=FIRST_APPLICATION,
             num_units=3,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
             config={"profile": "testing"},
         )
@@ -51,7 +51,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             charm,
             application_name=SECOND_APPLICATION,
             num_units=1,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 

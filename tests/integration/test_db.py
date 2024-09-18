@@ -13,7 +13,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from . import markers
 from .helpers import (
     APPLICATION_NAME,
-    CHARM_SERIES,
+    CHARM_BASE,
     DATABASE_APP_NAME,
     assert_sync_standbys,
     build_connection_string,
@@ -50,7 +50,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=DATABASE_UNITS,
-            series=CHARM_SERIES,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 
@@ -200,14 +200,14 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
         APPLICATION_NAME,
         application_name=APPLICATION_NAME,
         config={"legacy_roles": True},
-        series=CHARM_SERIES,
+        base=CHARM_BASE,
         channel="edge",
     )
     await ops_test.model.deploy(
         APPLICATION_NAME,
         application_name=f"{APPLICATION_NAME}2",
         config={"legacy_roles": True},
-        series=CHARM_SERIES,
+        base=CHARM_BASE,
         channel="edge",
     )
 
@@ -304,7 +304,7 @@ async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # aren't providing an Ubuntu Pro token (as this is just a test to ensure
     # the database works in the context of the relation with the Livepatch charm).
     overlay = {
-        "applications": {"ubuntu-advantage": {"charm": "ubuntu-advantage", "series": CHARM_SERIES}}
+        "applications": {"ubuntu-advantage": {"charm": "ubuntu-advantage", "base": CHARM_BASE}}
     }
     await deploy_and_relate_bundle_with_postgresql(
         ops_test,

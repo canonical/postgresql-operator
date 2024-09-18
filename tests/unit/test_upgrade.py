@@ -9,7 +9,6 @@ from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
 from constants import SNAP_PACKAGES
-from tests.helpers import patch_network_get
 
 
 @pytest.fixture(autouse=True)
@@ -27,7 +26,6 @@ def harness():
     harness.cleanup()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_build_upgrade_stack(harness):
     with (
         patch("charm.Patroni.get_sync_standby_names") as _get_sync_standby_names,
@@ -91,7 +89,6 @@ def test_on_upgrade_charm_check_legacy(harness, unit_states, is_cluster_initiali
         _member_started.assert_called_once() if call else _member_started.assert_not_called()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_on_upgrade_granted(harness):
     with (
         patch("charm.Patroni.get_postgresql_version"),
@@ -189,7 +186,6 @@ def test_on_upgrade_granted(harness):
         _on_upgrade_changed.assert_called_once()
 
 
-@patch_network_get(private_address="1.1.1.1")
 def test_pre_upgrade_check(harness):
     with (
         patch(
