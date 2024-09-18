@@ -653,11 +653,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        # Check whether raft is stuck
-        if (
-            isinstance(event, RelationChangedEvent)
-            and self.has_raft_keys()
-            and self._raft_reinitialisation()
+        # Check whether raft is stuck.
+        if self.has_raft_keys() and (
+            isinstance(event, RelationChangedEvent) or self._raft_reinitialisation()
         ):
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
