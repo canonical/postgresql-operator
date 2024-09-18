@@ -793,6 +793,10 @@ class Patroni:
             RaftMemberNotFoundError: if the member to be removed
                 is not part of the raft cluster.
         """
+        if self.charm.has_raft_keys():
+            logger.debug("Remove raft member: Raft already in recovery")
+            return
+
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 

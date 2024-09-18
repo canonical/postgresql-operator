@@ -515,7 +515,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Check for stuck raft cluster and reinitialise if safe."""
         raft_stuck = False
         all_units_stuck = True
-        candidate = None
+        candidate = self.app_peer_data.get("raft_selected_candidate")
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
@@ -612,7 +612,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self._stuck_raft_cluster_cleanup()
         return should_exit
 
-    def _has_raft_keys(self):
+    def has_raft_keys(self):
+        """Checks for the presence of raft recovery keys in peer data."""
         for key in self.app_peer_data.keys():
             if key.startswith("raft_"):
                 return True
@@ -631,7 +632,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Check whether raft is stuck
-        if self._has_raft_keys() and self._raft_reinitialisation():
+        if self.has_raft_keys() and self._raft_reinitialisation():
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
@@ -688,7 +689,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
         if (
-            not self._has_raft_keys()
+            not self.has_raft_keys()
             and not self.is_primary
             and not self.is_standby_leader
             and (
@@ -1037,7 +1038,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.get_secret(APP_SCOPE, key) is None:
                 self.set_secret(APP_SCOPE, key, new_password())
 
-        if self._has_raft_keys() and self._raft_reinitialisation():
+        if self.has_raft_keys() and self._raft_reinitialisation():
             return
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
@@ -1548,7 +1549,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            not self._has_raft_keys()
+            not self.has_raft_keys()
             and not is_primary
             and not is_standby_leader
             and not self._patroni.member_started
