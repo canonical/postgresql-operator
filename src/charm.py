@@ -553,7 +553,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             elif "raft_stopped" not in data:
                 all_units_down = False
         if primary and "raft_reset_primary" not in self.app_peer_data:
-            logger.info("Updating new primary endpoint")
+            logger.info("Updating the primary endpoint")
+            self.app_peer_data.pop("members_ips", None)
+            self._add_to_members_ips(self._get_unit_ip(primary))
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if all_units_down and "raft_rejoin" not in self.app_peer_data:
@@ -839,14 +841,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _get_unit_ip(self, unit: Unit) -> Optional[str]:
         """Get the IP address of a specific unit."""
         # Check if host is current host.
+        ip = None
         if unit == self.unit:
-            return str(self.model.get_binding(PEER).network.bind_address)
+            ip = self.model.get_binding(PEER).network.bind_address
         # Check if host is a peer.
         elif unit in self._peers.data:
-            return str(self._peers.data[unit].get("private-address"))
+            ip = self._peers.data[unit].get("private-address")
         # Return None if the unit is not a peer neither the current unit.
-        else:
-            return None
+        if ip:
+            return str(ip)
+        return None
 
     @property
     def _hosts(self) -> set:
@@ -949,7 +953,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         ips = json.loads(self._peers.data[self.app].get("members_ips", "[]"))
-        if ip_to_add and ip_to_add != "None" and ip_to_add not in ips:
+        if ip_to_add and ip_to_add not in ips:
             ips.append(ip_to_add)
         elif ip_to_remove:
             ips.remove(ip_to_remove)
