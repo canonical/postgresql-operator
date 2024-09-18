@@ -577,8 +577,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
-            if "raft_primary" in data or "raft_stopped" in data:
-                return
+            for flag in data.keys():
+                if flag.startswith("raft_"):
+                    return
 
         logger.info("Cleaning up raft app data")
         self.app_peer_data.pop("raft_rejoin", None)
