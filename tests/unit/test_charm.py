@@ -1348,6 +1348,7 @@ def test_on_cluster_topology_change(harness):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
+        patch("charm.ClusterTopologyObserver.restart_observer") as _restart_observer,
     ):
         # Mock the property value.
         _primary_endpoint.side_effect = [None, "1.1.1.1"]
@@ -1371,6 +1372,7 @@ def test_on_cluster_topology_change_keep_blocked(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
+        patch("charm.ClusterTopologyObserver.restart_observer") as _restart_observer,
     ):
         harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
@@ -1392,6 +1394,7 @@ def test_on_cluster_topology_change_clear_blocked(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
+        patch("charm.ClusterTopologyObserver.restart_observer") as _restart_observer,
     ):
         harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 

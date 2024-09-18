@@ -860,6 +860,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
+        self._observer.restart_observer()
         if self.primary_endpoint:
             self._update_relation_endpoints()
             self.unit.status = ActiveStatus()
