@@ -560,7 +560,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return True
         return False
 
-    def _stuck_raft_cluster_stopped(self) -> None:
+    def _stuck_raft_cluster_stopped_check(self) -> None:
         """Check that the cluster is stopped."""
         if "raft_followers_stopped" in self.app_peer_data:
             return
@@ -596,18 +596,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if candidate := self.app_peer_data.get("raft_selected_candidate"):
             should_exit = True
-            if "raft_stuck" in self.unit_peer_data:
+            if "raft_stopped" not in self.unit_peer_data:
                 self.unit_peer_data.pop("raft_stuck", None)
                 self.unit_peer_data.pop("raft_candidate", None)
-                self.unit_peer_data["raft_stopping"] = "True"
-
-            if "raft_stopping" in self.unit_peer_data:
                 self._patroni.remove_raft_data()
-                self.unit_peer_data.pop("raft_stopping", None)
                 logger.info("Stopping %s" % self.unit.name)
                 self.unit_peer_data["raft_stopped"] = "True"
 
-        if self.unit.is_leader() and self._stuck_raft_cluster_stopped():
+        if self.unit.is_leader() and self._stuck_raft_cluster_stopped_check():
             should_exit = True
 
         if (
