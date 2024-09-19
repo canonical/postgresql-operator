@@ -73,18 +73,25 @@ bootstrap:
         {%- endif %}
         archive_mode: on
         autovacuum: true
+        debug_print_plan: 'off'
+        debug_print_parse: 'off'
+        debug_print_rewritten: 'off'
         fsync: true
         full_page_writes: true
         lc_messages: 'en_US.UTF8'
         log_autovacuum_min_duration: 60000
         log_checkpoints: 'on'
+        log_connections: 'on'
         log_destination: 'stderr'
         log_directory: '{{ postgresql_log_path }}'
+        log_disconnections: 'on'
+        log_error_verbosity: 'verbose'
         log_file_mode: '0600'
         log_filename: 'postgresql-%w_%H%M.log'
         log_hostname: 'off'
         log_line_prefix: '%t [%p]: user=%u,db=%d,app=%a,client=%h,line=%l '
         log_min_duration_sample: -1
+        log_min_error_statement: 'warning'
         log_recovery_conflict_waits: 'on'
         log_replication_commands: 'on'
         log_rotation_age: 1
