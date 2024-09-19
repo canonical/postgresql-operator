@@ -36,6 +36,7 @@ class CharmConfig(BaseConfigModel):
     optimizer_join_collapse_limit: Optional[int]
     profile: str
     profile_limit_memory: Optional[int]
+    plugin_audit_enable: bool
     plugin_citext_enable: bool
     plugin_debversion_enable: bool
     plugin_hstore_enable: bool

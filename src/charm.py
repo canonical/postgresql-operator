@@ -76,6 +76,7 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
     PEER,
+    PLUGIN_OVERRIDES,
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
     REPLICATION_PASSWORD_KEY,
@@ -84,6 +85,7 @@ from constants import (
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SNAP_PACKAGES,
+    SPI_MODULE,
     SYSTEM_USERS,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -996,8 +998,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._patroni.get_primary() is None:
             logger.debug("Early exit enable_disable_extensions: standby cluster")
             return
-        spi_module = ["refint", "autoinc", "insert_username", "moddatetime"]
-        plugins_exception = {"uuid_ossp": '"uuid-ossp"'}
         original_status = self.unit.status
         extensions = {}
         # collect extensions
@@ -1007,10 +1007,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Enable or disable the plugin/extension.
             extension = "_".join(plugin.split("_")[1:-1])
             if extension == "spi":
-                for ext in spi_module:
+                for ext in SPI_MODULE:
                     extensions[ext] = enable
                 continue
-            extension = plugins_exception.get(extension, extension)
+            extension = PLUGIN_OVERRIDES.get(extension, extension)
             if self._check_extension_dependencies(extension, enable):
                 self.unit.status = BlockedStatus(EXTENSIONS_DEPENDENCY_MESSAGE)
                 return
@@ -1514,7 +1514,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         snap_package.hold()
                     else:
                         snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
-
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
                     "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
@@ -1860,6 +1859,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"Last completed transaction was at {log_time[-1]}")
         else:
             logger.error("Can't tell last completed transaction time")
+
+    def get_plugins(self) -> List[str]:
+        """Return a list of installed plugins."""
+        plugins = [
+            "_".join(plugin.split("_")[1:-1])
+            for plugin in self.config.plugin_keys()
+            if self.config[plugin]
+        ]
+        plugins = [PLUGIN_OVERRIDES.get(plugin, plugin) for plugin in plugins]
+        if "spi" in plugins:
+            plugins.remove("spi")
+            for ext in SPI_MODULE:
+                plugins.append(ext)
+        return plugins
 
 
 if __name__ == "__main__":
