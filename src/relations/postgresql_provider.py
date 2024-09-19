@@ -91,11 +91,7 @@ class PostgreSQLProvider(Object):
             user = f"relation-{event.relation.id}"
             password = new_password()
             self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
-            plugins = [
-                "_".join(plugin.split("_")[1:-1])
-                for plugin in self.charm.config.plugin_keys()
-                if self.charm.config[plugin]
-            ]
+            plugins = self.charm.get_plugins()
 
             self.charm.postgresql.create_database(
                 database, user, plugins=plugins, client_relations=self.charm.client_relations

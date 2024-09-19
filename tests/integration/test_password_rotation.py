@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
+import re
 import time
 
 import psycopg2
@@ -194,4 +195,8 @@ async def test_no_password_exposed_on_logs(ops_test: OpsTest) -> None:
             )
         except Exception:
             continue
-        assert len(logs) == 0, f"Sensitive information detected on {unit.name} logs"
+        regex = re.compile("(PASSWORD )(?!<REDACTED>)")
+        logs_without_false_positives = regex.findall(logs)
+        assert (
+            len(logs_without_false_positives) == 0
+        ), f"Sensitive information detected on {unit.name} logs"

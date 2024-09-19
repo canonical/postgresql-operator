@@ -41,7 +41,7 @@ SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
         {
-            "revision": {"aarch64": "121", "x86_64": "120"},
+            "revision": {"aarch64": "125", "x86_64": "124"},
             "channel": "14/stable",
         },
     )
@@ -84,3 +84,6 @@ TRACING_RELATION_NAME = "tracing"
 TRACING_PROTOCOL = "otlp_http"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
+PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
+
+SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
