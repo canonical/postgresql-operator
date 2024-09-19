@@ -38,7 +38,6 @@ from ops.charm import (
     HookEvent,
     InstallEvent,
     LeaderElectedEvent,
-    RelationChangedEvent,
     RelationDepartedEvent,
     StartEvent,
 )
@@ -650,10 +649,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        # Check whether raft is stuck. Secrets events may have stale peer data
+        # Check whether raft is stuck.
         if self.has_raft_keys():
-            if isinstance(event, RelationChangedEvent):
-                self._raft_reinitialisation()
+            self._raft_reinitialisation()
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 

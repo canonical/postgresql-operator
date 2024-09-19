@@ -96,7 +96,7 @@ async def are_writes_increasing(
     extra_model: Model = None,
 ) -> None:
     """Verify new writes are continuing by counting the number of writes."""
-    if isinstance(down_unit, str):
+    if isinstance(down_unit, str) or not down_unit:
         down_units = [down_unit]
     else:
         down_units = down_unit
