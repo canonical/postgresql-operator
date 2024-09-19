@@ -1959,7 +1959,6 @@ def test_raft_reinitialisation(harness):
         ) as _stuck_raft_cluster_cleanup,
         patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
         patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
-        patch("charm.Patroni.start_patroni") as _start_patroni,
     ):
         # No data
         harness.charm._raft_reinitialisation()
@@ -1973,34 +1972,44 @@ def test_raft_reinitialisation(harness):
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"raft_rejoin": "True", "raft_selected_candidate": "test_candidate"},
+                {"raft_selected_candidate": "test_candidate"},
             )
 
         harness.charm._raft_reinitialisation()
         _stuck_raft_cluster_rejoin.assert_called_once_with()
         _stuck_raft_cluster_check.assert_called_once_with()
-        _stuck_raft_cluster_cleanup.assert_called_once_with()
+        assert not _stuck_raft_cluster_cleanup.called
         _remove_raft_data.assert_called_once_with()
-        _start_patroni.assert_called_once_with()
         assert not _reinitialise_raft_data.called
-        assert "raft_stopped" not in harness.charm.unit_peer_data
-        assert "raft_primary" not in harness.charm.unit_peer_data
-        _start_patroni.reset_mock()
 
         # Current candidate
         with harness.hooks_disabled():
             harness.set_leader()
             harness.update_relation_data(
-                rel_id, harness.charm.unit.name, {"raft_stuck": "True", "raft_candidate": "True"}
+                rel_id,
+                harness.charm.unit.name,
+                {"raft_stuck": "", "raft_candidate": "True", "raft_stopped": "True"},
             )
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"raft_selected_candidate": "postgresql/0"},
+                {"raft_selected_candidate": "postgresql/0", "raft_followers_stopped": "True"},
             )
 
         harness.charm._raft_reinitialisation()
         _reinitialise_raft_data.assert_called_once_with()
+
+        # Cleanup
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.unit.name,
+                {"raft_stuck": "", "raft_candidate": "True", "raft_stopped": "True"},
+            )
+            harness.update_relation_data(rel_id, harness.charm.app.name, {"raft_rejoin": "True"})
+        harness.charm._raft_reinitialisation()
+        _stuck_raft_cluster_cleanup.assert_called_once_with()
 
 
 #
