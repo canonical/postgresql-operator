@@ -507,7 +507,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _stuck_raft_cluster_check(self) -> bool:
+    def _stuck_raft_cluster_check(self) -> None:
         """Check for stuck raft cluster and reinitialise if safe."""
         raft_stuck = False
         all_units_stuck = True
@@ -523,19 +523,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 candidate = key
 
         if not raft_stuck:
-            return False
+            return
 
         if not all_units_stuck:
             logger.warning("Stuck raft not yet detected on all units")
-            return True
+            return
 
         if not candidate:
             logger.warning("Stuck raft has no candidate")
-            return True
+            return
         if "raft_selected_candidate" not in self.app_peer_data:
             logger.info("%s selected for new raft leader" % candidate.name)
             self.app_peer_data["raft_selected_candidate"] = candidate.name
-        return True
 
     def _stuck_raft_cluster_rejoin(self) -> bool:
         """Reconnect cluster to new raft."""
@@ -588,16 +587,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.app_peer_data.pop("raft_selected_candidate", None)
         self.app_peer_data.pop("raft_followers_stopped", None)
 
-    def _raft_reinitialisation(self) -> bool:
+    def _raft_reinitialisation(self) -> None:
         """Handle raft cluster loss of quorum."""
         logger.error(f"!!!!!!!!!!!!!!!!!!1{self.unit} {self.unit_peer_data}")
         logger.error(f"@@@@@@@@@@@@@@@2@{self.unit} {self.app_peer_data}")
-        should_exit = False
-        if self.unit.is_leader() and self._stuck_raft_cluster_check():
-            should_exit = True
+        if self.unit.is_leader():
+            self._stuck_raft_cluster_check()
 
         if candidate := self.app_peer_data.get("raft_selected_candidate"):
-            should_exit = True
             if "raft_stopped" not in self.unit_peer_data:
                 self.unit_peer_data.pop("raft_stuck", None)
                 self.unit_peer_data.pop("raft_candidate", None)
@@ -605,32 +602,29 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.info("Stopping %s" % self.unit.name)
                 self.unit_peer_data["raft_stopped"] = "True"
 
-        if self.unit.is_leader() and self._stuck_raft_cluster_stopped_check():
-            should_exit = True
+        if self.unit.is_leader():
+            self._stuck_raft_cluster_stopped_check()
 
         if (
             candidate == self.unit.name
             and "raft_primary" not in self.unit_peer_data
             and "raft_followers_stopped" in self.app_peer_data
         ):
-            should_exit = True
             logger.info("Reinitialising %s as primary" % self.unit.name)
             self._patroni.reinitialise_raft_data()
             self.unit_peer_data["raft_primary"] = "True"
 
-        if self.unit.is_leader() and self._stuck_raft_cluster_rejoin():
-            should_exit = True
+        if self.unit.is_leader():
+            self._stuck_raft_cluster_rejoin()
 
         if "raft_rejoin" in self.app_peer_data:
-            should_exit = True
             logger.info("Cleaning up raft unit data")
             self.unit_peer_data.pop("raft_primary", None)
             self.unit_peer_data.pop("raft_stopped", None)
             self._patroni.start_patroni()
 
-            if self.unit.is_leader() and "raft_rejoin" in self.app_peer_data:
+            if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()
-        return should_exit
 
     def has_raft_keys(self):
         """Checks for the presence of raft recovery keys in peer data."""
@@ -653,9 +647,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Check whether raft is stuck. Secrets events may have stale peer data
         logger.error(f"@@@@@@@@@@@@@@@2@{self.unit} {event}")
-        if self.has_raft_keys() and (
-            isinstance(event, RelationChangedEvent) or self._raft_reinitialisation()
-        ):
+        if self.has_raft_keys():
+            if isinstance(event, RelationChangedEvent):
+                self._raft_reinitialisation()
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
@@ -1063,7 +1057,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             if self.get_secret(APP_SCOPE, key) is None:
                 self.set_secret(APP_SCOPE, key, new_password())
 
-        if self.has_raft_keys() and self._raft_reinitialisation():
+        if self.has_raft_keys():
+            self._raft_reinitialisation()
             return
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.

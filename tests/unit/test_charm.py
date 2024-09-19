@@ -1857,13 +1857,13 @@ def test_stuck_raft_cluster_check(harness):
         harness.set_leader()
         harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
 
-    assert harness.charm._stuck_raft_cluster_check()
+    harness.charm._stuck_raft_cluster_check()
     assert "raft_selected_candidate" not in harness.charm.app_peer_data
 
     # Raft candidate
     with harness.hooks_disabled():
         harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_candidate": "True"})
-    assert harness.charm._stuck_raft_cluster_check()
+    harness.charm._stuck_raft_cluster_check()
     assert harness.charm.app_peer_data["raft_selected_candidate"] == harness.charm.unit.name
 
     # Don't override existing candidate
@@ -1871,7 +1871,7 @@ def test_stuck_raft_cluster_check(harness):
         harness.update_relation_data(
             rel_id, harness.charm.app.name, {"raft_selected_candidate": "something_else"}
         )
-    assert harness.charm._stuck_raft_cluster_check()
+    harness.charm._stuck_raft_cluster_check()
     assert harness.charm.app_peer_data["raft_selected_candidate"] != harness.charm.unit.name
 
 
@@ -1959,7 +1959,7 @@ def test_raft_reinitialisation(harness):
         patch("charm.Patroni.start_patroni") as _start_patroni,
     ):
         # No data
-        assert not harness.charm._raft_reinitialisation()
+        harness.charm._raft_reinitialisation()
 
         # Different candidate
         with harness.hooks_disabled():
@@ -1973,7 +1973,7 @@ def test_raft_reinitialisation(harness):
                 {"raft_rejoin": "True", "raft_selected_candidate": "test_candidate"},
             )
 
-        assert harness.charm._raft_reinitialisation()
+        harness.charm._raft_reinitialisation()
         _stuck_raft_cluster_rejoin.assert_called_once_with()
         _stuck_raft_cluster_check.assert_called_once_with()
         _stuck_raft_cluster_cleanup.assert_called_once_with()
@@ -1996,7 +1996,7 @@ def test_raft_reinitialisation(harness):
                 {"raft_selected_candidate": "postgresql/0"},
             )
 
-        assert harness.charm._raft_reinitialisation()
+        harness.charm._raft_reinitialisation()
         _reinitialise_raft_data.assert_called_once_with()
 
 
