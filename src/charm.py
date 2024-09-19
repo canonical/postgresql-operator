@@ -636,10 +636,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Checks for the presence of raft recovery keys in peer data."""
         for key in self.app_peer_data.keys():
             if key.startswith("raft_"):
+                self.unit.status = MaintenanceStatus("Reinitialising raft...")
                 return True
 
         for key in self.unit_peer_data.keys():
             if key.startswith("raft_"):
+                self.unit.status = MaintenanceStatus("Reinitialising raft...")
                 return True
         return False
 
