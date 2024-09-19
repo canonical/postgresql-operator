@@ -540,21 +540,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _stuck_raft_cluster_rejoin(self) -> bool:
         """Reconnect cluster to new raft."""
         primary = None
-        all_units_down = True
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
             if "raft_primary" in data:
                 primary = key
-            elif "raft_stopped" not in data:
-                all_units_down = False
+                break
         if primary and "raft_reset_primary" not in self.app_peer_data:
             logger.info("Updating the primary endpoint")
             self.app_peer_data.pop("members_ips", None)
             self._add_to_members_ips(self._get_unit_ip(primary))
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
-        if all_units_down and "raft_rejoin" not in self.app_peer_data:
+        if (
+            "raft_rejoin" not in self.app_peer_data
+            and "raft_followers_stopped" in self.app_peer_data
+            and "raft_reset_primary" in self.app_peer_data
+        ):
             logger.info("Notify units they can rejoin")
             self.app_peer_data["raft_rejoin"] = "True"
             return True
@@ -590,8 +592,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _raft_reinitialisation(self) -> None:
         """Handle raft cluster loss of quorum."""
-        logger.error(f"!!!!!!!!!!!!!!!!!!1{self.unit} {self.unit_peer_data}")
-        logger.error(f"@@@@@@@@@@@@@@@2@{self.unit} {self.app_peer_data}")
         # Skip to cleanup if rejoining
         if "raft_rejoin" not in self.app_peer_data:
             if self.unit.is_leader():
