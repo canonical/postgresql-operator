@@ -537,7 +537,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("%s selected for new raft leader" % candidate.name)
             self.app_peer_data["raft_selected_candidate"] = candidate.name
 
-    def _stuck_raft_cluster_rejoin(self) -> bool:
+    def _stuck_raft_cluster_rejoin(self) -> None:
         """Reconnect cluster to new raft."""
         primary = None
         for key, data in self._peers.data.items():
@@ -559,8 +559,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             logger.info("Notify units they can rejoin")
             self.app_peer_data["raft_rejoin"] = "True"
-            return True
-        return False
 
     def _stuck_raft_cluster_stopped_check(self) -> None:
         """Check that the cluster is stopped."""

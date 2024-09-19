@@ -1927,15 +1927,23 @@ def test_stuck_raft_cluster_rejoin(harness):
         patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
     ):
         # No data
-        assert not harness.charm._stuck_raft_cluster_rejoin()
+        harness.charm._stuck_raft_cluster_rejoin()
+
+        assert "raft_reset_primary" not in harness.charm.app_peer_data
+        assert "raft_rejoin" not in harness.charm.app_peer_data
 
         # Raises primary flag
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id, harness.charm.unit.name, {"raft_primary": "test_primary"}
             )
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"raft_followers_stopped": "test_candidate"},
+            )
 
-        assert harness.charm._stuck_raft_cluster_rejoin()
+        harness.charm._stuck_raft_cluster_rejoin()
 
         assert "raft_reset_primary" in harness.charm.app_peer_data
         assert "raft_rejoin" in harness.charm.app_peer_data
