@@ -7,7 +7,7 @@ import random
 import subprocess
 from pathlib import Path
 from tempfile import mkstemp
-from typing import Dict, Optional, Set, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import psycopg2
 import requests
@@ -90,12 +90,19 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str
 
 
 async def are_writes_increasing(
-    ops_test, down_unit: str = None, use_ip_from_inside: bool = False, extra_model: Model = None
+    ops_test,
+    down_unit: Optional[Union[str, List[str]]] = None,
+    use_ip_from_inside: bool = False,
+    extra_model: Model = None,
 ) -> None:
     """Verify new writes are continuing by counting the number of writes."""
+    if isinstance(down_unit, str):
+        down_units = [down_unit]
+    else:
+        down_units = down_unit
     writes, _ = await count_writes(
         ops_test,
-        down_unit=down_unit,
+        down_unit=down_units[0],
         use_ip_from_inside=use_ip_from_inside,
         extra_model=extra_model,
     )
@@ -111,7 +118,7 @@ async def are_writes_increasing(
             )
             logger.info(f"Retry writes {more_writes}")
             for member, count in writes.items():
-                if "/".join(member.split(".", 1)[-1].rsplit("-", 1)) == down_unit:
+                if "/".join(member.split(".", 1)[-1].rsplit("-", 1)) in down_units:
                     continue
                 assert (
                     more_writes[member] > count
