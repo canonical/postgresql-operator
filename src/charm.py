@@ -636,12 +636,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Checks for the presence of raft recovery keys in peer data."""
         for key in self.app_peer_data.keys():
             if key.startswith("raft_"):
-                self.unit.status = MaintenanceStatus("Reinitialising raft...")
                 return True
 
         for key in self.unit_peer_data.keys():
             if key.startswith("raft_"):
-                self.unit.status = MaintenanceStatus("Reinitialising raft...")
                 return True
         return False
 
@@ -653,7 +651,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        # Check whether raft is stuck.
+        # Check whether raft is stuck. Secrets events may have stale peer data
+        logger.error(f"@@@@@@@@@@@@@@@2@{self.unit} {event}")
         if self.has_raft_keys() and (
             isinstance(event, RelationChangedEvent) or self._raft_reinitialisation()
         ):

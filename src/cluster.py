@@ -829,6 +829,7 @@ class Patroni:
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
 
+            # Leader doesn't always trigger when changing it's own peer data.
             if self.charm.unit.is_leader():
                 self.charm.on[PEER].relation_changed.emit(
                     unit=self.charm.unit,
