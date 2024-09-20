@@ -255,11 +255,9 @@ def test_can_use_s3_repository(harness):
         ]
         with harness.hooks_disabled():
             harness.set_leader()
-        with pytest.raises(Exception):
-            assert harness.charm.backup.can_use_s3_repository() == (
-                False,
-                ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
-            )
+        with pytest.raises(Exception, match="fake error"):
+            harness.charm.backup.can_use_s3_repository()
+            assert False
         _update_config.assert_not_called()
         _member_started.assert_not_called()
         _reload_patroni_configuration.assert_not_called()
@@ -663,7 +661,8 @@ def test_list_backups(harness):
         # Test when the command that list the backups fails.
         _execute_command.return_value = (1, "", "fake stderr")
         with pytest.raises(ListBackupsError):
-            assert harness.charm.backup._list_backups(show_failed=True) == OrderedDict[str, str]()
+            harness.charm.backup._list_backups(show_failed=True)
+            assert False
 
         # Test when no backups are available.
         _execute_command.return_value = (0, "[]", "")
