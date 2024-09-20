@@ -429,6 +429,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
             event.defer()
             return
+        except RetryError:
+            logger.warning(
+                "Early exit on_peer_relation_departed: Cannot get %s member IP"
+                % event.departing_unit.name
+            )
+            return
 
         # Allow leader to update the cluster members.
         if not self.unit.is_leader():
