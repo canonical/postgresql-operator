@@ -69,7 +69,7 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
     primary = await get_primary(ops_test, app)
     await ops_test.model.destroy_unit(primary, force=True, destroy_storage=False, max_wait=1500)
 
-    await ops_test.model.wait_for_idle(status="active", timeout=600)
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
     await are_writes_increasing(ops_test, primary)
 
@@ -104,7 +104,7 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
     ).name
     await ops_test.model.destroy_unit(secondary, force=True, destroy_storage=False, max_wait=1500)
 
-    await ops_test.model.wait_for_idle(status="active", timeout=600)
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
     await are_writes_increasing(ops_test, secondary)
 
@@ -154,7 +154,7 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
         ),
     )
 
-    await ops_test.model.wait_for_idle(status="active", timeout=900)
+    await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
 
     await are_writes_increasing(
         ops_test,
@@ -202,7 +202,7 @@ async def test_removing_raft_majority_async(ops_test: OpsTest, continuous_writes
         ),
     )
 
-    await ops_test.model.wait_for_idle(status="active", timeout=900)
+    await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
 
     await are_writes_increasing(
         ops_test,
