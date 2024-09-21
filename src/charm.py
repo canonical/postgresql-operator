@@ -827,6 +827,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         elif ip_to_remove:
             ips.remove(ip_to_remove)
         self._peers.data[self.app]["members_ips"] = json.dumps(ips)
+        self._observer.restart_observer()
 
     @retry(
         stop=stop_after_delay(60),
@@ -861,6 +862,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
+        self._observer.restart_observer()
         if self.primary_endpoint:
             self._update_relation_endpoints()
             self.unit.status = ActiveStatus()

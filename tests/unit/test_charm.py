@@ -201,7 +201,7 @@ def test_primary_endpoint_no_peers(harness):
 
 
 def test_on_leader_elected(harness):
-    with patch(
+    with patch("charm.ClusterTopologyObserver.start_observer") as _start_observer, patch(
         "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
     ) as _update_relation_endpoints, patch(
         "charm.PostgresqlOperatorCharm.primary_endpoint",
@@ -568,6 +568,7 @@ def test_enable_disable_extensions(harness, caplog):
 
 def test_on_start(harness):
     with (
+        patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
         patch(
             "charm.PostgresqlOperatorCharm._restart_services_after_reboot"
         ) as _restart_services_after_reboot,
@@ -730,6 +731,7 @@ def test_on_start_replica(harness):
 
 def test_on_start_no_patroni_member(harness):
     with (
+        patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
@@ -779,7 +781,10 @@ def test_on_start_after_blocked_state(harness):
 
 
 def test_on_get_password(harness):
-    with patch("charm.PostgresqlOperatorCharm.update_config"):
+    with (
+        patch("charm.ClusterTopologyObserver.start_observer") as _start_observer,
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+    ):
         rel_id = harness.model.get_relation(PEER).id
         # Create a mock event and set passwords in peer relation data.
         harness.set_leader(True)
@@ -1330,6 +1335,7 @@ def test_on_cluster_topology_change(harness):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
+        patch("charm.ClusterTopologyObserver.restart_observer") as _restart_observer,
     ):
         # Mock the property value.
         _primary_endpoint.side_effect = [None, "1.1.1.1"]
@@ -1353,6 +1359,7 @@ def test_on_cluster_topology_change_keep_blocked(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
+        patch("charm.ClusterTopologyObserver.restart_observer") as _restart_observer,
     ):
         harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
@@ -1374,6 +1381,7 @@ def test_on_cluster_topology_change_clear_blocked(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
+        patch("charm.ClusterTopologyObserver.restart_observer") as _restart_observer,
     ):
         harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
