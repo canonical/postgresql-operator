@@ -418,6 +418,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return
 
+        if self.has_raft_keys():
+            logger.debug("Early exit on_peer_relation_departed: Raft recovery in progress")
+            return
+
         # Remove the departing member from the raft cluster.
         try:
             departing_member = event.departing_unit.name.replace("/", "-")
@@ -1525,6 +1529,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _can_run_on_update_status(self) -> bool:
         if "cluster_initialised" not in self._peers.data[self.app]:
+            return False
+
+        if self.has_raft_keys():
+            logger.debug("Early exit on_update_status: Raft recovery in progress")
             return False
 
         if not self.upgrade.idle:
