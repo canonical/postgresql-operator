@@ -5,7 +5,6 @@ import json
 import logging
 import platform
 import subprocess
-from unittest import TestCase
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
 import psycopg2
@@ -42,7 +41,6 @@ from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PA
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
 # used for assert functions
-tc = TestCase()
 
 
 @pytest.fixture(autouse=True)
@@ -2572,7 +2570,7 @@ def test_set_primary_status_message(harness, is_leader):
             if is_leader
             else databag_containing_restore_data
         )
-        tc.assertIsInstance(harness.charm.unit.status, BlockedStatus)
+        assert isinstance(harness.charm.unit.status, BlockedStatus)
 
         # Test other scenarios.
         with harness.hooks_disabled():
@@ -2605,28 +2603,28 @@ def test_set_primary_status_message(harness, is_leader):
                     _is_standby_leader.side_effect = values[1]
                     _is_standby_leader.return_value = None
                     harness.charm._set_primary_status_message()
-                    tc.assertIsInstance(harness.charm.unit.status, MaintenanceStatus)
+                    assert isinstance(harness.charm.unit.status, MaintenanceStatus)
                 else:
                     _is_standby_leader.side_effect = None
                     _is_standby_leader.return_value = values[1]
                     harness.charm._set_primary_status_message()
-                    tc.assertIsInstance(
+                    assert isinstance(
                         harness.charm.unit.status,
                         ActiveStatus
                         if values[0] == harness.charm.unit.name or values[1] or values[2]
                         else MaintenanceStatus,
                     )
-                    tc.assertEqual(
-                        harness.charm.unit.status.message,
+                    status = (
                         "Primary"
                         if values[0] == harness.charm.unit.name
-                        else ("Standby" if values[1] else ("" if values[2] else "fake status")),
+                        else ("Standby" if values[1] else "" if values[2] else "fake status")
                     )
+                    assert harness.charm.unit.status.message == status
             else:
                 _get_primary.side_effect = values[0]
                 _get_primary.return_value = None
                 harness.charm._set_primary_status_message()
-                tc.assertIsInstance(harness.charm.unit.status, MaintenanceStatus)
+                assert isinstance(harness.charm.unit.status, MaintenanceStatus)
 
 
 def test_override_patroni_restart_condition(harness):
