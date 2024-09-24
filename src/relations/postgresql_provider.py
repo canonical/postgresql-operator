@@ -8,6 +8,7 @@ import logging
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
     DatabaseRequestedEvent,
+    PrematureDataAccessError,
 )
 from charms.postgresql_k8s.v0.postgresql import (
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
@@ -207,11 +208,23 @@ class PostgreSQLProvider(Object):
                 read_only_endpoints,
             )
 
-            # Set connection string URI.
-            self.database_provides.set_uris(
-                relation_id,
-                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
-            )
+            try:
+                # Set connection string URI.
+                self.database_provides.set_uris(
+                    relation_id,
+                    f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
+                )
+            except PrematureDataAccessError:
+                database = ""
+                if event:
+                    database = event.database
+                # The relation is not yet fullin initialized
+                # Updates should be performed on a later 'update-status' cycle
+                logger.debug(
+                    f"There was an attempt to set endpoints ({database})"
+                    "before the relation was fully initialized."
+                )
+                return
 
     def _check_multiple_endpoints(self) -> bool:
         """Checks if there are relations with other endpoints."""
