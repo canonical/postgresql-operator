@@ -11,24 +11,22 @@ bases:
     architectures: [arm64]
 parts:
   charm:
-    override-pull: |
-      craftctl default
-      if [[ ! -f requirements.txt ]]
-      then
-          echo 'ERROR: Use "tox run -e build" instead of calling "charmcraft pack" directly' >&2
-          exit 1
-      fi
-    override-build: |
-      rustup default stable
-      craftctl default
-    charm-strict-dependencies: true
     build-snaps:
-      - rustup/latest/stable
+      - rustup
     build-packages:
       - libffi-dev
       - libssl-dev
       - pkg-config
       - libpq-dev
+    override-build: |
+      rustup default stable
+
+      # Convert subset of poetry.lock to requirements.txt
+      curl -sSL https://install.python-poetry.org | python3 -
+      /root/.local/bin/poetry export --only main,charm-libs --output requirements.txt
+
+      craftctl default
+    charm-strict-dependencies: true
   libpq:
     build-packages:
       - libpq-dev
