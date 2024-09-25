@@ -76,7 +76,7 @@ charmcraftcache --help
 Build the charm (inside this Git repository):
 
 ```shell
-tox run -e build-dev
+charmcraftcache pack
 ```
 
 ### Deploy
