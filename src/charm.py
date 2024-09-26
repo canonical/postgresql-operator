@@ -54,7 +54,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
-from backups import CANNOT_RESTORE_PITR, MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET, PostgreSQLBackups
+from backups import CANNOT_RESTORE_PITR, PostgreSQLBackups
 from cluster import (
     NotReadyError,
     Patroni,
@@ -1068,9 +1068,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
-        if self.is_blocked and self.unit.status.message not in [
-            MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
-        ]:
+        if self.is_blocked:
             logger.debug("Early exit on_start: Unit blocked")
             return False
 
@@ -1334,15 +1332,28 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.debug("on_update_status early exit: Patroni has not started yet")
                 return
 
+            restoring_backup = self.app_peer_data.get("restoring-backup")
+            restore_timeline = self.app_peer_data.get("restore-timeline")
+            restore_to_time = self.app_peer_data.get("restore-to-time")
+            current_timeline = self.postgresql.get_current_timeline()
+
             # Remove the restoring backup flag and the restore stanza name.
             self.app_peer_data.update({
                 "restoring-backup": "",
                 "restore-stanza": "",
                 "restore-to-time": "",
+                "restore-timeline": "",
             })
             self.update_config()
             self.restore_patroni_restart_condition()
-            logger.info("Restore succeeded")
+
+            logger.info(
+                "Restored"
+                f"{' to ' + restore_to_time if restore_to_time else ''}"
+                f"{' from timeline ' + restore_timeline if restore_timeline and not restoring_backup else ''}"
+                f"{' from backup ' + self.backup._parse_backup_id(restoring_backup)[0] if restoring_backup else ''}"
+                f". Currently tracking the newly created timeline {current_timeline}."
+            )
 
             can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
             if not can_use_s3_repository:
@@ -1437,15 +1448,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _set_primary_status_message(self) -> None:
         """Display 'Primary' in the unit status message if the current unit is the primary."""
         try:
-            if "require-change-bucket-after-restore" in self.app_peer_data:
-                if self.unit.is_leader():
-                    self.app_peer_data.update({
-                        "restoring-backup": "",
-                        "restore-stanza": "",
-                        "restore-to-time": "",
-                    })
-                self.unit.status = BlockedStatus(MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET)
-                return
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:
@@ -1637,12 +1639,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
+            restore_timeline=self.app_peer_data.get("restore-timeline"),
             restore_to_latest=self.app_peer_data.get("restore-to-time", None) == "latest",
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
-            disable_pgbackrest_archiving=bool(
-                self.app_peer_data.get("require-change-bucket-after-restore", None)
-            ),
             parameters=pg_parameters,
         )
         if not self._is_workload_running:

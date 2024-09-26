@@ -36,7 +36,6 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
-MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET = "Move restored cluster to another S3 bucket"
 
 logger = logging.getLogger(__name__)
 
@@ -1237,11 +1236,7 @@ async def backup_operations(
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await ops_test.model.block_until(
-            lambda: remaining_unit.workload_status_message
-            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
-            timeout=1000,
-        )
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
@@ -1286,11 +1281,7 @@ async def backup_operations(
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await ops_test.model.block_until(
-            lambda: remaining_unit.workload_status_message
-            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
-            timeout=1000,
-        )
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Check that the backup was correctly restored by having only the first created table.
     primary = await get_primary(ops_test, remaining_unit.name)

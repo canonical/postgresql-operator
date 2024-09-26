@@ -14,13 +14,13 @@ from . import architecture
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
-    MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
     backup_operations,
     construct_endpoint,
     db_connect,
     get_password,
     get_primary,
     get_unit_address,
+    scale_application,
     switchover,
     wait_for_idle_on_blocked,
 )
@@ -124,15 +124,9 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
 
     new_unit_name = f"{database_app_name}/2"
 
+    # Scale up to be able to test primary and leader being different.
     async with ops_test.fast_forward():
-        # Scale up to be able to test primary and leader being different.
-        await ops_test.model.applications[database_app_name].add_units(1)
-        # Ensure that new unit become in blocked status, but is fully functional.
-        await ops_test.model.block_until(
-            lambda: ops_test.model.units.get(new_unit_name).workload_status_message
-            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
-            timeout=1000,
-        )
+        await scale_application(ops_test, database_app_name, 2)
 
     # Ensure replication is working correctly.
     address = get_unit_address(ops_test, new_unit_name)
@@ -173,11 +167,6 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     await action.wait()
     backups = action.results.get("backups")
     assert backups, "backups not outputted"
-
-    # Remove S3 relation to ensure "move to another cluster" blocked status is gone
-    await ops_test.model.applications[database_app_name].remove_relation(
-        f"{database_app_name}:s3-parameters", f"{S3_INTEGRATOR_APP_NAME}:s3-credentials"
-    )
 
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
@@ -288,10 +277,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        unit = ops_test.model.units.get(f"{database_app_name}/0")
-        await ops_test.model.block_until(
-            lambda: unit.workload_status_message == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
-        )
+        await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
