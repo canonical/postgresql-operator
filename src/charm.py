@@ -724,6 +724,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 or int(self._patroni.member_replication_lag) > 1000
             )
         ):
+            logger.error(
+                f"!!!!!!!!!!!!!!!!!{self._patroni.member_replication_lag} {self._patroni.member_replication_lag}"
+            )
             self._patroni.reinitialize_postgresql()
             logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
             self.unit.status = MaintenanceStatus("reinitialising replica")
