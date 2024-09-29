@@ -559,7 +559,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if primary and "raft_reset_primary" not in self.app_peer_data:
             logger.info("Updating the primary endpoint")
             self.app_peer_data.pop("members_ips", None)
-            self._add_to_members_ips(self._get_unit_ip(primary))
+            for unit in self._peers.units:
+                self._add_to_members_ips(self._get_unit_ip(unit))
+            self._add_to_members_ips(self._get_unit_ip(self.unit))
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if (
@@ -662,17 +664,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
-        # Don't update this member before it's part of the members list.
-        if self._unit_ip not in self.members_ips and not self.unit.is_leader():
-            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
-            return
-
         # If the unit is the leader, it can reconfigure the cluster.
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
             event.defer()
             return False
 
         if self._update_member_ip():
+            return False
+
+        # Don't update this member before it's part of the members list.
+        if self._unit_ip not in self.members_ips:
+            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
             return False
         return True
 
@@ -715,8 +717,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
         if (
-            not self.has_raft_keys()
-            and not self.is_primary
+            not self.is_primary
             and not self.is_standby_leader
             and (
                 self._patroni.member_replication_lag == "unknown"
