@@ -662,6 +662,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
             return False
 
+        # Don't update this member before it's part of the members list.
+        if self._unit_ip not in self.members_ips and not self.unit.is_leader():
+            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
+            return
+
         # If the unit is the leader, it can reconfigure the cluster.
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
             event.defer()
@@ -674,11 +679,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
         if not self._peer_relation_changed_checks(event):
-            return
-
-        # Don't update this member before it's part of the members list.
-        if self._unit_ip not in self.members_ips:
-            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
