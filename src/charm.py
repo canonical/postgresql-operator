@@ -633,8 +633,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Cleaning up raft unit data")
             self.unit_peer_data.pop("raft_primary", None)
             self.unit_peer_data.pop("raft_stopped", None)
-            self.update_config()
-            self._patroni.start_patroni()
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()
