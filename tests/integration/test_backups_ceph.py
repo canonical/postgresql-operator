@@ -5,22 +5,22 @@ import dataclasses
 import json
 import logging
 import os
+import socket
 import subprocess
 import time
+from pathlib import Path
 
 import boto3
 import botocore.exceptions
 import pytest
-
-import socket
-from pathlib import Path
 from pytest_operator.plugin import OpsTest
+
 from . import architecture
-from .juju_ import juju_major_version
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
 )
+from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
@@ -56,34 +56,84 @@ def microceph():
         raise Exception("Not running on CI. Skipping microceph installation")
     logger.info("Setting up TLS certificates")
     subprocess.run(["sudo", "openssl", "genrsa", "-out", "~/ca.key", "2048"], check=True)
-    subprocess.run([
-        'sudo',
-        'openssl',
-        'req',
-        '-x509',
-        '-new',
-        '-nodes',
-        '-key',
-        '~/ca.key',
-        '-days',
-        '1024',
-        '-out',
-        '~/ca.crt',
-        '-outform',
-        'PEM',
-        '-subj',
-        '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"'], 
-        check=True)
-    subprocess.run(['sudo', 'openssl', 'genrsa', '-out', '~/server.key', '2048'], check=True)
-    subprocess.run(['sudo', 'openssl', 'req', '-new', '-key', '~/server.key', '-out', '~/server.csr', '-subj', '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"'], check=True)
-    subprocess.run(['echo', '"subjectAltName = DNS:10.0.1.1,IP:10.0.1.1"', '>', '~/extfile.cnf'], check=True)
-    subprocess.run(['sudo', 'openssl', 'x509', '-req', '-in', '~/server.csr', '-CA', '~/ca.crt', '-CAkey', '~/ca.key', '-CAcreateserial', '-out', '~/server.crt', '-days', '365', '-extfile', '~/extfile.cnf'], check=True)
-    
+    subprocess.run(
+        [
+            "sudo",
+            "openssl",
+            "req",
+            "-x509",
+            "-new",
+            "-nodes",
+            "-key",
+            "~/ca.key",
+            "-days",
+            "1024",
+            "-out",
+            "~/ca.crt",
+            "-outform",
+            "PEM",
+            "-subj",
+            '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"',
+        ],
+        check=True,
+    )
+    subprocess.run(["sudo", "openssl", "genrsa", "-out", "~/server.key", "2048"], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "openssl",
+            "req",
+            "-new",
+            "-key",
+            "~/server.key",
+            "-out",
+            "~/server.csr",
+            "-subj",
+            '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"',
+        ],
+        check=True,
+    )
+    subprocess.run(
+        ["echo", '"subjectAltName = DNS:10.0.1.1,IP:10.0.1.1"', ">", "~/extfile.cnf"], check=True
+    )
+    subprocess.run(
+        [
+            "sudo",
+            "openssl",
+            "x509",
+            "-req",
+            "-in",
+            "~/server.csr",
+            "-CA",
+            "~/ca.crt",
+            "-CAkey",
+            "~/ca.key",
+            "-CAcreateserial",
+            "-out",
+            "~/server.crt",
+            "-days",
+            "365",
+            "-extfile",
+            "~/extfile.cnf",
+        ],
+        check=True,
+    )
+
     logger.info("Setting up microceph")
     subprocess.run(["sudo", "snap", "install", "microceph", "--revision", "1169"], check=True)
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,1G,3"], check=True)
-    subprocess.run(["sudo", "microceph", "enable", "rgw", '--ssl-certificate="$(sudo base64 -w0 ~/server.crt)"', '--ssl-private-key="$(sudo base64 -w0 ~/server.key)"'], check=True)
+    subprocess.run(
+        [
+            "sudo",
+            "microceph",
+            "enable",
+            "rgw",
+            '--ssl-certificate="$(sudo base64 -w0 ~/server.crt)"',
+            '--ssl-private-key="$(sudo base64 -w0 ~/server.key)"',
+        ],
+        check=True,
+    )
     output = subprocess.run(
         [
             "sudo",
@@ -168,7 +218,9 @@ def clean_backups_from_buckets(cloud_configs, cloud_credentials):
 
 
 @pytest.mark.group(1)
-async def test_build_and_deploy(ops_test: OpsTest, cloud_configs, cloud_credentials, charm) -> None:
+async def test_build_and_deploy(
+    ops_test: OpsTest, cloud_configs, cloud_credentials, charm
+) -> None:
     """Simple test to ensure that the mysql charm gets deployed."""
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(s3_integrator_app_name)
