@@ -2017,6 +2017,7 @@ def test_raft_reinitialisation(harness):
             harness.update_relation_data(rel_id, harness.charm.app.name, {"raft_rejoin": "True"})
         harness.charm._raft_reinitialisation()
         _stuck_raft_cluster_cleanup.assert_called_once_with()
+        _update_config.assert_called_once_with()
 
 
 #
