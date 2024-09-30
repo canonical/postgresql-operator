@@ -559,7 +559,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if primary and "raft_reset_primary" not in self.app_peer_data:
             logger.info("Updating the primary endpoint")
             self.app_peer_data.pop("members_ips", None)
-            self._add_to_members_ips(self._get_unit_ip(primary))
+            for unit in self._peers.units:
+                self._add_to_members_ips(self._get_unit_ip(unit))
+            self._add_to_members_ips(self._get_unit_ip(self.unit))
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if (
@@ -633,6 +635,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Cleaning up raft unit data")
             self.unit_peer_data.pop("raft_primary", None)
             self.unit_peer_data.pop("raft_stopped", None)
+            self.update_config()
             self._patroni.start_patroni()
 
             if self.unit.is_leader():
@@ -670,16 +673,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self._update_member_ip():
             return False
+
+        # Don't update this member before it's part of the members list.
+        if self._unit_ip not in self.members_ips:
+            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
+            return False
         return True
 
     def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
         if not self._peer_relation_changed_checks(event):
-            return
-
-        # Don't update this member before it's part of the members list.
-        if self._unit_ip not in self.members_ips:
-            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
@@ -716,8 +719,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
         if (
-            not self.has_raft_keys()
-            and not self.is_primary
+            not self.is_primary
             and not self.is_standby_leader
             and (
                 self._patroni.member_replication_lag == "unknown"

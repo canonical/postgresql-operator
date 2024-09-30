@@ -1965,6 +1965,7 @@ def test_raft_reinitialisation(harness):
         ) as _stuck_raft_cluster_cleanup,
         patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
         patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
     ):
         # No data
         harness.charm._raft_reinitialisation()
@@ -2016,6 +2017,7 @@ def test_raft_reinitialisation(harness):
             harness.update_relation_data(rel_id, harness.charm.app.name, {"raft_rejoin": "True"})
         harness.charm._raft_reinitialisation()
         _stuck_raft_cluster_cleanup.assert_called_once_with()
+        _update_config.assert_called_once_with()
 
 
 #
