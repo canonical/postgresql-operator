@@ -8,14 +8,13 @@ import os
 import socket
 import subprocess
 import time
-from pathlib import Path
 
 import boto3
 import botocore.exceptions
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from . import architecture
+from . import architecture, markers
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -201,27 +200,8 @@ def cloud_configs(microceph: ConnectionInformation):
     }
 
 
-@pytest.fixture(scope="session", autouse=True)
-def clean_backups_from_buckets(cloud_configs, cloud_credentials):
-    """Teardown to clean up created backups from clouds."""
-    yield
-
-    logger.info("Cleaning backups from cloud buckets")
-    session = boto3.session.Session(  # pyright: ignore
-        aws_access_key_id=cloud_credentials["access-key"],
-        aws_secret_access_key=cloud_credentials["secret-key"],
-        region_name=cloud_configs["region"],
-    )
-    s3 = session.resource("s3", endpoint_url=cloud_configs["endpoint"])
-    bucket = s3.Bucket(cloud_configs["bucket"])
-
-    # GCS doesn't support batch delete operation, so delete the objects one by one
-    backup_path = str(Path(cloud_configs["path"]) / backup_id)
-    for bucket_object in bucket.objects.filter(Prefix=backup_path):
-        bucket_object.delete()
-
-
 @pytest.mark.group(1)
+@markers.amd64_only
 async def test_build_and_deploy(
     ops_test: OpsTest, cloud_configs, cloud_credentials, charm
 ) -> None:
