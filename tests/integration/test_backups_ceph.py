@@ -55,7 +55,7 @@ def microceph():
     if not os.environ.get("CI") == "true":
         raise Exception("Not running on CI. Skipping microceph installation")
     logger.info("Setting up TLS certificates")
-    subprocess.run(["sudo", "openssl", "genrsa", "-out", "~/ca.key", "2048"], check=True)
+    subprocess.run(["sudo", "openssl", "genrsa", "-out", "./ca.key", "2048"], check=True)
     subprocess.run(
         [
             "sudo",
@@ -65,11 +65,11 @@ def microceph():
             "-new",
             "-nodes",
             "-key",
-            "~/ca.key",
+            "./ca.key",
             "-days",
             "1024",
             "-out",
-            "~/ca.crt",
+            "./ca.crt",
             "-outform",
             "PEM",
             "-subj",
@@ -77,7 +77,7 @@ def microceph():
         ],
         check=True,
     )
-    subprocess.run(["sudo", "openssl", "genrsa", "-out", "~/server.key", "2048"], check=True)
+    subprocess.run(["sudo", "openssl", "genrsa", "-out", "./server.key", "2048"], check=True)
     subprocess.run(
         [
             "sudo",
@@ -85,16 +85,16 @@ def microceph():
             "req",
             "-new",
             "-key",
-            "~/server.key",
+            "./server.key",
             "-out",
-            "~/server.csr",
+            "./server.csr",
             "-subj",
             '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"',
         ],
         check=True,
     )
     subprocess.run(
-        ["echo", '"subjectAltName = DNS:10.0.1.1,IP:10.0.1.1"', ">", "~/extfile.cnf"], check=True
+        ["echo", '"subjectAltName = DNS:10.0.1.1,IP:10.0.1.1"', ">", "./extfile.cnf"], check=True
     )
     subprocess.run(
         [
@@ -103,18 +103,18 @@ def microceph():
             "x509",
             "-req",
             "-in",
-            "~/server.csr",
+            "./server.csr",
             "-CA",
-            "~/ca.crt",
+            "./ca.crt",
             "-CAkey",
-            "~/ca.key",
+            "./ca.key",
             "-CAcreateserial",
             "-out",
-            "~/server.crt",
+            "./server.crt",
             "-days",
             "365",
             "-extfile",
-            "~/extfile.cnf",
+            "./extfile.cnf",
         ],
         check=True,
     )
@@ -129,8 +129,8 @@ def microceph():
             "microceph",
             "enable",
             "rgw",
-            '--ssl-certificate="$(sudo base64 -w0 ~/server.crt)"',
-            '--ssl-private-key="$(sudo base64 -w0 ~/server.key)"',
+            '--ssl-certificate="$(sudo base64 -w0 ./server.crt)"',
+            '--ssl-private-key="$(sudo base64 -w0 ./server.key)"',
         ],
         check=True,
     )
