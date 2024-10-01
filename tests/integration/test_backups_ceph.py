@@ -124,14 +124,8 @@ def microceph():
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,1G,3"], check=True)
     subprocess.run(
-        [
-            "sudo",
-            "microceph",
-            "enable",
-            "rgw",
-            '--ssl-certificate="$(sudo base64 -w0 ./server.crt)"',
-            '--ssl-private-key="$(sudo base64 -w0 ./server.key)"',
-        ],
+        'sudo microceph enable rgw --ssl-certificate="$(sudo base64 -w0 ./server.crt)" --ssl-private-key="$(sudo base64 -w0 ./server.key)"',
+        shell=True,
         check=True,
     )
     output = subprocess.run(
