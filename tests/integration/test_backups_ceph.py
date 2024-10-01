@@ -194,8 +194,9 @@ def cloud_configs(microceph: ConnectionInformation):
     return {
         "endpoint": f"https://{host_ip}",
         "bucket": microceph.bucket,
-        "path": "pg",
+        "path": "/pg",
         "region": "",
+        "s3-uri-style": "path",
         "tls-ca-chain": f"{base64_output}",
     }
 
@@ -236,7 +237,7 @@ async def test_build_and_deploy(
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
-        num_units=2,
+        num_units=1,
         base=CHARM_BASE,
         config={"profile": "testing"},
     )
@@ -244,15 +245,18 @@ async def test_build_and_deploy(
     await ops_test.model.relate(database_app_name, tls_certificates_app_name)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
-    await ops_test.model.relate(database_app_name, s3_integrator_app_name)
 
     # Configure and set access and secret keys.
+    logger.info("Configuring s3-integrator.")
     await ops_test.model.applications[s3_integrator_app_name].set_config(cloud_configs)
     action = await ops_test.model.units.get(f"{s3_integrator_app_name}/0").run_action(
         "sync-s3-credentials",
         **cloud_credentials,
     )
     await action.wait()
+    logger.info("Relating s3-integrator to postgresql charm.")
+    await ops_test.model.relate(database_app_name, s3_integrator_app_name)
+
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[database_app_name, s3_integrator_app_name], status="active", timeout=1500
