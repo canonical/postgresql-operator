@@ -94,7 +94,7 @@ def microceph():
         check=True,
     )
     subprocess.run(
-      'echo "subjectAltName = DNS:10.0.1.1,IP:10.0.1.1" > ./extfile.cnf', shell=True, check=True
+        'echo "subjectAltName = DNS:10.0.1.1,IP:10.0.1.1" > ./extfile.cnf', shell=True, check=True
     )
     subprocess.run(
         [
