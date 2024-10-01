@@ -187,11 +187,16 @@ def cloud_credentials(microceph: ConnectionInformation) -> dict[str, str]:
 @pytest.fixture(scope="session")
 def cloud_configs(microceph: ConnectionInformation):
     host_ip = socket.gethostbyname(socket.gethostname())
+    result = subprocess.run(
+        "sudo base64 -w0 ./ca.crt", shell=True, check=True, stdout=subprocess.PIPE, text=True
+    )
+    base64_output = result.stdout
     return {
         "endpoint": f"https://{host_ip}",
         "bucket": microceph.bucket,
         "path": "pg",
         "region": "",
+        "tls-ca-chain": f"{base64_output}",
     }
 
 
