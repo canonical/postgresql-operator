@@ -73,7 +73,7 @@ def microceph():
             "-outform",
             "PEM",
             "-subj",
-            '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"',
+            "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com",
         ],
         check=True,
     )
@@ -89,7 +89,7 @@ def microceph():
             "-out",
             "./server.csr",
             "-subj",
-            '"/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com"',
+            "/C=US/ST=Denial/L=Springfield/O=Dis/CN=www.example.com",
         ],
         check=True,
     )
