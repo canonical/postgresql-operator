@@ -93,7 +93,7 @@ def microceph():
     )
     host_ip = socket.gethostbyname(socket.gethostname())
     subprocess.run(
-        f'echo "subjectAltName = DNS:{host_ip},IP:{host_ip}" > ./extfile.cnf',
+        f'echo "subjectAltName = IP:{host_ip}" > ./extfile.cnf',
         shell=True,
         check=True,
     )
