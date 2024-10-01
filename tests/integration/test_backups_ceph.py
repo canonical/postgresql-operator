@@ -16,14 +16,13 @@ from pytest_operator.plugin import OpsTest
 
 from . import architecture, markers
 from .helpers import (
-    CHARM_BASE,
-    DATABASE_APP_NAME,
+    backup_operations,
 )
 from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
-s3_integrator_app_name = "s3-integrator"
+S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
     tls_certificates_app_name = "tls-certificates-operator"
     if architecture.architecture == "arm64":
@@ -200,44 +199,18 @@ def cloud_configs(microceph: ConnectionInformation):
     }
 
 
-@pytest.mark.group(1)
+@pytest.mark.group("ceph")
 @markers.amd64_only
-async def test_build_and_deploy(
-    ops_test: OpsTest, cloud_configs, cloud_credentials, charm
-) -> None:
-    """Simple test to ensure that the mysql charm gets deployed."""
-    # Deploy S3 Integrator and TLS Certificates Operator.
-    await ops_test.model.deploy(s3_integrator_app_name)
-    await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
-
-    # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
-    # as archive_mode is disabled after restoring the backup) and to TLS Certificates Operator
-    # (to be able to create backups from replicas).
-    database_app_name = f"{DATABASE_APP_NAME}-ceph"
-    await ops_test.model.deploy(
+async def test_backup_ceph(ops_test: OpsTest, cloud_configs, cloud_credentials, charm) -> None:
+    """Build and deploy two units of PostgreSQL in microceph, test backup and restore actions."""
+    await backup_operations(
+        ops_test,
+        S3_INTEGRATOR_APP_NAME,
+        tls_certificates_app_name,
+        tls_config,
+        tls_channel,
+        cloud_credentials,
+        "ceph",
+        cloud_configs,
         charm,
-        application_name=database_app_name,
-        num_units=1,
-        base=CHARM_BASE,
-        config={"profile": "testing"},
     )
-
-    await ops_test.model.relate(database_app_name, tls_certificates_app_name)
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
-
-    # Configure and set access and secret keys.
-    logger.info("Configuring s3-integrator.")
-    await ops_test.model.applications[s3_integrator_app_name].set_config(cloud_configs)
-    action = await ops_test.model.units.get(f"{s3_integrator_app_name}/0").run_action(
-        "sync-s3-credentials",
-        **cloud_credentials,
-    )
-    await action.wait()
-    logger.info("Relating s3-integrator to postgresql charm.")
-    await ops_test.model.relate(database_app_name, s3_integrator_app_name)
-
-    async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[database_app_name, s3_integrator_app_name], status="active", timeout=1500
-        )
