@@ -93,8 +93,11 @@ def microceph():
         ],
         check=True,
     )
+    host_ip = socket.gethostbyname(socket.gethostname())
     subprocess.run(
-        'echo "subjectAltName = DNS:10.0.1.1,IP:10.0.1.1" > ./extfile.cnf', shell=True, check=True
+        f'echo "subjectAltName = DNS:{host_ip},IP:{host_ip}" > ./extfile.cnf',
+        shell=True,
+        check=True,
     )
     subprocess.run(
         [
@@ -151,9 +154,10 @@ def microceph():
         try:
             boto3.client(
                 "s3",
-                endpoint_url="http://localhost",
+                endpoint_url=f"https://{host_ip}",
                 aws_access_key_id=key_id,
                 aws_secret_access_key=secret_key,
+                verify="./ca.crt",
             ).create_bucket(Bucket=_BUCKET)
         except botocore.exceptions.EndpointConnectionError:
             if attempt == 2:
@@ -184,7 +188,7 @@ def cloud_credentials(microceph: ConnectionInformation) -> dict[str, str]:
 def cloud_configs(microceph: ConnectionInformation):
     host_ip = socket.gethostbyname(socket.gethostname())
     return {
-        "endpoint": f"http://{host_ip}",
+        "endpoint": f"https://{host_ip}",
         "bucket": microceph.bucket,
         "path": "pg",
         "region": "",
