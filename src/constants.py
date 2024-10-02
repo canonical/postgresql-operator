@@ -41,8 +41,8 @@ SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
         {
-            "revision": {"aarch64": "130", "x86_64": "131"},
-            "channel": "14/edge/pgbackrest-2.53",
+            "revision": {"aarch64": "132", "x86_64": "133"},
+            "channel": "14/stable",
         },
     )
 ]

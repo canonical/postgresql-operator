@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-# Copyright 2022 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 import dataclasses
 import json
@@ -53,10 +53,9 @@ def microceph():
     if not os.environ.get("CI") == "true":
         raise Exception("Not running on CI. Skipping microceph installation")
     logger.info("Setting up TLS certificates")
-    subprocess.run(["sudo", "openssl", "genrsa", "-out", "./ca.key", "2048"], check=True)
+    subprocess.run(["openssl", "genrsa", "-out", "./ca.key", "2048"], check=True)
     subprocess.run(
         [
-            "sudo",
             "openssl",
             "req",
             "-x509",
@@ -75,10 +74,9 @@ def microceph():
         ],
         check=True,
     )
-    subprocess.run(["sudo", "openssl", "genrsa", "-out", "./server.key", "2048"], check=True)
+    subprocess.run(["openssl", "genrsa", "-out", "./server.key", "2048"], check=True)
     subprocess.run(
         [
-            "sudo",
             "openssl",
             "req",
             "-new",
@@ -99,7 +97,6 @@ def microceph():
     )
     subprocess.run(
         [
-            "sudo",
             "openssl",
             "x509",
             "-req",
