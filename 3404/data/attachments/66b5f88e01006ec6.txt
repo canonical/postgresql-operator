@@ -1,0 +1,507 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  02:19:49Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+postgresql           14.13    active      3  postgresql                          0  no       
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  254  no       received database credentials of the first database
+
+Unit                    Workload  Agent  Machine  Public address  Ports     Message
+postgresql-test-app/0*  active    idle   3        10.238.42.253             received database credentials of the first database
+postgresql/0*           active    idle   0        10.238.42.189   5432/tcp  
+postgresql/2            active    idle   2        10.238.42.237   5432/tcp  
+postgresql/3            active    idle   4        10.238.42.62    5432/tcp  
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.238.42.189  juju-76b2f8-0  ubuntu@22.04      Running
+2        started  10.238.42.237  juju-76b2f8-2  ubuntu@22.04      Running
+3        started  10.238.42.253  juju-76b2f8-3  ubuntu@22.04      Running
+4        started  10.238.42.62   juju-76b2f8-4  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-0: 01:40:14 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:40:14 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:40:14 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:40:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:40:15 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:40:15 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:40:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:40:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:40:17 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:40:20 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:40:20 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:40:20 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:51:06 ERROR juju.api.watcher error trying to stop watcher: websocket: close sent
+machine-4: 01:53:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:53:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 01:53:44 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-test-app-0: 02:07:14 ERROR unit.postgresql-test-app/0.juju-log database:4: Unable to read result
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 407, in _stop_continuous_writes
+    with open(LAST_WRITTEN_FILE, "r") as fd:
+FileNotFoundError: [Errno 2] No such file or directory: '/tmp/last_written_value'
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 405, in _stop_continuous_writes
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(5)):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/venv/tenacity/__init__.py", line 443, in __iter__
+    do = self.iter(retry_state=retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/venv/tenacity/__init__.py", line 376, in iter
+    result = action(retry_state)
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/venv/tenacity/__init__.py", line 419, in exc_check
+    raise retry_exc from fut.exception()
+tenacity.RetryError: RetryError[<Future at 0x7f94a9fbcd30 state=finished raised FileNotFoundError>]
+unit-postgresql-0: 02:13:44 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-test-app-0: 02:14:44 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:14:48 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:14:52 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:14:56 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:00 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:04 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:08 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:12 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:16 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:20 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:24 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:28 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:32 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:36 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:40 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:44 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:48 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:52 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:15:56 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:01 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:05 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:09 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:13 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:17 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:21 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:25 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:29 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:33 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:37 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:41 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:45 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:49 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:53 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:16:57 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:01 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:05 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:09 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:13 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:17 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:21 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:25 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:29 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:33 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:37 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:41 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:45 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:49 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:53 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:17:57 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:01 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:05 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:09 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:13 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:17 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:21 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:25 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:29 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:34 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:38 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:42 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:46 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:50 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:54 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:18:58 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:02 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:06 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-0: 02:19:08 ERROR unit.postgresql/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-test-app-0: 02:19:10 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:14 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:18 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:22 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:26 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:30 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:34 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+unit-postgresql-test-app-0: 02:19:38 ERROR unit.postgresql-test-app/0.juju-log Unable to drop table
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-test-app-0/charm/./src/charm.py", line 304, in _on_clear_continuous_writes_action
+    cursor.execute("DROP TABLE IF EXISTS continuous_writes;")
+psycopg2.errors.ReadOnlySqlTransaction: cannot execute DROP TABLE in a read-only transaction
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...
