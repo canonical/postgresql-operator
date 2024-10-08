@@ -1,0 +1,28 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  01:37:23Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql           error       2  postgresql             0  no       hook failed: "leader-elected"
+
+Unit           Workload  Agent      Machine  Public address  Ports  Message
+postgresql/0*  error     idle       0        10.220.99.122          hook failed: "leader-elected"
+postgresql/1   blocked   executing  1        10.220.99.119          failed to install snap packages
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.220.99.122  juju-d02386-0  ubuntu@22.04      Running
+1        started  10.220.99.119  juju-d02386-1  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-0: 01:36:59 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:36:59 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:36:59 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:37:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:37:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:37:05 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:37:12 ERROR unit.postgresql/0.juju-log An exception occurred when installing charmed-postgresql. Reason: Snap: 'charmed-postgresql'; command ['snap', 'install', 'charmed-postgresql', '--channel="14/stable"', '--revision="133"'] failed with output = ''
+unit-postgresql-1: 01:37:16 ERROR unit.postgresql/1.juju-log An exception occurred when installing charmed-postgresql. Reason: Snap: 'charmed-postgresql'; command ['snap', 'install', 'charmed-postgresql', '--channel="14/stable"', '--revision="133"'] failed with output = ''
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...

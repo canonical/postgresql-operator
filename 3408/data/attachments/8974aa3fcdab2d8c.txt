@@ -1,0 +1,69 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:766 Connecting to existing model localhost-localhost:test on unspecified cloud
+[32mINFO    [0m juju.model:model.py:2097 Deploying ch:amd64/jammy/s3-integrator-31
+[32mINFO    [0m juju.model:model.py:2097 Deploying ch:amd64/jammy/self-signed-certificates-155
+[32mINFO    [0m juju.model:model.py:2097 Deploying local:postgresql-0
+[33mWARNING [0m juju.model:model.py:1563 relate is deprecated and will be removed. Use integrate instead.
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [allocating] waiting: waiting for machine
+  postgresql-aws/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  postgresql-aws/0 [executing] blocked: failed to install snap packages
+  postgresql-aws/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m integration.test_backups:test_backups.py:84 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  01:39:15Z
+
+App                       Version  Status   Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql-aws                     error        2  postgresql                                 0  no       hook failed: "certificates-relation-changed"
+s3-integrator                      blocked      1  s3-integrator             latest/stable   31  no       Missing parameters: ['access-key', 'secret-key']
+self-signed-certificates           active       1  self-signed-certificates  latest/stable  155  no       
+
+Unit                         Workload     Agent      Machine  Public address  Ports  Message
+postgresql-aws/0             error        idle       2        10.165.1.29            hook failed: "certificates-relation-changed"
+postgresql-aws/1*            maintenance  executing  3        10.165.1.250           (install) installing PostgreSQL
+s3-integrator/0*             blocked      idle       0        10.165.1.52            Missing parameters: ['access-key', 'secret-key']
+self-signed-certificates/0*  active       idle       1        10.165.1.159           
+
+Machine  State    Address       Inst id        Base          AZ  Message
+0        started  10.165.1.52   juju-2f3019-0  ubuntu@22.04      Running
+1        started  10.165.1.159  juju-2f3019-1  ubuntu@22.04      Running
+2        started  10.165.1.29   juju-2f3019-2  ubuntu@22.04      Running
+3        started  10.165.1.250  juju-2f3019-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-0: 01:38:13 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:38:13 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-s3-integrator-0: 01:38:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:38:32 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:38:32 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:38:32 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:38:39 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:38:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-1: 01:38:39 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:38:49 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:38:49 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-aws-0: 01:38:49 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-aws-0: 01:39:01 ERROR unit.postgresql-aws/0.juju-log An exception occurred when installing charmed-postgresql. Reason: Snap: 'charmed-postgresql'; command ['snap', 'install', 'charmed-postgresql', '--channel="14/stable"', '--revision="133"'] failed with output = ''
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...

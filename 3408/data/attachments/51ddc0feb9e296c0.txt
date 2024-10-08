@@ -1,0 +1,82 @@
+[32mINFO    [0m integration.test_backups:test_backups.py:84 deleting the previously created backups
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  01:39:14Z
+
+App                       Version  Status   Scale  Charm                     Channel        Rev  Exposed  Message
+postgresql-gcp                     error        2  postgresql                                 0  no       hook failed: "certificates-relation-changed"
+s3-integrator                      blocked      1  s3-integrator             latest/stable   31  no       Missing parameters: ['access-key', 'secret-key']
+self-signed-certificates           active       1  self-signed-certificates  latest/stable  155  no       
+
+Unit                         Workload  Agent      Machine  Public address  Ports  Message
+postgresql-gcp/0*            waiting   executing  2        10.170.79.147          waiting to start PostgreSQL
+postgresql-gcp/1             error     idle       3        10.170.79.64           hook failed: "certificates-relation-changed"
+s3-integrator/0*             blocked   idle       0        10.170.79.219          Missing parameters: ['access-key', 'secret-key']
+self-signed-certificates/0*  active    executing  1        10.170.79.149          
+
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.170.79.219  juju-061df1-0  ubuntu@22.04      Running
+1        started  10.170.79.149  juju-061df1-1  ubuntu@22.04      Running
+2        started  10.170.79.147  juju-061df1-2  ubuntu@22.04      Running
+3        started  10.170.79.64   juju-061df1-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-0: 01:38:09 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:38:09 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-s3-integrator-0: 01:38:09 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:38:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:38:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-self-signed-certificates-0: 01:38:28 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:38:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:38:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-0: 01:38:31 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:38:47 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:38:47 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-gcp-1: 01:38:47 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-gcp-1: 01:38:59 ERROR unit.postgresql-gcp/1.juju-log An exception occurred when installing charmed-postgresql. Reason: Snap: 'charmed-postgresql'; command ['snap', 'install', 'charmed-postgresql', '--channel="14/stable"', '--revision="133"'] failed with output = ''
+unit-postgresql-gcp-1: 01:39:13 ERROR unit.postgresql-gcp/1.juju-log certificates:4: Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 1884, in <module>
+    main(PostgresqlOperatorCharm)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/__init__.py", line 343, in __call__
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/_main.py", line 543, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/_main.py", line 529, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/_main.py", line 518, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name, self._juju_context)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/_main.py", line 134, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 347, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 857, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 947, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/tls_certificates_interface/v2/tls_certificates.py", line 1824, in _on_relation_changed
+    self.on.certificate_available.emit(
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 347, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 857, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/venv/ops/framework.py", line 947, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/tempo_k8s/v1/charm_tracing.py", line 735, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/postgresql_k8s/v0/postgresql_tls.py", line 142, in _on_certificate_available
+    if not self.charm.push_tls_files_to_workload():
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/tempo_k8s/v1/charm_tracing.py", line 735, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/./src/charm.py", line 1550, in push_tls_files_to_workload
+    self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/lib/charms/tempo_k8s/v1/charm_tracing.py", line 735, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-gcp-1/charm/src/cluster.py", line 542, in render_file
+    with open(path, "w+") as file:
+FileNotFoundError: [Errno 2] No such file or directory: '/var/snap/charmed-postgresql/current/etc/patroni/key.pem'
+unit-postgresql-gcp-1: 01:39:13 ERROR juju.worker.uniter.operation hook "certificates-relation-changed" (via hook dispatching script: dispatch) failed: exit status 1
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...
