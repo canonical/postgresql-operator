@@ -332,7 +332,7 @@ async def pitr_backup_operations(
     await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
-@pytest.mark.group(1)
+@pytest.mark.group("AWS")
 @pytest.mark.abort_on_fail
 async def test_pitr_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup in AWS. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
@@ -352,7 +352,7 @@ async def test_pitr_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dic
     )
 
 
-@pytest.mark.group(2)
+@pytest.mark.group("GCP")
 @pytest.mark.abort_on_fail
 async def test_pitr_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup in GCP. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""

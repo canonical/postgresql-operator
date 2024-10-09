@@ -32,7 +32,7 @@ from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_k8s.v1.charm_tracing import trace_charm
 from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
-from ops import JujuVersion
+from ops import JujuVersion, main
 from ops.charm import (
     ActionEvent,
     HookEvent,
@@ -42,7 +42,6 @@ from ops.charm import (
     StartEvent,
 )
 from ops.framework import EventBase
-from ops.main import main
 from ops.model import (
     ActiveStatus,
     BlockedStatus,
@@ -883,8 +882,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
-        postgres_snap.alias("patronictl")
-        postgres_snap.alias("psql")
+        try:
+            postgres_snap.alias("patronictl")
+        except snap.SnapError:
+            logger.warning("Unable to create patronictl alias")
+        try:
+            postgres_snap.alias("psql")
+        except snap.SnapError:
+            logger.warning("Unable to create psql alias")
 
         # Create the user home directory for the snap_daemon user.
         # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.

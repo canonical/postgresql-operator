@@ -1124,7 +1124,6 @@ async def backup_operations(
     await ops_test.model.relate(database_app_name, tls_certificates_app_name)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
-    await ops_test.model.relate(database_app_name, s3_integrator_app_name)
 
     # Configure and set access and secret keys.
     logger.info(f"configuring S3 integrator for {cloud}")
@@ -1134,6 +1133,8 @@ async def backup_operations(
         **credentials,
     )
     await action.wait()
+
+    await ops_test.model.relate(database_app_name, s3_integrator_app_name)
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
             apps=[database_app_name, s3_integrator_app_name], status="active", timeout=1500
