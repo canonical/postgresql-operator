@@ -226,8 +226,7 @@ async def pitr_backup_operations(
             await action.wait()
             restore_status = action.results.get("restore-status")
             assert restore_status, "1: restore the backup b1 to the timestamp ts1 hasn't succeeded"
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
 
     logger.info("2: successful restore")
     primary = await get_primary(ops_test, remaining_unit.name)
@@ -260,8 +259,7 @@ async def pitr_backup_operations(
             await action.wait()
             restore_status = action.results.get("restore-status")
             assert restore_status, "2: restore the backup b1 to the latest hasn't succeeded"
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
 
     logger.info("3: successful restore")
     primary = await get_primary(ops_test, remaining_unit.name)
@@ -299,8 +297,7 @@ async def pitr_backup_operations(
             await action.wait()
             restore_status = action.results.get("restore-status")
             assert restore_status, "3: restore the timeline 2 to the latest hasn't succeeded"
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
 
     logger.info("4: successful restore")
     primary = await get_primary(ops_test, remaining_unit.name)

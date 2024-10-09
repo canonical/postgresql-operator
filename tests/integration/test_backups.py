@@ -210,12 +210,16 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(
-        charm, application_name=previous_database_app_name, base=CHARM_BASE
+        charm,
+        application_name=previous_database_app_name,
+        base=CHARM_BASE,
+        config={"profile": "testing"},
     )
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
         base=CHARM_BASE,
+        config={"profile": "testing"},
     )
     await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
@@ -266,8 +270,9 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     ):
         with attempt:
             logger.info("restoring the backup")
-            most_recent_backup = backups.split("\n")[-1]
-            backup_id = most_recent_backup.split()[0]
+            # Last two entries are 'action: restore', that cannot be used without restore-to-time parameter
+            most_recent_real_backup = backups.split("\n")[-3]
+            backup_id = most_recent_real_backup.split()[0]
             action = await ops_test.model.units.get(unit_name).run_action(
                 "restore", **{"backup-id": backup_id}
             )
@@ -277,7 +282,10 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
 
     # Wait for the restore to complete.
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=1000)
+        unit = ops_test.model.units.get(f"{database_app_name}/0")
+        await ops_test.model.block_until(
+            lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+        )
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")

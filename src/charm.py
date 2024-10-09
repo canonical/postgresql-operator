@@ -25,6 +25,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
+    PostgreSQLGetCurrentTimelineError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
@@ -1318,52 +1319,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_run_on_update_status():
             return
 
-        if "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data:
-            if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
-                logger.error(
-                    "Restore failed: database service failed to reach point-in-time-recovery target. "
-                    "You can launch another restore with different parameters"
-                )
-                self.log_pitr_last_transaction_time()
-                self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
-                return
-
-            if "failed" in self._patroni.get_member_status(self._member_name):
-                logger.error("Restore failed: database service failed to start")
-                self.unit.status = BlockedStatus("Failed to restore backup")
-                return
-
-            if not self._patroni.member_started:
-                logger.debug("on_update_status early exit: Patroni has not started yet")
-                return
-
-            restoring_backup = self.app_peer_data.get("restoring-backup")
-            restore_timeline = self.app_peer_data.get("restore-timeline")
-            restore_to_time = self.app_peer_data.get("restore-to-time")
-            current_timeline = self.postgresql.get_current_timeline()
-
-            # Remove the restoring backup flag and the restore stanza name.
-            self.app_peer_data.update({
-                "restoring-backup": "",
-                "restore-stanza": "",
-                "restore-to-time": "",
-                "restore-timeline": "",
-            })
-            self.update_config()
-            self.restore_patroni_restart_condition()
-
-            logger.info(
-                "Restored"
-                f"{' to ' + restore_to_time if restore_to_time else ''}"
-                f"{' from timeline ' + restore_timeline if restore_timeline and not restoring_backup else ''}"
-                f"{' from backup ' + self.backup._parse_backup_id(restoring_backup)[0] if restoring_backup else ''}"
-                f". Currently tracking the newly created timeline {current_timeline}."
-            )
-
-            can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
-            if not can_use_s3_repository:
-                self.unit.status = BlockedStatus(validation_message)
-                return
+        if (
+            "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data
+        ) and not self._was_restore_successful():
+            return
 
         if self._handle_processes_failures():
             return
@@ -1382,6 +1341,59 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+    def _was_restore_successful(self) -> bool:
+        if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
+            logger.error(
+                "Restore failed: database service failed to reach point-in-time-recovery target. "
+                "You can launch another restore with different parameters"
+            )
+            self.log_pitr_last_transaction_time()
+            self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+            return False
+
+        if "failed" in self._patroni.get_member_status(self._member_name):
+            logger.error("Restore failed: database service failed to start")
+            self.unit.status = BlockedStatus("Failed to restore backup")
+            return False
+
+        if not self._patroni.member_started:
+            logger.debug("Restore check early exit: Patroni has not started yet")
+            return False
+
+        restoring_backup = self.app_peer_data.get("restoring-backup")
+        restore_timeline = self.app_peer_data.get("restore-timeline")
+        restore_to_time = self.app_peer_data.get("restore-to-time")
+        try:
+            current_timeline = self.postgresql.get_current_timeline()
+        except PostgreSQLGetCurrentTimelineError:
+            logger.debug("Restore check early exit: can't get current wal timeline")
+            return False
+
+        # Remove the restoring backup flag and the restore stanza name.
+        self.app_peer_data.update({
+            "restoring-backup": "",
+            "restore-stanza": "",
+            "restore-to-time": "",
+            "restore-timeline": "",
+        })
+        self.update_config()
+        self.restore_patroni_restart_condition()
+
+        logger.info(
+            "Restored"
+            f"{f' to {restore_to_time}' if restore_to_time else ''}"
+            f"{f' from timeline {restore_timeline}' if restore_timeline and not restoring_backup else ''}"
+            f"{f' from backup {self.backup._parse_backup_id(restoring_backup)[0]}' if restoring_backup else ''}"
+            f". Currently tracking the newly created timeline {current_timeline}."
+        )
+
+        can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
+        if not can_use_s3_repository:
+            self.unit.status = BlockedStatus(validation_message)
+            return False
+
+        return True
 
     def _can_run_on_update_status(self) -> bool:
         if "cluster_initialised" not in self._peers.data[self.app]:
