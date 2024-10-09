@@ -417,6 +417,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_peer_relation_departed: Skipping departing unit")
             return
 
+        if self.has_raft_keys():
+            logger.debug("Early exit on_peer_relation_departed: Raft recovery in progress")
+            return
+
         # Remove the departing member from the raft cluster.
         try:
             departing_member = event.departing_unit.name.replace("/", "-")
@@ -427,6 +431,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
             )
             event.defer()
+            return
+        except RetryError:
+            logger.warning(
+                "Early exit on_peer_relation_departed: Cannot get %s member IP"
+                % event.departing_unit.name
+            )
             return
 
         # Allow leader to update the cluster members.
@@ -507,25 +517,171 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _on_peer_relation_changed(self, event: HookEvent):
-        """Reconfigure cluster members when something changes."""
+    def _stuck_raft_cluster_check(self) -> None:
+        """Check for stuck raft cluster and reinitialise if safe."""
+        raft_stuck = False
+        all_units_stuck = True
+        candidate = self.app_peer_data.get("raft_selected_candidate")
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            if "raft_stuck" in data:
+                raft_stuck = True
+            else:
+                all_units_stuck = False
+            if not candidate and "raft_candidate" in data:
+                candidate = key
+
+        if not raft_stuck:
+            return
+
+        if not all_units_stuck:
+            logger.warning("Stuck raft not yet detected on all units")
+            return
+
+        if not candidate:
+            logger.warning("Stuck raft has no candidate")
+            return
+        if "raft_selected_candidate" not in self.app_peer_data:
+            logger.info("%s selected for new raft leader" % candidate.name)
+            self.app_peer_data["raft_selected_candidate"] = candidate.name
+
+    def _stuck_raft_cluster_rejoin(self) -> None:
+        """Reconnect cluster to new raft."""
+        primary = None
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            if "raft_primary" in data:
+                primary = key
+                break
+        if primary and "raft_reset_primary" not in self.app_peer_data:
+            logger.info("Updating the primary endpoint")
+            self.app_peer_data.pop("members_ips", None)
+            for unit in self._peers.units:
+                self._add_to_members_ips(self._get_unit_ip(unit))
+            self._add_to_members_ips(self._get_unit_ip(self.unit))
+            self.app_peer_data["raft_reset_primary"] = "True"
+            self._update_relation_endpoints()
+        if (
+            "raft_rejoin" not in self.app_peer_data
+            and "raft_followers_stopped" in self.app_peer_data
+            and "raft_reset_primary" in self.app_peer_data
+        ):
+            logger.info("Notify units they can rejoin")
+            self.app_peer_data["raft_rejoin"] = "True"
+
+    def _stuck_raft_cluster_stopped_check(self) -> None:
+        """Check that the cluster is stopped."""
+        if "raft_followers_stopped" in self.app_peer_data:
+            return
+
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            if "raft_stopped" not in data:
+                return
+
+        logger.info("Cluster is shut down")
+        self.app_peer_data["raft_followers_stopped"] = "True"
+
+    def _stuck_raft_cluster_cleanup(self) -> None:
+        for key, data in self._peers.data.items():
+            if key == self.app:
+                continue
+            for flag in data.keys():
+                if flag.startswith("raft_"):
+                    return
+
+        logger.info("Cleaning up raft app data")
+        self.app_peer_data.pop("raft_rejoin", None)
+        self.app_peer_data.pop("raft_reset_primary", None)
+        self.app_peer_data.pop("raft_selected_candidate", None)
+        self.app_peer_data.pop("raft_followers_stopped", None)
+
+    def _raft_reinitialisation(self) -> None:
+        """Handle raft cluster loss of quorum."""
+        # Skip to cleanup if rejoining
+        if "raft_rejoin" not in self.app_peer_data:
+            if self.unit.is_leader():
+                self._stuck_raft_cluster_check()
+
+            if (
+                candidate := self.app_peer_data.get("raft_selected_candidate")
+            ) and "raft_stopped" not in self.unit_peer_data:
+                self.unit_peer_data.pop("raft_stuck", None)
+                self.unit_peer_data.pop("raft_candidate", None)
+                self._patroni.remove_raft_data()
+                logger.info("Stopping %s" % self.unit.name)
+                self.unit_peer_data["raft_stopped"] = "True"
+
+            if self.unit.is_leader():
+                self._stuck_raft_cluster_stopped_check()
+
+            if (
+                candidate == self.unit.name
+                and "raft_primary" not in self.unit_peer_data
+                and "raft_followers_stopped" in self.app_peer_data
+            ):
+                logger.info("Reinitialising %s as primary" % self.unit.name)
+                self._patroni.reinitialise_raft_data()
+                self.unit_peer_data["raft_primary"] = "True"
+
+            if self.unit.is_leader():
+                self._stuck_raft_cluster_rejoin()
+
+        if "raft_rejoin" in self.app_peer_data:
+            logger.info("Cleaning up raft unit data")
+            self.unit_peer_data.pop("raft_primary", None)
+            self.unit_peer_data.pop("raft_stopped", None)
+            self.update_config()
+            self._patroni.start_patroni()
+
+            if self.unit.is_leader():
+                self._stuck_raft_cluster_cleanup()
+
+    def has_raft_keys(self):
+        """Checks for the presence of raft recovery keys in peer data."""
+        for key in self.app_peer_data.keys():
+            if key.startswith("raft_"):
+                return True
+
+        for key in self.unit_peer_data.keys():
+            if key.startswith("raft_"):
+                return True
+        return False
+
+    def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
+        """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
-            return
+            return False
+
+        # Check whether raft is stuck.
+        if self.has_raft_keys():
+            self._raft_reinitialisation()
+            logger.debug("Early exit on_peer_relation_changed: stuck raft recovery")
+            return False
 
         # If the unit is the leader, it can reconfigure the cluster.
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
             event.defer()
-            return
+            return False
 
         if self._update_member_ip():
-            return
+            return False
 
         # Don't update this member before it's part of the members list.
         if self._unit_ip not in self.members_ips:
             logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
+            return False
+        return True
+
+    def _on_peer_relation_changed(self, event: HookEvent):
+        """Reconfigure cluster members when something changes."""
+        if not self._peer_relation_changed_checks(event):
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
@@ -711,14 +867,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _get_unit_ip(self, unit: Unit) -> Optional[str]:
         """Get the IP address of a specific unit."""
         # Check if host is current host.
+        ip = None
         if unit == self.unit:
-            return str(self.model.get_binding(PEER).network.bind_address)
+            ip = self.model.get_binding(PEER).network.bind_address
         # Check if host is a peer.
         elif unit in self._peers.data:
-            return str(self._peers.data[unit].get("private-address"))
+            ip = self._peers.data[unit].get("private-address")
         # Return None if the unit is not a peer neither the current unit.
-        else:
-            return None
+        if ip:
+            return str(ip)
+        return None
 
     @property
     def _hosts(self) -> set:
@@ -915,6 +1073,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             if self.get_secret(APP_SCOPE, key) is None:
                 self.set_secret(APP_SCOPE, key, new_password())
+
+        if self.has_raft_keys():
+            self._raft_reinitialisation()
+            return
 
         # Update the list of the current PostgreSQL hosts when a new leader is elected.
         # Add this unit to the list of cluster members
@@ -1376,6 +1538,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if "cluster_initialised" not in self._peers.data[self.app]:
             return False
 
+        if self.has_raft_keys():
+            logger.debug("Early exit on_update_status: Raft recovery in progress")
+            return False
+
         if not self.upgrade.idle:
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
@@ -1422,7 +1588,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         if (
-            not is_primary
+            not self.has_raft_keys()
+            and not is_primary
             and not is_standby_leader
             and not self._patroni.member_started
             and "postgresql_restarted" in self._peers.data[self.unit]
@@ -1623,7 +1790,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
-    def update_config(self, is_creating_backup: bool = False) -> bool:
+    def update_config(self, is_creating_backup: bool = False, no_peers: bool = False) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
         enable_tls = self.is_tls_enabled
         limit_memory = None
@@ -1649,7 +1816,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.app_peer_data.get("require-change-bucket-after-restore", None)
             ),
             parameters=pg_parameters,
+            no_peers=no_peers,
         )
+        if no_peers:
+            return True
+
         if not self._is_workload_running:
             # If Patroni/PostgreSQL has not started yet and TLS relations was initialised,
             # then mark TLS as enabled. This commonly happens when the charm is deployed
