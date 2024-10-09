@@ -97,7 +97,7 @@ async def cloud_configs(github_secrets) -> None:
             bucket_object.delete()
 
 
-@pytest.mark.group(1)
+@pytest.mark.group("AWS")
 @pytest.mark.abort_on_fail
 async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in AWS, test backup and restore actions."""
@@ -188,7 +188,7 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
-@pytest.mark.group(2)
+@pytest.mark.group("GCP")
 @pytest.mark.abort_on_fail
 async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in GCP, test backup and restore actions."""
@@ -215,7 +215,7 @@ async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     await ops_test.model.remove_application(tls_certificates_app_name, block_until_done=True)
 
 
-@pytest.mark.group(2)
+@pytest.mark.group("GCP")
 async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) -> None:
     """Test that is possible to restore a backup to another PostgreSQL cluster."""
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
@@ -308,7 +308,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     connection.close()
 
 
-@pytest.mark.group(2)
+@pytest.mark.group("GCP")
 async def test_invalid_config_and_recovery_after_fixing_it(
     ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
 ) -> None:
