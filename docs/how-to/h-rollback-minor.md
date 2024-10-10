@@ -1,37 +1,30 @@
-# Minor Rollback
-
-**Example**: PostgreSQL 14.9 -> PostgreSQL 14.8<br/>
-(including simple charm revision bump: from revision 43 to revision 42)
-
-[note type="caution"]
-**Warning:** Do NOT trigger `rollback` during the running `upgrade` action! It may cause an unpredictable PostgreSQL cluster state!
-[/note]
-
 [note]
 **Note**: All commands are written for `juju >= v.3.0`
 
-If you are using an earlier version, be aware that:
-
- - `juju run` replaces `juju run-action --wait` in `juju v.2.9` 
- - `juju integrate` replaces `juju relate` and `juju add-relation` in `juju v.2.9`
-
-For more information, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#heading--juju-3-0-0---22-oct-2022).
+If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#heading--juju-3-0-0---22-oct-2022).
 [/note]
 
-## Manual rollback
+# Perform a minor rollback
+**Example**: PostgreSQL 14.9 -> PostgreSQL 14.8<br/>
+(including simple charm revision bump: from revision 43 to revision 42)
+
 After a `juju refresh`, if there are any version incompatibilities in charm revisions, its dependencies, or any other unexpected failure in the upgrade process, the process will be halted and enter a failure state.
 
 Even if the underlying PostgreSQL cluster continues to work, it’s important to roll back the charm to 
 a previous revision so that an update can be attempted after further inspection of the failure.
 
-## Minor rollback steps
+[note type="caution"]
+**Warning:** Do NOT trigger `rollback` during the running `upgrade` action! It may cause an unpredictable PostgreSQL cluster state!
+[/note]
+
+## Summary
 1. **Prepare** the Charmed PostgreSQL VM application for the in-place rollback. 
 2. **Rollback**. Once started, all units in a cluster will be executed sequentially. The rollback will be aborted (paused) if the unit rollback has failed.
 3. **Check**. Make sure the charm and cluster are in a healthy state again.
 
-To execute a rollback, we use a similar procedure to the upgrade. The difference is the charm revision to upgrade to. In this guide's example, we will refresh the charm back to revision `182`.
-
 ## Step 1: Prepare
+
+To execute a rollback, we use a similar procedure to the upgrade. The difference is the charm revision to upgrade to. In this guide's example, we will refresh the charm back to revision `182`.
 
 It is necessary to re-run `pre-upgrade-check` action on the leader unit, to enter the upgrade recovery state:
 ```shell

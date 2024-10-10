@@ -1,4 +1,4 @@
-> [Charmed PostgreSQL VM Tutorial](https://discourse.charmhub.io/t/9707) > 7. Clean up environment
+> [Charmed PostgreSQL VM Tutorial](/t/9707) > 7. Clean up environment
 
 # Clean up your environment
 
@@ -22,7 +22,7 @@ If you're done with testing and would like to free up resources on your machine,
 For more information, see the docs for [`multipass delete`](https://multipass.run/docs/delete-command).
 [/note]
 
-**Delete your VM and its data** with
+**Delete your VM and its data** by running
 ```shell
 multipass delete --purge my-vm
 ```

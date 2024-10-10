@@ -1,16 +1,20 @@
 # How to enable COS Alert Rules
-Charmed PostgreSQL VM [ships](https://github.com/canonical/postgresql-operator/tree/main/src/prometheus_alert_rules) a pre-configured and pre-enabled list of [Awesome Alert Rules](https://samber.github.io/awesome-prometheus-alerts/):
+
+This guide will show how to set up [Pushover](https://pushover.net/) to receive alert notifications from the COS Alert Manager with [Awesome Alert Rules](https://samber.github.io/awesome-prometheus-alerts/).
+
+Charmed PostgreSQL VM ships a pre-configured and pre-enabled [list of Awesome Alert Rules](https://github.com/canonical/postgresql-operator/tree/main/src/prometheus_alert_rules).
+
+<details><summary>Screenshot of alert rules in the Grafana web interface</summary>
 
 ![Screenshot from 2024-01-18 20-05-52|690x439](upload://j6WSPQ1BzoFzqIg2jm1mTq79SMo.png)
-
-This guide will show how to set up [Pushover](https://pushover.net/) to receive alert notifications from the COS Alert Manager.
+</details>
 
 For information about accessing and managing COS Alert Rules, refer to the [COS documentation](https://charmhub.io/cos-lite).
 
 ## Prerequisites
-* A deployed [Charmed PostgreSQL VM operator](/t/9697)
+* A deployed [Charmed PostgreSQL VM operator]
 * A deployed [`cos-lite` bundle in a Kubernetes environment](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
-* Fully configured [COS Monitoring](/t/10600) 
+* Fully configured [COS Monitoring]
 
 ## Enable COS alerts for Pushover
 The following section is an example of the [Pushover](https://pushover.net/) alerts aggregator.
@@ -64,4 +68,9 @@ The image below shows an example of the Pushover web client:
 
 The similar way as above, COS alerts can be send to the long [list of supported receivers](https://prometheus.io/docs/alerting/latest/configuration/#receiver-integration-settings).
 
-Do you have questions? [Contact us](/t/11852)!
+Do you have questions? [Contact us]!
+
+<!-- Links -->
+[Contact us]: /t/11852
+[Charmed PostgreSQL VM operator]: /t/9697
+[COS Monitoring]: /t/10600

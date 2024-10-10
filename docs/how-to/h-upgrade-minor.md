@@ -1,17 +1,28 @@
-# Perform a minor upgrade
-
-**Example**: PostgreSQL 14.8 -> PostgreSQL 14.9<br/>
-(including simple charm revision bump: from revision 193 to revision 196).
-
-[note]
-This guide is part of [Charmed PostgreSQL Upgrades](/t/12086). Please refer to this page for more information and an overview of the content.
-[/note]
 [note]
 **Note**: All commands are written for `juju >= v.3.0`
 
 If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#heading--juju-3-0-0---22-oct-2022).
 [/note]
-## Before upgrading
+
+# Perform a minor upgrade
+
+**Example**: PostgreSQL 14.8 -> PostgreSQL 14.9<br/>
+(including simple charm revision bump: from revision 193 to revision 196).
+
+This guide is part of [Charmed PostgreSQL Upgrades](/t/12086). Please refer to this page for more information and an overview of the content.
+
+## Summary
+- [**Pre-upgrade checks**](#pre-upgrade-checks): Important information to consider before starting an upgrade.
+- [**1. Collect**](#step-1-collect) all necessary pre-upgrade information. It will be necessary for a rollback, if needed. **Do not skip this step**; better to be safe than sorry!
+- [**2. Prepare**](#step-2-prepare) your Charmed PostgreSQL Juju application for the in-place upgrade. See the step details for all technical details executed by charm here.
+- [**3. Upgrade**](#step-3-upgrade). Once started, all units in a cluster will be executed sequentially. The upgrade will be aborted (paused) if the unit upgrade has failed.
+- [**4. (Optional) Consider a rollback**](#step-4-rollback-optional) in case of disaster. 
+    - Please [inform us](/t/11863) about your case scenario troubleshooting to trace the source of the issue and prevent it in the future.
+- [**Post-upgrade check**](#step-5-post-upgrade-check). Make sure all units are in the proper state and the cluster is healthy.
+
+---
+
+## Pre-upgrade checks
 Before performing a minor PostgreSQL upgrade, there are some important considerations to take into account:
 * Concurrency with other operations during the upgrade
 * Backing up your data
@@ -37,15 +48,6 @@ Guides on how to configure backups with S3-compatible storage can be found [here
 **It is recommended to deploy your application in conjunction with the [Charmed PgBouncer](https://charmhub.io/pgbouncer) operator.** 
 
 This will ensure minimal service disruption, if any.
-
-## Minor upgrade steps
-Here is a summary of the steps to perform a minor upgrade.:
-
-1. **Collect** all necessary pre-upgrade information. It will be necessary for a rollback, if needed. Do NOT skip this step, it is better to be safe than sorry!
-2. **Prepare** your Charmed PostgreSQL Juju application for the in-place upgrade. See the step description below for all technical details executed by charm here.
-3. **Upgrade**. Once started, all units in a cluster will be executed sequentially. The upgrade will be aborted (paused) if the unit upgrade has failed.
-4. (optional) Consider a [**rollback**](/t/12090) in case of disaster. Please inform and include us in your case scenario troubleshooting to trace the source of the issue and prevent it in the future. [Contact us](/t/11863)!
-5. Do a post-upgrade **check**. Make sure all units are in the proper state and the cluster is healthy.
 
 ## Step 1: Collect
 
@@ -170,7 +172,7 @@ The step must be skipped if the upgrade went well!
 
 Although the underlying PostgreSQL Cluster continues to work, it’s important to roll back the charm to a previous revision so that an update can be attempted after further inspection of the failure. Please switch to the dedicated [minor rollback](/t/12090) tutorial if necessary.
 
-## Step 5: Check
+## Post-upgrade check
 
 Future [improvements are planned](https://warthogs.atlassian.net/browse/DPE-2621) to check the state of a pod/cluster on a low level. 
 

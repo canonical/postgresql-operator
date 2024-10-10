@@ -136,6 +136,6 @@ postgres=# SELECT version();
 
 Feel free to test out any other PostgreSQL queries. 
 
-When you’re ready to leave the PostgreSQL shell, you can just type `exit`. This will take you back to the host of Charmed PostgreSQL K8s (`postgresql-k8s/0`). Exit this host by once again typing `exit`. Now you will be in your original shell where you first started the tutorial. Here you can interact with Juju and LXD.
+When you’re ready to leave the PostgreSQL shell, you can just type `exit`. This will take you back to the host of Charmed PostgreSQL K8s (`postgresql/0`). Exit this host by once again typing `exit`. Now you will be in your original shell where you first started the tutorial. Here you can interact with Juju and LXD.
 
 **Next step:** [3. Scale replicas](/t/9705)
