@@ -194,6 +194,8 @@ class PostgreSQLProvider(Object):
             user = f"relation-{relation_id}"
             database = rel_data[relation_id].get("database")
             password = secret_data.get(relation_id, {}).get("password")
+            if not database or not password:
+                continue
 
             # Set the read/write endpoint.
             self.database_provides.set_endpoints(
