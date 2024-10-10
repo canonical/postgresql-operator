@@ -4,6 +4,11 @@ Cross-regional (or multi-server) asynchronous replication focuses on disaster re
 
 This guide will show you the basics of initiating a cross-regional async setup using an example PostgreSQL deployment with two servers: one in Rome and one in Lisbon.
 
+## Prerequisites
+* Juju `v.3.4.2+`
+* Make sure your machine(s) fulfill the [system requirements](/t/11743)
+* See [supported target/source model relationships](/t/15412#substrate-dependencies).
+
 ## Summary
 * [Deploy](#deploy)
 * [Offer](#offer)
@@ -22,10 +27,10 @@ juju add-model rome
 juju add-model lisbon
 
 juju switch rome # active model must correspond to cluster
-juju deploy postgresql db1 --channel=14/edge/async-replication --config profile=testing --base ubuntu@22.04
+juju deploy postgresql db1
 
 juju switch lisbon 
-juju deploy postgresql db2 --channel=14/edge/async-replication --config profile=testing --base ubuntu@22.04
+juju deploy postgresql db2
 ```
 
 ## Offer
@@ -34,7 +39,7 @@ juju deploy postgresql db2 --channel=14/edge/async-replication --config profile=
 
 ```shell
 juju switch rome
-juju offer db1:async-primary async-primary
+juju offer db1:replication-offer replication-offer
 ``` 
 
 ## Consume
@@ -42,22 +47,22 @@ juju offer db1:async-primary async-primary
 Consume asynchronous replication on planned `Standby` cluster (Lisbon):
 ```shell
 juju switch lisbon
-juju consume rome.async-primary
-juju integrate async-primary db2:async-replica
+juju consume rome.replication-offer
+juju integrate replication-offer db2:replication
 ``` 
 
 ## Promote or switchover a cluster
 
-To define the primary cluster, use the `promote-cluster` action.
+To define the primary cluster, use the `create-replication` action.
 
 ```shell
-juju run -m rome db1/leader promote-cluster
+juju run -m rome db1/leader create-replication
 ```
 
 To switchover and use `lisbon` as the primary instead, run
 
 ```shell
-juju run -m lisbon db2/leader promote-cluster force-promotion=true
+juju run -m lisbon db2/leader promote-to-primary
 ```
 
 ## Scale a cluster

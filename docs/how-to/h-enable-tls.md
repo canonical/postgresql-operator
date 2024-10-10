@@ -11,7 +11,7 @@ This guide will show how to enable TLS using the [`self-signed-certificates` ope
 [note type="caution"]
 **[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
 
-Check [this guide](/t/11664) for an overview of the signed and self-signed certificate charms available. 
+Check [this guide](/t/11664) for an overview of the TLS certificate charms available. 
 [/note]
 
 ## Summary
