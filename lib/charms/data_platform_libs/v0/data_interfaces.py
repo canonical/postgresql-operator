@@ -1457,7 +1457,7 @@ class EventHandlers(Object):
 class ProviderData(Data):
     """Base provides-side of the data products relation."""
 
-    DATABASE_FIELD = "database"
+    RESOURCE_FIELD = "database"
 
     def __init__(
         self,
@@ -1626,7 +1626,7 @@ class ProviderData(Data):
         req_secret_fields = []
 
         keys = set(data.keys())
-        if self.fetch_relation_field(relation.id, self.DATABASE_FIELD) is None and (
+        if self.fetch_relation_field(relation.id, self.RESOURCE_FIELD) is None and (
             keys - {"endpoints", "read-only-endpoints", "replset"}
         ):
             raise PrematureDataAccessError(
@@ -3305,7 +3305,7 @@ class KafkaRequiresEvents(CharmEvents):
 class KafkaProviderData(ProviderData):
     """Provider-side of the Kafka relation."""
 
-    DATABASE_FIELD = "topic"
+    RESOURCE_FIELD = "topic"
 
     def __init__(self, model: Model, relation_name: str) -> None:
         super().__init__(model, relation_name)
@@ -3556,7 +3556,7 @@ class OpenSearchRequiresEvents(CharmEvents):
 class OpenSearchProvidesData(ProviderData):
     """Provider-side of the OpenSearch relation."""
 
-    DATABASE_FIELD = "index"
+    RESOURCE_FIELD = "index"
 
     def __init__(self, model: Model, relation_name: str) -> None:
         super().__init__(model, relation_name)
