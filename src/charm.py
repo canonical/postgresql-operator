@@ -11,6 +11,7 @@ import platform
 import re
 import subprocess
 import sys
+import time
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
@@ -53,7 +54,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
-from backups import CANNOT_RESTORE_PITR, PostgreSQLBackups
+from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
 from cluster import (
     NotReadyError,
     Patroni,
@@ -291,8 +292,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
-        peers = self.model.get_relation(PEER)
-        if not peers:
+        if not (peers := self.model.get_relation(PEER)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be taken
@@ -309,7 +309,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not value:
             return self.remove_secret(scope, key)
 
-        peers = self.model.get_relation(PEER)
+        if not (peers := self.model.get_relation(PEER)):
+            return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be deleted
         self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
@@ -320,7 +321,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
 
-        peers = self.model.get_relation(PEER)
+        if not (peers := self.model.get_relation(PEER)):
+            return None
         secret_key = self._translate_field_to_secret_key(key)
         if scope == APP_SCOPE:
             self.peer_relation_app.delete_relation_data(peers.id, [secret_key])
@@ -504,7 +506,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _on_peer_relation_changed(self, event: HookEvent):
+    def _on_peer_relation_changed(self, event: HookEvent):  # noqa: C901
         """Reconfigure cluster members when something changes."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
@@ -537,11 +539,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
-        # If PITR restore failed, then wait it for resolve.
+        # Should not override a blocked status
+        if isinstance(self.unit.status, BlockedStatus):
+            logger.debug("on_peer_relation_changed early exit: Unit in blocked status")
+            return
+
         if (
             "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data
-        ) and isinstance(self.unit.status, BlockedStatus):
-            event.defer()
+        ) and not self._was_restore_successful():
+            logger.debug("on_peer_relation_changed early exit: Backup restore check failed")
             return
 
         # Start can be called here multiple times as it's idempotent.
@@ -574,6 +580,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._start_stop_pgbackrest_service(event)
 
+        # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
+        if (
+            "s3-initialization-start" in self.app_peer_data
+            and "s3-initialization-done" not in self.unit_peer_data
+            and not self.unit.is_leader()
+            and self.is_primary
+            and not self.backup._on_s3_credential_changed_primary(event)
+        ):
+            return
+
+        # Clean-up unit initialization data after successful sync to the leader.
+        if "s3-initialization-done" in self.app_peer_data and not self.unit.is_leader():
+            self.unit_peer_data.update({
+                "stanza": "",
+                "s3-initialization-block-message": "",
+                "s3-initialization-done": "",
+                "s3-initialization-start": "",
+            })
+
         self._update_new_unit_status()
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
@@ -587,8 +612,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self.backup.coordinate_stanza_fields()
-
-        self.backup.check_stanza()
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
@@ -1333,6 +1356,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
 
+        self.backup.coordinate_stanza_fields()
+
         self._set_primary_status_message()
 
         # Restart topology observer if it is gone
@@ -1386,8 +1411,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
         if not can_use_s3_repository:
-            self.unit.status = BlockedStatus(validation_message)
-            return False
+            self.app_peer_data.update({
+                "stanza": "",
+                "s3-initialization-start": "",
+                "s3-initialization-done": "",
+                "s3-initialization-block-message": validation_message,
+            })
 
         return True
 
@@ -1399,7 +1428,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
 
-        if self.is_blocked:
+        if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES:
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
                 self.enable_disable_extensions()
@@ -1461,6 +1490,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _set_primary_status_message(self) -> None:
         """Display 'Primary' in the unit status message if the current unit is the primary."""
         try:
+            if self.unit.is_leader():
+                if "s3-initialization-block-message" in self.app_peer_data:
+                    self.unit.status = BlockedStatus(
+                        self.app_peer_data["s3-initialization-block-message"]
+                    )
+                    return
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:
@@ -1654,7 +1689,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             pitr_target=self.app_peer_data.get("restore-to-time"),
             restore_timeline=self.app_peer_data.get("restore-timeline"),
             restore_to_latest=self.app_peer_data.get("restore-to-time", None) == "latest",
-            stanza=self.app_peer_data.get("stanza"),
+            stanza=self.app_peer_data.get("stanza", self.unit_peer_data.get("stanza")),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
         )
@@ -1848,16 +1883,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 - Is patroni service failed to bootstrap cluster.
                 - Is it new fail, that wasn't observed previously.
         """
-        patroni_logs = self._patroni.patroni_logs()
-        patroni_exceptions = re.findall(
-            r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
-            patroni_logs,
-            re.MULTILINE,
-        )
+        patroni_exceptions = []
+        count = 0
+        while len(patroni_exceptions) == 0 and count < 10:
+            patroni_logs = self._patroni.patroni_logs(num_lines="all")
+            patroni_exceptions = re.findall(
+                r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
+                patroni_logs,
+                re.MULTILINE,
+            )
+            count += 1
+            time.sleep(3)
+
         if len(patroni_exceptions) > 0:
+            logger.debug("Failures to bootstrap cluster detected on Patroni service logs")
             old_pitr_fail_id = self.unit_peer_data.get("last_pitr_fail_id", None)
             self.unit_peer_data["last_pitr_fail_id"] = patroni_exceptions[-1]
             return True, patroni_exceptions[-1] != old_pitr_fail_id
+
+        logger.debug("No failures detected on Patroni service logs")
         return False, False
 
     def log_pitr_last_transaction_time(self) -> None:

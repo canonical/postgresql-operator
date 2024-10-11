@@ -10,6 +10,7 @@ import pwd
 import re
 import shutil
 import tempfile
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 from subprocess import PIPE, TimeoutExpired, run
@@ -18,13 +19,16 @@ from typing import Dict, List, Optional, Tuple
 import boto3 as boto3
 import botocore
 from botocore.exceptions import ClientError
-from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
+from charms.data_platform_libs.v0.s3 import (
+    CredentialsChangedEvent,
+    S3Requirer,
+)
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
-from ops.charm import ActionEvent
+from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.jujuversion import JujuVersion
-from ops.model import ActiveStatus, BlockedStatus, MaintenanceStatus
+from ops.model import ActiveStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
@@ -74,6 +78,9 @@ class PostgreSQLBackups(Object):
         self.framework.observe(
             self.s3_client.on.credentials_changed, self._on_s3_credential_changed
         )
+        # When the leader unit is being removed, s3_client.on.credentials_gone is performed on it (and only on it).
+        # After a new leader is elected, the S3 connection must be reinitialized.
+        self.framework.observe(self.charm.on.leader_elected, self._on_s3_credential_changed)
         self.framework.observe(self.s3_client.on.credentials_gone, self._on_s3_credential_gone)
         self.framework.observe(self.charm.on.create_backup_action, self._on_create_backup_action)
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
@@ -156,7 +163,6 @@ class PostgreSQLBackups(Object):
 
     def can_use_s3_repository(self) -> Tuple[bool, Optional[str]]:
         """Returns whether the charm was configured to use another cluster repository."""
-        # Prevent creating backups and storing in another cluster repository.
         try:
             return_code, stdout, stderr = self._execute_command(
                 [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"],
@@ -176,29 +182,24 @@ class PostgreSQLBackups(Object):
                 logger.error(stderr)
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
-        if self.charm.unit.is_leader():
-            for stanza in json.loads(stdout):
-                return_code, system_identifier_from_instance, error = self._execute_command([
-                    f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
-                    POSTGRESQL_DATA_PATH,
-                ])
-                if return_code != 0:
-                    raise Exception(error)
-                system_identifier_from_instance = [
-                    line
-                    for line in system_identifier_from_instance.splitlines()
-                    if "Database system identifier" in line
-                ][0].split(" ")[-1]
-                system_identifier_from_stanza = str(stanza.get("db")[0]["system-id"])
-                if system_identifier_from_instance != system_identifier_from_stanza or stanza.get(
-                    "name"
-                ) != self.charm.app_peer_data.get("stanza", self.stanza_name):
-                    # Prevent archiving of WAL files.
-                    self.charm.app_peer_data.update({"stanza": ""})
-                    self.charm.update_config()
-                    if self.charm._patroni.member_started:
-                        self.charm._patroni.reload_patroni_configuration()
-                    return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+        for stanza in json.loads(stdout):
+            return_code, system_identifier_from_instance, error = self._execute_command([
+                f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
+                POSTGRESQL_DATA_PATH,
+            ])
+            if return_code != 0:
+                raise Exception(error)
+            system_identifier_from_instance = [
+                line
+                for line in system_identifier_from_instance.splitlines()
+                if "Database system identifier" in line
+            ][0].split(" ")[-1]
+            system_identifier_from_stanza = str(stanza.get("db")[0]["system-id"])
+            if (
+                system_identifier_from_instance != system_identifier_from_stanza
+                or stanza.get("name") != self.stanza_name
+            ):
+                return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
         return True, None
 
@@ -564,21 +565,22 @@ class PostgreSQLBackups(Object):
             backup_type,
         )
 
-    def _initialise_stanza(self) -> None:
+    def _initialise_stanza(self, event: HookEvent) -> bool:
         """Initialize the stanza.
 
-        A stanza is the configuration for a PostgreSQL database cluster that defines where it is
-        located, how it will be backed up, archiving options, etc. (more info in
+        A stanza is the configuration for a PostgreSQL database cluster that defines where it is located, how it will
+        be backed up, archiving options, etc. (more info in
         https://pgbackrest.org/user-guide.html#quickstart/configure-stanza).
-        """
-        if not self.charm.is_primary:
-            return
 
+        Returns:
+            whether stanza initialization were successful.
+        """
         # Enable stanza initialisation if the backup settings were fixed after being invalid
         # or pointing to a repository where there are backups from another cluster.
         if self.charm.is_blocked and self.charm.unit.status.message not in S3_BLOCK_MESSAGES:
-            logger.warning("couldn't initialize stanza due to a blocked status")
-            return
+            logger.warning("couldn't initialize stanza due to a blocked status, deferring event")
+            event.defer()
+            return False
 
         self.charm.unit.status = MaintenanceStatus("initialising stanza")
 
@@ -599,36 +601,41 @@ class PostgreSQLBackups(Object):
             raise TimeoutError
         if return_code != 0:
             logger.error(stderr)
-            self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
-            return
+            self._s3_initialization_set_failure(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+            return False
 
         self.start_stop_pgbackrest_service()
 
-        # Store the stanza name to be used in configurations updates.
+        # Rest of the successful s3 initialization sequence such as s3-initialization-start and s3-initialization-done
+        # are left to the check_stanza func.
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
                 "stanza": self.stanza_name,
-                "init-pgbackrest": "True",
             })
         else:
             self.charm.unit_peer_data.update({
                 "stanza": self.stanza_name,
-                "init-pgbackrest": "True",
             })
 
-    def check_stanza(self) -> None:
-        """Runs the pgbackrest stanza validation."""
-        if not self.charm.is_primary or "init-pgbackrest" not in self.charm.app_peer_data:
-            return
+        return True
 
+    def check_stanza(self) -> bool:
+        """Runs the pgbackrest stanza validation.
+
+        Returns:
+            whether stanza validation was successful.
+        """
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
 
         self.charm.unit.status = MaintenanceStatus("checking stanza")
 
         try:
-            # Check that the stanza is correctly configured.
-            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
+            # If the tls is enabled, it requires all the units in the cluster to run the pgBackRest service to
+            # successfully complete validation, and upon receiving the same parent event other units should start it.
+            # Therefore, the first retry may fail due to the delay of these other units to start this service. 60s given
+            # for that or else the s3 initialization sequence will fail.
+            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
                 with attempt:
                     if self.charm._patroni.member_started:
                         self.charm._patroni.reload_patroni_configuration()
@@ -640,44 +647,50 @@ class PostgreSQLBackups(Object):
                     ])
                     if return_code != 0:
                         raise Exception(stderr)
-            self.charm.unit.status = ActiveStatus()
+            self.charm._set_primary_status_message()
         except RetryError as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
-            self.charm.app_peer_data.update({"stanza": ""})
-            self.charm.app_peer_data.pop("init-pgbackrest", None)
-            self.charm.unit_peer_data.update({"stanza": "", "init-pgbackrest": ""})
-            self.charm.update_config()
-
             logger.exception(e)
-            self.charm.unit.status = BlockedStatus(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+            self._s3_initialization_set_failure(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
+            self.charm.update_config()
+            return False
 
         if self.charm.unit.is_leader():
-            self.charm.app_peer_data.pop("init-pgbackrest", None)
-        self.charm.unit_peer_data.pop("init-pgbackrest", None)
+            self.charm.app_peer_data.update({
+                "s3-initialization-start": "",
+            })
+        else:
+            self.charm.unit_peer_data.update({"s3-initialization-done": "True"})
+
+        return True
 
     def coordinate_stanza_fields(self) -> None:
         """Coordinate the stanza name between the primary and the leader units."""
+        if (
+            not self.charm.unit.is_leader()
+            or "s3-initialization-start" not in self.charm.app_peer_data
+        ):
+            return
+
         for unit, unit_data in self.charm._peers.data.items():
-            if "stanza" not in unit_data:
+            if "s3-initialization-done" not in unit_data:
                 continue
-            # If the stanza name is not set in the application databag, then the primary is not
-            # the leader unit, and it's needed to set the stanza name in the application databag.
-            if "stanza" not in self.charm.app_peer_data and self.charm.unit.is_leader():
-                self.charm.app_peer_data.update({
-                    "stanza": self.stanza_name,
-                    "init-pgbackrest": "True",
-                })
-                break
-            # If the stanza was already checked and its name is still in the unit databag, mark
-            # the stanza as already checked in the application databag and remove it from the
-            # unit databag.
-            if "init-pgbackrest" not in unit_data:
-                if self.charm.unit.is_leader():
-                    self.charm.app_peer_data.pop("init-pgbackrest", None)
-                if "init-pgbackrest" not in self.charm.app_peer_data and unit == self.charm.unit:
-                    self.charm.unit_peer_data.update({"stanza": ""})
-                    break
+
+            self.charm.app_peer_data.update({
+                "stanza": unit_data.get("stanza", ""),
+                "s3-initialization-block-message": unit_data.get(
+                    "s3-initialization-block-message", ""
+                ),
+                "s3-initialization-start": "",
+                "s3-initialization-done": "True",
+            })
+
+            self.charm.update_config()
+            if self.charm._patroni.member_started:
+                self.charm._patroni.reload_patroni_configuration()
+
+            break
 
     @property
     def _is_primary_pgbackrest_service_running(self) -> bool:
@@ -710,7 +723,10 @@ class PostgreSQLBackups(Object):
             return
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
-        if "restoring-backup" in self.charm.app_peer_data:
+        if (
+            "restoring-backup" in self.charm.app_peer_data
+            or "restore-to-time" in self.charm.app_peer_data
+        ):
             logger.info("Cannot change S3 configuration during restore")
             event.defer()
             return
@@ -724,32 +740,60 @@ class PostgreSQLBackups(Object):
             event.defer()
             return
 
-        # Verify the s3 relation only on the primary.
-        if not self.charm.is_primary:
-            return
+        # Start the pgBackRest service for the check_stanza to be successful. It's required to run on all the units if the tls is enabled.
+        self.start_stop_pgbackrest_service()
+
+        if self.charm.unit.is_leader():
+            self.charm.app_peer_data.update({
+                "s3-initialization-block-message": "",
+                "s3-initialization-start": time.asctime(time.gmtime()),
+                "stanza": "",
+                "s3-initialization-done": "",
+            })
+            if not self.charm.is_primary:
+                self.charm._set_primary_status_message()
+
+        if self.charm.is_primary and "s3-initialization-done" not in self.charm.unit_peer_data:
+            self._on_s3_credential_changed_primary(event)
+
+    def _on_s3_credential_changed_primary(self, event: HookEvent) -> bool:
+        """Stanza must be cleared before calling this function."""
+        self.charm.update_config()
+        if self.charm._patroni.member_started:
+            self.charm._patroni.reload_patroni_configuration()
 
         try:
             self._create_bucket_if_not_exists()
         except (ClientError, ValueError):
-            self.charm.unit.status = BlockedStatus(FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE)
-            return
+            self._s3_initialization_set_failure(FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE)
+            return False
 
         can_use_s3_repository, validation_message = self.can_use_s3_repository()
         if not can_use_s3_repository:
-            self.charm.unit.status = BlockedStatus(validation_message)
-            return
+            self._s3_initialization_set_failure(validation_message)
+            return False
 
-        self._initialise_stanza()
+        if not self._initialise_stanza(event):
+            return False
+
+        return self.check_stanza()
 
     def _on_s3_credential_gone(self, _) -> None:
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
                 "stanza": "",
-                "init-pgbackrest": "",
+                "s3-initialization-start": "",
+                "s3-initialization-done": "",
+                "s3-initialization-block-message": "",
             })
-        self.charm.unit_peer_data.update({"stanza": "", "init-pgbackrest": ""})
+        self.charm.unit_peer_data.update({
+            "stanza": "",
+            "s3-initialization-start": "",
+            "s3-initialization-done": "",
+            "s3-initialization-block-message": "",
+        })
         if self.charm.is_blocked and self.charm.unit.status.message in S3_BLOCK_MESSAGES:
-            self.charm.unit.status = ActiveStatus()
+            self.charm._set_primary_status_message()
 
     def _on_create_backup_action(self, event) -> None:  # noqa: C901
         """Request that pgBackRest creates a backup."""
@@ -1011,6 +1055,7 @@ Stderr:
             "restore-stanza": restore_stanza_timeline[0],
             "restore-timeline": restore_stanza_timeline[1] if restore_to_time else "",
             "restore-to-time": restore_to_time or "",
+            "s3-initialization-block-message": "",
         })
         self.charm.update_config()
 
@@ -1297,3 +1342,31 @@ Stderr:
             return False
 
         return True
+
+    def _s3_initialization_set_failure(
+        self, block_message: str, update_leader_status: bool = True
+    ):
+        """Sets failed s3 initialization status with corresponding block_message in the app_peer_data (leader) or unit_peer_data (primary).
+
+        Args:
+            block_message: s3 initialization block message
+            update_leader_status: whether to update leader status (with s3-initialization-block-message set already)
+                immediately; defaults to True
+        """
+        if self.charm.unit.is_leader():
+            # If performed on the leader, then leader == primary and there is no need to sync s3 data between two
+            # different units. Therefore, there is no need for s3-initialization-done key, and it is sufficient to clear
+            # s3-initialization-start key only.
+            self.charm.app_peer_data.update({
+                "s3-initialization-block-message": block_message,
+                "s3-initialization-start": "",
+                "stanza": "",
+            })
+            if update_leader_status:
+                self.charm._set_primary_status_message()
+        else:
+            self.charm.unit_peer_data.update({
+                "s3-initialization-block-message": block_message,
+                "s3-initialization-done": "True",
+                "stanza": "",
+            })
