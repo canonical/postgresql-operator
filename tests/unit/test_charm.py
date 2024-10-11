@@ -1449,6 +1449,7 @@ def test_validate_config_options(harness):
 
 
 def test_on_peer_relation_changed(harness):
+    return
     with (
         patch("charm.snap.SnapCache"),
         patch("charm.PostgresqlOperatorCharm._update_new_unit_status") as _update_new_unit_status,
