@@ -40,10 +40,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {
-            "revision": {"aarch64": "132", "x86_64": "133"},
-            "channel": "14/stable",
-        },
+        {"revision": {"aarch64": "132", "x86_64": "133"}},
     )
 ]
 
@@ -80,7 +77,6 @@ ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
     "Please choose one endpoint to use. No need to relate all of them simultaneously!"
 )
 
-TRACING_RELATION_NAME = "tracing"
 TRACING_PROTOCOL = "otlp_http"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
