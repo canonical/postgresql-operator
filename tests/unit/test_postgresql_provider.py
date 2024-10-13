@@ -281,18 +281,35 @@ def test_update_endpoints_without_event(harness):
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
     ):
-        _fetch_my_relation_data.return_value.get().get.return_value = "test_password"
-
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
+        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
         rel_id = harness.model.get_relation(RELATION_NAME).id
+
+        # Don't set data if no password
+        _fetch_my_relation_data.return_value.get().get.return_value = None
+
+        harness.charm.postgresql_client_relation.update_endpoints()
+        assert harness.get_relation_data(rel_id, harness.charm.app.name) == {}
+
+        _fetch_my_relation_data.reset_mock()
+        _fetch_my_relation_data.return_value.get().get.return_value = "test_password"
 
         # Add two different relations.
         rel_id = harness.add_relation(RELATION_NAME, "application")
         another_rel_id = harness.add_relation(RELATION_NAME, "application")
 
+        relation_ids = [rel.id for rel in harness.charm.model.relations[RELATION_NAME]]
+        other_rel_ids = set(relation_ids) - set({rel_id, another_rel_id})
+
         with harness.hooks_disabled():
+            for relation_id in other_rel_ids:
+                harness.update_relation_data(
+                    relation_id,
+                    "application",
+                    {"database": "some_db", "extra-user-roles": ""},
+                )
+
             harness.update_relation_data(
                 rel_id,
                 "application",

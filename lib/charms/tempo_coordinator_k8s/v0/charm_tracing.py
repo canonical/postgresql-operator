@@ -12,15 +12,15 @@ in real time from the Grafana dashboard the execution flow of your charm.
 # Quickstart
 Fetch the following charm libs (and ensure the minimum version/revision numbers are satisfied):
 
-    charmcraft fetch-lib charms.tempo_k8s.v2.tracing  # >= 1.10
-    charmcraft fetch-lib charms.tempo_k8s.v1.charm_tracing  # >= 2.7
+    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.tracing  # >= 1.10
+    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.charm_tracing  # >= 2.7
 
 Then edit your charm code to include:
 
 ```python
 # import the necessary charm libs
-from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer, charm_tracing_config
-from charms.tempo_k8s.v1.charm_tracing import charm_tracing
+from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer, charm_tracing_config
+from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing
 
 # decorate your charm class with charm_tracing:
 @charm_tracing(
@@ -51,7 +51,7 @@ To use this library, you need to do two things:
 
 2) add to your charm a "my_tracing_endpoint" (you can name this attribute whatever you like)
 **property**, **method** or **instance attribute** that returns an otlp http/https endpoint url.
-If you are using the ``charms.tempo_k8s.v2.tracing.TracingEndpointRequirer`` as
+If you are using the ``charms.tempo_coordinator_k8s.v0.tracing.TracingEndpointRequirer`` as
 ``self.tracing = TracingEndpointRequirer(self)``, the implementation could be:
 
 ```
@@ -80,7 +80,7 @@ CA that Tempo is using.
 
 For example:
 ```
-from charms.tempo_k8s.v1.charm_tracing import trace_charm
+from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 @trace_charm(
     tracing_endpoint="my_tracing_endpoint",
     server_cert="_server_cert"
@@ -129,7 +129,7 @@ to return from ``TracingEndpointRequirer.get_endpoint("otlp_http")`` instead of 
 For example:
 
 ```
-    from charms.tempo_k8s.v0.charm_tracing import trace_charm
+    from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 
     @trace_charm(
         tracing_endpoint="my_tracing_endpoint",
@@ -150,7 +150,7 @@ For example:
 needs to be replaced with:
 
 ```
-    from charms.tempo_k8s.v1.charm_tracing import trace_charm
+    from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 
     @trace_charm(
         tracing_endpoint="my_tracing_endpoint",
@@ -249,28 +249,27 @@ from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExport
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import Span, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.trace import INVALID_SPAN, Tracer
+from opentelemetry.trace import get_current_span as otlp_get_current_span
 from opentelemetry.trace import (
-    INVALID_SPAN,
-    Tracer,
     get_tracer,
     get_tracer_provider,
     set_span_in_context,
     set_tracer_provider,
 )
-from opentelemetry.trace import get_current_span as otlp_get_current_span
 from ops.charm import CharmBase
 from ops.framework import Framework
 
 # The unique Charmhub library identifier, never change it
-LIBID = "cb1705dcd1a14ca09b2e60187d1215c7"
+LIBID = "01780f1e588c42c3976d26780fdf9b89"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 1
+LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 15
+LIBPATCH = 2
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -332,7 +331,7 @@ def _get_tracer() -> Optional[Tracer]:
         return tracer.get()
     except LookupError:
         # fallback: this course-corrects for a user error where charm_tracing symbols are imported
-        # from different paths (typically charms.tempo_k8s... and lib.charms.tempo_k8s...)
+        # from different paths (typically charms.tempo_coordinator_k8s... and lib.charms.tempo_coordinator_k8s...)
         try:
             ctx: Context = copy_context()
             if context_tracer := _get_tracer_from_context(ctx):
@@ -370,10 +369,6 @@ class TracingError(RuntimeError):
 
 class UntraceableObjectError(TracingError):
     """Raised when an object you're attempting to instrument cannot be autoinstrumented."""
-
-
-class TLSError(TracingError):
-    """Raised when the tracing endpoint is https but we don't have a cert yet."""
 
 
 def _get_tracing_endpoint(
@@ -485,10 +480,15 @@ def _setup_root_span_initializer(
         )
 
         if tracing_endpoint.startswith("https://") and not server_cert:
-            raise TLSError(
+            logger.error(
                 "Tracing endpoint is https, but no server_cert has been passed."
-                "Please point @trace_charm to a `server_cert` attr."
+                "Please point @trace_charm to a `server_cert` attr. "
+                "This might also mean that the tracing provider is related to a "
+                "certificates provider, but this application is not (yet). "
+                "In that case, you might just have to wait a bit for the certificates "
+                "integration to settle. "
             )
+            return
 
         exporter = OTLPSpanExporter(
             endpoint=tracing_endpoint,
@@ -562,8 +562,8 @@ def trace_charm(
     method calls on instances of this class.
 
     Usage:
-    >>> from charms.tempo_k8s.v1.charm_tracing import trace_charm
-    >>> from charms.tempo_k8s.v1.tracing import TracingEndpointRequirer
+    >>> from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+    >>> from charms.tempo_coordinator_k8s.v0.tracing import TracingEndpointRequirer
     >>> from ops import CharmBase
     >>>
     >>> @trace_charm(
@@ -626,7 +626,7 @@ def _autoinstrument(
 
     Usage:
 
-    >>> from charms.tempo_k8s.v1.charm_tracing import _autoinstrument
+    >>> from charms.tempo_coordinator_k8s.v0.charm_tracing import _autoinstrument
     >>> from ops.main import main
     >>> _autoinstrument(
     >>>         MyCharm,
