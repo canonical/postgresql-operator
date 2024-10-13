@@ -219,13 +219,13 @@ async def pitr_backup_operations(
         stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
     ):
         with attempt:
-            logger.info("1: restoring the backup b1 to the timestamp ts1")
+            logger.info("1: restoring to the timestamp ts1")
             action = await remaining_unit.run_action(
-                "restore", **{"backup-id": backup_b1, "restore-to-time": timestamp_ts1}
+                "restore", **{"restore-to-time": timestamp_ts1}
             )
             await action.wait()
             restore_status = action.results.get("restore-status")
-            assert restore_status, "1: restore the backup b1 to the timestamp ts1 hasn't succeeded"
+            assert restore_status, "1: restore to the timestamp ts1 hasn't succeeded"
     await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
 
     logger.info("2: successful restore")
@@ -244,6 +244,15 @@ async def pitr_backup_operations(
 
     logger.info("2: creating test data td3")
     _insert_test_data("test_data_td3", address, password)
+
+    logger.info("2: get timestamp ts2")
+    with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
+        cursor.execute("SELECT current_timestamp;")
+        timestamp_ts2 = str(cursor.fetchone()[0])
+    connection.close()
+
+    logger.info("2: creating test data td4")
+    _insert_test_data("test_data_td4", address, password)
 
     logger.info("2: switching wal")
     _switch_wal(address, password)
@@ -280,8 +289,10 @@ async def pitr_backup_operations(
         "test_data_td3", address, password
     ), "3: test data td3 shouldn't exist"
 
-    logger.info("3: creating test data td4")
-    _insert_test_data("test_data_td4", address, password)
+    logger.info("3: checking not test data td4")
+    assert not _check_test_data(
+        "test_data_td4", address, password
+    ), "3: test data td4 shouldn't exist"
 
     logger.info("3: switching wal")
     _switch_wal(address, password)
@@ -318,10 +329,51 @@ async def pitr_backup_operations(
     logger.info("4: checking test data td3")
     assert _check_test_data("test_data_td3", address, password), "4: test data td3 should exist"
 
-    logger.info("4: checking not test data td4")
+    logger.info("4: checking test data td4")
+    assert _check_test_data("test_data_td4", address, password), "4: test data td4 should exist"
+
+    logger.info("4: switching wal")
+    _switch_wal(address, password)
+
+    for attempt in Retrying(
+        stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=30)
+    ):
+        with attempt:
+            logger.info("4: restoring to the timestamp ts2")
+            action = await remaining_unit.run_action(
+                "restore", **{"restore-to-time": timestamp_ts2}
+            )
+            await action.wait()
+            restore_status = action.results.get("restore-status")
+            assert restore_status, "4: restore to the timestamp ts2 hasn't succeeded"
+    await ops_test.model.wait_for_idle(status="active", timeout=1000, idle_period=30)
+
+    logger.info("5: successful restore")
+    primary = await get_primary(ops_test, remaining_unit.name)
+    address = get_unit_address(ops_test, primary)
+    timeline_t5 = await _get_most_recent_backup(ops_test, remaining_unit)
+    assert (
+        backup_b1 != timeline_t5
+        and timeline_t2 != timeline_t5
+        and timeline_t3 != timeline_t5
+        and timeline_t4 != timeline_t5
+    ), "5: timeline 5 do not exist in list-backups action or bad"
+
+    logger.info("5: checking test data td1")
+    assert _check_test_data("test_data_td1", address, password), "5: test data td1 should exist"
+
+    logger.info("5: checking not test data td2")
+    assert not _check_test_data(
+        "test_data_td2", address, password
+    ), "5: test data td2 shouldn't exist"
+
+    logger.info("5: checking test data td3")
+    assert _check_test_data("test_data_td3", address, password), "5: test data td3 should exist"
+
+    logger.info("5: checking not test data td4")
     assert not _check_test_data(
         "test_data_td4", address, password
-    ), "4: test data td4 shouldn't exist"
+    ), "5: test data td4 shouldn't exist"
 
     # Remove the database app.
     await ops_test.model.remove_application(database_app_name, block_until_done=True)

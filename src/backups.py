@@ -439,8 +439,8 @@ class PostgreSQLBackups(Object):
             parse: whether to convert backup labels to their IDs or not.
 
         Returns:
-            a dict of previously created backups (id + stanza name) or an empty list
-                if there is no backups in the S3 bucket.
+            a dict of previously created backups: id => (stanza, timeline) or an empty dict if there is no backups in
+                the S3 bucket.
         """
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
@@ -474,7 +474,7 @@ class PostgreSQLBackups(Object):
         """Lists the timelines from the pgBackRest stanza.
 
         Returns:
-            a list of tuples with the timeline info: formatted name, stanza, id.
+            a dict of timelines: id => (stanza, timeline) or an empty dict if there is no timelines in the S3 bucket.
         """
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
@@ -493,7 +493,7 @@ class PostgreSQLBackups(Object):
         return dict[str, tuple[str, str]]({
             datetime.strftime(
                 datetime.fromtimestamp(timeline_object["time"], timezone.utc),
-                "%Y-%m-%dT%H:%M:%SZ",
+                BACKUP_ID_FORMAT,
             ): (
                 timeline.split("/")[1],
                 timeline.split("/")[-1].split(".")[0].lstrip("0"),
@@ -501,6 +501,42 @@ class PostgreSQLBackups(Object):
             for timeline, timeline_object in repository
             if timeline.endswith(".history") and not timeline.endswith("backup.history")
         })
+
+    def _get_nearest_timeline(self, timestamp: str) -> tuple[str, str] | None:
+        """Finds the nearest timeline or backup prior to the specified timeline.
+
+        Returns:
+            (stanza, timeline) of the nearest timeline or backup. None, if there are no matches.
+        """
+        timelines = self._list_backups(show_failed=False) | self._list_timelines()
+        filtered_timelines = [
+            (timeline_key, timeline_object)
+            for timeline_key, timeline_object in timelines.items()
+            if datetime.strptime(timeline_key, BACKUP_ID_FORMAT)
+            <= self._parse_psql_timestamp(timestamp)
+        ]
+        return max(filtered_timelines)[1] if len(filtered_timelines) > 0 else None
+
+    def _is_psql_timestamp(self, timestamp: str) -> bool:
+        return bool(
+            re.match(
+                r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?([-+](?:\d{2}|\d{4}|\d{2}:\d{2}))?$",
+                timestamp,
+            )
+        )
+
+    def _parse_psql_timestamp(self, timestamp: str) -> datetime:
+        """Intended to use with data only after _is_psql_timestamp check."""
+        # With the python >= 3.11 only the datetime.fromisoformat will be sufficient without any regexes. Therefore,
+        # it will not be required for the _is_psql_timestamp check that ensures intended regex execution.
+        t = re.sub(r"([-+]\d{2})$", r"\1:00", timestamp)
+        t = re.sub(r"([-+]\d{2})(\d{2})$", r"\1:\2", t)
+        t = re.sub(r"\.(\d+)", lambda x: f".{x[1]:06}", t)
+        dt = datetime.fromisoformat(t)
+        # Convert to the timezone-naive
+        if dt.tzinfo is not None and dt.tzinfo is not timezone.utc:
+            dt = dt.astimezone(tz=timezone.utc)
+        return dt.replace(tzinfo=None)
 
     def _parse_backup_id(self, label) -> Tuple[str, str]:
         """Parse backup ID as a timestamp and its type."""
@@ -882,7 +918,7 @@ Stderr:
             logger.exception(e)
             event.fail(f"Failed to list PostgreSQL backups with error: {str(e)}")
 
-    def _on_restore_action(self, event):
+    def _on_restore_action(self, event):  # noqa: C901
         """Request that pgBackRest restores a backup."""
         if not self._pre_restore_checks(event):
             return
@@ -891,7 +927,7 @@ Stderr:
         restore_to_time = event.params.get("restore-to-time")
         logger.info(
             f"A restore with backup-id {backup_id}"
-            f"{' to time point ' + restore_to_time if restore_to_time else ''}"
+            f"{f' to time point {restore_to_time}' if restore_to_time else ''}"
             f" has been requested on the unit"
         )
 
@@ -900,9 +936,11 @@ Stderr:
         try:
             backups = self._list_backups(show_failed=False)
             timelines = self._list_timelines()
-            is_backup_id_real = backup_id in backups.keys()
-            is_backup_id_timeline = not is_backup_id_real and backup_id in timelines.keys()
-            if not is_backup_id_real and not is_backup_id_timeline:
+            is_backup_id_real = backup_id and backup_id in backups.keys()
+            is_backup_id_timeline = (
+                backup_id and not is_backup_id_real and backup_id in timelines.keys()
+            )
+            if backup_id and not is_backup_id_real and not is_backup_id_timeline:
                 error_message = f"Invalid backup-id: {backup_id}"
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
@@ -912,20 +950,23 @@ Stderr:
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
                 return
+            if is_backup_id_real:
+                restore_stanza_timeline = backups[backup_id]
+            elif is_backup_id_timeline:
+                restore_stanza_timeline = timelines[backup_id]
+            else:
+                restore_stanza_timeline = self._get_nearest_timeline(restore_to_time)
+                if not restore_stanza_timeline:
+                    error_message = f"Can't find the nearest timeline before timestamp {restore_to_time} to restore"
+                    logger.error(f"Restore failed: {error_message}")
+                    event.fail(error_message)
+                    return
+                logger.info(
+                    f"Chosen timeline {restore_stanza_timeline[1]} as nearest for the specified timestamp {restore_to_time}"
+                )
         except ListBackupsError as e:
             logger.exception(e)
             error_message = "Failed to retrieve backups list"
-            logger.error(f"Restore failed: {error_message}")
-            event.fail(error_message)
-            return
-
-        # Quick check for timestamp format
-        if (
-            restore_to_time
-            and restore_to_time != "latest"
-            and not re.match("^[0-9-]+ [0-9:.+]+$", restore_to_time)
-        ):
-            error_message = "Bad restore-to-time format"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
@@ -963,14 +1004,8 @@ Stderr:
         logger.info("Configuring Patroni to restore the backup")
         self.charm.app_peer_data.update({
             "restoring-backup": self._fetch_backup_from_id(backup_id) if is_backup_id_real else "",
-            "restore-stanza": backups[backup_id][0]
-            if is_backup_id_real
-            else timelines[backup_id][0],
-            "restore-timeline": (
-                backups[backup_id][1] if is_backup_id_real else timelines[backup_id][1]
-            )
-            if restore_to_time
-            else "",
+            "restore-stanza": restore_stanza_timeline[0],
+            "restore-timeline": restore_stanza_timeline[1] if restore_to_time else "",
             "restore-to-time": restore_to_time or "",
         })
         self.charm.update_config()
@@ -1043,8 +1078,23 @@ Stderr:
             event.fail(validation_message)
             return False
 
-        if not event.params.get("backup-id"):
-            error_message = "Missing backup-id parameter to be able to do restore"
+        if not event.params.get("backup-id") and event.params.get("restore-to-time") in (
+            None,
+            "latest",
+        ):
+            error_message = "Missing backup-id or non-latest restore-to-time parameter to be able to do restore"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return False
+
+        # Quick check for timestamp format
+        restore_to_time = event.params.get("restore-to-time")
+        if (
+            restore_to_time
+            and restore_to_time != "latest"
+            and not self._is_psql_timestamp(restore_to_time)
+        ):
+            error_message = "Bad restore-to-time format"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
