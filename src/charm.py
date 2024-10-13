@@ -18,7 +18,7 @@ from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
-from charms.grafana_agent.v0.cos_agent import COSAgentProvider
+from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     REQUIRED_PLUGINS,
@@ -31,8 +31,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 )
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
-from charms.tempo_k8s.v1.charm_tracing import trace_charm
-from charms.tempo_k8s.v2.tracing import TracingEndpointRequirer
+from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import JujuVersion, main
 from ops.charm import (
     ActionEvent,
@@ -91,7 +90,6 @@ from constants import (
     TLS_CERT_FILE,
     TLS_KEY_FILE,
     TRACING_PROTOCOL,
-    TRACING_RELATION_NAME,
     UNIT_SCOPE,
     USER,
     USER_PASSWORD_KEY,
@@ -213,10 +211,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.on.secret_remove,
             ],
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
+            tracing_protocols=[TRACING_PROTOCOL],
         )
-        self._tracing = TracingEndpointRequirer(
-            self, relation_name=TRACING_RELATION_NAME, protocols=[TRACING_PROTOCOL]
-        )
+        self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
 
     def patroni_scrape_config(self) -> List[Dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -258,8 +255,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def tracing_endpoint(self) -> Optional[str]:
         """Otlp http endpoint for charm instrumentation."""
-        if self._tracing.is_ready():
-            return self._tracing.get_endpoint(TRACING_PROTOCOL)
+        return self._tracing_endpoint_config
 
     def _peer_data(self, scope: Scopes) -> Dict:
         """Return corresponding databag for app/unit."""
