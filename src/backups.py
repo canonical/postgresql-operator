@@ -585,22 +585,33 @@ class PostgreSQLBackups(Object):
         self.charm.unit.status = MaintenanceStatus("initialising stanza")
 
         # Create the stanza.
-        return_code, _, stderr = self._execute_command([
-            PGBACKREST_EXECUTABLE,
-            PGBACKREST_CONFIGURATION_FILE,
-            f"--stanza={self.stanza_name}",
-            "stanza-create",
-        ])
-        if return_code == 49:
-            # Raise an error if the connection timeouts, so the user has the possibility to
-            # fix network issues and call juju resolve to re-trigger the hook that calls
-            # this method.
-            logger.error(
-                f"error: {stderr} - please fix the error and call juju resolve on this unit"
-            )
-            raise TimeoutError
-        if return_code != 0:
-            logger.error(stderr)
+        try:
+            # If the tls is enabled, it requires all the units in the cluster to run the pgBackRest service to
+            # successfully complete validation, and upon receiving the same parent event other units should start it.
+            # Therefore, the first retry may fail due to the delay of these other units to start this service. 60s given
+            # for that or else the s3 initialization sequence will fail.
+            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+                with attempt:
+                    return_code, _, stderr = self._execute_command([
+                        PGBACKREST_EXECUTABLE,
+                        PGBACKREST_CONFIGURATION_FILE,
+                        f"--stanza={self.stanza_name}",
+                        "stanza-create",
+                    ])
+                    if return_code == 49:
+                        # Raise an error if the connection timeouts, so the user has the possibility to
+                        # fix network issues and call juju resolve to re-trigger the hook that calls
+                        # this method.
+                        logger.error(
+                            f"error: {stderr} - please fix the error and call juju resolve on this unit"
+                        )
+                        raise TimeoutError
+                    if return_code != 0:
+                        raise Exception(stderr)
+        except RetryError as e:
+            # If the check command doesn't succeed, remove the stanza name
+            # and rollback the configuration.
+            logger.exception(e)
             self._s3_initialization_set_failure(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
             return False
 
