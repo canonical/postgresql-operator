@@ -1078,6 +1078,13 @@ Stderr:
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
 
+        # Render the logrotate configuration file.
+        with open("templates/pgbackrest.logrotate.j2", "r") as file:
+            template = Template(file.read())
+            self.charm._patroni.render_file(
+                "/etc/logrotate.d/pgbackrest.logrotate", template.render(), 0o644
+            )
+
         return True
 
     def _restart_database(self) -> None:
