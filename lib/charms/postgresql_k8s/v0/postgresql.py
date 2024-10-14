@@ -84,7 +84,7 @@ class PostgreSQLGetLastArchivedWALError(Exception):
 
 
 class PostgreSQLGetCurrentTimelineError(Exception):
-    """Exception raised when retrieving last archived WAL fails."""
+    """Exception raised when retrieving current timeline id for the PostgreSQL unit fails."""
 
 
 class PostgreSQLGetPostgreSQLVersionError(Exception):
