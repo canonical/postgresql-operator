@@ -1,4 +1,4 @@
-# Charmed PostgreSQL Documentation
+# Charmed PostgreSQL documentation
 
 Charmed PostgreSQL is an open-source software operator designed to deploy and operate object-relational databases on IAAS/VM. It packages the powerful database management system [PostgreSQL](https://www.postgresql.org/) into a charmed operator for deployment with [Juju](https://juju.is/docs/juju).
 
@@ -8,7 +8,7 @@ Charmed PostgreSQL meets the need of deploying PostgreSQL in a structured and co
  
 This charmed operator is made for anyone looking for a comprehensive database management interface, whether for operating a complex production environment or simply as a playground to learn more about databases and charms.
  
-[note type="positive"]
+[note]
 This operator is built for **IAAS/VM**.
 
 For deployments in **Kubernetes** environments, see [Charmed PostgreSQL K8s](https://charmhub.io/postgresql-k8s).
@@ -47,51 +47,53 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 |--------|--------|-------------|
 | 1 | tutorial | [Tutorial]() |
 | 2 | t-overview | [Overview](/t/9707) |
-| 2 | t-set-up | [1. Set up the environment](/t/9709) |
+| 2 | t-set-up | [1. Set up environment](/t/9709) |
 | 2 | t-deploy | [2. Deploy PostgreSQL](/t/9697) |
-| 2 | t-scale | [3. Scale replicas](/t/9705) |
-| 2 | t-manage-passwords | [4. Manage passwords](/t/9703) |
-| 2 | t-integrate | [5. Integrate with other applications](/t/9701) |
-| 2 | t-enable-tls | [6. Enable TLS encryption](/t/9699) |
-| 2 | t-clean-up | [7. Clean up environment](/t/9695) |
-| 1 | how-to | [How-to guides]() |
-| 2 | h-set-up | [Set up]() |
-| 3 | h-deploy-lxd | [Deploy on LXD](/t/11861) |
-| 3 | h-deploy-maas | [Deploy on MAAS](/t/14293) |
-| 3 | h-deploy-terraform | [Deploy via Terraform](/t/14916) |
-| 3 | h-scale | [Scale replicas](/t/9689) |
-| 3 | h-enable-tls | [Enable TLS](/t/9685) |
-| 3 | h-manage-applications | [Manage client applications](/t/9687) |
-| 2 | h-backups | [Back up and restore]() |
+| 2 | t-access| [3. Access PostgreSQL](/t/15798) |
+| 2 | t-scale | [4. Scale replicas](/t/9705) |
+| 2 | t-manage-passwords | [5. Manage passwords](/t/9703) |
+| 2 | t-integrate | [6. Integrate with other applications](/t/9701) |
+| 2 | t-enable-tls | [7. Enable TLS encryption](/t/9699) |
+| 2 | t-clean-up | [8. Clean up environment](/t/9695) |
+| 1 | how-to | [How to]() |
+| 2 | h-deploy | [Deploy]() |
+| 3 | h-deploy-lxd | [LXD](/t/11861) |
+| 3 | h-deploy-maas | [MAAS](/t/14293) |
+| 3 | h-deploy-ec2 | [AWS EC2](/t/15703) |
+| 3 | h-deploy-gce | [GCE](/t/15722) |
+| 3 | h-deploy-terraform | [Terraform](/t/14916) |
+| 3 | h-deploy-airgapped | [Air-gapped](/t/15746) |
+| 2 | h-integrate | [Integrate with another application](/t/9687) |
+| 2 | h-external-access | [External access](/t/15802) |
+| 2 | h-scale | [Scale replicas](/t/9689) |
+| 2 | h-enable-tls | [Enable TLS](/t/9685) |
+| 2 | h-backup | [Back up and restore]() |
 | 3 | h-configure-s3-aws | [Configure S3 AWS](/t/9681) |
 | 3 | h-configure-s3-radosgw | [Configure S3 RadosGW](/t/10313) |
 | 3 | h-create-backup | [Create a backup](/t/9683) |
 | 3 | h-restore-backup | [Restore a backup](/t/9693) |
 | 3 | h-manage-backup-retention | [Manage backup retention](/t/14249) |
 | 3 | h-migrate-cluster | [Migrate a cluster](/t/9691) |
-| 2 | h-monitor | [Monitor (COS)]() |
+| 2 | h-monitor | [Monitoring (COS)]() |
 | 3 | h-enable-monitoring | [Enable monitoring](/t/10600) |
-| 3 | h-enable-alert-rules | [Enable Alert Rules](/t/13084) |
+| 3 | h-enable-alert-rules | [Enable alert rules](/t/13084) |
 | 3 | h-enable-tracing | [Enable tracing](/t/14521) |
-| 2 | h-upgrade | [Upgrade]() |
-| 3 | h-upgrade-intro | [Overview](/t/12086) |
-| 3 | h-upgrade-major | [Perform a major upgrade](/t/12087) |
-| 3 | h-rollback-major | [Perform a major rollback](/t/12088) |
+| 2 | h-upgrade | [Minor upgrades]() |
 | 3 | h-upgrade-minor | [Perform a minor upgrade](/t/12089) |
 | 3 | h-rollback-minor | [Perform a minor rollback](/t/12090) |
-| 2 | h-integrate-your-charm | [Integrate with your charm]() |
-| 3 | h-integrate-db-with-your-charm | [Integrate a database with your charm](/t/11865) |
-| 3 | h-migrate-pgdump | [Migrate data via pg_dump](/t/12163) |
-| 3 | h-migrate-backup-restore | [Migrate data via backup/restore](/t/12164) |
-| 2 | h-async | [Cross-regional async replication]() |
+| 2 | h-async | [Cross-regional async replication](/t/15412) |
 | 3 | h-async-set-up | [Set up clusters](/t/13991) |
 | 3 | h-async-integrate | [Integrate with a client app](/t/13992) |
 | 3 | h-async-remove-recover | [Remove or recover a cluster](/t/13994) |
 | 2 | h-enable-plugins-extensions | [Enable plugins/extensions](/t/10906) |
+| 2 | h-development| [Development]() |
+| 3 | h-development-integrate | [Integrate with your charm](/t/11865) |
+| 3 | h-migrate-pgdump | [Migrate data via pg_dump](/t/12163) |
+| 3 | h-migrate-backup-restore | [Migrate data via backup/restore](/t/12164) |
 | 1 | reference | [Reference]() |
 | 2 | r-overview | [Overview](/t/13976) |
-| 2 | r-releases | [Release Notes]() |
-| 3 | r-all-releases | [All releases](/t/11875) |
+| 2 | r-releases | [Release Notes](/t/11875) |
+| 3 | r-revision-467-468 | [Revision 467/468](/t/15378) |
 | 3 | r-revision-429-430 | [Revision 429/430](/t/14067) |
 | 3 | r-revision-363 | [Revision 363](/t/13124) |
 | 3 | r-revision-351 | [Revision 351](/t/12823) |
@@ -100,7 +102,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | r-system-requirements | [System requirements](/t/11743) |
 | 2 | r-software-testing | [Software testing](/t/11773) |
 | 2 | r-performance | [Performance and resources](/t/11974) |
-| 2 | h-troubleshooting | [Troubleshooting](/t/11864) |
+| 2 | r-troubleshooting | [Troubleshooting](/t/11864) |
 | 2 | r-plugins-extensions | [Plugins/extensions](/t/10946) |
 | 2 | r-contacts | [Contacts](/t/11863) |
 | 1 | explanation | [Explanation]() |
@@ -111,6 +113,13 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | e-logs | [Logs](/t/12099) |
 | 2 | e-juju-details | [Juju](/t/11985) |
 | 2 | e-legacy-charm | [Legacy charm](/t/10690) |
+| 2 | e-connection-pooling| [Connection pooling](/t/15777) |
 | 1 | search | [Search](https://canonical.com/data/docs/postgresql/iaas) |
 
 [/details]
+
+<!--Removed from navigation - to be archived.
+| 3 | h-upgrade-intro | [Overview](/t/12086) |
+| 3 | h-upgrade-major | [Perform a major upgrade](/t/12087) |
+| 3 | h-rollback-major | [Perform a major rollback](/t/12088) |
+-->

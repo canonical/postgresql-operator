@@ -170,7 +170,10 @@ Destroy complete! Resources: 1 destroyed.
 ```
 ---
 [note]
+If you expect having several concurrent connections frequently, it is highly recommended to deploy [PgBouncer](https://charmhub.io/pgbouncer?channel=1/stable) alongside PostgreSQL. For more information, read our explanation about [Connection pooling](/t/15777).
+
 For more examples of Terraform modules for VM, including PostgreSQL HA and PostgreSQL + PgBouncer, see the other directories in the [`terraform-modules` repository](https://github.com/canonical/terraform-modules/tree/main/modules/machine).
 [/note]
+
 
 Feel free to [contact us](/t/11863) if you have any question and [collaborate with us on GitHub](https://github.com/canonical/terraform-modules)!
