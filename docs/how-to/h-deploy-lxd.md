@@ -1,18 +1,30 @@
 # How to deploy on LXD
 
-For a detailed walkthrough of deploying the charm on LXD, refer to the [Charmed PostgreSQL Tutorial](/t/9707).
+This guide assumes you have a running Juju and LXD environment. 
 
-For a short summary of the commands on Ubuntu 22.04 LTS, see below:
+For a detailed walkthrough of setting up an environment and deploying the charm on LXD, refer to the [Tutorial](/t/9707).
+
+## Prerequisites
+* Canonical LXD 5.12+
+* Fulfil the general [system requirements](/t/11743)
+
+---
+
+[Bootstrap](https://juju.is/docs/juju/juju-bootstrap) a juju controller and create a [model](https://juju.is/docs/juju/juju-add-model) if you haven't already:
 ```shell
-sudo snap install multipass
-multipass launch --cpus 4 --memory 8G --disk 30G --name my-vm charm-dev # tune CPU/RAM/HDD accordingly to your needs
-multipass shell my-vm
-
-juju add-model postgresql
-juju deploy postgresql --channel 14/stable
+juju bootstrap localhost <controller name>
+juju add-model <model name>
 ```
 
-The expected result from `juju status` is something similar to:
+Deploy PostgreSQL:
+```shell
+juju deploy postgresql
+```
+> See the [`juju deploy` documentation](https://juju.is/docs/juju/juju-deploy) for all available options at deploy time.
+> 
+> See the [Configurations tab](https://charmhub.io/postgresql/configurations) for specific PostgreSQL parameters.
+
+Sample output of `juju status --watch 1s`:
 ```shell
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
 postgresql  overlord    localhost/localhost  2.9.42   unsupported  09:41:53+01:00
@@ -27,4 +39,6 @@ Machine  State    Address       Inst id        Series  AZ  Message
 0        started  10.89.49.129  juju-a8a31d-0  jammy       Running
 ```
 
-Check the [Testing](/t/11773) reference to test your deployment.
+[note]
+If you expect having several concurrent connections frequently, it is highly recommended to deploy [PgBouncer](https://charmhub.io/pgbouncer?channel=1/stable) alongside PostgreSQL. For more information, read our explanation about [Connection pooling](/t/15777).
+[/note]
