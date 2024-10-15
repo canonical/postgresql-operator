@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 from pathlib import PosixPath
 from subprocess import PIPE, CompletedProcess, TimeoutExpired
-from typing import OrderedDict
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
 import botocore as botocore
@@ -576,31 +575,44 @@ def test_format_backup_list(harness):
             == """Storage bucket name: test-bucket
 Backups base path: /test-path/backup/
 
-backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
------------------------------------------------------------------------------------------------------------------------------------------------------------"""
+backup-id            | action              | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | timeline | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------"""
         )
 
         # Test when there are backups.
         backup_list = [
             (
                 "2023-01-01T09:00:00Z",
-                "full",
+                "full backup",
                 "failed: fake error",
                 "None",
                 "0/3000000 / 0/5000000",
                 "2023-01-01T09:00:00Z",
                 "2023-01-01T09:00:05Z",
+                "1",
                 "a/b/c",
             ),
             (
                 "2023-01-01T10:00:00Z",
-                "full",
+                "full backup",
                 "finished",
                 "None",
                 "0/5000000 / 0/7000000",
                 "2023-01-01T10:00:00Z",
-                "2023-01-01T010:00:07Z",
+                "2023-01-01T10:00:07Z",
+                "A",
                 "a/b/d",
+            ),
+            (
+                "2023-01-01T11:00:00Z",
+                "restore",
+                "finished",
+                "None",
+                "n/a",
+                "2023-01-01T11:00:00Z",
+                "n/a",
+                "B",
+                "n/a",
             ),
         ]
         assert (
@@ -608,10 +620,11 @@ backup-id            | type         | status   | reference-backup-id  | LSN star
             == """Storage bucket name: test-bucket
 Backups base path: /test-path/backup/
 
-backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
------------------------------------------------------------------------------------------------------------------------------------------------------------
-2023-01-01T09:00:00Z | full         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2023-01-01T09:00:00Z | 2023-01-01T09:00:05Z | a/b/c
-2023-01-01T10:00:00Z | full         | finished | None                 | 0/5000000 / 0/7000000   | 2023-01-01T10:00:00Z | 2023-01-01T010:00:07Z | a/b/d"""
+backup-id            | action              | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | timeline | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2023-01-01T09:00:00Z | full backup         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2023-01-01T09:00:00Z | 2023-01-01T09:00:05Z | 1        | a/b/c
+2023-01-01T10:00:00Z | full backup         | finished | None                 | 0/5000000 / 0/7000000   | 2023-01-01T10:00:00Z | 2023-01-01T10:00:07Z | A        | a/b/d
+2023-01-01T11:00:00Z | restore             | finished | None                 | n/a                     | 2023-01-01T11:00:00Z | n/a                  | B        | n/a"""
         )
 
 
@@ -629,30 +642,38 @@ def test_generate_backup_list_output(harness):
             "path": " test-path/ ",
         }
         # Test when no backups are returned.
-        _execute_command.return_value = (0, '[{"backup":[]}]', "")
+        _execute_command.side_effect = [(0, '[{"backup":[]}]', ""), (0, "{}", "")]
         assert (
             harness.charm.backup._generate_backup_list_output()
             == """Storage bucket name: test-bucket
 Backups base path: /test-path/backup/
 
-backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
------------------------------------------------------------------------------------------------------------------------------------------------------------"""
+backup-id            | action              | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | timeline | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------"""
         )
 
         # Test when backups are returned.
-        _execute_command.return_value = (
-            0,
-            '[{"backup":[{"label":"20230101-090000F","error":"fake error","reference":null,"lsn":{"start":"0/3000000","stop":"0/5000000"},"timestamp":{"start":1719866711,"stop":1719866714}}]}]',
-            "",
-        )
+        _execute_command.side_effect = [
+            (
+                0,
+                '[{"backup":[{"archive":{"start":"00000001000000000000000B"},"label":"20230101-090000F","error":"fake error","reference":null,"lsn":{"start":"0/3000000","stop":"0/5000000"},"timestamp":{"start":1719866711,"stop":1719866714}}]}]',
+                "",
+            ),
+            (
+                0,
+                '{".":{"type":"path"},"archive/None.postgresql/14-1/00000002.history":{"type": "file","size": 32,"time": 1728937652}}',
+                "",
+            ),
+        ]
         assert (
             harness.charm.backup._generate_backup_list_output()
             == """Storage bucket name: test-bucket
 Backups base path: /test-path/backup/
 
-backup-id            | type         | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | backup-path
------------------------------------------------------------------------------------------------------------------------------------------------------------
-2023-01-01T09:00:00Z | full         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2024-07-01T20:45:11Z | 2024-07-01T20:45:14Z | /None.postgresql/20230101-090000F"""
+backup-id            | action              | status   | reference-backup-id  | LSN start/stop          | start-time           | finish-time          | timeline | backup-path
+-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+2023-01-01T09:00:00Z | full backup         | failed: fake error | None                 | 0/3000000 / 0/5000000   | 2024-07-01T20:45:11Z | 2024-07-01T20:45:14Z | 1        | /None.postgresql/20230101-090000F
+2024-10-14T20:27:32Z | restore             | finished | None                 | n/a                     | 2024-10-14T20:27:32Z | n/a                  | 2        | n/a"""
         )
 
 
@@ -666,22 +687,22 @@ def test_list_backups(harness):
 
         # Test when no backups are available.
         _execute_command.return_value = (0, "[]", "")
-        assert harness.charm.backup._list_backups(show_failed=True) == OrderedDict[str, str]()
+        assert harness.charm.backup._list_backups(show_failed=True) == dict[str, tuple[str, str]]()
 
         # Test when some backups are available.
         _execute_command.return_value = (
             0,
-            '[{"backup":[{"label":"20230101-090000F","error":"fake error"},{"label":"20230101-100000F","error":null}],"name":"test-stanza"}]',
+            '[{"backup":[{"archive":{"start":"00000001000000000000000B"},"label":"20230101-090000F","error":"fake error"},{"archive":{"start":"0000000A000000000000000B"},"label":"20230101-100000F","error":null}],"name":"test-stanza"}]',
             "",
         )
-        assert harness.charm.backup._list_backups(show_failed=True) == OrderedDict[str, str]([
-            ("2023-01-01T09:00:00Z", "test-stanza"),
-            ("2023-01-01T10:00:00Z", "test-stanza"),
+        assert harness.charm.backup._list_backups(show_failed=True) == dict[str, tuple[str, str]]([
+            ("2023-01-01T09:00:00Z", ("test-stanza", "1")),
+            ("2023-01-01T10:00:00Z", ("test-stanza", "A")),
         ])
 
         # Test when some backups are available, but it's not desired to list failed backups.
-        assert harness.charm.backup._list_backups(show_failed=False) == OrderedDict[str, str]([
-            ("2023-01-01T10:00:00Z", "test-stanza")
+        assert harness.charm.backup._list_backups(show_failed=False) == dict[str, tuple[str, str]]([
+            ("2023-01-01T10:00:00Z", ("test-stanza", "A"))
         ])
 
 
@@ -1033,80 +1054,12 @@ def test_on_s3_credential_changed(harness):
         _can_initialise_stanza.assert_called_once()
         _is_primary.assert_not_called()
 
-        # Test that followers will not initialise the bucket (and that only the leader will
-        # remove the "require-change-bucket-after-restore" flag from the application databag).
+        # Test when it's not possible to use the S3 repository due to backups from another cluster.
         with harness.hooks_disabled():
             harness.set_leader()
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.app.name,
-                {"require-change-bucket-after-restore": "True"},
-            )
-        harness.charm.unit.status = ActiveStatus()
-        _render_pgbackrest_conf_file.reset_mock()
-        _can_initialise_stanza.return_value = True
-        _is_primary.return_value = False
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.app.name,
-                {"cluster_initialised": "True"},
-            )
-        harness.charm.backup.s3_client.on.credentials_changed.emit(
-            relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
-        )
-        _render_pgbackrest_conf_file.assert_called_once()
-        assert "require-change-bucket-after-restore" not in harness.get_relation_data(
-            peer_rel_id, harness.charm.app
-        )
-        _is_primary.assert_called_once()
-        _create_bucket_if_not_exists.assert_not_called()
-        assert isinstance(harness.charm.unit.status, ActiveStatus)
-        _can_use_s3_repository.assert_not_called()
-        _initialise_stanza.assert_not_called()
-
-        # Test when the charm render the pgBackRest configuration file, but fails to
-        # access or create the S3 bucket  (and assert that a non-leader unit won't
-        # remove the "require-change-bucket-after-restore" flag from the application
-        # databag).
-        _is_primary.return_value = True
-        for error in [
-            ClientError(
-                error_response={"Error": {"Code": 1, "message": "fake error"}},
-                operation_name="fake operation name",
-            ),
-            ValueError,
-        ]:
-            with harness.hooks_disabled():
-                harness.set_leader(False)
-                harness.update_relation_data(
-                    peer_rel_id,
-                    harness.charm.app.name,
-                    {"require-change-bucket-after-restore": "True"},
-                )
-            _render_pgbackrest_conf_file.reset_mock()
-            _create_bucket_if_not_exists.reset_mock()
-            _create_bucket_if_not_exists.side_effect = error
-            harness.charm.backup.s3_client.on.credentials_changed.emit(
-                relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
-            )
-            _render_pgbackrest_conf_file.assert_called_once()
-            assert (
-                harness.get_relation_data(peer_rel_id, harness.charm.app)[
-                    "require-change-bucket-after-restore"
-                ]
-                == "True"
-            )
-            _create_bucket_if_not_exists.assert_called_once()
-            assert isinstance(harness.charm.unit.status, BlockedStatus)
-            assert (
-                harness.charm.unit.status.message == FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE
-            )
-            _can_use_s3_repository.assert_not_called()
-            _initialise_stanza.assert_not_called()
-
-        # Test when it's not possible to use the S3 repository due to backups from another cluster.
         _create_bucket_if_not_exists.reset_mock()
+        _can_initialise_stanza.return_value = True
+        _is_primary.return_value = True
         _create_bucket_if_not_exists.side_effect = None
         _can_use_s3_repository.return_value = (False, "fake validation message")
         harness.charm.backup.s3_client.on.credentials_changed.emit(
@@ -1376,6 +1329,70 @@ def test_on_list_backups_action(harness):
         mock_event.fail.assert_not_called()
 
 
+def test_list_timelines(harness):
+    with patch("charm.PostgreSQLBackups._execute_command") as _execute_command:
+        _execute_command.return_value = (0, "{}", "")
+        assert harness.charm.backup._list_timelines() == dict[str, tuple[str, str]]()
+
+        _execute_command.return_value = (
+            0,
+            '{".":{"type":"path"},"archive/test-stanza/14-1/00000002.history":{"type": "file","size": 32,"time": 1728937652}}',
+            "",
+        )
+        assert harness.charm.backup._list_timelines() == dict[str, tuple[str, str]]([
+            ("2024-10-14T20:27:32Z", ("test-stanza", "2"))
+        ])
+
+
+def test_get_nearest_timeline(harness):
+    with (
+        patch("charm.PostgreSQLBackups._list_backups") as _list_backups,
+        patch("charm.PostgreSQLBackups._list_timelines") as _list_timelines,
+    ):
+        _list_backups.return_value = dict[str, tuple[str, str]]()
+        _list_timelines.return_value = dict[str, tuple[str, str]]()
+        assert harness.charm.backup._get_nearest_timeline("2022-02-24 05:00:00") is None
+
+        _list_backups.return_value = dict[str, tuple[str, str]]({
+            "2022-02-24T05:00:00Z": ("test-stanza", "1"),
+            "2024-02-24T05:00:00Z": ("test-stanza", "2"),
+        })
+        _list_timelines.return_value = dict[str, tuple[str, str]]({
+            "2023-02-24T05:00:00Z": ("test-stanza", "2")
+        })
+        assert harness.charm.backup._get_nearest_timeline("2025-01-01 00:00:00") == tuple[
+            str, str
+        ](("test-stanza", "2"))
+        assert harness.charm.backup._get_nearest_timeline("2024-01-01 00:00:00") == tuple[
+            str, str
+        ](("test-stanza", "2"))
+        assert harness.charm.backup._get_nearest_timeline("2023-01-01 00:00:00") == tuple[
+            str, str
+        ](("test-stanza", "1"))
+        assert harness.charm.backup._get_nearest_timeline("2022-01-01 00:00:00") is None
+
+
+def test_is_psql_timestamp(harness):
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00+0000") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00+03") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00-01:00") is True
+
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.01") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.01+0000") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.01+03") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.01-01:00") is True
+
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.500001") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.500001+0000") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.500001+03") is True
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24 05:00:00.500001-01:00") is True
+
+    assert harness.charm.backup._is_psql_timestamp("bad data") is False
+    assert harness.charm.backup._is_psql_timestamp("2022-02-24T05:00:00.5000001-01:00") is False
+    assert harness.charm.backup._is_psql_timestamp("2022-24-24 05:00:00") is False
+
+
 def test_on_restore_action(harness):
     with (
         patch("charm.Patroni.start_patroni") as _start_patroni,
@@ -1385,6 +1402,7 @@ def test_on_restore_action(harness):
         patch("charm.PostgreSQLBackups._execute_command") as _execute_command,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
         patch("charm.PostgreSQLBackups._list_backups") as _list_backups,
+        patch("charm.PostgreSQLBackups._list_timelines") as _list_timelines,
         patch("charm.PostgreSQLBackups._fetch_backup_from_id") as _fetch_backup_from_id,
         patch("charm.PostgreSQLBackups._pre_restore_checks") as _pre_restore_checks,
         patch(
@@ -1414,10 +1432,32 @@ def test_on_restore_action(harness):
         # Test when the user provides an invalid backup id.
         mock_event.params = {"backup-id": "2023-01-01T10:00:00Z"}
         _pre_restore_checks.return_value = True
-        _list_backups.return_value = {"2023-01-01T09:00:00Z": harness.charm.backup.stanza_name}
+        _list_backups.return_value = {
+            "2023-01-01T09:00:00Z": (harness.charm.backup.stanza_name, "1")
+        }
+        _list_timelines.return_value = {
+            "2024-02-24T05:00:00Z": (harness.charm.backup.stanza_name, "2")
+        }
         harness.charm.unit.status = ActiveStatus()
         harness.charm.backup._on_restore_action(mock_event)
         _list_backups.assert_called_once_with(show_failed=False)
+        _list_timelines.assert_called_once()
+        _fetch_backup_from_id.assert_not_called()
+        mock_event.fail.assert_called_once()
+        _stop_patroni.assert_not_called()
+        _execute_command.assert_not_called()
+        _restart_database.assert_not_called()
+        _empty_data_files.assert_not_called()
+        _update_config.assert_not_called()
+        _start_patroni.assert_not_called()
+        mock_event.set_results.assert_not_called()
+        assert not isinstance(harness.charm.unit.status, MaintenanceStatus)
+
+        # Test when the user provides an only the timeline backup id leading to the error.
+        mock_event.reset_mock()
+        mock_event.params = {"backup-id": "2024-02-24T05:00:00Z"}
+        harness.charm.unit.status = ActiveStatus()
+        harness.charm.backup._on_restore_action(mock_event)
         _fetch_backup_from_id.assert_not_called()
         mock_event.fail.assert_called_once()
         _stop_patroni.assert_not_called()
@@ -1467,7 +1507,6 @@ def test_on_restore_action(harness):
         assert harness.get_relation_data(peer_rel_id, harness.charm.app) == {
             "restoring-backup": "20230101-090000F",
             "restore-stanza": f"{harness.charm.model.name}.{harness.charm.cluster_name}",
-            "require-change-bucket-after-restore": "True",
         }
         _execute_command.assert_called_once_with(
             [
@@ -1492,6 +1531,39 @@ def test_on_restore_action(harness):
         _execute_command.return_value = (0, "fake stdout", "")
         _fetch_backup_from_id.return_value = "20230101-090000F"
         harness.charm.backup._on_restore_action(mock_event)
+        _restart_database.assert_not_called()
+        mock_event.fail.assert_not_called()
+        mock_event.set_results.assert_called_once_with({"restore-status": "restore started"})
+
+        # Test a successful PITR with the real backup id to the latest.
+        mock_event.reset_mock()
+        mock_event.params = {"backup-id": "2023-01-01T09:00:00Z", "restore-to-time": "latest"}
+        _restart_database.reset_mock()
+        _execute_command.return_value = (0, "fake stdout", "")
+        _fetch_backup_from_id.return_value = "20230101-090000F"
+        harness.charm.backup._on_restore_action(mock_event)
+        assert harness.get_relation_data(peer_rel_id, harness.charm.app) == {
+            "restoring-backup": "20230101-090000F",
+            "restore-timeline": "1",
+            "restore-to-time": "latest",
+            "restore-stanza": f"{harness.charm.model.name}.{harness.charm.cluster_name}",
+        }
+        _restart_database.assert_not_called()
+        mock_event.fail.assert_not_called()
+        mock_event.set_results.assert_called_once_with({"restore-status": "restore started"})
+
+        # Test a successful PITR with only the timestamp.
+        mock_event.reset_mock()
+        mock_event.params = {"restore-to-time": "2025-02-24 05:00:00.001+00"}
+        _restart_database.reset_mock()
+        _execute_command.return_value = (0, "fake stdout", "")
+        _fetch_backup_from_id.return_value = "20230101-090000F"
+        harness.charm.backup._on_restore_action(mock_event)
+        assert harness.get_relation_data(peer_rel_id, harness.charm.app) == {
+            "restore-timeline": "2",
+            "restore-to-time": "2025-02-24 05:00:00.001+00",
+            "restore-stanza": f"{harness.charm.model.name}.{harness.charm.cluster_name}",
+        }
         _restart_database.assert_not_called()
         mock_event.fail.assert_not_called()
         mock_event.set_results.assert_called_once_with({"restore-status": "restore started"})
