@@ -727,7 +727,6 @@ def test_on_start_replica(harness):
 
 
 def test_on_start_no_patroni_member(harness):
-    return
     with (
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache") as _snap_cache,
@@ -982,7 +981,6 @@ def test_on_update_status(harness):
 
 
 def test_on_update_status_after_restore_operation(harness):
-    return
     with (
         patch("charm.ClusterTopologyObserver.start_observer"),
         patch(
@@ -1235,7 +1233,6 @@ def test_restart(harness):
 
 
 def test_update_config(harness):
-    return
     with (
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache"),
@@ -2372,7 +2369,6 @@ def test_update_new_unit_status(harness):
 
 @pytest.mark.parametrize("is_leader", [True, False])
 def test_set_primary_status_message(harness, is_leader):
-    return
     with (
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(

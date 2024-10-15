@@ -561,7 +561,6 @@ def test_execute_command(harness):
 
 
 def test_format_backup_list(harness):
-    return
     with patch(
         "charms.data_platform_libs.v0.s3.S3Requirer.get_s3_connection_info"
     ) as _get_s3_connection_info:
@@ -617,7 +616,6 @@ backup-id            | type         | status   | reference-backup-id  | LSN star
 
 
 def test_generate_backup_list_output(harness):
-    return
     with (
         patch(
             "charms.data_platform_libs.v0.s3.S3Requirer.get_s3_connection_info"
@@ -659,7 +657,6 @@ backup-id            | type         | status   | reference-backup-id  | LSN star
 
 
 def test_list_backups(harness):
-    return
     with patch("charm.PostgreSQLBackups._execute_command") as _execute_command:
         # Test when the command that list the backups fails.
         _execute_command.return_value = (1, "", "fake stderr")
@@ -977,7 +974,6 @@ def test_is_primary_pgbackrest_service_running(harness):
 
 
 def test_on_s3_credential_changed(harness):
-    return
     with (
         patch("charm.PostgreSQLBackups._initialise_stanza") as _initialise_stanza,
         patch("charm.PostgreSQLBackups.can_use_s3_repository") as _can_use_s3_repository,
@@ -1381,7 +1377,6 @@ def test_on_list_backups_action(harness):
 
 
 def test_on_restore_action(harness):
-    return
     with (
         patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
