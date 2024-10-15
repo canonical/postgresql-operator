@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 35
+LIBPATCH = 36
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -81,6 +81,10 @@ class PostgreSQLEnableDisableExtensionError(Exception):
 
 class PostgreSQLGetLastArchivedWALError(Exception):
     """Exception raised when retrieving last archived WAL fails."""
+
+
+class PostgreSQLGetCurrentTimelineError(Exception):
+    """Exception raised when retrieving current timeline id for the PostgreSQL unit fails."""
 
 
 class PostgreSQLGetPostgreSQLVersionError(Exception):
@@ -418,6 +422,16 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user
         except psycopg2.Error as e:
             logger.error(f"Failed to get PostgreSQL last archived WAL: {e}")
             raise PostgreSQLGetLastArchivedWALError()
+
+    def get_current_timeline(self) -> str:
+        """Get the timeline id for the current PostgreSQL unit."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT timeline_id FROM pg_control_checkpoint();")
+                return cursor.fetchone()[0]
+        except psycopg2.Error as e:
+            logger.error(f"Failed to get PostgreSQL current timeline id: {e}")
+            raise PostgreSQLGetCurrentTimelineError()
 
     def get_postgresql_text_search_configs(self) -> Set[str]:
         """Returns the PostgreSQL available text search configs.
