@@ -518,12 +518,16 @@ class PostgreSQLBackups(Object):
         return max(filtered_timelines)[1] if len(filtered_timelines) > 0 else None
 
     def _is_psql_timestamp(self, timestamp: str) -> bool:
-        return bool(
-            re.match(
-                r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?([-+](?:\d{2}|\d{4}|\d{2}:\d{2}))?$",
-                timestamp,
-            )
-        )
+        if not re.match(
+            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?([-+](?:\d{2}|\d{4}|\d{2}:\d{2}))?$",
+            timestamp,
+        ):
+            return False
+        try:
+            self._parse_psql_timestamp(timestamp)
+            return True
+        except ValueError:
+            return False
 
     def _parse_psql_timestamp(self, timestamp: str) -> datetime:
         """Intended to use with data only after _is_psql_timestamp check."""
