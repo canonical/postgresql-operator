@@ -389,11 +389,12 @@ END; $$;"""
 SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}')
 WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user, self.user)
             )
-            statements.append(
-                sql.SQL("ALTER SCHEMA {} OWNER TO {};").format(
-                    schema, sql.Identifier(user)
+            for schema in schemas:
+                statements.append(
+                    sql.SQL("ALTER SCHEMA {} OWNER TO {};").format(
+                        sql.Identifier(schema), sql.Identifier(user)
+                    )
                 )
-            )
         else:
             for schema in schemas:
                 schema = sql.Identifier(schema)
