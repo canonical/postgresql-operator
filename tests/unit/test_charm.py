@@ -737,6 +737,7 @@ def test_on_start_no_patroni_member(harness):
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -1001,11 +1002,15 @@ def test_on_update_status_after_restore_operation(harness):
             "charm.PostgresqlOperatorCharm._handle_processes_failures"
         ) as _handle_processes_failures,
         patch("charm.PostgreSQLBackups.can_use_s3_repository") as _can_use_s3_repository,
+        patch(
+            "charms.postgresql_k8s.v0.postgresql.PostgreSQL.get_current_timeline"
+        ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.get_member_status") as _get_member_status,
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True),
     ):
+        _get_current_timeline.return_value = "2"
         rel_id = harness.model.get_relation(PEER).id
         # Test when the restore operation fails.
         with harness.hooks_disabled():
@@ -1013,7 +1018,7 @@ def test_on_update_status_after_restore_operation(harness):
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"cluster_initialised": "True", "restoring-backup": "2023-01-01T09:00:00Z"},
+                {"cluster_initialised": "True", "restoring-backup": "20230101-090000F"},
             )
         _get_member_status.return_value = "failed"
         harness.charm.on.update_status.emit()
@@ -1041,7 +1046,7 @@ def test_on_update_status_after_restore_operation(harness):
         # Assert that the backup id is still in the application relation databag.
         assert harness.get_relation_data(rel_id, harness.charm.app) == {
             "cluster_initialised": "True",
-            "restoring-backup": "2023-01-01T09:00:00Z",
+            "restoring-backup": "20230101-090000F",
         }
 
         # Test when the restore operation finished successfully.
@@ -1074,7 +1079,7 @@ def test_on_update_status_after_restore_operation(harness):
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"restoring-backup": "2023-01-01T09:00:00Z"},
+                {"restoring-backup": "20230101-090000F"},
             )
         _can_use_s3_repository.return_value = (False, "fake validation message")
         harness.charm.on.update_status.emit()
@@ -1249,6 +1254,7 @@ def test_update_config(harness):
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
         ) as _is_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+        patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Mock some properties.
@@ -1269,9 +1275,9 @@ def test_update_config(harness):
             backup_id=None,
             stanza=None,
             restore_stanza=None,
+            restore_timeline=None,
             pitr_target=None,
             restore_to_latest=False,
-            disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
@@ -1292,9 +1298,9 @@ def test_update_config(harness):
             backup_id=None,
             stanza=None,
             restore_stanza=None,
+            restore_timeline=None,
             pitr_target=None,
             restore_to_latest=False,
-            disable_pgbackrest_archiving=False,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once()
@@ -2376,35 +2382,6 @@ def test_set_primary_status_message(harness, is_leader):
         ) as _is_standby_leader,
         patch("charm.Patroni.get_primary") as _get_primary,
     ):
-        # Test scenario when it's needed to move to another S3 bucket after a restore.
-        databag_containing_restore_data = {
-            "require-change-bucket-after-restore": "True",
-            "restoring-backup": "2024-01-01T09:00:00Z",
-            "restore-stanza": "fake-stanza",
-            "restore-to-time": "",
-        }
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
-                harness.charm.app.name,
-                databag_containing_restore_data,
-            )
-            harness.set_leader(is_leader)
-        harness.charm._set_primary_status_message()
-        harness.get_relation_data(harness.model.get_relation(PEER).id, harness.charm.app.name) == (
-            {"require-change-bucket-after-restore": "True"}
-            if is_leader
-            else databag_containing_restore_data
-        )
-        assert isinstance(harness.charm.unit.status, BlockedStatus)
-
-        # Test other scenarios.
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
-                harness.charm.app.name,
-                {"require-change-bucket-after-restore": ""},
-            )
         for values in itertools.product(
             [
                 RetryError(last_attempt=1),
