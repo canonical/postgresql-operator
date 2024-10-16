@@ -129,11 +129,12 @@ def test_get_member_ip(peers_ips, patroni):
 
 
 def test_get_patroni_health(peers_ips, patroni):
-    with patch("cluster.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay, patch(
-        "cluster.wait_fixed", new_callable=PropertyMock
-    ) as _wait_fixed, patch(
-        "charm.Patroni._patroni_url", new_callable=PropertyMock
-    ) as _patroni_url, patch("requests.get", side_effect=mocked_requests_get) as _get:
+    with (
+        patch("cluster.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay,
+        patch("cluster.wait_fixed", new_callable=PropertyMock) as _wait_fixed,
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
+        patch("requests.get", side_effect=mocked_requests_get) as _get,
+    ):
         # Test when the Patroni API is reachable.
         _patroni_url.return_value = "http://server1"
         health = patroni.get_patroni_health()
@@ -443,9 +444,11 @@ def test_switchover(peers_ips, patroni):
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):
-    with patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed, patch(
-        "cluster.wait_fixed", return_value=wait_fixed(0)
-    ) as _wait_fixed, patch("requests.patch") as _patch:
+    with (
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed,
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)) as _wait_fixed,
+        patch("requests.patch") as _patch,
+    ):
         response = _patch.return_value
         response.status_code = 200
 
@@ -595,9 +598,10 @@ def test_patroni_logs(patroni):
 
 
 def test_last_postgresql_logs(patroni):
-    with patch("glob.glob") as _glob, patch(
-        "builtins.open", mock_open(read_data="fake-logs")
-    ) as _open:
+    with (
+        patch("glob.glob") as _glob,
+        patch("builtins.open", mock_open(read_data="fake-logs")) as _open,
+    ):
         # Test when there are no files to read.
         assert patroni.last_postgresql_logs() == ""
         _open.assert_not_called()
@@ -638,9 +642,10 @@ def test_get_patroni_restart_condition(patroni):
 
 @pytest.mark.parametrize("new_restart_condition", ["on-success", "on-failure"])
 def test_update_patroni_restart_condition(patroni, new_restart_condition):
-    with patch("builtins.open", mock_open(read_data="Restart=always")) as _open, patch(
-        "subprocess.run"
-    ) as _run:
+    with (
+        patch("builtins.open", mock_open(read_data="Restart=always")) as _open,
+        patch("subprocess.run") as _run,
+    ):
         _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
         patroni.update_patroni_restart_condition(new_restart_condition)
         _open.return_value.__enter__.return_value.write.assert_called_once_with(

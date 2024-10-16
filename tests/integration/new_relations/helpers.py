@@ -2,14 +2,13 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import json
-from typing import Dict, Optional
 
 import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_exponential
 
 
-async def get_juju_secret(ops_test: OpsTest, secret_uri: str) -> Dict[str, str]:
+async def get_juju_secret(ops_test: OpsTest, secret_uri: str) -> dict[str, str]:
     """Retrieve juju secret."""
     secret_unique_id = secret_uri.split("/")[-1]
     complete_command = f"show-secret {secret_uri} --reveal --format=json"
@@ -22,10 +21,10 @@ async def build_connection_string(
     application_name: str,
     relation_name: str,
     *,
-    relation_id: Optional[str] = None,
-    relation_alias: Optional[str] = None,
+    relation_id: str | None = None,
+    relation_alias: str | None = None,
     read_only_endpoint: bool = False,
-    database: Optional[str] = None,
+    database: str | None = None,
 ) -> str:
     """Build a PostgreSQL connection string.
 
@@ -123,7 +122,7 @@ async def check_relation_data_existence(
 
 async def get_alias_from_relation_data(
     ops_test: OpsTest, unit_name: str, related_unit_name: str
-) -> Optional[str]:
+) -> str | None:
     """Get the alias that the unit assigned to the related unit application/cluster.
 
     Args:
@@ -164,9 +163,9 @@ async def get_application_relation_data(
     application_name: str,
     relation_name: str,
     key: str,
-    relation_id: Optional[str] = None,
-    relation_alias: Optional[str] = None,
-) -> Optional[str]:
+    relation_id: str | None = None,
+    relation_alias: str | None = None,
+) -> str | None:
     """Get relation data for an application.
 
     Args:

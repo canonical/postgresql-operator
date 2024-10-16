@@ -13,7 +13,6 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from subprocess import TimeoutExpired, run
-from typing import Dict, List, Optional, Tuple
 
 import boto3 as boto3
 import botocore
@@ -92,7 +91,7 @@ class PostgreSQLBackups(Object):
             return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
         return ""
 
-    def _are_backup_settings_ok(self) -> Tuple[bool, Optional[str]]:
+    def _are_backup_settings_ok(self) -> tuple[bool, str | None]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
             return (
@@ -123,7 +122,7 @@ class PostgreSQLBackups(Object):
             )
         )
 
-    def _can_unit_perform_backup(self) -> Tuple[bool, Optional[str]]:
+    def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
@@ -155,7 +154,7 @@ class PostgreSQLBackups(Object):
 
         return self._are_backup_settings_ok()
 
-    def can_use_s3_repository(self) -> Tuple[bool, Optional[str]]:
+    def can_use_s3_repository(self) -> tuple[bool, str | None]:
         """Returns whether the charm was configured to use another cluster repository."""
         # Prevent creating backups and storing in another cluster repository.
         try:
@@ -206,7 +205,7 @@ class PostgreSQLBackups(Object):
         self.charm.unit_peer_data.update({"connectivity": "on" if connectivity else "off"})
         self.charm.update_config()
 
-    def _construct_endpoint(self, s3_parameters: Dict) -> str:
+    def _construct_endpoint(self, s3_parameters: dict) -> str:
         """Construct the S3 service endpoint using the region.
 
         This is needed when the provided endpoint is from AWS, and it doesn't contain the region.
@@ -290,10 +289,10 @@ class PostgreSQLBackups(Object):
 
     def _execute_command(
         self,
-        command: List[str],
-        command_input: Optional[bytes] = None,
-        timeout: Optional[int] = None,
-    ) -> Tuple[int, str, str]:
+        command: list[str],
+        command_input: bytes | None = None,
+        timeout: int | None = None,
+    ) -> tuple[int, str, str]:
         """Execute a command in the workload container."""
 
         def demote():
@@ -529,7 +528,7 @@ class PostgreSQLBackups(Object):
             dt = dt.astimezone(tz=timezone.utc)
         return dt.replace(tzinfo=None)
 
-    def _parse_backup_id(self, label) -> Tuple[str, str]:
+    def _parse_backup_id(self, label) -> tuple[str, str]:
         """Parse backup ID as a timestamp and its type."""
         if label[-1] == "F":
             timestamp = label
@@ -813,7 +812,7 @@ Juju Version: {juju_version!s}
     def _run_backup(
         self,
         event: ActionEvent,
-        s3_parameters: Dict,
+        s3_parameters: dict,
         datetime_backup_requested: str,
         backup_type: str,
     ) -> None:
@@ -1162,7 +1161,7 @@ Stderr:
         self.charm.update_config()
         self.charm._patroni.start_patroni()
 
-    def _retrieve_s3_parameters(self) -> Tuple[Dict, List[str]]:
+    def _retrieve_s3_parameters(self) -> tuple[dict, list[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""
         s3_parameters = self.s3_client.get_s3_connection_info()
         required_parameters = [
@@ -1239,7 +1238,7 @@ Stderr:
         self: str,
         content: str,
         s3_path: str,
-        s3_parameters: Dict,
+        s3_parameters: dict,
     ) -> bool:
         """Uploads the provided contents to the provided S3 bucket.
 

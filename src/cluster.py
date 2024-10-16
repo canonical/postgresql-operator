@@ -10,7 +10,7 @@ import os
 import pwd
 import re
 import subprocess
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import requests
 from charms.operator_libs_linux.v2 import snap
@@ -90,7 +90,7 @@ class Patroni:
         cluster_name: str,
         member_name: str,
         planned_units: int,
-        peers_ips: Set[str],
+        peers_ips: set[str],
         superuser_password: str,
         replication_password: str,
         rewind_password: str,
@@ -250,7 +250,7 @@ class Patroni:
         return ""
 
     def get_primary(
-        self, unit_name_pattern=False, alternative_endpoints: Optional[List[str]] = None
+        self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
     ) -> str:
         """Get primary instance.
 
@@ -281,7 +281,7 @@ class Patroni:
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get standby leader instance.
 
         Args:
@@ -312,7 +312,7 @@ class Patroni:
                             standby_leader = "/".join(standby_leader.rsplit("-", 1))
                         return standby_leader
 
-    def get_sync_standby_names(self) -> List[str]:
+    def get_sync_standby_names(self) -> list[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
@@ -331,7 +331,7 @@ class Patroni:
         return sync_standbys
 
     def _get_alternative_patroni_url(
-        self, attempt: AttemptManager, alternative_endpoints: Optional[List[str]] = None
+        self, attempt: AttemptManager, alternative_endpoints: list[str] | None = None
     ) -> str:
         """Get an alternative REST API URL from another member each time.
 
@@ -389,7 +389,7 @@ class Patroni:
             for member in cluster_status.json()["members"]
         )
 
-    def get_patroni_health(self) -> Dict[str, str]:
+    def get_patroni_health(self) -> dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
             with attempt:
@@ -569,14 +569,14 @@ class Patroni:
         connectivity: bool = False,
         is_creating_backup: bool = False,
         enable_tls: bool = False,
-        stanza: Optional[str] = None,
-        restore_stanza: Optional[str] = None,
+        stanza: str | None = None,
+        restore_stanza: str | None = None,
         disable_pgbackrest_archiving: bool = False,
-        backup_id: Optional[str] = None,
-        pitr_target: Optional[str] = None,
-        restore_timeline: Optional[str] = None,
+        backup_id: str | None = None,
+        pitr_target: str | None = None,
+        restore_timeline: str | None = None,
         restore_to_latest: bool = False,
-        parameters: Optional[dict[str, str]] = None,
+        parameters: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -821,7 +821,7 @@ class Patroni:
         )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def bulk_update_parameters_controller_by_patroni(self, parameters: Dict[str, Any]) -> None:
+    def bulk_update_parameters_controller_by_patroni(self, parameters: dict[str, Any]) -> None:
         """Update the value of a parameter controller by Patroni.
 
         For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
@@ -834,7 +834,7 @@ class Patroni:
             timeout=PATRONI_TIMEOUT,
         )
 
-    def update_synchronous_node_count(self, units: Optional[int] = None) -> None:
+    def update_synchronous_node_count(self, units: int | None = None) -> None:
         """Update synchronous_node_count to the minority of the planned cluster."""
         if units is None:
             units = self.planned_units

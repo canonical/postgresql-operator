@@ -400,9 +400,10 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         connection.close()
 
         # Connect to the database using the replica endpoint.
-        with psycopg2.connect(
-            replica_connection_string
-        ) as connection, connection.cursor() as cursor:
+        with (
+            psycopg2.connect(replica_connection_string) as connection,
+            connection.cursor() as cursor,
+        ):
             # Read some data.
             cursor.execute("SELECT data FROM test;")
             data = cursor.fetchone()

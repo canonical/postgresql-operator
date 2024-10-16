@@ -4,7 +4,7 @@
 """Library containing the implementation of the legacy db and db-admin relations."""
 
 import logging
-from typing import Iterable, List, Set, Tuple
+from collections.abc import Iterable
 
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
@@ -131,7 +131,7 @@ class DbProvides(Object):
 
         self.set_up_relation(event.relation)
 
-    def _get_extensions(self, relation: Relation) -> Tuple[List, Set]:
+    def _get_extensions(self, relation: Relation) -> tuple[list, set]:
         """Returns the list of required and disabled extensions."""
         requested_extensions = relation.data.get(relation.app, {}).get("extensions", "").split(",")
         for unit in relation.units:

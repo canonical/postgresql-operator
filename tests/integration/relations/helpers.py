@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-from typing import Optional
 
 import yaml
 from pytest_operator.plugin import OpsTest
@@ -12,8 +11,8 @@ async def get_legacy_db_connection_str(
     application_name: str,
     relation_name: str,
     read_only_endpoint: bool = False,
-    remote_unit_name: Optional[str] = None,
-) -> Optional[str]:
+    remote_unit_name: str | None = None,
+) -> str | None:
     """Returns a PostgreSQL connection string.
 
     Args:

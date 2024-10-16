@@ -11,7 +11,6 @@ import tempfile
 import zipfile
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional
 
 import botocore
 import psycopg2
@@ -45,8 +44,8 @@ async def build_connection_string(
     application_name: str,
     relation_name: str,
     read_only_endpoint: bool = False,
-    remote_unit_name: Optional[str] = None,
-) -> Optional[str]:
+    remote_unit_name: str | None = None,
+) -> str | None:
     """Returns a PostgreSQL connection string.
 
     Args:
@@ -87,7 +86,7 @@ async def build_connection_string(
 
 
 def change_primary_start_timeout(
-    ops_test: OpsTest, unit_name: str, seconds: Optional[int], password: str
+    ops_test: OpsTest, unit_name: str, seconds: int | None, password: str
 ) -> None:
     """Change primary start timeout configuration.
 
@@ -108,7 +107,7 @@ def change_primary_start_timeout(
             )
 
 
-def get_patroni_cluster(unit_ip: str) -> Dict[str, str]:
+def get_patroni_cluster(unit_ip: str) -> dict[str, str]:
     resp = requests.get(f"http://{unit_ip}:8008/cluster")
     return resp.json()
 
@@ -126,8 +125,8 @@ def assert_sync_standbys(unit_ip: str, standbys: int) -> None:
 
 async def check_database_users_existence(
     ops_test: OpsTest,
-    users_that_should_exist: List[str],
-    users_that_should_not_exist: List[str],
+    users_that_should_exist: list[str],
+    users_that_should_not_exist: list[str],
 ) -> None:
     """Checks that applications users exist in the database.
 
@@ -156,7 +155,7 @@ async def check_database_users_existence(
         assert user not in users_in_db
 
 
-async def check_databases_creation(ops_test: OpsTest, databases: List[str]) -> None:
+async def check_databases_creation(ops_test: OpsTest, databases: list[str]) -> None:
     """Checks that database and tables are successfully created for the application.
 
     Args:
@@ -255,7 +254,7 @@ def construct_endpoint(endpoint: str, region: str) -> str:
     return endpoint
 
 
-def convert_records_to_dict(records: List[tuple]) -> dict:
+def convert_records_to_dict(records: list[tuple]) -> dict:
     """Converts psycopg2 records list to a dict."""
     records_dict = {}
     for record in records:
@@ -291,10 +290,10 @@ async def deploy_and_relate_application_with_postgresql(
     charm: str,
     application_name: str,
     number_of_units: int,
-    config: Optional[Dict] = None,
+    config: dict | None = None,
     channel: str = "stable",
     relation: str = "db",
-    series: Optional[str] = None,
+    series: str | None = None,
 ) -> int:
     """Helper function to deploy and relate application with PostgreSQL.
 
@@ -346,11 +345,11 @@ async def deploy_and_relate_bundle_with_postgresql(
     ops_test: OpsTest,
     bundle_name: str,
     main_application_name: str,
-    main_application_num_units: Optional[int] = None,
+    main_application_num_units: int | None = None,
     relation_name: str = "db",
     status: str = "active",
-    status_message: Optional[str] = None,
-    overlay: Optional[Dict] = None,
+    status_message: str | None = None,
+    overlay: dict | None = None,
     timeout: int = 2000,
 ) -> str:
     """Helper function to deploy and relate a bundle with PostgreSQL.
@@ -489,7 +488,7 @@ async def execute_query_on_unit(
     password: str,
     query: str,
     database: str = "postgres",
-    sslmode: Optional[str] = None,
+    sslmode: str | None = None,
 ):
     """Execute given PostgreSQL query on a unit.
 
@@ -504,10 +503,13 @@ async def execute_query_on_unit(
         A list of rows that were potentially returned from the query.
     """
     extra_connection_parameters = f"sslmode={sslmode}" if sslmode else ""
-    with psycopg2.connect(
-        f"dbname='{database}' user='operator' host='{unit_address}'"
-        f"password='{password}' connect_timeout=10 {extra_connection_parameters}"
-    ) as connection, connection.cursor() as cursor:
+    with (
+        psycopg2.connect(
+            f"dbname='{database}' user='operator' host='{unit_address}'"
+            f"password='{password}' connect_timeout=10 {extra_connection_parameters}"
+        ) as connection,
+        connection.cursor() as cursor,
+    ):
         cursor.execute(query)
         output = list(itertools.chain(*cursor.fetchall()))
     return output
@@ -532,7 +534,7 @@ async def find_unit(ops_test: OpsTest, application: str, leader: bool) -> Unit:
     return ret_unit
 
 
-def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]:
+def get_application_units(ops_test: OpsTest, application_name: str) -> list[str]:
     """List the unit names of an application.
 
     Args:
@@ -547,7 +549,7 @@ def get_application_units(ops_test: OpsTest, application_name: str) -> List[str]
     ]
 
 
-def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[str]:
+def get_application_units_ips(ops_test: OpsTest, application_name: str) -> list[str]:
     """List the unit IPs of an application.
 
     Args:
@@ -560,7 +562,7 @@ def get_application_units_ips(ops_test: OpsTest, application_name: str) -> List[
     return [unit.public_address for unit in ops_test.model.applications[application_name].units]
 
 
-async def get_landscape_api_credentials(ops_test: OpsTest) -> List[str]:
+async def get_landscape_api_credentials(ops_test: OpsTest) -> list[str]:
     """Returns the key and secret to be used in the Landscape API.
 
     Args:
@@ -580,7 +582,7 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> List[str]:
     return output
 
 
-async def get_leader_unit(ops_test: OpsTest, app: str, model: Model = None) -> Optional[Unit]:
+async def get_leader_unit(ops_test: OpsTest, app: str, model: Model = None) -> Unit | None:
     if model is None:
         model = ops_test.model
 
@@ -841,9 +843,10 @@ def has_relation_exited(
 
 def remove_chown_workaround(original_charm_filename: str, patched_charm_filename: str) -> None:
     """Remove the chown workaround from the charm."""
-    with zipfile.ZipFile(original_charm_filename, "r") as charm_file, zipfile.ZipFile(
-        patched_charm_filename, "w"
-    ) as modified_charm_file:
+    with (
+        zipfile.ZipFile(original_charm_filename, "r") as charm_file,
+        zipfile.ZipFile(patched_charm_filename, "w") as modified_charm_file,
+    ):
         # Iterate the input files
         unix_attributes = {}
         for charm_info in charm_file.infolist():
@@ -973,7 +976,7 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
 
 
 async def set_password(
-    ops_test: OpsTest, unit_name: str, username: str = "operator", password: Optional[str] = None
+    ops_test: OpsTest, unit_name: str, username: str = "operator", password: str | None = None
 ):
     """Set a user password using the action.
 
@@ -1019,7 +1022,7 @@ async def stop_machine(ops_test: OpsTest, machine_name: str) -> None:
 
 
 def switchover(
-    ops_test: OpsTest, current_primary: str, password: str, candidate: Optional[str] = None
+    ops_test: OpsTest, current_primary: str, password: str, candidate: str | None = None
 ) -> None:
     """Trigger a switchover.
 

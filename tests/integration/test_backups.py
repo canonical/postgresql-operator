@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import logging
 import uuid
-from typing import Dict, Tuple
 
 import boto3
 import pytest as pytest
@@ -93,7 +92,7 @@ async def cloud_configs(github_secrets) -> None:
 
 @pytest.mark.group("AWS")
 @pytest.mark.abort_on_fail
-async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
+async def test_backup_aws(ops_test: OpsTest, cloud_configs: tuple[dict, dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in AWS, test backup and restore actions."""
     config = cloud_configs[0][AWS]
     credentials = cloud_configs[1][AWS]
@@ -173,7 +172,7 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
 
 @pytest.mark.group("GCP")
 @pytest.mark.abort_on_fail
-async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
+async def test_backup_gcp(ops_test: OpsTest, cloud_configs: tuple[dict, dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in GCP, test backup and restore actions."""
     config = cloud_configs[0][GCP]
     credentials = cloud_configs[1][GCP]
@@ -298,7 +297,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
 
 @pytest.mark.group("GCP")
 async def test_invalid_config_and_recovery_after_fixing_it(
-    ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
+    ops_test: OpsTest, cloud_configs: tuple[dict, dict]
 ) -> None:
     """Test that the charm can handle invalid and valid backup configurations."""
     database_app_name = f"new-{DATABASE_APP_NAME}"

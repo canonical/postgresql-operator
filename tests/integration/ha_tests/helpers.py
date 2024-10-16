@@ -8,7 +8,6 @@ import random
 import subprocess
 from pathlib import Path
 from tempfile import mkstemp
-from typing import Dict, Optional, Set, Tuple, Union
 
 import psycopg2
 import requests
@@ -89,7 +88,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str
 
 async def are_writes_increasing(
     ops_test,
-    down_unit: Optional[str] = None,
+    down_unit: str | None = None,
     use_ip_from_inside: bool = False,
     extra_model: Model = None,
 ) -> None:
@@ -116,7 +115,7 @@ async def are_writes_increasing(
 
 async def app_name(
     ops_test: OpsTest, application_name: str = "postgresql", model: Model = None
-) -> Optional[str]:
+) -> str | None:
     """Returns the name of the cluster running PostgreSQL.
 
     This is important since not all deployments of the PostgreSQL charm have the application name
@@ -140,7 +139,7 @@ async def app_name(
 async def change_patroni_setting(
     ops_test: OpsTest,
     setting: str,
-    value: Union[int, bool],
+    value: int | bool,
     password: str,
     use_random_unit: bool = False,
     tls: bool = False,
@@ -265,10 +264,10 @@ async def check_writes(
 
 async def count_writes(
     ops_test: OpsTest,
-    down_unit: Optional[str] = None,
+    down_unit: str | None = None,
     use_ip_from_inside: bool = False,
     extra_model: Model = None,
-) -> Tuple[Dict[str, int], Dict[str, int]]:
+) -> tuple[dict[str, int], dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
     password = await get_password(ops_test, app, down_unit)
@@ -298,7 +297,7 @@ async def count_writes(
     return count_writes_on_members(members, password, down_ips)
 
 
-def count_writes_on_members(members, password, down_ips) -> Tuple[Dict[str, int], Dict[str, int]]:
+def count_writes_on_members(members, password, down_ips) -> tuple[dict[str, int], dict[str, int]]:
     count = {}
     maximum = {}
     for member in members:
@@ -313,9 +312,10 @@ def count_writes_on_members(members, password, down_ips) -> Tuple[Dict[str, int]
             member_name = f'{member["model"]}.{member["name"]}'
             connection = None
             try:
-                with psycopg2.connect(
-                    connection_string
-                ) as connection, connection.cursor() as cursor:
+                with (
+                    psycopg2.connect(connection_string) as connection,
+                    connection.cursor() as cursor,
+                ):
                     cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
                     results = cursor.fetchone()
                     count[member_name] = results[0]
@@ -415,7 +415,7 @@ async def get_ip_from_inside_the_unit(ops_test: OpsTest, unit_name: str) -> str:
     return stdout.splitlines()[0].strip()
 
 
-async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False) -> Optional[int]:
+async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False) -> int | None:
     """Get the value of one of the integer Patroni settings.
 
     Args:
@@ -437,7 +437,7 @@ async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False
             return int(value) if value is not None else None
 
 
-async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> Optional[int]:
+async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> int | None:
     """Get the value of a PostgreSQL parameter from Patroni API.
 
     Args:
@@ -504,7 +504,7 @@ async def get_sync_standby(ops_test: OpsTest, model: Model, application_name: st
             return member["name"]
 
 
-async def get_password(ops_test: OpsTest, app: str, down_unit: Optional[str] = None) -> str:
+async def get_password(ops_test: OpsTest, app: str, down_unit: str | None = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 
     Returns:
@@ -555,9 +555,10 @@ async def is_connection_possible(
     try:
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
-                with db_connect(
-                    host=address, password=password
-                ) as connection, connection.cursor() as cursor:
+                with (
+                    db_connect(host=address, password=password) as connection,
+                    connection.cursor() as cursor,
+                ):
                     cursor.execute("SELECT 1;")
                     success = cursor.fetchone()[0] == 1
                 connection.close()
@@ -632,7 +633,7 @@ async def instance_ip(ops_test: OpsTest, instance: str) -> str:
             return line.split()[2]
 
 
-async def get_primary(ops_test: OpsTest, app, down_unit: Optional[str] = None) -> str:
+async def get_primary(ops_test: OpsTest, app, down_unit: str | None = None) -> str:
     """Use the charm action to retrieve the primary from provided application.
 
     Args:
@@ -654,7 +655,7 @@ async def get_primary(ops_test: OpsTest, app, down_unit: Optional[str] = None) -
     return None
 
 
-async def list_wal_files(ops_test: OpsTest, app: str) -> Set:
+async def list_wal_files(ops_test: OpsTest, app: str) -> set:
     """Returns the list of WAL segment files in each unit."""
     units = [unit.name for unit in ops_test.model.applications[app].units]
     command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
@@ -744,8 +745,8 @@ async def is_secondary_up_to_date(
     """
     app = await app_name(ops_test)
     password = await get_password(ops_test, app)
-    host = next(
-        await (
+    host = await anext(
+        (
             get_ip_from_inside_the_unit(ops_test, unit.name)
             if use_ip_from_inside
             else get_unit_ip(ops_test, unit.name)
@@ -760,9 +761,11 @@ async def is_secondary_up_to_date(
 
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt, psycopg2.connect(
-                connection_string
-            ) as connection, connection.cursor() as cursor:
+            with (
+                attempt,
+                psycopg2.connect(connection_string) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
                 results = cursor.fetchone()
                 assert results[0] == expected_writes and results[1] == expected_writes

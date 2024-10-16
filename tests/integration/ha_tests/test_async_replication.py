@@ -5,7 +5,6 @@ import contextlib
 import logging
 import subprocess
 from asyncio import gather
-from typing import Optional
 
 import psycopg2
 import pytest as pytest
@@ -45,9 +44,7 @@ DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 
 @contextlib.asynccontextmanager
-async def fast_forward(
-    model: Model, fast_interval: str = "10s", slow_interval: Optional[str] = None
-):
+async def fast_forward(model: Model, fast_interval: str = "10s", slow_interval: str | None = None):
     """Adaptation of OpsTest.fast_forward to work with different models."""
     update_interval_key = "update-status-hook-interval"
     interval_after = (
