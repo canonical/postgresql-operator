@@ -353,8 +353,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         host = unit.public_address
         logger.info("connecting to the database host: %s", host)
-        with db_connect(host, password) as connection:
-            with connection.cursor() as cursor:
-                # Ensure we can read from "primarydeletiontest" table
-                cursor.execute("SELECT * FROM primarydeletiontest;")
+        with db_connect(host, password) as connection, connection.cursor() as cursor:
+            # Ensure we can read from "primarydeletiontest" table
+            cursor.execute("SELECT * FROM primarydeletiontest;")
         connection.close()

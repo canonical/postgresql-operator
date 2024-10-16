@@ -22,10 +22,10 @@ async def build_connection_string(
     application_name: str,
     relation_name: str,
     *,
-    relation_id: str = None,
-    relation_alias: str = None,
+    relation_id: Optional[str] = None,
+    relation_alias: Optional[str] = None,
     read_only_endpoint: bool = False,
-    database: str = None,
+    database: Optional[str] = None,
 ) -> str:
     """Build a PostgreSQL connection string.
 
@@ -164,8 +164,8 @@ async def get_application_relation_data(
     application_name: str,
     relation_name: str,
     key: str,
-    relation_id: str = None,
-    relation_alias: str = None,
+    relation_id: Optional[str] = None,
+    relation_alias: Optional[str] = None,
 ) -> Optional[str]:
     """Get relation data for an application.
 

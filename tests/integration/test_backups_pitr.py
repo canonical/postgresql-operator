@@ -26,17 +26,11 @@ CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
     TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
-    if architecture.architecture == "arm64":
-        TLS_CHANNEL = "legacy/edge"
-    else:
-        TLS_CHANNEL = "legacy/stable"
+    TLS_CHANNEL = "legacy/edge" if architecture.architecture == "arm64" else "legacy/stable"
     TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-    if architecture.architecture == "arm64":
-        TLS_CHANNEL = "latest/edge"
-    else:
-        TLS_CHANNEL = "latest/stable"
+    TLS_CHANNEL = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
     TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)

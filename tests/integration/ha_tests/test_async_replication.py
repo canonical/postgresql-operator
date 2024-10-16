@@ -50,10 +50,9 @@ async def fast_forward(
 ):
     """Adaptation of OpsTest.fast_forward to work with different models."""
     update_interval_key = "update-status-hook-interval"
-    if slow_interval:
-        interval_after = slow_interval
-    else:
-        interval_after = (await model.get_config())[update_interval_key]
+    interval_after = (
+        slow_interval if slow_interval else (await model.get_config())[update_interval_key]
+    )
 
     await model.set_config({update_interval_key: fast_interval})
     yield

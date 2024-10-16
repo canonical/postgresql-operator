@@ -1,5 +1,6 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import contextlib
 import json
 import logging
 import os
@@ -62,10 +63,7 @@ class ProcessRunningError(Exception):
 async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str) -> bool:
     """Verifies that all units of the charm do not have the DB process running."""
     app = await app_name(ops_test)
-    if "/" in process:
-        pgrep_cmd = ("pgrep", "-f", process)
-    else:
-        pgrep_cmd = ("pgrep", "-x", process)
+    pgrep_cmd = ("pgrep", "-f", process) if "/" in process else ("pgrep", "-x", process)
 
     try:
         for attempt in Retrying(stop=stop_after_delay(400), wait=wait_fixed(3)):
@@ -79,7 +77,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str
 
                     # If something was returned, there is a running process.
                     if len(processes) > 0:
-                        logger.info("Unit %s not yet down" % unit.name)
+                        logger.info("Unit {unit.name} not yet down")
                         # Try to rekill the unit
                         await send_signal_to_process(ops_test, unit.name, process, signal)
                         raise ProcessRunningError
@@ -90,7 +88,10 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str
 
 
 async def are_writes_increasing(
-    ops_test, down_unit: str = None, use_ip_from_inside: bool = False, extra_model: Model = None
+    ops_test,
+    down_unit: Optional[str] = None,
+    use_ip_from_inside: bool = False,
+    extra_model: Model = None,
 ) -> None:
     """Verify new writes are continuing by counting the number of writes."""
     writes, _ = await count_writes(
@@ -155,10 +156,7 @@ async def change_patroni_setting(
             so it uses the primary).
         tls: if Patroni is serving using tls.
     """
-    if tls:
-        schema = "https"
-    else:
-        schema = "http"
+    schema = "https" if tls else "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
@@ -267,7 +265,7 @@ async def check_writes(
 
 async def count_writes(
     ops_test: OpsTest,
-    down_unit: str = None,
+    down_unit: Optional[str] = None,
     use_ip_from_inside: bool = False,
     extra_model: Model = None,
 ) -> Tuple[Dict[str, int], Dict[str, int]]:
@@ -287,8 +285,8 @@ async def count_writes(
                         else get_unit_ip(ops_test, unit.name)
                     )
                 )["members"]
-                for index, member_data in enumerate(members_data):
-                    members_data[index]["model"] = model.info.name
+                for member_data in members_data:
+                    member_data["model"] = model.info.name
                 members.extend(members_data)
                 break
     down_ips = []
@@ -350,11 +348,9 @@ def cut_network_from_unit_without_ip_change(machine_name: str) -> None:
         machine_name: lxc container hostname
     """
     override_command = f"lxc config device override {machine_name} eth0"
-    try:
+    # Ignore if the interface was already overridden.
+    with contextlib.suppress(subprocess.CalledProcessError):
         subprocess.check_call(override_command.split())
-    except subprocess.CalledProcessError:
-        # Ignore if the interface was already overridden.
-        pass
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.egress=0kbit"
     subprocess.check_call(limit_set_command.split())
     limit_set_command = f"lxc config device set {machine_name} eth0 limits.ingress=1kbit"
@@ -403,10 +399,10 @@ async def get_controller_machine(ops_test: OpsTest) -> str:
 
     controller = yaml.safe_load(raw_controller.strip())
 
-    return [
+    return next(
         machine.get("instance-id")
         for machine in controller[ops_test.controller_name]["controller-machines"].values()
-    ][0]
+    )
 
 
 async def get_ip_from_inside_the_unit(ops_test: OpsTest, unit_name: str) -> str:
@@ -430,10 +426,7 @@ async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False
     Returns:
         the value of the configuration or None if it's using the default value.
     """
-    if tls:
-        schema = "https"
-    else:
-        schema = "http"
+    schema = "https" if tls else "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
@@ -511,7 +504,7 @@ async def get_sync_standby(ops_test: OpsTest, model: Model, application_name: st
             return member["name"]
 
 
-async def get_password(ops_test: OpsTest, app: str, down_unit: str = None) -> str:
+async def get_password(ops_test: OpsTest, app: str, down_unit: Optional[str] = None) -> str:
     """Use the charm action to retrieve the password from provided application.
 
     Returns:
@@ -639,7 +632,7 @@ async def instance_ip(ops_test: OpsTest, instance: str) -> str:
             return line.split()[2]
 
 
-async def get_primary(ops_test: OpsTest, app, down_unit: str = None) -> str:
+async def get_primary(ops_test: OpsTest, app, down_unit: Optional[str] = None) -> str:
     """Use the charm action to retrieve the primary from provided application.
 
     Args:
@@ -685,10 +678,7 @@ async def send_signal_to_process(
         await ops_test.model.applications[app].add_unit(count=1)
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=1000)
 
-    if "/" in process:
-        opt = "-f"
-    else:
-        opt = "-x"
+    opt = "-f" if "/" in process else "-x"
 
     command = f"exec --unit {unit_name} -- pkill --signal {signal} {opt} {process}"
 
@@ -754,7 +744,7 @@ async def is_secondary_up_to_date(
     """
     app = await app_name(ops_test)
     password = await get_password(ops_test, app)
-    host = [
+    host = next(
         await (
             get_ip_from_inside_the_unit(ops_test, unit.name)
             if use_ip_from_inside
@@ -762,7 +752,7 @@ async def is_secondary_up_to_date(
         )
         for unit in ops_test.model.applications[app].units
         if unit.name == unit_name
-    ][0]
+    )
     connection_string = (
         f"dbname='{APPLICATION_NAME.replace('-', '_')}_database' user='operator'"
         f" host='{host}' password='{password}' connect_timeout=10"
@@ -770,13 +760,12 @@ async def is_secondary_up_to_date(
 
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                with psycopg2.connect(
-                    connection_string
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
-                    results = cursor.fetchone()
-                    assert results[0] == expected_writes and results[1] == expected_writes
+            with attempt, psycopg2.connect(
+                connection_string
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT COUNT(number), MAX(number) FROM continuous_writes;")
+                results = cursor.fetchone()
+                assert results[0] == expected_writes and results[1] == expected_writes
     except RetryError:
         return False
     finally:
@@ -831,7 +820,7 @@ async def update_restart_condition(ops_test: OpsTest, unit, condition: str):
     # Load the service file from the unit and update it with the new delay.
     _, temp_path = mkstemp()
     await unit.scp_from(source=PATRONI_SERVICE_DEFAULT_PATH, destination=temp_path)
-    with open(temp_path, "r") as patroni_service_file:
+    with open(temp_path) as patroni_service_file:
         patroni_service = patroni_service_file.readlines()
 
     for index, line in enumerate(patroni_service):
@@ -943,7 +932,7 @@ async def add_unit_with_storage(ops_test, app, storage):
 
     # verify storage attached
     curr_units = [unit.name for unit in ops_test.model.applications[app].units]
-    new_unit = list(set(curr_units) - set(prev_units))[0]
+    new_unit = next(set(curr_units) - set(prev_units))
     assert storage_id(ops_test, new_unit) == storage, "unit added with incorrect storage"
 
     # return a reference to newly added unit

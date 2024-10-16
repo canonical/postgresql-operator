@@ -45,7 +45,7 @@ async def build_connection_string(
     application_name: str,
     relation_name: str,
     read_only_endpoint: bool = False,
-    remote_unit_name: str = None,
+    remote_unit_name: Optional[str] = None,
 ) -> Optional[str]:
     """Returns a PostgreSQL connection string.
 
@@ -291,10 +291,10 @@ async def deploy_and_relate_application_with_postgresql(
     charm: str,
     application_name: str,
     number_of_units: int,
-    config: dict = None,
+    config: Optional[Dict] = None,
     channel: str = "stable",
     relation: str = "db",
-    series: str = None,
+    series: Optional[str] = None,
 ) -> int:
     """Helper function to deploy and relate application with PostgreSQL.
 
@@ -346,11 +346,11 @@ async def deploy_and_relate_bundle_with_postgresql(
     ops_test: OpsTest,
     bundle_name: str,
     main_application_name: str,
-    main_application_num_units: int = None,
+    main_application_num_units: Optional[int] = None,
     relation_name: str = "db",
     status: str = "active",
-    status_message: str = None,
-    overlay: Dict = None,
+    status_message: Optional[str] = None,
+    overlay: Optional[Dict] = None,
     timeout: int = 2000,
 ) -> str:
     """Helper function to deploy and relate a bundle with PostgreSQL.
@@ -489,7 +489,7 @@ async def execute_query_on_unit(
     password: str,
     query: str,
     database: str = "postgres",
-    sslmode: str = None,
+    sslmode: Optional[str] = None,
 ):
     """Execute given PostgreSQL query on a unit.
 
@@ -783,11 +783,7 @@ async def check_tls_replication(ops_test: OpsTest, unit_name: str, enabled: bool
         " JOIN pg_stat_activity pg_sa ON pg_ssl.pid = pg_sa.pid"
         " AND pg_sa.usename = 'replication';",
     )
-
-    for i in range(0, len(output), 2):
-        if output[i] != enabled:
-            return False
-    return True
+    return all(output[i] == enabled for i in range(0, len(output), 2))
 
 
 async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
@@ -892,11 +888,11 @@ async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
         ops_test: The ops test framework instance
         old_primary: The name of the unit that was the primary before.
     """
-    other_unit = [
+    other_unit = next(
         unit.name
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units
         if unit.name != old_primary
-    ][0]
+    )
     primary = await get_primary(ops_test, other_unit)
     return primary != old_primary
 
@@ -977,7 +973,7 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
 
 
 async def set_password(
-    ops_test: OpsTest, unit_name: str, username: str = "operator", password: str = None
+    ops_test: OpsTest, unit_name: str, username: str = "operator", password: Optional[str] = None
 ):
     """Set a user password using the action.
 
@@ -1023,7 +1019,7 @@ async def stop_machine(ops_test: OpsTest, machine_name: str) -> None:
 
 
 def switchover(
-    ops_test: OpsTest, current_primary: str, password: str, candidate: str = None
+    ops_test: OpsTest, current_primary: str, password: str, candidate: Optional[str] = None
 ) -> None:
     """Trigger a switchover.
 

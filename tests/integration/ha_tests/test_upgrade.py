@@ -136,10 +136,7 @@ async def test_fail_and_rollback(ops_test, continuous_writes) -> None:
     await action.wait()
 
     local_charm = await ops_test.build_charm(".")
-    if isinstance(local_charm, str):
-        filename = local_charm.split("/")[-1]
-    else:
-        filename = local_charm.name
+    filename = local_charm.split("/")[-1] if isinstance(local_charm, str) else local_charm.name
     fault_charm = Path("/tmp/", filename)
     shutil.copy(local_charm, fault_charm)
 

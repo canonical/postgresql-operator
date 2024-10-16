@@ -12,7 +12,7 @@ from ops.testing import Harness
 from tenacity import RetryError, stop_after_delay, wait_fixed
 
 from charm import PostgresqlOperatorCharm
-from cluster import Patroni
+from cluster import PATRONI_TIMEOUT, Patroni
 from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -332,7 +332,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
-        with open("templates/patroni.yml.j2", "r") as f:
+        with open("templates/patroni.yml.j2") as f:
             mock = mock_open(read_data=f.read())
 
         # Patch the `open` method with our mock.
@@ -341,7 +341,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
-        assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2", "r")
+        assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2",)
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
@@ -416,7 +416,10 @@ def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
-            f"http://{patroni.unit_ip}:8008/reinitialize", verify=True, auth=patroni._patroni_auth
+            f"http://{patroni.unit_ip}:8008/reinitialize",
+            verify=True,
+            auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
 
@@ -435,6 +438,7 @@ def test_switchover(peers_ips, patroni):
             json={"leader": "primary"},
             verify=True,
             auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
 
@@ -452,6 +456,7 @@ def test_update_synchronous_node_count(peers_ips, patroni):
             json={"synchronous_node_count": 0},
             verify=True,
             auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
         # Test when the request fails.
@@ -605,7 +610,7 @@ def test_last_postgresql_logs(patroni):
         ]
         assert patroni.last_postgresql_logs() == "fake-logs"
         _open.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3"
         )
 
         # Test when the charm fails to read the logs.
@@ -613,7 +618,7 @@ def test_last_postgresql_logs(patroni):
         _open.side_effect = OSError
         assert patroni.last_postgresql_logs() == ""
         _open.assert_called_with(
-            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3"
         )
 
 

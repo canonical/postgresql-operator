@@ -4,6 +4,7 @@
 
 """Charmed Machine Operator for the PostgreSQL database."""
 
+import contextlib
 import json
 import logging
 import os
@@ -114,6 +115,10 @@ Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
 
 
+class CannotConnectError(Exception):
+    """Cannot run smoke check on connected Database."""
+
+
 @trace_charm(
     tracing_endpoint="tracing_endpoint",
     extra_types=(
@@ -163,10 +168,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
 
         juju_version = JujuVersion.from_environ()
-        if juju_version.major > 2:
-            run_cmd = "/usr/bin/juju-exec"
-        else:
-            run_cmd = "/usr/bin/juju-run"
+        run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
         self._observer = ClusterTopologyObserver(self, run_cmd)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -398,7 +400,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def _updated_synchronous_node_count(self, num_units: int = None) -> bool:
+    def _updated_synchronous_node_count(self, num_units: Optional[int] = None) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
         try:
             self._patroni.update_synchronous_node_count(num_units)
@@ -804,7 +806,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Remove IPs from the members list."""
         self._update_members_ips(ip_to_remove=ip)
 
-    def _update_members_ips(self, ip_to_add: str = None, ip_to_remove: str = None) -> None:
+    def _update_members_ips(
+        self, ip_to_add: Optional[str] = None, ip_to_remove: Optional[str] = None
+    ) -> None:
         """Update cluster member IPs on application data.
 
         Member IPs on application data are used to determine when a unit of PostgreSQL
@@ -891,9 +895,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Create the user home directory for the snap_daemon user.
         # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
         try:
-            subprocess.check_call("mkdir -p /home/snap_daemon".split())
-            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())
+            # Input is hardcoded
+            subprocess.check_call("mkdir -p /home/snap_daemon".split())  # noqa: S603
+            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())  # noqa: S603
+            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())  # noqa: S603
         except subprocess.CalledProcessError:
             logger.exception("Unable to create snap_daemon home dir")
 
@@ -991,7 +996,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 )
                 return
 
-    def enable_disable_extensions(self, database: str = None) -> None:
+    def enable_disable_extensions(self, database: Optional[str] = None) -> None:
         """Enable/disable PostgreSQL extensions set through config options.
 
         Args:
@@ -1126,9 +1131,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        if postgres_snap.revision != list(
+        if postgres_snap.revision != next(
             filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
-        )[0][1]["revision"].get(platform.machine()):
+        )[1]["revision"].get(platform.machine()):
             logger.debug(
                 "Early exit _setup_exporter: snap was not refreshed to the right version yet"
             )
@@ -1274,11 +1279,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             other_cluster_primary = self._patroni.get_primary(
                 alternative_endpoints=other_cluster_endpoints
             )
-            other_cluster_primary_ip = [
+            other_cluster_primary_ip = next(
                 replication_offer_relation.data[unit].get("private-address")
                 for unit in replication_offer_relation.units
                 if unit.name.replace("/", "-") == other_cluster_primary
-            ][0]
+            )
             try:
                 self.postgresql.update_user_password(
                     username, password, database_host=other_cluster_primary_ip
@@ -1538,7 +1543,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
         try:
-            subprocess.check_call(["mountpoint", "-q", self._storage_path])
+            # Storage path is constant
+            subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
             return True
         except subprocess.CalledProcessError:
             return False
@@ -1580,10 +1586,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         event.defer()
         logger.error("Data directory not attached. Reboot unit.")
         self.unit.status = WaitingStatus("Data directory not attached")
-        try:
-            subprocess.check_call(["systemctl", "reboot"])
-        except subprocess.CalledProcessError:
-            pass
+        with contextlib.suppress(subprocess.CalledProcessError):
+            # Call is constant
+            subprocess.check_call(["/usr/bin/systemctl", "reboot"])  # noqa: S603
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
@@ -1605,7 +1610,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for attempt in Retrying(wait=wait_fixed(3), stop=stop_after_delay(300)):
                 with attempt:
                     if not self._can_connect_to_postgresql:
-                        assert False
+                        raise CannotConnectError
         except Exception:
             logger.exception("Unable to reconnect to postgresql")
 
@@ -1627,7 +1632,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
                 with attempt:
-                    assert self.postgresql.get_postgresql_timezones()
+                    if not self.postgresql.get_postgresql_timezones():
+                        raise CannotConnectError
         except RetryError:
             logger.debug("Cannot connect to database")
             return False
@@ -1677,10 +1683,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Use config value if set, calculate otherwise
-        if self.config.experimental_max_connections:
-            max_connections = self.config.experimental_max_connections
-        else:
-            max_connections = max(4 * os.cpu_count(), 100)
+        max_connections = (
+            self.config.experimental_max_connections
+            if self.config.experimental_max_connections
+            else max(4 * os.cpu_count(), 100)
+        )
 
         self._patroni.bulk_update_parameters_controller_by_patroni({
             "max_connections": max_connections,

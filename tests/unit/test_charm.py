@@ -1193,7 +1193,11 @@ def test_is_storage_attached(harness):
     ) as _check_call:
         # Test with attached storage.
         is_storage_attached = harness.charm._is_storage_attached()
-        _check_call.assert_called_once_with(["mountpoint", "-q", harness.charm._storage_path])
+        _check_call.assert_called_once_with([
+            "/usr/bin/mountpoint",
+            "-q",
+            harness.charm._storage_path,
+        ])
         assert is_storage_attached
 
         # Test with detached storage.
@@ -1207,7 +1211,7 @@ def test_reboot_on_detached_storage(harness):
         harness.charm._reboot_on_detached_storage(mock_event)
         mock_event.defer.assert_called_once()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
-        _check_call.assert_called_once_with(["systemctl", "reboot"])
+        _check_call.assert_called_once_with(["/usr/bin/systemctl", "reboot"])
 
 
 def test_restart(harness):

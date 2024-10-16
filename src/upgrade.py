@@ -139,7 +139,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                 # All peers have set the state to ready
                 self.unit_upgrade_data.update({"state": "ready"})
                 self._prepare_upgrade_from_legacy()
-            getattr(self.on, "upgrade_charm").emit()
+            self.on.upgrade_charm.emit()
 
     @override
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
