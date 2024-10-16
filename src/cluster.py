@@ -558,6 +558,7 @@ class Patroni:
         disable_pgbackrest_archiving: bool = False,
         backup_id: Optional[str] = None,
         pitr_target: Optional[str] = None,
+        restore_timeline: Optional[str] = None,
         restore_to_latest: bool = False,
         parameters: Optional[dict[str, str]] = None,
     ) -> None:
@@ -571,7 +572,8 @@ class Patroni:
             restore_stanza: name of the stanza used when restoring a backup.
             disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
             backup_id: id of the backup that is being restored.
-            pitr_target: point-in-time-recovery target for the backup.
+            pitr_target: point-in-time-recovery target for the restore.
+            restore_timeline: timeline to restore from.
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
         """
@@ -603,6 +605,7 @@ class Patroni:
             restoring_backup=backup_id is not None or pitr_target is not None,
             backup_id=backup_id,
             pitr_target=pitr_target if not restore_to_latest else None,
+            restore_timeline=restore_timeline,
             restore_to_latest=restore_to_latest,
             stanza=stanza,
             restore_stanza=restore_stanza,
