@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 from pathlib import PosixPath
-from subprocess import PIPE, CompletedProcess, TimeoutExpired
+from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
 import botocore as botocore
