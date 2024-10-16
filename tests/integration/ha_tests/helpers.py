@@ -932,7 +932,7 @@ async def add_unit_with_storage(ops_test, app, storage):
 
     # verify storage attached
     curr_units = [unit.name for unit in ops_test.model.applications[app].units]
-    new_unit = next(set(curr_units) - set(prev_units))
+    new_unit = next(list(set(curr_units) - set(prev_units)))
     assert storage_id(ops_test, new_unit) == storage, "unit added with incorrect storage"
 
     # return a reference to newly added unit
