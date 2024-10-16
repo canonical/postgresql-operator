@@ -83,3 +83,5 @@ BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": 
 PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
 
 SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
+
+PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"

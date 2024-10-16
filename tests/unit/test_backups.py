@@ -1691,13 +1691,24 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         # Check the template is opened read-only in the call to open.
         assert mock.call_args_list[0][0] == ("templates/pgbackrest.conf.j2", "r")
 
+        # Get the expected content from a file.
+        with open("templates/pgbackrest.conf.j2") as file:
+            template = Template(file.read())
+        log_rotation_expected_content = template.render()
+
         # Ensure the correct rendered template is sent to _render_file method.
         calls = [
             call(
                 "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
                 expected_content,
                 0o644,
-            )
+            ),
+            call(
+                "/etc/logrotate.d/pgbackrest.logrotate",
+                log_rotation_expected_content,
+                0o644,
+                change_owner=False,
+            ),
         ]
         if tls_ca_chain_filename != "":
             calls.insert(0, call(tls_ca_chain_filename, "fake-tls-ca-chain", 0o644))
