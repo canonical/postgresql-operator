@@ -400,16 +400,18 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         connection.close()
 
         # Connect to the database using the replica endpoint.
-        with psycopg2.connect(replica_connection_string) as connection:
-            with connection.cursor() as cursor:
-                # Read some data.
-                cursor.execute("SELECT data FROM test;")
-                data = cursor.fetchone()
-                assert data[0] == "some data"
+        with (
+            psycopg2.connect(replica_connection_string) as connection,
+            connection.cursor() as cursor,
+        ):
+            # Read some data.
+            cursor.execute("SELECT data FROM test;")
+            data = cursor.fetchone()
+            assert data[0] == "some data"
 
-                # Try to alter some data in a read-only transaction.
-                with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
-                    cursor.execute("DROP TABLE test;")
+            # Try to alter some data in a read-only transaction.
+            with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
+                cursor.execute("DROP TABLE test;")
         connection.close()
 
     async with ops_test.fast_forward():

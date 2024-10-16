@@ -141,9 +141,10 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
     password = await get_password(ops_test, app=new_cluster_app)
     for unit in ops_test.model.applications[new_cluster_app].units:
         try:
-            with db_connect(
-                host=unit.public_address, password=password
-            ) as connection, connection.cursor() as cursor:
+            with (
+                db_connect(host=unit.public_address, password=password) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
                     "SELECT EXISTS (SELECT FROM information_schema.tables"
                     " WHERE table_schema = 'public' AND table_name = 'continuous_writes');"

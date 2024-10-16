@@ -1,7 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import signal
-from typing import Optional
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
@@ -52,7 +51,7 @@ class MockCharm(CharmBase):
         return Mock(_patroni_url="http://1.1.1.1:8008/", verify=True)
 
     @property
-    def _peers(self) -> Optional[Relation]:
+    def _peers(self) -> Relation | None:
         return None
 
 

@@ -164,7 +164,7 @@ async def test_plugins(ops_test: OpsTest) -> None:
 
     def enable_disable_config(enabled: False):
         config = {}
-        for plugin in sql_tests.keys():
+        for plugin in sql_tests:
             config[plugin] = f"{enabled}"
         return config
 

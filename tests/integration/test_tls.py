@@ -33,17 +33,11 @@ logger = logging.getLogger(__name__)
 APP_NAME = METADATA["name"]
 if juju_major_version < 3:
     tls_certificates_app_name = "tls-certificates-operator"
-    if architecture.architecture == "arm64":
-        tls_channel = "legacy/edge"
-    else:
-        tls_channel = "legacy/stable"
+    tls_channel = "legacy/edge" if architecture.architecture == "arm64" else "legacy/stable"
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
-    if architecture.architecture == "arm64":
-        tls_channel = "latest/edge"
-    else:
-        tls_channel = "latest/stable"
+    tls_channel = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
     tls_config = {"ca-common-name": "Test CA"}
 
 
@@ -89,11 +83,11 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # operation when the old primary is started again).
         any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
         primary = await get_primary(ops_test, any_unit)
-        replica = [
+        replica = next(
             unit.name
             for unit in ops_test.model.applications[DATABASE_APP_NAME].units
             if unit.name != primary
-        ][0]
+        )
 
         # Check if TLS enabled for replication
         assert await check_tls_replication(ops_test, primary, enabled=True)

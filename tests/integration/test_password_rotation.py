@@ -65,7 +65,7 @@ async def test_password_rotation(ops_test: OpsTest):
 
     # Change both passwords.
     result = await set_password(ops_test, unit_name=leader)
-    assert "password" in result.keys()
+    assert "password" in result
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # For replication, generate a specific password and pass it to the action.
@@ -73,7 +73,7 @@ async def test_password_rotation(ops_test: OpsTest):
     result = await set_password(
         ops_test, unit_name=leader, username="replication", password=new_replication_password
     )
-    assert "password" in result.keys()
+    assert "password" in result
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # For monitoring, generate a specific password and pass it to the action.
@@ -81,7 +81,7 @@ async def test_password_rotation(ops_test: OpsTest):
     result = await set_password(
         ops_test, unit_name=leader, username="monitoring", password=new_monitoring_password
     )
-    assert "password" in result.keys()
+    assert "password" in result
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # For backup, generate a specific password and pass it to the action.
@@ -89,7 +89,7 @@ async def test_password_rotation(ops_test: OpsTest):
     result = await set_password(
         ops_test, unit_name=leader, username="backup", password=new_backup_password
     )
-    assert "password" in result.keys()
+    assert "password" in result
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     # For rewind, generate a specific password and pass it to the action.
@@ -97,7 +97,7 @@ async def test_password_rotation(ops_test: OpsTest):
     result = await set_password(
         ops_test, unit_name=leader, username="rewind", password=new_rewind_password
     )
-    assert "password" in result.keys()
+    assert "password" in result
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
     new_superuser_password = await get_password(ops_test, any_unit_name)
@@ -165,9 +165,8 @@ async def test_db_connection_with_empty_password(ops_test: OpsTest):
     """Test that user can't connect with empty password."""
     primary = await get_primary(ops_test, f"{APP_NAME}/0")
     address = get_unit_address(ops_test, primary)
-    with pytest.raises(psycopg2.Error):
-        with db_connect(address, "") as connection:
-            connection.close()
+    with pytest.raises(psycopg2.Error), db_connect(address, "") as connection:
+        connection.close()
 
 
 @pytest.mark.group(1)

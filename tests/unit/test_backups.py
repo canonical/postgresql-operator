@@ -1,7 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 from pathlib import PosixPath
-from subprocess import PIPE, CompletedProcess, TimeoutExpired
+from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
 import botocore as botocore
@@ -541,7 +541,7 @@ def test_execute_command(harness):
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         assert harness.charm.backup._execute_command(command) == (1, "", "fake stderr")
         _run.assert_called_once_with(
-            command, input=None, stdout=PIPE, stderr=PIPE, preexec_fn=ANY, timeout=None
+            command, input=None, capture_output=True, preexec_fn=ANY, timeout=None
         )
         _getpwnam.assert_called_once_with("snap_daemon")
 
@@ -554,7 +554,7 @@ def test_execute_command(harness):
             command, command_input=b"fake input", timeout=5
         ) == (0, "fake stdout", "")
         _run.assert_called_once_with(
-            command, input=b"fake input", stdout=PIPE, stderr=PIPE, preexec_fn=ANY, timeout=5
+            command, input=b"fake input", capture_output=True, preexec_fn=ANY, timeout=5
         )
         _getpwnam.assert_called_once_with("snap_daemon")
 
@@ -1630,7 +1630,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
     ):
         # Set up a mock for the `open` method, set returned data to postgresql.conf template.
-        with open("templates/pgbackrest.conf.j2", "r") as f:
+        with open("templates/pgbackrest.conf.j2") as f:
             mock = mock_open(read_data=f.read())
 
         # Test when there are missing S3 parameters.
@@ -1689,7 +1689,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             harness.charm.backup._render_pgbackrest_conf_file()
 
         # Check the template is opened read-only in the call to open.
-        assert mock.call_args_list[0][0] == ("templates/pgbackrest.conf.j2", "r")
+        assert mock.call_args_list[0][0] == ("templates/pgbackrest.conf.j2",)
 
         # Ensure the correct rendered template is sent to _render_file method.
         calls = [
