@@ -1,7 +1,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""Custom event for rotating logs."""
+"""Background process for rotating logs."""
 
 import logging
 import os
@@ -27,7 +27,7 @@ class RotateLogs(Object):
         super().__init__(charm, "rotate-logs")
         self._charm = charm
 
-    def start_observer(self):
+    def start_log_rotation(self):
         """Start the rotate logs running in a new process."""
         if (
             not isinstance(self._charm.unit.status, ActiveStatus)
