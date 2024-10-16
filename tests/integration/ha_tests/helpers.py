@@ -745,7 +745,7 @@ async def is_secondary_up_to_date(
     """
     app = await app_name(ops_test)
     password = await get_password(ops_test, app)
-    host = await anext(
+    host = await next(
         (
             get_ip_from_inside_the_unit(ops_test, unit.name)
             if use_ip_from_inside
