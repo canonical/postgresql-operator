@@ -12,6 +12,7 @@ import shutil
 import tempfile
 import time
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from subprocess import PIPE, TimeoutExpired, run
 from typing import Dict, List, Optional, Tuple
@@ -163,6 +164,21 @@ class PostgreSQLBackups(Object):
 
     def can_use_s3_repository(self) -> Tuple[bool, Optional[str]]:
         """Returns whether the charm was configured to use another cluster repository."""
+        # Check model uuid
+        s3_parameters, _ = self._retrieve_s3_parameters()
+        s3_model_uuid = self._read_content_from_s3(
+            os.path.join(
+                s3_parameters["path"],
+                "model-uuid.txt",
+            ),
+            s3_parameters,
+        )
+        if s3_model_uuid and s3_model_uuid.strip() != self.model.uuid:
+            logger.debug(
+                f"can_use_s3_repository: incompatible model-uuid s3={s3_model_uuid.strip()}, local={self.model.uuid}"
+            )
+            return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+
         try:
             return_code, stdout, stderr = self._execute_command(
                 [PGBACKREST_EXECUTABLE, PGBACKREST_CONFIGURATION_FILE, "info", "--output=json"],
@@ -183,6 +199,12 @@ class PostgreSQLBackups(Object):
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
         for stanza in json.loads(stdout):
+            if stanza.get("name") != self.stanza_name:
+                logger.debug(
+                    f"can_use_s3_repository: incompatible stanza name s3={stanza.get('name', '')}, local={self.stanza_name}"
+                )
+                return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
+
             return_code, system_identifier_from_instance, error = self._execute_command([
                 f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
                 POSTGRESQL_DATA_PATH,
@@ -195,10 +217,10 @@ class PostgreSQLBackups(Object):
                 if "Database system identifier" in line
             ][0].split(" ")[-1]
             system_identifier_from_stanza = str(stanza.get("db")[0]["system-id"])
-            if (
-                system_identifier_from_instance != system_identifier_from_stanza
-                or stanza.get("name") != self.stanza_name
-            ):
+            if system_identifier_from_instance != system_identifier_from_stanza:
+                logger.debug(
+                    f"can_use_s3_repository: incompatible system identifier s3={system_identifier_from_stanza}, local={system_identifier_from_instance}"
+                )
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
         return True, None
@@ -787,7 +809,18 @@ class PostgreSQLBackups(Object):
         if not self._initialise_stanza(event):
             return False
 
-        return self.check_stanza()
+        if not self.check_stanza():
+            return False
+
+        s3_parameters, _ = self._retrieve_s3_parameters()
+        self._upload_content_to_s3(
+            self.model.uuid,
+            os.path.join(
+                s3_parameters["path"],
+                "model-uuid.txt",
+            ),
+            s3_parameters,
+        )
 
     def _on_s3_credential_gone(self, _) -> None:
         if self.charm.unit.is_leader():
@@ -1307,7 +1340,7 @@ Stderr:
         return True
 
     def _upload_content_to_s3(
-        self: str,
+        self,
         content: str,
         s3_path: str,
         s3_parameters: Dict,
@@ -1325,10 +1358,9 @@ Stderr:
             a boolean indicating success.
         """
         bucket_name = s3_parameters["bucket"]
-        s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
-        logger.info(f"Uploading content to bucket={s3_parameters['bucket']}, path={s3_path}")
+        processed_s3_path = s3_path.lstrip("/")
         try:
-            logger.info(f"Uploading content to bucket={bucket_name}, path={s3_path}")
+            logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
             session = boto3.session.Session(
                 aws_access_key_id=s3_parameters["access-key"],
                 aws_secret_access_key=s3_parameters["secret-key"],
@@ -1345,14 +1377,64 @@ Stderr:
             with tempfile.NamedTemporaryFile() as temp_file:
                 temp_file.write(content.encode("utf-8"))
                 temp_file.flush()
-                bucket.upload_file(temp_file.name, s3_path)
+                bucket.upload_file(temp_file.name, processed_s3_path)
         except Exception as e:
             logger.exception(
-                f"Failed to upload content to S3 bucket={bucket_name}, path={s3_path}", exc_info=e
+                f"Failed to upload content to S3 bucket={bucket_name}, path={processed_s3_path}",
+                exc_info=e,
             )
             return False
 
         return True
+
+    def _read_content_from_s3(self, s3_path: str, s3_parameters: Dict) -> Optional[str]:
+        """Reads specified content from the provided S3 bucket.
+
+        Args:
+            s3_path: The S3 path from which download the content
+            s3_parameters: A dictionary containing the S3 parameters
+                The following are expected keys in the dictionary: bucket, region,
+                endpoint, access-key and secret-key
+
+        Returns:
+            a string with the content if object is successfully downloaded and None if file is not existing or error
+            occurred during download.
+        """
+        bucket_name = s3_parameters["bucket"]
+        processed_s3_path = s3_path.lstrip("/")
+        try:
+            logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
+            session = boto3.session.Session(
+                aws_access_key_id=s3_parameters["access-key"],
+                aws_secret_access_key=s3_parameters["secret-key"],
+                region_name=s3_parameters["region"],
+            )
+            s3 = session.resource(
+                "s3",
+                endpoint_url=self._construct_endpoint(s3_parameters),
+                verify=(self._tls_ca_chain_filename or None),
+            )
+            bucket = s3.Bucket(bucket_name)
+            with BytesIO() as buf:
+                bucket.download_fileobj(processed_s3_path, buf)
+                return buf.getvalue().decode("utf-8")
+        except botocore.exceptions.ClientError as e:
+            if e.response["Error"]["Code"] == "404":
+                logger.info(
+                    f"No such object to read from S3 bucket={bucket_name}, path={processed_s3_path}"
+                )
+            else:
+                logger.exception(
+                    f"Failed to read content from S3 bucket={bucket_name}, path={processed_s3_path}",
+                    exc_info=e,
+                )
+        except Exception as e:
+            logger.exception(
+                f"Failed to read content from S3 bucket={bucket_name}, path={processed_s3_path}",
+                exc_info=e,
+            )
+
+        return None
 
     def _s3_initialization_set_failure(
         self, block_message: str, update_leader_status: bool = True
