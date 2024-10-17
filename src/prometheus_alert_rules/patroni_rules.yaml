@@ -7,13 +7,15 @@ groups:
   rules:
 
     - alert: PatroniPostgresqlDown
-      expr: "patroni_postgres_running == 0"
+      expr: 'patroni_postgres_running == 0'
       for: 0m
       labels:
         severity: critical
       annotations:
-        summary: Patroni Posrgresql Down (instance {{ $labels.instance }})
-        description: "Patroni Postgresql instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: Patroni PostgreSQL instance {{ $labels.instance }} is down.
+        description: |
+          Check for errors in the Loki logs.
+          LABELS = {{ $labels }}
 
     # 2.4.1
     - alert: PatroniHasNoLeader
@@ -22,5 +24,8 @@ groups:
       labels:
         severity: critical
       annotations:
-        summary: Patroni has no Leader (instance {{ $labels.instance }})
-        description: "A leader node (neither primary nor standby) cannot be found inside the cluster {{ $labels.scope }}\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: Patroni instance {{ $labels.instance }} has no leader node. 
+        description: |
+          A leader node (neither primary nor standby) cannot be found inside the cluster {{ $labels.scope }}.
+          Check for errors in the Loki logs.
+          LABELS = {{ $labels }}
