@@ -433,8 +433,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
         except RetryError:
             logger.warning(
-                "Early exit on_peer_relation_departed: Cannot get %s member IP"
-                % event.departing_unit.name
+                f"Early exit on_peer_relation_departed: Cannot get {event.departing_unit.name} member IP"
             )
             return
 
@@ -542,7 +541,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Stuck raft has no candidate")
             return
         if "raft_selected_candidate" not in self.app_peer_data:
-            logger.info("%s selected for new raft leader" % candidate.name)
+            logger.info(f"{candidate.name} selected for new raft leader")
             self.app_peer_data["raft_selected_candidate"] = candidate.name
 
     def _stuck_raft_cluster_rejoin(self) -> None:
@@ -588,7 +587,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         for key, data in self._peers.data.items():
             if key == self.app:
                 continue
-            for flag in data.keys():
+            for flag in data:
                 if flag.startswith("raft_"):
                     return
 
@@ -611,7 +610,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.unit_peer_data.pop("raft_stuck", None)
                 self.unit_peer_data.pop("raft_candidate", None)
                 self._patroni.remove_raft_data()
-                logger.info("Stopping %s" % self.unit.name)
+                logger.info(f"Stopping {self.unit.name}")
                 self.unit_peer_data["raft_stopped"] = "True"
 
             if self.unit.is_leader():
@@ -622,7 +621,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 and "raft_primary" not in self.unit_peer_data
                 and "raft_followers_stopped" in self.app_peer_data
             ):
-                logger.info("Reinitialising %s as primary" % self.unit.name)
+                logger.info(f"Reinitialising {self.unit.name} as primary")
                 self._patroni.reinitialise_raft_data()
                 self.unit_peer_data["raft_primary"] = "True"
 
@@ -641,14 +640,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def has_raft_keys(self):
         """Checks for the presence of raft recovery keys in peer data."""
-        for key in self.app_peer_data.keys():
+        for key in self.app_peer_data:
             if key.startswith("raft_"):
                 return True
 
-        for key in self.unit_peer_data.keys():
-            if key.startswith("raft_"):
-                return True
-        return False
+        return any(key.startswith("raft_") for key in self.unit_peer_data)
 
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""

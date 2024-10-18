@@ -772,7 +772,9 @@ class Patroni:
             if path.exists() and path.is_dir():
                 shutil.rmtree(path)
         except OSError as e:
-            raise Exception(f"Failed to remove previous cluster information with error: {e!s}")
+            raise Exception(
+                f"Failed to remove previous cluster information with error: {e!s}"
+            ) from e
         logger.info("Raft ready to reinitialise")
 
     def reinitialise_raft_data(self) -> None:
@@ -828,7 +830,7 @@ class Patroni:
             raft_status = syncobj_util.executeCommand(raft_host, ["status"])
         except UtilityException:
             logger.warning("Remove raft member: Cannot connect to raft cluster")
-            raise RemoveRaftMemberFailedError()
+            raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
@@ -848,7 +850,7 @@ class Patroni:
             if health_status.get("role") in ("leader", "master") or health_status.get(
                 "sync_standby"
             ):
-                logger.info("%s is raft candidate" % self.charm.unit.name)
+                logger.info(f"{self.charm.unit.name} is raft candidate")
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
 
@@ -867,7 +869,7 @@ class Patroni:
             result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])
         except UtilityException:
             logger.debug("Remove raft member: Remove call failed")
-            raise RemoveRaftMemberFailedError()
+            raise RemoveRaftMemberFailedError() from None
 
         if not result.startswith("SUCCESS"):
             raise RemoveRaftMemberFailedError()
