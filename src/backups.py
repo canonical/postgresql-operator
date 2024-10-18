@@ -789,6 +789,9 @@ class PostgreSQLBackups(Object):
         if self.charm.is_primary and "s3-initialization-done" not in self.charm.unit_peer_data:
             self._on_s3_credential_changed_primary(event)
 
+        if self.charm.is_standby_leader:
+            logger.info("S3 credentials will not be connected on standby cluster until it becomes primary")
+
     def _on_s3_credential_changed_primary(self, event: HookEvent) -> bool:
         """Stanza must be cleared before calling this function."""
         self.charm.update_config()

@@ -584,7 +584,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if (
             "s3-initialization-start" in self.app_peer_data
             and "s3-initialization-done" not in self.unit_peer_data
-            and not self.unit.is_leader()
             and self.is_primary
             and not self.backup._on_s3_credential_changed_primary(event)
         ):
