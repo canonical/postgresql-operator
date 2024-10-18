@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import logging
 import uuid
-from typing import Dict, Tuple
 
 import boto3
 import pytest as pytest
@@ -26,17 +25,11 @@ CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
     TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
-    if architecture.architecture == "arm64":
-        TLS_CHANNEL = "legacy/edge"
-    else:
-        TLS_CHANNEL = "legacy/stable"
+    TLS_CHANNEL = "legacy/edge" if architecture.architecture == "arm64" else "legacy/stable"
     TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-    if architecture.architecture == "arm64":
-        TLS_CHANNEL = "latest/edge"
-    else:
-        TLS_CHANNEL = "latest/stable"
+    TLS_CHANNEL = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
     TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
@@ -383,7 +376,7 @@ async def pitr_backup_operations(
 
 @pytest.mark.group("AWS")
 @pytest.mark.abort_on_fail
-async def test_pitr_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
+async def test_pitr_backup_aws(ops_test: OpsTest, cloud_configs: tuple[dict, dict], charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup in AWS. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
     config = cloud_configs[0][AWS]
     credentials = cloud_configs[1][AWS]
@@ -403,7 +396,7 @@ async def test_pitr_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dic
 
 @pytest.mark.group("GCP")
 @pytest.mark.abort_on_fail
-async def test_pitr_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
+async def test_pitr_backup_gcp(ops_test: OpsTest, cloud_configs: tuple[dict, dict], charm) -> None:
     """Build, deploy two units of PostgreSQL and do backup in GCP. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
     config = cloud_configs[0][GCP]
     credentials = cloud_configs[1][GCP]
