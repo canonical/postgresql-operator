@@ -30,7 +30,7 @@ Integrations with charmed applications are supported via the modern [`postgresql
 ### Modern `postgresql_client` interface
 To integrate with a charmed application that supports the `postgresql_client` interface, run
 ```shell
-juju integrate postgresql <charm>
+juju integrate postgresql:database <charm>
 ```
 
 To remove the integration, run
