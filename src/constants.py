@@ -16,21 +16,15 @@ API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
 REPLICATION_USER = "replication"
-REPLICATION_PASSWORD_KEY = "replication-password"
 REWIND_USER = "rewind"
-REWIND_PASSWORD_KEY = "rewind-password"
 TLS_KEY_FILE = "key.pem"
 TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"
 USER = "operator"
-USER_PASSWORD_KEY = "operator-password"
 MONITORING_USER = "monitoring"
-MONITORING_PASSWORD_KEY = "monitoring-password"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
-RAFT_PASSWORD_KEY = "raft-password"
-PATRONI_PASSWORD_KEY = "patroni-password"
 # List of system usernames needed for correct work of the charm/workload.
 SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
 
@@ -65,8 +59,15 @@ PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.con
 
 METRICS_PORT = "9187"
 
-SECRET_INTERNAL_LABEL = "internal-secret"
-SECRET_DELETED_LABEL = "None"
+# Labels are not confidential
+REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105
+REWIND_PASSWORD_KEY = "rewind-password"  # noqa: S105
+USER_PASSWORD_KEY = "operator-password"  # noqa: S105
+MONITORING_PASSWORD_KEY = "monitoring-password"  # noqa: S105
+RAFT_PASSWORD_KEY = "raft-password"  # noqa: S105
+PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
+SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
+SECRET_DELETED_LABEL = "None"  # noqa: S105
 
 APP_SCOPE = "app"
 UNIT_SCOPE = "unit"
