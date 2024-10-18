@@ -61,6 +61,8 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-deploy-maas | [MAAS](/t/14293) |
 | 3 | h-deploy-ec2 | [AWS EC2](/t/15703) |
 | 3 | h-deploy-gce | [GCE](/t/15722) |
+| 3 | h-deploy-azure | [Azure](/t/15733) |
+| 3 | h-deploy-multi-az | [Multi-AZ](/t/15749) |
 | 3 | h-deploy-terraform | [Terraform](/t/14916) |
 | 3 | h-deploy-airgapped | [Air-gapped](/t/15746) |
 | 2 | h-integrate | [Integrate with another application](/t/9687) |
@@ -77,6 +79,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | h-monitor | [Monitoring (COS)]() |
 | 3 | h-enable-monitoring | [Enable monitoring](/t/10600) |
 | 3 | h-enable-alert-rules | [Enable alert rules](/t/13084) |
+| 4 | r-alert-rules | [Alert rules](/t/15841) |
 | 3 | h-enable-tracing | [Enable tracing](/t/14521) |
 | 2 | h-upgrade | [Minor upgrades]() |
 | 3 | h-upgrade-minor | [Perform a minor upgrade](/t/12089) |
@@ -104,6 +107,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | r-performance | [Performance and resources](/t/11974) |
 | 2 | r-troubleshooting | [Troubleshooting](/t/11864) |
 | 2 | r-plugins-extensions | [Plugins/extensions](/t/10946) |
+| 2 | r-alert-rules | [Alert rules](/t/15841) |
 | 2 | r-contacts | [Contacts](/t/11863) |
 | 1 | explanation | [Explanation]() |
 | 2 | e-architecture | [Architecture](/t/11857) |
