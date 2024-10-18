@@ -167,10 +167,7 @@ class PostgreSQLBackups(Object):
         # Check model uuid
         s3_parameters, _ = self._retrieve_s3_parameters()
         s3_model_uuid = self._read_content_from_s3(
-            os.path.join(
-                s3_parameters["path"],
-                "model-uuid.txt",
-            ),
+            "model-uuid.txt",
             s3_parameters,
         )
         if s3_model_uuid and s3_model_uuid.strip() != self.model.uuid:
@@ -612,7 +609,7 @@ class PostgreSQLBackups(Object):
             # successfully complete validation, and upon receiving the same parent event other units should start it.
             # Therefore, the first retry may fail due to the delay of these other units to start this service. 60s given
             # for that or else the s3 initialization sequence will fail.
-            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10), reraise=True):
                 with attempt:
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
@@ -630,7 +627,9 @@ class PostgreSQLBackups(Object):
                         raise TimeoutError
                     if return_code != 0:
                         raise Exception(stderr)
-        except RetryError as e:
+        except TimeoutError:
+            raise TimeoutError
+        except Exception as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
             logger.exception(e)
@@ -668,7 +667,7 @@ class PostgreSQLBackups(Object):
             # successfully complete validation, and upon receiving the same parent event other units should start it.
             # Therefore, the first retry may fail due to the delay of these other units to start this service. 60s given
             # for that or else the s3 initialization sequence will fail.
-            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10), reraise=True):
                 with attempt:
                     if self.charm._patroni.member_started:
                         self.charm._patroni.reload_patroni_configuration()
@@ -681,7 +680,7 @@ class PostgreSQLBackups(Object):
                     if return_code != 0:
                         raise Exception(stderr)
             self.charm._set_primary_status_message()
-        except RetryError as e:
+        except Exception as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
             logger.exception(e)
@@ -790,7 +789,9 @@ class PostgreSQLBackups(Object):
             self._on_s3_credential_changed_primary(event)
 
         if self.charm.is_standby_leader:
-            logger.info("S3 credentials will not be connected on standby cluster until it becomes primary")
+            logger.info(
+                "S3 credentials will not be connected on standby cluster until it becomes primary"
+            )
 
     def _on_s3_credential_changed_primary(self, event: HookEvent) -> bool:
         """Stanza must be cleared before calling this function."""
@@ -818,12 +819,11 @@ class PostgreSQLBackups(Object):
         s3_parameters, _ = self._retrieve_s3_parameters()
         self._upload_content_to_s3(
             self.model.uuid,
-            os.path.join(
-                s3_parameters["path"],
-                "model-uuid.txt",
-            ),
+            "model-uuid.txt",
             s3_parameters,
         )
+
+        return True
 
     def _on_s3_credential_gone(self, _) -> None:
         if self.charm.unit.is_leader():
@@ -883,10 +883,7 @@ Juju Version: {str(juju_version)}
 """
         if not self._upload_content_to_s3(
             metadata,
-            os.path.join(
-                s3_parameters["path"],
-                f"backup/{self.stanza_name}/latest",
-            ),
+            f"backup/{self.stanza_name}/latest",
             s3_parameters,
         ):
             error_message = "Failed to upload metadata to provided S3"
@@ -957,10 +954,7 @@ Stderr:
 """
             self._upload_content_to_s3(
                 logs,
-                os.path.join(
-                    s3_parameters["path"],
-                    f"backup/{self.stanza_name}/{backup_id}/backup.log",
-                ),
+                f"backup/{self.stanza_name}/{backup_id}/backup.log",
                 s3_parameters,
             )
             error_message = f"Failed to backup PostgreSQL with error: {stderr}"
@@ -985,10 +979,7 @@ Stderr:
 """
             if not self._upload_content_to_s3(
                 logs,
-                os.path.join(
-                    s3_parameters["path"],
-                    f"backup/{self.stanza_name}/{backup_id}/backup.log",
-                ),
+                f"backup/{self.stanza_name}/{backup_id}/backup.log",
                 s3_parameters,
             ):
                 error_message = "Error uploading logs to S3"
@@ -1348,7 +1339,7 @@ Stderr:
         s3_path: str,
         s3_parameters: Dict,
     ) -> bool:
-        """Uploads the provided contents to the provided S3 bucket.
+        """Uploads the provided contents to the provided S3 bucket relative to the path from the S3 config.
 
         Args:
             content: The content to upload to S3
@@ -1361,7 +1352,7 @@ Stderr:
             a boolean indicating success.
         """
         bucket_name = s3_parameters["bucket"]
-        processed_s3_path = s3_path.lstrip("/")
+        processed_s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
             session = boto3.session.Session(
@@ -1391,7 +1382,7 @@ Stderr:
         return True
 
     def _read_content_from_s3(self, s3_path: str, s3_parameters: Dict) -> Optional[str]:
-        """Reads specified content from the provided S3 bucket.
+        """Reads specified content from the provided S3 bucket relative to the path from the S3 config.
 
         Args:
             s3_path: The S3 path from which download the content
@@ -1404,7 +1395,7 @@ Stderr:
             occurred during download.
         """
         bucket_name = s3_parameters["bucket"]
-        processed_s3_path = s3_path.lstrip("/")
+        processed_s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
             session = boto3.session.Session(
