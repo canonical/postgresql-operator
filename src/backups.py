@@ -12,8 +12,7 @@ import shutil
 import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
-from subprocess import PIPE, TimeoutExpired, run
-from typing import Dict, List, Optional, OrderedDict, Tuple
+from subprocess import TimeoutExpired, run
 
 import boto3 as boto3
 import botocore
@@ -48,13 +47,11 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 )
 FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE = "failed to initialize stanza, check your S3 settings"
 CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
-MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET = "Move restored cluster to another S3 bucket"
 
 S3_BLOCK_MESSAGES = [
     ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
     FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE,
     FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
-    MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
 ]
 
 
@@ -94,7 +91,7 @@ class PostgreSQLBackups(Object):
             return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
         return ""
 
-    def _are_backup_settings_ok(self) -> Tuple[bool, Optional[str]]:
+    def _are_backup_settings_ok(self) -> tuple[bool, str | None]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
             return (
@@ -114,17 +111,18 @@ class PostgreSQLBackups(Object):
         # Don't allow stanza initialisation if this unit hasn't started the database
         # yet and either hasn't joined the peer relation yet or hasn't configured TLS
         # yet while other unit already has TLS enabled.
-        if not self.charm._patroni.member_started and (
-            (len(self.charm._peers.data.keys()) == 2)
-            or (
-                "tls" not in self.charm.unit_peer_data
-                and any("tls" in unit_data for _, unit_data in self.charm._peers.data.items())
+        return not (
+            not self.charm._patroni.member_started
+            and (
+                (len(self.charm._peers.data.keys()) == 2)
+                or (
+                    "tls" not in self.charm.unit_peer_data
+                    and any("tls" in unit_data for _, unit_data in self.charm._peers.data.items())
+                )
             )
-        ):
-            return False
-        return True
+        )
 
-    def _can_unit_perform_backup(self) -> Tuple[bool, Optional[str]]:
+    def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
@@ -156,7 +154,7 @@ class PostgreSQLBackups(Object):
 
         return self._are_backup_settings_ok()
 
-    def can_use_s3_repository(self) -> Tuple[bool, Optional[str]]:
+    def can_use_s3_repository(self) -> tuple[bool, str | None]:
         """Returns whether the charm was configured to use another cluster repository."""
         # Prevent creating backups and storing in another cluster repository.
         try:
@@ -168,10 +166,8 @@ class PostgreSQLBackups(Object):
             # Raise an error if the connection timeouts, so the user has the possibility to
             # fix network issues and call juju resolve to re-trigger the hook that calls
             # this method.
-            logger.error(
-                f"error: {str(e)} - please fix the error and call juju resolve on this unit"
-            )
-            raise TimeoutError
+            logger.error(f"error: {e!s} - please fix the error and call juju resolve on this unit")
+            raise TimeoutError from e
 
         else:
             if return_code != 0:
@@ -186,11 +182,11 @@ class PostgreSQLBackups(Object):
                 ])
                 if return_code != 0:
                     raise Exception(error)
-                system_identifier_from_instance = [
+                system_identifier_from_instance = next(
                     line
                     for line in system_identifier_from_instance.splitlines()
                     if "Database system identifier" in line
-                ][0].split(" ")[-1]
+                ).split(" ")[-1]
                 system_identifier_from_stanza = str(stanza.get("db")[0]["system-id"])
                 if system_identifier_from_instance != system_identifier_from_stanza or stanza.get(
                     "name"
@@ -201,27 +197,7 @@ class PostgreSQLBackups(Object):
                     if self.charm._patroni.member_started:
                         self.charm._patroni.reload_patroni_configuration()
                     return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
-                return self._is_s3_wal_compatible(stanza)
 
-        return True, None
-
-    def _is_s3_wal_compatible(self, stanza) -> Tuple[bool, Optional[str]]:
-        """Returns whether the S3 stanza is compatible with current PostgreSQL cluster by WAL parity."""
-        charm_last_archived_wal = self.charm.postgresql.get_last_archived_wal()
-        logger.debug(f"last archived wal: {charm_last_archived_wal}")
-        s3_archive = stanza.get("archive", [])
-        if len(s3_archive) > 0:
-            s3_last_archived_wal = s3_archive[0].get("max")
-            logger.debug(f"last s3 wal: {str(s3_last_archived_wal)}")
-            if (
-                charm_last_archived_wal
-                and s3_last_archived_wal
-                and charm_last_archived_wal.split(".", 1)[0] != str(s3_last_archived_wal)
-            ):
-                if bool(self.charm.app_peer_data.get("require-change-bucket-after-restore", None)):
-                    return False, MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
-                else:
-                    return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
         return True, None
 
     def _change_connectivity_to_database(self, connectivity: bool) -> None:
@@ -229,7 +205,7 @@ class PostgreSQLBackups(Object):
         self.charm.unit_peer_data.update({"connectivity": "on" if connectivity else "off"})
         self.charm.update_config()
 
-    def _construct_endpoint(self, s3_parameters: Dict) -> str:
+    def _construct_endpoint(self, s3_parameters: dict) -> str:
         """Construct the S3 service endpoint using the region.
 
         This is needed when the provided endpoint is from AWS, and it doesn't contain the region.
@@ -282,9 +258,7 @@ class PostgreSQLBackups(Object):
             # Re-raise the error if the connection timeouts, so the user has the possibility to
             # fix network issues and call juju resolve to re-trigger the hook that calls
             # this method.
-            logger.error(
-                f"error: {str(e)} - please fix the error and call juju resolve on this unit"
-            )
+            logger.error(f"error: {e!s} - please fix the error and call juju resolve on this unit")
             raise e
         except ClientError:
             logger.warning("Bucket %s doesn't exist or you don't have access to it.", bucket_name)
@@ -308,17 +282,17 @@ class PostgreSQLBackups(Object):
             if path.exists() and path.is_dir():
                 shutil.rmtree(path)
         except OSError as e:
-            logger.warning(f"Failed to remove contents of the data directory with error: {str(e)}")
+            logger.warning(f"Failed to remove contents of the data directory with error: {e!s}")
             return False
 
         return True
 
     def _execute_command(
         self,
-        command: List[str],
-        command_input: bytes = None,
-        timeout: int = None,
-    ) -> Tuple[int, str, str]:
+        command: list[str],
+        command_input: bytes | None = None,
+        timeout: int | None = None,
+    ) -> tuple[int, str, str]:
         """Execute a command in the workload container."""
 
         def demote():
@@ -330,11 +304,11 @@ class PostgreSQLBackups(Object):
 
             return result
 
-        process = run(
+        # Input is generated by the charm
+        process = run(  # noqa: S603
             command,
             input=command_input,
-            stdout=PIPE,
-            stderr=PIPE,
+            capture_output=True,
             preexec_fn=demote(),
             timeout=timeout,
         )
@@ -346,39 +320,32 @@ class PostgreSQLBackups(Object):
         backups = [
             "Storage bucket name: {:s}".format(s3_parameters["bucket"]),
             "Backups base path: {:s}/backup/\n".format(s3_parameters["path"]),
-            "{:<20s} | {:<12s} | {:<8s} | {:<20s} | {:<23s} | {:<20s} | {:<20s} | {:s}".format(
+            "{:<20s} | {:<19s} | {:<8s} | {:<20s} | {:<23s} | {:<20s} | {:<20s} | {:<8s} | {:s}".format(
                 "backup-id",
-                "type",
+                "action",
                 "status",
                 "reference-backup-id",
                 "LSN start/stop",
                 "start-time",
                 "finish-time",
+                "timeline",
                 "backup-path",
             ),
         ]
         backups.append("-" * len(backups[2]))
         for (
             backup_id,
-            backup_type,
+            backup_action,
             backup_status,
             reference,
             lsn_start_stop,
             start,
             stop,
+            backup_timeline,
             path,
         ) in backup_list:
             backups.append(
-                "{:<20s} | {:<12s} | {:<8s} | {:<20s} | {:<23s} | {:<20s} | {:<20s} | {:s}".format(
-                    backup_id,
-                    backup_type,
-                    backup_status,
-                    reference,
-                    lsn_start_stop,
-                    start,
-                    stop,
-                    path,
-                )
+                f"{backup_id:<20s} | {backup_action:<19s} | {backup_status:<8s} | {reference:<20s} | {lsn_start_stop:<23s} | {start:<20s} | {stop:<20s} | {backup_timeline:<8s} | {path:s}"
             )
         return "\n".join(backups)
 
@@ -400,6 +367,7 @@ class PostgreSQLBackups(Object):
         backups = json.loads(output)[0]["backup"]
         for backup in backups:
             backup_id, backup_type = self._parse_backup_id(backup["label"])
+            backup_action = f"{backup_type} backup"
             backup_reference = "None"
             if backup["reference"]:
                 backup_reference, _ = self._parse_backup_id(backup["reference"][-1])
@@ -410,6 +378,11 @@ class PostgreSQLBackups(Object):
                 )
                 for stamp in backup["timestamp"].values()
             )
+            backup_timeline = (
+                backup["archive"]["start"][:8].lstrip("0")
+                if backup["archive"] and backup["archive"]["start"]
+                else ""
+            )
             backup_path = f'/{self.stanza_name}/{backup["label"]}'
             error = backup["error"]
             backup_status = "finished"
@@ -417,17 +390,34 @@ class PostgreSQLBackups(Object):
                 backup_status = f"failed: {error}"
             backup_list.append((
                 backup_id,
-                backup_type,
+                backup_action,
                 backup_status,
                 backup_reference,
                 lsn_start_stop,
                 time_start,
                 time_stop,
+                backup_timeline,
                 backup_path,
             ))
+
+        for timeline, (_, timeline_id) in self._list_timelines().items():
+            backup_list.append((
+                timeline,
+                "restore",
+                "finished",
+                "None",
+                "n/a",
+                timeline,
+                "n/a",
+                timeline_id,
+                "n/a",
+            ))
+
+        backup_list.sort(key=lambda x: x[0])
+
         return self._format_backup_list(backup_list)
 
-    def _list_backups(self, show_failed: bool, parse=True) -> OrderedDict[str, str]:
+    def _list_backups(self, show_failed: bool, parse=True) -> dict[str, tuple[str, str]]:
         """Retrieve the list of backups.
 
         Args:
@@ -435,8 +425,8 @@ class PostgreSQLBackups(Object):
             parse: whether to convert backup labels to their IDs or not.
 
         Returns:
-            a dict of previously created backups (id + stanza name) or an empty list
-                if there is no backups in the S3 bucket.
+            a dict of previously created backups: id => (stanza, timeline) or an empty dict if there is no backups in
+                the S3 bucket.
         """
         return_code, output, stderr = self._execute_command([
             PGBACKREST_EXECUTABLE,
@@ -451,21 +441,95 @@ class PostgreSQLBackups(Object):
 
         # If there are no backups, returns an empty dict.
         if repository_info is None:
-            return OrderedDict[str, str]()
+            return dict[str, tuple[str, str]]()
 
         backups = repository_info["backup"]
         stanza_name = repository_info["name"]
-        return OrderedDict[str, str](
-            (
-                self._parse_backup_id(backup["label"])[0] if parse else backup["label"],
+        return dict[str, tuple[str, str]]({
+            self._parse_backup_id(backup["label"])[0] if parse else backup["label"]: (
                 stanza_name,
+                backup["archive"]["start"][:8].lstrip("0")
+                if backup["archive"] and backup["archive"]["start"]
+                else "",
             )
             for backup in backups
             if show_failed or not backup["error"]
-        )
+        })
 
-    def _parse_backup_id(self, label) -> Tuple[str, str]:
-        """Parse backup ID as a timestamp."""
+    def _list_timelines(self) -> dict[str, tuple[str, str]]:
+        """Lists the timelines from the pgBackRest stanza.
+
+        Returns:
+            a dict of timelines: id => (stanza, timeline) or an empty dict if there is no timelines in the S3 bucket.
+        """
+        return_code, output, stderr = self._execute_command([
+            PGBACKREST_EXECUTABLE,
+            PGBACKREST_CONFIGURATION_FILE,
+            "repo-ls",
+            "--recurse",
+            "--output=json",
+        ])
+        if return_code != 0:
+            raise ListBackupsError(f"Failed to list repository with error: {stderr}")
+
+        repository = json.loads(output).items()
+        if repository is None:
+            return dict[str, tuple[str, str]]()
+
+        return dict[str, tuple[str, str]]({
+            datetime.strftime(
+                datetime.fromtimestamp(timeline_object["time"], timezone.utc),
+                BACKUP_ID_FORMAT,
+            ): (
+                timeline.split("/")[1],
+                timeline.split("/")[-1].split(".")[0].lstrip("0"),
+            )
+            for timeline, timeline_object in repository
+            if timeline.endswith(".history") and not timeline.endswith("backup.history")
+        })
+
+    def _get_nearest_timeline(self, timestamp: str) -> tuple[str, str] | None:
+        """Finds the nearest timeline or backup prior to the specified timeline.
+
+        Returns:
+            (stanza, timeline) of the nearest timeline or backup. None, if there are no matches.
+        """
+        timelines = self._list_backups(show_failed=False) | self._list_timelines()
+        filtered_timelines = [
+            (timeline_key, timeline_object)
+            for timeline_key, timeline_object in timelines.items()
+            if datetime.strptime(timeline_key, BACKUP_ID_FORMAT)
+            <= self._parse_psql_timestamp(timestamp)
+        ]
+        return max(filtered_timelines)[1] if len(filtered_timelines) > 0 else None
+
+    def _is_psql_timestamp(self, timestamp: str) -> bool:
+        if not re.match(
+            r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}(\.\d{1,6})?([-+](?:\d{2}|\d{4}|\d{2}:\d{2}))?$",
+            timestamp,
+        ):
+            return False
+        try:
+            self._parse_psql_timestamp(timestamp)
+            return True
+        except ValueError:
+            return False
+
+    def _parse_psql_timestamp(self, timestamp: str) -> datetime:
+        """Intended to use with data only after _is_psql_timestamp check."""
+        # With the python >= 3.11 only the datetime.fromisoformat will be sufficient without any regexes. Therefore,
+        # it will not be required for the _is_psql_timestamp check that ensures intended regex execution.
+        t = re.sub(r"([-+]\d{2})$", r"\1:00", timestamp)
+        t = re.sub(r"([-+]\d{2})(\d{2})$", r"\1:\2", t)
+        t = re.sub(r"\.(\d+)", lambda x: f".{x[1]:06}", t)
+        dt = datetime.fromisoformat(t)
+        # Convert to the timezone-naive
+        if dt.tzinfo is not None and dt.tzinfo is not timezone.utc:
+            dt = dt.astimezone(tz=timezone.utc)
+        return dt.replace(tzinfo=None)
+
+    def _parse_backup_id(self, label) -> tuple[str, str]:
+        """Parse backup ID as a timestamp and its type."""
         if label[-1] == "F":
             timestamp = label
             backup_type = "full"
@@ -646,9 +710,6 @@ class PostgreSQLBackups(Object):
             event.defer()
             return
 
-        if self.charm.unit.is_leader():
-            self.charm.app_peer_data.pop("require-change-bucket-after-restore", None)
-
         # Verify the s3 relation only on the primary.
         if not self.charm.is_primary:
             return
@@ -671,13 +732,12 @@ class PostgreSQLBackups(Object):
             self.charm.app_peer_data.update({
                 "stanza": "",
                 "init-pgbackrest": "",
-                "require-change-bucket-after-restore": "",
             })
         self.charm.unit_peer_data.update({"stanza": "", "init-pgbackrest": ""})
         if self.charm.is_blocked and self.charm.unit.status.message in S3_BLOCK_MESSAGES:
             self.charm.unit.status = ActiveStatus()
 
-    def _on_create_backup_action(self, event) -> None:  # noqa: C901
+    def _on_create_backup_action(self, event) -> None:
         """Request that pgBackRest creates a backup."""
         backup_type = event.params.get("type", "full")
         if backup_type not in BACKUP_TYPE_OVERRIDES:
@@ -714,7 +774,7 @@ class PostgreSQLBackups(Object):
 Model Name: {self.model.name}
 Application Name: {self.model.app.name}
 Unit Name: {self.charm.unit.name}
-Juju Version: {str(juju_version)}
+Juju Version: {juju_version!s}
 """
         if not self._upload_content_to_s3(
             metadata,
@@ -752,7 +812,7 @@ Juju Version: {str(juju_version)}
     def _run_backup(
         self,
         event: ActionEvent,
-        s3_parameters: Dict,
+        s3_parameters: dict,
         datetime_backup_requested: str,
         backup_type: str,
     ) -> None:
@@ -846,9 +906,9 @@ Stderr:
             event.set_results({"backups": formatted_list})
         except ListBackupsError as e:
             logger.exception(e)
-            event.fail(f"Failed to list PostgreSQL backups with error: {str(e)}")
+            event.fail(f"Failed to list PostgreSQL backups with error: {e!s}")
 
-    def _on_restore_action(self, event):
+    def _on_restore_action(self, event):  # noqa: C901
         """Request that pgBackRest restores a backup."""
         if not self._pre_restore_checks(event):
             return
@@ -856,9 +916,8 @@ Stderr:
         backup_id = event.params.get("backup-id")
         restore_to_time = event.params.get("restore-to-time")
         logger.info(
-            f"A restore"
-            f"{' with backup-id ' + backup_id if backup_id else ''}"
-            f"{' to time point ' + restore_to_time if restore_to_time else ''}"
+            f"A restore with backup-id {backup_id}"
+            f"{f' to time point {restore_to_time}' if restore_to_time else ''}"
             f" has been requested on the unit"
         )
 
@@ -866,30 +925,36 @@ Stderr:
         logger.info("Validating provided backup-id and restore-to-time")
         try:
             backups = self._list_backups(show_failed=False)
-            if backup_id and backup_id not in backups.keys():
+            timelines = self._list_timelines()
+            is_backup_id_real = backup_id and backup_id in backups
+            is_backup_id_timeline = backup_id and not is_backup_id_real and backup_id in timelines
+            if backup_id and not is_backup_id_real and not is_backup_id_timeline:
                 error_message = f"Invalid backup-id: {backup_id}"
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
                 return
-            if not backup_id and restore_to_time and not backups:
-                error_message = "Cannot restore PITR without any backups created"
+            if is_backup_id_timeline and not restore_to_time:
+                error_message = "Cannot restore to the timeline without restore-to-time parameter"
                 logger.error(f"Restore failed: {error_message}")
                 event.fail(error_message)
                 return
+            if is_backup_id_real:
+                restore_stanza_timeline = backups[backup_id]
+            elif is_backup_id_timeline:
+                restore_stanza_timeline = timelines[backup_id]
+            else:
+                restore_stanza_timeline = self._get_nearest_timeline(restore_to_time)
+                if not restore_stanza_timeline:
+                    error_message = f"Can't find the nearest timeline before timestamp {restore_to_time} to restore"
+                    logger.error(f"Restore failed: {error_message}")
+                    event.fail(error_message)
+                    return
+                logger.info(
+                    f"Chosen timeline {restore_stanza_timeline[1]} as nearest for the specified timestamp {restore_to_time}"
+                )
         except ListBackupsError as e:
             logger.exception(e)
             error_message = "Failed to retrieve backups list"
-            logger.error(f"Restore failed: {error_message}")
-            event.fail(error_message)
-            return
-
-        # Quick check for timestamp format
-        if (
-            restore_to_time
-            and restore_to_time != "latest"
-            and not re.match("^[0-9-]+ [0-9:.+]+$", restore_to_time)
-        ):
-            error_message = "Bad restore-to-time format"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return
@@ -926,12 +991,10 @@ Stderr:
         # Mark the cluster as in a restoring backup state and update the Patroni configuration.
         logger.info("Configuring Patroni to restore the backup")
         self.charm.app_peer_data.update({
-            "restoring-backup": self._fetch_backup_from_id(backup_id) if backup_id else "",
-            "restore-stanza": backups[backup_id]
-            if backup_id
-            else self.charm.app_peer_data.get("stanza", self.stanza_name),
+            "restoring-backup": self._fetch_backup_from_id(backup_id) if is_backup_id_real else "",
+            "restore-stanza": restore_stanza_timeline[0],
+            "restore-timeline": restore_stanza_timeline[1] if restore_to_time else "",
             "restore-to-time": restore_to_time or "",
-            "require-change-bucket-after-restore": "True",
         })
         self.charm.update_config()
 
@@ -1003,10 +1066,23 @@ Stderr:
             event.fail(validation_message)
             return False
 
-        if not event.params.get("backup-id") and not event.params.get("restore-to-time"):
-            error_message = (
-                "Missing backup-id or/and restore-to-time parameter to be able to do restore"
-            )
+        if not event.params.get("backup-id") and event.params.get("restore-to-time") in (
+            None,
+            "latest",
+        ):
+            error_message = "Missing backup-id or non-latest restore-to-time parameter to be able to do restore"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return False
+
+        # Quick check for timestamp format
+        restore_to_time = event.params.get("restore-to-time")
+        if (
+            restore_to_time
+            and restore_to_time != "latest"
+            and not self._is_psql_timestamp(restore_to_time)
+        ):
+            error_message = "Bad restore-to-time format"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
@@ -1015,7 +1091,6 @@ Stderr:
         if self.charm.is_blocked and self.charm.unit.status.message not in [
             ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
             CANNOT_RESTORE_PITR,
-            MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
         ]:
             error_message = "Cluster or unit is in a blocking state"
             logger.error(f"Restore failed: {error_message}")
@@ -1054,7 +1129,7 @@ Stderr:
                 self._tls_ca_chain_filename, "\n".join(s3_parameters["tls-ca-chain"]), 0o644
             )
 
-        with open("templates/pgbackrest.conf.j2", "r") as file:
+        with open("templates/pgbackrest.conf.j2") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
@@ -1086,7 +1161,7 @@ Stderr:
         self.charm.update_config()
         self.charm._patroni.start_patroni()
 
-    def _retrieve_s3_parameters(self) -> Tuple[Dict, List[str]]:
+    def _retrieve_s3_parameters(self) -> tuple[dict, list[str]]:
         """Retrieve S3 parameters from the S3 integrator relation."""
         s3_parameters = self.s3_client.get_s3_connection_info()
         required_parameters = [
@@ -1163,7 +1238,7 @@ Stderr:
         self: str,
         content: str,
         s3_path: str,
-        s3_parameters: Dict,
+        s3_parameters: dict,
     ) -> bool:
         """Uploads the provided contents to the provided S3 bucket.
 

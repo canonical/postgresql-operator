@@ -3,9 +3,11 @@
 This guide will cover how to manage clusters using an example PostgreSQL deployment with two servers: one in Rome and one in Lisbon.
 
 ## Prerequisites
-* `juju v.3.4.2+`
+* Juju `v.3.4.2+`
+* Make sure your machine(s) fulfill the [system requirements](/t/11743)
+* See [supported target/source model relationships](/t/15412#substrate-dependencies).
 * A cross-regional async replication setup
-  * Refer to the page [How to set up clusters](/t/13991)
+  * See [How to set up clusters](/t/13991)
 
 ## Summary
 * [Switchover](#switchover)

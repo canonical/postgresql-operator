@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import logging
 import uuid
-from typing import Dict, Tuple
 
 import boto3
 import pytest as pytest
@@ -14,13 +13,13 @@ from . import architecture
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
-    MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
     backup_operations,
     construct_endpoint,
     db_connect,
     get_password,
     get_primary,
     get_unit_address,
+    scale_application,
     switchover,
     wait_for_idle_on_blocked,
 )
@@ -33,17 +32,11 @@ FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 if juju_major_version < 3:
     tls_certificates_app_name = "tls-certificates-operator"
-    if architecture.architecture == "arm64":
-        tls_channel = "legacy/edge"
-    else:
-        tls_channel = "legacy/stable"
+    tls_channel = "legacy/edge" if architecture.architecture == "arm64" else "legacy/stable"
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
-    if architecture.architecture == "arm64":
-        tls_channel = "latest/edge"
-    else:
-        tls_channel = "latest/stable"
+    tls_channel = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
     tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
@@ -99,7 +92,7 @@ async def cloud_configs(github_secrets) -> None:
 
 @pytest.mark.group("AWS")
 @pytest.mark.abort_on_fail
-async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
+async def test_backup_aws(ops_test: OpsTest, cloud_configs: tuple[dict, dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in AWS, test backup and restore actions."""
     config = cloud_configs[0][AWS]
     credentials = cloud_configs[1][AWS]
@@ -124,15 +117,9 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
 
     new_unit_name = f"{database_app_name}/2"
 
+    # Scale up to be able to test primary and leader being different.
     async with ops_test.fast_forward():
-        # Scale up to be able to test primary and leader being different.
-        await ops_test.model.applications[database_app_name].add_units(1)
-        # Ensure that new unit become in blocked status, but is fully functional.
-        await ops_test.model.block_until(
-            lambda: ops_test.model.units.get(new_unit_name).workload_status_message
-            == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET,
-            timeout=1000,
-        )
+        await scale_application(ops_test, database_app_name, 2)
 
     # Ensure replication is working correctly.
     address = get_unit_address(ops_test, new_unit_name)
@@ -174,11 +161,6 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
     backups = action.results.get("backups")
     assert backups, "backups not outputted"
 
-    # Remove S3 relation to ensure "move to another cluster" blocked status is gone
-    await ops_test.model.applications[database_app_name].remove_relation(
-        f"{database_app_name}:s3-parameters", f"{S3_INTEGRATOR_APP_NAME}:s3-credentials"
-    )
-
     await ops_test.model.wait_for_idle(status="active", timeout=1000)
 
     # Remove the database app.
@@ -190,7 +172,7 @@ async def test_backup_aws(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], c
 
 @pytest.mark.group("GCP")
 @pytest.mark.abort_on_fail
-async def test_backup_gcp(ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict], charm) -> None:
+async def test_backup_gcp(ops_test: OpsTest, cloud_configs: tuple[dict, dict], charm) -> None:
     """Build and deploy two units of PostgreSQL in GCP, test backup and restore actions."""
     config = cloud_configs[0][GCP]
     credentials = cloud_configs[1][GCP]
@@ -221,12 +203,16 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     previous_database_app_name = f"{DATABASE_APP_NAME}-gcp"
     database_app_name = f"new-{DATABASE_APP_NAME}"
     await ops_test.model.deploy(
-        charm, application_name=previous_database_app_name, base=CHARM_BASE
+        charm,
+        application_name=previous_database_app_name,
+        base=CHARM_BASE,
+        config={"profile": "testing"},
     )
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
         base=CHARM_BASE,
+        config={"profile": "testing"},
     )
     await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)
     await ops_test.model.relate(database_app_name, S3_INTEGRATOR_APP_NAME)
@@ -277,8 +263,9 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     ):
         with attempt:
             logger.info("restoring the backup")
-            most_recent_backup = backups.split("\n")[-1]
-            backup_id = most_recent_backup.split()[0]
+            # Last two entries are 'action: restore', that cannot be used without restore-to-time parameter
+            most_recent_real_backup = backups.split("\n")[-3]
+            backup_id = most_recent_real_backup.split()[0]
             action = await ops_test.model.units.get(unit_name).run_action(
                 "restore", **{"backup-id": backup_id}
             )
@@ -290,7 +277,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     async with ops_test.fast_forward():
         unit = ops_test.model.units.get(f"{database_app_name}/0")
         await ops_test.model.block_until(
-            lambda: unit.workload_status_message == MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
+            lambda: unit.workload_status_message == ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
         )
 
     # Check that the backup was correctly restored by having only the first created table.
@@ -310,7 +297,7 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
 
 @pytest.mark.group("GCP")
 async def test_invalid_config_and_recovery_after_fixing_it(
-    ops_test: OpsTest, cloud_configs: Tuple[Dict, Dict]
+    ops_test: OpsTest, cloud_configs: tuple[dict, dict]
 ) -> None:
     """Test that the charm can handle invalid and valid backup configurations."""
     database_app_name = f"new-{DATABASE_APP_NAME}"

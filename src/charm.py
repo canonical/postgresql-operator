@@ -4,6 +4,7 @@
 
 """Charmed Machine Operator for the PostgreSQL database."""
 
+import contextlib
 import json
 import logging
 import os
@@ -13,7 +14,7 @@ import subprocess
 import sys
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Literal, Optional, Set, Tuple, get_args
+from typing import Literal, get_args
 
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -25,6 +26,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQL,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
+    PostgreSQLGetCurrentTimelineError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
@@ -52,7 +54,7 @@ from ops.model import (
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
-from backups import CANNOT_RESTORE_PITR, MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET, PostgreSQLBackups
+from backups import CANNOT_RESTORE_PITR, PostgreSQLBackups
 from cluster import (
     NotReadyError,
     Patroni,
@@ -113,6 +115,10 @@ Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
 
 
+class CannotConnectError(Exception):
+    """Cannot run smoke check on connected Database."""
+
+
 @trace_charm(
     tracing_endpoint="tracing_endpoint",
     extra_types=(
@@ -162,10 +168,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
 
         juju_version = JujuVersion.from_environ()
-        if juju_version.major > 2:
-            run_cmd = "/usr/bin/juju-exec"
-        else:
-            run_cmd = "/usr/bin/juju-run"
+        run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
         self._observer = ClusterTopologyObserver(self, run_cmd)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -214,7 +217,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
         self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
 
-    def patroni_scrape_config(self) -> List[Dict]:
+    def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
         return [
             {
@@ -234,7 +237,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return {self.unit, *self._peers.units}
 
     @property
-    def app_peer_data(self) -> Dict:
+    def app_peer_data(self) -> dict:
         """Application peer relation data object."""
         relation = self.model.get_relation(PEER)
         if relation is None:
@@ -243,7 +246,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return relation.data[self.app]
 
     @property
-    def unit_peer_data(self) -> Dict:
+    def unit_peer_data(self) -> dict:
         """Unit peer relation data object."""
         relation = self.model.get_relation(PEER)
         if relation is None:
@@ -252,11 +255,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return relation.data[self.unit]
 
     @property
-    def tracing_endpoint(self) -> Optional[str]:
+    def tracing_endpoint(self) -> str | None:
         """Otlp http endpoint for charm instrumentation."""
         return self._tracing_endpoint_config
 
-    def _peer_data(self, scope: Scopes) -> Dict:
+    def _peer_data(self, scope: Scopes) -> dict:
         """Return corresponding databag for app/unit."""
         relation = self.model.get_relation(PEER)
         if relation is None:
@@ -285,7 +288,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         new_key = key.replace("_", "-")
         return new_key.strip("-")
 
-    def get_secret(self, scope: Scopes, key: str) -> Optional[str]:
+    def get_secret(self, scope: Scopes, key: str) -> str | None:
         """Get secret from the secret storage."""
         if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
@@ -300,7 +303,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
 
-    def set_secret(self, scope: Scopes, key: str, value: Optional[str]) -> Optional[str]:
+    def set_secret(self, scope: Scopes, key: str, value: str | None) -> str | None:
         """Set secret from the secret storage."""
         if scope not in get_args(Scopes):
             raise RuntimeError("Unknown secret scope.")
@@ -344,7 +347,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
 
     @property
-    def primary_endpoint(self) -> Optional[str]:
+    def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
         if not self._peers:
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
@@ -397,7 +400,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def _updated_synchronous_node_count(self, num_units: int = None) -> bool:
+    def _updated_synchronous_node_count(self, num_units: int | None = None) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
         try:
             self._patroni.update_synchronous_node_count(num_units)
@@ -860,7 +863,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_unit_ip(self, unit: Unit) -> Optional[str]:
+    def _get_unit_ip(self, unit: Unit) -> str | None:
         """Get the IP address of a specific unit."""
         # Check if host is current host.
         ip = None
@@ -923,7 +926,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return all(self.tls.get_tls_files())
 
     @property
-    def _peer_members_ips(self) -> Set[str]:
+    def _peer_members_ips(self) -> set[str]:
         """Fetch current list of peer members IPs.
 
         Returns:
@@ -937,7 +940,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return addresses
 
     @property
-    def _units_ips(self) -> Set[str]:
+    def _units_ips(self) -> set[str]:
         """Fetch current list of peers IPs.
 
         Returns:
@@ -949,7 +952,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return addresses
 
     @property
-    def members_ips(self) -> Set[str]:
+    def members_ips(self) -> set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
         return set(json.loads(self._peers.data[self.app].get("members_ips", "[]")))
 
@@ -961,7 +964,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Remove IPs from the members list."""
         self._update_members_ips(ip_to_remove=ip)
 
-    def _update_members_ips(self, ip_to_add: str = None, ip_to_remove: str = None) -> None:
+    def _update_members_ips(
+        self, ip_to_add: str | None = None, ip_to_remove: str | None = None
+    ) -> None:
         """Update cluster member IPs on application data.
 
         Member IPs on application data are used to determine when a unit of PostgreSQL
@@ -1048,9 +1053,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Create the user home directory for the snap_daemon user.
         # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
         try:
-            subprocess.check_call("mkdir -p /home/snap_daemon".split())
-            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())
+            # Input is hardcoded
+            subprocess.check_call("mkdir -p /home/snap_daemon".split())  # noqa: S603
+            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())  # noqa: S603
+            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())  # noqa: S603
         except subprocess.CalledProcessError:
             logger.exception("Unable to create snap_daemon home dir")
 
@@ -1152,7 +1158,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 )
                 return
 
-    def enable_disable_extensions(self, database: str = None) -> None:
+    def enable_disable_extensions(self, database: str | None = None) -> None:
         """Enable/disable PostgreSQL extensions set through config options.
 
         Args:
@@ -1211,7 +1217,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     )
         return skip
 
-    def _get_ips_to_remove(self) -> Set[str]:
+    def _get_ips_to_remove(self) -> set[str]:
         """List the IPs that were part of the cluster but departed."""
         old = self.members_ips
         current = self._units_ips
@@ -1231,9 +1237,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
-        if self.is_blocked and self.unit.status.message not in [
-            MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET
-        ]:
+        if self.is_blocked:
             logger.debug("Early exit on_start: Unit blocked")
             return False
 
@@ -1289,9 +1293,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        if postgres_snap.revision != list(
+        if postgres_snap.revision != next(
             filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
-        )[0][1]["revision"].get(platform.machine()):
+        )[1]["revision"].get(platform.machine()):
             logger.debug(
                 "Early exit _setup_exporter: snap was not refreshed to the right version yet"
             )
@@ -1437,11 +1441,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             other_cluster_primary = self._patroni.get_primary(
                 alternative_endpoints=other_cluster_endpoints
             )
-            other_cluster_primary_ip = [
+            other_cluster_primary_ip = next(
                 replication_offer_relation.data[unit].get("private-address")
                 for unit in replication_offer_relation.units
                 if unit.name.replace("/", "-") == other_cluster_primary
-            ][0]
+            )
             try:
                 self.postgresql.update_user_password(
                     username, password, database_host=other_cluster_primary_ip
@@ -1478,39 +1482,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_run_on_update_status():
             return
 
-        if "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data:
-            if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
-                logger.error(
-                    "Restore failed: database service failed to reach point-in-time-recovery target. "
-                    "You can launch another restore with different parameters"
-                )
-                self.log_pitr_last_transaction_time()
-                self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
-                return
-
-            if "failed" in self._patroni.get_member_status(self._member_name):
-                logger.error("Restore failed: database service failed to start")
-                self.unit.status = BlockedStatus("Failed to restore backup")
-                return
-
-            if not self._patroni.member_started:
-                logger.debug("on_update_status early exit: Patroni has not started yet")
-                return
-
-            # Remove the restoring backup flag and the restore stanza name.
-            self.app_peer_data.update({
-                "restoring-backup": "",
-                "restore-stanza": "",
-                "restore-to-time": "",
-            })
-            self.update_config()
-            self.restore_patroni_restart_condition()
-            logger.info("Restore succeeded")
-
-            can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
-            if not can_use_s3_repository:
-                self.unit.status = BlockedStatus(validation_message)
-                return
+        if (
+            "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data
+        ) and not self._was_restore_successful():
+            return
 
         if self._handle_processes_failures():
             return
@@ -1529,6 +1504,59 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+    def _was_restore_successful(self) -> bool:
+        if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
+            logger.error(
+                "Restore failed: database service failed to reach point-in-time-recovery target. "
+                "You can launch another restore with different parameters"
+            )
+            self.log_pitr_last_transaction_time()
+            self.unit.status = BlockedStatus(CANNOT_RESTORE_PITR)
+            return False
+
+        if "failed" in self._patroni.get_member_status(self._member_name):
+            logger.error("Restore failed: database service failed to start")
+            self.unit.status = BlockedStatus("Failed to restore backup")
+            return False
+
+        if not self._patroni.member_started:
+            logger.debug("Restore check early exit: Patroni has not started yet")
+            return False
+
+        restoring_backup = self.app_peer_data.get("restoring-backup")
+        restore_timeline = self.app_peer_data.get("restore-timeline")
+        restore_to_time = self.app_peer_data.get("restore-to-time")
+        try:
+            current_timeline = self.postgresql.get_current_timeline()
+        except PostgreSQLGetCurrentTimelineError:
+            logger.debug("Restore check early exit: can't get current wal timeline")
+            return False
+
+        # Remove the restoring backup flag and the restore stanza name.
+        self.app_peer_data.update({
+            "restoring-backup": "",
+            "restore-stanza": "",
+            "restore-to-time": "",
+            "restore-timeline": "",
+        })
+        self.update_config()
+        self.restore_patroni_restart_condition()
+
+        logger.info(
+            "Restored"
+            f"{f' to {restore_to_time}' if restore_to_time else ''}"
+            f"{f' from timeline {restore_timeline}' if restore_timeline and not restoring_backup else ''}"
+            f"{f' from backup {self.backup._parse_backup_id(restoring_backup)[0]}' if restoring_backup else ''}"
+            f". Currently tracking the newly created timeline {current_timeline}."
+        )
+
+        can_use_s3_repository, validation_message = self.backup.can_use_s3_repository()
+        if not can_use_s3_repository:
+            self.unit.status = BlockedStatus(validation_message)
+            return False
+
+        return True
 
     def _can_run_on_update_status(self) -> bool:
         if "cluster_initialised" not in self._peers.data[self.app]:
@@ -1605,15 +1633,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _set_primary_status_message(self) -> None:
         """Display 'Primary' in the unit status message if the current unit is the primary."""
         try:
-            if "require-change-bucket-after-restore" in self.app_peer_data:
-                if self.unit.is_leader():
-                    self.app_peer_data.update({
-                        "restoring-backup": "",
-                        "restore-stanza": "",
-                        "restore-to-time": "",
-                    })
-                self.unit.status = BlockedStatus(MOVE_RESTORED_CLUSTER_TO_ANOTHER_BUCKET)
-                return
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:
@@ -1655,7 +1674,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: List[str], refresh: bool = False) -> None:
+    def _install_snap_packages(self, packages: list[str], refresh: bool = False) -> None:
         """Installs package(s) to container.
 
         Args:
@@ -1691,7 +1710,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
         try:
-            subprocess.check_call(["mountpoint", "-q", self._storage_path])
+            # Storage path is constant
+            subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
             return True
         except subprocess.CalledProcessError:
             return False
@@ -1733,10 +1753,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         event.defer()
         logger.error("Data directory not attached. Reboot unit.")
         self.unit.status = WaitingStatus("Data directory not attached")
-        try:
-            subprocess.check_call(["systemctl", "reboot"])
-        except subprocess.CalledProcessError:
-            pass
+        with contextlib.suppress(subprocess.CalledProcessError):
+            # Call is constant
+            subprocess.check_call(["/usr/bin/systemctl", "reboot"])  # noqa: S603
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
@@ -1758,7 +1777,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for attempt in Retrying(wait=wait_fixed(3), stop=stop_after_delay(300)):
                 with attempt:
                     if not self._can_connect_to_postgresql:
-                        assert False
+                        raise CannotConnectError
         except Exception:
             logger.exception("Unable to reconnect to postgresql")
 
@@ -1780,7 +1799,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
                 with attempt:
-                    assert self.postgresql.get_postgresql_timezones()
+                    if not self.postgresql.get_postgresql_timezones():
+                        raise CannotConnectError
         except RetryError:
             logger.debug("Cannot connect to database")
             return False
@@ -1805,12 +1825,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
+            restore_timeline=self.app_peer_data.get("restore-timeline"),
             restore_to_latest=self.app_peer_data.get("restore-to-time", None) == "latest",
             stanza=self.app_peer_data.get("stanza"),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
-            disable_pgbackrest_archiving=bool(
-                self.app_peer_data.get("require-change-bucket-after-restore", None)
-            ),
             parameters=pg_parameters,
             no_peers=no_peers,
         )
@@ -1836,10 +1854,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Use config value if set, calculate otherwise
-        if self.config.experimental_max_connections:
-            max_connections = self.config.experimental_max_connections
-        else:
-            max_connections = max(4 * os.cpu_count(), 100)
+        max_connections = (
+            self.config.experimental_max_connections
+            if self.config.experimental_max_connections
+            else max(4 * os.cpu_count(), 100)
+        )
 
         self._patroni.bulk_update_parameters_controller_by_patroni({
             "max_connections": max_connections,
@@ -1921,7 +1940,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return 0
 
     @property
-    def client_relations(self) -> List[Relation]:
+    def client_relations(self) -> list[Relation]:
         """Return the list of established client relations."""
         relations = []
         for relation_name in ["database", "db", "db-admin"]:
@@ -1995,7 +2014,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             logger.warning("not restoring patroni restart condition as it's not overridden")
 
-    def is_pitr_failed(self) -> Tuple[bool, bool]:
+    def is_pitr_failed(self) -> tuple[bool, bool]:
         """Check if Patroni service failed to bootstrap cluster during point-in-time-recovery.
 
         Typically, this means that database service failed to reach point-in-time-recovery target or has been
@@ -2032,7 +2051,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             logger.error("Can't tell last completed transaction time")
 
-    def get_plugins(self) -> List[str]:
+    def get_plugins(self) -> list[str]:
         """Return a list of installed plugins."""
         plugins = [
             "_".join(plugin.split("_")[1:-1])

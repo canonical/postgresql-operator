@@ -20,7 +20,7 @@ from tenacity import (
 )
 
 from charm import PostgresqlOperatorCharm
-from cluster import Patroni, RemoveRaftMemberFailedError
+from cluster import PATRONI_TIMEOUT, Patroni, RemoveRaftMemberFailedError
 from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -341,7 +341,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
-        with open("templates/patroni.yml.j2", "r") as f:
+        with open("templates/patroni.yml.j2") as f:
             mock = mock_open(read_data=f.read())
 
         # Patch the `open` method with our mock.
@@ -350,7 +350,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
-        assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2", "r")
+        assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2",)
         # Ensure the correct rendered template is sent to _render_file method.
         _render_file.assert_called_once_with(
             "/var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml",
@@ -425,7 +425,10 @@ def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
-            f"http://{patroni.unit_ip}:8008/reinitialize", verify=True, auth=patroni._patroni_auth
+            f"http://{patroni.unit_ip}:8008/reinitialize",
+            verify=True,
+            auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
 
@@ -444,13 +447,16 @@ def test_switchover(peers_ips, patroni):
             json={"leader": "primary"},
             verify=True,
             auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):
-    with patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed, patch(
-        "cluster.wait_fixed", return_value=wait_fixed(0)
-    ) as _wait_fixed, patch("requests.patch") as _patch:
+    with (
+        patch("cluster.stop_after_delay", return_value=stop_after_delay(0)) as _wait_fixed,
+        patch("cluster.wait_fixed", return_value=wait_fixed(0)) as _wait_fixed,
+        patch("requests.patch") as _patch,
+    ):
         response = _patch.return_value
         response.status_code = 200
 
@@ -461,6 +467,7 @@ def test_update_synchronous_node_count(peers_ips, patroni):
             json={"synchronous_node_count": 0},
             verify=True,
             auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
         # Test when the request fails.
@@ -599,9 +606,10 @@ def test_patroni_logs(patroni):
 
 
 def test_last_postgresql_logs(patroni):
-    with patch("glob.glob") as _glob, patch(
-        "builtins.open", mock_open(read_data="fake-logs")
-    ) as _open:
+    with (
+        patch("glob.glob") as _glob,
+        patch("builtins.open", mock_open(read_data="fake-logs")) as _open,
+    ):
         # Test when there are no files to read.
         assert patroni.last_postgresql_logs() == ""
         _open.assert_not_called()
@@ -614,7 +622,7 @@ def test_last_postgresql_logs(patroni):
         ]
         assert patroni.last_postgresql_logs() == "fake-logs"
         _open.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3"
         )
 
         # Test when the charm fails to read the logs.
@@ -622,7 +630,7 @@ def test_last_postgresql_logs(patroni):
         _open.side_effect = OSError
         assert patroni.last_postgresql_logs() == ""
         _open.assert_called_with(
-            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3", "r"
+            "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql.log.3"
         )
 
 
@@ -642,9 +650,10 @@ def test_get_patroni_restart_condition(patroni):
 
 @pytest.mark.parametrize("new_restart_condition", ["on-success", "on-failure"])
 def test_update_patroni_restart_condition(patroni, new_restart_condition):
-    with patch("builtins.open", mock_open(read_data="Restart=always")) as _open, patch(
-        "subprocess.run"
-    ) as _run:
+    with (
+        patch("builtins.open", mock_open(read_data="Restart=always")) as _open,
+        patch("subprocess.run") as _run,
+    ):
         _open.return_value.__enter__.return_value.read.return_value = "Restart=always"
         patroni.update_patroni_restart_condition(new_restart_condition)
         _open.return_value.__enter__.return_value.write.assert_called_once_with(

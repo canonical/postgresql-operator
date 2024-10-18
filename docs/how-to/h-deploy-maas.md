@@ -4,6 +4,8 @@ This guide aims to provide a quick start to deploying Charmed PostgreSQL on MAAS
 
 If you want to deploy PostgreSQL on MAAS in a **production environment**, refer to the official [Bootstrap MAAS Tutorial](https://maas.io/docs/tutorial-bootstrapping-maas) followed by the [Charmed PostgreSQL Tutorial](/t/9707).
 
+
+
 ## Summary
  * [Bootstrap a Multipass VM](#heading--bootstrap-multipass-vm)
  * [Configure MAAS](#heading--configure-maas)
@@ -160,3 +162,7 @@ To completely delete your VM and all its data, run:
 ```shell
 multipass delete --purge maas
 ```
+
+[note]
+If you expect having several concurrent connections frequently, it is highly recommended to deploy [PgBouncer](https://charmhub.io/pgbouncer?channel=1/stable) alongside PostgreSQL. For more information, read our explanation about [Connection pooling](/t/15777).
+[/note]

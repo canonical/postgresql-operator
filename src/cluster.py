@@ -12,7 +12,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any
 
 import psutil
 import requests
@@ -53,6 +53,8 @@ logger = logging.getLogger(__name__)
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
 RUNNING_STATES = ["running", "streaming"]
+
+PATRONI_TIMEOUT = 10
 
 
 class RaftPostgresqlNotUpError(Exception):
@@ -105,7 +107,7 @@ class Patroni:
         cluster_name: str,
         member_name: str,
         planned_units: int,
-        peers_ips: Set[str],
+        peers_ips: set[str],
         superuser_password: str,
         replication_password: str,
         rewind_password: str,
@@ -168,8 +170,9 @@ class Patroni:
         # Create empty base config
         open(PG_BASE_CONF_PATH, "a").close()
 
+        # Expected permission
         # Replicas refuse to start with the default permissions
-        os.chmod(POSTGRESQL_DATA_PATH, 0o750)
+        os.chmod(POSTGRESQL_DATA_PATH, 0o750)  # noqa: S103
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
@@ -263,7 +266,9 @@ class Patroni:
                         return member["state"]
         return ""
 
-    def get_primary(self, unit_name_pattern=False, alternative_endpoints: List[str] = None) -> str:
+    def get_primary(
+        self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
+    ) -> str:
         """Get primary instance.
 
         Args:
@@ -293,7 +298,7 @@ class Patroni:
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get standby leader instance.
 
         Args:
@@ -324,21 +329,26 @@ class Patroni:
                             standby_leader = "/".join(standby_leader.rsplit("-", 1))
                         return standby_leader
 
-    def get_sync_standby_names(self) -> List[str]:
+    def get_sync_standby_names(self) -> list[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
                 url = self._get_alternative_patroni_url(attempt)
-                r = requests.get(f"{url}/cluster", verify=self.verify, auth=self._patroni_auth)
+                r = requests.get(
+                    f"{url}/cluster",
+                    verify=self.verify,
+                    auth=self._patroni_auth,
+                    timeout=PATRONI_TIMEOUT,
+                )
                 for member in r.json()["members"]:
                     if member["role"] == "sync_standby":
                         sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
         return sync_standbys
 
     def _get_alternative_patroni_url(
-        self, attempt: AttemptManager, alternative_endpoints: List[str] = None
+        self, attempt: AttemptManager, alternative_endpoints: list[str] | None = None
     ) -> str:
         """Get an alternative REST API URL from another member each time.
 
@@ -396,7 +406,7 @@ class Patroni:
             for member in cluster_status.json()["members"]
         )
 
-    def get_patroni_health(self) -> Dict[str, str]:
+    def get_patroni_health(self) -> dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
             with attempt:
@@ -419,7 +429,10 @@ class Patroni:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
                     r = requests.get(
-                        f"{self._patroni_url}/cluster", verify=self.verify, auth=self._patroni_auth
+                        f"{self._patroni_url}/cluster",
+                        verify=self.verify,
+                        auth=self._patroni_auth,
+                        timeout=PATRONI_TIMEOUT,
                     )
         except RetryError:
             return False
@@ -442,12 +455,14 @@ class Patroni:
                         endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
                         member_status = requests.get(
-                            f"{url}/{endpoint}", verify=self.verify, auth=self._patroni_auth
+                            f"{url}/{endpoint}",
+                            verify=self.verify,
+                            auth=self._patroni_auth,
+                            timeout=PATRONI_TIMEOUT,
                         )
                         if member_status.status_code != 200:
                             logger.debug(
-                                "Failed replication check for %s with code %d"
-                                % (members_ip, member_status.status_code)
+                                f"Failed replication check for {members_ip} with code {member_status.status_code}"
                             )
                             raise Exception
         except RetryError:
@@ -529,7 +544,10 @@ class Patroni:
     def promote_standby_cluster(self) -> None:
         """Promote a standby cluster to be a regular cluster."""
         config_response = requests.get(
-            f"{self._patroni_url}/config", verify=self.verify, auth=self._patroni_auth
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
         if "standby_cluster" not in config_response.json():
             raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
@@ -538,6 +556,7 @@ class Patroni:
             verify=self.verify,
             json={"standby_cluster": None},
             auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
@@ -567,13 +586,14 @@ class Patroni:
         connectivity: bool = False,
         is_creating_backup: bool = False,
         enable_tls: bool = False,
-        stanza: str = None,
-        restore_stanza: Optional[str] = None,
+        stanza: str | None = None,
+        restore_stanza: str | None = None,
         disable_pgbackrest_archiving: bool = False,
-        backup_id: Optional[str] = None,
-        pitr_target: Optional[str] = None,
+        backup_id: str | None = None,
+        pitr_target: str | None = None,
+        restore_timeline: str | None = None,
         restore_to_latest: bool = False,
-        parameters: Optional[dict[str, str]] = None,
+        parameters: dict[str, str] | None = None,
         no_peers: bool = False,
     ) -> None:
         """Render the Patroni configuration file.
@@ -586,13 +606,14 @@ class Patroni:
             restore_stanza: name of the stanza used when restoring a backup.
             disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
             backup_id: id of the backup that is being restored.
-            pitr_target: point-in-time-recovery target for the backup.
+            pitr_target: point-in-time-recovery target for the restore.
+            restore_timeline: timeline to restore from.
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
         """
         # Open the template patroni.yml file.
-        with open("templates/patroni.yml.j2", "r") as file:
+        with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
@@ -621,6 +642,7 @@ class Patroni:
             restoring_backup=backup_id is not None or pitr_target is not None,
             backup_id=backup_id,
             pitr_target=pitr_target if not restore_to_latest else None,
+            restore_timeline=restore_timeline,
             restore_to_latest=restore_to_latest,
             stanza=stanza,
             restore_stanza=restore_stanza,
@@ -681,7 +703,7 @@ class Patroni:
             return ""
         log_files.sort(reverse=True)
         try:
-            with open(log_files[0], "r") as last_log_file:
+            with open(log_files[0]) as last_log_file:
                 return last_log_file.read()
         except OSError as e:
             error_message = "Failed to read last postgresql log file"
@@ -715,6 +737,7 @@ class Patroni:
                     json={"leader": current_primary},
                     verify=self.verify,
                     auth=self._patroni_auth,
+                    timeout=PATRONI_TIMEOUT,
                 )
 
         # Check whether the switchover was unsuccessful.
@@ -749,7 +772,7 @@ class Patroni:
             if path.exists() and path.is_dir():
                 shutil.rmtree(path)
         except OSError as e:
-            raise Exception(f"Failed to remove previous cluster information with error: {str(e)}")
+            raise Exception(f"Failed to remove previous cluster information with error: {e!s}")
         logger.info("Raft ready to reinitialise")
 
     def reinitialise_raft_data(self) -> None:
@@ -838,6 +861,7 @@ class Patroni:
                 )
             return
 
+        # Suppressing since the call will be removed soon
         # Remove the member from the raft cluster.
         try:
             result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])
@@ -851,7 +875,12 @@ class Patroni:
     @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(f"{self._patroni_url}/reload", verify=self.verify, auth=self._patroni_auth)
+        requests.post(
+            f"{self._patroni_url}/reload",
+            verify=self.verify,
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
     def restart_patroni(self) -> bool:
         """Restart Patroni.
@@ -872,17 +901,25 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
-        requests.post(f"{self._patroni_url}/restart", verify=self.verify, auth=self._patroni_auth)
+        requests.post(
+            f"{self._patroni_url}/restart",
+            verify=self.verify,
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
         requests.post(
-            f"{self._patroni_url}/reinitialize", verify=self.verify, auth=self._patroni_auth
+            f"{self._patroni_url}/reinitialize",
+            verify=self.verify,
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
-    def bulk_update_parameters_controller_by_patroni(self, parameters: Dict[str, Any]) -> None:
+    def bulk_update_parameters_controller_by_patroni(self, parameters: dict[str, Any]) -> None:
         """Update the value of a parameter controller by Patroni.
 
         For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
@@ -892,9 +929,10 @@ class Patroni:
             verify=self.verify,
             json={"postgresql": {"parameters": parameters}},
             auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
         )
 
-    def update_synchronous_node_count(self, units: int = None) -> None:
+    def update_synchronous_node_count(self, units: int | None = None) -> None:
         """Update synchronous_node_count to the minority of the planned cluster."""
         if units is None:
             units = self.planned_units
@@ -906,6 +944,7 @@ class Patroni:
                     json={"synchronous_node_count": units // 2},
                     verify=self.verify,
                     auth=self._patroni_auth,
+                    timeout=PATRONI_TIMEOUT,
                 )
 
                 # Check whether the update was unsuccessful.
@@ -918,7 +957,7 @@ class Patroni:
         Returns:
             Patroni systemd service restart condition.
         """
-        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+        with open(PATRONI_SERVICE_DEFAULT_PATH) as patroni_service_file:
             patroni_service = patroni_service_file.read()
             found_restart = re.findall(r"Restart=(\w+)", patroni_service)
             if len(found_restart) == 1:
@@ -934,11 +973,12 @@ class Patroni:
             new_condition: new Patroni systemd service restart condition.
         """
         logger.info(f"setting restart-condition to {new_condition} for patroni service")
-        with open(PATRONI_SERVICE_DEFAULT_PATH, "r") as patroni_service_file:
+        with open(PATRONI_SERVICE_DEFAULT_PATH) as patroni_service_file:
             patroni_service = patroni_service_file.read()
         logger.debug(f"patroni service file: {patroni_service}")
         new_patroni_service = re.sub(r"Restart=\w+", f"Restart={new_condition}", patroni_service)
         logger.debug(f"new patroni service file: {new_patroni_service}")
         with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
             patroni_service_file.write(new_patroni_service)
-        subprocess.run(["/bin/systemctl", "daemon-reload"])
+        # Input is hardcoded
+        subprocess.run(["/bin/systemctl", "daemon-reload"])  # noqa: S603
