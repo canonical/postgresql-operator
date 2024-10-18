@@ -5,7 +5,6 @@
 
 import json
 import logging
-from typing import List
 
 from charms.data_platform_libs.v0.upgrade import (
     ClusterNotReadyError,
@@ -55,7 +54,7 @@ class PostgreSQLUpgrade(DataUpgrade):
         self._on_upgrade_charm_check_legacy()
 
     @override
-    def build_upgrade_stack(self) -> List[int]:
+    def build_upgrade_stack(self) -> list[int]:
         """Builds ordered iterable of all application unit.ids to upgrade in.
 
         Called by leader unit during :meth:`_on_pre_upgrade_check_action`.
@@ -139,7 +138,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                 # All peers have set the state to ready
                 self.unit_upgrade_data.update({"state": "ready"})
                 self._prepare_upgrade_from_legacy()
-            getattr(self.on, "upgrade_charm").emit()
+            self.on.upgrade_charm.emit()
 
     @override
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:

@@ -17,20 +17,20 @@ In this section, you will integrate your Charmed PostgreSQL to another charmed a
 
 <a href="#heading--deploy-data-integrator"><h2 id="heading--deploy-data-integrator"> Deploy <code>data-integrator</code> </h2></a>
 
-Before relating to a charmed application, we must first deploy our charmed application. In this tutorial, we will relate to the [Data Integrator charm](https://charmhub.io/data-integrator). This is a bare-bones charm that allows for central management of database users, providing support for different kinds of data platforms (e.g. PostgreSQL, MySQL, MongoDB, Kafka, etc) with a consistent, opinionated and robust user experience. 
+In this tutorial, we will relate to the [Data Integrator charm](https://charmhub.io/data-integrator). This is a bare-bones charm that allows for central management of database users. It automatically provides credentials and endpoints that are needed to connect with a charmed database application.
 
 To deploy `data-integrator`, run
 
 ```shell
 juju deploy data-integrator --config database-name=test-database
 ```
-The expected output:
+Example output:
 ```
 Located charm "data-integrator" in charm-hub, revision 11
 Deploying "data-integrator" from charm-hub charm "data-integrator", revision 11 in channel stable on jammy
 ```
 
-Checking the deployment progress using `juju status` will show a `blocked` state for the newly deployed charm:
+Running `juju status` will show you `data-integrator` in a `blocked` state. This state is expected due to not-yet established relation (integration) between applications.
 ```
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  3.1.7   unsupported  10:22:13+01:00
@@ -49,7 +49,6 @@ Machine  State    Address       Inst id        Series  AZ  Message
 1        started  10.89.49.197  juju-a8a31d-1  jammy       Running
 3        started  10.89.49.179  juju-a8a31d-3  jammy       Running
 ```
-The `blocked` state is expected due to not-yet established relation (integration) between applications.
 
 <a href="#heading--integrate-with-postgresql"><h2 id="heading--integrate-with-postgresql"> Integrate with PostgreSQL </h2></a>
 
@@ -79,11 +78,12 @@ Machine  State    Address       Inst id        Series  AZ  Message
 3        started  10.89.49.179  juju-a8a31d-3  jammy       Running
 ```
 
-To retrieve information such as the username, password, and database, run the command
+To retrieve the username, password and database name, run the command
 ```shell
 juju run data-integrator/leader get-credentials
 ```
-This should output something like:
+
+Example output:
 ```yaml
 unit-data-integrator-0:
   UnitId: data-integrator/0

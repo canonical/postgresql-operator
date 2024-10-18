@@ -169,16 +169,15 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     connection.close()
 
     # Connect to the database using the replica endpoint.
-    with psycopg2.connect(replica_connection_string) as connection:
-        with connection.cursor() as cursor:
-            # Read some data.
-            cursor.execute("SELECT data FROM test;")
-            data = cursor.fetchone()
-            assert data[0] == "some data"
+    with psycopg2.connect(replica_connection_string) as connection, connection.cursor() as cursor:
+        # Read some data.
+        cursor.execute("SELECT data FROM test;")
+        data = cursor.fetchone()
+        assert data[0] == "some data"
 
-            # Try to alter some data in a read-only transaction.
-            with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
-                cursor.execute("DROP TABLE test;")
+        # Try to alter some data in a read-only transaction.
+        with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
+            cursor.execute("DROP TABLE test;")
     connection.close()
 
     # Remove the relation and test that its user was deleted
@@ -189,9 +188,8 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(10)):
-        with attempt:
-            with pytest.raises(psycopg2.OperationalError):
-                psycopg2.connect(primary_connection_string)
+        with attempt, pytest.raises(psycopg2.OperationalError):
+            psycopg2.connect(primary_connection_string)
 
 
 @pytest.mark.group(1)
