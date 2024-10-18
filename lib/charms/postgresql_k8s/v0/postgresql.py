@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 36
+LIBPATCH = 37
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -393,24 +393,32 @@ END; $$;"""
 SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}')
 WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user, self.user)
             )
+            for schema in schemas:
+                statements.append(
+                    sql.SQL("ALTER SCHEMA {} OWNER TO {};").format(
+                        sql.Identifier(schema), sql.Identifier(user)
+                    )
+                )
         else:
             for schema in schemas:
                 schema = sql.Identifier(schema)
-                statements.append(
+                statements.extend([
                     sql.SQL("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} TO {};").format(
                         schema, sql.Identifier(user)
-                    )
-                )
-                statements.append(
+                    ),
                     sql.SQL("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} TO {};").format(
                         schema, sql.Identifier(user)
-                    )
-                )
-                statements.append(
+                    ),
                     sql.SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
                         schema, sql.Identifier(user)
-                    )
-                )
+                    ),
+                    sql.SQL("GRANT USAGE ON SCHEMA {} TO {};").format(
+                        schema, sql.Identifier(user)
+                    ),
+                    sql.SQL("GRANT CREATE ON SCHEMA {} TO {};").format(
+                        schema, sql.Identifier(user)
+                    ),
+                ])
         return statements
 
     def get_last_archived_wal(self) -> str:
