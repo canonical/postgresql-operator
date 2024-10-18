@@ -35,6 +35,7 @@ from constants import (
     PGBACKREST_CONF_PATH,
     PGBACKREST_CONFIGURATION_FILE,
     PGBACKREST_EXECUTABLE,
+    PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
 )
@@ -1152,6 +1153,13 @@ Stderr:
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
+
+        # Render the logrotate configuration file.
+        with open("templates/pgbackrest.logrotate.j2") as file:
+            template = Template(file.read())
+            self.charm._patroni.render_file(
+                PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
+            )
 
         return True
 
