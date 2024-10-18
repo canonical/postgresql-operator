@@ -1,6 +1,5 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
-from typing import Dict, Optional
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
@@ -18,11 +17,11 @@ class MockCharm(CharmBase):
         self.rotate_logs = RotateLogs(self)
 
     @property
-    def _peers(self) -> Optional[Relation]:
+    def _peers(self) -> Relation | None:
         return None
 
     @property
-    def unit_peer_data(self) -> Dict:
+    def unit_peer_data(self) -> dict:
         """Unit peer relation data object."""
         if self._peers is None:
             return {}

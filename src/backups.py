@@ -1155,7 +1155,7 @@ Stderr:
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
 
         # Render the logrotate configuration file.
-        with open("templates/pgbackrest.logrotate.j2", "r") as file:
+        with open("templates/pgbackrest.logrotate.j2") as file:
             template = Template(file.read())
             self.charm._patroni.render_file(
                 PGBACKREST_LOGROTATE_FILE, template.render(), 0o644, change_owner=False
