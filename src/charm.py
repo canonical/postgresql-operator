@@ -1885,6 +1885,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         patroni_exceptions = []
         count = 0
         while len(patroni_exceptions) == 0 and count < 10:
+            if count > 0:
+                time.sleep(3)
             patroni_logs = self._patroni.patroni_logs(num_lines="all")
             patroni_exceptions = re.findall(
                 r"^([0-9-:TZ]+).*patroni\.exceptions\.PatroniFatalException: Failed to bootstrap cluster$",
@@ -1892,7 +1894,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 re.MULTILINE,
             )
             count += 1
-            time.sleep(3)
 
         if len(patroni_exceptions) > 0:
             logger.debug("Failures to bootstrap cluster detected on Patroni service logs")
