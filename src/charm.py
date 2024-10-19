@@ -1494,12 +1494,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _set_primary_status_message(self) -> None:
         """Display 'Primary' in the unit status message if the current unit is the primary."""
         try:
-            if self.unit.is_leader():
-                if "s3-initialization-block-message" in self.app_peer_data:
-                    self.unit.status = BlockedStatus(
-                        self.app_peer_data["s3-initialization-block-message"]
-                    )
-                    return
+            if self.unit.is_leader() and "s3-initialization-block-message" in self.app_peer_data:
+                self.unit.status = BlockedStatus(
+                    self.app_peer_data["s3-initialization-block-message"]
+                )
+                return
             if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
                 self.unit.status = ActiveStatus("Primary")
             elif self.is_standby_leader:

@@ -613,8 +613,8 @@ class PostgreSQLBackups(Object):
                         raise TimeoutError
                     if return_code != 0:
                         raise Exception(stderr)
-        except TimeoutError:
-            raise TimeoutError
+        except TimeoutError as e:
+            raise e
         except Exception as e:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
@@ -691,7 +691,7 @@ class PostgreSQLBackups(Object):
         ):
             return
 
-        for unit, unit_data in self.charm._peers.data.items():
+        for _unit, unit_data in self.charm._peers.data.items():
             if "s3-initialization-done" not in unit_data:
                 continue
 
@@ -1365,7 +1365,7 @@ Stderr:
 
         return True
 
-    def _read_content_from_s3(self, s3_path: str, s3_parameters: Dict) -> Optional[str]:
+    def _read_content_from_s3(self, s3_path: str, s3_parameters: dict) -> str | None:
         """Reads specified content from the provided S3 bucket relative to the path from the S3 config.
 
         Args:
