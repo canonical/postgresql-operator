@@ -55,16 +55,18 @@ def harness():
 
 
 def test_on_install(harness):
-    with patch("charm.subprocess.check_call") as _check_call, patch(
-        "charm.snap.SnapCache"
-    ) as _snap_cache, patch(
-        "charm.PostgresqlOperatorCharm._install_snap_packages"
-    ) as _install_snap_packages, patch(
-        "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-    ) as _reboot_on_detached_storage, patch(
-        "charm.PostgresqlOperatorCharm._is_storage_attached",
-        side_effect=[False, True, True],
-    ) as _is_storage_attached:
+    with (
+        patch("charm.subprocess.check_call") as _check_call,
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
+        patch(
+            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
+        ) as _reboot_on_detached_storage,
+        patch(
+            "charm.PostgresqlOperatorCharm._is_storage_attached",
+            side_effect=[False, True, True],
+        ) as _is_storage_attached,
+    ):
         # Test without storage.
         harness.charm.on.install.emit()
         _reboot_on_detached_storage.assert_called_once()
@@ -88,16 +90,19 @@ def test_on_install(harness):
 
 
 def test_on_install_failed_to_create_home(harness):
-    with patch("charm.subprocess.check_call") as _check_call, patch(
-        "charm.snap.SnapCache"
-    ) as _snap_cache, patch(
-        "charm.PostgresqlOperatorCharm._install_snap_packages"
-    ) as _install_snap_packages, patch(
-        "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-    ) as _reboot_on_detached_storage, patch(
-        "charm.PostgresqlOperatorCharm._is_storage_attached",
-        side_effect=[False, True, True],
-    ) as _is_storage_attached, patch("charm.logger.exception") as _logger_exception:
+    with (
+        patch("charm.subprocess.check_call") as _check_call,
+        patch("charm.snap.SnapCache") as _snap_cache,
+        patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
+        patch(
+            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
+        ) as _reboot_on_detached_storage,
+        patch(
+            "charm.PostgresqlOperatorCharm._is_storage_attached",
+            side_effect=[False, True, True],
+        ) as _is_storage_attached,
+        patch("charm.logger.exception") as _logger_exception,
+    ):
         # Test without storage.
         harness.charm.on.install.emit()
         _reboot_on_detached_storage.assert_called_once()
@@ -119,11 +124,12 @@ def test_on_install_failed_to_create_home(harness):
 
 
 def test_on_install_snap_failure(harness):
-    with patch(
-        "charm.PostgresqlOperatorCharm._install_snap_packages"
-    ) as _install_snap_packages, patch(
-        "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
-    ) as _is_storage_attached:
+    with (
+        patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
+        patch(
+            "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
+        ) as _is_storage_attached,
+    ):
         # Mock the result of the call.
         _install_snap_packages.side_effect = snap.SnapError
         # Trigger the hook.
@@ -165,13 +171,16 @@ def test_patroni_scrape_config_tls(harness):
 
 
 def test_primary_endpoint(harness):
-    with patch("charm.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay, patch(
-        "charm.wait_fixed", new_callable=PropertyMock
-    ) as _wait_fixed, patch(
-        "charm.PostgresqlOperatorCharm._units_ips",
-        new_callable=PropertyMock,
-        return_value={"1.1.1.1", "1.1.1.2"},
-    ), patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni:
+    with (
+        patch("charm.stop_after_delay", new_callable=PropertyMock) as _stop_after_delay,
+        patch("charm.wait_fixed", new_callable=PropertyMock) as _wait_fixed,
+        patch(
+            "charm.PostgresqlOperatorCharm._units_ips",
+            new_callable=PropertyMock,
+            return_value={"1.1.1.1", "1.1.1.2"},
+        ),
+        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+    ):
         _patroni.return_value.get_member_ip.return_value = "1.1.1.1"
         _patroni.return_value.get_primary.return_value = sentinel.primary
         assert harness.charm.primary_endpoint == "1.1.1.1"
@@ -185,13 +194,17 @@ def test_primary_endpoint(harness):
 
 
 def test_primary_endpoint_no_peers(harness):
-    with patch(
-        "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None
-    ), patch(
-        "charm.PostgresqlOperatorCharm._units_ips",
-        new_callable=PropertyMock,
-        return_value={"1.1.1.1", "1.1.1.2"},
-    ), patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni:
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._peers", new_callable=PropertyMock, return_value=None
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm._units_ips",
+            new_callable=PropertyMock,
+            return_value={"1.1.1.1", "1.1.1.2"},
+        ),
+        patch("charm.PostgresqlOperatorCharm._patroni", new_callable=PropertyMock) as _patroni,
+    ):
         assert harness.charm.primary_endpoint is None
 
         assert not _patroni.return_value.get_member_ip.called
@@ -199,12 +212,16 @@ def test_primary_endpoint_no_peers(harness):
 
 
 def test_on_leader_elected(harness):
-    with patch(
-        "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
-    ) as _update_relation_endpoints, patch(
-        "charm.PostgresqlOperatorCharm.primary_endpoint",
-        new_callable=PropertyMock,
-    ) as _primary_endpoint, patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._update_relation_endpoints", new_callable=PropertyMock
+        ) as _update_relation_endpoints,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+        ) as _primary_endpoint,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+    ):
         # Assert that there is no password in the peer relation.
         assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) is None
 
@@ -249,17 +266,19 @@ def test_is_cluster_initialised(harness):
 
 
 def test_on_config_changed(harness):
-    with patch(
-        "charm.PostgresqlOperatorCharm._validate_config_options"
-    ) as _validate_config_options, patch(
-        "charm.PostgresqlOperatorCharm.update_config"
-    ) as _update_config, patch(
-        "relations.db.DbProvides.set_up_relation"
-    ) as _set_up_relation, patch(
-        "charm.PostgresqlOperatorCharm.enable_disable_extensions"
-    ) as _enable_disable_extensions, patch(
-        "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
-    ) as _is_cluster_initialised:
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._validate_config_options"
+        ) as _validate_config_options,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("relations.db.DbProvides.set_up_relation") as _set_up_relation,
+        patch(
+            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
+        ) as _enable_disable_extensions,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
+        ) as _is_cluster_initialised,
+    ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
         harness.charm.on.config_changed.emit()
@@ -326,9 +345,11 @@ def test_on_config_changed(harness):
 
 
 def test_check_extension_dependencies(harness):
-    with patch("charm.Patroni.get_primary") as _get_primary, patch(
-        "subprocess.check_output", return_value=b"C"
-    ), patch.object(PostgresqlOperatorCharm, "postgresql", Mock()):
+    with (
+        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("subprocess.check_output", return_value=b"C"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()),
+    ):
         _get_primary.return_value = harness.charm.unit
 
         # Test when plugins dependencies exception is not caused
@@ -356,11 +377,13 @@ def test_check_extension_dependencies(harness):
 
 
 def test_enable_disable_extensions(harness, caplog):
-    with patch("charm.Patroni.get_primary") as _get_primary, patch(
-        "charm.PostgresqlOperatorCharm._unit_ip"
-    ), patch("charm.PostgresqlOperatorCharm._patroni"), patch(
-        "subprocess.check_output", return_value=b"C"
-    ), patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock:
+    with (
+        patch("charm.Patroni.get_primary") as _get_primary,
+        patch("charm.PostgresqlOperatorCharm._unit_ip"),
+        patch("charm.PostgresqlOperatorCharm._patroni"),
+        patch("subprocess.check_output", return_value=b"C"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
+    ):
         _get_primary.return_value = harness.charm.unit
 
         # Test when all extensions install/uninstall succeed.
@@ -1183,7 +1206,11 @@ def test_is_storage_attached(harness):
     ) as _check_call:
         # Test with attached storage.
         is_storage_attached = harness.charm._is_storage_attached()
-        _check_call.assert_called_once_with(["mountpoint", "-q", harness.charm._storage_path])
+        _check_call.assert_called_once_with([
+            "/usr/bin/mountpoint",
+            "-q",
+            harness.charm._storage_path,
+        ])
         assert is_storage_attached
 
         # Test with detached storage.
@@ -1197,7 +1224,7 @@ def test_reboot_on_detached_storage(harness):
         harness.charm._reboot_on_detached_storage(mock_event)
         mock_event.defer.assert_called_once()
         assert isinstance(harness.charm.unit.status, WaitingStatus)
-        _check_call.assert_called_once_with(["systemctl", "reboot"])
+        _check_call.assert_called_once_with(["/usr/bin/systemctl", "reboot"])
 
 
 def test_restart(harness):

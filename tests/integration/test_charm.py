@@ -205,9 +205,12 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
         logger.info("connecting to the database host: %s", host)
         try:
-            with psycopg2.connect(
-                f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
-            ) as connection, connection.cursor() as cursor:
+            with (
+                psycopg2.connect(
+                    f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=1"
+                ) as connection,
+                connection.cursor() as cursor,
+            ):
                 settings_names = [
                     "max_prepared_transactions",
                     "shared_buffers",
@@ -353,8 +356,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         host = unit.public_address
         logger.info("connecting to the database host: %s", host)
-        with db_connect(host, password) as connection:
-            with connection.cursor() as cursor:
-                # Ensure we can read from "primarydeletiontest" table
-                cursor.execute("SELECT * FROM primarydeletiontest;")
+        with db_connect(host, password) as connection, connection.cursor() as cursor:
+            # Ensure we can read from "primarydeletiontest" table
+            cursor.execute("SELECT * FROM primarydeletiontest;")
         connection.close()
