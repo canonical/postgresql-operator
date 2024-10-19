@@ -102,6 +102,7 @@ from relations.async_replication import (
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
+from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
 from utils import new_password
 
@@ -170,6 +171,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         juju_version = JujuVersion.from_environ()
         run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
         self._observer = ClusterTopologyObserver(self, run_cmd)
+        self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -203,6 +205,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             charm=self, relation="restart", callback=self._restart
         )
         self._observer.start_observer()
+        self._rotate_logs.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
             metrics_endpoints=[{"path": "/metrics", "port": METRICS_PORT}],

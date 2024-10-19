@@ -546,7 +546,7 @@ class Patroni:
                 if self.get_primary() is None:
                     raise ClusterNotPromotedError("cluster not promoted")
 
-    def render_file(self, path: str, content: str, mode: int) -> None:
+    def render_file(self, path: str, content: str, mode: int, change_owner: bool = True) -> None:
         """Write a content rendered from a template to a file.
 
         Args:
@@ -554,6 +554,8 @@ class Patroni:
             content: the data to be written to the file.
             mode: access permission mask applied to the
               file using chmod (e.g. 0o640).
+            change_owner: whether to change the file owner
+              to the snap_daemon user.
         """
         # TODO: keep this method to use it also for generating replication configuration files and
         # move it to an utils / helpers file.
@@ -562,7 +564,8 @@ class Patroni:
             file.write(content)
         # Ensure correct permissions are set on the file.
         os.chmod(path, mode)
-        self._change_owner(path)
+        if change_owner:
+            self._change_owner(path)
 
     def render_patroni_yml_file(
         self,
