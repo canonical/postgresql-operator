@@ -1,0 +1,75 @@
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  pg (waiting for exactly 3 units, current : 4)
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  pg/1 [executing] active: 
+  pg/2 [executing] maintenance: reconfiguring cluster
+  pg/3 [executing] active: 
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  pg/1 [idle] active: 
+  pg/2 [idle] active: 
+  pg/3 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  pg/2 [idle] active: 
+  pg/3 [idle] active: 
+[32mINFO    [0m juju.model:model.py:2971 Waiting for model:
+  landscape-client/1 [idle] active: Client registered!
+  landscape-client/3 [idle] active: Client registered!
+  landscape-client/4 [idle] active: Client registered!
+  ubuntu-advantage/1 [idle] active: Attached (esm-apps,esm-infra)
+  ubuntu-advantage/2 [idle] active: Attached (esm-apps,esm-infra)
+  ubuntu-advantage/3 [idle] active: Attached (esm-apps,esm-infra)
+  pg/1 [idle] active: 
+  pg/2 [idle] active: 
+  pg/3 [idle] active:
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  02:13:44Z
+
+App               Version  Status  Scale  Charm             Channel      Rev  Exposed  Message
+landscape-client           active      3  landscape-client  latest/edge   69  no       Client registered!
+pg                14.13    active      3  postgresql                       0  no       
+ubuntu-advantage           active      3  ubuntu-advantage  latest/edge  133  no       Attached (esm-apps,esm-infra)
+
+Unit                   Workload  Agent  Machine  Public address  Ports     Message
+pg/1                   active    idle   1        10.64.60.94     5432/tcp  
+  landscape-client/3   active    idle            10.64.60.94               Client registered!
+  ubuntu-advantage/2   active    idle            10.64.60.94               Attached (esm-apps,esm-infra)
+pg/2*                  active    idle   2        10.64.60.189    5432/tcp  
+  landscape-client/1*  active    idle            10.64.60.189              Client registered!
+  ubuntu-advantage/1   active    idle            10.64.60.189              Attached (esm-apps,esm-infra)
+pg/3                   active    idle   3        10.64.60.31     5432/tcp  
+  landscape-client/4   active    idle            10.64.60.31               Client registered!
+  ubuntu-advantage/3*  active    idle            10.64.60.31               Attached (esm-apps,esm-infra)
+
+Machine  State    Address       Inst id        Base          AZ  Message
+1        started  10.64.60.94   juju-6693b1-1  ubuntu@22.04      Running
+2        started  10.64.60.189  juju-6693b1-2  ubuntu@22.04      Running
+3        started  10.64.60.31   juju-6693b1-3  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-2: 01:40:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:40:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:40:39 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:40:39 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-2: 01:40:39 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-pg-0: 01:40:39 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:40:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:40:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-1: 01:40:48 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-pg-2: 01:42:08 ERROR unit.pg/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-landscape-client-1: 01:46:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-2: 01:46:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-3: 01:46:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-0: 01:46:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-1: 01:46:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-2: 01:46:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:50:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:50:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-3: 01:50:35 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-4: 02:05:30 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-3: 02:05:31 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...
