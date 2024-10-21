@@ -1790,6 +1790,7 @@ def test_start_stop_pgbackrest_service(harness):
         patch(
             "charm.PostgresqlOperatorCharm.is_primary", new_callable=PropertyMock
         ) as _is_primary,
+        patch("charm.Patroni.get_standby_leader") as _get_standby_leader,
         patch("backups.snap.SnapCache") as _snap_cache,
         patch(
             "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
@@ -1833,9 +1834,17 @@ def test_start_stop_pgbackrest_service(harness):
         stop.assert_called_once()
         restart.assert_not_called()
 
-        # Test when the service hasn't started in the primary yet.
+        # Test when it's a standby.
         stop.reset_mock()
         _peer_members_ips.return_value = ["1.1.1.1"]
+        _get_standby_leader.return_value = "standby"
+        assert harness.charm.backup.start_stop_pgbackrest_service()
+        stop.assert_called_once()
+        restart.assert_not_called()
+
+        # Test when the service hasn't started in the primary yet.
+        stop.reset_mock()
+        _get_standby_leader.return_value = None
         _is_primary.return_value = False
         _is_primary_pgbackrest_service_running.return_value = False
         assert not harness.charm.backup.start_stop_pgbackrest_service()

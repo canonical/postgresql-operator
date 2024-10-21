@@ -1305,7 +1305,11 @@ Stderr:
             return False
 
         # Stop the service if TLS is not enabled or there are no replicas.
-        if not self.charm.is_tls_enabled or len(self.charm._peer_members_ips) == 0:
+        if (
+            not self.charm.is_tls_enabled
+            or len(self.charm._peer_members_ips) == 0
+            or self.charm._patroni.get_standby_leader()
+        ):
             charmed_postgresql_snap.stop(services=["pgbackrest-service"])
             return True
 
