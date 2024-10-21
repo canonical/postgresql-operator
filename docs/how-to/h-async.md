@@ -13,7 +13,7 @@ The following table shows the source and target controller/model combinations th
 |  | AWS | GCP | Azure |
 |---|---|:---:|:---:|
 | AWS |  |  |  |
-| GCP |  | ![ check ] | ![ check ] |
+| GCP |  | ![ check ] |  |
 | Azure |  | ![ check ] | ![ check ] |
 
 ## How-to guides

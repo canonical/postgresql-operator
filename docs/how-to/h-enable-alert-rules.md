@@ -2,7 +2,7 @@
 
 This guide will show how to set up [Pushover](https://pushover.net/) to receive alert notifications from the COS Alert Manager with [Awesome Alert Rules](https://samber.github.io/awesome-prometheus-alerts/).
 
-Charmed PostgreSQL VM ships a pre-configured and pre-enabled [list of Awesome Alert Rules](https://github.com/canonical/postgresql-operator/tree/main/src/prometheus_alert_rules).
+Charmed PostgreSQL VM ships a pre-configured and pre-enabled [list of Awesome Alert Rules].
 
 <details><summary>Screenshot of alert rules in the Grafana web interface</summary>
 
@@ -74,3 +74,4 @@ Do you have questions? [Contact us]!
 [Contact us]: /t/11852
 [Charmed PostgreSQL VM operator]: /t/9697
 [COS Monitoring]: /t/10600
+[list of Awesome Alert Rules]: /t/15841
