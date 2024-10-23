@@ -293,6 +293,17 @@ def test_render_file(peers_ips, patroni):
         # Ensure the file is chown'd correctly.
         _chown.assert_called_with(filename, uid=35, gid=35)
 
+        # Test when it's requested to not change the file owner.
+        mock.reset_mock()
+        _pwnam.reset_mock()
+        _chmod.reset_mock()
+        _chown.reset_mock()
+        with patch("builtins.open", mock, create=True):
+            patroni.render_file(filename, "rendered-content", 0o640, change_owner=False)
+        _pwnam.assert_not_called()
+        _chmod.assert_called_once_with(filename, 0o640)
+        _chown.assert_not_called()
+
 
 def test_render_patroni_yml_file(peers_ips, patroni):
     with (
