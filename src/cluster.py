@@ -654,7 +654,7 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def patroni_logs(self, num_lines: int | None = 10) -> str:
+    def patroni_logs(self, num_lines: int | str | None = 10) -> str:
         """Get Patroni snap service logs. Executes only on current unit.
 
         Args:
