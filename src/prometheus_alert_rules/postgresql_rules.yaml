@@ -13,8 +13,10 @@ groups:
       labels:
         severity: critical
       annotations:
-        summary: Postgresql down (instance {{ $labels.instance }})
-        description: "Postgresql instance is down\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} is down.
+        description: |
+          If you are not upgrading or configuring cross-region async replication clusters, check for errors in the Loki logs.
+          LABELS = {{ $labels }}
 
     # 2.2.2
     # critical -> info
@@ -24,8 +26,10 @@ groups:
       labels:
         severity: info
       annotations:
-        summary: Postgresql restarted (instance {{ $labels.instance }})
-        description: "Postgresql restarted\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has restarted.
+        description: |
+          If you are not enabling/disabling TLS or upgrading or configuring cross-region async replication clusters, check for errors in the Loki logs.
+          LABELS = {{ $labels }}
 
     # 2.2.3
     - alert: PostgresqlExporterError
@@ -34,8 +38,10 @@ groups:
       labels:
         severity: critical
       annotations:
-        summary: Postgresql exporter error (instance {{ $labels.instance }})
-        description: "Postgresql exporter is showing errors. A query may be buggy in query.yaml\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} is showing an exporter error.
+        description: |
+          There may be a buggy query in query.yaml
+          LABELS = {{ $labels }}
 
     # 2.2.4
     # 10 days -> 7 days
@@ -45,8 +51,11 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql table not auto vacuumed (instance {{ $labels.instance }})
-        description: "Table {{ $labels.relname }} has not been auto vacuumed for 7 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: A PostgreSQL table in instance {{ $labels.instance }} is not auto vacuumed.
+        description: |
+          Table {{ $labels.relname }} has not been auto vacuumed for 7 days.
+          Double-check your VACUUM settings.
+          LABELS = {{ $labels }}
 
     # 2.2.5
     # 10 days -> 7 days
@@ -56,8 +65,11 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql table not auto analyzed (instance {{ $labels.instance }})
-        description: "Table {{ $labels.relname }} has not been auto analyzed for 7 days\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: A PostgreSQL table in instance {{ $labels.instance }} is not auto analyzed.
+        description: |
+          Table {{ $labels.relname }} has not been auto analyzed for 7 days.
+          Double-check your AUTOVACUUM ANALYZE settings.
+          LABELS = {{ $labels }}
 
     # 2.2.6
     - alert: PostgresqlTooManyConnections
@@ -66,8 +78,10 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql too many connections (instance {{ $labels.instance }})
-        description: "PostgreSQL instance has too many connections (> 80%).\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} is using > 80% of the maximum connections.
+        description: |
+          Consider checking how many connections the client application is opening, or using PgBouncer in front of the database.
+          LABELS = {{ $labels }}
 
     # 2.2.7
     # warning -> info
@@ -77,8 +91,11 @@ groups:
       labels:
         severity: info
       annotations:
-        summary: Postgresql not enough connections (instance {{ $labels.instance }})
-        description: "PostgreSQL instance should have more connections (> 5)\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} does not have enough connections.
+        description: |
+          PostgreSQL instance {{ $labels.instance }} should have more connections (> 5).
+          Consider double-checking how many connections the client application is opening and/or using PgBouncer in front of the database.
+          LABELS = {{ $labels }}
 
     # 2.2.8
     - alert: PostgresqlDeadLocks
@@ -87,8 +104,10 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql dead locks (instance {{ $labels.instance }})
-        description: "PostgreSQL has dead-locks\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has dead locks.
+        description: |
+          See more details with the pg_locks view.
+          LABELS = {{ $labels }}
 
     # 2.2.9
     - alert: PostgresqlHighRollbackRate
@@ -97,8 +116,11 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql high rollback rate (instance {{ $labels.instance }})
-        description: "Ratio of transactions being aborted compared to committed is > 2 %\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has a high rollback rate instance.
+        description: |
+          The ratio of transactions being aborted compared to committed is > 2 %.
+          This is probably happening due to unoptimized configurations related to commit delay, connections, memory, and WAL files.
+          LABELS = {{ $labels }}
 
     # 2.2.10
     # critical -> info
@@ -108,8 +130,11 @@ groups:
       labels:
         severity: info
       annotations:
-        summary: Postgresql commit rate low (instance {{ $labels.instance }})
-        description: "Postgresql seems to be processing very few transactions\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has a low commit rate. 
+        description: |
+          PostgreSQL seems to be processing very few transactions.
+          Please check for long-running queries and configuration issues, like insufficient cache size.
+          LABELS = {{ $labels }}
 
     # 2.2.11
     # warning -> info
@@ -119,8 +144,11 @@ groups:
       labels:
         severity: info
       annotations:
-        summary: Postgresql low XID consumption (instance {{ $labels.instance }})
-        description: "Postgresql seems to be consuming transaction IDs very slowly\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} shows low XID consumption.
+        description: |
+          PostgreSQL seems to be consuming transaction IDs very slowly.
+          Run ANALYZE to update the optimizer statistics, ensure that query plans are correct, and double-check your VACUUM settings.
+          LABELS = {{ $labels }}
 
     # 2.2.12
     - alert: PostgresqlHighRateStatementTimeout
@@ -129,8 +157,11 @@ groups:
       labels:
         severity: critical
       annotations:
-        summary: Postgresql high rate statement timeout (instance {{ $labels.instance }})
-        description: "Postgres transactions showing high rate of statement timeouts\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} shows a high rate of statement timeout.
+        description: |
+          Either tune `statement_timeout` when sending queries or use EXPLAIN ANALYZE to understand how the queries can be improved.
+          VALUE = {{ $value }}
+          LABELS = {{ $labels }}
 
     # 2.2.13
     # critical -> warning
@@ -140,8 +171,10 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql high rate deadlock (instance {{ $labels.instance }})
-        description: "Postgres detected deadlocks\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} shows a high deadlock rate.
+        description: |
+          More details can be obtained through the pg_locks view.
+          LABELS = {{ $labels }}
 
     # 2.2.14
     # warning -> info
@@ -151,8 +184,10 @@ groups:
       labels:
         severity: info
       annotations:
-        summary: Postgresql unused replication slot (instance {{ $labels.instance }})
-        description: "Unused Replication Slots\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has unused replication slots.
+        description: |
+          Check if a replica is not using any of them before deleting it.
+          LABELS = {{ $labels }}
 
     # 2.2.15
     - alert: PostgresqlTooManyDeadTuples
@@ -161,8 +196,10 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql too many dead tuples (instance {{ $labels.instance }})
-        description: "PostgreSQL dead tuples is too large\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has too many dead tuples.
+        description: |
+          Double-check your VACUUM settings.
+          LABELS = {{ $labels }}
 
     # 2.2.16
     - alert: PostgresqlConfigurationChanged
@@ -171,8 +208,10 @@ groups:
       labels:
         severity: info
       annotations:
-        summary: Postgresql configuration changed (instance {{ $labels.instance }})
-        description: "Postgres Database configuration change has occurred\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} configuration has changed.
+        description: |
+          PostgreSQL database configuration has changed.
+          LABELS = {{ $labels }}
 
     # 2.2.17
     # critical -> warning
@@ -182,8 +221,11 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql SSL compression active (instance {{ $labels.instance }})
-        description: "Database connections with SSL compression enabled. This may add significant jitter in replication delay. Replicas should turn off SSL compression via `sslcompression=0` in `recovery.conf`.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} SSL compression is active.
+        description: |
+          Database connections with SSL compression are enabled. This may add significant jitter in replication delay.
+          Replicas should turn off SSL compression via `sslcompression=0` in `recovery.conf`.
+          LABELS = {{ $labels }}
 
     # 2.2.18
     # critical -> warning
@@ -193,8 +235,10 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql too many locks acquired (instance {{ $labels.instance }})
-        description: "Too many locks acquired on the database. If this alert happens frequently, we may need to increase the postgres setting max_locks_per_transaction.\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has acquired too many locks.
+        description: |
+          If this alert happens frequently, you may need to increase the PostgreSQL setting max_locks_per_transaction.
+          LABELS = {{ $labels }}
 
     # 2.2.19
     - alert: PostgresqlBloatIndexHigh(>80%)
@@ -203,8 +247,11 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql bloat index high (> 80%) (instance {{ $labels.instance }})
-        description: "The index {{ $labels.idxname }} is bloated. You should execute `REINDEX INDEX CONCURRENTLY {{ $labels.idxname }};`\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has a high bloat index (> 80%).
+        description: |
+          The index {{ $labels.idxname }} is bloated.
+          Consider running `REINDEX INDEX CONCURRENTLY {{ $labels.idxname }};`
+          LABELS = {{ $labels }}
 
     # 2.2.20
     - alert: PostgresqlBloatTableHigh(>80%)
@@ -213,8 +260,11 @@ groups:
       labels:
         severity: warning
       annotations:
-        summary: Postgresql bloat table high (> 80%) (instance {{ $labels.instance }})
-        description: "The table {{ $labels.relname }} is bloated. You should execute `VACUUM {{ $labels.relname }};`\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }} has a high bloat table (> 80%).
+        description: |
+          The table {{ $labels.relname }} is bloated.
+          Consider running `VACUUM {{ $labels.relname }};`
+          LABELS = {{ $labels }}
 
     # 2.2.21
     # warning -> critical
@@ -224,5 +274,8 @@ groups:
       labels:
         severity: critical
       annotations:
-        summary: Postgresql invalid index (instance {{ $labels.instance }})
-        description: "The table {{ $labels.relname }} has an invalid index: {{ $labels.indexrelname }}. You should execute `DROP INDEX {{ $labels.indexrelname }};`\n  VALUE = {{ $value }}\n  LABELS = {{ $labels }}"
+        summary: PostgreSQL instance {{ $labels.instance }})= has an invalid index. 
+        description: |
+          The table {{ $labels.relname }} has an invalid index: {{ $labels.indexrelname }}.
+          Consider running `DROP INDEX {{ $labels.indexrelname }};`
+          LABELS = {{ $labels }}

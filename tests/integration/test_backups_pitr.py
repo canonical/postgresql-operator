@@ -189,9 +189,9 @@ async def pitr_backup_operations(
         "restore", **{"backup-id": backup_b1, "restore-to-time": "bad data"}
     )
     await action.wait()
-    assert (
-        action.status == "failed"
-    ), "1: restore must fail with bad restore-to-time parameter, but that action succeeded"
+    assert action.status == "failed", (
+        "1: restore must fail with bad restore-to-time parameter, but that action succeeded"
+    )
 
     logger.info("1: restoring the backup b1 with unreachable restore-to-time parameter")
     action = await remaining_unit.run_action(
@@ -231,9 +231,9 @@ async def pitr_backup_operations(
     assert _check_test_data("test_data_td1", address, password), "2: test data td1 should exist"
 
     logger.info("2: checking not test data td2")
-    assert not _check_test_data(
-        "test_data_td2", address, password
-    ), "2: test data td2 shouldn't exist"
+    assert not _check_test_data("test_data_td2", address, password), (
+        "2: test data td2 shouldn't exist"
+    )
 
     logger.info("2: creating test data td3")
     _insert_test_data("test_data_td3", address, password)
@@ -267,9 +267,9 @@ async def pitr_backup_operations(
     primary = await get_primary(ops_test, remaining_unit.name)
     address = get_unit_address(ops_test, primary)
     timeline_t3 = await _get_most_recent_backup(ops_test, remaining_unit)
-    assert (
-        backup_b1 != timeline_t3 and timeline_t2 != timeline_t3
-    ), "3: timeline 3 do not exist in list-backups action or bad"
+    assert backup_b1 != timeline_t3 and timeline_t2 != timeline_t3, (
+        "3: timeline 3 do not exist in list-backups action or bad"
+    )
 
     logger.info("3: checking test data td1")
     assert _check_test_data("test_data_td1", address, password), "3: test data td1 should exist"
@@ -278,14 +278,14 @@ async def pitr_backup_operations(
     assert _check_test_data("test_data_td2", address, password), "3: test data td2 should exist"
 
     logger.info("3: checking not test data td3")
-    assert not _check_test_data(
-        "test_data_td3", address, password
-    ), "3: test data td3 shouldn't exist"
+    assert not _check_test_data("test_data_td3", address, password), (
+        "3: test data td3 shouldn't exist"
+    )
 
     logger.info("3: checking not test data td4")
-    assert not _check_test_data(
-        "test_data_td4", address, password
-    ), "3: test data td4 shouldn't exist"
+    assert not _check_test_data("test_data_td4", address, password), (
+        "3: test data td4 shouldn't exist"
+    )
 
     logger.info("3: switching wal")
     _switch_wal(address, password)
@@ -315,9 +315,9 @@ async def pitr_backup_operations(
     assert _check_test_data("test_data_td1", address, password), "4: test data td1 should exist"
 
     logger.info("4: checking not test data td2")
-    assert not _check_test_data(
-        "test_data_td2", address, password
-    ), "4: test data td2 shouldn't exist"
+    assert not _check_test_data("test_data_td2", address, password), (
+        "4: test data td2 shouldn't exist"
+    )
 
     logger.info("4: checking test data td3")
     assert _check_test_data("test_data_td3", address, password), "4: test data td3 should exist"
@@ -356,17 +356,17 @@ async def pitr_backup_operations(
     assert _check_test_data("test_data_td1", address, password), "5: test data td1 should exist"
 
     logger.info("5: checking not test data td2")
-    assert not _check_test_data(
-        "test_data_td2", address, password
-    ), "5: test data td2 shouldn't exist"
+    assert not _check_test_data("test_data_td2", address, password), (
+        "5: test data td2 shouldn't exist"
+    )
 
     logger.info("5: checking test data td3")
     assert _check_test_data("test_data_td3", address, password), "5: test data td3 should exist"
 
     logger.info("5: checking not test data td4")
-    assert not _check_test_data(
-        "test_data_td4", address, password
-    ), "5: test data td4 shouldn't exist"
+    assert not _check_test_data("test_data_td4", address, password), (
+        "5: test data td4 shouldn't exist"
+    )
 
     # Remove the database app.
     await ops_test.model.remove_application(database_app_name, block_until_done=True)
