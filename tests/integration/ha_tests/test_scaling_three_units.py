@@ -70,6 +70,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 )
 @pytest.mark.abort_on_fail
 async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_writes) -> None:
+    logger.info(f"removing {', '.join(roles)}")
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     original_roles = await get_cluster_roles(
