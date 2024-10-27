@@ -577,9 +577,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 or int(self._patroni.member_replication_lag) > 1000
             )
         ):
+            logger.warning("Degraded member detected: reinitialising unit")
+            self.unit.status = MaintenanceStatus("reinitialising replica")
             self._patroni.reinitialize_postgresql()
             logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
-            self.unit.status = MaintenanceStatus("reinitialising replica")
             event.defer()
             return
 
@@ -1483,6 +1484,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and "postgresql_restarted" in self._peers.data[self.unit]
             and self._patroni.member_replication_lag == "unknown"
         ):
+            logger.warning("Workload failure detected. Reinitialising unit.")
+            self.unit.status = MaintenanceStatus("reinitialising replica")
             self._patroni.reinitialize_postgresql()
             return True
 
