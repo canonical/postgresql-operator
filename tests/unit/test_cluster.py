@@ -735,7 +735,7 @@ def test_remove_raft_member(patroni):
 def test_remove_raft_member_no_quorum(patroni, harness):
     with (
         patch("cluster.TcpUtility") as _tcp_utility,
-        patch("cluster.Patroni.get_patroni_health") as _get_patroni_health,
+        patch("cluster.requests.get") as _get,
         patch(
             "charm.PostgresqlOperatorCharm.unit_peer_data", new_callable=PropertyMock
         ) as _unit_peer_data,
@@ -747,7 +747,9 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "has_quorum": False,
             "leader": None,
         }
-        _get_patroni_health.return_value = {"role": "replica", "sync_standby": False}
+        _get.return_value.json.return_value = {
+            "members": [{"role": "async_replica", "name": "postgresql-0"}]
+        }
 
         patroni.remove_raft_member("1.2.3.4")
         assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
@@ -759,7 +761,7 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "has_quorum": False,
             "leader": None,
         }
-        _get_patroni_health.side_effect = Exception
+        _get.side_effect = Exception
 
         patroni.remove_raft_member("1.2.3.4")
 
@@ -774,8 +776,10 @@ def test_remove_raft_member_no_quorum(patroni, harness):
             "has_quorum": False,
             "leader": leader_mock,
         }
-        _get_patroni_health.side_effect = None
-        _get_patroni_health.return_value = {"role": "replica", "sync_standby": True}
+        _get.side_effect = None
+        _get.return_value.json.return_value = {
+            "members": [{"role": "sync_standby", "name": "postgresql-0"}]
+        }
 
         patroni.remove_raft_member("1.2.3.4")
 
