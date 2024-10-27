@@ -11,6 +11,7 @@ from .. import markers
 from ..helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
+    get_machine_from_unit,
     stop_machine,
 )
 from .conftest import APPLICATION_NAME
@@ -68,7 +69,7 @@ async def test_removing_primary(ops_test: OpsTest, continuous_writes) -> None:
     await start_continuous_writes(ops_test, app)
     logger.info("Deleting primary")
     primary = await get_primary(ops_test, app)
-    await stop_machine(ops_test, primary)
+    await stop_machine(ops_test, await get_machine_from_unit(ops_test, primary))
     await sleep(15)
     await ops_test.model.destroy_unit(primary, force=True, destroy_storage=False, max_wait=1500)
 
