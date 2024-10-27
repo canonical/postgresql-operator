@@ -58,9 +58,18 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
 
 @pytest.mark.group(1)
 @markers.juju3
-@pytest.mark.parametrize("role", ["primaries", "sync_standbys", "replicas"])
+@pytest.mark.parametrize(
+    "roles",
+    [
+        ["primaries"],
+        ["sync_standbys"],
+        ["replicas"],
+        ["primaries", "replicas"],
+        ["sync_standbys", "replicas"],
+    ],
+)
 @pytest.mark.abort_on_fail
-async def test_removing_single_unit(ops_test: OpsTest, role: str, continuous_writes) -> None:
+async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
     app = await app_name(ops_test)
     original_roles = await get_cluster_roles(
@@ -68,18 +77,20 @@ async def test_removing_single_unit(ops_test: OpsTest, role: str, continuous_wri
     )
     await start_continuous_writes(ops_test, app)
     logger.info("Stopping unit")
-    unit = original_roles[role][0]
-    await stop_machine(ops_test, await get_machine_from_unit(ops_test, unit))
+    units = [original_roles[role][0] for role in roles]
+    for unit in units:
+        await stop_machine(ops_test, await get_machine_from_unit(ops_test, unit))
     await sleep(15)
     logger.info("Deleting unit")
-    await ops_test.model.destroy_unit(unit, force=True, destroy_storage=False, max_wait=1500)
+    for unit in units:
+        await ops_test.model.destroy_unit(unit, force=True, destroy_storage=False, max_wait=1500)
 
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
     await are_writes_increasing(ops_test, unit)
 
     logger.info("Scaling back up")
-    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
+    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=len(roles))
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
     new_roles = await get_cluster_roles(
@@ -88,7 +99,7 @@ async def test_removing_single_unit(ops_test: OpsTest, role: str, continuous_wri
     assert len(new_roles["primaries"]) == 1
     assert len(new_roles["sync_standbys"]) == 1
     assert len(new_roles["replicas"]) == 1
-    if role == "primaries":
+    if "primaries" in roles:
         assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
     else:
         assert new_roles["primaries"][0] == original_roles["primaries"][0]
