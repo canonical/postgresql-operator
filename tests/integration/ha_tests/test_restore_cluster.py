@@ -97,9 +97,9 @@ async def test_cluster_restore(ops_test):
     logger.info("Upscaling the second cluster with the old data")
     for storage in storages:
         unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storage)
-        assert await reused_full_cluster_recovery_storage(
-            ops_test, unit.name
-        ), "attached storage not properly re-used by Postgresql."
+        assert await reused_full_cluster_recovery_storage(ops_test, unit.name), (
+            "attached storage not properly re-used by Postgresql."
+        )
 
     primary = await get_primary(
         ops_test, ops_test.model.applications[SECOND_APPLICATION].units[0].name
@@ -111,9 +111,9 @@ async def test_cluster_restore(ops_test):
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'restore_table_1');"
         )
-        assert cursor.fetchone()[
-            0
-        ], "data wasn't correctly restored: table 'restore_table_1' doesn't exist"
+        assert cursor.fetchone()[0], (
+            "data wasn't correctly restored: table 'restore_table_1' doesn't exist"
+        )
     connection.close()
 
     # check that there is only one primary

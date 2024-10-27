@@ -131,17 +131,17 @@ async def test_storage_re_use(ops_test, continuous_writes):
     )
     new_unit = await add_unit_with_storage(ops_test, app, unit_storage_id)
 
-    assert await reused_replica_storage(
-        ops_test, new_unit.name
-    ), "attached storage not properly re-used by Postgresql."
+    assert await reused_replica_storage(ops_test, new_unit.name), (
+        "attached storage not properly re-used by Postgresql."
+    )
 
     # Verify that no writes to the database were missed after stopping the writes.
     total_expected_writes = await check_writes(ops_test)
 
     # Verify that new instance is up-to-date.
-    assert await is_secondary_up_to_date(
-        ops_test, new_unit.name, total_expected_writes
-    ), "new instance not up to date."
+    assert await is_secondary_up_to_date(ops_test, new_unit.name, total_expected_writes), (
+        "new instance not up to date."
+    )
 
 
 @pytest.mark.group(1)
@@ -266,9 +266,9 @@ async def test_full_cluster_restart(
     # they come back online they operate as expected. This check verifies that we meet the criteria
     # of all replicas being down at the same time.
     try:
-        assert await are_all_db_processes_down(
-            ops_test, process, signal
-        ), "Not all units down at the same time."
+        assert await are_all_db_processes_down(ops_test, process, signal), (
+            "Not all units down at the same time."
+        )
     finally:
         if process == PATRONI_PROCESS:
             awaits = []
@@ -285,9 +285,9 @@ async def test_full_cluster_restart(
     # Verify all units are up and running.
     sleep(30)
     for unit in ops_test.model.applications[app].units:
-        assert await is_postgresql_ready(
-            ops_test, unit.name
-        ), f"unit {unit.name} not restarted after cluster restart."
+        assert await is_postgresql_ready(ops_test, unit.name), (
+            f"unit {unit.name} not restarted after cluster restart."
+        )
 
     # Check if a primary is elected
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
@@ -373,9 +373,9 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         new_files = await list_wal_files(ops_test, app)
         # Check that the WAL was correctly rotated.
         for unit_name in files:
-            assert not files[unit_name].intersection(
-                new_files
-            ), "WAL segments weren't correctly rotated"
+            assert not files[unit_name].intersection(new_files), (
+                "WAL segments weren't correctly rotated"
+            )
 
         # Start the systemd service in the old primary.
         await run_command_on_unit(ops_test, primary_name, "snap start charmed-postgresql.patroni")
@@ -403,9 +403,9 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
-    assert await is_connection_possible(
-        ops_test, primary_name
-    ), f"Connection {primary_name} is not possible"
+    assert await is_connection_possible(ops_test, primary_name), (
+        f"Connection {primary_name} is not possible"
+    )
 
     logger.info(f"Cutting network for {primary_name}")
     cut_network_from_unit(primary_hostname)
@@ -415,22 +415,22 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     for unit_name in set(all_units_names) - {primary_name}:
         logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
         hostname = await get_machine_from_unit(ops_test, unit_name)
-        assert not is_machine_reachable_from(
-            hostname, primary_hostname
-        ), "unit is reachable from peer"
+        assert not is_machine_reachable_from(hostname, primary_hostname), (
+            "unit is reachable from peer"
+        )
 
     # Verify machine is not reachable from controller.
     logger.info(f"checking for no connectivity between {primary_name} and the controller")
     controller = await get_controller_machine(ops_test)
-    assert not is_machine_reachable_from(
-        controller, primary_hostname
-    ), "unit is reachable from controller"
+    assert not is_machine_reachable_from(controller, primary_hostname), (
+        "unit is reachable from controller"
+    )
 
     # Verify that connection is not possible.
     logger.info("checking whether the connectivity to the database is not working")
-    assert not await is_connection_possible(
-        ops_test, primary_name
-    ), "Connection is possible after network cut"
+    assert not await is_connection_possible(ops_test, primary_name), (
+        "Connection is possible after network cut"
+    )
 
     async with ops_test.fast_forward():
         logger.info("checking whether writes are increasing")
@@ -468,9 +468,9 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
-    assert await is_connection_possible(
-        ops_test, primary_name, use_ip_from_inside=True
-    ), "Connection is not possible after network restore"
+    assert await is_connection_possible(ops_test, primary_name, use_ip_from_inside=True), (
+        "Connection is not possible after network restore"
+    )
 
     await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)
 
@@ -493,9 +493,9 @@ async def test_network_cut_without_ip_change(
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
-    assert await is_connection_possible(
-        ops_test, primary_name
-    ), f"Connection {primary_name} is not possible"
+    assert await is_connection_possible(ops_test, primary_name), (
+        f"Connection {primary_name} is not possible"
+    )
 
     logger.info(f"Cutting network for {primary_name}")
     cut_network_from_unit_without_ip_change(primary_hostname)
@@ -505,22 +505,22 @@ async def test_network_cut_without_ip_change(
     for unit_name in set(all_units_names) - {primary_name}:
         logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
         hostname = await get_machine_from_unit(ops_test, unit_name)
-        assert not is_machine_reachable_from(
-            hostname, primary_hostname
-        ), "unit is reachable from peer"
+        assert not is_machine_reachable_from(hostname, primary_hostname), (
+            "unit is reachable from peer"
+        )
 
     # Verify machine is not reachable from controller.
     logger.info(f"checking for no connectivity between {primary_name} and the controller")
     controller = await get_controller_machine(ops_test)
-    assert not is_machine_reachable_from(
-        controller, primary_hostname
-    ), "unit is reachable from controller"
+    assert not is_machine_reachable_from(controller, primary_hostname), (
+        "unit is reachable from controller"
+    )
 
     # Verify that connection is not possible.
     logger.info("checking whether the connectivity to the database is not working")
-    assert not await is_connection_possible(
-        ops_test, primary_name
-    ), "Connection is possible after network cut"
+    assert not await is_connection_possible(ops_test, primary_name), (
+        "Connection is possible after network cut"
+    )
 
     async with ops_test.fast_forward():
         logger.info("checking whether writes are increasing")
@@ -547,8 +547,8 @@ async def test_network_cut_without_ip_change(
 
     # Verify that connection is possible.
     logger.info("checking whether the connectivity to the database is working")
-    assert await is_connection_possible(
-        ops_test, primary_name
-    ), "Connection is not possible after network restore"
+    assert await is_connection_possible(ops_test, primary_name), (
+        "Connection is not possible after network restore"
+    )
 
     await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)

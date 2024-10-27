@@ -1093,10 +1093,6 @@ def test_on_update_status_after_restore_operation(harness):
 
         # Test when it's not possible to use the configured S3 repository.
         _update_config.reset_mock()
-        _handle_processes_failures.reset_mock()
-        _oversee_users.reset_mock()
-        _update_relation_endpoints.reset_mock()
-        _handle_workload_failures.reset_mock()
         _set_primary_status_message.reset_mock()
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -1107,17 +1103,11 @@ def test_on_update_status_after_restore_operation(harness):
         _can_use_s3_repository.return_value = (False, "fake validation message")
         harness.charm.on.update_status.emit()
         _update_config.assert_called_once()
-        _handle_processes_failures.assert_not_called()
-        _oversee_users.assert_not_called()
-        _update_relation_endpoints.assert_not_called()
-        _handle_workload_failures.assert_not_called()
-        _set_primary_status_message.assert_not_called()
-        assert isinstance(harness.charm.unit.status, BlockedStatus)
-        assert harness.charm.unit.status.message == "fake validation message"
-
+        _set_primary_status_message.assert_called_once()
         # Assert that the backup id is not in the application relation databag anymore.
         assert harness.get_relation_data(rel_id, harness.charm.app) == {
-            "cluster_initialised": "True"
+            "cluster_initialised": "True",
+            "s3-initialization-block-message": "fake validation message",
         }
 
 
@@ -1484,7 +1474,6 @@ def test_on_peer_relation_changed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
         ) as _primary_endpoint,
-        patch("backups.PostgreSQLBackups.check_stanza") as _check_stanza,
         patch("backups.PostgreSQLBackups.coordinate_stanza_fields") as _coordinate_stanza_fields,
         patch(
             "backups.PostgreSQLBackups.start_stop_pgbackrest_service"
@@ -1567,7 +1556,14 @@ def test_on_peer_relation_changed(harness):
         _update_new_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
+        # Test event is early exiting when in blocked status.
+        _update_config.side_effect = None
+        _member_started.return_value = False
+        harness.charm._on_peer_relation_changed(mock_event)
+        _start_patroni.assert_not_called()
+
         # Test when Patroni hasn't started yet in the unit.
+        harness.model.unit.status = ActiveStatus()
         _update_config.side_effect = None
         _member_started.return_value = False
         harness.charm._on_peer_relation_changed(mock_event)
@@ -1581,7 +1577,6 @@ def test_on_peer_relation_changed(harness):
         _member_started.return_value = True
         for values in itertools.product([True, False], ["0", "1000", "1001", "unknown"]):
             _defer.reset_mock()
-            _check_stanza.reset_mock()
             _start_stop_pgbackrest_service.reset_mock()
             _is_primary.return_value = values[0]
             _is_standby_leader.return_value = values[0]
@@ -1590,12 +1585,10 @@ def test_on_peer_relation_changed(harness):
             harness.charm.on.database_peers_relation_changed.emit(relation)
             if _is_primary.return_value == values[0] or int(values[1]) <= 1000:
                 _defer.assert_not_called()
-                _check_stanza.assert_called_once()
                 _start_stop_pgbackrest_service.assert_called_once()
                 assert isinstance(harness.charm.unit.status, ActiveStatus)
             else:
                 _defer.assert_called_once()
-                _check_stanza.assert_not_called()
                 _start_stop_pgbackrest_service.assert_not_called()
                 assert isinstance(harness.charm.unit.status, MaintenanceStatus)
 
@@ -1604,12 +1597,10 @@ def test_on_peer_relation_changed(harness):
         _member_started.return_value = True
         _defer.reset_mock()
         _coordinate_stanza_fields.reset_mock()
-        _check_stanza.reset_mock()
         _start_stop_pgbackrest_service.return_value = False
         harness.charm.on.database_peers_relation_changed.emit(relation)
         _defer.assert_called_once()
         _coordinate_stanza_fields.assert_not_called()
-        _check_stanza.assert_not_called()
 
         # Test the last calls been made when it was possible to start the
         # pgBackRest service.
@@ -1618,7 +1609,6 @@ def test_on_peer_relation_changed(harness):
         harness.charm.on.database_peers_relation_changed.emit(relation)
         _defer.assert_not_called()
         _coordinate_stanza_fields.assert_called_once()
-        _check_stanza.assert_called_once()
 
 
 def test_reconfigure_cluster(harness):
