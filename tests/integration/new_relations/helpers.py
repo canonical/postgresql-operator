@@ -44,7 +44,7 @@ async def build_connection_string(
     """
     # Get the connection data exposed to the application through the relation.
     if database is None:
-        database = f'{application_name.replace("-", "_")}_{relation_name.replace("-", "_")}'
+        database = f"{application_name.replace('-', '_')}_{relation_name.replace('-', '_')}"
 
     if secret_uri := await get_application_relation_data(
         ops_test,

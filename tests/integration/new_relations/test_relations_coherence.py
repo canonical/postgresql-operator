@@ -105,9 +105,9 @@ async def test_relations(ops_test: OpsTest, charm):
             )
             cursor.execute(f"CREATE DATABASE {random_name};")
         except psycopg2.errors.InsufficientPrivilege:
-            assert (
-                False
-            ), f"failed connect to {random_name} or run a statement in the following database"
+            assert False, (
+                f"failed connect to {random_name} or run a statement in the following database"
+            )
         finally:
             connection.close()
 
@@ -147,13 +147,15 @@ async def test_relations(ops_test: OpsTest, charm):
                     random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                     cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
                     if should_fail:
-                        assert (
-                            False
-                        ), f"failed to run a statement in the following database: {database}"
+                        assert False, (
+                            f"failed to run a statement in the following database: {database}"
+                        )
             except psycopg2.errors.InsufficientPrivilege as e:
                 if not should_fail:
                     logger.exception(e)
-                    assert False, f"failed to connect to or run a statement in the following database: {database}"
+                    assert False, (
+                        f"failed to connect to or run a statement in the following database: {database}"
+                    )
             except psycopg2.OperationalError as e:
                 if not should_fail:
                     logger.exception(e)

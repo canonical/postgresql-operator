@@ -339,7 +339,7 @@ class PostgreSQLAsyncReplication(Object):
         # Input is hardcoded
         process = run(  # noqa: S603
             [
-                f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_PATH,
             ],
             capture_output=True,
@@ -645,7 +645,7 @@ class PostgreSQLAsyncReplication(Object):
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
         relation = self._relation
-        getattr(self.charm.on, f'{relation.name.replace("-", "_")}_relation_changed').emit(
+        getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
             relation,
             app=relation.app,
             unit=next(unit for unit in relation.units if unit.app == relation.app),

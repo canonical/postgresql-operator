@@ -492,15 +492,15 @@ async def test_admin_role(ops_test: OpsTest):
                 should_fail = database == "postgres"
                 cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
                 if should_fail:
-                    assert (
-                        False
-                    ), f"failed to run a statement in the following database: {database}"
+                    assert False, (
+                        f"failed to run a statement in the following database: {database}"
+                    )
         except psycopg2.errors.InsufficientPrivilege as e:
             if not should_fail:
                 logger.exception(e)
-                assert (
-                    False
-                ), f"failed to connect to or run a statement in the following database: {database}"
+                assert False, (
+                    f"failed to connect to or run a statement in the following database: {database}"
+                )
         finally:
             if connection is not None:
                 connection.close()
