@@ -249,7 +249,7 @@ def construct_endpoint(endpoint: str, region: str) -> str:
 
     # Use the built endpoint if it is an AWS endpoint.
     if endpoint_data and endpoint.endswith(endpoint_data["dnsSuffix"]):
-        endpoint = f'{endpoint.split("://")[0]}://{endpoint_data["hostname"]}'
+        endpoint = f"{endpoint.split('://')[0]}://{endpoint_data['hostname']}"
 
     return endpoint
 
@@ -475,12 +475,12 @@ async def ensure_correct_relation_data(
                 unit_ip = get_unit_address(ops_test, unit_name)
                 host_parameter = f"host={unit_ip} "
                 if unit_name == primary:
-                    assert (
-                        host_parameter in primary_connection_string
-                    ), f"{unit_name} is not the host of the primary connection string"
-                    assert (
-                        host_parameter not in replica_connection_string
-                    ), f"{unit_name} is the host of the replica connection string"
+                    assert host_parameter in primary_connection_string, (
+                        f"{unit_name} is not the host of the primary connection string"
+                    )
+                    assert host_parameter not in replica_connection_string, (
+                        f"{unit_name} is the host of the replica connection string"
+                    )
 
 
 async def execute_query_on_unit(
@@ -1247,23 +1247,23 @@ async def backup_operations(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'backup_table_1');"
         )
-        assert cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        assert cursor.fetchone()[0], (
+            "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        )
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
         )
-        assert cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_2' doesn't exist"
+        assert cursor.fetchone()[0], (
+            "backup wasn't correctly restored: table 'backup_table_2' doesn't exist"
+        )
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'backup_table_3');"
         )
-        assert not cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_3' exists"
+        assert not cursor.fetchone()[0], (
+            "backup wasn't correctly restored: table 'backup_table_3' exists"
+        )
     connection.close()
 
     # Run the "restore backup" action for full backup.
@@ -1292,21 +1292,21 @@ async def backup_operations(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'backup_table_1');"
         )
-        assert cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        assert cursor.fetchone()[0], (
+            "backup wasn't correctly restored: table 'backup_table_1' doesn't exist"
+        )
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'backup_table_2');"
         )
-        assert not cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_2' exists"
+        assert not cursor.fetchone()[0], (
+            "backup wasn't correctly restored: table 'backup_table_2' exists"
+        )
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"
             " WHERE table_schema = 'public' AND table_name = 'backup_table_3');"
         )
-        assert not cursor.fetchone()[
-            0
-        ], "backup wasn't correctly restored: table 'backup_table_3' exists"
+        assert not cursor.fetchone()[0], (
+            "backup wasn't correctly restored: table 'backup_table_3' exists"
+        )
     connection.close()

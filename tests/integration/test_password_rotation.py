@@ -196,6 +196,6 @@ async def test_no_password_exposed_on_logs(ops_test: OpsTest) -> None:
             continue
         regex = re.compile("(PASSWORD )(?!<REDACTED>)")
         logs_without_false_positives = regex.findall(logs)
-        assert (
-            len(logs_without_false_positives) == 0
-        ), f"Sensitive information detected on {unit.name} logs"
+        assert len(logs_without_false_positives) == 0, (
+            f"Sensitive information detected on {unit.name} logs"
+        )

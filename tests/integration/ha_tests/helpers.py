@@ -76,7 +76,7 @@ async def are_all_db_processes_down(ops_test: OpsTest, process: str, signal: str
 
                     # If something was returned, there is a running process.
                     if len(processes) > 0:
-                        logger.info("Unit {unit.name} not yet down")
+                        logger.info(f"Unit {unit.name} not yet down")
                         # Try to rekill the unit
                         await send_signal_to_process(ops_test, unit.name, process, signal)
                         raise ProcessRunningError
@@ -108,9 +108,9 @@ async def are_writes_increasing(
                     use_ip_from_inside=use_ip_from_inside,
                     extra_model=extra_model,
                 )
-                assert (
-                    more_writes[member] > count
-                ), f"{member}: writes not continuing to DB (current writes: {more_writes[member]} - previous writes: {count})"
+                assert more_writes[member] > count, (
+                    f"{member}: writes not continuing to DB (current writes: {more_writes[member]} - previous writes: {count})"
+                )
 
 
 async def app_name(
@@ -214,9 +214,9 @@ async def is_cluster_updated(
 ) -> None:
     # Verify that the old primary is now a replica.
     logger.info("checking that the former primary is now a replica")
-    assert await is_replica(
-        ops_test, primary_name, use_ip_from_inside
-    ), "there are more than one primary in the cluster."
+    assert await is_replica(ops_test, primary_name, use_ip_from_inside), (
+        "there are more than one primary in the cluster."
+    )
 
     # Verify that all units are part of the same cluster.
     logger.info("checking that all units are part of the same cluster")
@@ -255,9 +255,9 @@ async def check_writes(
         print(
             f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}"
         )
-        assert (
-            count == max_number_written[member]
-        ), f"{member}: writes to the db were missed: count of actual writes different from the max number written."
+        assert count == max_number_written[member], (
+            f"{member}: writes to the db were missed: count of actual writes different from the max number written."
+        )
         assert total_expected_writes == count, f"{member}: writes to the db were missed."
     return total_expected_writes
 
@@ -309,7 +309,7 @@ def count_writes_on_members(members, password, down_ips) -> tuple[dict[str, int]
                 f" host='{host}' password='{password}' connect_timeout=10"
             )
 
-            member_name = f'{member["model"]}.{member["name"]}'
+            member_name = f"{member['model']}.{member['name']}"
             connection = None
             try:
                 with (
@@ -378,9 +378,9 @@ async def fetch_cluster_members(ops_test: OpsTest, use_ip_from_inside: bool = Fa
         if len(member_ips) > 0:
             # If the list of members IPs was already fetched, also compare the
             # list provided by other members.
-            assert member_ips == {
-                member["host"] for member in cluster_info.json()["members"]
-            }, "members report different lists of cluster members."
+            assert member_ips == {member["host"] for member in cluster_info.json()["members"]}, (
+                "members report different lists of cluster members."
+            )
         else:
             member_ips = {member["host"] for member in cluster_info.json()["members"]}
     return member_ips
@@ -929,9 +929,9 @@ async def add_unit_with_storage(ops_test, app, storage):
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=2000)
-    assert (
-        len(ops_test.model.applications[app].units) == expected_units
-    ), "New unit not added to model"
+    assert len(ops_test.model.applications[app].units) == expected_units, (
+        "New unit not added to model"
+    )
 
     # verify storage attached
     curr_units = [unit.name for unit in ops_test.model.applications[app].units]

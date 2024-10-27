@@ -149,8 +149,8 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
                     "SELECT EXISTS (SELECT FROM information_schema.tables"
                     " WHERE table_schema = 'public' AND table_name = 'continuous_writes');"
                 )
-                assert not cursor.fetchone()[
-                    0
-                ], "table 'continuous_writes' was replicated to the second cluster"
+                assert not cursor.fetchone()[0], (
+                    "table 'continuous_writes' was replicated to the second cluster"
+                )
         finally:
             connection.close()

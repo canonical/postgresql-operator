@@ -202,7 +202,7 @@ class PostgreSQLBackups(Object):
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
             return_code, system_identifier_from_instance, error = self._execute_command([
-                f'/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split(".")[0]}/bin/pg_controldata',
+                f"/snap/charmed-postgresql/current/usr/lib/postgresql/{self.charm._patroni.get_postgresql_version().split('.')[0]}/bin/pg_controldata",
                 POSTGRESQL_DATA_PATH,
             ])
             if return_code != 0:
@@ -244,7 +244,7 @@ class PostgreSQLBackups(Object):
 
         # Use the built endpoint if it is an AWS endpoint.
         if endpoint_data and endpoint.endswith(endpoint_data["dnsSuffix"]):
-            endpoint = f'{endpoint.split("://")[0]}://{endpoint_data["hostname"]}'
+            endpoint = f"{endpoint.split('://')[0]}://{endpoint_data['hostname']}"
 
         return endpoint
 
@@ -392,7 +392,7 @@ class PostgreSQLBackups(Object):
             backup_reference = "None"
             if backup["reference"]:
                 backup_reference, _ = self._parse_backup_id(backup["reference"][-1])
-            lsn_start_stop = f'{backup["lsn"]["start"]} / {backup["lsn"]["stop"]}'
+            lsn_start_stop = f"{backup['lsn']['start']} / {backup['lsn']['stop']}"
             time_start, time_stop = (
                 datetime.strftime(
                     datetime.fromtimestamp(stamp, timezone.utc), "%Y-%m-%dT%H:%M:%SZ"
@@ -404,7 +404,7 @@ class PostgreSQLBackups(Object):
                 if backup["archive"] and backup["archive"]["start"]
                 else ""
             )
-            backup_path = f'/{self.stanza_name}/{backup["label"]}'
+            backup_path = f"/{self.stanza_name}/{backup['label']}"
             error = backup["error"]
             backup_status = "finished"
             if error:
@@ -1121,16 +1121,16 @@ Stderr:
 
             if last_full_backup is None:
                 raise TypeError("Differential backup requested but no previous full backup")
-            return f'{last_full_backup}_{datetime.strftime(datetime.now(), "%Y%m%d-%H%M%SD")}'
+            return f"{last_full_backup}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SD')}"
         if backup_type == "incremental":
             backups = self._list_backups(show_failed=False, parse=False).keys()
             if not backups:
                 raise TypeError("Incremental backup requested but no previous successful backup")
-            return f'{backups[-1]}_{datetime.strftime(datetime.now(), "%Y%m%d-%H%M%SI")}'
+            return f"{backups[-1]}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SI')}"
 
     def _fetch_backup_from_id(self, backup_id: str) -> str:
         """Fetches backup's pgbackrest label from backup id."""
-        timestamp = f'{datetime.strftime(datetime.strptime(backup_id, "%Y-%m-%dT%H:%M:%SZ"), "%Y%m%d-%H%M%S")}'
+        timestamp = f"{datetime.strftime(datetime.strptime(backup_id, '%Y-%m-%dT%H:%M:%SZ'), '%Y%m%d-%H%M%S')}"
         backups = self._list_backups(show_failed=False, parse=False).keys()
         for label in backups:
             if timestamp in label:
@@ -1285,7 +1285,7 @@ Stderr:
         # like Ceph Object Gateway (radosgw).
         s3_parameters["endpoint"] = s3_parameters["endpoint"].rstrip("/")
         s3_parameters["path"] = (
-            f'/{s3_parameters["path"].strip("/")}'  # The slash in the beginning is required by pgBackRest.
+            f"/{s3_parameters['path'].strip('/')}"  # The slash in the beginning is required by pgBackRest.
         )
         s3_parameters["bucket"] = s3_parameters["bucket"].strip("/")
 
