@@ -639,6 +639,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.pop("raft_stopped", None)
             self.update_config()
             self._patroni.start_patroni()
+            self._set_primary_status_message()
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()

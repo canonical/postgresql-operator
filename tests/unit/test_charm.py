@@ -1989,6 +1989,7 @@ def test_raft_reinitialisation(harness):
         patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
         patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.PostgresqlOperatorCharm._set_primary_status_message"),
     ):
         # No data
         harness.charm._raft_reinitialisation()
