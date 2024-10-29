@@ -758,6 +758,19 @@ class Patroni:
         primary = self.get_primary()
         return primary != old_primary
 
+    def has_raft_quorum(self) -> bool:
+        """Check if raft cluster has quorum."""
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+
+        raft_host = "127.0.0.1:2222"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException:
+            logger.warning("Has raft quorum: Cannot connect to raft cluster")
+            return False
+        return raft_status["has_quorum"]
+
     def remove_raft_data(self) -> None:
         """Stops Patroni and removes the raft journals."""
         logger.info("Stopping patroni")
@@ -822,6 +835,21 @@ class Patroni:
         for member in members:
             if member["name"] == member_name:
                 return member["role"]
+
+    def get_running_cluster_members(self) -> list[str]:
+        """List running patroni members."""
+        try:
+            members = requests.get(
+                f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                verify=self.verify,
+                timeout=API_REQUEST_TIMEOUT,
+                auth=self._patroni_auth,
+            ).json()["members"]
+            return [
+                member["name"] for member in members if member["state"] in ("streaming", "running")
+            ]
+        except Exception:
+            return []
 
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
