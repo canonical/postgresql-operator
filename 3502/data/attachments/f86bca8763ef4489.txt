@@ -1,0 +1,47 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:82 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:903 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  02:13:46Z
+
+App                  Version  Status   Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active       1  data-integrator      latest/edge   72  no       
+postgresql           14.13    blocked      3  postgresql                          0  no       Standalone read-only cluster
+postgresql-test-app           active       1  postgresql-test-app  latest/edge  275  no       
+
+Unit                    Workload  Agent      Machine  Public address  Ports     Message
+data-integrator/0*      active    idle       3        10.251.136.146            
+postgresql-test-app/0*  active    idle       4        10.251.136.219            
+postgresql/0*           active    executing  0        10.251.136.221  5432/tcp  Standby
+postgresql/1            active    executing  1        10.251.136.75   5432/tcp  
+postgresql/2            active    executing  2        10.251.136.128  5432/tcp  
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.251.136.221  juju-e85fe9-0  ubuntu@22.04      Running
+1        started  10.251.136.75   juju-e85fe9-1  ubuntu@22.04      Running
+2        started  10.251.136.128  juju-e85fe9-2  ubuntu@22.04      Running
+3        started  10.251.136.146  juju-e85fe9-3  ubuntu@22.04      Running
+4        started  10.251.136.219  juju-e85fe9-4  ubuntu@22.04      Running
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication        postgresql   postgresql  0    0/0        replication        postgresql_async  requirer
+replication-offer  postgresql   postgresql  0    0/0        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:909 Juju error logs:
+
+machine-3: 01:46:48 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:46:48 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-data-integrator-0: 01:46:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:46:56 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:46:57 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:47:05 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:47:05 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:47:06 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:47:06 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:47:07 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 01:47:10 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:48:07 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:48:07 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:48:09 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:991 Forgetting model main...
