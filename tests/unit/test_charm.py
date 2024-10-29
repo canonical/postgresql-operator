@@ -2605,7 +2605,9 @@ def test_set_primary_status_message(harness, is_leader):
                     assert isinstance(harness.charm.unit.status, MaintenanceStatus)
                 else:
                     _is_standby_leader.side_effect = None
-                    _is_standby_leader.return_value = values[0] != harness.charm.unit.name and values[1]
+                    _is_standby_leader.return_value = (
+                        values[0] != harness.charm.unit.name and values[1]
+                    )
                     harness.charm._set_primary_status_message()
                     assert isinstance(
                         harness.charm.unit.status,
