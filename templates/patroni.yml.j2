@@ -102,7 +102,15 @@ bootstrap:
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
-        shared_preload_libraries: 'timescaledb,pgaudit'
+        shared_preload_libraries: 'pg_tracing,pgaudit'
+        {%- if tracing_endpoint_config %}
+        compute_query_id = on
+        pg_tracing.max_span = 10000
+        pg_tracing.track = all
+        pg_tracing.otel_endpoint = {{tracing_endpoint_config}}/v1/traces
+        pg_tracing.otel_naptime = 2000
+        pg_tracing.sample_rate = 1.0
+        {% endif %}
         {%- if pg_parameters %}
         {%- for key, value in pg_parameters.items() %}
         {{key}}: {{value}}

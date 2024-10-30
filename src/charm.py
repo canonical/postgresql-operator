@@ -1701,6 +1701,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_to_latest=self.app_peer_data.get("restore-to-time", None) == "latest",
             stanza=self.app_peer_data.get("stanza", self.unit_peer_data.get("stanza")),
             restore_stanza=self.app_peer_data.get("restore-stanza"),
+            tracing_endpoint_config=self._tracing_endpoint_config,
             parameters=pg_parameters,
         )
         if not self._is_workload_running:

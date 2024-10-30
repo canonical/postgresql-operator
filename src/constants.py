@@ -34,7 +34,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "132", "x86_64": "133"}},
+        {"revision": {"aarch64": "132", "x86_64": "134"}},
     )
 ]
 
