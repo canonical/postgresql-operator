@@ -579,6 +579,7 @@ class Patroni:
         pitr_target: str | None = None,
         restore_timeline: str | None = None,
         restore_to_latest: bool = False,
+        tracing_endpoint_config: str | None = None,
         parameters: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
@@ -631,6 +632,7 @@ class Patroni:
             version=self.get_postgresql_version().split(".")[0],
             minority_count=self.planned_units // 2,
             pg_parameters=parameters,
+            tracing_endpoint_config=tracing_endpoint_config,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
             raft_password=self.raft_password,
