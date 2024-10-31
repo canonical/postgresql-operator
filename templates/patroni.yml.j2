@@ -103,14 +103,6 @@ bootstrap:
         logging_collector: 'on'
         wal_level: logical
         shared_preload_libraries: 'pg_tracing,pgaudit'
-        {%- if tracing_endpoint_config %}
-        compute_query_id = on
-        pg_tracing.max_span = 10000
-        pg_tracing.track = all
-        pg_tracing.otel_endpoint = {{tracing_endpoint_config}}/v1/traces
-        pg_tracing.otel_naptime = 2000
-        pg_tracing.sample_rate = 1.0
-        {% endif %}
         {%- if pg_parameters %}
         {%- for key, value in pg_parameters.items() %}
         {{key}}: {{value}}
@@ -158,6 +150,14 @@ postgresql:
     ssl_ca_file: {{ conf_path }}/ca.pem
     ssl_cert_file: {{ conf_path }}/cert.pem
     ssl_key_file: {{ conf_path }}/key.pem
+    {%- endif %}
+    {%- if tracing_endpoint_config %}
+    compute_query_id: on
+    pg_tracing.max_span: 10000
+    pg_tracing.track: all
+    pg_tracing.otel_endpoint: {{tracing_endpoint_config}}/v1/traces
+    pg_tracing.otel_naptime: 2000
+    pg_tracing.sample_rate: 1.0
     {%- endif %}
     unix_socket_directories: /tmp
     {%- if pg_parameters %}
