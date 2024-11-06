@@ -595,6 +595,7 @@ class Patroni:
             pitr_target: point-in-time-recovery target for the restore.
             restore_timeline: timeline to restore from.
             restore_to_latest: restore all the WAL transaction logs from the stanza.
+            tracing_endpoint_config: endpoint for tracing data.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
         """
         # Open the template patroni.yml file.
