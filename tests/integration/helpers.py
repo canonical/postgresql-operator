@@ -30,7 +30,7 @@ from tenacity import (
     wait_fixed,
 )
 
-CHARM_BASE = "ubuntu@24.04"
+CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]

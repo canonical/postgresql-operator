@@ -24,7 +24,7 @@ variable "revision" {
 variable "base" {
   description = "Application base"
   type        = string
-  default     = "ubuntu@24.04"
+  default     = "ubuntu@22.04"
 }
 
 variable "units" {
