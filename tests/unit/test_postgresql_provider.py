@@ -142,6 +142,7 @@ def test_on_database_requested(harness):
             "password": "test-password",
             "version": POSTGRESQL_VERSION,
             "database": f"{DATABASE}",
+            "tls": "False",
         }
 
         # Assert no BlockedStatus was set.
@@ -153,6 +154,7 @@ def test_on_database_requested(harness):
         # No data is set in the databag by the database.
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
+            "tls": "False",
         }
 
         # BlockedStatus due to a PostgreSQLCreateDatabaseError.
@@ -161,6 +163,7 @@ def test_on_database_requested(harness):
         # No data is set in the databag by the database.
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "data": f'{{"database": "{DATABASE}", "extra-user-roles": "{EXTRA_USER_ROLES}"}}',
+            "tls": "False",
         }
 
         # BlockedStatus due to a PostgreSQLGetPostgreSQLVersionError.

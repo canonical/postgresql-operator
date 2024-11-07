@@ -1709,6 +1709,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            self.postgresql_client_relation.update_tls_flag(
+                "True" if self.is_tls_enabled else "False"
+            )
             logger.debug("Early exit update_config: Workload not started yet")
             return True
 
@@ -1784,6 +1787,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
         self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+        self.postgresql_client_relation.update_tls_flag("True" if self.is_tls_enabled else "False")
 
         # Restart PostgreSQL if TLS configuration has changed
         # (so the both old and new connections use the configuration).
