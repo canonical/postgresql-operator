@@ -9,9 +9,9 @@ If you are using an earlier version, check the [Juju 3.0 Release Notes](https://
 This guide contains recommended steps and useful commands for creating and managing backups to ensure smooth restores.
 
 ## Prerequisites
-* A cluster with at [least three nodes](/t/charmed-postgresql-how-to-manage-units/9689?channel=14/stable) deployed
+* A cluster with at [least three nodes](/t/9689?channel=14/stable) deployed
 * Access to S3 storage
-* [Configured settings for S3 storage](/t/charmed-postgresql-how-to-configure-s3/9681?channel=14/stable)
+* [Configured settings for S3 storage](/t/9681?channel=14/stable)
 
 ## Summary
 - [Save your current cluster credentials](#heading--save-credentials), as you'll need them for restoring
@@ -38,7 +38,7 @@ Once Charmed PostgreSQL is `active` and `idle`, you can create your first backup
 ```shell
 juju run postgresql/leader create-backup
 ```
-By default, backups created with command above will be **full** backups: a copy of *all* your data will be stored in S3. There are 2 other supported types of backups (available in revision 416+, currently in channel `14/edge` only):
+By default, backups created with the command above will be **full** backups: a copy of *all* your data will be stored in S3. There are 2 other supported types of backups (available in revision 416+, currently in channel `14/edge` only):
 * Differential: Only modified files since the last full backup will be stored.
 * Incremental: Only modified files since the last successful backup (of any type) will be stored.
 
@@ -48,8 +48,8 @@ juju run postgresql/leader create-backup type={full|differential|incremental}
 ```
 
 **Tip**: To avoid unnecessary service downtime, always use non-primary units for the action `create-backup`. Keep in mind that:
-* TLS enabled:  disables the command from running on *primary units*.
-* TLS **not** enabled: disables the command from running on *non-primary units*.
+* When TLS is enabled, `create-backup` can only run on replicas (non-primary)
+* When TLS is **not** enabled, `create-backup` can only run in the primary unit
 
 <a href="#heading--list-backups"><h2 id="heading--list-backups">List backups</h2></a>
 You can list your available, failed, and in progress backups by running the `list-backups` command:

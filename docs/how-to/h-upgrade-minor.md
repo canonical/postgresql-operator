@@ -7,9 +7,9 @@ If you are using an earlier version, check the [Juju 3.0 Release Notes](https://
 # Perform a minor upgrade
 
 **Example**: PostgreSQL 14.8 -> PostgreSQL 14.9<br/>
-(including simple charm revision bump: from revision 193 to revision 196).
+(including charm revision bump: e.g. Revision 193 -> Revision 196)
 
-This guide is part of [Charmed PostgreSQL Upgrades](/t/12086). Please refer to this page for more information and an overview of the content.
+This guide is part of [Charmed PostgreSQL Upgrades](/t/12086). Refer to this page for more information and an overview of the content.
 
 ## Summary
 - [**Pre-upgrade checks**](#pre-upgrade-checks): Important information to consider before starting an upgrade.
@@ -39,6 +39,7 @@ Some examples are operations like (but not limited to) the following:
 * Upgrading other connected/related/integrated applications simultaneously
 
 Concurrency with other operations is not supported, and it can lead the cluster into inconsistent states.
+
 ### Backups
 **Make sure to have a backup of your data when running any type of upgrade.**
 
@@ -57,7 +58,7 @@ This step is only valid when deploying from [charmhub](https://charmhub.io/).
 If a [local charm](https://juju.is/docs/sdk/deploy-a-charm) is deployed (revision is small, e.g. 0-10), make sure the proper/current local revision of the `.charm` file is available BEFORE going further. You might need it for a rollback.
 [/note]
 
-The first step is to record the revision of the running application as a safety measure for a rollback action. To accomplish this, simply run the `juju status` command and look for the deployed Charmed PostgreSQL revision in the command output, e.g.:
+The first step is to record the revision of the running application as a safety measure for a rollback action. To accomplish this, run the `juju status` command and look for the deployed Charmed PostgreSQL revision in the command output, e.g.:
 
 ```shell
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
@@ -115,7 +116,7 @@ All units will be refreshed (i.e. receive new charm content), and the upgrade wi
 First the `replica` units, then the `sync-standby` units, and lastly, the `leader`(or `primary`) unit. 
 [/note]
 
- `juju status` will look like:
+ `juju status` will look like similar to the output below:
 
 ```shell
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
@@ -170,7 +171,9 @@ After a `juju refresh`, if there are any version incompatibilities in charm revi
 
 The step must be skipped if the upgrade went well! 
 
-Although the underlying PostgreSQL Cluster continues to work, it’s important to roll back the charm to a previous revision so that an update can be attempted after further inspection of the failure. Please switch to the dedicated [minor rollback](/t/12090) tutorial if necessary.
+Although the underlying PostgreSQL Cluster continues to work, it’s important to roll back the charm to a previous revision so that an update can be attempted after further inspection of the failure. 
+
+> See: [How to perform a minor rollback](/t/12090)
 
 ## Post-upgrade check
 

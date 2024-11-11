@@ -1,3 +1,5 @@
+> This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL K8s](https://charmhub.io/postgresql-k8s).
+
 # Charmed PostgreSQL documentation
 
 Charmed PostgreSQL is an open-source software operator designed to deploy and operate object-relational databases on IAAS/VM. It packages the powerful database management system [PostgreSQL](https://www.postgresql.org/) into a charmed operator for deployment with [Juju](https://juju.is/docs/juju).
@@ -7,12 +9,6 @@ This charm offers automated operations management from day 0 to day 2. It is equ
 Charmed PostgreSQL meets the need of deploying PostgreSQL in a structured and consistent manner while providing flexibility in configuration. It simplifies deployment, scaling, configuration and management of relational databases in large-scale production environments reliably.
  
 This charmed operator is made for anyone looking for a comprehensive database management interface, whether for operating a complex production environment or simply as a playground to learn more about databases and charms.
- 
-[note]
-This operator is built for **IAAS/VM**.
-
-For deployments in **Kubernetes** environments, see [Charmed PostgreSQL K8s](https://charmhub.io/postgresql-k8s).
-[/note]
 
 <!-- 
 This "Charmed PostgreSQL" operator (in the channel `14/stable`) is a new "[Charmed SDK](https://juju.is/docs/sdk)"-based charm to replace legacy "[Reactive](https://juju.is/docs/sdk/charm-taxonomy#heading--reactive)"-based charm (in the channel `latest/stable`). <br/>Read more about [legacy charm here](/t/10690).
@@ -61,6 +57,8 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-deploy-maas | [MAAS](/t/14293) |
 | 3 | h-deploy-ec2 | [AWS EC2](/t/15703) |
 | 3 | h-deploy-gce | [GCE](/t/15722) |
+| 3 | h-deploy-azure | [Azure](/t/15733) |
+| 3 | h-deploy-multi-az | [Multi-AZ](/t/15749) |
 | 3 | h-deploy-terraform | [Terraform](/t/14916) |
 | 3 | h-deploy-airgapped | [Air-gapped](/t/15746) |
 | 2 | h-integrate | [Integrate with another application](/t/9687) |
@@ -104,11 +102,12 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | r-performance | [Performance and resources](/t/11974) |
 | 2 | r-troubleshooting | [Troubleshooting](/t/11864) |
 | 2 | r-plugins-extensions | [Plugins/extensions](/t/10946) |
+| 2 | r-alert-rules | [Alert rules](/t/15841) |
+| 2 | r-statuses | [Statuses](/t/10844) |
 | 2 | r-contacts | [Contacts](/t/11863) |
 | 1 | explanation | [Explanation]() |
 | 2 | e-architecture | [Architecture](/t/11857) |
 | 2 | e-interfaces-endpoints | [Interfaces and endpoints](/t/10251) |
-| 2 | e-statuses | [Statuses](/t/10844) |
 | 2 | e-users | [Users](/t/10798) |
 | 2 | e-logs | [Logs](/t/12099) |
 | 2 | e-juju-details | [Juju](/t/11985) |

@@ -1,6 +1,6 @@
-# Charm Statuses Explanations
+# Charm statuses
 
-> :warning: **WARNING** : it is an work-in-progress article. Do NOT use it in production! Contact [Canonical Data Platform team](https://chat.charmhub.io/charmhub/channels/data-platform) if you are interested in the topic.
+> :warning: **WARNING** : This is an work-in-progress article. Do NOT use it in production! Contact [Canonical Data Platform team](https://chat.charmhub.io/charmhub/channels/data-platform) if you are interested in the topic.
  
 The charm follows [standard Juju applications statuses](https://juju.is/docs/olm/status-values#heading--application-status). Here you can find the expected end-users reaction on different statuses:
 
@@ -17,6 +17,7 @@ The charm follows [standard Juju applications statuses](https://juju.is/docs/olm
 | **blocked** | failed to start Patroni | TODO: error/retry? | |
 | **blocked** | Failed to create postgres user | The charm couldn't create the default `postgres` database user due to connection problems | Connect to the database using the `operator` user and the password from the `get-password` action, then run `CREATE ROLE postgres WITH LOGIN SUPERUSER;` |
 | **blocked** | Failed to restore backup | The database couldn't start after the restore | The charm needs fix in the code to recover from this status and enable a new restore to be requested |
+| **blocked** | Please choose one endpoint to use. No need to relate all of them simultaneously! | [The modern / legacy interfaces](https://charmhub.io/postgresql/docs/e-legacy-charm) should not be used simultaneously. | Remove modern or legacy relation. Choose one to use at a time. |
 | **error** | any | An unhanded internal error happened | Read the message hint. Execute `juju resolve <error_unit/0>` after addressing the root of the error state |
 | **terminated** | any | The unit is gone and will be cleaned by Juju soon | No actions possible |
 | **unknown** | any | Juju doesn't know the charm app/unit status. Possible reason: K8s charm termination in progress. | Manual investigation required if status is permanent |
