@@ -822,6 +822,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def members_ips(self) -> set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
+        if not self._peers:
+            return set()
         return set(json.loads(self._peers.data[self.app].get("members_ips", "[]")))
 
     def _add_to_members_ips(self, ip: str) -> None:
