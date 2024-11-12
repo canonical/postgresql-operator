@@ -49,7 +49,7 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
 RUNNING_STATES = ["running", "streaming"]
 
-PATRONI_TIMEOUT = 10
+PATRONI_TIMEOUT = 60
 
 
 class ClusterNotPromotedError(Exception):
