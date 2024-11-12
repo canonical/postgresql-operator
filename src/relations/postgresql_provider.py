@@ -108,17 +108,6 @@ class PostgreSQLProvider(Object):
             # Set the database name
             self.database_provides.set_database(event.relation.id, database)
 
-            # Set TLS flag
-            self.database_provides.set_tls(
-                event.relation.id,
-                "True" if self.charm.is_tls_enabled else "False",
-            )
-
-            # Set TLS CA
-            if self.charm.is_tls_enabled:
-                _, ca, _ = self.charm.tls.get_tls_files()
-                self.database_provides.set_tls_ca(event.relation.id, ca)
-
             # Update the read/write and read-only endpoints.
             self.update_endpoints(event)
 
@@ -201,6 +190,12 @@ class PostgreSQLProvider(Object):
             else ""
         )
 
+        tls = "True" if self.charm.is_tls_enabled else "False"
+        if tls == "True":
+            _, ca, _ = self.charm.tls.get_tls_files()
+        else:
+            ca = ""
+
         for relation_id in rel_data:
             user = f"relation-{relation_id}"
             database = rel_data[relation_id].get("database")
@@ -226,17 +221,8 @@ class PostgreSQLProvider(Object):
                 f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
             )
 
-    def update_tls_flag(self, tls: str) -> None:
-        """Update TLS flag and CA in relation databag."""
-        relations = self.model.relations[self.relation_name]
-        if tls == "True":
-            _, ca, _ = self.charm.tls.get_tls_files()
-        else:
-            ca = ""
-
-        for relation in relations:
-            self.database_provides.set_tls(relation.id, tls)
-            self.database_provides.set_tls_ca(relation.id, ca)
+            self.database_provides.set_tls(relation_id, tls)
+            self.database_provides.set_tls_ca(relation_id, ca)
 
     def _check_multiple_endpoints(self) -> bool:
         """Checks if there are relations with other endpoints."""
