@@ -338,7 +338,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
             version=postgresql_version,
-            minority_count=patroni.planned_units // 2,
+            synchronous_node_count=patroni.planned_units - 1,
             raft_password=raft_password,
             patroni_password=patroni_password,
         )

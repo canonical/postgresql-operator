@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 37
+LIBPATCH = 38
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -244,7 +244,7 @@ class PostgreSQL:
                     privilege for privilege in privileges if privilege not in valid_privileges
                 ]
                 if len(invalid_privileges) > 0:
-                    logger.error(f'Invalid extra user roles: {", ".join(privileges)}')
+                    logger.error(f"Invalid extra user roles: {', '.join(privileges)}")
                     raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
 
             with self._connect_to_database() as connection, connection.cursor() as cursor:
@@ -256,7 +256,7 @@ class PostgreSQL:
                     user_definition = "CREATE ROLE {}"
                 user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
                 if privileges:
-                    user_definition += f' {" ".join(privileges)}'
+                    user_definition += f" {' '.join(privileges)}"
                 cursor.execute(sql.SQL("BEGIN;"))
                 cursor.execute(sql.SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(sql.SQL(f"{user_definition};").format(sql.Identifier(user)))
