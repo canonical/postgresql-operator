@@ -846,7 +846,7 @@ class Patroni:
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={"synchronous_node_count": units // 2},
+                    json={"synchronous_node_count": units - 1},
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,

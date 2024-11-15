@@ -1043,7 +1043,6 @@ def switchover(
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
-    minority_count = len(ops_test.model.applications[app_name].units) // 2
     for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
             response = requests.get(f"http://{primary_ip}:8008/cluster")
@@ -1051,7 +1050,7 @@ def switchover(
             standbys = len([
                 member for member in response.json()["members"] if member["role"] == "sync_standby"
             ])
-            assert standbys >= minority_count
+            assert standbys == len(ops_test.model.applications[app_name].units) - 1
 
 
 async def wait_for_idle_on_blocked(
