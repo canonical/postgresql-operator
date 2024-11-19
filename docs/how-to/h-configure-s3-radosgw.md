@@ -6,9 +6,14 @@ If you are using an earlier version, check the [Juju 3.0 Release Notes](https://
 
 # Configure S3 for RadosGW
 
-A Charmed PostgreSQL backup can be stored on any S3-compatible storage. S3 access and configurations are managed with the [s3-integrator charm](https://charmhub.io/s3-integrator).
+A PostgreSQL backup can be stored on any S3-compatible storage. S3 access and configurations are managed with the [s3-integrator charm](https://charmhub.io/s3-integrator).
 
-This guide will teach you how to deploy and configure the s3-integrator charm on Ceph via [RadosGW](https://docs.ceph.com/en/quincy/man/8/radosgw/), send the configuration to a Charmed PostgreSQL application, and update it. (To configure S3 for AWS, see [this guide](/t/9681))
+This guide will teach you how to deploy and configure the s3-integrator charm on Ceph via [RadosGW](https://docs.ceph.com/en/quincy/man/8/radosgw/), send the configuration to a Charmed PostgreSQL application, and update it. 
+> For AWS, see the guide [How to configure S3 for AWS](/t/9681)
+
+[note]
+The Charmed PostgreSQL backup tool ([pgBackRest](https://pgbackrest.org/)) can currently only interact with S3-compatible storages if they work with [SSL/TLS](https://github.com/pgbackrest/pgbackrest/issues/2340) (backup via the plain HTTP is currently not supported).
+[/note]
 
 ## Configure s3-integrator
 First, install the MinIO client and create a bucket:

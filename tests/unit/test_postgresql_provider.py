@@ -253,6 +253,7 @@ def test_update_endpoints_with_event(harness):
             "endpoints": "1.1.1.1:5432",
             "read-only-endpoints": "2.2.2.2:5432",
             "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
+            "tls": "False",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {}
         _fetch_my_relation_data.assert_called_once_with([2], ["password"])
@@ -262,6 +263,7 @@ def test_update_endpoints_with_event(harness):
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
+            "tls": "False",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {}
 
@@ -328,11 +330,13 @@ def test_update_endpoints_without_event(harness):
             "endpoints": "1.1.1.1:5432",
             "read-only-endpoints": "2.2.2.2:5432",
             "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
+            "tls": "False",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "read-only-endpoints": "2.2.2.2:5432",
             "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
+            "tls": "False",
         }
         _fetch_my_relation_data.assert_called_once_with(None, ["password"])
 
@@ -341,8 +345,10 @@ def test_update_endpoints_without_event(harness):
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
+            "tls": "False",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
             "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
+            "tls": "False",
         }

@@ -190,6 +190,12 @@ class PostgreSQLProvider(Object):
             else ""
         )
 
+        tls = "True" if self.charm.is_tls_enabled else "False"
+        if tls == "True":
+            _, ca, _ = self.charm.tls.get_tls_files()
+        else:
+            ca = ""
+
         for relation_id in rel_data:
             user = f"relation-{relation_id}"
             database = rel_data[relation_id].get("database")
@@ -214,6 +220,9 @@ class PostgreSQLProvider(Object):
                 relation_id,
                 f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
             )
+
+            self.database_provides.set_tls(relation_id, tls)
+            self.database_provides.set_tls_ca(relation_id, ca)
 
     def _check_multiple_endpoints(self) -> bool:
         """Checks if there are relations with other endpoints."""
