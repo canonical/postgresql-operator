@@ -11,6 +11,7 @@ import psycopg2
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from .. import markers
 from ..helpers import (
@@ -208,13 +209,15 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
     # Topology observer runs every half a minute
     await asyncio.sleep(60)
 
-    data = await get_application_relation_data(
-        ops_test,
-        APPLICATION_APP_NAME,
-        FIRST_DATABASE_RELATION_NAME,
-        "read-only-endpoints",
-    )
-    assert len(data.split(",")) == 1
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            data = await get_application_relation_data(
+                ops_test,
+                APPLICATION_APP_NAME,
+                FIRST_DATABASE_RELATION_NAME,
+                "read-only-endpoints",
+            )
+            assert data is None
 
     await start_machine(ops_test, machine)
     await ops_test.model.wait_for_idle(apps=DATABASE_APP_NAME, status="active", timeout=200)
