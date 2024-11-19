@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 37
+LIBPATCH = 39
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -244,7 +244,7 @@ class PostgreSQL:
                     privilege for privilege in privileges if privilege not in valid_privileges
                 ]
                 if len(invalid_privileges) > 0:
-                    logger.error(f'Invalid extra user roles: {", ".join(privileges)}')
+                    logger.error(f"Invalid extra user roles: {', '.join(privileges)}")
                     raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
 
             with self._connect_to_database() as connection, connection.cursor() as cursor:
@@ -256,7 +256,7 @@ class PostgreSQL:
                     user_definition = "CREATE ROLE {}"
                 user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
                 if privileges:
-                    user_definition += f' {" ".join(privileges)}'
+                    user_definition += f" {' '.join(privileges)}"
                 cursor.execute(sql.SQL("BEGIN;"))
                 cursor.execute(sql.SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(sql.SQL(f"{user_definition};").format(sql.Identifier(user)))
@@ -378,13 +378,19 @@ FROM pg_tables WHERE NOT schemaname IN ('pg_catalog', 'information_schema')
 UNION SELECT 2 AS index,'ALTER SEQUENCE '|| sequence_schema || '."' || sequence_name ||'" OWNER TO {};' AS statement
 FROM information_schema.sequences WHERE NOT sequence_schema IN ('pg_catalog', 'information_schema')
 UNION SELECT 3 AS index,'ALTER FUNCTION '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema')
-UNION SELECT 4 AS index,'ALTER VIEW '|| schemaname || '."' || viewname ||'" OWNER TO {};' AS statement
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'f'
+UNION SELECT 4 AS index,'ALTER PROCEDURE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'p'
+UNION SELECT 5 AS index,'ALTER AGGREGATE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'a'
+UNION SELECT 6 AS index,'ALTER VIEW '|| schemaname || '."' || viewname ||'" OWNER TO {};' AS statement
 FROM pg_catalog.pg_views WHERE NOT schemaname IN ('pg_catalog', 'information_schema')) AS statements ORDER BY index) LOOP
       EXECUTE format(r.statement);
   END LOOP;
 END; $$;"""
                 ).format(
+                    sql.Identifier(user),
+                    sql.Identifier(user),
                     sql.Identifier(user),
                     sql.Identifier(user),
                     sql.Identifier(user),
