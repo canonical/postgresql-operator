@@ -106,6 +106,9 @@ def test_on_upgrade_granted(harness):
         patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch(
+            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
+        ) as _updated_synchronous_node_count,
     ):
         # Test when the charm fails to start Patroni.
         mock_event = MagicMock()
@@ -174,6 +177,7 @@ def test_on_upgrade_granted(harness):
         _member_started.reset_mock()
         _cluster_members.reset_mock()
         mock_event.defer.reset_mock()
+        _updated_synchronous_node_count.reset_mock()
         _is_replication_healthy.return_value = True
         with harness.hooks_disabled():
             harness.set_leader(True)
@@ -184,6 +188,7 @@ def test_on_upgrade_granted(harness):
         _set_unit_completed.assert_called_once()
         _set_unit_failed.assert_not_called()
         _on_upgrade_changed.assert_called_once()
+        _updated_synchronous_node_count.assert_called_once_with(2)
 
 
 def test_pre_upgrade_check(harness):
