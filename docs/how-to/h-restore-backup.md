@@ -79,3 +79,5 @@ juju run postgresql/leader restore restore-to-time="YYYY-MM-DDTHH:MM:SSZ"
 ```
 
 Your restore will then be in progress.
+
+It’s also possible to restore to the latest point from a specific timeline by passing the ID of a backup taken on that timeline and `restore-to-time=latest` when requesting a restore.

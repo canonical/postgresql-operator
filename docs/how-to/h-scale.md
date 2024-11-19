@@ -6,7 +6,7 @@ If you are using an earlier version, check the [Juju 3.0 Release Notes](https://
 
 # How to scale units
 
-Replication in PostgreSQL is the process of creating copies of the stored data. This provides redundancy, which means the application can provide self-healing capabilities in case one replica fails. In this context, each replica is equivalent one juju unit.
+Replication in PostgreSQL is the process of creating copies of the stored data. This provides redundancy, which means the application can provide self-healing capabilities in case one replica fails. In this context, each replica is equivalent to one juju unit.
 
 This guide will show you how to establish and change the amount of juju units used to replicate your data. 
 
@@ -16,6 +16,7 @@ To deploy PostgreSQL with multiple replicas, specify the number of desired units
 ```shell
 juju deploy postgresql --channel 14/stable -n <number_of_replicas>
 ```
+> It is recommended to use an odd number to prevent a [split-brain](https://en.wikipedia.org/wiki/Split-brain_(computing) scenario.
 
 ### Primary vs. leader unit
 
@@ -27,6 +28,7 @@ To retrieve the juju unit that corresponds to the PostgreSQL primary, use the ac
 ```shell
 juju run postgresql/leader get-primary
 ```
+
 Similarly, the primary replica is displayed as a status message in `juju status`. However, one should note that this hook gets called on regular time intervals and the primary may be outdated if the status hook has not been called recently. 
 
 [note]
