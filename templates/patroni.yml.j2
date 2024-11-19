@@ -190,12 +190,27 @@ postgresql:
     replication:
       username: replication
       password: {{ replication_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
     rewind:
       username: {{ rewind_user }}
       password: {{ rewind_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
 use_unix_socket: true
 {%- if is_creating_backup %}
 tags:
