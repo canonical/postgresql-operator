@@ -62,8 +62,10 @@ HLL_EXTENSION_STATEMENT = "CREATE TABLE hll_test (users hll);"
 HYPOPG_EXTENSION_STATEMENT = "CREATE TABLE hypopg_test (id integer, val text); SELECT hypopg_create_index('CREATE INDEX ON hypopg_test (id)');"
 IP4R_EXTENSION_STATEMENT = "CREATE TABLE ip4r_test (ip ip4);"
 JSONB_PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION jsonb_plperl_test(val jsonb) RETURNS jsonb TRANSFORM FOR TYPE jsonb LANGUAGE plperl as $$ return $_[0]; $$;"
-ORAFCE_EXTENSION_STATEMENT = "SELECT add_months(date '2005-05-31',1);"
-PG_SIMILARITY_EXTENSION_STATEMENT = "SHOW pg_similarity.levenshtein_threshold;"
+ORAFCE_EXTENSION_STATEMENT = "SELECT oracle.add_months(date '2005-05-31',1);"
+PG_SIMILARITY_EXTENSION_STATEMENT = (
+    "SET pg_similarity.levenshtein_threshold = 0.7; SELECT 'aaa', 'aab', lev('aaa','aab');"
+)
 PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION plperl_test(name text) RETURNS text AS $$ return $_SHARED{$_[0]}; $$ LANGUAGE plperl;"
 PREFIX_EXTENSION_STATEMENT = "SELECT '123'::prefix_range @> '123456';"
 RDKIT_EXTENSION_STATEMENT = "SELECT is_valid_smiles('CCC');"

@@ -102,7 +102,7 @@ bootstrap:
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
-        shared_preload_libraries: 'timescaledb,pgaudit'
+        shared_preload_libraries: 'timescaledb,pg_tracing,pgaudit'
         {%- if pg_parameters %}
         {%- for key, value in pg_parameters.items() %}
         {{key}}: {{value}}
@@ -151,6 +151,14 @@ postgresql:
     ssl_cert_file: {{ conf_path }}/cert.pem
     ssl_key_file: {{ conf_path }}/key.pem
     {%- endif %}
+    {%- if tracing_endpoint_config %}
+    compute_query_id: on
+    pg_tracing.max_span: 10000
+    pg_tracing.track: all
+    pg_tracing.otel_endpoint: {{tracing_endpoint_config}}/v1/traces
+    pg_tracing.otel_naptime: 2000
+    pg_tracing.sample_rate: 1.0
+    {%- endif %}
     unix_socket_directories: /tmp
     {%- if pg_parameters %}
     {%- for key, value in pg_parameters.items() %}
@@ -182,12 +190,27 @@ postgresql:
     replication:
       username: replication
       password: {{ replication_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
     rewind:
       username: {{ rewind_user }}
       password: {{ rewind_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
 use_unix_socket: true
 {%- if is_creating_backup %}
 tags:

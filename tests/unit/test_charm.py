@@ -1295,6 +1295,7 @@ def test_update_config(harness):
             restore_timeline=None,
             pitr_target=None,
             restore_to_latest=False,
+            tracing_endpoint_config=None,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
@@ -1318,6 +1319,7 @@ def test_update_config(harness):
             restore_timeline=None,
             pitr_target=None,
             restore_to_latest=False,
+            tracing_endpoint_config=None,
             parameters={"test": "test"},
         )
         _handle_postgresql_restart_need.assert_called_once()
