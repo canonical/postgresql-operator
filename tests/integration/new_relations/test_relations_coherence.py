@@ -35,7 +35,7 @@ async def test_relations(ops_test: OpsTest, charm):
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=3000)
 
         # Creating first time relation with user role
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
+        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
         })
