@@ -1778,7 +1778,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
-        restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+        if self._can_connect_to_postgresql:
+            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+        else:
+            restart_postgresql = False
         self._patroni.reload_patroni_configuration()
         # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
         # which tells how much time Patroni will wait before checking the configuration

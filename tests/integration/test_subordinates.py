@@ -33,7 +33,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
         ops_test.model.deploy(
             UBUNTU_PRO_APP_NAME,
             config={"token": github_secrets["UBUNTU_PRO_TOKEN"]},
-            channel="noble/edge",
+            channel="latest/edge",
             num_units=0,
         ),
         ops_test.model.deploy(
