@@ -35,7 +35,6 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             config={"token": github_secrets["UBUNTU_PRO_TOKEN"]},
             channel="latest/edge",
             num_units=0,
-            base=CHARM_BASE,
         ),
         ops_test.model.deploy(
             LS_CLIENT,
@@ -46,7 +45,6 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             },
             channel="latest/edge",
             num_units=0,
-            base=CHARM_BASE,
         ),
     )
 
