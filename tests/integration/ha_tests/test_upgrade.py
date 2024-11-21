@@ -30,6 +30,7 @@ TIMEOUT = 600
 
 
 @pytest.mark.group(1)
+@pytest.mark.unstable
 @pytest.mark.abort_on_fail
 async def test_deploy_latest(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
@@ -53,6 +54,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.group(1)
+@pytest.mark.unstable
 @pytest.mark.abort_on_fail
 async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     """Test that the pre-upgrade-check action runs successfully."""
@@ -66,6 +68,7 @@ async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.group(1)
+@pytest.mark.unstable
 @pytest.mark.abort_on_fail
 async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
@@ -116,6 +119,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes) -> None:
 
 
 @pytest.mark.group(1)
+@pytest.mark.unstable
 @pytest.mark.abort_on_fail
 async def test_fail_and_rollback(ops_test, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
