@@ -216,8 +216,12 @@ def test_update_endpoints_with_event(harness):
         patch(
             "charm.PostgresqlOperatorCharm.members_ips",
             new_callable=PropertyMock,
+            return_value={"1.1.1.1", "2.2.2.2"},
         ) as _members_ips,
         patch("charm.Patroni.get_primary", new_callable=PropertyMock) as _get_primary,
+        patch(
+            "charm.Patroni.are_replicas_up", return_value={"1.1.1.1": True, "2.2.2.2": True}
+        ) as _are_replicas_up,
         patch(
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
@@ -227,7 +231,6 @@ def test_update_endpoints_with_event(harness):
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
         rel_id = harness.model.get_relation(RELATION_NAME).id
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
 
         # Add two different relations.
         rel_id = harness.add_relation(RELATION_NAME, "application")
@@ -259,6 +262,7 @@ def test_update_endpoints_with_event(harness):
         _fetch_my_relation_data.assert_called_once_with([2], ["password"])
 
         # Also test with only a primary instance.
+        _members_ips.return_value = {"1.1.1.1"}
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
@@ -277,15 +281,18 @@ def test_update_endpoints_without_event(harness):
         patch(
             "charm.PostgresqlOperatorCharm.members_ips",
             new_callable=PropertyMock,
+            return_value={"1.1.1.1", "2.2.2.2"},
         ) as _members_ips,
         patch("charm.Patroni.get_primary", new_callable=PropertyMock) as _get_primary,
+        patch(
+            "charm.Patroni.are_replicas_up", return_value={"1.1.1.1": True, "2.2.2.2": True}
+        ) as _are_replicas_up,
         patch(
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
     ):
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
-        _members_ips.side_effect = [{"1.1.1.1", "2.2.2.2"}, {"1.1.1.1", "2.2.2.2"}, {"1.1.1.1"}]
         rel_id = harness.model.get_relation(RELATION_NAME).id
 
         # Don't set data if no password
@@ -340,7 +347,41 @@ def test_update_endpoints_without_event(harness):
         }
         _fetch_my_relation_data.assert_called_once_with(None, ["password"])
 
+        # Filter out missing replica
+        _members_ips.return_value = {"1.1.1.1", "2.2.2.2", "3.3.3.3"}
+        harness.charm.postgresql_client_relation.update_endpoints()
+        assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
+            "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "2.2.2.2:5432",
+            "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
+            "tls": "False",
+        }
+        assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
+            "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "2.2.2.2:5432",
+            "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
+            "tls": "False",
+        }
+
+        # Don't filter if unable to get cluster status
+        _are_replicas_up.return_value = None
+        harness.charm.postgresql_client_relation.update_endpoints()
+        assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
+            "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "2.2.2.2:5432,3.3.3.3:5432",
+            "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
+            "tls": "False",
+        }
+        assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
+            "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "2.2.2.2:5432,3.3.3.3:5432",
+            "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
+            "tls": "False",
+        }
+
         # Also test with only a primary instance.
+        _members_ips.return_value = {"1.1.1.1"}
+        _are_replicas_up.return_value = {"1.1.1.1": True}
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",

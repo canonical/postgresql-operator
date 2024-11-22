@@ -835,3 +835,21 @@ def test_reinitialise_raft_data(patroni):
         _restart_patroni.assert_called_once_with()
         assert _psutil.process_iter.call_count == 2
         _psutil.process_iter.assert_any_call(["name"])
+
+
+def test_are_replicas_up(patroni):
+    with (
+        patch("requests.get") as _get,
+    ):
+        _get.return_value.json.return_value = {
+            "members": [
+                {"host": "1.1.1.1", "state": "running"},
+                {"host": "2.2.2.2", "state": "streaming"},
+                {"host": "3.3.3.3", "state": "other state"},
+            ]
+        }
+        assert patroni.are_replicas_up() == {"1.1.1.1": True, "2.2.2.2": True, "3.3.3.3": False}
+
+        # Return None on error
+        _get.side_effect = Exception
+        assert patroni.are_replicas_up() is None
