@@ -511,25 +511,31 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-    def _on_peer_relation_changed(self, event: HookEvent):  # noqa: C901
-        """Reconfigure cluster members when something changes."""
+    def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
+        """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if "cluster_initialised" not in self._peers.data[self.app]:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
-            return
+            return False
 
         # If the unit is the leader, it can reconfigure the cluster.
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
             event.defer()
-            return
+            return False
 
         if self._update_member_ip():
-            return
+            return False
 
         # Don't update this member before it's part of the members list.
         if self._unit_ip not in self.members_ips:
             logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
+            return False
+        return True
+
+    def _on_peer_relation_changed(self, event: HookEvent):
+        """Reconfigure cluster members when something changes."""
+        if not self._peer_relation_changed_checks(event):
             return
 
         # Update the list of the cluster members in the replicas to make them know each other.
@@ -736,14 +742,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _get_unit_ip(self, unit: Unit) -> str | None:
         """Get the IP address of a specific unit."""
         # Check if host is current host.
+        ip = None
         if unit == self.unit:
-            return str(self.model.get_binding(PEER).network.bind_address)
+            ip = self.model.get_binding(PEER).network.bind_address
         # Check if host is a peer.
         elif unit in self._peers.data:
-            return str(self._peers.data[unit].get("private-address"))
+            ip = self._peers.data[unit].get("private-address")
         # Return None if the unit is not a peer neither the current unit.
-        else:
-            return None
+        if ip:
+            return str(ip)
+        return None
 
     @property
     def _hosts(self) -> set:
