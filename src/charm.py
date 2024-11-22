@@ -1782,7 +1782,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
         else:
             restart_postgresql = False
-        self._patroni.reload_patroni_configuration()
+        try:
+            self._patroni.reload_patroni_configuration()
+        except Exception as e:
+            logger.error(f"Reload patroni call failed! error: {e!s}")
         # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
         # which tells how much time Patroni will wait before checking the configuration
         # file again to reload it.
