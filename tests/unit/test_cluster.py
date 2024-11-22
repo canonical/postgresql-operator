@@ -663,3 +663,21 @@ def test_update_patroni_restart_condition(patroni, new_restart_condition):
             f"Restart={new_restart_condition}"
         )
         _run.assert_called_once_with(["/bin/systemctl", "daemon-reload"])
+
+
+def test_are_replicas_up(patroni):
+    with (
+        patch("requests.get") as _get,
+    ):
+        _get.return_value.json.return_value = {
+            "members": [
+                {"host": "1.1.1.1", "state": "running"},
+                {"host": "2.2.2.2", "state": "streaming"},
+                {"host": "3.3.3.3", "state": "other state"},
+            ]
+        }
+        assert patroni.are_replicas_up() == {"1.1.1.1": True, "2.2.2.2": True, "3.3.3.3": False}
+
+        # Return None on error
+        _get.side_effect = Exception
+        assert patroni.are_replicas_up() is None

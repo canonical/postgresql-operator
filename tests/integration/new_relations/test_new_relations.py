@@ -11,9 +11,19 @@ import psycopg2
 import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from .. import markers
-from ..helpers import CHARM_BASE, assert_sync_standbys, get_leader_unit, scale_application
+from ..helpers import (
+    CHARM_BASE,
+    assert_sync_standbys,
+    get_leader_unit,
+    get_machine_from_unit,
+    get_primary,
+    scale_application,
+    start_machine,
+    stop_machine,
+)
 from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
@@ -182,6 +192,35 @@ async def test_database_relation_with_charm_libraries(ops_test: OpsTest):
         # Try to alter some data in a read-only transaction.
         with pytest.raises(psycopg2.errors.ReadOnlySqlTransaction):
             cursor.execute("DROP TABLE test;")
+
+
+@pytest.mark.group("new_relations_tests")
+@pytest.mark.abort_on_fail
+async def test_filter_out_degraded_replicas(ops_test: OpsTest):
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    replica = next(
+        unit.name
+        for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+        if unit.name != primary
+    )
+    machine = await get_machine_from_unit(ops_test, replica)
+    await stop_machine(ops_test, machine)
+
+    # Topology observer runs every half a minute
+    await asyncio.sleep(60)
+
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            data = await get_application_relation_data(
+                ops_test,
+                APPLICATION_APP_NAME,
+                FIRST_DATABASE_RELATION_NAME,
+                "read-only-endpoints",
+            )
+            assert data is None
+
+    await start_machine(ops_test, machine)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=200)
 
 
 @pytest.mark.group("new_relations_tests")
