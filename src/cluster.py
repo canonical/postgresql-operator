@@ -524,6 +524,23 @@ class Patroni:
 
         return len(cluster_status.json()["members"]) == 0
 
+    def are_replicas_up(self) -> dict[str, bool] | None:
+        """Check if cluster members are running or streaming."""
+        try:
+            response = requests.get(
+                f"{self._patroni_url}/cluster",
+                verify=self.verify,
+                auth=self._patroni_auth,
+                timeout=PATRONI_TIMEOUT,
+            )
+            return {
+                member["host"]: member["state"] in ["running", "streaming"]
+                for member in response.json()["members"]
+            }
+        except Exception:
+            logger.exception("Unable to get the state of the cluster")
+            return
+
     def promote_standby_cluster(self) -> None:
         """Promote a standby cluster to be a regular cluster."""
         config_response = requests.get(
