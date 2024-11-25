@@ -93,21 +93,27 @@ async def are_writes_increasing(
     extra_model: Model = None,
 ) -> None:
     """Verify new writes are continuing by counting the number of writes."""
+    down_units = [down_unit] if isinstance(down_unit, str) or not down_unit else down_unit
     writes, _ = await count_writes(
         ops_test,
-        down_unit=down_unit,
+        down_unit=down_units[0],
         use_ip_from_inside=use_ip_from_inside,
         extra_model=extra_model,
     )
-    for member, count in writes.items():
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes, _ = await count_writes(
-                    ops_test,
-                    down_unit=down_unit,
-                    use_ip_from_inside=use_ip_from_inside,
-                    extra_model=extra_model,
-                )
+    logger.info(f"Initial writes {writes}")
+
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            more_writes, _ = await count_writes(
+                ops_test,
+                down_unit=down_unit,
+                use_ip_from_inside=use_ip_from_inside,
+                extra_model=extra_model,
+            )
+            logger.info(f"Retry writes {more_writes}")
+            for member, count in writes.items():
+                if "/".join(member.split(".", 1)[-1].rsplit("-", 1)) in down_units:
+                    continue
                 assert more_writes[member] > count, (
                     f"{member}: writes not continuing to DB (current writes: {more_writes[member]} - previous writes: {count})"
                 )
@@ -614,6 +620,33 @@ async def is_replica(ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool
                     raise MemberNotUpdatedOnClusterError()
     except RetryError:
         return False
+
+
+async def get_cluster_roles(
+    ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool = False
+) -> dict[str, str | list[str] | None]:
+    """Returns whether the unit a replica in the cluster."""
+    unit_ip = await (
+        get_ip_from_inside_the_unit(ops_test, unit_name)
+        if use_ip_from_inside
+        else get_unit_ip(ops_test, unit_name)
+    )
+
+    members = {"replicas": [], "primaries": [], "sync_standbys": []}
+    cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+    member_list = cluster_info.json()["members"]
+    logger.info(f"Cluster members are: {member_list}")
+    for member in member_list:
+        role = member["role"]
+        name = "/".join(member["name"].rsplit("-", 1))
+        if role == "leader":
+            members["primaries"].append(name)
+        elif role == "sync_standby":
+            members["sync_standbys"].append(name)
+        else:
+            members["replicas"].append(name)
+
+    return members
 
 
 async def instance_ip(ops_test: OpsTest, instance: str) -> str:
