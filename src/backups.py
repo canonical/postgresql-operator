@@ -1033,7 +1033,7 @@ Stderr:
                 if (
                     restore_to_time == "latest"
                     and timelines_list is not None
-                    and max(timelines_list.values()) not in backups_list
+                    and max(timelines_list.values() or [backups_list[0]]) not in backups_list
                 ):
                     error_message = "There is no base backup created from the latest timeline"
                     logger.error(f"Restore failed: {error_message}")
