@@ -12,7 +12,7 @@ variable "app_name" {
 variable "channel" {
   description = "Charm channel to use when deploying"
   type        = string
-  default     = "14/stable"
+  default     = "16/stable"
 }
 
 variable "revision" {

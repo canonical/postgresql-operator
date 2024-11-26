@@ -114,8 +114,8 @@ class PostgreSQLUpgrade(DataUpgrade):
                 fixed_dependencies["snap"] = {
                     "dependencies": {},
                     "name": "charmed-postgresql",
-                    "upgrade_supported": "^14",
-                    "version": "14.9",
+                    "upgrade_supported": "^16",
+                    "version": "16.4",
                 }
                 self.peer_relation.data[self.charm.app].update({
                     "dependencies": json.dumps(fixed_dependencies)

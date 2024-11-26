@@ -202,7 +202,7 @@ def test_can_use_s3_repository(harness):
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
-            "charm.Patroni.get_postgresql_version", return_value="14.10"
+            "charm.Patroni.get_postgresql_version", return_value="16.4"
         ) as _get_postgresql_version,
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch(

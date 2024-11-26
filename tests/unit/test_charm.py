@@ -623,7 +623,7 @@ def test_on_start(harness):
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
     ):
-        _get_postgresql_version.return_value = "14.0"
+        _get_postgresql_version.return_value = "16.4"
 
         # Test without storage.
         harness.charm.on.start.emit()
@@ -709,7 +709,7 @@ def test_on_start_replica(harness):
             return_value=True,
         ) as _is_storage_attached,
     ):
-        _get_postgresql_version.return_value = "14.0"
+        _get_postgresql_version.return_value = "16.4"
 
         # Set the current unit to be a replica (non leader unit).
         harness.set_leader(False)
@@ -768,7 +768,7 @@ def test_on_start_no_patroni_member(harness):
         bootstrap_cluster = patroni.return_value.bootstrap_cluster
         bootstrap_cluster.return_value = True
 
-        patroni.return_value.get_postgresql_version.return_value = "14.0"
+        patroni.return_value.get_postgresql_version.return_value = "16.4"
 
         harness.set_leader()
         harness.charm.on.start.emit()
@@ -1119,29 +1119,29 @@ def test_install_snap_packages(harness):
 
         # Test for problem with snap update.
         with pytest.raises(snap.SnapError):
-            harness.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
+            harness.charm._install_snap_packages([("postgresql", {"channel": "16/edge"})])
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_cache.assert_called_once_with()
-        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="16/edge")
 
         # Test with a not found package.
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = snap.SnapNotFoundError
         with pytest.raises(snap.SnapNotFoundError):
-            harness.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
+            harness.charm._install_snap_packages([("postgresql", {"channel": "16/edge"})])
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
         _snap_cache.assert_called_once_with()
-        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="16/edge")
 
         # Then test a valid one.
         _snap_cache.reset_mock()
         _snap_package.reset_mock()
         _snap_package.ensure.side_effect = None
-        harness.charm._install_snap_packages([("postgresql", {"channel": "14/edge"})])
+        harness.charm._install_snap_packages([("postgresql", {"channel": "16/edge"})])
         _snap_cache.assert_called_once_with()
         _snap_cache.return_value.__getitem__.assert_called_once_with("postgresql")
-        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="14/edge")
+        _snap_package.ensure.assert_called_once_with(snap.SnapState.Latest, channel="16/edge")
         _snap_package.hold.assert_not_called()
 
         # Test revision

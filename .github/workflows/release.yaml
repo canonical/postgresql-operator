@@ -5,7 +5,7 @@ name: Release to Charmhub
 on:
   push:
     branches:
-      - main
+      - 16/edge
     paths-ignore:
       - 'tests/**'
       - 'docs/**'
@@ -14,6 +14,8 @@ on:
       - '.github/workflows/ci.yaml'
       - '.github/workflows/lib-check.yaml'
       - '.github/workflows/sync_docs.yaml'
+  # for testing purposes:
+  workflow_dispatch:
 
 jobs:
   ci-tests:
@@ -25,16 +27,16 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v23.0.5
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@lucas/fix-collect-bases
 
   release:
     name: Release charm
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v23.0.5
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@lucas/fix-collect-bases
     with:
-      channel: 14/edge
+      channel: 16/edge
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
