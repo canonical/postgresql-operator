@@ -185,6 +185,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
+        self.framework.observe(
+            self.on.experimental_set_raft_candidate_action,
+            self._on_experimental_set_raft_candidate,
+        )
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -626,9 +630,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 and "raft_primary" not in self.unit_peer_data
                 and "raft_followers_stopped" in self.app_peer_data
             ):
+                self.unit.status = MaintenanceStatus("Reinitialising raft")
                 logger.info(f"Reinitialising {self.unit.name} as primary")
                 self._patroni.reinitialise_raft_data()
                 self.unit_peer_data["raft_primary"] = "True"
+                self._set_primary_status_message()
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_rejoin()
@@ -1501,6 +1507,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.update_config()
 
         event.set_results({"password": password})
+
+    def _on_experimental_set_raft_candidate(self, event: ActionEvent) -> None:
+        if self.has_raft_keys():
+            self.unit_peer_data.update({"raft_candidate": "True"})
+            return
+        event.fail("Raft is not stuck.")
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
