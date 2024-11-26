@@ -18,6 +18,7 @@ import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from ops import MaintenanceStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
     AttemptManager,
@@ -774,6 +775,19 @@ class Patroni:
         primary = self.get_primary()
         return primary != old_primary
 
+    def has_raft_quorum(self) -> bool:
+        """Check if raft cluster has quorum."""
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+
+        raft_host = "127.0.0.1:2222"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException:
+            logger.warning("Has raft quorum: Cannot connect to raft cluster")
+            return False
+        return raft_status["has_quorum"]
+
     def remove_raft_data(self) -> None:
         """Stops Patroni and removes the raft journals."""
         logger.info("Stopping patroni")
@@ -827,6 +841,33 @@ class Patroni:
                     raise RaftPostgresqlNotUpError()
         logger.info("Raft should be unstuck")
 
+    def _get_role(self) -> str | None:
+        members = requests.get(
+            f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
+        ).json()["members"]
+        member_name = self.charm.unit.name[::-1].replace("/", "-", 1)[::-1]
+        for member in members:
+            if member["name"] == member_name:
+                return member["role"]
+
+    def get_running_cluster_members(self) -> list[str]:
+        """List running patroni members."""
+        try:
+            members = requests.get(
+                f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                verify=self.verify,
+                timeout=API_REQUEST_TIMEOUT,
+                auth=self._patroni_auth,
+            ).json()["members"]
+            return [
+                member["name"] for member in members if member["state"] in ("streaming", "running")
+            ]
+        except Exception:
+            return []
+
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
 
@@ -860,16 +901,15 @@ class Patroni:
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].host == member_ip
         ):
+            self.charm.unit.status = MaintenanceStatus("Reinitialising raft")
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
             try:
-                health_status = self.get_patroni_health()
+                candidate = self._get_role() in ["leader", "sync_standby"]
             except Exception:
-                logger.warning("Remove raft member: Unable to get health status")
-                health_status = {}
-            if health_status.get("role") in ("leader", "master") or health_status.get(
-                "sync_standby"
-            ):
+                logger.warning("Remove raft member: Unable to get cluster status")
+                candidate = False
+            if candidate:
                 logger.info(f"{self.charm.unit.name} is raft candidate")
                 data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)

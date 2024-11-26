@@ -639,6 +639,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.pop("raft_stopped", None)
             self.update_config()
             self._patroni.start_patroni()
+            self._set_primary_status_message()
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()
@@ -1594,6 +1595,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.has_raft_keys():
             logger.debug("Early exit on_update_status: Raft recovery in progress")
+            if self.unit.is_leader():
+                self._raft_reinitialisation()
             return False
 
         if not self.upgrade.idle:
@@ -1670,10 +1673,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.app_peer_data["s3-initialization-block-message"]
                 )
                 return
-            if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
-                self.unit.status = ActiveStatus("Primary")
-            elif self.is_standby_leader:
-                self.unit.status = ActiveStatus("Standby")
+            if (
+                self._patroni.get_primary(unit_name_pattern=True) == self.unit.name
+                or self.is_standby_leader
+            ):
+                danger_state = ""
+                if not self._patroni.has_raft_quorum():
+                    danger_state = " (disaster)"
+                elif len(self._patroni.get_running_cluster_members()) < self.app.planned_units():
+                    danger_state = " (degraded)"
+                self.unit.status = ActiveStatus(
+                    f"{'Standby' if self.is_standby_leader else 'Primary'}{danger_state}"
+                )
             elif self._patroni.member_started:
                 self.unit.status = ActiveStatus()
         except (RetryError, ConnectionError) as e:

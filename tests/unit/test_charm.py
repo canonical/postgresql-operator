@@ -1989,6 +1989,7 @@ def test_raft_reinitialisation(harness):
         patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
         patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.PostgresqlOperatorCharm._set_primary_status_message"),
     ):
         # No data
         harness.charm._raft_reinitialisation()
@@ -2569,6 +2570,8 @@ def test_update_new_unit_status(harness):
 @pytest.mark.parametrize("is_leader", [True, False])
 def test_set_primary_status_message(harness, is_leader):
     with (
+        patch("charm.Patroni.has_raft_quorum", return_value=True),
+        patch("charm.Patroni.get_running_cluster_members", return_value=["test"]),
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock
@@ -2602,7 +2605,9 @@ def test_set_primary_status_message(harness, is_leader):
                     assert isinstance(harness.charm.unit.status, MaintenanceStatus)
                 else:
                     _is_standby_leader.side_effect = None
-                    _is_standby_leader.return_value = values[1]
+                    _is_standby_leader.return_value = (
+                        values[0] != harness.charm.unit.name and values[1]
+                    )
                     harness.charm._set_primary_status_message()
                     assert isinstance(
                         harness.charm.unit.status,
