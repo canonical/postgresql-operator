@@ -2,8 +2,8 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+import asyncio
 import logging
-from asyncio import TimeoutError
 
 import pytest
 from juju import tag
@@ -163,7 +163,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             await ops_test.model.wait_for_idle(
                 apps=[DUP_APPLICATION_NAME], timeout=1000, status="blocked"
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             logger.info("Application is not in blocked state. Checking logs...")
 
         # Since application have postgresql db in storage from external application it should not be able to connect due to new password
@@ -211,7 +211,7 @@ async def test_app_resources_conflicts_v2(ops_test: OpsTest, charm: str):
             await ops_test.model.wait_for_idle(
                 apps=[DUP_APPLICATION_NAME], timeout=1000, status="blocked"
             )
-        except TimeoutError:
+        except asyncio.TimeoutError:
             logger.info("Application is not in blocked state. Checking logs...")
 
         # Since application have postgresql db in storage from external application it should not be able to connect due to new password

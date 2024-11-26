@@ -15,6 +15,7 @@ from typing import Any
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
     AttemptManager,
     RetryError,
@@ -524,6 +525,23 @@ class Patroni:
 
         return len(cluster_status.json()["members"]) == 0
 
+    def are_replicas_up(self) -> dict[str, bool] | None:
+        """Check if cluster members are running or streaming."""
+        try:
+            response = requests.get(
+                f"{self._patroni_url}/cluster",
+                verify=self.verify,
+                auth=self._patroni_auth,
+                timeout=PATRONI_TIMEOUT,
+            )
+            return {
+                member["host"]: member["state"] in ["running", "streaming"]
+                for member in response.json()["members"]
+            }
+        except Exception:
+            logger.exception("Unable to get the state of the cluster")
+            return
+
     def promote_standby_cluster(self) -> None:
         """Promote a standby cluster to be a regular cluster."""
         config_response = requests.get(
@@ -749,32 +767,28 @@ class Patroni:
         """
         # Suppressing since the call will be removed soon
         # Get the status of the raft cluster.
-        raft_status = subprocess.check_output([  # noqa
-            "charmed-postgresql.syncobj-admin",
-            "-conn",
-            "127.0.0.1:2222",
-            "-pass",
-            self.raft_password,
-            "-status",
-        ]).decode("UTF-8")
+        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+
+        raft_host = "127.0.0.1:2222"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException:
+            logger.warning("Remove raft member: Cannot connect to raft cluster")
+            raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
-        if not member_ip or member_ip not in raft_status:
+        if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
             return
 
         # Suppressing since the call will be removed soon
         # Remove the member from the raft cluster.
-        result = subprocess.check_output([  # noqa
-            "charmed-postgresql.syncobj-admin",
-            "-conn",
-            "127.0.0.1:2222",
-            "-pass",
-            self.raft_password,
-            "-remove",
-            f"{member_ip}:2222",
-        ]).decode("UTF-8")
+        try:
+            result = syncobj_util.executeCommand(raft_host, ["remove", f"{member_ip}:2222"])
+        except UtilityException:
+            logger.debug("Remove raft member: Remove call failed")
+            raise RemoveRaftMemberFailedError() from None
 
-        if "SUCCESS" not in result:
+        if not result.startswith("SUCCESS"):
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
