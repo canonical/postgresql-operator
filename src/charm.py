@@ -1595,6 +1595,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.has_raft_keys():
             logger.debug("Early exit on_update_status: Raft recovery in progress")
+            if self.charm.unit.is_leader():
+                self._raft_reinitialisation()
             return False
 
         if not self.upgrade.idle:
