@@ -1338,6 +1338,7 @@ def test_update_config(harness):
         harness.update_relation_data(
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it doesn't change.
+        _is_tls_enabled.return_value = False
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
