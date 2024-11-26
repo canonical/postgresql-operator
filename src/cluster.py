@@ -901,17 +901,9 @@ class Patroni:
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].host == member_ip
         ):
-            self.charm.unit.status = MaintenanceStatus("Reinitialising raft")
+            self.charm.unit.status = MaintenanceStatus("Raft majority loss")
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
-            try:
-                candidate = self._get_role() in ["leader", "sync_standby"]
-            except Exception:
-                logger.warning("Remove raft member: Unable to get cluster status")
-                candidate = False
-            if candidate:
-                logger.info(f"{self.charm.unit.name} is raft candidate")
-                data_flags["raft_candidate"] = "True"
             self.charm.unit_peer_data.update(data_flags)
 
             # Leader doesn't always trigger when changing it's own peer data.

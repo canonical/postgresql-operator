@@ -783,7 +783,7 @@ def test_remove_raft_member_no_quorum(patroni, harness):
 
         patroni.remove_raft_member("1.2.3.4")
 
-        assert harness.charm.unit_peer_data == {"raft_candidate": "True", "raft_stuck": "True"}
+        assert harness.charm.unit_peer_data == {"raft_stuck": "True"}
 
 
 def test_remove_raft_data(patroni):
