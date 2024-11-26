@@ -634,7 +634,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.info(f"Reinitialising {self.unit.name} as primary")
                 self._patroni.reinitialise_raft_data()
                 self.unit_peer_data["raft_primary"] = "True"
-                self._set_primary_status_message()
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_rejoin()
@@ -1511,6 +1510,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _on_experimental_set_raft_candidate(self, event: ActionEvent) -> None:
         if self.has_raft_keys():
             self.unit_peer_data.update({"raft_candidate": "True"})
+            if self.unit.is_leader():
+                self._raft_reinitialisation()
             return
         event.fail("Raft is not stuck.")
 
