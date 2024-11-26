@@ -11,14 +11,14 @@ Charmed PostgreSQL can be integrated with any charmed application that supports 
 ---
 
 ## Check supported interfaces
-First, we recommend that you check [the supported interfaces](/t/10251) of the current charm. You have options to use modern (preferred) or legacy interfaces. 
+First, we recommend that you check [the supported interfaces](/t/10251) of the current charm. You have the option to use modern (preferred) or legacy interfaces. 
 
-Most existing charms currently use [ops-lib-pgsql](https://github.com/canonical/ops-lib-pgsql) interface (legacy). For new charms, **Canonical recommends using [data-platform-libs](https://github.com/canonical/data-platform-libs) instead.**
+Most existing charms currently use [ops-lib-pgsql](https://github.com/canonical/ops-lib-pgsql) interface (legacy). For new charms, **Canonical recommends using [data-platform-libs](https://github.com/canonical/data-platform-libs).**
 
 Legacy charm details are described [here](/t/10690).
 
 ## Integrate your charm with PostgreSQL
-**For an introduction** to the concepts of Juju integrations, see [Juju | Integration](https://juju.is/docs/juju/integration).
+> See also: [Juju documentation | Integration](https://juju.is/docs/juju/integration)
 
 **For a detailed tutorial** about integrating your charm with the PostgreSQL charm, refer to [Juju | Integrate your charm with PostgreSQL](https://juju.is/docs/sdk/integrate-your-charm-with-postgresql). 
 
@@ -37,7 +37,7 @@ Legacy charm details are described [here](/t/10690).
 >It depends on the interface. Check the `postgresql_client` [interface requirements](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/postgresql_client/v0/README.md).
 
 **Is there a charm library available, or does my charm need to compile the postgresql relation data on its own?**
->Yes, the library is available: [data-platform-libs](https://github.com/canonical/data-platform-libs). The integration is trivial: [example](https://github.com/nextcloud-charmers/nextcloud-charms/pull/78).
+>Yes, a library is available: [data-platform-libs](https://github.com/canonical/data-platform-libs). The integration is trivial: [example](https://github.com/nextcloud-charmers/nextcloud-charms/pull/78).
 
 **How do I obtain the database url/uri?**
 >This feature is [planned](https://warthogs.atlassian.net/browse/DPE-2278) but currently missing.
@@ -58,7 +58,6 @@ Legacy charm details are described [here](/t/10690).
 >    
 >    return f"postgres://{username}:{password}@{endpoints}/ratings"
 > ```
-
 
 
 ## Success stories
