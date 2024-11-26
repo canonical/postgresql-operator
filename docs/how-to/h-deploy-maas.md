@@ -70,7 +70,7 @@ The LXD machine will be up and running after the images downloading and sync is 
 
 **6.** Finally, dump MAAS admin user API key to add as Juju credentials later:
 ```shell
-sudo maas apikey --username admin
+multipass exec maas -- sudo maas apikey --username admin
 ```
 
  <a href="#heading--register-maas-juju"><h2 id="heading--register-maas-juju"> Register MAAS with Juju </h2></a>

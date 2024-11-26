@@ -23,6 +23,9 @@ For a given release, this table shows:
 | [336] | 14.9 | `3.1.5+` |  | ![check] | ![check] |  |  |
 | [288] | 14.7 | `2.9.32+` |  |  |  |  |  |
 
+<!--TODO: insert as first row
+| [517], [518] | 14.12 | `3.4.3+` | ![check] | ![check] | ![check] | ![check] | ![check] |
+-->
 
 \* **TLS encryption**: Support for **`v2` or higher** of the [`tls-certificates` interface](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates). This means that you can integrate with [modern TLS charms](https://charmhub.io/topics/security-with-x-509-certificates).
 
@@ -36,6 +39,15 @@ Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneous
 
 > If you deploy a specific revision, **you must make sure it matches your base and architecture** via the tables below or with [`juju info`](https://juju.is/docs/juju/juju-info)
 
+<!-- TODO: Fill in arch columns and remove "14/stable" from previous table
+### Release 517-518 (`14/stable`)
+
+| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
+|:--------:|:-----:|:-----:|:-----:|
+|[517]  |         |        |  ![check]  |
+|[518] |          |        |  ![check]  |
+--->
+
 ### Release 467-468 (`14/stable`)
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
@@ -43,40 +55,41 @@ Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneous
 |[468]  |![check] | | ![check]  |
 |[467] |  | ![check]| ![check] |
 
-[details=Release 429-430]
+[details=Older releases]
+### Release 429-430
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
 |[430] |![check]| | ![check]   |
 |[429] |  | ![check]| ![check] |
-[/details]
 
-[details=Release 363]
+### Release 363
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
 |[363] | ![check]| | ![check]  |
-[/details]
 
-[details=Release 351]
+
+### Release 351
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
 |[351] |![check]| | ![check]   |
-[/details]
 
-[details=Release 336]
+
+### Release 336
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
 |[336] |![check]| | ![check]   |
-[/details]
 
-[details=Release 288]
+
+### Release 288
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
 |[288] |![check]| | ![check]   |
+
 [/details]
 
 ## Plugins/extensions
