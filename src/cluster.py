@@ -668,7 +668,7 @@ class Patroni:
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
-            minority_count=self.planned_units // 2,
+            synchronous_node_count=self.planned_units - 1,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
@@ -1003,7 +1003,7 @@ class Patroni:
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={"synchronous_node_count": units // 2},
+                    json={"synchronous_node_count": units - 1},
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
