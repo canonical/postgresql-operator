@@ -18,13 +18,6 @@ on:
   workflow_dispatch:
 
 jobs:
-  ci-tests:
-    name: Tests
-    uses: ./.github/workflows/ci.yaml
-    secrets: inherit
-    permissions:
-      contents: write  # Needed for Allure Report beta
-
   build:
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@lucas/fix-collect-bases
@@ -32,10 +25,56 @@ jobs:
       cache: false
       charmcraft-snap-channel: 3.x/stable
 
+  integration-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        juju:
+          - agent: 3.4.6  # renovate: juju-agent-pin-minor
+            allure_on_amd64: true
+          - snap_channel: 3.6/candidate
+            allure_on_amd64: false
+        architecture:
+          - amd64
+        include:
+          - juju:
+              agent: 3.4.6  # renovate: juju-agent-pin-minor
+              allure_on_amd64: true
+            architecture: arm64
+          - juju:
+              snap_channel: 3.6/candidate
+              allure_on_amd64: false
+            architecture: arm64
+    name: Integration | ${{ matrix.juju.agent || matrix.juju.snap_channel }} | ${{ matrix.architecture }}
+    needs:
+      - build
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v23.0.5
+    with:
+      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+      architecture: ${{ matrix.architecture }}
+      cloud: lxd
+      juju-agent-version: ${{ matrix.juju.agent }}
+      juju-snap-channel: ${{ matrix.juju.snap_channel }}
+      libjuju-version-constraint: ${{ matrix.juju.libjuju }}
+      _beta_allure_report: ${{ matrix.juju.allure_on_amd64 && matrix.architecture == 'amd64' }}
+    secrets:
+      integration-test: |
+        {
+          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
+          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
+          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
+          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
+          "UBUNTU_PRO_TOKEN" : "${{ secrets.UBUNTU_PRO_TOKEN }}",
+          "LANDSCAPE_ACCOUNT_NAME": "${{ secrets.LANDSCAPE_ACCOUNT_NAME }}",
+          "LANDSCAPE_REGISTRATION_KEY": "${{ secrets.LANDSCAPE_REGISTRATION_KEY }}",
+        }
+    permissions:
+      contents: write  # Needed for Allure Report beta
+
   release:
     name: Release charm
     needs:
-      - ci-tests
+      - integration-test
       - build
     uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@lucas/fix-collect-bases
     with:
