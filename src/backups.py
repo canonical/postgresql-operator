@@ -658,8 +658,6 @@ class PostgreSQLBackups(Object):
             # for that or else the s3 initialization sequence will fail.
             for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10), reraise=True):
                 with attempt:
-                    if self.charm._patroni.member_started:
-                        self.charm._patroni.reload_patroni_configuration()
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
@@ -708,9 +706,6 @@ class PostgreSQLBackups(Object):
             })
 
             self.charm.update_config()
-            if self.charm._patroni.member_started:
-                self.charm._patroni.reload_patroni_configuration()
-
             break
 
     @property
@@ -785,8 +780,6 @@ class PostgreSQLBackups(Object):
     def _on_s3_credential_changed_primary(self, event: HookEvent) -> bool:
         """Stanza must be cleared before calling this function."""
         self.charm.update_config()
-        if self.charm._patroni.member_started:
-            self.charm._patroni.reload_patroni_configuration()
 
         try:
             self._create_bucket_if_not_exists()
