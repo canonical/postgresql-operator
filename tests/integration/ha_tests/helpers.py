@@ -93,24 +93,27 @@ async def are_writes_increasing(
     extra_model: Model = None,
 ) -> None:
     """Verify new writes are continuing by counting the number of writes."""
+    down_units = [down_unit] if isinstance(down_unit, str) or not down_unit else down_unit
     writes, _ = await count_writes(
         ops_test,
-        down_unit=down_unit,
+        down_unit=down_units[0],
         use_ip_from_inside=use_ip_from_inside,
         extra_model=extra_model,
     )
-    logger.info(f"Initial writes {writes}")
+    # logger.info(f"Initial writes {writes}")
 
-    for member, count in writes.items():
-        for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
-            with attempt:
-                more_writes, _ = await count_writes(
-                    ops_test,
-                    down_unit=down_unit,
-                    use_ip_from_inside=use_ip_from_inside,
-                    extra_model=extra_model,
-                )
-                logger.info(f"Retry writes {more_writes}")
+    for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            more_writes, _ = await count_writes(
+                ops_test,
+                down_unit=down_unit,
+                use_ip_from_inside=use_ip_from_inside,
+                extra_model=extra_model,
+            )
+            # logger.info(f"Retry writes {more_writes}")
+            for member, count in writes.items():
+                if "/".join(member.split(".", 1)[-1].rsplit("-", 1)) in down_units:
+                    continue
                 assert more_writes[member] > count, (
                     f"{member}: writes not continuing to DB (current writes: {more_writes[member]} - previous writes: {count})"
                 )
