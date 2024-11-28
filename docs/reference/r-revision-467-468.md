@@ -1,9 +1,7 @@
 >Reference > Release Notes > [All revisions] > Revision 467/468
 
 # Revision 467/468
-September 11, 2024
-
-Dear community,
+<sub>September 11, 2024</sub>
 
 Canonical's newest Charmed PostgreSQL operator has been published in the [14/stable channel].
 
