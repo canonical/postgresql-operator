@@ -2,8 +2,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import time
-
 import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -70,8 +68,6 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     # Wait and get the primary again (which can be any unit, including the previous primary).
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active")
-
-    time.sleep(30)
 
     await are_writes_increasing(ops_test, primary_name)
 
