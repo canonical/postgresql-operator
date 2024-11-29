@@ -100,7 +100,7 @@ async def are_writes_increasing(
         use_ip_from_inside=use_ip_from_inside,
         extra_model=extra_model,
     )
-    # logger.info(f"Initial writes {writes}")
+    logger.info(f"Initial writes {writes}")
 
     for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3), reraise=True):
         with attempt:
@@ -110,7 +110,7 @@ async def are_writes_increasing(
                 use_ip_from_inside=use_ip_from_inside,
                 extra_model=extra_model,
             )
-            # logger.info(f"Retry writes {more_writes}")
+            logger.info(f"Retry writes {more_writes}")
             for member, count in writes.items():
                 if "/".join(member.split(".", 1)[-1].rsplit("-", 1)) in down_units:
                     continue
