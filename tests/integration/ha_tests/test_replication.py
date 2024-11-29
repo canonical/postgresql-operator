@@ -63,7 +63,7 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
 
     # Remove the primary unit.
     primary_name = await get_primary(ops_test, app)
-    await ops_test.model.destroy_units(primary_name)
+    await ops_test.model.destroy_units([primary_name])
 
     # Wait and get the primary again (which can be any unit, including the previous primary).
     async with ops_test.fast_forward():

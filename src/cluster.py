@@ -789,7 +789,6 @@ class Patroni:
             raise RemoveRaftMemberFailedError() from None
 
         if not result.startswith("SUCCESS"):
-            logger.error(f"!!!!!!!!!!!!!{result}")
             logger.debug("Remove raft member: Remove call not successful")
             raise RemoveRaftMemberFailedError()
 
