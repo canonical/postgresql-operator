@@ -647,6 +647,7 @@ class Patroni:
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
+            # -1 for leader
             synchronous_node_count=self.planned_units - 1,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
