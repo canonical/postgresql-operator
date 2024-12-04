@@ -623,7 +623,7 @@ def test_on_start(harness):
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
     ):
-        _get_postgresql_version.return_value = "16.4"
+        _get_postgresql_version.return_value = "16.6"
 
         # Test without storage.
         harness.charm.on.start.emit()
@@ -709,7 +709,7 @@ def test_on_start_replica(harness):
             return_value=True,
         ) as _is_storage_attached,
     ):
-        _get_postgresql_version.return_value = "16.4"
+        _get_postgresql_version.return_value = "16.6"
 
         # Set the current unit to be a replica (non leader unit).
         harness.set_leader(False)
@@ -768,7 +768,7 @@ def test_on_start_no_patroni_member(harness):
         bootstrap_cluster = patroni.return_value.bootstrap_cluster
         bootstrap_cluster.return_value = True
 
-        patroni.return_value.get_postgresql_version.return_value = "16.4"
+        patroni.return_value.get_postgresql_version.return_value = "16.6"
 
         harness.set_leader()
         harness.charm.on.start.emit()

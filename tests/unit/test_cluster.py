@@ -165,11 +165,11 @@ def test_get_postgresql_version(peers_ips, patroni):
         _get_installed_snaps = _snap_client.return_value.get_installed_snaps
         _get_installed_snaps.return_value = [
             {"name": "something"},
-            {"name": "charmed-postgresql", "version": "16.4"},
+            {"name": "charmed-postgresql", "version": "16.6"},
         ]
         version = patroni.get_postgresql_version()
 
-        assert version == "16.4"
+        assert version == "16.6"
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
@@ -314,7 +314,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.Patroni._create_directory"),
     ):
-        _get_postgresql_version.return_value = "16.4"
+        _get_postgresql_version.return_value = "16.6"
 
         # Define variables to render in the template.
         member_name = "postgresql-0"
