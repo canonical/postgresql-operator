@@ -405,7 +405,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def _updated_synchronous_node_count(self, num_units: int | None = None) -> bool:
+    def updated_synchronous_node_count(self, num_units: int | None = None) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
         try:
             self._patroni.update_synchronous_node_count(num_units)
@@ -439,7 +439,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if "cluster_initialised" not in self._peers.data[
             self.app
-        ] or not self._updated_synchronous_node_count(len(self._units_ips)):
+        ] or not self.updated_synchronous_node_count(len(self._units_ips)):
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return

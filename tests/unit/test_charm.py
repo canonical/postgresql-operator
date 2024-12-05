@@ -2189,7 +2189,7 @@ def test_on_peer_relation_departed(harness):
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._get_ips_to_remove") as _get_ips_to_remove,
         patch(
-            "charm.PostgresqlOperatorCharm._updated_synchronous_node_count"
+            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
         patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
         patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
