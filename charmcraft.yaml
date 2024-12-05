@@ -2,13 +2,15 @@
 # See LICENSE file for licensing details.
 
 type: charm
-bases:
-  - name: ubuntu
-    channel: "22.04"
-    architectures: [amd64]
-  - name: ubuntu
-    channel: "22.04"
-    architectures: [arm64]
+base: ubuntu@24.04
+
+platforms:
+  amd64:
+    build-on: amd64
+    build-for: amd64
+  arm64:
+    build-on: arm64
+    build-for: arm64
 parts:
   charm:
     build-snaps:

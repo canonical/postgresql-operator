@@ -36,7 +36,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 39
+LIBPATCH = 40
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -339,10 +339,12 @@ class PostgreSQL:
 
             # Enable/disabled the extension in each database.
             for database in databases:
-                with self._connect_to_database(
-                    database=database
-                ) as connection, connection.cursor() as cursor:
+                connection = self._connect_to_database(database=database)
+                connection.autocommit = True
+                with connection.cursor() as cursor:
                     for extension, enable in ordered_extensions.items():
+                        if extension == "postgis":
+                            cursor.execute("SET pgaudit.log = 'none';")
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
                             if enable
@@ -364,6 +366,7 @@ class PostgreSQL:
     ) -> List[Composed]:
         """Generates a list of databases privileges statements."""
         statements = []
+        statements.append(sql.SQL("GRANT USAGE, CREATE ON SCHEMA public TO admin;"))
         if relations_accessing_this_database == 1:
             statements.append(
                 sql.SQL(
@@ -418,11 +421,11 @@ WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = '{}');""".format(user
                     sql.SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
                         schema, sql.Identifier(user)
                     ),
-                    sql.SQL("GRANT USAGE ON SCHEMA {} TO {};").format(
+                    sql.SQL("GRANT USAGE, CREATE ON SCHEMA {} TO {};").format(
                         schema, sql.Identifier(user)
                     ),
-                    sql.SQL("GRANT CREATE ON SCHEMA {} TO {};").format(
-                        schema, sql.Identifier(user)
+                    sql.SQL("GRANT USAGE, CREATE ON SCHEMA {} TO admin;").format(
+                        schema
                     ),
                 ])
         return statements

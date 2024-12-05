@@ -198,14 +198,12 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
         APPLICATION_NAME,
         application_name=APPLICATION_NAME,
         config={"legacy_roles": True},
-        base=CHARM_BASE,
         channel="edge",
     )
     await ops_test.model.deploy(
         APPLICATION_NAME,
         application_name=f"{APPLICATION_NAME}2",
         config={"legacy_roles": True},
-        base=CHARM_BASE,
         channel="edge",
     )
 

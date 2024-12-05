@@ -29,7 +29,7 @@ juju add-model sample-model
 To deploy a single unit of PostgreSQL using its [default configuration](config.yaml), run the following command:
 
 ```shell
-juju deploy postgresql --channel 14/stable
+juju deploy postgresql --channel 16/stable
 ```
 
 It is customary to use PostgreSQL with replication to ensure high availability. A replica is equivalent to a juju unit.
@@ -37,7 +37,7 @@ It is customary to use PostgreSQL with replication to ensure high availability. 
 To deploy PostgreSQL with multiple replicas, specify the number of desired units with the `-n` option:
 
 ```shell
-juju deploy postgresql --channel 14/stable -n <number_of_units>
+juju deploy postgresql --channel 16/stable -n <number_of_units>
 ```
 
 To add replicas to an existing deployment, see the [Add replicas](#add-replicas) section.
