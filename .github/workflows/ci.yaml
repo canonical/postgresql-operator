@@ -23,7 +23,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v23.0.5
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v23.1.1
 
   unit-test:
     name: Unit test charm
@@ -57,7 +57,7 @@ jobs:
         juju:
           - agent: 3.4.6  # renovate: juju-agent-pin-minor
             allure_on_amd64: true
-          - snap_channel: 3.6/candidate
+          - snap_channel: 3.6/stable
             allure_on_amd64: false
         architecture:
           - amd64
@@ -67,7 +67,7 @@ jobs:
               allure_on_amd64: true
             architecture: arm64
           - juju:
-              snap_channel: 3.6/candidate
+              snap_channel: 3.6/stable
               allure_on_amd64: false
             architecture: arm64
     name: Integration | ${{ matrix.juju.agent || matrix.juju.snap_channel }} | ${{ matrix.architecture }}
@@ -75,7 +75,7 @@ jobs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v23.0.5
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v23.1.1
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       architecture: ${{ matrix.architecture }}
