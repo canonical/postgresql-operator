@@ -284,13 +284,28 @@ class PostgreSQLBackups(Object):
         except ClientError:
             logger.warning("Bucket %s doesn't exist or you don't have access to it.", bucket_name)
             exists = False
-        if not exists:
-            try:
-                bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+        if exists:
+            return
 
-                bucket.wait_until_exists()
-                logger.info("Created bucket '%s' in region=%s", bucket_name, region)
-            except ClientError as error:
+        try:
+            bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+
+            bucket.wait_until_exists()
+            logger.info("Created bucket '%s' in region=%s", bucket_name, region)
+        except ClientError as error:
+            if error.response["Error"]["Code"] == "InvalidLocationConstraint":
+                logger.info("Specified location-constraint is not valid, trying create without it")
+                try:
+                    bucket.create()
+
+                    bucket.wait_until_exists()
+                    logger.info("Created bucket '%s', ignored region=%s", bucket_name, region)
+                except ClientError as error:
+                    logger.exception(
+                        "Couldn't create bucket named '%s' in region=%s.", bucket_name, region
+                    )
+                    raise error
+            else:
                 logger.exception(
                     "Couldn't create bucket named '%s' in region=%s.", bucket_name, region
                 )
