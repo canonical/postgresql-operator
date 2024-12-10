@@ -368,7 +368,7 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
         # Test when the bucket doesn't exist.
         head_bucket.reset_mock()
         head_bucket.side_effect = ClientError(
-            error_response={"Error": {"Code": 1, "message": "fake error"}},
+            error_response={"Error": {"Code": "SomeFakeException", "message": "fake error"}},
             operation_name="fake operation name",
         )
         harness.charm.backup._create_bucket_if_not_exists()
@@ -381,7 +381,7 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
         create.reset_mock()
         wait_until_exists.reset_mock()
         create.side_effect = ClientError(
-            error_response={"Error": {"Code": 1, "message": "fake error"}},
+            error_response={"Error": {"Code": "SomeFakeException", "message": "fake error"}},
             operation_name="fake operation name",
         )
         with pytest.raises(ClientError):
@@ -391,9 +391,31 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
         create.assert_called_once()
         wait_until_exists.assert_not_called()
 
+        # Test when the bucket creation fails with InvalidLocationConstraint.
+        head_bucket.reset_mock()
+        create.reset_mock()
+        wait_until_exists.reset_mock()
+        create.side_effect = ClientError(
+            error_response={
+                "Error": {"Code": "InvalidLocationConstraint", "message": "fake error"}
+            },
+            operation_name="fake operation name",
+        )
+        with pytest.raises(ClientError):
+            harness.charm.backup._create_bucket_if_not_exists()
+            assert False
+        head_bucket.assert_called_once()
+        want = [
+            call(CreateBucketConfiguration={"LocationConstraint": "test-region"}),
+            call(),
+        ]
+        create.assert_has_calls(want)
+        wait_until_exists.assert_not_called()
+
         # Test when the bucket creation fails due to a timeout error.
         head_bucket.reset_mock()
         create.reset_mock()
+        wait_until_exists.reset_mock()
         head_bucket.side_effect = botocore.exceptions.ConnectTimeoutError(
             endpoint_url="fake endpoint URL"
         )
