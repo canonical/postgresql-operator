@@ -10,7 +10,8 @@ bases:
     channel: "22.04"
     architectures: [arm64]
 parts:
-  charm:
+  rust-deps:
+    plugin: nil
     build-snaps:
       - rustup
     build-packages:
@@ -20,14 +21,23 @@ parts:
       - libpq-dev
     override-build: |
       rustup default stable
-
-      # Convert subset of poetry.lock to requirements.txt
+  poetry-deps:
+    plugin: nil
+    build-packages:
+      - curl
+    build-environment:
+      - POETRY_VERSION: "1.8.0"
+    override-build: |
       curl -sSL https://install.python-poetry.org | python3 -
-      /root/.local/bin/poetry export --only main,charm-libs --output requirements.txt
+      ln -sf $HOME/.local/bin/poetry /usr/local/bin/poetry
 
-      craftctl default
-    charm-strict-dependencies: true
-    charm-requirements: [requirements.txt]
+      /usr/bin/python3 -m pip install pip==24.2
+  charm:
+    after: [rust-deps, poetry-deps]
+    plugin: poetry
+    source: .
+    poetry-with:
+      - charm-libs
   libpq:
     build-packages:
       - libpq-dev
