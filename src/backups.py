@@ -18,7 +18,7 @@ from subprocess import TimeoutExpired, run
 
 import boto3 as boto3
 import botocore
-from botocore.exceptions import ClientError
+from botocore.exceptions import ClientError, ParamValidationError
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     S3Requirer,
@@ -290,7 +290,7 @@ class PostgreSQLBackups(Object):
 
                 bucket.wait_until_exists()
                 logger.info("Created bucket '%s' in region=%s", bucket_name, region)
-            except ClientError as error:
+            except (ClientError, ParamValidationError) as error:
                 logger.exception(
                     "Couldn't create bucket named '%s' in region=%s.", bucket_name, region
                 )
@@ -783,7 +783,7 @@ class PostgreSQLBackups(Object):
 
         try:
             self._create_bucket_if_not_exists()
-        except (ClientError, ValueError):
+        except (ClientError, ValueError, ParamValidationError):
             self._s3_initialization_set_failure(FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE)
             return False
 
