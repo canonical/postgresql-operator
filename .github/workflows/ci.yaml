@@ -57,10 +57,8 @@ jobs:
           - agent: 2.9.51  # renovate: juju-agent-pin-minor
             libjuju: ==2.9.49.1  # renovate: latest libjuju 2
             allure_on_amd64: false
-          - agent: 3.4.6  # renovate: juju-agent-pin-minor
+          - agent: 3.6.1  # renovate: juju-agent-pin-minor
             allure_on_amd64: true
-          - snap_channel: 3.6/stable
-            allure_on_amd64: false
         architecture:
           - amd64
         include:
@@ -68,11 +66,7 @@ jobs:
               agent: 3.4.6  # renovate: juju-agent-pin-minor
               allure_on_amd64: true
             architecture: arm64
-          - juju:
-              snap_channel: 3.6/stable
-              allure_on_amd64: false
-            architecture: arm64
-    name: Integration | ${{ matrix.juju.agent || matrix.juju.snap_channel }} | ${{ matrix.architecture }}
+    name: Integration | ${{ matrix.juju.agent }} | ${{ matrix.architecture }}
     needs:
       - lint
       - unit-test
@@ -83,7 +77,6 @@ jobs:
       architecture: ${{ matrix.architecture }}
       cloud: lxd
       juju-agent-version: ${{ matrix.juju.agent }}
-      juju-snap-channel: ${{ matrix.juju.snap_channel }}
       libjuju-version-constraint: ${{ matrix.juju.libjuju }}
       _beta_allure_report: ${{ matrix.juju.allure_on_amd64 && matrix.architecture == 'amd64' }}
     secrets:
