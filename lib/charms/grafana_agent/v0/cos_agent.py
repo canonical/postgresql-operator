@@ -22,7 +22,6 @@ this charm library.
 Using the `COSAgentProvider` object only requires instantiating it,
 typically in the `__init__` method of your charm (the one which sends telemetry).
 
-The constructor of `COSAgentProvider` has only one required and ten optional parameters:
 
 ```python
     def __init__(
@@ -253,7 +252,7 @@ if TYPE_CHECKING:
 
 LIBID = "dc15fa84cef84ce58155fb84f6c6213a"
 LIBAPI = 0
-LIBPATCH = 11
+LIBPATCH = 12
 
 PYDEPS = ["cosl", "pydantic"]
 
