@@ -1,0 +1,577 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:929 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  02:48:03Z
+
+App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+postgresql  14.13    active      3  postgresql             0  no       
+
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/4*  active    idle   4        10.84.220.56    5432/tcp  
+postgresql/5   active    idle   5        10.84.220.91    5432/tcp  
+postgresql/6   active    idle   6        10.84.220.89    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ  Message
+4        started  10.84.220.56  juju-a1c994-4  ubuntu@22.04      Running
+5        started  10.84.220.91  juju-a1c994-5  ubuntu@22.04      Running
+6        started  10.84.220.89  juju-a1c994-6  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:935 Juju error logs:
+
+machine-2: 01:37:30 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:37:30 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:37:30 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:37:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:37:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:37:35 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:37:35 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:37:35 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:37:36 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-2: 01:38:36 ERROR unit.postgresql/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connection.py", line 199, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connectionpool.py", line 789, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connectionpool.py", line 495, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connection.py", line 441, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connection.py", line 279, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connection.py", line 214, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7fab51d70a90>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/connectionpool.py", line 843, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.84.220.156', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fab51d70a90>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/src/cluster.py", line 531, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-2/charm/venv/requests/adapters.py", line 700, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.84.220.156', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fab51d70a90>: Failed to establish a new connection: [Errno 111] Connection refused'))
+machine-4: 01:51:16 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:51:16 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-4: 01:51:16 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:51:17 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:51:17 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 01:51:17 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:59:28 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:59:28 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-6: 01:59:28 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-5: 01:59:31 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:59:31 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-5: 01:59:31 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-4: 02:08:13 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:08:16 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:08:27 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:08:38 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:08:50 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:08:59 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:09:11 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:09:20 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:09:30 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:09:42 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:09:52 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:10:02 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:10:13 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:10:24 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:10:32 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:10:41 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:10:51 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:11:02 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:11:14 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:11:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:11:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:11:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:11:54 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:12:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:12:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:12:29 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:12:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:12:50 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:12:58 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:13:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:13:15 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:13:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:13:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:13:46 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:13:56 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:14:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:14:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:14:29 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:14:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:14:49 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:00 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:10 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:19 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:29 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:38 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:49 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:15:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:16:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:16:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:16:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:16:35 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:16:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:16:56 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:17:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:17:16 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:17:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:17:35 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:17:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:17:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:04 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:13 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:22 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:31 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:42 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:49 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:18:59 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:19:08 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:19:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:19:28 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:19:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:19:50 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:01 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:11 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:21 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:31 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:40 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:49 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:20:58 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:21:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:21:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:21:28 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:21:38 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:21:49 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:21:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:22:09 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:22:21 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:22:31 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:22:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:22:48 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:22:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:23:08 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:23:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:23:27 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:23:35 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:23:44 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:23:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:24:05 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:24:15 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:24:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:24:36 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:24:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:24:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:25:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:25:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:25:27 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:25:36 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:25:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:25:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:26:05 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:26:14 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:26:24 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:26:35 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:26:44 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:26:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:27:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:27:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:27:27 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:27:38 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:27:48 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:28:00 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:28:12 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:28:23 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:28:34 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:28:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:28:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:29:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:29:14 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:29:24 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:29:36 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:29:47 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:29:59 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:30:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:30:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:30:29 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:30:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:30:47 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:30:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:31:05 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:31:13 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:31:22 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:31:32 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:31:43 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:31:54 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:32:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:32:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:32:27 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:32:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:32:48 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:32:58 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:33:08 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:33:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:33:28 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:33:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:33:46 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:33:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:34:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:34:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:34:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:34:35 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:34:46 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:34:56 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:35:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:35:16 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:35:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:35:35 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:35:46 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:35:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:36:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:36:18 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:36:28 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:36:39 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:36:49 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:37:01 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:37:12 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:37:23 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:37:32 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:37:43 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:37:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:38:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:38:16 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:38:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:38:36 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:38:46 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:38:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:39:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:39:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:39:29 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:39:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:39:46 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:39:55 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:40:04 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:40:14 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:40:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:40:36 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:40:47 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:40:58 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:41:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:41:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:41:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:41:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:41:48 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:41:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:42:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:42:16 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:42:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:42:34 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:42:44 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:42:53 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:43:02 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:43:13 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:43:24 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:43:36 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:43:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:43:54 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:44:05 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:44:14 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:44:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:44:34 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:44:44 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:44:56 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:45:07 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:45:15 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:45:25 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:45:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:45:48 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:45:59 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:46:08 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:46:17 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:46:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:46:34 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:46:45 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:46:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:47:06 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:47:14 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:47:26 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:47:37 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:47:48 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-postgresql-4: 02:47:57 ERROR unit.postgresql/4.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1017 Forgetting model main...
