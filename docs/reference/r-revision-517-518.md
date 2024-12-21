@@ -72,10 +72,6 @@ Due to the newly added support for `arm64` architecture, the PostgreSQL charm no
 * Increase linting rules ([PR #649](https://github.com/canonical/postgresql-operator/pull/649)) ([DPE-5324](https://warthogs.atlassian.net/browse/DPE-5324))
 [/details]
 
-## Known limitations
-...
-<TODO>
-
 ## Requirements and compatibility
 * (no change) Minimum Juju 2 version: `v.2.9.49`
 * (no change) Minimum Juju 3 version: `v.3.4.3`
