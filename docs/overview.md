@@ -53,6 +53,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | t-clean-up | [8. Clean up environment](/t/9695) |
 | 1 | how-to | [How to]() |
 | 2 | h-deploy | [Deploy]() |
+| 3 | h-deploy-sunbeam | [Sunbeam](/t/15972) |
 | 3 | h-deploy-lxd | [LXD](/t/11861) |
 | 3 | h-deploy-maas | [MAAS](/t/14293) |
 | 3 | h-deploy-ec2 | [AWS EC2](/t/15703) |
@@ -91,6 +92,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 1 | reference | [Reference]() |
 | 2 | r-overview | [Overview](/t/13976) |
 | 2 | r-releases | [Release Notes](/t/11875) |
+| 3 | r-revision-517-518| [Revision 517/518](/t/16007) |
 | 3 | r-revision-467-468 | [Revision 467/468](/t/15378) |
 | 3 | r-revision-429-430 | [Revision 429/430](/t/14067) |
 | 3 | r-revision-363 | [Revision 363](/t/13124) |

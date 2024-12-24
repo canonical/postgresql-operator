@@ -516,6 +516,8 @@ class PostgreSQLBackups(Object):
             (stanza, timeline) of the nearest timeline or backup. None, if there are no matches.
         """
         timelines = self._list_backups(show_failed=False) | self._list_timelines()
+        if timestamp == "latest":
+            return max(timelines.items())[1] if len(timelines) > 0 else None
         filtered_timelines = [
             (timeline_key, timeline_object)
             for timeline_key, timeline_object in timelines.items()
@@ -656,8 +658,6 @@ class PostgreSQLBackups(Object):
             # for that or else the s3 initialization sequence will fail.
             for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10), reraise=True):
                 with attempt:
-                    if self.charm._patroni.member_started:
-                        self.charm._patroni.reload_patroni_configuration()
                     return_code, _, stderr = self._execute_command([
                         PGBACKREST_EXECUTABLE,
                         PGBACKREST_CONFIGURATION_FILE,
@@ -706,9 +706,6 @@ class PostgreSQLBackups(Object):
             })
 
             self.charm.update_config()
-            if self.charm._patroni.member_started:
-                self.charm._patroni.reload_patroni_configuration()
-
             break
 
     @property
@@ -783,8 +780,6 @@ class PostgreSQLBackups(Object):
     def _on_s3_credential_changed_primary(self, event: HookEvent) -> bool:
         """Stanza must be cleared before calling this function."""
         self.charm.update_config()
-        if self.charm._patroni.member_started:
-            self.charm._patroni.reload_patroni_configuration()
 
         try:
             self._create_bucket_if_not_exists()
@@ -1026,6 +1021,17 @@ Stderr:
             elif is_backup_id_timeline:
                 restore_stanza_timeline = timelines[backup_id]
             else:
+                backups_list = list(self._list_backups(show_failed=False).values())
+                timelines_list = self._list_timelines()
+                if (
+                    restore_to_time == "latest"
+                    and timelines_list is not None
+                    and max(timelines_list.values() or [backups_list[0]]) not in backups_list
+                ):
+                    error_message = "There is no base backup created from the latest timeline"
+                    logger.error(f"Restore failed: {error_message}")
+                    event.fail(error_message)
+                    return
                 restore_stanza_timeline = self._get_nearest_timeline(restore_to_time)
                 if not restore_stanza_timeline:
                     error_message = f"Can't find the nearest timeline before timestamp {restore_to_time} to restore"
@@ -1150,11 +1156,8 @@ Stderr:
             event.fail(validation_message)
             return False
 
-        if not event.params.get("backup-id") and event.params.get("restore-to-time") in (
-            None,
-            "latest",
-        ):
-            error_message = "Missing backup-id or non-latest restore-to-time parameter to be able to do restore"
+        if not event.params.get("backup-id") and event.params.get("restore-to-time") is None:
+            error_message = "Either backup-id or restore-to-time parameters need to be provided to be able to do restore"
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
             return False
