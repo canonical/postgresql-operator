@@ -1705,7 +1705,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             ):
                 danger_state = ""
                 if not self._patroni.has_raft_quorum():
-                    danger_state = " (disaster)"
+                    danger_state = " (read-only)"
                 elif len(self._patroni.get_running_cluster_members()) < self.app.planned_units():
                     danger_state = " (degraded)"
                 self.unit.status = ActiveStatus(
