@@ -1522,6 +1522,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
             event.fail("Raft is not stuck.")
         else:
+            if self.has_raft_keys():
+                event.fail("Raft is stuck. Set force to reinitialise with new primary")
+                return
             # TODO Regular promotion
             pass
 

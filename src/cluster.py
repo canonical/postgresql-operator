@@ -18,7 +18,7 @@ import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
-from ops import MaintenanceStatus
+from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
     AttemptManager,
@@ -901,7 +901,7 @@ class Patroni:
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].host == member_ip
         ):
-            self.charm.unit.status = MaintenanceStatus("Raft majority loss")
+            self.charm.unit.status = BlockedStatus("Raft majority loss, run: promote-to-primary")
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
             self.charm.unit_peer_data.update(data_flags)
