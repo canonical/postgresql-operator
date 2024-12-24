@@ -185,10 +185,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
-        self.framework.observe(
-            self.on.experimental_set_raft_candidate_action,
-            self._on_experimental_set_raft_candidate,
-        )
+        self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -1507,13 +1504,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         event.set_results({"password": password})
 
-    def _on_experimental_set_raft_candidate(self, event: ActionEvent) -> None:
-        if self.has_raft_keys():
-            self.unit_peer_data.update({"raft_candidate": "True"})
-            if self.unit.is_leader():
-                self._raft_reinitialisation()
-            return
-        event.fail("Raft is not stuck.")
+    def _on_promote_to_primary(self, event: ActionEvent) -> None:
+        if event.params.get("scope") == "cluster":
+            return self.async_replication.promote_to_primary(event)
+        elif event.params.get("scope") == "unit":
+            return self.promote_primary_unit(event)
+        else:
+            event.fail("Scope should be either cluster or unit")
+
+    def promote_primary_unit(self, event: ActionEvent) -> None:
+        """Handles promote to primary for unit scope."""
+        if event.params.get("force"):
+            if self.has_raft_keys():
+                self.unit_peer_data.update({"raft_candidate": "True"})
+                if self.unit.is_leader():
+                    self._raft_reinitialisation()
+                return
+            event.fail("Raft is not stuck.")
+        else:
+            # TODO Regular promotion
+            pass
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
