@@ -307,7 +307,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 28
+LIBPATCH = 29
 
 PYDEPS = ["cryptography", "jsonschema"]
 
@@ -459,7 +459,7 @@ class CertificateAvailableEvent(EventBase):
 class CertificateExpiringEvent(EventBase):
     """Charm Event triggered when a TLS certificate is almost expired."""
 
-    def __init__(self, handle, certificate: str, expiry: str):
+    def __init__(self, handle: Handle, certificate: str, expiry: str):
         """CertificateExpiringEvent.
 
         Args:
