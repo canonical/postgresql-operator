@@ -2759,3 +2759,35 @@ def test_get_plugins(harness):
             "insert_username",
             "moddatetime",
         ]
+
+
+def test_on_promote_to_primary(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm._raft_reinitialisation") as _raft_reinitialisation,
+        patch("charm.PostgreSQLAsyncReplication.promote_to_primary") as _promote_to_primary,
+    ):
+        event = Mock()
+        event.params = {"scope": "cluster"}
+
+        # Cluster
+        harness.charm._on_promote_to_primary(event)
+        _promote_to_primary.assert_called_once_with(event)
+
+        # Unit, no force
+        event.params = {"scope": "unit"}
+        rel_id = harness.model.get_relation(PEER).id
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
+
+        harness.charm._on_promote_to_primary(event)
+        event.fail.assert_called_once_with(
+            "Raft is stuck. Set force to reinitialise with new primary"
+        )
+
+        # Unit, raft reinit
+        event.params = {"scope": "unit", "force": "true"}
+        with harness.hooks_disabled():
+            harness.set_leader()
+        harness.charm._on_promote_to_primary(event)
+        _raft_reinitialisation.assert_called_once_with()
+        assert harness.charm.unit_peer_data["raft_candidate"] == "True"

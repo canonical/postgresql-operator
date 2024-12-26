@@ -86,14 +86,15 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
     for unit in units:
         await ops_test.model.destroy_unit(unit, force=True, destroy_storage=False, max_wait=1500)
 
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], timeout=600, status="blocked")
+    if len(roles) > 1:
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], timeout=300, status="blocked")
 
-    run_action = (
-        await ops_test.model.applications[DATABASE_APP_NAME]
-        .units[0]
-        .run_action("promote-to-primary", scope="unit", force="True")
-    )
-    await run_action.wait()
+        run_action = (
+            await ops_test.model.applications[DATABASE_APP_NAME]
+            .units[0]
+            .run_action("promote-to-primary", scope="unit", force="True")
+        )
+        await run_action.wait()
 
     await ops_test.model.wait_for_idle(status="active", timeout=600)
 
