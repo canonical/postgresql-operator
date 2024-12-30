@@ -77,17 +77,22 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
     await start_continuous_writes(ops_test, app)
-    logger.info("Stopping unit")
     units = [original_roles[role][0] for role in roles]
     for unit in units:
+        logger.info(f"Stopping unit {unit}")
         await stop_machine(ops_test, await get_machine_from_unit(ops_test, unit))
     await sleep(15)
-    logger.info("Deleting unit")
     for unit in units:
+        logger.info(f"Deleting unit {unit}")
         await ops_test.model.destroy_unit(unit, force=True, destroy_storage=False, max_wait=1500)
 
     if len(roles) > 1:
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], timeout=300, status="blocked")
+        unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
+        await ops_test.model.block_until(
+            lambda: unit.workload_status_message == "Primary (read-only)"
+            or unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+            timeout=600,
+        )
 
         run_action = (
             await ops_test.model.applications[DATABASE_APP_NAME]
