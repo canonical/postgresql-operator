@@ -87,23 +87,26 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
         await ops_test.model.destroy_unit(unit, force=True, destroy_storage=False, max_wait=1500)
 
     if len(roles) > 1:
-        unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
+        for left_unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+            if left_unit.name not in units:
+                break
+
         await ops_test.model.block_until(
-            lambda: unit.workload_status_message == "Primary (read-only)"
-            or unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+            lambda: left_unit.workload_status_message == "Primary (read-only)"
+            or left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
             timeout=600,
         )
 
         run_action = (
             await ops_test.model.applications[DATABASE_APP_NAME]
             .units[0]
-            .run_action("promote-to-primary", scope="unit", force="True")
+            .run_action("promote-to-primary", scope="unit", force=True)
         )
         await run_action.wait()
 
-    await ops_test.model.wait_for_idle(status="active", timeout=600)
+    await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
-    await are_writes_increasing(ops_test, unit)
+    await are_writes_increasing(ops_test, units)
 
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=len(roles))
