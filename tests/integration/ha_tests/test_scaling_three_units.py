@@ -92,8 +92,8 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
                 break
 
         await ops_test.model.block_until(
-            lambda: left_unit.workload_status_message == "Primary (read-only)"
-            or left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+            lambda: left_unit.workload_status == "blocked"
+            and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
             timeout=600,
         )
 

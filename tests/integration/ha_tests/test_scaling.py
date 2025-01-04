@@ -69,6 +69,24 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
     primary = await get_primary(ops_test, app)
     await ops_test.model.destroy_unit(primary, force=True, destroy_storage=False, max_wait=1500)
 
+    left_unit = ops_test.model.units[original_roles["sync_standbys"][0]]
+    for left_unit in ops_test.model.applications[DATABASE_APP_NAME].units:
+        if left_unit.name not in original_roles["primaries"]:
+            break
+
+    await ops_test.model.block_until(
+        lambda: left_unit.workload_status == "blocked"
+        and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+        timeout=600,
+    )
+
+    run_action = (
+        await ops_test.model.applications[DATABASE_APP_NAME]
+        .units[0]
+        .run_action("promote-to-primary", scope="unit", force=True)
+    )
+    await run_action.wait()
+
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
     await are_writes_increasing(ops_test, primary)
@@ -154,6 +172,20 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
         ),
     )
 
+    left_unit = ops_test.model.units[original_roles["sync_standbys"][1]]
+    await ops_test.model.block_until(
+        lambda: left_unit.workload_status == "blocked"
+        and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+        timeout=600,
+    )
+
+    run_action = (
+        await ops_test.model.applications[DATABASE_APP_NAME]
+        .units[0]
+        .run_action("promote-to-primary", scope="unit", force=True)
+    )
+    await run_action.wait()
+
     await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
 
     await are_writes_increasing(
@@ -201,6 +233,20 @@ async def test_removing_raft_majority_async(ops_test: OpsTest, continuous_writes
             original_roles["replicas"][1], force=True, destroy_storage=False, max_wait=1500
         ),
     )
+
+    left_unit = ops_test.model.units[original_roles["sync_standbys"][0]]
+    await ops_test.model.block_until(
+        lambda: left_unit.workload_status == "blocked"
+        and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
+        timeout=600,
+    )
+
+    run_action = (
+        await ops_test.model.applications[DATABASE_APP_NAME]
+        .units[0]
+        .run_action("promote-to-primary", scope="unit", force=True)
+    )
+    await run_action.wait()
 
     await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
 
