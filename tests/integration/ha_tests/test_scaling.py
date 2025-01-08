@@ -179,11 +179,7 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
         timeout=600,
     )
 
-    run_action = (
-        await ops_test.model.applications[DATABASE_APP_NAME]
-        .units[0]
-        .run_action("promote-to-primary", scope="unit", force=True)
-    )
+    run_action = await left_unit.run_action("promote-to-primary", scope="unit", force=True)
     await run_action.wait()
 
     await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
@@ -241,11 +237,7 @@ async def test_removing_raft_majority_async(ops_test: OpsTest, continuous_writes
         timeout=600,
     )
 
-    run_action = (
-        await ops_test.model.applications[DATABASE_APP_NAME]
-        .units[0]
-        .run_action("promote-to-primary", scope="unit", force=True)
-    )
+    run_action = await left_unit.run_action("promote-to-primary", scope="unit", force=True)
     await run_action.wait()
 
     await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
