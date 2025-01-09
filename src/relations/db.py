@@ -192,6 +192,9 @@ class DbProvides(Object):
             user = f"relation-{relation.id}"
             password = unit_relation_databag.get("password", new_password())
 
+            if not database:
+                database = self.charm.get_secret(APP_SCOPE, f"{user}-database")
+
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
             self.charm.set_secret(APP_SCOPE, user, password)
