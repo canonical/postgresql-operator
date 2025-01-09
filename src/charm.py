@@ -205,7 +205,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
-        self._observer.start_observer()
+
+        # In case the leader was restarted
+        if self._observer.start_observer() and self.unit.is_leader():
+            self._update_relation_endpoints()
+
         self._rotate_logs.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
             self,
