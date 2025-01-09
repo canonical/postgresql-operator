@@ -195,6 +195,8 @@ class DbProvides(Object):
             if not database:
                 database = self.charm.get_secret(APP_SCOPE, f"{user}-database")
 
+            logger.error(f"!!!!!!!!!!!!!!!!!!!!!!!!11{database}")
+
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
             self.charm.set_secret(APP_SCOPE, user, password)
@@ -337,6 +339,7 @@ class DbProvides(Object):
             user = f"relation-{relation.id}"
             password = self.charm.get_secret(APP_SCOPE, user)
             database = self.charm.get_secret(APP_SCOPE, f"{user}-database")
+            logger.error(f"!!!!!!!!!!!!!!!!!!!!!!!!22{database}")
 
             # If the relation data is not complete, the relations was not initialised yet.
             if not database or not user or not password:
