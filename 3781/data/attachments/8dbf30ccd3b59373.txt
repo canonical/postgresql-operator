@@ -1,0 +1,137 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:929 Model status:
+
+Model  Controller           Cloud/Region         Version  SLA          Timestamp
+test   localhost-localhost  localhost/localhost  3.4.6    unsupported  02:01:08Z
+
+App                   Version  Status  Scale  Charm                Channel        Rev  Exposed  Message
+mailman3-core                  active      1  mailman3-core        latest/stable   18  no       Ready (source version/commit e1d5a03)
+postgresql            14.13    active      2  postgresql                            0  no       
+postgresql-test-app            active      1  postgresql-test-app  latest/edge    308  no       
+postgresql-test-app2           active      1  postgresql-test-app  latest/edge    308  no       
+
+Unit                     Workload  Agent      Machine  Public address  Ports     Message
+mailman3-core/0*         active    idle       2        10.202.178.91   25/tcp    Ready (source version/commit e1d5a03)
+postgresql-test-app2/0*  active    executing  6        10.202.178.45             
+postgresql-test-app/0*   active    executing  5        10.202.178.149            
+postgresql/2             active    executing  3        10.202.178.167  5432/tcp  Primary
+postgresql/3*            blocked   executing  4        10.202.178.40   5432/tcp  extensions requested through relation, enable them through config options
+
+Machine  State    Address         Inst id        Base          AZ  Message
+2        started  10.202.178.91   juju-b0e436-2  ubuntu@20.04      Running
+3        started  10.202.178.167  juju-b0e436-3  ubuntu@22.04      Running
+4        started  10.202.178.40   juju-b0e436-4  ubuntu@22.04      Running
+5        started  10.202.178.149  juju-b0e436-5  ubuntu@22.04      Running
+6        started  10.202.178.45   juju-b0e436-6  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:935 Juju error logs:
+
+machine-0: 01:35:11 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:35:11 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:35:11 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:35:12 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:35:12 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:35:12 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:36:08 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connection.py", line 445, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connection.py", line 276, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7fd04ddeedd0>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.202.178.239', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd04ddeedd0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 531, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/requests/adapters.py", line 700, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.202.178.239', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fd04ddeedd0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+machine-2: 01:43:21 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:43:21 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-mailman3-core-0: 01:43:21 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:49:54 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:49:54 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:49:54 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:49:55 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:49:55 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-3: 01:49:55 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:55:40 ERROR unit.postgresql/0.juju-log Failed to get PostgreSQL version: connection to server at "10.202.178.239", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-0: 01:55:40 ERROR unit.postgresql/0.juju-log Failed to retrieve the PostgreSQL version to initialise/update db relation
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 490, in get_postgresql_version
+    with self._connect_to_database(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1064, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 153, in _connect_to_database
+    connection = psycopg2.connect(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: connection to server at "10.202.178.239", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/relations/db.py", line 321, in update_endpoints
+    postgresql_version = self.charm.postgresql.get_postgresql_version()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1064, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 498, in get_postgresql_version
+    raise PostgreSQLGetPostgreSQLVersionError() from e
+charms.postgresql_k8s.v0.postgresql.PostgreSQLGetPostgreSQLVersionError
+machine-0: 01:55:54 ERROR juju.api.watcher error trying to stop watcher: websocket: close sent
+machine-5: 02:00:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 02:00:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 02:00:00 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 02:00:00 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 02:00:00 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app2-0: 02:00:00 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-3: 02:01:07 ERROR unit.postgresql/3.juju-log db:8: ERROR - `extensions` (unaccent, pg_trgm) cannot be requested through relations - Please enable extensions through `juju config` and add the relation again.
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1017 Forgetting model main...
