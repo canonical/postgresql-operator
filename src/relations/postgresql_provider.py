@@ -22,8 +22,8 @@ from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
 from constants import (
-    ALL_CLIENT_RELATIONS,
     APP_SCOPE,
+    DATABASE,
     DATABASE_PORT,
     ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
 )
@@ -130,7 +130,7 @@ class PostgreSQLProvider(Object):
 
     def oversee_users(self) -> None:
         """Remove users from database if their relations were broken."""
-        if not self.charm.unit.is_leader() or not isinstance(self.charm.unit.status, ActiveStatus):
+        if not self.charm.unit.is_leader():
             return
 
         delete_user = "suppress-oversee-users" not in self.charm.app_peer_data
@@ -148,7 +148,7 @@ class PostgreSQLProvider(Object):
             relation
             for relation_name, relations_list in self.model.relations.items()
             for relation in relations_list
-            if relation_name in ALL_CLIENT_RELATIONS
+            if relation_name in [DATABASE]
         ]
         relation_users = set()
         for relation in relations:
