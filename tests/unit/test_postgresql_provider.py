@@ -183,6 +183,7 @@ def test_oversee_users(harness):
             harness.charm.app.name,
             {"username": f"relation-{another_rel_id}"},
         )
+        harness.charm.unit.status = ActiveStatus()
 
         # Mock some database calls.
         postgresql_mock.list_users = PropertyMock(

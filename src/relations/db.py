@@ -184,10 +184,6 @@ class DbProvides(Object):
         if not database:
             database = relation.app.name
 
-        if not database:
-            logger.debug("No database or app name")
-            return
-
         try:
             unit_relation_databag = relation.data[self.charm.unit]
 

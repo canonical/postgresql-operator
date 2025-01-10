@@ -130,7 +130,7 @@ class PostgreSQLProvider(Object):
 
     def oversee_users(self) -> None:
         """Remove users from database if their relations were broken."""
-        if not self.charm.unit.is_leader():
+        if not self.charm.unit.is_leader() or not isinstance(self.charm.unit.status, ActiveStatus):
             return
 
         delete_user = "suppress-oversee-users" not in self.charm.app_peer_data
