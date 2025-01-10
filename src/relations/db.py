@@ -183,7 +183,6 @@ class DbProvides(Object):
         # so create a database with the other application name.
         if not database:
             database = relation.app.name
-            logger.error(f"!!!!!!!!!!!!!!!!!!!!!!!!22{database!r}")
 
         try:
             unit_relation_databag = relation.data[self.charm.unit]

@@ -103,11 +103,6 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
 
-    # Enable automatically-retry-hooks due to https://bugs.launchpad.net/juju/+bug/1999758
-    # (the implemented workaround restarts the unit in the middle of the start hook,
-    # so the hook fails, and it's not retried on CI).
-    await ops_test.model.set_config({"automatically-retry-hooks": "true"})
-
     # Stop the primary unit machine.
     logger.info("restarting primary")
     former_primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
