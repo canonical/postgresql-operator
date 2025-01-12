@@ -22,8 +22,8 @@ from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
 from constants import (
+    ALL_CLIENT_RELATIONS,
     APP_SCOPE,
-    DATABASE,
     DATABASE_PORT,
     ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
 )
@@ -148,7 +148,7 @@ class PostgreSQLProvider(Object):
             relation
             for relation_name, relations_list in self.model.relations.items()
             for relation in relations_list
-            if relation_name in [DATABASE]
+            if relation_name in ALL_CLIENT_RELATIONS
         ]
         relation_users = set()
         for relation in relations:
