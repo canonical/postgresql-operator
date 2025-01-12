@@ -16,6 +16,7 @@ from ops.charm import (
     RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
+    RelationJoinedEvent,
 )
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation, Unit
@@ -65,6 +66,9 @@ class DbProvides(Object):
         super().__init__(charm, self.relation_name)
 
         self.framework.observe(
+            charm.on[self.relation_name].relation_joined, self._on_relation_joined
+        )
+        self.framework.observe(
             charm.on[self.relation_name].relation_changed, self._on_relation_changed
         )
         self.framework.observe(
@@ -103,15 +107,77 @@ class DbProvides(Object):
                 return True
         return False
 
+    def _on_relation_joined(self, event: RelationJoinedEvent):
+        """Handle db-relation-joined event.
+
+        If the backend relation is fully initialised and available, we generate the proposed
+        database and create a user on the postgres charm, and add preliminary data to the databag.
+        """
+        if not self.charm.unit.is_leader():
+            return
+
+        logger.info(f"Setting up {self.relation_name} relation")
+        logger.warning(
+            f"DEPRECATION WARNING - {self.relation_name} is a legacy relation, and will be deprecated in a future release. "
+        )
+
+        # remote_app_databag = event.relation.data[event.app]
+        # remote_unit_databag = event.relation.data[event.unit]
+        # if not (database := remote_app_databag.get("database")) and not (
+        #     database := remote_unit_databag.get("database")
+        # ):
+        #     # Sometimes a relation changed event is triggered, and it doesn't have
+        #     # a database name in it (like the relation with Landscape server charm),
+        #     # so create a database with the other application name.
+        #     database = event.relation.app.name
+
+        # if self._block_on_extensions(event.relation, remote_app_databag):
+        #     return
+
+        # user = self._generate_username(event.relation)
+        # password = pgb.generate_password()
+
+        # if None in [database, password]:
+        #     # If database isn't available, defer
+        #     event.defer()
+        #     return
+
+        # creds = {
+        #     "user": user,
+        #     "password": password,
+        #     "database": database,
+        # }
+        # self.update_databags(event.relation, creds)
+
+        self.set_up_relation(event.relation)
+        # Create user and database in backend postgresql database
+        # try:
+        #     initial_status = self.charm.unit.status
+        #     init_msg = f"initialising database and user for {self.relation_name} relation"
+        #     self.charm.unit.status = MaintenanceStatus(init_msg)
+        #     logger.info(init_msg)
+
+        #     self.charm.backend.postgres.create_user(user, password, admin=self.admin)
+        #     self.charm.backend.postgres.create_database(
+        #         database, user, client_relations=self.charm.client_relations
+        #     )
+
+        #     created_msg = f"database and user for {self.relation_name} relation created"
+        #     self.charm.unit.status = initial_status
+        #     self.charm.update_status()
+        #     logger.info(created_msg)
+        # except (PostgreSQLCreateDatabaseError, PostgreSQLCreateUserError):
+        #     err_msg = f"failed to create database or user for {self.relation_name}"
+        #     logger.error(err_msg)
+        #     self.charm.unit.status = BlockedStatus(err_msg)
+        #     return
+
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle the legacy db/db-admin relation changed event.
 
         Generate password and handle user and database creation for the related application.
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
-        if not self.charm.unit.is_leader():
-            return
-
         if self._check_multiple_endpoints():
             self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
             return
@@ -128,8 +194,9 @@ class DbProvides(Object):
             return
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
+        self.update_endpoints(event.relation)
 
-        self.set_up_relation(event.relation)
+        self._update_unit_status(event.relation)
 
     def _get_extensions(self, relation: Relation) -> tuple[list, set]:
         """Returns the list of required and disabled extensions."""
