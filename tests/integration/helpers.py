@@ -394,6 +394,8 @@ async def deploy_and_relate_bundle_with_postgresql(
 
             # Remove PostgreSQL and relations with it from the bundle.yaml file.
             config = data["applications"]["postgresql"]["options"]
+            if config.get("experimental_max_connections", 0) > 200:
+                config["experimental_max_connections"] = 200
             for key, val in config.items():
                 config[key] = str(val)
             logger.info(f"Bundle {bundle_name} needs configuration {config}")

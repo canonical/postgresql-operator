@@ -170,7 +170,10 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(ROLES_BLOCKING_MESSAGE)
             return False
 
-        database = relation.data.get(relation.app, {}).get("database")
+        user = f"relation-{relation.id}"
+        database = relation.data.get(relation.app, {}).get(
+            "database", self.charm.get_secret(APP_SCOPE, f"{user}-database")
+        )
         if not database:
             for unit in relation.units:
                 unit_database = relation.data.get(unit, {}).get("database")
@@ -189,13 +192,14 @@ class DbProvides(Object):
 
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            user = f"relation-{relation.id}"
             password = unit_relation_databag.get("password", new_password())
 
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
-            self.charm.set_secret(APP_SCOPE, user, password)
-            self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
+            if password != self.charm.get_secret(APP_SCOPE, user):
+                self.charm.set_secret(APP_SCOPE, user, password)
+            if database and database != self.charm.get_secret(APP_SCOPE, f"{user}-database"):
+                self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
             self.charm.postgresql.create_user(user, password, self.admin)
             plugins = self.charm.get_plugins()
