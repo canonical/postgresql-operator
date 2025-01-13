@@ -32,16 +32,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      # - name: Install tox & poetry
-      #   run: |
-      #     pipx install tox
-      #     pipx install poetry
-      # - name: Run tests
-      #   run: tox run -e unit
-      # - name: Upload Coverage to Codecov
-      #   uses: codecov/codecov-action@v5
-      #   env:
-      #     CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
+      - name: Install tox & poetry
+        run: |
+          pipx install tox
+          pipx install poetry
+      - name: Run tests
+        run: tox run -e unit
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v5
+        env:
+          CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
 
   build:
     name: Build charm
@@ -57,13 +57,13 @@ jobs:
           - agent: 2.9.51  # renovate: juju-agent-pin-minor
             libjuju: ==2.9.49.1  # renovate: latest libjuju 2
             allure_on_amd64: false
-          - agent: 3.6.1  # renovate: juju-agent-pin-minor
+          - agent: 3.4.6  # renovate: juju-agent-pin-minor
             allure_on_amd64: true
         architecture:
           - amd64
         include:
           - juju:
-              agent: 3.6.1  # renovate: juju-agent-pin-minor
+              agent: 3.4.6  # renovate: juju-agent-pin-minor
               allure_on_amd64: true
             architecture: arm64
     name: Integration | ${{ matrix.juju.agent }} | ${{ matrix.architecture }}
