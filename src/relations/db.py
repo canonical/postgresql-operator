@@ -121,56 +121,33 @@ class DbProvides(Object):
             f"DEPRECATION WARNING - {self.relation_name} is a legacy relation, and will be deprecated in a future release. "
         )
 
-        # remote_app_databag = event.relation.data[event.app]
-        # remote_unit_databag = event.relation.data[event.unit]
-        # if not (database := remote_app_databag.get("database")) and not (
-        #     database := remote_unit_databag.get("database")
-        # ):
-        #     # Sometimes a relation changed event is triggered, and it doesn't have
-        #     # a database name in it (like the relation with Landscape server charm),
-        #     # so create a database with the other application name.
-        #     database = event.relation.app.name
+        database = event.relation.data.get(event.relation.app, {}).get("database")
+        if not database:
+            for unit in event.relation.units:
+                unit_database = event.relation.data.get(unit, {}).get("database")
+                if unit_database:
+                    database = unit_database
+                    break
 
-        # if self._block_on_extensions(event.relation, remote_app_databag):
-        #     return
+        # Sometimes a relation changed event is triggered, and it doesn't have
+        # a database name in it (like the relation with Landscape server charm),
+        # so create a database with the other application name.
+        if not database:
+            database = event.relation.app.name
 
-        # user = self._generate_username(event.relation)
-        # password = pgb.generate_password()
+        unit_relation_databag = event.relation.data[self.charm.unit]
 
-        # if None in [database, password]:
-        #     # If database isn't available, defer
-        #     event.defer()
-        #     return
+        # Creates the user and the database for this specific relation if it was not already
+        # created in a previous relation changed event.
+        user = f"relation-{event.relation.id}"
+        password = unit_relation_databag.get("password", new_password())
 
-        # creds = {
-        #     "user": user,
-        #     "password": password,
-        #     "database": database,
-        # }
-        # self.update_databags(event.relation, creds)
+        # Store the user, password and database name in the secret store to be accessible by
+        # non-leader units when the cluster topology changes.
+        self.charm.set_secret(APP_SCOPE, user, password)
+        self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
         self.set_up_relation(event.relation)
-        # Create user and database in backend postgresql database
-        # try:
-        #     initial_status = self.charm.unit.status
-        #     init_msg = f"initialising database and user for {self.relation_name} relation"
-        #     self.charm.unit.status = MaintenanceStatus(init_msg)
-        #     logger.info(init_msg)
-
-        #     self.charm.backend.postgres.create_user(user, password, admin=self.admin)
-        #     self.charm.backend.postgres.create_database(
-        #         database, user, client_relations=self.charm.client_relations
-        #     )
-
-        #     created_msg = f"database and user for {self.relation_name} relation created"
-        #     self.charm.unit.status = initial_status
-        #     self.charm.update_status()
-        #     logger.info(created_msg)
-        # except (PostgreSQLCreateDatabaseError, PostgreSQLCreateUserError):
-        #     err_msg = f"failed to create database or user for {self.relation_name}"
-        #     logger.error(err_msg)
-        #     self.charm.unit.status = BlockedStatus(err_msg)
-        #     return
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         """Handle the legacy db/db-admin relation changed event.
@@ -237,32 +214,12 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(ROLES_BLOCKING_MESSAGE)
             return False
 
-        database = relation.data.get(relation.app, {}).get("database")
-        if not database:
-            for unit in relation.units:
-                unit_database = relation.data.get(unit, {}).get("database")
-                if unit_database:
-                    database = unit_database
-                    break
-
-        # Sometimes a relation changed event is triggered, and it doesn't have
-        # a database name in it (like the relation with Landscape server charm),
-        # so create a database with the other application name.
-        if not database:
-            database = relation.app.name
-
         try:
-            unit_relation_databag = relation.data[self.charm.unit]
-
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
             user = f"relation-{relation.id}"
-            password = unit_relation_databag.get("password", new_password())
-
-            # Store the user, password and database name in the secret store to be accessible by
-            # non-leader units when the cluster topology changes.
-            self.charm.set_secret(APP_SCOPE, user, password)
-            self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
+            password = self.charm.get_secret(APP_SCOPE, user)
+            database = self.charm.get_secret(APP_SCOPE, f"{user}-database")
 
             self.charm.postgresql.create_user(user, password, self.admin)
             plugins = self.charm.get_plugins()
