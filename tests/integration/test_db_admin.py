@@ -57,7 +57,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         relation_name=RELATION_NAME,
         timeout=3000,
     )
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
 
     await check_databases_creation(
         ops_test,

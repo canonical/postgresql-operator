@@ -397,6 +397,7 @@ async def deploy_and_relate_bundle_with_postgresql(
             for key, val in config.items():
                 config[key] = str(val)
             logger.info(f"Bundle {bundle_name} needs configuration {config}")
+            await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
             del data["applications"]["postgresql"]
             data["relations"] = [
                 relation
@@ -419,7 +420,6 @@ async def deploy_and_relate_bundle_with_postgresql(
                     await ops_test.juju("deploy", patched.name)
 
     async with ops_test.fast_forward(fast_interval="30s"):
-        await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
         # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
             main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
@@ -479,10 +479,10 @@ async def ensure_correct_relation_data(
                 )
                 unit_ip = get_unit_address(ops_test, unit_name)
                 host_parameter = f"host={unit_ip} "
-                logger.info(f"Expected primary: {unit_ip}")
-                logger.info(f"Primary conn string: {primary_connection_string}")
-                logger.info(f"Replica conn string: {replica_connection_string}")
                 if unit_name == primary:
+                    logger.info(f"Expected primary: {unit_ip}")
+                    logger.info(f"Primary conn string: {primary_connection_string}")
+                    logger.info(f"Replica conn string: {replica_connection_string}")
                     assert host_parameter in primary_connection_string, (
                         f"{unit_name} is not the host of the primary connection string"
                     )

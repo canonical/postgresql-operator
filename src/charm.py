@@ -1228,7 +1228,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.postgresql.set_up_database()
 
-        self.postgresql_client_relation.oversee_users()
+        # self.postgresql_client_relation.oversee_users()
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
@@ -1364,7 +1364,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._handle_processes_failures():
             return
 
-        self.postgresql_client_relation.oversee_users()
+        # self.postgresql_client_relation.oversee_users()
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
