@@ -196,10 +196,8 @@ class DbProvides(Object):
 
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
-            if password != self.charm.get_secret(APP_SCOPE, user):
-                self.charm.set_secret(APP_SCOPE, user, password)
-            if database and database != self.charm.get_secret(APP_SCOPE, f"{user}-database"):
-                self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
+            self.charm.set_secret(APP_SCOPE, user, password)
+            self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
             self.charm.postgresql.create_user(user, password, self.admin)
             plugins = self.charm.get_plugins()
