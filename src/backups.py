@@ -287,13 +287,28 @@ class PostgreSQLBackups(Object):
         except SSLError as e:
             logger.error(f"error: {e!s} - Is TLS enabled and CA chain set on S3?")
             raise e
-        if not exists:
-            try:
-                bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+        if exists:
+            return
 
-                bucket.wait_until_exists()
-                logger.info("Created bucket '%s' in region=%s", bucket_name, region)
-            except (ClientError, ParamValidationError) as error:
+        try:
+            bucket.create(CreateBucketConfiguration={"LocationConstraint": region})
+
+            bucket.wait_until_exists()
+            logger.info("Created bucket '%s' in region=%s", bucket_name, region)
+        except ClientError as error:
+            if error.response["Error"]["Code"] == "InvalidLocationConstraint":
+                logger.info("Specified location-constraint is not valid, trying create without it")
+                try:
+                    bucket.create()
+
+                    bucket.wait_until_exists()
+                    logger.info("Created bucket '%s', ignored region=%s", bucket_name, region)
+                except ClientError as error:
+                    logger.exception(
+                        "Couldn't create bucket named '%s' in region=%s.", bucket_name, region
+                    )
+                    raise error
+            else:
                 logger.exception(
                     "Couldn't create bucket named '%s' in region=%s.", bucket_name, region
                 )
