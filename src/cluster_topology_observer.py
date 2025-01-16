@@ -76,7 +76,6 @@ class ClusterTopologyObserver(Object):
                 "/usr/bin/python3",
                 "scripts/cluster_topology_observer.py",
                 self._charm._patroni._patroni_url,
-                f"{self._charm._patroni.verify}",
                 self._run_cmd,
                 self._charm.unit.name,
                 self._charm.charm_dir,
