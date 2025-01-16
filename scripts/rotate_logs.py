@@ -6,7 +6,7 @@
 import subprocess
 from time import sleep
 
-from constants import PGBACKREST_LOGROTATE_FILE
+PGBACKREST_LOGROTATE_FILE = "/etc/logrotate.d/pgbackrest.logrotate"
 
 
 def main():

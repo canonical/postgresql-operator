@@ -10,7 +10,8 @@ import sys
 from time import sleep
 from urllib.request import urlopen
 
-from constants import API_REQUEST_TIMEOUT, PATRONI_CLUSTER_STATUS_ENDPOINT
+API_REQUEST_TIMEOUT = 5
+PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 
 # File path for the spawned cluster topology observer process to write logs.
 LOG_FILE_PATH = "/var/log/cluster_topology_observer.log"
@@ -45,7 +46,7 @@ def main():
             sleep(30)
             continue
         current_cluster_topology = {
-            member["name"]: member["role"] for member in cluster_status.json()["members"]
+            member["name"]: member["role"] for member in cluster_status["members"]
         }
 
         # If it's the first time the cluster topology was retrieved, then store it and use
