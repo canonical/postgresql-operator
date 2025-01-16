@@ -647,7 +647,8 @@ class Patroni:
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
-            minority_count=self.planned_units // 2,
+            # -1 for leader
+            synchronous_node_count=self.planned_units - 1,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
@@ -789,6 +790,7 @@ class Patroni:
             raise RemoveRaftMemberFailedError() from None
 
         if not result.startswith("SUCCESS"):
+            logger.debug("Remove raft member: Remove call not successful")
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
@@ -860,7 +862,7 @@ class Patroni:
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={"synchronous_node_count": units // 2},
+                    json={"synchronous_node_count": units - 1},
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
