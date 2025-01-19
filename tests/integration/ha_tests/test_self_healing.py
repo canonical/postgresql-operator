@@ -502,12 +502,14 @@ async def test_network_cut_without_ip_change(
 
     # Verify machine is not reachable from peer units.
     all_units_names = [unit.name for unit in ops_test.model.applications[app].units]
-    for unit_name in set(all_units_names) - {primary_name}:
-        logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
-        hostname = await get_machine_from_unit(ops_test, unit_name)
-        assert not is_machine_reachable_from(hostname, primary_hostname), (
-            "unit is reachable from peer"
-        )
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            for unit_name in set(all_units_names) - {primary_name}:
+                logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
+                hostname = await get_machine_from_unit(ops_test, unit_name)
+                assert not is_machine_reachable_from(hostname, primary_hostname), (
+                    "unit is reachable from peer"
+                )
 
     # Verify machine is not reachable from controller.
     logger.info(f"checking for no connectivity between {primary_name} and the controller")

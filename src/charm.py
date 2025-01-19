@@ -240,6 +240,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return {self.unit, *self._peers.units}
 
+    def scoped_peer_data(self, scope: Scopes) -> dict | None:
+        """Returns peer data based on scope."""
+        if scope == APP_SCOPE:
+            return self.app_peer_data
+        elif scope == UNIT_SCOPE:
+            return self.unit_peer_data
+
     @property
     def app_peer_data(self) -> dict:
         """Application peer relation data object."""
@@ -318,7 +325,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         secret_key = self._translate_field_to_secret_key(key)
         # Old translation in databag is to be deleted
-        self.peer_relation_data(scope).delete_relation_data(peers.id, [key])
+        self.scoped_peer_data(scope).pop(key, None)
         self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
 
     def remove_secret(self, scope: Scopes, key: str) -> None:
@@ -329,10 +336,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not (peers := self.model.get_relation(PEER)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
-        if scope == APP_SCOPE:
-            self.peer_relation_app.delete_relation_data(peers.id, [secret_key])
-        else:
-            self.peer_relation_unit.delete_relation_data(peers.id, [secret_key])
+
+        self.peer_relation_data(scope).delete_relation_data(peers.id, [secret_key])
 
     @property
     def is_cluster_initialised(self) -> bool:
