@@ -45,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 11
+LIBPATCH = 13
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -130,9 +130,13 @@ class PostgreSQLTLS(Object):
             logger.error("An unknown certificate available.")
             return
 
-        self.charm.set_secret(
-            SCOPE, "chain", "\n".join(event.chain) if event.chain is not None else None
-        )
+        if not event.certificate:
+            logger.debug("No certificate available.")
+            event.defer()
+            return
+
+        new_chain = "\n".join(event.chain) if event.chain is not None else None
+        self.charm.set_secret(SCOPE, "chain", new_chain)
         self.charm.set_secret(SCOPE, "cert", event.certificate)
         self.charm.set_secret(SCOPE, "ca", event.ca)
 

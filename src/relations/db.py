@@ -170,7 +170,10 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(ROLES_BLOCKING_MESSAGE)
             return False
 
-        database = relation.data.get(relation.app, {}).get("database")
+        user = f"relation-{relation.id}"
+        database = relation.data.get(relation.app, {}).get(
+            "database", self.charm.get_secret(APP_SCOPE, f"{user}-database")
+        )
         if not database:
             for unit in relation.units:
                 unit_database = relation.data.get(unit, {}).get("database")
@@ -189,7 +192,6 @@ class DbProvides(Object):
 
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            user = f"relation-{relation.id}"
             password = unit_relation_databag.get("password", new_password())
 
             # Store the user, password and database name in the secret store to be accessible by
