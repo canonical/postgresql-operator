@@ -16,8 +16,8 @@ To restore a backup that was made from a *different* cluster, (i.e. cluster migr
 - [Configured settings for S3 storage](/t/charmed-postgresql-how-to-configure-s3/9681?channel=14/stable)
 - [Existing backups in your S3 storage](/t/charmed-postgresql-how-to-create-and-list-backups/9683?channel=14/stable)
 - [Point-in-time recovery](#point-in-time-recovery) requires the following PostgreSQL charm revisions:
-   - 334+ for `arm64`
-  -  33+ for `amd64`
+   - 467+ for `arm64`
+  -  468+ for `amd64`
 
 ## Summary
 * [List backups](#list-backups)
@@ -81,6 +81,7 @@ juju run postgresql/leader restore restore-to-time="YYYY-MM-DDTHH:MM:SSZ"
 Your restore will then be in progress.
 
 It’s also possible to restore to the latest point from a specific timeline by passing the ID of a backup taken on that timeline and `restore-to-time=latest` when requesting a restore:
+
  ```shell
 juju run postgresql/leader restore restore-to-time=latest
 ```

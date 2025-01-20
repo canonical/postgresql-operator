@@ -62,6 +62,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-deploy-multi-az | [Multi-AZ](/t/15749) |
 | 3 | h-deploy-terraform | [Terraform](/t/14916) |
 | 3 | h-deploy-airgapped | [Air-gapped](/t/15746) |
+| 3 | h-deploy-tls-vip-access | [TLS VIP access](/t/16576) |
 | 2 | h-integrate | [Integrate with another application](/t/9687) |
 | 2 | h-external-access | [External access](/t/15802) |
 | 2 | h-scale | [Scale replicas](/t/9689) |
