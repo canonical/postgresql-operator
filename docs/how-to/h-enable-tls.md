@@ -6,23 +6,26 @@ If you're using `juju 2.9`, check the [`juju 3.0` Release Notes](https://juju.is
 
 # How to enable TLS encryption
 
-This guide will show how to enable TLS using the [`self-signed-certificates` operator](https://github.com/canonical/self-signed-certificates-operator) as an example. 
+This guide will show how to enable TLS/SSL on a PostgreSQL cluster using the [`self-signed-certificates` operator](https://github.com/canonical/self-signed-certificates-operator) as an example.
 
-[note type="caution"]
-**[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
+This guide assumes everything is deployed within the same network and Juju model.
 
-Check [this guide](/t/11664) for an overview of the TLS certificate charms available. 
-[/note]
+> See also: [How to deploy for external TLS access](/t/16576)
 
 ## Summary
 * Enable TLS
 * Disable TLS
-* Manage certificates
-  * Check certificates in use
-  * Update keys
+* Check certificates in use
+* Update keys
 ---
 
 ## Enable TLS
+
+[note type="caution"]
+**[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
+
+Check [this guide about X.509 certificates](/t/11664) for an overview of all the TLS certificate charms available. 
+[/note]
 
 First, deploy the TLS charm:
 ```shell
@@ -35,19 +38,18 @@ juju integrate self-signed-certificates postgresql
 ```
 
 ## Disable TLS
-You can disable TLS by removing the integration.
+Disable TLS by removing the integration.
 ```shell
 juju remove-relation self-signed-certificates postgresql
 ```
 
-## Manage certificates
-### Check certificates in use
-To check the certificates in use by PostgreSQL, you can run:
+## Check certificates in use
+To check the certificates in use by PostgreSQL, run
 ```shell
 openssl s_client -starttls postgres -connect <leader_unit_IP>:<port> | grep issuer
 ```
 
-### Update keys
+## Update keys
 Updates to private keys for certificate signing requests (CSR) can be made via the `set-tls-private-key` action. Note that passing keys to external/internal keys should *only be done with* `base64 -w0`, *not* `cat`. 
 
 With three replicas, this schema should be followed:

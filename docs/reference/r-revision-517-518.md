@@ -27,6 +27,8 @@ Due to the newly added support for `arm64` architecture, the PostgreSQL charm no
 
 ## Highlights 
 
+* Upgraded PostgreSQL from v.14.12 → v.14.13 ([PR #633](https://github.com/canonical/postgresql-operator/pull/633))
+  * Check the official [PostgreSQL release notes](https://www.postgresql.org/docs/release/14.13/)
 * Added timeline management to point-in-time recovery (PITR) ([PR #629](https://github.com/canonical/postgresql-operator/pull/629)) ([DPE-5561](https://warthogs.atlassian.net/browse/DPE-5561))
 * Added pgAudit plugin/extension ([PR #612](https://github.com/canonical/postgresql-operator/pull/612)) ([DPE-5248](https://warthogs.atlassian.net/browse/DPE-5248))
 * Observability stack (COS) improvements
@@ -71,10 +73,6 @@ Due to the newly added support for `arm64` architecture, the PostgreSQL charm no
 * Bump libs ([PR #677](https://github.com/canonical/postgresql-operator/pull/677))
 * Increase linting rules ([PR #649](https://github.com/canonical/postgresql-operator/pull/649)) ([DPE-5324](https://warthogs.atlassian.net/browse/DPE-5324))
 [/details]
-
-## Known limitations
-...
-<TODO>
 
 ## Requirements and compatibility
 * (no change) Minimum Juju 2 version: `v.2.9.49`
