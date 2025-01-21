@@ -1525,13 +1525,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 if self.unit.is_leader():
                     self._raft_reinitialisation()
                 return
-            event.fail("Raft is not stuck.")
+            event.fail("Raft is not stuck")
         else:
             if self.has_raft_keys():
                 event.fail("Raft is stuck. Set force to reinitialise with new primary")
                 return
-            # TODO Regular promotion
-            pass
+            try:
+                self._patroni.switchover(self._member_name)
+            except SwitchoverFailedError:
+                event.fail("Unit is not sync standby")
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""

@@ -15,6 +15,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from locales import SNAP_LOCALES
 
+from .ha_tests.helpers import get_cluster_roles
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -321,6 +322,42 @@ async def test_scale_down_and_up(ops_test: OpsTest):
 
     # End with the cluster having the initial number of units.
     await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
+
+
+@pytest.mark.group(1)
+async def test_switchover_sync_standby(ops_test: OpsTest):
+    original_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    run_action = await ops_test.model.units[original_roles["sync_standbys"][0]].run_action(
+        "promote-to-primary", scope="unit"
+    )
+    await run_action.wait()
+
+    await ops_test.model.wait_for_idle(status="active", timeout=200)
+
+    new_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
+
+
+@pytest.mark.group(1)
+async def test_switchover_async_replica(ops_test: OpsTest):
+    original_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    run_action = await ops_test.model.units[original_roles["replicas"][0]].run_action(
+        "promote-to-primary", scope="unit"
+    )
+    await run_action.wait()
+
+    await ops_test.model.wait_for_idle(status="active", timeout=200)
+
+    new_roles = await get_cluster_roles(
+        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
+    )
+    assert new_roles["primaries"][0] == original_roles["primaries"][0]
 
 
 @pytest.mark.group(1)

@@ -747,15 +747,18 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def switchover(self) -> None:
+    def switchover(self, candidate: str | None = None) -> None:
         """Trigger a switchover."""
         # Try to trigger the switchover.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 current_primary = self.get_primary()
+                body = {"leader": current_primary}
+                if candidate:
+                    body["candidate"] = candidate
                 r = requests.post(
                     f"{self._patroni_url}/switchover",
-                    json={"leader": current_primary},
+                    json=body,
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
