@@ -271,6 +271,9 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm._validate_config_options"
         ) as _validate_config_options,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch(
+            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count", return_value=True
+        ) as _updated_synchronous_node_count,
         patch("relations.db.DbProvides.set_up_relation") as _set_up_relation,
         patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
@@ -298,6 +301,7 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         assert not _update_config.called
         _validate_config_options.side_effect = None
+        _updated_synchronous_node_count.assert_called_once_with()
 
         # Test after the cluster was initialised.
         with harness.hooks_disabled():
@@ -333,7 +337,7 @@ def test_on_config_changed(harness):
         _enable_disable_extensions.assert_called_once()
         _set_up_relation.assert_called_once()
 
-        # Test when  there are established legacy relations,
+        # Test when there are established legacy relations,
         # but the charm fails to set up one of them.
         _enable_disable_extensions.reset_mock()
         _set_up_relation.reset_mock()
@@ -409,6 +413,9 @@ def test_enable_disable_extensions(harness, caplog):
         postgresql_mock.enable_disable_extensions.side_effect = None
         with caplog.at_level(logging.ERROR):
             config = """options:
+  synchronous_node_count:
+    type: string
+    default: "all"
   plugin_citext_enable:
     default: false
     type: boolean
@@ -2268,7 +2275,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(1)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2283,7 +2290,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2299,7 +2306,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_not_called()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2317,7 +2324,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2333,7 +2340,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_not_called()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_has_calls([call(ips_to_remove[0]), call(ips_to_remove[1])])
         assert _update_config.call_count == 2
@@ -2352,7 +2359,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_not_called()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_called_once()
         _update_config.assert_called_once()

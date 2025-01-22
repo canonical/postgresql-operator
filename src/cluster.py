@@ -647,8 +647,7 @@ class Patroni:
             stanza=stanza,
             restore_stanza=restore_stanza,
             version=self.get_postgresql_version().split(".")[0],
-            # -1 for leader
-            synchronous_node_count=self.planned_units - 1,
+            synchronous_node_count=self._synchronous_node_count,
             pg_parameters=parameters,
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
@@ -853,16 +852,28 @@ class Patroni:
             timeout=PATRONI_TIMEOUT,
         )
 
-    def update_synchronous_node_count(self, units: int | None = None) -> None:
+    @property
+    def _synchronous_node_count(self) -> int:
+        planned_units = self.charm.app.planned_units()
+        if self.charm.config.synchronous_node_count == "all":
+            return planned_units - 1
+        elif self.charm.config.synchronous_node_count == "majority":
+            return planned_units // 2
+        # -1 for leader
+        return (
+            self.charm.config.synchronous_node_count
+            if self.charm.config.synchronous_node_count < self._members_count - 1
+            else planned_units - 1
+        )
+
+    def update_synchronous_node_count(self) -> None:
         """Update synchronous_node_count to the minority of the planned cluster."""
-        if units is None:
-            units = self.planned_units
         # Try to update synchronous_node_count.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
-                    json={"synchronous_node_count": units - 1},
+                    json={"synchronous_node_count": self._synchronous_node_count},
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,

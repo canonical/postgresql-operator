@@ -410,10 +410,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def updated_synchronous_node_count(self, num_units: int | None = None) -> bool:
+    def updated_synchronous_node_count(self) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
         try:
-            self._patroni.update_synchronous_node_count(num_units)
+            self._patroni.update_synchronous_node_count()
             return True
         except RetryError:
             logger.debug("Unable to set synchronous_node_count")
@@ -442,9 +442,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
-        if "cluster_initialised" not in self._peers.data[
-            self.app
-        ] or not self.updated_synchronous_node_count(len(self._units_ips)):
+        if (
+            "cluster_initialised" not in self._peers.data[self.app]
+            or not self.updated_synchronous_node_count()
+        ):
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
@@ -1010,6 +1011,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
+        if not self.updated_synchronous_node_count():
+            logger.debug("Defer on_config_changed: unable to set synchronous node count")
+            event.defer()
+            return
+
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.unit.status = ActiveStatus()
 
@@ -1021,7 +1027,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Enable and/or disable the extensions.
         self.enable_disable_extensions()
+        self._unblock_extensions()
 
+    def _unblock_extensions(self) -> None:
         # Unblock the charm after extensions are enabled (only if it's blocked due to application
         # charms requesting extensions).
         if self.unit.status.message != EXTENSIONS_BLOCKING_MESSAGE:
