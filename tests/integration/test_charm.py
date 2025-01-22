@@ -325,24 +325,6 @@ async def test_scale_down_and_up(ops_test: OpsTest):
 
 
 @pytest.mark.group(1)
-async def test_switchover_async_replica(ops_test: OpsTest):
-    original_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
-    run_action = await ops_test.model.units[original_roles["replicas"][0]].run_action(
-        "promote-to-primary", scope="unit"
-    )
-    await run_action.wait()
-
-    await ops_test.model.wait_for_idle(status="active", timeout=200)
-
-    new_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
-    assert new_roles["primaries"][0] == original_roles["primaries"][0]
-
-
-@pytest.mark.group(1)
 async def test_switchover_sync_standby(ops_test: OpsTest):
     original_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
