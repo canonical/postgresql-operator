@@ -45,7 +45,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
         base=CHARM_BASE,
-        config={"profile": "testing", "plugin_plpython3u_enable": "True"},
+        config={"profile": "testing"},
     )
 
     # Deploy and test the Landscape Scalable bundle (using this PostgreSQL charm).
@@ -57,6 +57,8 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         relation_name=RELATION_NAME,
         timeout=3000,
     )
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
     await check_databases_creation(
         ops_test,
         [
@@ -102,11 +104,6 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     assert role_name not in [user["name"] for user in json.loads(api_response)]
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
-
-    # Enable automatically-retry-hooks due to https://bugs.launchpad.net/juju/+bug/1999758
-    # (the implemented workaround restarts the unit in the middle of the start hook,
-    # so the hook fails, and it's not retried on CI).
-    await ops_test.model.set_config({"automatically-retry-hooks": "true"})
 
     # Stop the primary unit machine.
     logger.info("restarting primary")

@@ -33,7 +33,8 @@ from charms.tls_certificates_interface.v2.tls_certificates import (
 )
 from ops.charm import ActionEvent, RelationBrokenEvent
 from ops.framework import Object
-from ops.pebble import ConnectionError, PathError, ProtocolError
+from ops.pebble import ConnectionError as PebbleConnectionError
+from ops.pebble import PathError, ProtocolError
 from tenacity import RetryError
 
 # The unique Charmhub library identifier, never change it
@@ -44,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 9
+LIBPATCH = 13
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -81,10 +82,7 @@ class PostgreSQLTLS(Object):
 
     def _request_certificate(self, param: Optional[str]):
         """Request a certificate to TLS Certificates Operator."""
-        if param is None:
-            key = generate_private_key()
-        else:
-            key = self._parse_tls_file(param)
+        key = generate_private_key() if param is None else self._parse_tls_file(param)
 
         csr = generate_csr(
             private_key=key,
@@ -132,9 +130,13 @@ class PostgreSQLTLS(Object):
             logger.error("An unknown certificate available.")
             return
 
-        self.charm.set_secret(
-            SCOPE, "chain", "\n".join(event.chain) if event.chain is not None else None
-        )
+        if not event.certificate:
+            logger.debug("No certificate available.")
+            event.defer()
+            return
+
+        new_chain = "\n".join(event.chain) if event.chain is not None else None
+        self.charm.set_secret(SCOPE, "chain", new_chain)
         self.charm.set_secret(SCOPE, "cert", event.certificate)
         self.charm.set_secret(SCOPE, "ca", event.ca)
 
@@ -143,7 +145,7 @@ class PostgreSQLTLS(Object):
                 logger.debug("Cannot push TLS certificates at this moment")
                 event.defer()
                 return
-        except (ConnectionError, PathError, ProtocolError, RetryError) as e:
+        except (PebbleConnectionError, PathError, ProtocolError, RetryError) as e:
             logger.error("Cannot push TLS certificates: %r", e)
             event.defer()
             return

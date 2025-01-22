@@ -20,6 +20,7 @@ class CharmConfig(BaseConfigModel):
 
     durability_synchronous_commit: str | None
     instance_default_text_search_config: str | None
+    instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
     logging_log_connections: bool | None
     logging_log_disconnections: bool | None
@@ -128,6 +129,15 @@ class CharmConfig(BaseConfigModel):
         """Check instance_password_encryption config option is one of `md5` or `scram-sha-256`."""
         if value not in ["md5", "scram-sha-256"]:
             raise ValueError("Value not one of 'md5' or 'scram-sha-256'")
+
+        return value
+
+    @validator("instance_max_locks_per_transaction")
+    @classmethod
+    def instance_max_locks_per_transaction_values(cls, value: int) -> int | None:
+        """Check instance_max_locks_per_transaction config option is between 64 and 2147483647."""
+        if value < 64 or value > 2147483647:
+            raise ValueError("Value is not between 64 and 2147483647")
 
         return value
 
