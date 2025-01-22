@@ -460,6 +460,18 @@ def test_switchover(peers_ips, patroni):
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        _post.reset_mock()
+
+        # Test candidate
+        patroni.switchover("candidate")
+
+        _post.assert_called_once_with(
+            "http://1.1.1.1:8008/switchover",
+            json={"leader": "primary", "candidate": "candidate"},
+            verify=True,
+            auth=patroni._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):

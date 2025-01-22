@@ -35,7 +35,7 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
 )
-from cluster import NotReadyError, RemoveRaftMemberFailedError
+from cluster import NotReadyError, RemoveRaftMemberFailedError, SwitchoverFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -2765,6 +2765,7 @@ def test_on_promote_to_primary(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._raft_reinitialisation") as _raft_reinitialisation,
         patch("charm.PostgreSQLAsyncReplication.promote_to_primary") as _promote_to_primary,
+        patch("charm.Patroni.switchover") as _switchover,
     ):
         event = Mock()
         event.params = {"scope": "cluster"}
@@ -2773,7 +2774,23 @@ def test_on_promote_to_primary(harness):
         harness.charm._on_promote_to_primary(event)
         _promote_to_primary.assert_called_once_with(event)
 
-        # Unit, no force
+        # Unit, no force, regular promotion
+        event.params = {"scope": "unit"}
+
+        harness.charm._on_promote_to_primary(event)
+
+        _switchover.assert_called_once_with("postgresql-0")
+
+        # Unit, no force, switchover failed
+        event.params = {"scope": "unit"}
+        _switchover.side_effect = SwitchoverFailedError
+
+        harness.charm._on_promote_to_primary(event)
+
+        event.fail.assert_called_once_with("Unit is not sync standby")
+        event.fail.reset_mock()
+
+        # Unit, no force, raft stuck
         event.params = {"scope": "unit"}
         rel_id = harness.model.get_relation(PEER).id
         with harness.hooks_disabled():
