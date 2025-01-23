@@ -12,8 +12,8 @@ from cluster import Patroni
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
-    dispatch,
 )
+from scripts.cluster_topology_observer import dispatch
 
 
 # This method will be used by the mock to replace requests.get
