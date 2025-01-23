@@ -25,7 +25,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v26.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.1
     with:
       charmcraft-snap-channel: latest/candidate  # TODO: remove after charmcraft 3.3 stable release
 
@@ -34,7 +34,7 @@ jobs:
     needs:
       - ci-tests
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v26.0.0
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v29.0.1
     with:
       charmcraft-snap-channel: latest/candidate  # TODO: remove after charmcraft 3.3 stable release
       channel: 14/edge
@@ -42,4 +42,4 @@ jobs:
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
-      contents: write  # Needed to create GitHub release
+      contents: write  # Needed to create git tags
