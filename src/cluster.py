@@ -862,7 +862,7 @@ class Patroni:
         # -1 for leader
         return (
             self.charm.config.synchronous_node_count
-            if self.charm.config.synchronous_node_count < self._members_count - 1
+            if self.charm.config.synchronous_node_count < planned_units - 1
             else planned_units - 1
         )
 
