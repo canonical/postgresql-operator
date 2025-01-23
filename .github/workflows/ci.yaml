@@ -16,9 +16,13 @@ on:
       - .github/renovate.json5
       - '.github/workflows/sync_docs.yaml'
   schedule:
-    - cron: '53 0 * * *' # Daily at 00:53 UTC
+    - cron: '53 0 * * *'  # Daily at 00:53 UTC
   # Triggered on push to branch "main" by .github/workflows/release.yaml
   workflow_call:
+    outputs:
+      artifact-prefix:
+        description: build_charm.yaml `artifact-prefix` output
+        value: ${{ jobs.build.outputs.artifact-prefix }}
 
 jobs:
   lint:
@@ -47,7 +51,6 @@ jobs:
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.1
     with:
-      cache: true
       charmcraft-snap-channel: latest/candidate  # TODO: remove after charmcraft 3.3 stable release
 
   integration-test:
