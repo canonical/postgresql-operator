@@ -9,7 +9,7 @@ platforms:
 # - dispatch (https://github.com/canonical/charmcraft/pull/1898)
 # - manifest.yaml
 #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L259)
-# Files implicitly copied/"primed" by charmcraft without a part:
+# Files implicitly copied/"staged" by charmcraft without a part:
 # - actions.yaml, config.yaml, metadata.yaml
 #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L290-L293
 #   https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/services/package.py#L156-L157)
@@ -41,7 +41,7 @@ parts:
   # "charm-poetry" part name is arbitrary; use for consistency
   # Avoid using "charm" part name since that has special meaning to charmcraft
   charm-poetry:
-    # By default, the `poetry` plugin creates/primes these directories:
+    # By default, the `poetry` plugin creates/stages these directories:
     # - lib, src
     #   (https://github.com/canonical/charmcraft/blob/9ff19c328e23b50cc06f04e8a5ad4835740badf4/charmcraft/parts/plugins/_poetry.py#L76-L78)
     # - venv
@@ -84,7 +84,7 @@ parts:
   files:
     plugin: dump
     source: .
-    prime:
+    stage:
       - LICENSE
       - scripts
       - templates
@@ -94,7 +94,7 @@ parts:
     plugin: dump
     source: /usr/lib/
     source-type: local
-    prime:
+    stage:
       - lib/
     organize:
       "*-linux-gnu/libpq.so*": lib/
