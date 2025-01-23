@@ -5,8 +5,8 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
-from ..helpers import CHARM_BASE, app_name
-from .helpers import get_cluster_roles
+from ..helpers import CHARM_BASE
+from .helpers import app_name, get_cluster_roles
 
 
 @pytest.mark.group(1)
