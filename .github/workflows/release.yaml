@@ -27,7 +27,7 @@ jobs:
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v26.0.0
     with:
-      charmcraft-snap-channel: latest/beta/data-platform  # TODO: remove after charmcraft 3.3 stable release
+      charmcraft-snap-channel: latest/candidate  # TODO: remove after charmcraft 3.3 stable release
 
   release:
     name: Release charm
@@ -36,7 +36,7 @@ jobs:
       - build
     uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v26.0.0
     with:
-      charmcraft-snap-channel: latest/beta/data-platform  # TODO: remove after charmcraft 3.3 stable release
+      charmcraft-snap-channel: latest/candidate  # TODO: remove after charmcraft 3.3 stable release
       channel: 14/edge
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
     secrets:
