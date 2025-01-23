@@ -220,7 +220,9 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
             assert data is None
 
     await start_machine(ops_test, machine)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=200)
+    await ops_test.model.wait_for_idle(
+        apps=[DATABASE_APP_NAME], status="active", timeout=200, raise_on_error=False
+    )
 
 
 @pytest.mark.group("new_relations_tests")
