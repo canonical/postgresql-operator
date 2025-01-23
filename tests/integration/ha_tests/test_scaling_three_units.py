@@ -2,7 +2,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-from asyncio import gather, sleep
+from asyncio import exceptions, gather, sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -105,7 +105,7 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
                 .run_action("promote-to-primary", scope="unit", force=True)
             )
             await run_action.wait()
-        except TimeoutError:
+        except exceptions.TimeoutError:
             # Check if Patroni self healed
             assert (
                 left_unit.workload_status == "active"
