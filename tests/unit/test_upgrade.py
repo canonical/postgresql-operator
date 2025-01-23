@@ -188,7 +188,7 @@ def test_on_upgrade_granted(harness):
         _set_unit_completed.assert_called_once()
         _set_unit_failed.assert_not_called()
         _on_upgrade_changed.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
 
 
 def test_pre_upgrade_check(harness):
