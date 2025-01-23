@@ -844,18 +844,6 @@ class Patroni:
                     raise RaftPostgresqlNotUpError()
         logger.info("Raft should be unstuck")
 
-    def _get_role(self) -> str | None:
-        members = requests.get(
-            f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-            verify=self.verify,
-            timeout=API_REQUEST_TIMEOUT,
-            auth=self._patroni_auth,
-        ).json()["members"]
-        member_name = self.charm.unit.name[::-1].replace("/", "-", 1)[::-1]
-        for member in members:
-            if member["name"] == member_name:
-                return member["role"]
-
     def get_running_cluster_members(self) -> list[str]:
         """List running patroni members."""
         try:
