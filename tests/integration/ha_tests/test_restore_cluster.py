@@ -98,7 +98,7 @@ async def test_cluster_restore(ops_test):
     for storage in storages:
         unit = await add_unit_with_storage(ops_test, SECOND_APPLICATION, storage)
         assert await reused_full_cluster_recovery_storage(ops_test, unit.name), (
-            "attached storage not properly re-used by Postgresql."
+            "attached storage not properly reused by Postgresql."
         )
 
     primary = await get_primary(
