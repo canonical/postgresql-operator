@@ -132,7 +132,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     new_unit = await add_unit_with_storage(ops_test, app, unit_storage_id)
 
     assert await reused_replica_storage(ops_test, new_unit.name), (
-        "attached storage not properly re-used by Postgresql."
+        "attached storage not properly reused by Postgresql."
     )
 
     # Verify that no writes to the database were missed after stopping the writes.
