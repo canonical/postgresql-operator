@@ -62,6 +62,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-deploy-multi-az | [Multi-AZ](/t/15749) |
 | 3 | h-deploy-terraform | [Terraform](/t/14916) |
 | 3 | h-deploy-airgapped | [Air-gapped](/t/15746) |
+| 3 | h-deploy-tls-vip-access | [TLS VIP access](/t/16576) |
 | 2 | h-integrate | [Integrate with another application](/t/9687) |
 | 2 | h-external-access | [External access](/t/15802) |
 | 2 | h-scale | [Scale replicas](/t/9689) |
@@ -92,7 +93,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 1 | reference | [Reference]() |
 | 2 | r-overview | [Overview](/t/13976) |
 | 2 | r-releases | [Release Notes](/t/11875) |
-| 3 | r-revision-517-518| [Revision 517/518](/t/16007) |
+| 3 | r-revision-544-545| [Revision 544/545](/t/16007) |
 | 3 | r-revision-467-468 | [Revision 467/468](/t/15378) |
 | 3 | r-revision-429-430 | [Revision 429/430](/t/14067) |
 | 3 | r-revision-363 | [Revision 363](/t/13124) |
