@@ -2,7 +2,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-from asyncio import gather, sleep
+from asyncio import exceptions, gather, sleep
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -90,19 +90,27 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
         for left_unit in ops_test.model.applications[DATABASE_APP_NAME].units:
             if left_unit.name not in units:
                 break
+        try:
+            await ops_test.model.block_until(
+                lambda: left_unit.workload_status == "blocked"
+                and left_unit.workload_status_message
+                == "Raft majority loss, run: promote-to-primary",
+                timeout=600,
+            )
 
-        await ops_test.model.block_until(
-            lambda: left_unit.workload_status == "blocked"
-            and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
-            timeout=600,
-        )
-
-        run_action = (
-            await ops_test.model.applications[DATABASE_APP_NAME]
-            .units[0]
-            .run_action("promote-to-primary", scope="unit", force=True)
-        )
-        await run_action.wait()
+            run_action = (
+                await ops_test.model.applications[DATABASE_APP_NAME]
+                .units[0]
+                .run_action("promote-to-primary", scope="unit", force=True)
+            )
+            await run_action.wait()
+        except exceptions.TimeoutError:
+            # Check if Patroni self healed
+            assert (
+                left_unit.workload_status == "active"
+                and left_unit.workload_status_message == "Primary"
+            )
+            logger.warning(f"Patroni self-healed without raft reinitialisation for roles {roles}")
 
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
