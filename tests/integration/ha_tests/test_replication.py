@@ -7,6 +7,7 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import APPLICATION_NAME, CHARM_BASE, db_connect, scale_application
+from ..juju_ import juju_major_version
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -38,12 +39,17 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     # Deploy the continuous writes application charm if it wasn't already deployed.
     if not await app_name(ops_test, APPLICATION_NAME):
         wait_for_apps = True
+        kwargs = {}
+        if juju_major_version == 2:
+            kwargs["series"] = "jammy"
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
                 base=CHARM_BASE,
+                revision=346,
                 channel="edge",
+                **kwargs,
             )
 
     if wait_for_apps:
