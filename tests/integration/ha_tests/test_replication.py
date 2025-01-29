@@ -47,7 +47,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
                 base=CHARM_BASE,
-                revision=346,
+                revision=347,
                 channel="edge",
                 **kwargs,
             )

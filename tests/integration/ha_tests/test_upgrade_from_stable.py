@@ -14,6 +14,7 @@ from ..helpers import (
     get_primary,
     remove_chown_workaround,
 )
+from ..juju_ import juju_major_version
 from .helpers import (
     are_writes_increasing,
     check_writes,
@@ -63,10 +64,15 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
             num_units=3,
             channel="14/stable",
         )
+    kwargs = {}
+    if juju_major_version == 2:
+        kwargs["series"] = "jammy"
     await ops_test.model.deploy(
         APPLICATION_NAME,
+        revision=347,
         num_units=1,
         channel="latest/edge",
+        **kwargs,
     )
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():

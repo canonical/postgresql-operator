@@ -17,6 +17,7 @@ from ..helpers import (
     get_leader_unit,
     get_primary,
 )
+from ..juju_ import juju_major_version
 from ..new_relations.helpers import get_application_relation_data
 from .helpers import (
     are_writes_increasing,
@@ -39,10 +40,15 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         channel="14/edge",
         config={"profile": "testing"},
     )
+    kwargs = {}
+    if juju_major_version == 2:
+        kwargs["series"] = "jammy"
     await ops_test.model.deploy(
         APPLICATION_NAME,
+        revision=347,
         num_units=1,
         channel="latest/edge",
+        **kwargs,
     )
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():

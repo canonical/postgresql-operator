@@ -23,6 +23,7 @@ from ..helpers import (
     scale_application,
     wait_for_relation_removed_between,
 )
+from ..juju_ import juju_major_version
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -128,8 +129,23 @@ async def test_deploy_async_replication_setup(
             num_units=CLUSTER_SIZE,
             config={"profile": "testing"},
         )
-    await ops_test.model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
-    await second_model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
+        kwargs = {}
+    if juju_major_version == 2:
+        kwargs["series"] = "jammy"
+    await ops_test.model.deploy(
+        APPLICATION_NAME,
+        application_name=APPLICATION_NAME,
+        revision=347,
+        channel="edge",
+        **kwargs,
+    )
+    await second_model.deploy(
+        APPLICATION_NAME,
+        application_name=APPLICATION_NAME,
+        revision=347,
+        channel="edge",
+        **kwargs,
+    )
 
     async with ops_test.fast_forward(), fast_forward(second_model):
         await gather(
