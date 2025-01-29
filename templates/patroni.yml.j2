@@ -140,6 +140,7 @@ postgresql:
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
   data_dir: {{ data_path }}
   parameters:
+    shared_preload_libraries: 'timescaledb,pgaudit'
     {%- if enable_pgbackrest_archiving %}
     archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
