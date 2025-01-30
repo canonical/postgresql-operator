@@ -360,6 +360,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return "departing" in self.unit_peer_data
 
     @property
+    def is_unit_stopped(self) -> bool:
+        """Returns whether the unit is stopped."""
+        return "stopped" in self.unit_peer_data
+
+    @property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
