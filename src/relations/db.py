@@ -117,7 +117,7 @@ class DbProvides(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -240,7 +240,7 @@ class DbProvides(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -266,7 +266,7 @@ class DbProvides(Object):
         # Check for some conditions before trying to access the PostgreSQL instance.
         if (
             not self.charm.unit.is_leader()
-            or "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            or not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):

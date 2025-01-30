@@ -442,9 +442,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
-        if "cluster_initialised" not in self._peers.data[
-            self.app
-        ] or not self._updated_synchronous_node_count(len(self._units_ips)):
+        if not self.is_cluster_initialised or not self._updated_synchronous_node_count(
+            len(self._units_ips)
+        ):
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
@@ -519,7 +519,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
             return False
@@ -974,7 +974,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Don't update connection endpoints in the first time this event run for
         # this application because there are no primary and replicas yet.
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             logger.debug("Early exit on_leader_elected: Cluster not initialized")
             return
 
@@ -1250,7 +1250,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _start_replica(self, event) -> None:
         """Configure the replica if the cluster was already initialised."""
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             logger.debug("Deferring on_start: awaiting for cluster to start")
             self.unit.status = WaitingStatus("awaiting for cluster to start")
             event.defer()
@@ -1444,7 +1444,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return True
 
     def _can_run_on_update_status(self) -> bool:
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             return False
 
         if not self.upgrade.idle:
