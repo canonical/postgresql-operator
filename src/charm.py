@@ -355,6 +355,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return "restore-to-time" in self.app_peer_data
 
     @property
+    def is_unit_departing(self) -> bool:
+        """Returns whether the unit is departing."""
+        return "departing" in self.unit_peer_data
+
+    @property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(

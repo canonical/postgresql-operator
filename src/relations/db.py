@@ -281,7 +281,7 @@ class DbProvides(Object):
         # https://bugs.launchpad.net/juju/+bug/1979811.
         # Neither peer relation data nor stored state
         # are good solutions, just a temporary solution.
-        if "departing" in self.charm._peers.data[self.charm.unit]:
+        if self.charm.is_unit_departing:
             logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 

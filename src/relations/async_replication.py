@@ -482,7 +482,7 @@ class PostgreSQLAsyncReplication(Object):
         return self.charm.app == self._get_primary_cluster()
 
     def _on_async_relation_broken(self, _) -> None:
-        if not self.charm._peers or "departing" in self.charm._peers.data[self.charm.unit]:
+        if not self.charm._peers or self.charm.is_unit_departing:
             logger.debug("Early exit on_async_relation_broken: Skipping departing unit.")
             return
 
