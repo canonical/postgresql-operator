@@ -185,6 +185,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
+        self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -631,6 +632,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 and "raft_primary" not in self.unit_peer_data
                 and "raft_followers_stopped" in self.app_peer_data
             ):
+                self.unit.status = MaintenanceStatus("Reinitialising raft")
                 logger.info(f"Reinitialising {self.unit.name} as primary")
                 self._patroni.reinitialise_raft_data()
                 self.unit_peer_data["raft_primary"] = "True"
@@ -644,6 +646,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.pop("raft_stopped", None)
             self.update_config()
             self._patroni.start_patroni()
+            self._set_primary_status_message()
 
             if self.unit.is_leader():
                 self._stuck_raft_cluster_cleanup()
@@ -1506,6 +1509,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         event.set_results({"password": password})
 
+    def _on_promote_to_primary(self, event: ActionEvent) -> None:
+        if event.params.get("scope") == "cluster":
+            return self.async_replication.promote_to_primary(event)
+        elif event.params.get("scope") == "unit":
+            return self.promote_primary_unit(event)
+        else:
+            event.fail("Scope should be either cluster or unit")
+
+    def promote_primary_unit(self, event: ActionEvent) -> None:
+        """Handles promote to primary for unit scope."""
+        if event.params.get("force"):
+            if self.has_raft_keys():
+                self.unit_peer_data.update({"raft_candidate": "True"})
+                if self.unit.is_leader():
+                    self._raft_reinitialisation()
+                return
+            event.fail("Raft is not stuck")
+        else:
+            if self.has_raft_keys():
+                event.fail("Raft is stuck. Set force to reinitialise with new primary")
+                return
+            try:
+                self._patroni.switchover(self._member_name)
+            except SwitchoverFailedError:
+                event.fail("Unit is not sync standby")
+
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
         if not self._can_run_on_update_status():
@@ -1675,10 +1704,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.app_peer_data["s3-initialization-block-message"]
                 )
                 return
-            if self._patroni.get_primary(unit_name_pattern=True) == self.unit.name:
-                self.unit.status = ActiveStatus("Primary")
-            elif self.is_standby_leader:
-                self.unit.status = ActiveStatus("Standby")
+            if (
+                self._patroni.get_primary(unit_name_pattern=True) == self.unit.name
+                or self.is_standby_leader
+            ):
+                danger_state = ""
+                if not self._patroni.has_raft_quorum():
+                    danger_state = " (read-only)"
+                elif len(self._patroni.get_running_cluster_members()) < self.app.planned_units():
+                    danger_state = " (degraded)"
+                self.unit.status = ActiveStatus(
+                    f"{'Standby' if self.is_standby_leader else 'Primary'}{danger_state}"
+                )
             elif self._patroni.member_started:
                 self.unit.status = ActiveStatus()
         except (RetryError, ConnectionError) as e:
