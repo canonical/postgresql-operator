@@ -27,7 +27,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v29.0.4
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v29.0.5
 
   unit-test:
     name: Unit test charm
@@ -49,7 +49,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.4
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.5
 
   integration-test:
     strategy:
@@ -73,7 +73,7 @@ jobs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v29.0.4
+    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v29.0.5
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
       architecture: ${{ matrix.architecture }}
