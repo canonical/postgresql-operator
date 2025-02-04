@@ -9,12 +9,16 @@ import logging
 import os
 import pwd
 import re
+import shutil
 import subprocess
+from pathlib import Path
 from typing import Any
 
+import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
+from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
     AttemptManager,
@@ -34,6 +38,7 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,
+    PEER,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
@@ -51,6 +56,18 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 PATRONI_TIMEOUT = 10
+
+
+class RaftPostgresqlNotUpError(Exception):
+    """Postgresql not yet started."""
+
+
+class RaftPostgresqlStillUpError(Exception):
+    """Postgresql not yet down."""
+
+
+class RaftNotPromotedError(Exception):
+    """Leader not yet set when reinitialising raft."""
 
 
 class ClusterNotPromotedError(Exception):
@@ -598,6 +615,7 @@ class Patroni:
         restore_timeline: str | None = None,
         restore_to_latest: bool = False,
         parameters: dict[str, str] | None = None,
+        no_peers: bool = False,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -613,6 +631,7 @@ class Patroni:
             restore_timeline: timeline to restore from.
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
+            no_peers: Don't include peers.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
@@ -627,8 +646,10 @@ class Patroni:
             data_path=POSTGRESQL_DATA_PATH,
             enable_tls=enable_tls,
             member_name=self.member_name,
-            partner_addrs=self.charm.async_replication.get_partner_addresses(),
-            peers_ips=self.peers_ips,
+            partner_addrs=self.charm.async_replication.get_partner_addresses()
+            if not no_peers
+            else [],
+            peers_ips=self.peers_ips if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
@@ -727,15 +748,18 @@ class Patroni:
             logger.exception(error_message, exc_info=e)
             return False
 
-    def switchover(self) -> None:
+    def switchover(self, candidate: str | None = None) -> None:
         """Trigger a switchover."""
         # Try to trigger the switchover.
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 current_primary = self.get_primary()
+                body = {"leader": current_primary}
+                if candidate:
+                    body["candidate"] = candidate
                 r = requests.post(
                     f"{self._patroni_url}/switchover",
-                    json={"leader": current_primary},
+                    json=body,
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
@@ -755,6 +779,87 @@ class Patroni:
         primary = self.get_primary()
         return primary != old_primary
 
+    def has_raft_quorum(self) -> bool:
+        """Check if raft cluster has quorum."""
+        # Get the status of the raft cluster.
+        syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
+
+        raft_host = "127.0.0.1:2222"
+        try:
+            raft_status = syncobj_util.executeCommand(raft_host, ["status"])
+        except UtilityException:
+            logger.warning("Has raft quorum: Cannot connect to raft cluster")
+            return False
+        return raft_status["has_quorum"]
+
+    def remove_raft_data(self) -> None:
+        """Stops Patroni and removes the raft journals."""
+        logger.info("Stopping patroni")
+        self.stop_patroni()
+
+        logger.info("Wait for postgresql to stop")
+        for attempt in Retrying(wait=wait_fixed(5)):
+            with attempt:
+                for proc in psutil.process_iter(["name"]):
+                    if proc.name() == "postgres":
+                        raise RaftPostgresqlStillUpError()
+
+        logger.info("Removing raft data")
+        try:
+            path = Path(f"{PATRONI_CONF_PATH}/raft")
+            if path.exists() and path.is_dir():
+                shutil.rmtree(path)
+        except OSError as e:
+            raise Exception(
+                f"Failed to remove previous cluster information with error: {e!s}"
+            ) from e
+        logger.info("Raft ready to reinitialise")
+
+    def reinitialise_raft_data(self) -> None:
+        """Reinitialise the raft journals and promoting the unit to leader. Should only be run on sync replicas."""
+        logger.info("Rerendering patroni config without peers")
+        self.charm.update_config(no_peers=True)
+        logger.info("Starting patroni")
+        self.start_patroni()
+
+        logger.info("Waiting for new raft cluster to initialise")
+        for attempt in Retrying(wait=wait_fixed(5)):
+            with attempt:
+                health_status = self.get_patroni_health()
+                if (
+                    health_status["role"] not in ["leader", "master"]
+                    or health_status["state"] != "running"
+                ):
+                    raise RaftNotPromotedError()
+
+        logger.info("Restarting patroni")
+        self.restart_patroni()
+        for attempt in Retrying(wait=wait_fixed(5)):
+            with attempt:
+                found_postgres = False
+                for proc in psutil.process_iter(["name"]):
+                    if proc.name() == "postgres":
+                        found_postgres = True
+                        break
+                if not found_postgres:
+                    raise RaftPostgresqlNotUpError()
+        logger.info("Raft should be unstuck")
+
+    def get_running_cluster_members(self) -> list[str]:
+        """List running patroni members."""
+        try:
+            members = requests.get(
+                f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                verify=self.verify,
+                timeout=API_REQUEST_TIMEOUT,
+                auth=self._patroni_auth,
+            ).json()["members"]
+            return [
+                member["name"] for member in members if member["state"] in ("streaming", "running")
+            ]
+        except Exception:
+            return []
+
     def remove_raft_member(self, member_ip: str) -> None:
         """Remove a member from the raft cluster.
 
@@ -766,7 +871,10 @@ class Patroni:
             RaftMemberNotFoundError: if the member to be removed
                 is not part of the raft cluster.
         """
-        # Suppressing since the call will be removed soon
+        if self.charm.has_raft_keys():
+            logger.debug("Remove raft member: Raft already in recovery")
+            return
+
         # Get the status of the raft cluster.
         syncobj_util = TcpUtility(password=self.raft_password, timeout=3)
 
@@ -779,6 +887,24 @@ class Patroni:
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
+            return
+
+        # If there's no quorum and the leader left raft cluster is stuck
+        if not raft_status["has_quorum"] and (
+            not raft_status["leader"] or raft_status["leader"].host == member_ip
+        ):
+            self.charm.unit.status = BlockedStatus("Raft majority loss, run: promote-to-primary")
+            logger.warning("Remove raft member: Stuck raft cluster detected")
+            data_flags = {"raft_stuck": "True"}
+            self.charm.unit_peer_data.update(data_flags)
+
+            # Leader doesn't always trigger when changing it's own peer data.
+            if self.charm.unit.is_leader():
+                self.charm.on[PEER].relation_changed.emit(
+                    unit=self.charm.unit,
+                    app=self.charm.app,
+                    relation=self.charm.model.get_relation(PEER),
+                )
             return
 
         # Suppressing since the call will be removed soon
