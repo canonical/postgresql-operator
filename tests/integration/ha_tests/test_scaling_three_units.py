@@ -101,7 +101,7 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
             run_action = (
                 await ops_test.model.applications[DATABASE_APP_NAME]
                 .units[0]
-                .run_action("promote-to-primary", scope="unit", force=True)
+                .run_action("promote-to-primary", force=True)
             )
             await run_action.wait()
         except exceptions.TimeoutError:
