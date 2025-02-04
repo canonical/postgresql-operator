@@ -106,9 +106,6 @@ class PostgreSQLAsyncReplication(Object):
         self.framework.observe(
             self.charm.on.create_replication_action, self._on_create_replication
         )
-        self.framework.observe(
-            self.charm.on.promote_to_primary_action, self._on_promote_to_primary
-        )
 
         self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
 
@@ -583,7 +580,7 @@ class PostgreSQLAsyncReplication(Object):
         # Set the status.
         self.charm.unit.status = MaintenanceStatus("Creating replication...")
 
-    def _on_promote_to_primary(self, event: ActionEvent) -> None:
+    def promote_to_primary(self, event: ActionEvent) -> None:
         """Promote this cluster to the primary cluster."""
         if (
             self.charm.app.status.message != READ_ONLY_MODE_BLOCKING_MESSAGE
