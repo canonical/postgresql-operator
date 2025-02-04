@@ -82,7 +82,7 @@ async def build_connection_string(
             return None
         return data.get("standbys").split(",")[0]
     else:
-        return data.get("master")
+        return f"{data.get('master')} tcp_user_timeout=5"
 
 
 def change_primary_start_timeout(
