@@ -202,5 +202,5 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
     assert len(new_roles["primaries"]) == 1
-    assert len(new_roles["sync_standbys"]) == 2
+    assert len(new_roles["sync_standbys"]) == 4
     assert new_roles["primaries"][0] == original_roles["sync_standbys"][2]
