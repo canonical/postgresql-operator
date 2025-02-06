@@ -1533,7 +1533,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 self._patroni.switchover(self._member_name)
             except SwitchoverFailedError:
-                event.fail("Unit is not sync standby")
+                event.fail("Switchover failed or timed out, check the logs for details")
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""

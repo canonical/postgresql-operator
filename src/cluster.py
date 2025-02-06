@@ -766,6 +766,7 @@ class Patroni:
 
         # Check whether the switchover was unsuccessful.
         if r.status_code != 200:
+            logger.warning(f"Switchover call failed with code {r.status_code} {r.body}")
             raise SwitchoverFailedError(f"received {r.status_code}")
 
     @retry(

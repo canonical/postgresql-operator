@@ -2787,7 +2787,9 @@ def test_on_promote_to_primary(harness):
 
         harness.charm._on_promote_to_primary(event)
 
-        event.fail.assert_called_once_with("Unit is not sync standby")
+        event.fail.assert_called_once_with(
+            "Switchover failed or timed out, check the logs for details"
+        )
         event.fail.reset_mock()
 
         # Unit, no force, raft stuck
