@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import logging
 from asyncio import exceptions, gather, sleep
+from copy import deepcopy
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -63,9 +64,8 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     [
         ["primaries"],
         ["sync_standbys"],
-        ["replicas"],
-        ["primaries", "replicas"],
-        ["sync_standbys", "replicas"],
+        ["primaries", "sync_standbys"],
+        ["sync_standbys", "sync_standbys"],
     ],
 )
 @pytest.mark.abort_on_fail
@@ -76,8 +76,9 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
     original_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
+    copied_roles = deepcopy(original_roles)
     await start_continuous_writes(ops_test, app)
-    units = [original_roles[role][0] for role in roles]
+    units = [copied_roles[role].pop(0) for role in roles]
     for unit in units:
         logger.info(f"Stopping unit {unit}")
         await stop_machine(ops_test, await get_machine_from_unit(ops_test, unit))
@@ -124,10 +125,10 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
     assert len(new_roles["primaries"]) == 1
-    assert len(new_roles["sync_standbys"]) == 1
-    assert len(new_roles["replicas"]) == 1
+    assert len(new_roles["sync_standbys"]) == 2
+    assert len(new_roles["replicas"]) == 0
     if "primaries" in roles:
-        assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
+        assert new_roles["primaries"][0] in original_roles["sync_standbys"]
     else:
         assert new_roles["primaries"][0] == original_roles["primaries"][0]
 

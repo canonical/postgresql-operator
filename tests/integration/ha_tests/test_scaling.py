@@ -165,14 +165,14 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
             original_roles["primaries"][0], force=True, destroy_storage=False, max_wait=1500
         ),
         ops_test.model.destroy_unit(
-            original_roles["replicas"][0], force=True, destroy_storage=False, max_wait=1500
-        ),
-        ops_test.model.destroy_unit(
             original_roles["sync_standbys"][0], force=True, destroy_storage=False, max_wait=1500
         ),
+        ops_test.model.destroy_unit(
+            original_roles["sync_standbys"][1], force=True, destroy_storage=False, max_wait=1500
+        ),
     )
 
-    left_unit = ops_test.model.units[original_roles["sync_standbys"][1]]
+    left_unit = ops_test.model.units[original_roles["sync_standbys"][2]]
     await ops_test.model.block_until(
         lambda: left_unit.workload_status == "blocked"
         and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
@@ -188,8 +188,8 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
         ops_test,
         [
             original_roles["primaries"][0],
-            original_roles["replicas"][0],
             original_roles["sync_standbys"][0],
+            original_roles["sync_standbys"][1],
         ],
     )
 
@@ -203,65 +203,4 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
     )
     assert len(new_roles["primaries"]) == 1
     assert len(new_roles["sync_standbys"]) == 2
-    assert new_roles["primaries"][0] == original_roles["sync_standbys"][1]
-
-
-@pytest.mark.group(1)
-@markers.juju3
-@pytest.mark.abort_on_fail
-async def test_removing_raft_majority_async(ops_test: OpsTest, continuous_writes) -> None:
-    # Start an application that continuously writes data to the database.
-    app = await app_name(ops_test)
-    original_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
-
-    await start_continuous_writes(ops_test, app)
-    logger.info("Deleting primary")
-    await gather(
-        ops_test.model.destroy_unit(
-            original_roles["primaries"][0], force=True, destroy_storage=False, max_wait=1500
-        ),
-        ops_test.model.destroy_unit(
-            original_roles["replicas"][0], force=True, destroy_storage=False, max_wait=1500
-        ),
-        ops_test.model.destroy_unit(
-            original_roles["replicas"][1], force=True, destroy_storage=False, max_wait=1500
-        ),
-    )
-
-    left_unit = ops_test.model.units[original_roles["sync_standbys"][0]]
-    await ops_test.model.block_until(
-        lambda: left_unit.workload_status == "blocked"
-        and left_unit.workload_status_message == "Raft majority loss, run: promote-to-primary",
-        timeout=600,
-    )
-
-    run_action = await left_unit.run_action("promote-to-primary", scope="unit", force=True)
-    await run_action.wait()
-
-    await ops_test.model.wait_for_idle(status="active", timeout=900, idle_period=45)
-
-    await are_writes_increasing(
-        ops_test,
-        [
-            original_roles["primaries"][0],
-            original_roles["replicas"][0],
-            original_roles["replicas"][1],
-        ],
-    )
-
-    logger.info("Scaling back up")
-    await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=3)
-    await ops_test.model.wait_for_idle(status="active", timeout=1500)
-
-    await check_writes(ops_test)
-    new_roles = await get_cluster_roles(
-        ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    )
-    assert len(new_roles["primaries"]) == 1
-    assert len(new_roles["sync_standbys"]) == 2
-    assert (
-        new_roles["primaries"][0] == original_roles["sync_standbys"][0]
-        or new_roles["primaries"][0] == original_roles["sync_standbys"][1]
-    )
+    assert new_roles["primaries"][0] == original_roles["sync_standbys"][2]
