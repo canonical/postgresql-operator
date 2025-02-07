@@ -9,7 +9,6 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from .helpers import (
-    CHARM_BASE,
     scale_application,
 )
 
@@ -27,7 +26,6 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=3,
-            base=CHARM_BASE,
         ),
         ops_test.model.deploy(
             LS_CLIENT,

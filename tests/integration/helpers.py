@@ -1157,7 +1157,6 @@ async def backup_operations(
         charm,
         application_name=database_app_name,
         num_units=2,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 

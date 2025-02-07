@@ -7,7 +7,6 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
 from .helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     build_charm,
     get_leader_unit,
@@ -26,7 +25,6 @@ async def test_config_parameters(ops_test: OpsTest) -> None:
         await ops_test.model.deploy(
             charm,
             num_units=1,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)

@@ -9,7 +9,6 @@ from pytest_operator.plugin import OpsTest
 
 from .. import markers
 from ..helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     build_charm,
     get_machine_from_unit,
@@ -43,13 +42,11 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=3,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
-                base=CHARM_BASE,
                 channel="edge",
             ),
         )

@@ -15,7 +15,6 @@ from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from .. import markers
 from ..helpers import (
-    CHARM_BASE,
     assert_sync_standbys,
     get_leader_unit,
     get_machine_from_unit,
@@ -65,14 +64,12 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 charm,
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
         )
@@ -635,7 +632,6 @@ async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=1,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         ),
         ops_test.model.deploy(

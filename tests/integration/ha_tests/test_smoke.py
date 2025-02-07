@@ -12,7 +12,6 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
     APPLICATION_NAME,
-    CHARM_BASE,
 )
 from ..juju_ import juju_major_version
 from .helpers import (
@@ -44,7 +43,6 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             charm,
             application_name=APPLICATION_NAME,
             num_units=1,
-            base=CHARM_BASE,
             storage={"pgdata": {"pool": "lxd-btrfs", "size": 8046}},
             config={"profile": "testing"},
         )
@@ -150,7 +148,6 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             charm,
             application_name=DUP_APPLICATION_NAME,
             num_units=1,
-            base=CHARM_BASE,
             attach_storage=[tag.storage(garbage_storage)],
             config={"profile": "testing"},
         )
@@ -191,7 +188,6 @@ async def test_app_resources_conflicts_v2(ops_test: OpsTest, charm: str):
             charm,
             application_name=DUP_APPLICATION_NAME,
             num_units=1,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 

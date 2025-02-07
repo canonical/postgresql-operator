@@ -12,7 +12,6 @@ from .ha_tests.helpers import (
     change_patroni_setting,
 )
 from .helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     METADATA,
     build_charm,
@@ -53,7 +52,6 @@ async def test_deploy_active(ops_test: OpsTest):
             charm,
             application_name=APP_NAME,
             num_units=3,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         # No wait between deploying charms, since we can't guarantee users will wait. Furthermore,

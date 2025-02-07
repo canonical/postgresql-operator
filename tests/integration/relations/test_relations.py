@@ -9,7 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import CHARM_BASE, METADATA
+from ..helpers import METADATA
 from ..new_relations.test_new_relations import APPLICATION_APP_NAME, build_connection_string
 from ..relations.helpers import get_legacy_db_connection_str
 
@@ -43,7 +43,6 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 charm,
                 application_name=APP_NAME,
                 num_units=1,
-                base=CHARM_BASE,
                 config={
                     "profile": "testing",
                     "plugin_unaccent_enable": "True",

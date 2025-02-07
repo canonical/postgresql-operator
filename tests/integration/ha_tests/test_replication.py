@@ -6,7 +6,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import APPLICATION_NAME, CHARM_BASE, build_charm, db_connect, scale_application
+from ..helpers import APPLICATION_NAME, build_charm, db_connect, scale_application
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -32,7 +32,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.deploy(
                 charm,
                 num_units=3,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             )
     # Deploy the continuous writes application charm if it wasn't already deployed.
@@ -121,7 +120,6 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
                 charm,
                 application_name=new_cluster_app,
                 num_units=2,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             )
             await ops_test.model.wait_for_idle(

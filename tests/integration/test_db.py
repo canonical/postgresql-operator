@@ -50,7 +50,6 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=DATABASE_UNITS,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 
