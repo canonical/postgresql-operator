@@ -6,7 +6,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import APPLICATION_NAME, CHARM_BASE, db_connect, scale_application
+from ..helpers import APPLICATION_NAME, CHARM_BASE, build_charm, db_connect, scale_application
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -27,7 +27,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        charm = await ops_test.build_charm(".")
+        charm = await build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
@@ -115,7 +115,7 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
     # Deploy another cluster.
     new_cluster_app = f"second-{app}"
     if not await app_name(ops_test, new_cluster_app):
-        charm = await ops_test.build_charm(".")
+        charm = await build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,

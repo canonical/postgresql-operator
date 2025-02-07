@@ -11,6 +11,7 @@ from .. import markers
 from ..helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
+    build_charm,
 )
 from .conftest import APPLICATION_NAME
 from .helpers import (
@@ -33,7 +34,7 @@ charm = None
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy two PostgreSQL clusters."""
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await gather(

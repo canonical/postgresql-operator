@@ -9,6 +9,7 @@ from pytest_operator.plugin import OpsTest
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
+    build_charm,
     count_switchovers,
     get_leader_unit,
     get_primary,
@@ -116,7 +117,7 @@ async def test_upgrade_from_stable(ops_test: OpsTest):
     actions = await application.get_actions()
 
     logger.info("Build charm locally")
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
 
     logger.info("Refresh the charm")
     await application.refresh(path=charm)

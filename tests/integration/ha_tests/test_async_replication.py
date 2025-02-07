@@ -16,6 +16,7 @@ from .. import architecture, markers
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
+    build_charm,
     get_leader_unit,
     get_password,
     get_primary,
@@ -107,7 +108,7 @@ async def test_deploy_async_replication_setup(
 ) -> None:
     """Build and deploy two PostgreSQL cluster in two separate models to test async replication."""
     if not await app_name(ops_test):
-        charm = await ops_test.build_charm(".")
+        charm = await build_charm(".")
         await ops_test.model.deploy(
             charm,
             num_units=CLUSTER_SIZE,
@@ -122,7 +123,7 @@ async def test_deploy_async_replication_setup(
         )
         await ops_test.model.relate(DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME)
     if not await app_name(ops_test, model=second_model):
-        charm = await ops_test.build_charm(".")
+        charm = await build_charm(".")
         await second_model.deploy(
             charm,
             num_units=CLUSTER_SIZE,

@@ -15,6 +15,7 @@ from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
     METADATA,
+    build_charm,
     change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
@@ -46,7 +47,7 @@ else:
 @pytest.mark.skip_if_deployed
 async def test_deploy_active(ops_test: OpsTest):
     """Build the charm and deploy it."""
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
             charm,

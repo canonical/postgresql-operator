@@ -13,6 +13,7 @@ from pytest_operator.plugin import OpsTest
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
+    build_charm,
     count_switchovers,
     get_leader_unit,
     get_primary,
@@ -82,7 +83,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes) -> None:
     application = ops_test.model.applications[DATABASE_APP_NAME]
 
     logger.info("Build charm locally")
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
 
     logger.info("Refresh the charm")
     await application.refresh(path=charm)
@@ -134,7 +135,7 @@ async def test_fail_and_rollback(ops_test, continuous_writes) -> None:
     action = await leader_unit.run_action("pre-upgrade-check")
     await action.wait()
 
-    local_charm = await ops_test.build_charm(".")
+    local_charm = await build_charm(".")
     filename = local_charm.split("/")[-1] if isinstance(local_charm, str) else local_charm.name
     fault_charm = Path("/tmp/", filename)
     shutil.copy(local_charm, fault_charm)

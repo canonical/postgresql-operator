@@ -11,6 +11,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
     CHARM_BASE,
+    build_charm,
     db_connect,
     get_machine_from_unit,
     get_password,
@@ -71,7 +72,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        charm = await ops_test.build_charm(".")
+        charm = await build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,

@@ -13,6 +13,7 @@ from . import markers
 from .helpers import (
     CHARM_BASE,
     METADATA,
+    build_charm,
     check_patroni,
     db_connect,
     get_leader_unit,
@@ -32,7 +33,7 @@ APP_NAME = METADATA["name"]
 @pytest.mark.skip_if_deployed
 async def test_deploy_active(ops_test: OpsTest):
     """Build the charm and deploy it."""
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
             charm,
