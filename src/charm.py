@@ -346,6 +346,26 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return "cluster_initialised" in self.app_peer_data
 
     @property
+    def is_cluster_restoring_backup(self) -> bool:
+        """Returns whether the cluster is restoring a backup."""
+        return "restoring-backup" in self.app_peer_data
+
+    @property
+    def is_cluster_restoring_to_time(self) -> bool:
+        """Returns whether the cluster is restoring a backup to a specific time."""
+        return "restore-to-time" in self.app_peer_data
+
+    @property
+    def is_unit_departing(self) -> bool:
+        """Returns whether the unit is departing."""
+        return "departing" in self.unit_peer_data
+
+    @property
+    def is_unit_stopped(self) -> bool:
+        """Returns whether the unit is stopped."""
+        return "stopped" in self.unit_peer_data
+
+    @property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
@@ -452,9 +472,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
-        if "cluster_initialised" not in self._peers.data[
-            self.app
-        ] or not self._updated_synchronous_node_count(len(self._units_ips)):
+        if not self.is_cluster_initialised or not self._updated_synchronous_node_count(
+            len(self._units_ips)
+        ):
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
@@ -662,7 +682,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
             event.defer()
             return False
@@ -710,7 +730,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if (
-            "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data
+            self.is_cluster_restoring_backup or self.is_cluster_restoring_to_time
         ) and not self._was_restore_successful():
             logger.debug("on_peer_relation_changed early exit: Backup restore check failed")
             return
@@ -1127,7 +1147,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Don't update connection endpoints in the first time this event run for
         # this application because there are no primary and replicas yet.
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             logger.debug("Early exit on_leader_elected: Cluster not initialized")
             return
 
@@ -1403,7 +1423,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _start_replica(self, event) -> None:
         """Configure the replica if the cluster was already initialised."""
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             logger.debug("Deferring on_start: awaiting for cluster to start")
             self.unit.status = WaitingStatus("awaiting for cluster to start")
             event.defer()
@@ -1541,7 +1561,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if (
-            "restoring-backup" in self.app_peer_data or "restore-to-time" in self.app_peer_data
+            self.is_cluster_restoring_backup or self.is_cluster_restoring_to_time
         ) and not self._was_restore_successful():
             return
 
@@ -1566,7 +1586,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._observer.start_observer()
 
     def _was_restore_successful(self) -> bool:
-        if "restore-to-time" in self.app_peer_data and all(self.is_pitr_failed()):
+        if self.is_cluster_restoring_to_time and all(self.is_pitr_failed()):
             logger.error(
                 "Restore failed: database service failed to reach point-in-time-recovery target. "
                 "You can launch another restore with different parameters"
@@ -1623,7 +1643,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return True
 
     def _can_run_on_update_status(self) -> bool:
-        if "cluster_initialised" not in self._peers.data[self.app]:
+        if not self.is_cluster_initialised:
             return False
 
         if self.has_raft_keys():

@@ -72,7 +72,7 @@ class PostgreSQLProvider(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
