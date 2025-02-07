@@ -125,7 +125,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_static{release=\"$release\", instance=\"$instance\"}",
+          "expr": "topk(1, pg_static{release=\"$release\", instance=\"$instance\"})",
           "format": "time_series",
           "instant": true,
           "intervalFactor": 1,
@@ -212,7 +212,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "process_start_time_seconds{release=\"$release\", instance=\"$instance\"} * 1000",
+          "expr": "min(process_start_time_seconds{release=\"$release\", instance=\"$instance\"} * 1000) by (label)",
           "format": "time_series",
           "intervalFactor": 2,
           "legendFormat": "",
@@ -556,7 +556,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_max_connections{release=\"$release\", instance=\"$instance\"}",
+          "expr": "max(pg_settings_max_connections{release=\"$release\", instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -945,7 +945,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_shared_buffers_bytes{instance=\"$instance\"}",
+          "expr": "max(pg_settings_shared_buffers_bytes{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1030,7 +1030,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_effective_cache_size_bytes{instance=\"$instance\"}",
+          "expr": "max(pg_settings_effective_cache_size_bytes{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1115,7 +1115,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_maintenance_work_mem_bytes{instance=\"$instance\"}",
+          "expr": "max(pg_settings_maintenance_work_mem_bytes{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1200,7 +1200,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_work_mem_bytes{instance=\"$instance\"}",
+          "expr": "max(pg_settings_work_mem_bytes{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "legendFormat": "",
@@ -1287,7 +1287,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_max_wal_size_bytes{instance=\"$instance\"}",
+          "expr": "max(pg_settings_max_wal_size_bytes{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1372,7 +1372,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_random_page_cost{instance=\"$instance\"}",
+          "expr": "max(pg_settings_random_page_cost{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1457,7 +1457,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_seq_page_cost",
+          "expr": "max(pg_settings_seq_page_cost) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1542,7 +1542,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_max_worker_processes{instance=\"$instance\"}",
+          "expr": "max(pg_settings_max_worker_processes{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",
@@ -1627,7 +1627,7 @@
       "tableColumn": "",
       "targets": [
         {
-          "expr": "pg_settings_max_parallel_workers{instance=\"$instance\"}",
+          "expr": "max(pg_settings_max_parallel_workers{instance=\"$instance\"}) by (label)",
           "format": "time_series",
           "intervalFactor": 1,
           "refId": "A",

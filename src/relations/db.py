@@ -117,7 +117,7 @@ class DbProvides(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -170,7 +170,10 @@ class DbProvides(Object):
             self.charm.unit.status = BlockedStatus(ROLES_BLOCKING_MESSAGE)
             return False
 
-        database = relation.data.get(relation.app, {}).get("database")
+        user = f"relation-{relation.id}"
+        database = relation.data.get(relation.app, {}).get(
+            "database", self.charm.get_secret(APP_SCOPE, f"{user}-database")
+        )
         if not database:
             for unit in relation.units:
                 unit_database = relation.data.get(unit, {}).get("database")
@@ -189,7 +192,6 @@ class DbProvides(Object):
 
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            user = f"relation-{relation.id}"
             password = unit_relation_databag.get("password", new_password())
 
             # Store the user, password and database name in the secret store to be accessible by
@@ -238,7 +240,7 @@ class DbProvides(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -264,7 +266,7 @@ class DbProvides(Object):
         # Check for some conditions before trying to access the PostgreSQL instance.
         if (
             not self.charm.unit.is_leader()
-            or "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            or not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -279,7 +281,7 @@ class DbProvides(Object):
         # https://bugs.launchpad.net/juju/+bug/1979811.
         # Neither peer relation data nor stored state
         # are good solutions, just a temporary solution.
-        if "departing" in self.charm._peers.data[self.charm.unit]:
+        if self.charm.is_unit_departing:
             logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 

@@ -35,7 +35,7 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
 )
-from cluster import NotReadyError, RemoveRaftMemberFailedError
+from cluster import NotReadyError, RemoveRaftMemberFailedError, SwitchoverFailedError
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -1296,6 +1296,7 @@ def test_update_config(harness):
             pitr_target=None,
             restore_to_latest=False,
             parameters={"test": "test"},
+            no_peers=False,
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
@@ -1319,6 +1320,7 @@ def test_update_config(harness):
             pitr_target=None,
             restore_to_latest=False,
             parameters={"test": "test"},
+            no_peers=False,
         )
         _handle_postgresql_restart_need.assert_called_once()
         assert "tls" not in harness.get_relation_data(
@@ -1493,6 +1495,8 @@ def test_on_peer_relation_changed(harness):
         rel_id = harness.model.get_relation(PEER).id
         # Test an uninitialized cluster.
         mock_event = Mock()
+        mock_event.unit = None
+
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id, harness.charm.app.name, {"cluster_initialised": ""}
@@ -1866,6 +1870,179 @@ def test_add_cluster_member(harness):
         _are_all_members_ready.return_value = False
         with pytest.raises(NotReadyError):
             harness.charm.add_cluster_member("postgresql/0")
+
+
+def test_stuck_raft_cluster_check(harness):
+    # doesn't raise flags if there are no raft flags
+    assert not harness.charm._stuck_raft_cluster_check()
+
+    # Raft is stuck
+    rel_id = harness.model.get_relation(PEER).id
+    with harness.hooks_disabled():
+        harness.set_leader()
+        harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
+
+    harness.charm._stuck_raft_cluster_check()
+    assert "raft_selected_candidate" not in harness.charm.app_peer_data
+
+    # Raft candidate
+    with harness.hooks_disabled():
+        harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_candidate": "True"})
+    harness.charm._stuck_raft_cluster_check()
+    assert harness.charm.app_peer_data["raft_selected_candidate"] == harness.charm.unit.name
+
+    # Don't override existing candidate
+    with harness.hooks_disabled():
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"raft_selected_candidate": "something_else"}
+        )
+    harness.charm._stuck_raft_cluster_check()
+    assert harness.charm.app_peer_data["raft_selected_candidate"] != harness.charm.unit.name
+
+
+def test_stuck_raft_cluster_cleanup(harness):
+    rel_id = harness.model.get_relation(PEER).id
+
+    # Cleans up app data
+    with harness.hooks_disabled():
+        harness.update_relation_data(
+            rel_id,
+            harness.charm.app.name,
+            {
+                "raft_rejoin": "True",
+                "raft_reset_primary": "True",
+                "raft_selected_candidate": "unit_name",
+            },
+        )
+    harness.charm._stuck_raft_cluster_cleanup()
+
+    assert "raft_rejoin" not in harness.charm.app_peer_data
+    assert "raft_reset_primary" not in harness.charm.app_peer_data
+    assert "raft_selected_candidate" not in harness.charm.app_peer_data
+
+    # Don't clean up if there's unit data flags
+    with harness.hooks_disabled():
+        harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_primary": "True"})
+        harness.update_relation_data(
+            rel_id,
+            harness.charm.app.name,
+            {
+                "raft_rejoin": "True",
+                "raft_reset_primary": "True",
+                "raft_selected_candidate": "unit_name",
+            },
+        )
+    harness.charm._stuck_raft_cluster_cleanup()
+
+    assert "raft_rejoin" in harness.charm.app_peer_data
+    assert "raft_reset_primary" in harness.charm.app_peer_data
+    assert "raft_selected_candidate" in harness.charm.app_peer_data
+
+
+def test_stuck_raft_cluster_rejoin(harness):
+    rel_id = harness.model.get_relation(PEER).id
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
+        ) as _update_relation_endpoints,
+        patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
+    ):
+        # No data
+        harness.charm._stuck_raft_cluster_rejoin()
+
+        assert "raft_reset_primary" not in harness.charm.app_peer_data
+        assert "raft_rejoin" not in harness.charm.app_peer_data
+
+        # Raises primary flag
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id, harness.charm.unit.name, {"raft_primary": "test_primary"}
+            )
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"raft_followers_stopped": "test_candidate"},
+            )
+
+        harness.charm._stuck_raft_cluster_rejoin()
+
+        assert "raft_reset_primary" in harness.charm.app_peer_data
+        assert "raft_rejoin" in harness.charm.app_peer_data
+        assert "members_ips" not in harness.charm.app_peer_data
+        _add_to_members_ips.assert_called_once_with("192.0.2.0")
+        _update_relation_endpoints.assert_called_once_with()
+
+
+def test_raft_reinitialisation(harness):
+    rel_id = harness.model.get_relation(PEER).id
+
+    with (
+        patch(
+            "charm.PostgresqlOperatorCharm._stuck_raft_cluster_check"
+        ) as _stuck_raft_cluster_check,
+        patch(
+            "charm.PostgresqlOperatorCharm._stuck_raft_cluster_rejoin"
+        ) as _stuck_raft_cluster_rejoin,
+        patch(
+            "charm.PostgresqlOperatorCharm._stuck_raft_cluster_cleanup"
+        ) as _stuck_raft_cluster_cleanup,
+        patch("charm.Patroni.remove_raft_data") as _remove_raft_data,
+        patch("charm.Patroni.reinitialise_raft_data") as _reinitialise_raft_data,
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.PostgresqlOperatorCharm._set_primary_status_message"),
+    ):
+        # No data
+        harness.charm._raft_reinitialisation()
+
+        # Different candidate
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id, harness.charm.unit.name, {"raft_stuck": "True", "raft_candidate": "True"}
+            )
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"raft_selected_candidate": "test_candidate"},
+            )
+
+        harness.charm._raft_reinitialisation()
+        _stuck_raft_cluster_rejoin.assert_called_once_with()
+        _stuck_raft_cluster_check.assert_called_once_with()
+        assert not _stuck_raft_cluster_cleanup.called
+        _remove_raft_data.assert_called_once_with()
+        assert not _reinitialise_raft_data.called
+
+        # Current candidate
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.unit.name,
+                {"raft_stuck": "", "raft_candidate": "True", "raft_stopped": "True"},
+            )
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"raft_selected_candidate": "postgresql/0", "raft_followers_stopped": "True"},
+            )
+
+        harness.charm._raft_reinitialisation()
+        _reinitialise_raft_data.assert_called_once_with()
+
+        # Cleanup
+        with harness.hooks_disabled():
+            harness.set_leader()
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.unit.name,
+                {"raft_stuck": "", "raft_candidate": "True", "raft_stopped": "True"},
+            )
+            harness.update_relation_data(rel_id, harness.charm.app.name, {"raft_rejoin": "True"})
+        harness.charm._raft_reinitialisation()
+        _stuck_raft_cluster_cleanup.assert_called_once_with()
+        _update_config.assert_called_once_with()
 
 
 #
@@ -2394,6 +2571,8 @@ def test_update_new_unit_status(harness):
 @pytest.mark.parametrize("is_leader", [True, False])
 def test_set_primary_status_message(harness, is_leader):
     with (
+        patch("charm.Patroni.has_raft_quorum", return_value=True),
+        patch("charm.Patroni.get_running_cluster_members", return_value=["test"]),
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock
@@ -2427,7 +2606,9 @@ def test_set_primary_status_message(harness, is_leader):
                     assert isinstance(harness.charm.unit.status, MaintenanceStatus)
                 else:
                     _is_standby_leader.side_effect = None
-                    _is_standby_leader.return_value = values[1]
+                    _is_standby_leader.return_value = (
+                        values[0] != harness.charm.unit.name and values[1]
+                    )
                     harness.charm._set_primary_status_message()
                     assert isinstance(
                         harness.charm.unit.status,
@@ -2579,3 +2760,52 @@ def test_get_plugins(harness):
             "insert_username",
             "moddatetime",
         ]
+
+
+def test_on_promote_to_primary(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm._raft_reinitialisation") as _raft_reinitialisation,
+        patch("charm.PostgreSQLAsyncReplication.promote_to_primary") as _promote_to_primary,
+        patch("charm.Patroni.switchover") as _switchover,
+    ):
+        event = Mock()
+        event.params = {"scope": "cluster"}
+
+        # Cluster
+        harness.charm._on_promote_to_primary(event)
+        _promote_to_primary.assert_called_once_with(event)
+
+        # Unit, no force, regular promotion
+        event.params = {"scope": "unit"}
+
+        harness.charm._on_promote_to_primary(event)
+
+        _switchover.assert_called_once_with("postgresql-0")
+
+        # Unit, no force, switchover failed
+        event.params = {"scope": "unit"}
+        _switchover.side_effect = SwitchoverFailedError
+
+        harness.charm._on_promote_to_primary(event)
+
+        event.fail.assert_called_once_with("Unit is not sync standby")
+        event.fail.reset_mock()
+
+        # Unit, no force, raft stuck
+        event.params = {"scope": "unit"}
+        rel_id = harness.model.get_relation(PEER).id
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, harness.charm.unit.name, {"raft_stuck": "True"})
+
+        harness.charm._on_promote_to_primary(event)
+        event.fail.assert_called_once_with(
+            "Raft is stuck. Set force to reinitialise with new primary"
+        )
+
+        # Unit, raft reinit
+        event.params = {"scope": "unit", "force": "true"}
+        with harness.hooks_disabled():
+            harness.set_leader()
+        harness.charm._on_promote_to_primary(event)
+        _raft_reinitialisation.assert_called_once_with()
+        assert harness.charm.unit_peer_data["raft_candidate"] == "True"
