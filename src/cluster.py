@@ -776,7 +776,6 @@ class Patroni:
             ):
                 logger.debug("Unit is not sync standby")
                 raise SwitchoverNotSyncError()
-                return
             logger.warning(f"Switchover call failed with code {r.status_code} {r.text}")
             raise SwitchoverFailedError(f"received {r.status_code}")
 
