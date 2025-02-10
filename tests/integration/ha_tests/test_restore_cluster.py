@@ -7,7 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
-    CHARM_BASE,
+    build_charm,
     db_connect,
     get_password,
     get_patroni_cluster,
@@ -34,14 +34,13 @@ charm = None
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy two PostgreSQL clusters."""
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await ops_test.model.deploy(
             charm,
             application_name=FIRST_APPLICATION,
             num_units=3,
-            base=CHARM_BASE,
             storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
             config={"profile": "testing"},
         )
@@ -51,7 +50,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             charm,
             application_name=SECOND_APPLICATION,
             num_units=1,
-            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 

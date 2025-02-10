@@ -11,7 +11,6 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential
 
 from . import architecture
 from .helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     backup_operations,
     construct_endpoint,
@@ -205,13 +204,11 @@ async def test_restore_on_new_cluster(ops_test: OpsTest, github_secrets, charm) 
     await ops_test.model.deploy(
         charm,
         application_name=previous_database_app_name,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
     await ops_test.model.deploy(
         charm,
         application_name=database_app_name,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
     await ops_test.model.relate(previous_database_app_name, S3_INTEGRATOR_APP_NAME)

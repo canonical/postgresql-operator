@@ -17,7 +17,6 @@ from locales import SNAP_LOCALES
 
 from .ha_tests.helpers import get_cluster_roles
 from .helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
     STORAGE_PATH,
     check_cluster_members,
@@ -50,7 +49,6 @@ async def test_deploy(ops_test: OpsTest, charm: str):
         charm,
         application_name=DATABASE_APP_NAME,
         num_units=3,
-        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 

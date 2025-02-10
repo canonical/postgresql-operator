@@ -50,16 +50,15 @@ jobs:
   build:
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.1.0
-
+    with:
+      cache: false
   integration-test:
     strategy:
       fail-fast: false
       matrix:
         juju:
-          - agent: 2.9.51  # renovate: juju-agent-pin-minor
-            libjuju: ==2.9.49.1  # renovate: latest libjuju 2
-            allure_on_amd64: false
           - agent: 3.6.2  # renovate: juju-agent-pin-minor
+            libjuju: ==3.6.1.0
             allure_on_amd64: true
         architecture:
           - amd64

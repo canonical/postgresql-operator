@@ -10,7 +10,7 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
-    CHARM_BASE,
+    build_charm,
     db_connect,
     get_machine_from_unit,
     get_password,
@@ -71,12 +71,11 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        charm = await ops_test.build_charm(".")
+        charm = await build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
                 num_units=3,
-                base=CHARM_BASE,
                 storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
                 config={"profile": "testing"},
             )
@@ -87,7 +86,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
-                base=CHARM_BASE,
                 channel="edge",
             )
 

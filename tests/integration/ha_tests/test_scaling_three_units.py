@@ -9,8 +9,8 @@ from pytest_operator.plugin import OpsTest
 
 from .. import markers
 from ..helpers import (
-    CHARM_BASE,
     DATABASE_APP_NAME,
+    build_charm,
     get_machine_from_unit,
     stop_machine,
 )
@@ -34,7 +34,7 @@ charm = None
 async def test_build_and_deploy(ops_test: OpsTest) -> None:
     """Build and deploy two PostgreSQL clusters."""
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await ops_test.build_charm(".")
+    charm = await build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await gather(
@@ -42,13 +42,11 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=3,
-                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
-                base=CHARM_BASE,
                 channel="edge",
             ),
         )

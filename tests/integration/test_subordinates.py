@@ -9,13 +9,11 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from .helpers import (
-    CHARM_BASE,
     scale_application,
 )
 
 DATABASE_APP_NAME = "pg"
 LS_CLIENT = "landscape-client"
-UBUNTU_PRO_APP_NAME = "ubuntu-advantage"
 
 logger = logging.getLogger(__name__)
 
@@ -28,14 +26,6 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=3,
-            base=CHARM_BASE,
-        ),
-        ops_test.model.deploy(
-            UBUNTU_PRO_APP_NAME,
-            config={"token": github_secrets["UBUNTU_PRO_TOKEN"]},
-            channel="latest/edge",
-            num_units=0,
-            base=CHARM_BASE,
         ),
         ops_test.model.deploy(
             LS_CLIENT,
@@ -46,18 +36,12 @@ async def test_deploy(ops_test: OpsTest, charm: str, github_secrets):
             },
             channel="latest/edge",
             num_units=0,
-            base=CHARM_BASE,
         ),
     )
 
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
     await ops_test.model.relate(f"{DATABASE_APP_NAME}:juju-info", f"{LS_CLIENT}:container")
-    await ops_test.model.relate(
-        f"{DATABASE_APP_NAME}:juju-info", f"{UBUNTU_PRO_APP_NAME}:juju-info"
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active"
-    )
+    await ops_test.model.wait_for_idle(apps=[LS_CLIENT, DATABASE_APP_NAME], status="active")
 
 
 @pytest.mark.group(1)
@@ -65,7 +49,7 @@ async def test_scale_up(ops_test: OpsTest, github_secrets):
     await scale_application(ops_test, DATABASE_APP_NAME, 4)
 
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
+        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active", timeout=1500
     )
 
 
@@ -74,5 +58,5 @@ async def test_scale_down(ops_test: OpsTest, github_secrets):
     await scale_application(ops_test, DATABASE_APP_NAME, 3)
 
     await ops_test.model.wait_for_idle(
-        apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
+        apps=[LS_CLIENT, DATABASE_APP_NAME], status="active", timeout=1500
     )
