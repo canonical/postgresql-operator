@@ -18,20 +18,21 @@ on:
   workflow_dispatch:
 
 jobs:
-  build:
-    name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.1.0
-    with:
-      cache: false
+  ci-tests:
+    name: Tests
+    uses: ./.github/workflows/ci.yaml
+    secrets: inherit
+    permissions:
+      contents: write  # Needed for Allure Report beta
 
   release:
     name: Release charm
     needs:
-      - build
+      - ci-tests
     uses: canonical/data-platform-workflows/.github/workflows/release_charm.yaml@v29.1.0
     with:
       channel: 16/edge
-      artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
+      artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
     permissions:
