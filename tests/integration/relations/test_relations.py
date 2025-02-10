@@ -10,7 +10,7 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import CHARM_BASE, METADATA
-from ..new_relations.test_new_relations import APPLICATION_APP_NAME, build_connection_string
+from ..new_relations.test_new_relations_1 import APPLICATION_APP_NAME, build_connection_string
 from ..relations.helpers import get_legacy_db_connection_str
 
 logger = logging.getLogger(__name__)
@@ -25,7 +25,6 @@ DB_APP_NAME = "db-app"
 APP_NAMES = [APP_NAME, DATABASE_APP_NAME, DB_APP_NAME]
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_deploy_charms(ops_test: OpsTest, charm):
     """Deploy both charms (application and database) to use in the tests."""
@@ -63,7 +62,6 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
 
 
-@pytest.mark.group(1)
 async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest):
     await ops_test.model.relate(f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}")
     await ops_test.model.relate(APP_NAME, f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}")
@@ -104,7 +102,6 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
                 psycopg2.connect(legacy_interface_connect)
 
 
-@pytest.mark.group(1)
 async def test_modern_endpoint_with_multiple_related_endpoints(ops_test: OpsTest):
     await ops_test.model.relate(f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}")
     await ops_test.model.relate(APP_NAME, f"{DATABASE_APP_NAME}:{FIRST_DATABASE_RELATION}")

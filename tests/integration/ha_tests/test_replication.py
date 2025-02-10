@@ -18,16 +18,14 @@ from .helpers import (
 )
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy three unit of PostgreSQL."""
     wait_for_apps = False
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
@@ -51,7 +49,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_timeout) -> None:
     """Kill primary unit, check reelection."""
     app = await app_name(ops_test)
@@ -89,7 +86,6 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
 async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     """Write to primary, read data from secondaries (check consistency)."""
     # Locate primary unit.
@@ -106,8 +102,9 @@ async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
-async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous_writes) -> None:
+async def test_no_data_replicated_between_clusters(
+    ops_test: OpsTest, charm, continuous_writes
+) -> None:
     """Check that writes in one cluster are not replicated to another cluster."""
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -116,7 +113,6 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
     # Deploy another cluster.
     new_cluster_app = f"second-{app}"
     if not await app_name(ops_test, new_cluster_app):
-        charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,

@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 RELATION_ENDPOINT = "database"
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
     """Test the audit plugin."""
