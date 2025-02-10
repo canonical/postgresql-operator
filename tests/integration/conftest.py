@@ -1,12 +1,13 @@
-#!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import pytest
-from pytest_operator.plugin import OpsTest
+
+from . import architecture
 
 
-@pytest.fixture(scope="module")
-async def charm(ops_test: OpsTest):
-    """Build the charm-under-test."""
-    # Build charm from local source folder.
-    yield await ops_test.build_charm(".")
+@pytest.fixture(scope="session")
+def charm():
+    # Return str instead of pathlib.Path since python-libjuju's model.deploy(), juju deploy, and
+    # juju bundle files expect local charms to begin with `./` or `/` to distinguish them from
+    # Charmhub charms.
+    return f"./postgresql_ubuntu@22.04-{architecture.architecture}.charm"
