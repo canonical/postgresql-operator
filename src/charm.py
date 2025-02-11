@@ -181,7 +181,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
-        self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
@@ -497,52 +496,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
-
-    def _on_pgdata_storage_detaching(self, _) -> None:
-        # Change the primary if it's the unit that is being removed.
-        try:
-            primary = self._patroni.get_primary(unit_name_pattern=True)
-        except RetryError:
-            # Ignore the event if the primary couldn't be retrieved.
-            # If a switchover is needed, an automatic failover will be triggered
-            # when the unit is removed.
-            logger.debug("Early exit on_pgdata_storage_detaching: primary cannot be retrieved")
-            return
-
-        if self.unit.name != primary:
-            return
-
-        if not self._patroni.are_all_members_ready():
-            logger.warning(
-                "could not switchover because not all members are ready"
-                " - an automatic failover will be triggered"
-            )
-            return
-
-        # Try to switchover to another member and raise an exception if it doesn't succeed.
-        # If it doesn't happen on time, Patroni will automatically run a fail-over.
-        try:
-            # Get the current primary to check if it has changed later.
-            current_primary = self._patroni.get_primary()
-
-            # Trigger the switchover.
-            self._patroni.switchover()
-
-            # Wait for the switchover to complete.
-            self._patroni.primary_changed(current_primary)
-
-            logger.info("successful switchover")
-        except (RetryError, SwitchoverFailedError) as e:
-            logger.warning(
-                f"switchover failed with reason: {e} - an automatic failover will be triggered"
-            )
-            return
-
-        # Only update the connection endpoints if there is a primary.
-        # A cluster can have all members as replicas for some time after
-        # a failed switchover, so wait until the primary is elected.
-        if self.primary_endpoint:
-            self._update_relation_endpoints()
 
     def _stuck_raft_cluster_check(self) -> None:
         """Check for stuck raft cluster and reinitialise if safe."""

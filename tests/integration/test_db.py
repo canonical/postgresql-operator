@@ -154,7 +154,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     )
 
     logger.info("Connect to the database using the primary connection string.")
-    logger.error(primary_connection_string)
     with psycopg2.connect(primary_connection_string) as connection:
         connection.autocommit = True
         with connection.cursor() as cursor:

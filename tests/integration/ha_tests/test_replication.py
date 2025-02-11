@@ -63,10 +63,8 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     await ops_test.model.destroy_units(primary_name)
 
     # Wait and get the primary again (which can be any unit, including the previous primary).
-    async with ops_test.fast_forward("60s"):
-        await ops_test.model.wait_for_idle(
-            apps=[app, APPLICATION_NAME], status="active", idle_period=30
-        )
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(apps=[app], status="active")
 
     await are_writes_increasing(ops_test, primary_name)
 
