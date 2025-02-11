@@ -10,10 +10,8 @@ from .helpers import app_name, get_cluster_roles
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm: str) -> None:
     """Build and deploy two PostgreSQL clusters."""
-    # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await ops_test.model.deploy(
