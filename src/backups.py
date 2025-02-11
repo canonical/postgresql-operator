@@ -745,7 +745,7 @@ class PostgreSQLBackups(Object):
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Call the stanza initialization when the credentials or the connection info change."""
-        if "cluster_initialised" not in self.charm.app_peer_data:
+        if not self.charm.is_cluster_initialised:
             logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
             event.defer()
             return
@@ -757,10 +757,7 @@ class PostgreSQLBackups(Object):
             return
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
-        if (
-            "restoring-backup" in self.charm.app_peer_data
-            or "restore-to-time" in self.charm.app_peer_data
-        ):
+        if self.charm.is_cluster_restoring_backup or self.charm.is_cluster_restoring_to_time:
             logger.info("Cannot change S3 configuration during restore")
             event.defer()
             return

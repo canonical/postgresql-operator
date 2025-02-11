@@ -27,7 +27,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v29.0.5
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v29.1.0
 
   unit-test:
     name: Unit test charm
@@ -49,48 +49,17 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.0.5
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v29.1.0
 
   integration-test:
-    strategy:
-      fail-fast: false
-      matrix:
-        juju:
-          - agent: 2.9.51  # renovate: juju-agent-pin-minor
-            libjuju: ==2.9.49.1  # renovate: latest libjuju 2
-            allure_on_amd64: false
-          - agent: 3.6.2  # renovate: juju-agent-pin-minor
-            allure_on_amd64: true
-        architecture:
-          - amd64
-        include:
-          - juju:
-              agent: 3.6.2  # renovate: juju-agent-pin-minor
-              allure_on_amd64: true
-            architecture: arm64
-    name: Integration | ${{ matrix.juju.agent }} | ${{ matrix.architecture }}
+    name: Integration test charm
     needs:
       - lint
       - unit-test
       - build
-    uses: canonical/data-platform-workflows/.github/workflows/integration_test_charm.yaml@v29.0.5
+    uses: ./.github/workflows/integration_test.yaml
     with:
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-      architecture: ${{ matrix.architecture }}
-      cloud: lxd
-      juju-agent-version: ${{ matrix.juju.agent }}
-      libjuju-version-constraint: ${{ matrix.juju.libjuju }}
-      _beta_allure_report: ${{ matrix.juju.allure_on_amd64 && matrix.architecture == 'amd64' }}
-    secrets:
-      integration-test: |
-        {
-          "AWS_ACCESS_KEY": "${{ secrets.AWS_ACCESS_KEY }}",
-          "AWS_SECRET_KEY": "${{ secrets.AWS_SECRET_KEY }}",
-          "GCP_ACCESS_KEY": "${{ secrets.GCP_ACCESS_KEY }}",
-          "GCP_SECRET_KEY": "${{ secrets.GCP_SECRET_KEY }}",
-          "UBUNTU_PRO_TOKEN" : "${{ secrets.UBUNTU_PRO_TOKEN }}",
-          "LANDSCAPE_ACCOUNT_NAME": "${{ secrets.LANDSCAPE_ACCOUNT_NAME }}",
-          "LANDSCAPE_REGISTRATION_KEY": "${{ secrets.LANDSCAPE_REGISTRATION_KEY }}",
-        }
+    secrets: inherit
     permissions:
-      contents: write  # Needed for Allure Report beta
+      contents: write  # Needed for Allure Report

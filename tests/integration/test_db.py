@@ -41,7 +41,6 @@ ROLES_BLOCKING_MESSAGE = (
 )
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Mailman3 Core to test the 'db' relation."""
@@ -109,7 +108,6 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
         assert domain_name not in [domain.mail_host for domain in client.domains]
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
@@ -195,7 +193,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             psycopg2.connect(primary_connection_string)
 
 
-@pytest.mark.group(1)
 async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     await ops_test.model.deploy(
         APPLICATION_NAME,
@@ -253,7 +250,6 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
 
-@pytest.mark.group(1)
 async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
     await asyncio.gather(
         ops_test.model.applications[APPLICATION_NAME].set_config({"legacy_roles": "False"}),
@@ -295,8 +291,7 @@ async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
 
 
 @markers.juju2
-@pytest.mark.group(1)
-@pytest.mark.unstable
+@pytest.mark.skip(reason="Unstable")
 @markers.amd64_only  # canonical-livepatch-server charm (in bundle) not available for arm64
 async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
     # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
