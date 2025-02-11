@@ -27,13 +27,11 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy two PostgreSQL clusters."""
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await gather(
@@ -55,7 +53,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> None:
@@ -105,7 +102,6 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
     await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes) -> None:
@@ -140,7 +136,6 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
     await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_scale_to_five_units(ops_test: OpsTest) -> None:
@@ -148,7 +143,6 @@ async def test_scale_to_five_units(ops_test: OpsTest) -> None:
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> None:
@@ -206,7 +200,6 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
     assert new_roles["primaries"][0] == original_roles["sync_standbys"][1]
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_raft_majority_async(ops_test: OpsTest, continuous_writes) -> None:

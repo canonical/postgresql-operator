@@ -41,12 +41,10 @@ else:
     tls_config = {"ca-common-name": "Test CA"}
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_active(ops_test: OpsTest):
+async def test_deploy_active(ops_test: OpsTest, charm):
     """Build the charm and deploy it."""
-    charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
             charm,
@@ -59,7 +57,6 @@ async def test_deploy_active(ops_test: OpsTest):
         # bundles don't wait between deploying charms.
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""

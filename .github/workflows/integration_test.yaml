@@ -1,0 +1,316 @@
+on:
+  workflow_call:
+    inputs:
+      artifact-prefix:
+        description: |
+          Prefix for charm package GitHub artifact(s)
+          
+          Use canonical/data-platform-workflows build_charm.yaml to build the charm(s)
+        required: true
+        type: string
+
+jobs:
+  collect-integration-tests:
+    name: Collect integration test spread jobs
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up environment
+        run: |
+          sudo snap install charmcraft --classic
+          pipx install tox poetry
+      - name: Collect spread jobs
+        id: collect-jobs
+        shell: python
+        run: |
+          import json
+          import os
+          import subprocess
+
+          spread_jobs = (
+              subprocess.run(
+                  ["charmcraft", "test", "--list", "github-ci"], capture_output=True, check=True, text=True
+              )
+              .stdout.strip()
+              .split("\n")
+          )
+          jobs = []
+          for job in spread_jobs:
+              # Example `job`: "github-ci:ubuntu-24.04:tests/spread/test_charm.py:juju36"
+              _, runner, task, variant = job.split(":")
+              # Example: "test_charm.py"
+              task = task.removeprefix("tests/spread/")
+              if runner.endswith("-arm"):
+                  architecture = "arm64"
+              else:
+                  architecture = "amd64"
+              # Example: "test_charm.py:juju36 | amd64"
+              name = f"{task}:{variant} | {architecture}"
+              # ":" character not valid in GitHub Actions artifact
+              name_in_artifact = f"{task}-{variant}-{architecture}"
+              jobs.append({
+                  "spread_job": job,
+                  "name": name,
+                  "name_in_artifact": name_in_artifact,
+                  "runner": runner,
+              })
+          output = f"jobs={json.dumps(jobs)}"
+          print(output)
+          with open(os.environ["GITHUB_OUTPUT"], "a") as file:
+              file.write(output)
+      - name: Generate Allure default test results
+        if: ${{ github.event_name == 'schedule' && github.run_attempt == '1' }}
+        run: tox run -e integration -- tests/integration --allure-default-dir=allure-default-results
+      - name: Upload Allure default results
+        # Default test results in case the integration tests time out or runner set up fails
+        # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
+        if: ${{ github.event_name == 'schedule' && github.run_attempt == '1' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-default-results-integration-test
+          path: allure-default-results/
+          if-no-files-found: error
+    outputs:
+      jobs: ${{ steps.collect-jobs.outputs.jobs }}
+
+  integration-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        job: ${{ fromJSON(needs.collect-integration-tests.outputs.jobs) }}
+    name: ${{ matrix.job.name }}
+    needs:
+      - collect-integration-tests
+    runs-on: ${{ matrix.job.runner }}
+    timeout-minutes: 217  # Sum of steps `timeout-minutes` + 5
+    steps:
+      - name: Free up disk space
+        timeout-minutes: 1
+        run: |
+          printf '\nDisk usage before cleanup\n'
+          df --human-readable
+          # Based on https://github.com/actions/runner-images/issues/2840#issuecomment-790492173
+          rm -r /opt/hostedtoolcache/
+          printf '\nDisk usage after cleanup\n'
+          df --human-readable
+      - name: Checkout
+        timeout-minutes: 3
+        uses: actions/checkout@v4
+      - name: Set up environment
+        timeout-minutes: 5
+        run: sudo snap install charmcraft --classic
+      # TODO: remove when https://github.com/canonical/charmcraft/issues/2105 and
+      # https://github.com/canonical/charmcraft/issues/2130 fixed
+      - run: |
+          sudo snap install go --classic
+          go install github.com/snapcore/spread/cmd/spread@latest
+      - name: Download packed charm(s)
+        timeout-minutes: 5
+        uses: actions/download-artifact@v4
+        with:
+          pattern: ${{ inputs.artifact-prefix }}-*
+          merge-multiple: true
+      - name: Run spread job
+        timeout-minutes: 180
+        id: spread
+        # TODO: replace with `charmcraft test` when
+        # https://github.com/canonical/charmcraft/issues/2105 and
+        # https://github.com/canonical/charmcraft/issues/2130 fixed
+        run: ~/go/bin/spread -vv -artifacts=artifacts '${{ matrix.job.spread_job }}'
+        env:
+          AWS_ACCESS_KEY: ${{ secrets.AWS_ACCESS_KEY }}
+          AWS_SECRET_KEY: ${{ secrets.AWS_SECRET_KEY }}
+          GCP_ACCESS_KEY: ${{ secrets.GCP_ACCESS_KEY }}
+          GCP_SECRET_KEY: ${{ secrets.GCP_SECRET_KEY }}
+          UBUNTU_PRO_TOKEN: ${{ secrets.UBUNTU_PRO_TOKEN }}
+          LANDSCAPE_ACCOUNT_NAME: ${{ secrets.LANDSCAPE_ACCOUNT_NAME }}
+          LANDSCAPE_REGISTRATION_KEY: ${{ secrets.LANDSCAPE_REGISTRATION_KEY }}
+      - name: Upload Allure results
+        timeout-minutes: 3
+        # Only upload results from one spread system & one spread variant
+        # Allure can only process one result per pytest test ID. If parameterization is done via
+        # spread instead of pytest, there will be overlapping pytest test IDs.
+        if: ${{ (success() || (failure() && steps.spread.outcome == 'failure')) && startsWith(matrix.job.spread_job, 'github-ci:ubuntu-24.04:') && endsWith(matrix.job.spread_job, ':juju36') && github.event_name == 'schedule' && github.run_attempt == '1' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: allure-results-integration-test-${{ matrix.job.name_in_artifact }}
+          path: artifacts/${{ matrix.job.spread_job }}/allure-results/
+          if-no-files-found: error
+      - timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: snap list
+      - name: Select model
+        timeout-minutes: 1
+        # `!contains(matrix.job.spread_job, 'juju29')` workaround for juju 2 error:
+        # "ERROR cannot acquire lock file to read controller concierge-microk8s: unable to open
+        # /tmp/juju-store-lock-3635383939333230: permission denied"
+        # Unable to workaround error with `sudo rm /tmp/juju-*`
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        id: juju-switch
+        run: |
+          # sudo needed since spread runs scripts as root
+          # "testing" is default model created by concierge
+          sudo juju switch testing
+          mkdir ~/logs/
+      - name: juju status
+        timeout-minutes: 1
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: sudo juju status --color --relations | tee ~/logs/juju-status.txt
+      - name: juju debug-log
+        timeout-minutes: 3
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: sudo juju debug-log --color --replay --no-tail | tee ~/logs/juju-debug-log.txt
+      - name: jhack tail
+        timeout-minutes: 3
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        run: sudo jhack tail --printer raw --replay --no-watch | tee ~/logs/jhack-tail.txt
+      - name: Upload logs
+        timeout-minutes: 5
+        if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: logs-integration-test-${{ matrix.job.name_in_artifact }}
+          path: ~/logs/
+          if-no-files-found: error
+      - name: Disk usage
+        timeout-minutes: 1
+        if: ${{ success() || (failure() && steps.spread.outcome == 'failure') }}
+        run: df --human-readable
+
+  allure-report:
+    # TODO future improvement: use concurrency group for job
+    name: Publish Allure report
+    if: ${{ !cancelled() && github.event_name == 'schedule' && github.run_attempt == '1' }}
+    needs:
+      - integration-test
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Download Allure
+        # Following instructions from https://allurereport.org/docs/install-for-linux/#install-from-a-deb-package
+        run: gh release download --repo allure-framework/allure2 --pattern 'allure_*.deb'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Allure
+        run: |
+          sudo apt-get update
+          sudo apt-get install ./allure_*.deb -y
+      # For first run, manually create branch with no history
+      # (e.g.
+      # git checkout --orphan gh-pages-beta
+      # git rm -rf .
+      # touch .nojekyll
+      # git add .nojekyll
+      # git commit -m "Initial commit"
+      # git push origin gh-pages-beta
+      # )
+      - name: Checkout GitHub pages branch
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages-beta
+          path: repo/
+      - name: Download default test results
+        # Default test results in case the integration tests time out or runner set up fails
+        # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
+        uses: actions/download-artifact@v4
+        with:
+          path: allure-default-results/
+          name: allure-default-results-integration-test
+      - name: Download test results
+        uses: actions/download-artifact@v4
+        with:
+          path: allure-results/
+          pattern: allure-results-integration-test-*
+          merge-multiple: true
+      - name: Combine Allure default results & actual results
+        # For every test: if actual result available, use that. Otherwise, use default result
+        # So that, if actual result not available, Allure report will show "unknown"/"failed" test result
+        # instead of omitting the test
+        shell: python
+        run: |
+          import dataclasses
+          import json
+          import pathlib
+
+
+          @dataclasses.dataclass(frozen=True)
+          class Result:
+              test_case_id: str
+              path: pathlib.Path
+
+              def __eq__(self, other):
+                  if not isinstance(other, type(self)):
+                      return False
+                  return self.test_case_id == other.test_case_id
+
+
+          actual_results = pathlib.Path("allure-results")
+          default_results = pathlib.Path("allure-default-results")
+
+          results: dict[pathlib.Path, set[Result]] = {
+              actual_results: set(),
+              default_results: set(),
+          }
+          for directory, results_ in results.items():
+              for path in directory.glob("*-result.json"):
+                  with path.open("r") as file:
+                      id_ = json.load(file)["testCaseId"]
+                  results_.add(Result(id_, path))
+
+          actual_results.mkdir(exist_ok=True)
+
+          missing_results = results[default_results] - results[actual_results]
+          for default_result in missing_results:
+              # Move to `actual_results` directory
+              default_result.path.rename(actual_results / default_result.path.name)
+      - name: Load test report history
+        run: |
+          if [[ -d repo/_latest/history/ ]]
+          then
+            echo 'Loading history'
+            cp -r repo/_latest/history/ allure-results/
+          fi
+      - name: Create executor.json
+        shell: python
+        run: |
+          # Reverse engineered from https://github.com/simple-elf/allure-report-action/blob/eca283b643d577c69b8e4f048dd6cd8eb8457cfd/entrypoint.sh
+          import json
+
+          DATA = {
+              "name": "GitHub Actions",
+              "type": "github",
+              "buildOrder": ${{ github.run_number }},  # TODO future improvement: use run ID
+              "buildName": "Run ${{ github.run_id }}",
+              "buildUrl": "https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+              "reportUrl": "../${{ github.run_number }}/",
+          }
+          with open("allure-results/executor.json", "w") as file:
+              json.dump(DATA, file)
+      - name: Generate Allure report
+        run: allure generate
+      - name: Create index.html
+        shell: python
+        run: |
+          DATA = f"""<!DOCTYPE html>
+          <meta charset="utf-8">
+          <meta http-equiv="cache-control" content="no-cache">
+          <meta http-equiv="refresh" content="0; url=${{ github.run_number }}">
+          """
+          with open("repo/index.html", "w") as file:
+              file.write(DATA)
+      - name: Update GitHub pages branch
+        working-directory: repo/
+        # TODO future improvement: commit message
+        run: |
+          mkdir '${{ github.run_number }}'
+          rm -f _latest
+          ln -s '${{ github.run_number }}' _latest
+          cp -r ../allure-report/. _latest/
+          git add .
+          git config user.name "GitHub Actions"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Allure report ${{ github.run_number }}"
+          # Uses token set in checkout step
+          git push origin gh-pages-beta
