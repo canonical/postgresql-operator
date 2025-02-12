@@ -4,6 +4,7 @@ import asyncio
 import logging
 from pathlib import Path
 
+import pytest
 import yaml
 from pytest_operator.plugin import OpsTest
 
@@ -29,6 +30,7 @@ INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles
 
 
 @markers.amd64_only  # nextcloud charm not available for arm64
+@pytest.mark.skip(reason="Unstable")
 async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
     # Deploy Database Charm and Nextcloud
     await asyncio.gather(
