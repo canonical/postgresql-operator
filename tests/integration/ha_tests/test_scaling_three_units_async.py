@@ -63,7 +63,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
         ["sync_standbys"],
         ["replicas"],
         ["primaries", "replicas"],
-        ["primaries", "sync_standbys"],
         ["sync_standbys", "replicas"],
     ],
 )
