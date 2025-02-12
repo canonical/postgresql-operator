@@ -60,7 +60,6 @@ async def test_majority(ops_test: OpsTest) -> None:
 
 
 async def test_constant(ops_test: OpsTest) -> None:
-    """Kill primary unit, check reelection."""
     app = await app_name(ops_test)
 
     await ops_test.model.applications[app].set_config({"synchronous_node_count": "2"})
