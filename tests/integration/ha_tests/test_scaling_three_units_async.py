@@ -64,7 +64,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
         ["replicas"],
         ["primaries", "replicas"],
         ["primaries", "sync_standbys"],
-        ["sync_standbys", "replica"],
+        ["sync_standbys", "replicas"],
     ],
 )
 @pytest.mark.abort_on_fail
