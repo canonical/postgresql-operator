@@ -117,7 +117,7 @@ class DbProvides(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -196,10 +196,8 @@ class DbProvides(Object):
 
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
-            if password != self.charm.get_secret(APP_SCOPE, user):
-                self.charm.set_secret(APP_SCOPE, user, password)
-            if database and database != self.charm.get_secret(APP_SCOPE, f"{user}-database"):
-                self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
+            self.charm.set_secret(APP_SCOPE, user, password)
+            self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
 
             self.charm.postgresql.create_user(user, password, self.admin)
             plugins = self.charm.get_plugins()
@@ -242,7 +240,7 @@ class DbProvides(Object):
             return
 
         if (
-            "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -268,7 +266,7 @@ class DbProvides(Object):
         # Check for some conditions before trying to access the PostgreSQL instance.
         if (
             not self.charm.unit.is_leader()
-            or "cluster_initialised" not in self.charm._peers.data[self.charm.app]
+            or not self.charm.is_cluster_initialised
             or not self.charm._patroni.member_started
             or not self.charm.primary_endpoint
         ):
@@ -283,7 +281,7 @@ class DbProvides(Object):
         # https://bugs.launchpad.net/juju/+bug/1979811.
         # Neither peer relation data nor stored state
         # are good solutions, just a temporary solution.
-        if "departing" in self.charm._peers.data[self.charm.unit]:
+        if self.charm.is_unit_departing:
             logger.debug("Early exit on_relation_broken: Skipping departing unit")
             return
 

@@ -15,13 +15,11 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_config_parameters(ops_test: OpsTest) -> None:
+async def test_config_parameters(ops_test: OpsTest, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test config with wrong parameters."""
     # Build and deploy the PostgreSQL charm.
     async with ops_test.fast_forward():
-        charm = await ops_test.build_charm(".")
         await ops_test.model.deploy(
             charm,
             num_units=1,

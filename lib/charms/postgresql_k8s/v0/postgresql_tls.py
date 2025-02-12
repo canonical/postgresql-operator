@@ -45,7 +45,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 12
+LIBPATCH = 13
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -135,16 +135,10 @@ class PostgreSQLTLS(Object):
             event.defer()
             return
 
-        chain = self.charm.get_secret(SCOPE, "chain")
         new_chain = "\n".join(event.chain) if event.chain is not None else None
-        if chain != new_chain:
-            self.charm.set_secret(SCOPE, "chain", new_chain)
-        cert = self.charm.get_secret(SCOPE, "cert")
-        if cert != event.certificate:
-            self.charm.set_secret(SCOPE, "cert", event.certificate)
-        ca = self.charm.get_secret(SCOPE, "ca")
-        if ca != event.ca:
-            self.charm.set_secret(SCOPE, "ca", event.ca)
+        self.charm.set_secret(SCOPE, "chain", new_chain)
+        self.charm.set_secret(SCOPE, "cert", event.certificate)
+        self.charm.set_secret(SCOPE, "ca", event.ca)
 
         try:
             if not self.charm.push_tls_files_to_workload():

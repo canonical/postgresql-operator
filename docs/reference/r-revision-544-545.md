@@ -1,10 +1,10 @@
->Reference > Release Notes > [All revisions] > Revision 517/518
+>Reference > Release Notes > [All revisions] > Revision 544/545
 
 [note type=caution]
 This page is a work in progress for a **future release**. Please revisit at a later date!
 [/note]
 
-# Revision 517/518
+# Revision 544/545
 <sub><TODO></sub>
 
 Canonical's newest Charmed PostgreSQL operator has been published in the [14/stable channel].
@@ -27,16 +27,19 @@ Due to the newly added support for `arm64` architecture, the PostgreSQL charm no
 
 ## Highlights 
 
+* Upgraded PostgreSQL from v.14.12 → v.14.15 ([PR #730](https://github.com/canonical/postgresql-operator/pull/730))
+  * Check the official [PostgreSQL 14.13 release notes](https://www.postgresql.org/docs/release/14.13/)
+  * Check the official [PostgreSQL 14.14 release notes](https://www.postgresql.org/docs/release/14.14/)
+  * Check the official [PostgreSQL 14.15 release notes](https://www.postgresql.org/docs/release/14.15/)
 * Added timeline management to point-in-time recovery (PITR) ([PR #629](https://github.com/canonical/postgresql-operator/pull/629)) ([DPE-5561](https://warthogs.atlassian.net/browse/DPE-5561))
 * Added pgAudit plugin/extension ([PR #612](https://github.com/canonical/postgresql-operator/pull/612)) ([DPE-5248](https://warthogs.atlassian.net/browse/DPE-5248))
 * Observability stack (COS) improvements
   *  Polished built-in Grafana dashboard ([PR #646](https://github.com/canonical/postgresql-operator/pull/646))
   * Improved COS alert rule descriptions ([PR #651](https://github.com/canonical/postgresql-operator/pull/651)) ([DPE-5658](https://warthogs.atlassian.net/browse/DPE-5658))
 * Added fully-featured terraform module ([PR #643](https://github.com/canonical/postgresql-operator/pull/643))
-* Several S3 improvements ([PR #642](https://github.com/canonical/postgresql-operator/pull/642))
+* Several S3 stability improvements ([PR #642](https://github.com/canonical/postgresql-operator/pull/642))
 
 ## Features and improvements
-* Split PITR backup test in AWS and GCP ([PR #605](https://github.com/canonical/postgresql-operator/pull/605)) ([DPE-5181](https://warthogs.atlassian.net/browse/DPE-5181))
 * Removed patching of private ops class. ([PR #617](https://github.com/canonical/postgresql-operator/pull/617))
 * Switched charm libs from `tempo_k8s` to `tempo_coordinator_k8s` and relay tracing traffic through `grafana-agent` ([PR #640](https://github.com/canonical/postgresql-operator/pull/640))
 * Implemented more meaningful group naming for multi-group tests ([PR #625](https://github.com/canonical/postgresql-operator/pull/625))
@@ -48,11 +51,19 @@ Due to the newly added support for `arm64` architecture, the PostgreSQL charm no
 * Merged `update_tls_flag` into `update_endpoints` ([PR #669](https://github.com/canonical/postgresql-operator/pull/669))
 * Made tox commands resilient to white-space paths ([PR #678](https://github.com/canonical/postgresql-operator/pull/678)) ([DPE-6042](https://warthogs.atlassian.net/browse/DPE-6042))
 * Added microceph (local backup) integration test + bump snap version ([PR #633](https://github.com/canonical/postgresql-operator/pull/633)) ([DPE-5386](https://warthogs.atlassian.net/browse/DPE-5386))
+* Add `max_locks_per_transaction` config option in ([PR#718](https://github.com/canonical/postgresql-operator/pull/718)) ([DPE-5533](https://warthogs.atlassian.net/browse/DPE-5533))
+* Split PITR backup test in AWS and GCP ([PR #605](https://github.com/canonical/postgresql-operator/pull/605)) ([DPE-5181](https://warthogs.atlassian.net/browse/DPE-5181))
+
 
 ## Bugfixes and maintenance
+* Juju secrets resetting fix on Juju 3.6 in ([PR#726](https://github.com/canonical/postgresql-operator/pull/726)) ([DPE-6320](https://warthogs.atlassian.net/browse/DPE-6320)) ([DPE-6325](https://warthogs.atlassian.net/browse/DPE-6325))
+* Fallback to trying to create bucket without LocationConstraint in ([PR#690](https://github.com/canonical/postgresql-operator/pull/690))
 * Added warning logs to Patroni reinitialisation ([PR #660](https://github.com/canonical/postgresql-operator/pull/660))
 * Fixed some `postgresql.conf` parameters for hardening ([PR #621](https://github.com/canonical/postgresql-operator/pull/621)) ([DPE-5512](https://warthogs.atlassian.net/browse/DPE-5512))
 * Fixed lib check ([PR #627](https://github.com/canonical/postgresql-operator/pull/627))
+* Allow `--restore-to-time=latest` without a `backup-id` in ([PR#683](https://github.com/canonical/postgresql-operator/pull/683))
+* Clean-up duplicated Patroni config reloads in ([PR#682](https://github.com/canonical/postgresql-operator/pull/682))
+* Filter out degraded read only endpoints in ([PR#679](https://github.com/canonical/postgresql-operator/pull/679)) ([DPE-5714](https://warthogs.atlassian.net/browse/DPE-5714))
 
 [details=Libraries, testing, and CI]
 * Data Interafces v40 ([PR #615](https://github.com/canonical/postgresql-operator/pull/615)) ([DPE-5306](https://warthogs.atlassian.net/browse/DPE-5306))
@@ -72,13 +83,10 @@ Due to the newly added support for `arm64` architecture, the PostgreSQL charm no
 * Increase linting rules ([PR #649](https://github.com/canonical/postgresql-operator/pull/649)) ([DPE-5324](https://warthogs.atlassian.net/browse/DPE-5324))
 [/details]
 
-## Known limitations
-...
-<TODO>
-
 ## Requirements and compatibility
 * (no change) Minimum Juju 2 version: `v.2.9.49`
 * (no change) Minimum Juju 3 version: `v.3.4.3`
+* (recommended) Juju LTS 3.6.1+ 
 
 See the [system requirements] for more details about Juju versions and other software and hardware prerequisites.
 
