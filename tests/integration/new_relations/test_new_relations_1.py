@@ -12,6 +12,8 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
+from constants import DATABASE_DEFAULT_NAME
+
 from ..helpers import (
     CHARM_BASE,
     assert_sync_standbys,
@@ -277,7 +279,10 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         (another_application_app_name, f"{APPLICATION_APP_NAME.replace('-', '_')}_database"),
     ]:
         connection_string = await build_connection_string(
-            ops_test, application, FIRST_DATABASE_RELATION_NAME, database="postgres"
+            ops_test,
+            application,
+            FIRST_DATABASE_RELATION_NAME,
+            database=DATABASE_DEFAULT_NAME,
         )
         with pytest.raises(psycopg2.Error):
             psycopg2.connect(connection_string)
@@ -487,7 +492,7 @@ async def test_admin_role(ops_test: OpsTest):
 
     # Check that the user can access all the databases.
     for database in [
-        "postgres",
+        DATABASE_DEFAULT_NAME,
         f"{APPLICATION_APP_NAME.replace('-', '_')}_database",
         "another_application_database",
     ]:
@@ -511,11 +516,11 @@ async def test_admin_role(ops_test: OpsTest):
                 )
                 assert version == data
 
-                # Write some data (it should fail in the "postgres" database).
+                # Write some data (it should fail in the default database name).
                 random_name = (
                     f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                 )
-                should_fail = database == "postgres"
+                should_fail = database == DATABASE_DEFAULT_NAME
                 cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
                 if should_fail:
                     assert False, (
@@ -533,7 +538,7 @@ async def test_admin_role(ops_test: OpsTest):
 
     # Test the creation and deletion of databases.
     connection_string = await build_connection_string(
-        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database="postgres"
+        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=DATABASE_DEFAULT_NAME
     )
     connection = psycopg2.connect(connection_string)
     connection.autocommit = True
@@ -542,8 +547,10 @@ async def test_admin_role(ops_test: OpsTest):
     cursor.execute(f"CREATE DATABASE {random_name};")
     cursor.execute(f"DROP DATABASE {random_name};")
     try:
-        cursor.execute("DROP DATABASE postgres;")
-        assert False, "the admin extra user role was able to drop the `postgres` system database"
+        cursor.execute(f"DROP DATABASE {DATABASE_DEFAULT_NAME};")
+        assert False, (
+            f"the admin extra user role was able to drop the `{DATABASE_DEFAULT_NAME}` system database"
+        )
     except psycopg2.errors.InsufficientPrivilege:
         # Ignore the error, as the admin extra user role mustn't be able to drop
         # the "postgres" system database.
