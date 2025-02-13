@@ -35,7 +35,12 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
 )
-from cluster import NotReadyError, RemoveRaftMemberFailedError, SwitchoverFailedError
+from cluster import (
+    NotReadyError,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -2768,6 +2773,17 @@ def test_on_promote_to_primary(harness):
         # Unit, no force, switchover failed
         event.params = {"scope": "unit"}
         _switchover.side_effect = SwitchoverFailedError
+
+        harness.charm._on_promote_to_primary(event)
+
+        event.fail.assert_called_once_with(
+            "Switchover failed or timed out, check the logs for details"
+        )
+        event.fail.reset_mock()
+
+        # Unit, no force, not sync
+        event.params = {"scope": "unit"}
+        _switchover.side_effect = SwitchoverNotSyncError
 
         harness.charm._on_promote_to_primary(event)
 
