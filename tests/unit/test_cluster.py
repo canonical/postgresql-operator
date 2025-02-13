@@ -20,7 +20,13 @@ from tenacity import (
 )
 
 from charm import PostgresqlOperatorCharm
-from cluster import PATRONI_TIMEOUT, Patroni, RemoveRaftMemberFailedError
+from cluster import (
+    PATRONI_TIMEOUT,
+    Patroni,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -472,6 +478,22 @@ def test_switchover(peers_ips, patroni):
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+
+        # Test candidate, not sync
+        response = _post.return_value
+        response.status_code = 412
+        response.text = "candidate name does not match with sync_standby"
+        with pytest.raises(SwitchoverNotSyncError):
+            patroni.switchover("candidate")
+            assert False
+
+        # Test general error
+        response = _post.return_value
+        response.status_code = 412
+        response.text = "something else "
+        with pytest.raises(SwitchoverFailedError):
+            patroni.switchover()
+            assert False
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):

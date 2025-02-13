@@ -21,7 +21,7 @@ Any charm using this library should import the `psycopg2` or `psycopg2-binary` d
 
 import logging
 from collections import OrderedDict
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import psycopg2
 from ops.model import Relation
@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 41
+LIBPATCH = 42
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -318,7 +318,7 @@ class PostgreSQL:
             raise PostgreSQLDeleteUserError() from e
 
     def enable_disable_extensions(
-        self, extensions: dict[str, bool], database: Optional[str] = None
+        self, extensions: Dict[str, bool], database: Optional[str] = None
     ) -> None:
         """Enables or disables a PostgreSQL extension.
 

@@ -61,6 +61,7 @@ from cluster import (
     Patroni,
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
+    SwitchoverNotSyncError,
 )
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
@@ -1552,8 +1553,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
             try:
                 self._patroni.switchover(self._member_name)
-            except SwitchoverFailedError:
+            except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
+            except SwitchoverFailedError:
+                event.fail("Switchover failed or timed out, check the logs for details")
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""
