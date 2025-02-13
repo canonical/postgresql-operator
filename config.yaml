@@ -410,6 +410,458 @@ options:
       Allowed values are: from 0 to 2000000000.
     type: int
     default: 150000000
+  request_array_nulls:
+    description: |
+      Enable input of NULL elements in arrays.
+    type: boolean
+    default: true
+  connection_authentication_timeout:
+    description: |
+      Sets the maximum allowed time to complete client authentication.
+      Allowed values are: from 0 to 180.
+    type: int
+    default: 20
+  vacuum_autovacuum_naptime:
+    description: |
+      Time to sleep between autovacuum runs.
+      Allowed values are: from 1 to 2147483.
+    type: int
+    default: 60
+  vacuum_autovacuum_vacuum_cost_limit:
+    description: |
+      Vacuum cost amount available before napping, for autovacuum.
+      Allowed values are: from -1 to 10000.
+    type: int
+    default: -1
+  vacuum_autovacuum_vacuum_insert_scale_factor:
+    description: |
+      Number of tuple inserts prior to vacuum as a fraction of reltuples.
+      Allowed values are: from 0 to 100.
+    type: float
+    default: 0.2
+  vacuum_autovacuum_vacuum_insert_threshold:
+    description: |
+      Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.
+      Allowed values are: from -1 to 2147483647.
+    type: int
+    default: 1000
+  vacuum_autovacuum_vacuum_threshold:
+    description: |
+      Minimum number of tuple updates or deletes prior to vacuum.
+      Allowed values are: from 1 to 2147483647.
+    type: int
+    default: 50
+  request_backslash_quote:
+    description: |
+      Sets whether "\'" is allowed in string literals.
+      Allowed values are "safe_encoding" and "on" and "off".
+      Safe_encoding is allow only if client encoding does not allow ASCII \ within a multibyte character.
+    type: string
+    default: "safe_encoding"
+  storage_bgwriter_lru_maxpages:
+    description: |
+      Background writer maximum number of LRU pages to flush per round.
+      Allowed values are: from 10 to 1073741823.
+    type: int
+    default: 100
+  storage_bgwriter_lru_multiplier:
+    description: |
+      Multiple of the average buffer usage to free per round.
+      Allowed values are: from 1 to 10.
+    type: float
+    default: 2
+  logging_client_min_messages:
+    description: |
+      Sets the message levels that are sent to the client.
+      Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
+      Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
+    type: string
+    default: "notice"
+  optimizer_cpu_index_tuple_cost:
+    description: |
+      Sets the planner's estimate of the cost of processing each index entry during an index scan.
+      Allowed values are: from 0 to 1.80E+308.
+    type: float
+    default: 0.005
+  optimizer_cpu_operator_cost:
+    description: |
+      Sets the planner's estimate of the cost of processing each operator or function call.
+      Allowed values are: from 0 to 1.80E+308.
+    type: float
+    default: 0.0025
+  optimizer_cpu_tuple_cost:
+    description: |
+      Sets the planner's estimate of the cost of processing each tuple (row).
+      Allowed values are: from 0 to 1.80E+308.
+    type: float
+    default: 0.01
+  optimizer_cursor_tuple_fraction:
+    description: |
+      Sets the planner's estimate of the fraction of a cursor's rows that will be retrieved.
+      Allowed values are: from 0 to 1.
+    type: float
+    default: 0.1
+  request_deadlock_timeout:
+    description: |
+      Sets the time to wait on a lock before checking for deadlock.
+      Allowed values are: from 1 to 2147483647.
+    type: int
+    default: 1000
+  request_default_transaction_isolation:
+    description: |
+      Sets the transaction isolation level of each new transaction.
+      Allowed values are one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.
+      Read commited or read uncommited is a statement can only see rows committed before it began.
+      Repeatable read is all statements of the current transaction can only see rows committed before 
+      the first query or data-modification statement was executed in this transaction.
+      Serializable is all statements of the current transaction can only see rows committed before the first 
+      query or data-modification statement was executed in this transaction.
+    type: string
+    default: "read committed"
+  request_default_transaction_deferrable:
+    description: |
+      Sets the default deferrable status of new transactions.
+    type: boolean
+    default: false
+  request_default_transaction_read_only:
+    description: |
+      Sets the default read-only status of new transactions.
+    type: boolean
+    default: false
+  optimizer_enable_async_append:
+    description: |
+      Enables the planner's use of async append plans.
+    type: boolean
+    default: true
+  optimizer_enable_bitmapscan:
+    description: |
+      Enables the planner's use of bitmap-scan plans.
+    type: boolean
+    default: true
+  optimizer_enable_gathermerge:
+    description: |
+      Enables the planner's use of gather merge plans.
+    type: boolean
+    default: true
+  optimizer_enable_hashagg:
+    description: |
+      Enables the planner's use of hashed aggregation plans.
+    type: boolean
+    default: true
+  optimizer_enable_hashjoin:
+    description: |
+      Enables the planner's use of hash join plans.
+    type: boolean
+    default: true
+  optimizer_enable_incremental_sort:
+    description: |
+      Enables the planner's use of incremental sort steps.
+    type: boolean
+    default: true
+  optimizer_enable_indexonlyscan:
+    description: |
+      Enables the planner's use of index-only-scan plans.
+    type: boolean
+    default: true
+  optimizer_enable_indexscan:
+    description: |
+      Enables the planner's use of index-scan plans.
+    type: boolean
+    default: true
+  optimizer_enable_material:
+    description: |
+      Enables the planner's use of materialization.
+    type: boolean
+    default: true
+  optimizer_enable_memoize:
+    description: |
+      Enables the planner's use of memoization.
+    type: boolean
+    default: true
+  optimizer_enable_mergejoin:
+    description: |
+      Enables the planner's use of merge join plans.
+    type: boolean
+    default: true
+  optimizer_enable_nestloop:
+    description: |
+      Enables the planner's use of nested-loop join plans.
+    type: boolean
+    default: true
+  optimizer_enable_parallel_append:
+    description: |
+      Enables the planner's use of parallel append plans.
+    type: boolean
+    default: true
+  optimizer_enable_parallel_hash:
+    description: |
+      Enables the planner's use of parallel hash plans.
+    type: boolean
+    default: true
+  optimizer_enable_partition_pruning:
+    description: |
+      Enables plan-time and execution-time partition pruning.
+    type: boolean
+    default: true
+  optimizer_enable_partitionwise_aggregate:
+    description: |
+      Enables partitionwise aggregation and grouping.
+    type: boolean
+    default: false
+  optimizer_enable_partitionwise_join:
+    description: |
+      Enables partitionwise join.
+    type: boolean
+    default: false
+  optimizer_enable_seqscan:
+    description: |
+      Enables the planner's use of sequential-scan plans.
+    type: boolean
+    default: true
+  optimizer_enable_sort:
+    description: |
+      Enables the planner's use of explicit sort steps.
+    type: boolean
+    default: true
+  optimizer_enable_tidscan:
+    description: |
+      Enables the planner's use of TID scan plans.
+    type: boolean
+    default: true
+  request_escape_string_warning:
+    description: |
+      Warn about backslash escapes in ordinary string literals.
+    type: boolean
+    default: true
+  response_exit_on_error:
+    description: |
+      Terminate session on any error.
+    type: boolean
+    default: false
+  response_extra_float_digits:
+    description: |
+      Sets the number of digits displayed for floating-point values.
+      Allowed values are: from -15 to 3.
+    type: int
+    default: 1
+  optimizer_geqo:
+    description: |
+      Enables genetic query optimization.
+    type: boolean
+    default: true
+  optimizer_geqo_effort:
+    description: |
+      GEQO: effort is used to set the default for other GEQO parameters.
+      Allowed values are: from 1 to 10.
+    type: int
+    default: 5
+  optimizer_geqo_generations:
+    description: |
+      GEQO: number of iterations of the algorithm.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  optimizer_geqo_pool_size:
+    description: |
+      GEQO: number of individuals in the population.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  optimizer_geqo_seed:
+    description: |
+      GEQO: seed for random path selection.
+      Allowed values are: from 0 to 1.
+    type: float
+    default: 0
+  optimizer_geqo_selection_bias:
+    description: |
+      GEQO: selective pressure within the population.
+      Allowed values are: from 1.5 to 2.
+    type: float
+    default: 2
+  optimizer_geqo_threshold:
+    description: |
+      Sets the threshold of FROM items beyond which GEQO is used.
+      Allowed values are: from 2 to 2147483647.
+    type: int
+    default: 12
+  response_gin_fuzzy_search_limit:
+    description: |
+      Sets the maximum allowed result for exact search by GIN.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  storage_gin_pending_list_limit:
+    description: |
+      Sets the maximum size of the pending list for GIN index.
+      Allowed values are: from 64 to 2147483647.
+    type: int
+    default: 4096
+  session_idle_in_transaction_session_timeout:
+    description: |
+      Sets the maximum allowed idle time between queries, when in a transaction.
+      Allowed values are: from 10 to 99999.
+    type: int
+    default: 10
+  optimizer_jit:
+    description: |
+      Allow JIT compilation.
+    type: boolean
+    default: true
+  optimizer_jit_above_cost:
+    description: |
+      Perform JIT compilation if query is more expensive.
+      Allowed values are: from -1 to 1.80E+308.
+    type: float
+    default: 100000
+  optimizer_jit_inline_above_cost:
+    description: |
+      Perform JIT inlining if query is more expensive.
+      Allowed values are: from -1 to 1.80E+308.
+    type: float
+    default: 500000
+  optimizer_jit_optimize_above_cost:
+    description: |
+      Optimize JIT-compiled functions if query is more expensive.
+      Allowed values are: from -1 to 1.80E+308.
+    type: float
+    default: 500000
+  request_lock_timeout:
+    description: |
+      Sets the maximum allowed duration of any wait for a lock.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  optimizer_min_parallel_index_scan_size:
+    description: |
+      Sets the minimum amount of index data for a parallel scan.
+      Allowed values are: from 0 to 715827882.
+    type: int
+    default: 64
+  optimizer_min_parallel_table_scan_size:
+    description: |
+      Sets the minimum amount of table data for a parallel scan.
+      Allowed values are: from 0 to 715827882.
+    type: int
+    default: 1024
+  storage_old_snapshot_threshold:
+    description: |
+      Time before a snapshot is too old to read pages changed after the snapshot was taken.
+      Allowed values are: from -1 to 16666.
+    type: int
+    default: -1
+  cpu_parallel_leader_participation:
+    description: |
+      Controls whether Gather and Gather Merge also run subplans.
+    type: boolean
+    default: true
+  optimizer_parallel_setup_cost:
+    description: |
+      Sets the planner's estimate of the cost of starting up worker processes for parallel query.
+      Allowed values are: from 0 to 1.80E+308.
+    type: float
+    default: 1000
+  optimizer_parallel_tuple_cost:
+    description: |
+      Sets the planner's estimate of the cost of passing each tuple (row) from worker to leader backend.
+      Allowed values are: from 0 to 1.80E+308.
+    type: float
+    default: 0.1
+  connection_statement_timeout:
+    description: |
+      Sets the maximum allowed duration of any statement.
+      Allowed values are: from 0 to 700000000.
+    type: int
+    default: 0
+  instance_synchronize_seqscans:
+    description: |
+      Enable synchronized sequential scans.
+    type: boolean
+    default: true
+  logging_track_functions:
+    description: |
+      Collects function-level statistics on database activity.
+      Allowed values are one of 'none', 'pl'.
+      Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
+    type: string
+    default: "none"
+  request_transaction_isolation:
+    description: |
+      Sets the current transaction's isolation level.
+      Allowed values are one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.
+      Read commited or read uncommited is a statement can only see rows committed before it began.
+      Repeatable read is all statements of the current transaction can only see rows committed before 
+      the first query or data-modification statement was executed in this transaction.
+      Serializable is all statements of the current transaction can only see rows committed before the first 
+      query or data-modification statement was executed in this transaction.
+    type: string
+    default: "read committed"
+  vacuum_vacuum_cost_limit:
+    description: |
+      Vacuum cost amount available before napping.
+      Allowed values are: from 1 to 10000.
+    type: int
+    default: 200
+  vacuum_vacuum_cost_page_dirty:
+    description: |
+      Vacuum cost for a page dirtied by vacuum.
+      Allowed values are: from 0 to 10000.
+    type: int
+    default: 20
+  vacuum_vacuum_cost_page_hit:
+    description: |
+      Vacuum cost for a page found in the buffer cache.
+      Allowed values are: from 0 to 10000.
+    type: int
+    default: 1
+  vacuum_vacuum_cost_page_miss:
+    description: |
+      Vacuum cost for a page not found in the buffer cache.
+      Allowed values are: from 0 to 10000.
+    type: int
+    default: 2
+  vacuum_vacuum_failsafe_age:
+    description: |
+      Age at which VACUUM should trigger failsafe to avoid a wraparound outage.
+      Allowed values are: from 0 to 2100000000.
+    type: int
+    default: 1600000000
+  vacuum_vacuum_freeze_min_age:
+    description: |
+      Minimum age at which VACUUM should freeze a table row.
+      Allowed values are: from 0 to 1000000000.
+    type: int
+    default: 50000000
+  vacuum_vacuum_multixact_failsafe_age:
+    description: |
+      Multixact age at which VACUUM should trigger failsafe to avoid a wraparound outage.
+      Allowed values are: from 0 to 2100000000.
+    type: int
+    default: 1600000000
+  vacuum_vacuum_multixact_freeze_min_age:
+    description: |
+      Minimum age at which VACUUM should freeze a MultiXactId in a table row.
+      Allowed values are: from 0 to 1000000000.
+    type: int
+    default: 5000000
+  vacuum_vacuum_multixact_freeze_table_age:
+    description: |
+      Multixact age at which VACUUM should scan whole table to freeze tuples.
+      Allowed values are: from 0 to 2000000000.
+    type: int
+    default: 150000000
+  request_xmlbinary:
+    description: |
+      Sets how binary values are to be encoded in XML.
+      Allowed values are one of 'base64', 'hex'.
+    type: string
+    default: "base64"
+  request_xmloption:
+    description: |
+      Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
+      Allowed values are one of 'content', 'document'.
+    type: string
+    default: "content"
   experimental_max_connections:
     type: int
     description: |
