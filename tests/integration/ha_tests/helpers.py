@@ -106,7 +106,7 @@ async def are_writes_increasing(
         with attempt:
             more_writes, _ = await count_writes(
                 ops_test,
-                down_unit=down_unit,
+                down_unit=down_units[0],
                 use_ip_from_inside=use_ip_from_inside,
                 extra_model=extra_model,
             )
