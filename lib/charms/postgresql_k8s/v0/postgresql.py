@@ -35,7 +35,10 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 42
+LIBPATCH = 43
+
+# Groups to distinguish database permissions
+PERMISSIONS_GROUP_ADMIN = "admin"
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -187,7 +190,7 @@ class PostgreSQL:
                     Identifier(database)
                 )
             )
-            for user_to_grant_access in [user, "admin", *self.system_users]:
+            for user_to_grant_access in [user, PERMISSIONS_GROUP_ADMIN, *self.system_users]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
@@ -236,15 +239,17 @@ class PostgreSQL:
             roles = privileges = None
             if extra_user_roles:
                 extra_user_roles = tuple(extra_user_roles.lower().split(","))
-                admin_role = "admin" in extra_user_roles
+                admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [
-                    role for role in extra_user_roles if role in valid_roles and role != "admin"
+                    role
+                    for role in extra_user_roles
+                    if role in valid_roles and role != PERMISSIONS_GROUP_ADMIN
                 ]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
-                    if extra_user_role not in roles and extra_user_role != "admin"
+                    if extra_user_role not in roles and extra_user_role != PERMISSIONS_GROUP_ADMIN
                 }
                 invalid_privileges = [
                     privilege for privilege in privileges if privilege not in valid_privileges
@@ -566,7 +571,7 @@ END; $$;"""
                         )
                     )
                 self.create_user(
-                    "admin",
+                    PERMISSIONS_GROUP_ADMIN,
                     extra_user_roles="pg_read_all_data,pg_write_all_data",
                 )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
