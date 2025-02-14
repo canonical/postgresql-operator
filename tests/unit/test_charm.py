@@ -333,7 +333,8 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
         _set_up_relation.assert_called_once()
-        harness.remove_relation(db_relation_id)
+        with harness.hooks_disabled():
+            harness.remove_relation(db_relation_id)
 
         _enable_disable_extensions.reset_mock()
         _set_up_relation.reset_mock()
