@@ -10,10 +10,10 @@ This means that, if your charm is related to, for example, COS' Tempo charm, you
 in real time from the Grafana dashboard the execution flow of your charm.
 
 # Quickstart
-Fetch the following charm libs (and ensure the minimum version/revision numbers are satisfied):
+Fetch the following charm libs:
 
-    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.tracing  # >= 1.10
-    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.charm_tracing  # >= 2.7
+    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.tracing
+    charmcraft fetch-lib charms.tempo_coordinator_k8s.v0.charm_tracing
 
 Then edit your charm code to include:
 
@@ -168,9 +168,10 @@ class MyCharm(CharmBase):
     ...
 ```
 
-## Upgrading from `v0`
+## Upgrading from `tempo_k8s.v0`
 
-If you are upgrading from `charm_tracing` v0, you need to take the following steps (assuming you already
+If you are upgrading from `tempo_k8s.v0.charm_tracing` (note that since then, the charm library moved to
+`tempo_coordinator_k8s.v0.charm_tracing`), you need to take the following steps (assuming you already
 have the newest version of the library in your charm):
 1) If you need the dependency for your tests, add the following dependency to your charm project
 (or, if your project had a dependency on `opentelemetry-exporter-otlp-proto-grpc` only because
@@ -183,7 +184,7 @@ to return from ``TracingEndpointRequirer.get_endpoint("otlp_http")`` instead of 
 For example:
 
 ```
-    from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+    from charms.tempo_k8s.v0.charm_tracing import trace_charm
 
     @trace_charm(
         tracing_endpoint="my_tracing_endpoint",
@@ -337,7 +338,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 4
+LIBPATCH = 5
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 

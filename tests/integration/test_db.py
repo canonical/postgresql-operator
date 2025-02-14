@@ -53,7 +53,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             config={"profile": "testing"},
         )
 
-        # Wait until the PostgreSQL charm is successfully deployed.
+        logger.info("Wait until the PostgreSQL charm is successfully deployed.")
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME],
             status="active",
@@ -78,12 +78,12 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
 
         await check_database_users_existence(ops_test, mailman3_core_users, [])
 
-        # Assert Mailman3 Core is configured to use PostgreSQL instead of SQLite.
+        logger.info("Assert Mailman3 Core is configured to use PostgreSQL instead of SQLite.")
         mailman_unit = ops_test.model.applications[MAILMAN3_CORE_APP_NAME].units[0]
         result = await run_command_on_unit(ops_test, mailman_unit.name, "mailman info")
         assert "db url: postgres://" in result
 
-        # Do some CRUD operations using Mailman3 Core client.
+        logger.info("Do some CRUD operations using Mailman3 Core client.")
         domain_name = "canonical.com"
         list_name = "postgresql-list"
         credentials = (
@@ -93,17 +93,17 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             f"http://{mailman_unit.public_address}:8001/3.1", credentials[0], credentials[1]
         )
 
-        # Create a domain and list the domains to check that the new one is there.
+        logger.info("Create a domain and list the domains to check that the new one is there.")
         domain = client.create_domain(domain_name)
         assert domain_name in [domain.mail_host for domain in client.domains]
 
-        # Update the domain by creating a mailing list into it.
+        logger.info("Update the domain by creating a mailing list into it.")
         mailing_list = domain.create_list(list_name)
         assert mailing_list.fqdn_listname in [
             mailing_list.fqdn_listname for mailing_list in domain.lists
         ]
 
-        # Delete the domain and check that the change was persisted.
+        logger.info("Delete the domain and check that the change was persisted.")
         domain.delete()
         assert domain_name not in [domain.mail_host for domain in client.domains]
 
@@ -115,7 +115,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
     units_to_remove = [unit.name for unit in ops_test.model.applications[DATABASE_APP_NAME].units]
 
     async with ops_test.fast_forward():
-        # Add two more units.
+        logger.info("Add two more units.")
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
             apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
@@ -125,7 +125,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             ops_test.model.applications[DATABASE_APP_NAME].units[0].public_address, 2
         )
 
-        # Remove the original units.
+        logger.info("Remove the original units.")
         leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
         await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(*[
             unit for unit in units_to_remove if unit != leader_unit.name
@@ -138,8 +138,9 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=2
         )
 
-    # Get the updated connection data and assert it can be used
-    # to write and read some data properly.
+    logger.info(
+        "Get the updated connection data and assert it can be used to write and read some data properly."
+    )
     database_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     primary_connection_string = await build_connection_string(
         ops_test, MAILMAN3_CORE_APP_NAME, RELATION_NAME, remote_unit_name=database_unit_name
@@ -152,7 +153,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         remote_unit_name=database_unit_name,
     )
 
-    # Connect to the database using the primary connection string.
+    logger.info("Connect to the database using the primary connection string.")
     with psycopg2.connect(primary_connection_string) as connection:
         connection.autocommit = True
         with connection.cursor() as cursor:
@@ -166,7 +167,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             assert data[0] == "some data"
     connection.close()
 
-    # Connect to the database using the replica endpoint.
+    logger.info("Connect to the database using the replica endpoint.")
     with psycopg2.connect(replica_connection_string) as connection, connection.cursor() as cursor:
         # Read some data.
         cursor.execute("SELECT data FROM test;")
@@ -178,8 +179,9 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             cursor.execute("DROP TABLE test;")
     connection.close()
 
-    # Remove the relation and test that its user was deleted
-    # (by checking that the connection string doesn't work anymore).
+    logger.info(
+        "Remove the relation and test that its user was deleted (by checking that the connection string doesn't work anymore)."
+    )
     async with ops_test.fast_forward():
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}:{RELATION_NAME}", f"{MAILMAN3_CORE_APP_NAME}:{RELATION_NAME}"

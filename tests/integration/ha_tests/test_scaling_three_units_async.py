@@ -42,7 +42,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
                 application_name=DATABASE_APP_NAME,
                 num_units=3,
                 base=CHARM_BASE,
-                config={"profile": "testing"},
+                config={"profile": "testing", "synchronous_node_count": "majority"},
             ),
             ops_test.model.deploy(
                 APPLICATION_NAME,
@@ -61,8 +61,9 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     [
         ["primaries"],
         ["sync_standbys"],
-        ["primaries", "sync_standbys"],
-        ["sync_standbys", "sync_standbys"],
+        ["replicas"],
+        ["primaries", "replicas"],
+        ["sync_standbys", "replicas"],
     ],
 )
 @pytest.mark.abort_on_fail
@@ -122,8 +123,8 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
     assert len(new_roles["primaries"]) == 1
-    assert len(new_roles["sync_standbys"]) == 2
-    assert len(new_roles["replicas"]) == 0
+    assert len(new_roles["sync_standbys"]) == 1
+    assert len(new_roles["replicas"]) == 1
     if "primaries" in roles:
         assert new_roles["primaries"][0] in original_roles["sync_standbys"]
     else:
