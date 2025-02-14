@@ -657,6 +657,10 @@ END; $$;"""
                 "request",
                 "response",
                 "vacuum",
+                "storage",
+                "cpu",
+                "connection",
+                "session"
             )):
                 continue
             parameter = "_".join(config.split("_")[1:])

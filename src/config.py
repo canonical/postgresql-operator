@@ -176,6 +176,7 @@ class CharmConfig(BaseConfigModel):
     request_transaction_isolation: str | None
     request_transaction_read_only: bool | None
     request_transform_null_equals: bool | None
+    vacuum_vacuum_cost_delay: float | None
     vacuum_vacuum_cost_limit: int | None
     vacuum_vacuum_cost_page_dirty: int | None
     vacuum_vacuum_cost_page_hit: int | None
@@ -609,9 +610,9 @@ class CharmConfig(BaseConfigModel):
     @validator("session_idle_in_transaction_session_timeout")
     @classmethod
     def session_idle_in_transaction_session_timeout_values(cls, value: int) -> int | None:
-        """Check session_idle_in_transaction_session_timeout config option is between 10 and 99999."""
-        if value < 10 or value > 99999:
-            raise ValueError("Value is not between 10 and 99999")
+        """Check session_idle_in_transaction_session_timeout config option is between 10000 and 99999000."""
+        if value < 10000 or value > 99999000:
+            raise ValueError("Value is not between 10000 and 99999000")
 
         return value
 
@@ -731,6 +732,15 @@ class CharmConfig(BaseConfigModel):
         if value not in ["serializable", "repeatable read", "read committed", "read uncommitted"]:
             raise ValueError(
                 "Value not one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.")
+
+        return value
+
+    @validator("vacuum_vacuum_cost_delay")
+    @classmethod
+    def vacuum_vacuum_cost_delay_values(cls, value: float) -> float | None:
+        """Check vacuum_vacuum_cost_delay config option is between 0 and 20."""
+        if value < 0 or value > 20:
+            raise ValueError("Value is not between 0 and 20")
 
         return value
 

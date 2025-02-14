@@ -469,7 +469,7 @@ options:
       Multiple of the average buffer usage to free per round.
       Allowed values are: from 1 to 10.
     type: float
-    default: 2
+    default: 2.0
   logging_client_min_messages:
     description: |
       Sets the message levels that are sent to the client.
@@ -672,13 +672,13 @@ options:
       GEQO: seed for random path selection.
       Allowed values are: from 0 to 1.
     type: float
-    default: 0
+    default: 0.0
   optimizer_geqo_selection_bias:
     description: |
       GEQO: selective pressure within the population.
       Allowed values are: from 1.5 to 2.
     type: float
-    default: 2
+    default: 2.0
   optimizer_geqo_threshold:
     description: |
       Sets the threshold of FROM items beyond which GEQO is used.
@@ -700,9 +700,9 @@ options:
   session_idle_in_transaction_session_timeout:
     description: |
       Sets the maximum allowed idle time between queries, when in a transaction.
-      Allowed values are: from 10 to 99999.
+      Allowed values are: from 10000 to 99999000.
     type: int
-    default: 10
+    default: 10000 # Bad default value, used min
   optimizer_jit:
     description: |
       Allow JIT compilation.
@@ -713,19 +713,19 @@ options:
       Perform JIT compilation if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 100000
+    default: 100000.0
   optimizer_jit_inline_above_cost:
     description: |
       Perform JIT inlining if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 500000
+    default: 500000.0
   optimizer_jit_optimize_above_cost:
     description: |
       Optimize JIT-compiled functions if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 500000
+    default: 500000.0
   request_lock_timeout:
     description: |
       Sets the maximum allowed duration of any wait for a lock.
@@ -760,7 +760,7 @@ options:
       Sets the planner's estimate of the cost of starting up worker processes for parallel query.
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 1000
+    default: 1000.0
   optimizer_parallel_tuple_cost:
     description: |
       Sets the planner's estimate of the cost of passing each tuple (row) from worker to leader backend.
@@ -778,6 +778,12 @@ options:
       Enable synchronized sequential scans.
     type: boolean
     default: true
+  request_track_activity_query_size:
+    description: |
+      Sets the size reserved for pg_stat_activity.query, in bytes.
+      Allowed values are: from 0 to 700000000.
+    type: int
+    default: 1024
   logging_track_functions:
     description: |
       Collects function-level statistics on database activity.
@@ -785,6 +791,11 @@ options:
       Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
     type: string
     default: "none"
+  request_transaction_deferrable:
+    description: |
+      Whether to defer a read-only serializable transaction until it can be executed with no possible serialization failures.
+    type: boolean
+    default: false
   request_transaction_isolation:
     description: |
       Sets the current transaction's isolation level.
@@ -796,6 +807,22 @@ options:
       query or data-modification statement was executed in this transaction.
     type: string
     default: "read committed"
+  request_transaction_read_only:
+    description: |
+      Treats "expr=NULL" as "expr IS NULL".
+    type: boolean
+    default: false
+  request_transform_null_equals:
+    description: |
+      Sets the current transaction's read-only status.
+    type: boolean
+    default: false
+  vacuum_vacuum_cost_delay:
+    description: |
+      Vacuum cost delay in milliseconds.
+      Allowed values are: from 0 to 20.
+    type: float
+    default: 0.0
   vacuum_vacuum_cost_limit:
     description: |
       Vacuum cost amount available before napping.
