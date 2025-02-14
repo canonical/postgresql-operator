@@ -104,7 +104,7 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_freeze_table_age: int | None
     experimental_max_connections: int | None
     request_array_nulls: bool | None
-    connection_authentication_timeout: int | None # not working
+    connection_authentication_timeout: int | None
     vacuum_autovacuum_naptime: int | None
     vacuum_autovacuum_vacuum_cost_limit: int | None
     vacuum_autovacuum_vacuum_insert_scale_factor: float | None
@@ -113,7 +113,7 @@ class CharmConfig(BaseConfigModel):
     request_backslash_quote: str | None
     storage_bgwriter_lru_maxpages: int | None
     storage_bgwriter_lru_multiplier: float | None
-    #request_client_encoding: str | None
+    # request_client_encoding: str | None
     logging_client_min_messages: str | None
     optimizer_cpu_index_tuple_cost: float | None
     optimizer_cpu_operator_cost: float | None
@@ -165,7 +165,7 @@ class CharmConfig(BaseConfigModel):
     optimizer_min_parallel_index_scan_size: int | None
     optimizer_min_parallel_table_scan_size: int | None
     storage_old_snapshot_threshold: int | None
-    cpu_parallel_leader_participation: bool | None#!
+    cpu_parallel_leader_participation: bool | None
     optimizer_parallel_setup_cost: float | None
     optimizer_parallel_tuple_cost: float | None
     connection_statement_timeout: int | None
@@ -398,6 +398,7 @@ class CharmConfig(BaseConfigModel):
             raise ValueError("Value is not between 1 and 2147483")
 
         return value
+
     @validator("vacuum_autovacuum_vacuum_cost_limit")
     @classmethod
     def vacuum_autovacuum_vacuum_cost_limit_values(cls, value: int) -> int | None:
@@ -406,6 +407,7 @@ class CharmConfig(BaseConfigModel):
             raise ValueError("Value is not between -1 and 10000")
 
         return value
+
     @validator("vacuum_autovacuum_vacuum_insert_scale_factor")
     @classmethod
     def vacuum_autovacuum_vacuum_insert_scale_factor_values(cls, value: float) -> float | None:
@@ -463,11 +465,21 @@ class CharmConfig(BaseConfigModel):
     @validator("logging_client_min_messages")
     @classmethod
     def logging_client_min_messages_values(cls, value: str) -> str | None:
-        """Check logging_client_min_messages config option is one of 'debug5',
-         'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'."""
-        if value not in ["debug5", "debug4", "debug3", "debug2", "debug1",
-                         "log", "notice", "warning", "error"]:
-            raise ValueError("Value not one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.")
+        """Check logging_client_min_messages config option is one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'."""
+        if value not in [
+            "debug5",
+            "debug4",
+            "debug3",
+            "debug2",
+            "debug1",
+            "log",
+            "notice",
+            "warning",
+            "error",
+        ]:
+            raise ValueError(
+                "Value not one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'."
+            )
 
         return value
 
@@ -475,7 +487,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_cpu_index_tuple_cost_values(cls, value: float) -> float | None:
         """Check optimizer_cpu_index_tuple_cost config option is between 0 and 1.80E+308."""
-        if value < 0 or value > 1.80E+308:
+        if value < 0 or value > 1.80e308:
             raise ValueError("Value is not between 0 and 1.80E+308")
 
         return value
@@ -484,7 +496,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_cpu_operator_cost_values(cls, value: float) -> float | None:
         """Check optimizer_cpu_operator_cost config option is between 0 and 1.80E+308."""
-        if value < 0 or value > 1.80E+308:
+        if value < 0 or value > 1.80e308:
             raise ValueError("Value is not between 0 and 1.80E+308")
 
         return value
@@ -493,7 +505,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_cpu_tuple_cost_values(cls, value: float) -> float | None:
         """Check optimizer_cpu_tuple_cost config option is between 0 and 1.80E+308."""
-        if value < 0 or value > 1.80E+308:
+        if value < 0 or value > 1.80e308:
             raise ValueError("Value is not between 0 and 1.80E+308")
 
         return value
@@ -516,13 +528,15 @@ class CharmConfig(BaseConfigModel):
 
         return value
 
-    #storage_default_table_access_method: str | None
+    # storage_default_table_access_method: str | None
     @validator("request_default_transaction_isolation")
     @classmethod
     def request_default_transaction_isolation_values(cls, value: str) -> str | None:
         """Check request_default_transaction_isolation config option is one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'."""
         if value not in ["serializable", "repeatable read", "read committed", "read uncommitted"]:
-            raise ValueError("Value not one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.")
+            raise ValueError(
+                "Value not one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'."
+            )
 
         return value
 
@@ -620,7 +634,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_jit_above_cost_values(cls, value: float) -> float | None:
         """Check optimizer_jit_above_cost config option is between -1 and 1.80E+308."""
-        if value < -1 or value > 1.80E+308:
+        if value < -1 or value > 1.80e308:
             raise ValueError("Value is not between -1 and 1.80E+308")
 
         return value
@@ -629,7 +643,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_jit_inline_above_cost_values(cls, value: float) -> float | None:
         """Check optimizer_jit_inline_above_cost config option is between -1 and 1.80E+308."""
-        if value < -1 or value > 1.80E+308:
+        if value < -1 or value > 1.80e308:
             raise ValueError("Value is not between -1 and 1.80E+308")
 
         return value
@@ -638,7 +652,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_jit_optimize_above_cost_values(cls, value: float) -> float | None:
         """Check optimizer_jit_optimize_above_cost config option is between -1 and 1.80E+308."""
-        if value < -1 or value > 1.80E+308:
+        if value < -1 or value > 1.80e308:
             raise ValueError("Value is not between -1 and 1.80E+308")
 
         return value
@@ -683,7 +697,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_parallel_setup_cost_values(cls, value: float) -> float | None:
         """Check optimizer_parallel_setup_cost config option is between 0 and 1.80E+308."""
-        if value < 0 or value > 1.80E+308:
+        if value < 0 or value > 1.80e308:
             raise ValueError("Value is not between 0 and 1.80E+308")
 
         return value
@@ -692,7 +706,7 @@ class CharmConfig(BaseConfigModel):
     @classmethod
     def optimizer_parallel_tuple_cost_values(cls, value: float) -> float | None:
         """Check optimizer_parallel_tuple_cost config option is between 0 and 1.80E+308."""
-        if value < 0 or value > 1.80E+308:
+        if value < 0 or value > 1.80e308:
             raise ValueError("Value is not between 0 and 1.80E+308")
 
         return value
@@ -720,8 +734,7 @@ class CharmConfig(BaseConfigModel):
     def logging_track_functions_values(cls, value: str) -> str | None:
         """Check logging_track_functions config option is one of 'none', 'pl'."""
         if value not in ["none", "pl"]:
-            raise ValueError(
-                "Value not one of 'none', 'pl'.")
+            raise ValueError("Value not one of 'none', 'pl'.")
 
         return value
 
@@ -731,7 +744,8 @@ class CharmConfig(BaseConfigModel):
         """Check request_transaction_isolation config option is one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'."""
         if value not in ["serializable", "repeatable read", "read committed", "read uncommitted"]:
             raise ValueError(
-                "Value not one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.")
+                "Value not one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'."
+            )
 
         return value
 
@@ -830,8 +844,7 @@ class CharmConfig(BaseConfigModel):
     def request_xmlbinary_values(cls, value: str) -> str | None:
         """Check request_xmlbinary config option is 'base64' or 'hex'."""
         if value not in ["base64", "hex"]:
-            raise ValueError(
-                "Value not 'base64' or 'hex'.")
+            raise ValueError("Value not 'base64' or 'hex'.")
 
         return value
 
@@ -840,7 +853,6 @@ class CharmConfig(BaseConfigModel):
     def request_xmloption_values(cls, value: str) -> str | None:
         """Check request_xmloption config option is 'content' or 'document'."""
         if value not in ["content", "document"]:
-            raise ValueError(
-                "Value not 'content' or 'document'.")
+            raise ValueError("Value not 'content' or 'document'.")
 
         return value
