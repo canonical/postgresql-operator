@@ -96,11 +96,6 @@ options:
       Allowed values are: “on”, “off” and “partition”.
     type: string
     default: "partition"
-  optimizer_default_statistics_target:
-    description: |
-      Sets the default statistics target. Allowed values are: from 1 to 10000.
-    type: int
-    default: 100
   optimizer_from_collapse_limit:
     description: |
       Sets the FROM-list size beyond which subqueries are not collapsed.
@@ -353,12 +348,6 @@ options:
       like PST and POSIX-style time zone specifications.
     type: string
     default: "UTC"
-  response_bytea_output:
-    description: |
-      Sets the output format for bytes.
-      Allowed values are: “escape” and “hex”.
-    type: string
-    default: "hex"
   response_lc_monetary:
     description: |
       Sets the locale for formatting monetary amounts.
@@ -424,9 +413,9 @@ options:
   connection_authentication_timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
-      Allowed values are: from 0 to 180.
+      Allowed values are: from 1 to 600.
     type: int
-    default: 20
+    default: 60
   vacuum_autovacuum_naptime:
     description: |
       Time to sleep between autovacuum runs.
@@ -454,7 +443,7 @@ options:
   vacuum_autovacuum_vacuum_threshold:
     description: |
       Minimum number of tuple updates or deletes prior to vacuum.
-      Allowed values are: from 1 to 2147483647.
+      Allowed values are: from 0 to 2147483647.
     type: int
     default: 50
   request_backslash_quote:
@@ -467,15 +456,32 @@ options:
   storage_bgwriter_lru_maxpages:
     description: |
       Background writer maximum number of LRU pages to flush per round.
-      Allowed values are: from 10 to 1073741823.
+      Allowed values are: from 0 to 1073741823.
     type: int
     default: 100
   storage_bgwriter_lru_multiplier:
     description: |
       Multiple of the average buffer usage to free per round.
-      Allowed values are: from 1 to 10.
+      Allowed values are: from 0 to 10.
     type: float
     default: 2.0
+  response_bytea_output:
+    description: |
+      Sets the output format for bytes.
+      Allowed values are: “escape” and “hex”.
+    type: string
+    default: "hex"
+  request_client_encoding:
+    description: |
+      Sets the client's character set encoding.
+      Allowed values are: BIG5, WIN950, Windows950, EUC_CN, EUC_JP, EUC_JIS_2004,EUC_KR, EUC_TW, GB18030, GBK, WIN936, 
+      Windows936, ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, JOHAB, KOI8R, KOI8, KOI8U,LATIN1, ISO88591, LATIN2, 
+      ISO88592, LATIN3, ISO88593, LATIN4, ISO88594, LATIN5, ISO88599, LATIN6, ISO885910, LATIN7, ISO885913,LATIN8, ISO885914, 
+      LATIN9, ISO885915, LATIN10, ISO885916, MULE_INTERNAL, SJIS, Mskanji, ShiftJIS, WIN932, Windows932, SHIFT_JIS_2004,SQL_ASCII, 
+      UHC, WIN949, Windows949, UTF8, Unicode, WIN866, ALT, WIN874, WIN1250, WIN1251, WIN, WIN1252, WIN1253, WIN1254, WIN1255,WIN1256, 
+      WIN1257, WIN1258, ABC, TCVN, TCVN5712, VSCII.
+    type: string
+    default: "UTF-8"
   logging_client_min_messages:
     description: |
       Sets the message levels that are sent to the client.
@@ -513,6 +519,17 @@ options:
       Allowed values are: from 1 to 2147483647.
     type: int
     default: 1000
+  optimizer_default_statistics_target:
+    description: |
+      Sets the default statistics target. Allowed values are: from 1 to 10000.
+    type: int
+    default: 100
+  default_table_access_method:
+    description: |
+      Sets the default table access method for new tables.
+      These entries can be created using the CREATE ACCESS METHOD SQL command.
+    type: string
+    default: "heap"
   request_default_transaction_isolation:
     description: |
       Sets the transaction isolation level of each new transaction.
@@ -706,9 +723,9 @@ options:
   session_idle_in_transaction_session_timeout:
     description: |
       Sets the maximum allowed idle time between queries, when in a transaction.
-      Allowed values are: from 10000 to 99999000.
+      Allowed values are: from 0 to 2147483647.
     type: int
-    default: 10000 # Bad default value, used min
+    default: 0
   optimizer_jit:
     description: |
       Allow JIT compilation.
@@ -753,7 +770,7 @@ options:
   storage_old_snapshot_threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.
-      Allowed values are: from -1 to 16666.
+      Allowed values are: from -1 to 86400.
     type: int
     default: -1
   cpu_parallel_leader_participation:
@@ -776,7 +793,7 @@ options:
   connection_statement_timeout:
     description: |
       Sets the maximum allowed duration of any statement.
-      Allowed values are: from 0 to 700000000.
+      Allowed values are: from 0 to 2147483647.
     type: int
     default: 0
   instance_synchronize_seqscans:
@@ -787,13 +804,13 @@ options:
   request_track_activity_query_size:
     description: |
       Sets the size reserved for pg_stat_activity.query, in bytes.
-      Allowed values are: from 0 to 700000000.
+      Allowed values are: from 100 to 1048576.
     type: int
     default: 1024
   logging_track_functions:
     description: |
       Collects function-level statistics on database activity.
-      Allowed values are one of 'none', 'pl'.
+      Allowed values are one of 'none', 'pl', 'all'.
       Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
     type: string
     default: "none"
@@ -815,18 +832,18 @@ options:
     default: "read committed"
   request_transaction_read_only:
     description: |
-      Treats "expr=NULL" as "expr IS NULL".
+      Sets the current transaction's read-only status
     type: boolean
     default: false
   request_transform_null_equals:
     description: |
-      Sets the current transaction's read-only status.
+      Treats "expr=NULL" as "expr IS NULL"
     type: boolean
     default: false
   vacuum_vacuum_cost_delay:
     description: |
       Vacuum cost delay in milliseconds.
-      Allowed values are: from 0 to 20.
+      Allowed values are: from 0 to 100.
     type: float
     default: 0.0
   vacuum_vacuum_cost_limit:

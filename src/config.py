@@ -20,7 +20,6 @@ class CharmConfig(BaseConfigModel):
 
     synchronous_node_count: Literal["all", "majority"] | PositiveInt
     durability_synchronous_commit: str | None
-    instance_default_text_search_config: str | None
     instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
     logging_log_connections: bool | None
@@ -32,10 +31,6 @@ class CharmConfig(BaseConfigModel):
     memory_shared_buffers: int | None
     memory_temp_buffers: int | None
     memory_work_mem: int | None
-    optimizer_constraint_exclusion: str | None
-    optimizer_default_statistics_target: int | None
-    optimizer_from_collapse_limit: int | None
-    optimizer_join_collapse_limit: int | None
     profile: str
     profile_limit_memory: int | None
     plugin_audit_enable: bool
@@ -91,37 +86,39 @@ class CharmConfig(BaseConfigModel):
     plugin_postgis_raster_enable: bool
     plugin_vector_enable: bool
     request_date_style: str | None
-    request_standard_conforming_strings: bool | None
     request_time_zone: str | None
-    response_bytea_output: str | None
     response_lc_monetary: Literal[tuple(SNAP_LOCALES)] | None
     response_lc_numeric: Literal[tuple(SNAP_LOCALES)] | None
     response_lc_time: Literal[tuple(SNAP_LOCALES)] | None
-    vacuum_autovacuum_analyze_scale_factor: float | None
-    vacuum_autovacuum_analyze_threshold: int | None
     vacuum_autovacuum_freeze_max_age: int | None
-    vacuum_autovacuum_vacuum_cost_delay: float | None
-    vacuum_autovacuum_vacuum_scale_factor: float | None
-    vacuum_vacuum_freeze_table_age: int | None
     experimental_max_connections: int | None
+
     request_array_nulls: bool | None
     connection_authentication_timeout: int | None
+    vacuum_autovacuum_analyze_scale_factor: float | None
+    vacuum_autovacuum_analyze_threshold: int | None
     vacuum_autovacuum_naptime: int | None
+    vacuum_autovacuum_vacuum_cost_delay: float | None
     vacuum_autovacuum_vacuum_cost_limit: int | None
     vacuum_autovacuum_vacuum_insert_scale_factor: float | None
     vacuum_autovacuum_vacuum_insert_threshold: int | None
+    vacuum_autovacuum_vacuum_scale_factor: float | None
     vacuum_autovacuum_vacuum_threshold: int | None
     request_backslash_quote: str | None
     storage_bgwriter_lru_maxpages: int | None
     storage_bgwriter_lru_multiplier: float | None
-    # request_client_encoding: str | None
+    response_bytea_output: str | None
+    request_client_encoding: str | None
     logging_client_min_messages: str | None
+    optimizer_constraint_exclusion: str | None
     optimizer_cpu_index_tuple_cost: float | None
     optimizer_cpu_operator_cost: float | None
     optimizer_cpu_tuple_cost: float | None
     optimizer_cursor_tuple_fraction: float | None
     request_deadlock_timeout: int | None
+    optimizer_default_statistics_target: int | None
     storage_default_table_access_method: str | None
+    instance_default_text_search_config: str | None
     request_default_transaction_deferrable: bool | None
     request_default_transaction_isolation: str | None
     request_default_transaction_read_only: bool | None
@@ -148,6 +145,7 @@ class CharmConfig(BaseConfigModel):
     request_escape_string_warning: bool | None
     response_exit_on_error: bool | None
     response_extra_float_digits: float | None
+    optimizer_from_collapse_limit: int | None
     optimizer_geqo: bool | None
     optimizer_geqo_effort: int | None
     optimizer_geqo_generations: int | None
@@ -162,6 +160,7 @@ class CharmConfig(BaseConfigModel):
     optimizer_jit_above_cost: float | None
     optimizer_jit_inline_above_cost: float | None
     optimizer_jit_optimize_above_cost: float | None
+    optimizer_join_collapse_limit: int | None
     request_lock_timeout: int | None
     optimizer_min_parallel_index_scan_size: int | None
     optimizer_min_parallel_table_scan_size: int | None
@@ -169,6 +168,7 @@ class CharmConfig(BaseConfigModel):
     cpu_parallel_leader_participation: bool | None
     optimizer_parallel_setup_cost: float | None
     optimizer_parallel_tuple_cost: float | None
+    request_standard_conforming_strings: bool | None
     connection_statement_timeout: int | None
     instance_synchronize_seqscans: bool | None
     request_track_activity_query_size: int | None
@@ -184,6 +184,7 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_cost_page_miss: int | None
     vacuum_vacuum_failsafe_age: int | None
     vacuum_vacuum_freeze_min_age: int | None
+    vacuum_vacuum_freeze_table_age: int | None
     vacuum_vacuum_multixact_failsafe_age: int | None
     vacuum_vacuum_multixact_freeze_min_age: int | None
     vacuum_vacuum_multixact_freeze_table_age: int | None
@@ -328,15 +329,6 @@ class CharmConfig(BaseConfigModel):
 
         return value
 
-    @validator("response_bytea_output")
-    @classmethod
-    def response_bytea_output_values(cls, value: str) -> str | None:
-        """Check response_bytea_output config option is one of `escape` or `hex`."""
-        if value not in ["escape", "hex"]:
-            raise ValueError("Value not one of 'escape' or 'hex'")
-
-        return value
-
     @validator("vacuum_autovacuum_analyze_scale_factor", "vacuum_autovacuum_vacuum_scale_factor")
     @classmethod
     def vacuum_autovacuum_vacuum_scale_factor_values(cls, value: float) -> float | None:
@@ -385,9 +377,9 @@ class CharmConfig(BaseConfigModel):
     @validator("connection_authentication_timeout")
     @classmethod
     def connection_authentication_timeout_values(cls, value: int) -> int | None:
-        """Check connection_authentication_timeout config option is between 1 and 180."""
-        if value < 1 or value > 180:
-            raise ValueError("Value is not between 1 and 180")
+        """Check connection_authentication_timeout config option is between 1 and 600."""
+        if value < 1 or value > 600:
+            raise ValueError("Value is not between 1 and 600")
 
         return value
 
@@ -430,9 +422,9 @@ class CharmConfig(BaseConfigModel):
     @validator("vacuum_autovacuum_vacuum_threshold")
     @classmethod
     def vacuum_autovacuum_vacuum_threshold_values(cls, value: int) -> int | None:
-        """Check vacuum_autovacuum_vacuum_threshold config option is between 1 and 2147483647."""
-        if value < 1 or value > 2147483647:
-            raise ValueError("Value is not between 1 and 2147483647")
+        """Check vacuum_autovacuum_vacuum_threshold config option is between 0 and 2147483647."""
+        if value < 0 or value > 2147483647:
+            raise ValueError("Value is not between 0 and 2147483647")
 
         return value
 
@@ -448,18 +440,61 @@ class CharmConfig(BaseConfigModel):
     @validator("storage_bgwriter_lru_maxpages")
     @classmethod
     def storage_bgwriter_lru_maxpages_values(cls, value: int) -> int | None:
-        """Check storage_bgwriter_lru_maxpages config option is between 10 and 1073741823."""
-        if value < 10 or value > 1073741823:
-            raise ValueError("Value is not between 10 and 1073741823")
+        """Check storage_bgwriter_lru_maxpages config option is between 0 and 1073741823."""
+        if value < 0 or value > 1073741823:
+            raise ValueError("Value is not between 0 and 1073741823")
 
         return value
 
     @validator("storage_bgwriter_lru_multiplier")
     @classmethod
     def storage_bgwriter_lru_multiplier_values(cls, value: float) -> float | None:
-        """Check storage_bgwriter_lru_multiplier config option is between 1 and 10."""
-        if value < 1 or value > 10:
-            raise ValueError("Value is not between 1 and 10")
+        """Check storage_bgwriter_lru_multiplier config option is between 0 and 10."""
+        if value < 0 or value > 10:
+            raise ValueError("Value is not between 0 and 10")
+
+        return value
+
+    @validator("response_bytea_output")
+    @classmethod
+    def response_bytea_output_values(cls, value: str) -> str | None:
+        """Check response_bytea_output config option is one of `escape` or `hex`."""
+        if value not in ["escape", "hex"]:
+            raise ValueError("Value not one of 'escape' or 'hex'")
+
+        return value
+
+    @validator("request_client_encoding")
+    @classmethod
+    def request_client_encoding_values(cls, value: str) -> str | None:
+        """Check request_client_encoding config option is one of BIG5, WIN950, Windows950, EUC_CN, EUC_JP, EUC_JIS_2004,
+    EUC_KR, EUC_TW, GB18030, GBK, WIN936, Windows936, ISO_8859_5, ISO_8859_6, ISO_8859_7, ISO_8859_8, JOHAB, KOI8R, KOI8, KOI8U,
+    LATIN1, ISO88591, LATIN2, ISO88592, LATIN3, ISO88593, LATIN4, ISO88594, LATIN5, ISO88599, LATIN6, ISO885910, LATIN7, ISO885913,
+    LATIN8, ISO885914, LATIN9, ISO885915, LATIN10, ISO885916, MULE_INTERNAL, SJIS, Mskanji, ShiftJIS, WIN932, Windows932, SHIFT_JIS_2004,
+    SQL_ASCII, UHC, WIN949, Windows949, UTF8, Unicode, WIN866, ALT, WIN874, WIN1250, WIN1251, WIN, WIN1252, WIN1253, WIN1254, WIN1255,
+    WIN1256, WIN1257, WIN1258, ABC, TCVN, TCVN5712, VSCII.
+    """
+        if value not in [
+            "BIG5", "WIN950", "Windows950", "EUC_CN", "EUC_JP", "EUC_JIS_2004",
+            "EUC_KR", "EUC_TW", "GB18030", "GBK", "WIN936", "Windows936", "ISO_8859_5", "ISO_8859_6", "ISO_8859_7",
+            "ISO_8859_8", "JOHAB", "KOI8R", "KOI8", "KOI8U",
+            "LATIN1", "ISO88591", "LATIN2", "ISO88592", "LATIN3", "ISO88593", "LATIN4", "ISO88594", "LATIN5",
+            "ISO88599", "LATIN6", "ISO885910", "LATIN7", "ISO885913",
+            "LATIN8", "ISO885914", "LATIN9", "ISO885915", "LATIN10", "ISO885916", "MULE_INTERNAL", "SJIS", "Mskanji",
+            "ShiftJIS", "WIN932", "Windows932", "SHIFT_JIS_2004",
+            "SQL_ASCII", "UHC", "WIN949", "Windows949", "UTF8", "Unicode", "WIN866", "ALT", "WIN874", "WIN1250",
+            "WIN1251", "WIN", "WIN1252", "WIN1253", "WIN1254", "WIN1255",
+            "WIN1256", "WIN1257", "WIN1258", "ABC", "TCVN", "TCVN5712", "VSCII"
+        ]:
+            raise ValueError("Value not one of BIG5, WIN950, Windows950, EUC_CN, EUC_JP, EUC_JIS_2004, "
+                             "EUC_KR, EUC_TW, GB18030, GBK, WIN936, Windows936, ISO_8859_5, ISO_8859_6, "
+                             "ISO_8859_7, ISO_8859_8, JOHAB, KOI8R, KOI8, KOI8U, LATIN1, ISO88591, LATIN2, "
+                             "ISO88592, LATIN3, ISO88593, LATIN4, ISO88594, LATIN5, ISO88599, LATIN6, "
+                             "ISO885910, LATIN7, ISO885913, LATIN8, ISO885914, LATIN9, ISO885915, LATIN10, "
+                             "ISO885916, MULE_INTERNAL, SJIS, Mskanji, ShiftJIS, WIN932, Windows932, SHIFT_JIS_2004, "
+                             "SQL_ASCII, UHC, WIN949, Windows949, UTF8, Unicode, WIN866, ALT, WIN874, "
+                             "WIN1250, WIN1251, WIN, WIN1252, WIN1253, WIN1254, WIN1255, WIN1256, WIN1257, "
+                             "WIN1258, ABC, TCVN, TCVN5712, VSCII.")
 
         return value
 
@@ -625,9 +660,9 @@ class CharmConfig(BaseConfigModel):
     @validator("session_idle_in_transaction_session_timeout")
     @classmethod
     def session_idle_in_transaction_session_timeout_values(cls, value: int) -> int | None:
-        """Check session_idle_in_transaction_session_timeout config option is between 10000 and 99999000."""
-        if value < 10000 or value > 99999000:
-            raise ValueError("Value is not between 10000 and 99999000")
+        """Check session_idle_in_transaction_session_timeout config option is between 0 and 2147483647."""
+        if value < 0 or value > 2147483647:
+            raise ValueError("Value is not between 0 and 2147483647")
 
         return value
 
@@ -688,9 +723,9 @@ class CharmConfig(BaseConfigModel):
     @validator("storage_old_snapshot_threshold")
     @classmethod
     def storage_old_snapshot_threshold_values(cls, value: int) -> int | None:
-        """Check storage_old_snapshot_threshold config option is between -1 and 1666."""
-        if value < -1 or value > 1666:
-            raise ValueError("Value is not between -1 and 1666")
+        """Check storage_old_snapshot_threshold config option is between -1 and 86400."""
+        if value < -1 or value > 86400:
+            raise ValueError("Value is not between -1 and 86400")
 
         return value
 
@@ -715,9 +750,9 @@ class CharmConfig(BaseConfigModel):
     @validator("connection_statement_timeout")
     @classmethod
     def connection_statement_timeout_values(cls, value: int) -> int | None:
-        """Check connection_statement_timeout config option is between 0 and 700000000."""
-        if value < 0 or value > 700000000:
-            raise ValueError("Value is not between 0 and 700000000")
+        """Check connection_statement_timeout config option is between 0 and 2147483647."""
+        if value < 0 or value > 2147483647:
+            raise ValueError("Value is not between 0 and 2147483647")
 
         return value
 
@@ -733,9 +768,9 @@ class CharmConfig(BaseConfigModel):
     @validator("logging_track_functions")
     @classmethod
     def logging_track_functions_values(cls, value: str) -> str | None:
-        """Check logging_track_functions config option is one of 'none', 'pl'."""
-        if value not in ["none", "pl"]:
-            raise ValueError("Value not one of 'none', 'pl'.")
+        """Check logging_track_functions config option is one of 'none', 'pl', 'all'."""
+        if value not in ["none", "pl", "all"]:
+            raise ValueError("Value not one of 'none', 'pl', 'all'.")
 
         return value
 
@@ -753,9 +788,9 @@ class CharmConfig(BaseConfigModel):
     @validator("vacuum_vacuum_cost_delay")
     @classmethod
     def vacuum_vacuum_cost_delay_values(cls, value: float) -> float | None:
-        """Check vacuum_vacuum_cost_delay config option is between 0 and 20."""
-        if value < 0 or value > 20:
-            raise ValueError("Value is not between 0 and 20")
+        """Check vacuum_vacuum_cost_delay config option is between 0 and 100."""
+        if value < 0 or value > 100:
+            raise ValueError("Value is not between 0 and 100")
 
         return value
 
