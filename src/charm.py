@@ -1960,6 +1960,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.config.request_time_zone not in self.postgresql.get_postgresql_timezones():
             raise ValueError("request_time_zone config option has an invalid value")
 
+        if (
+            self.config.storage_default_table_access_method
+            not in self.postgresql.get_postgresql_default_table_access_methods()
+        ):
+            raise ValueError(
+                "storage_default_table_access_method config option has an invalid value"
+            )
+
     def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()

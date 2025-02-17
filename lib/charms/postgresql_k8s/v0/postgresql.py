@@ -479,6 +479,19 @@ END; $$;"""
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
 
+    def get_postgresql_default_table_access_methods(self) -> Set[str]:
+        """Returns the PostgreSQL available table access methods.
+
+        Returns:
+            Set of PostgreSQL table access methods.
+        """
+        with self._connect_to_database(
+                database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT amname FROM pg_am WHERE amtype = 't';")
+            access_methods = cursor.fetchall()
+            return {access_method[0] for access_method in access_methods}
+
     def get_postgresql_version(self, current_host=True) -> str:
         """Returns the PostgreSQL version.
 

@@ -173,9 +173,6 @@ class CharmConfig(BaseConfigModel):
     instance_synchronize_seqscans: bool | None
     request_track_activity_query_size: int | None
     logging_track_functions: str | None
-    request_transaction_deferrable: bool | None
-    request_transaction_isolation: str | None
-    request_transaction_read_only: bool | None
     request_transform_null_equals: bool | None
     vacuum_vacuum_cost_delay: float | None
     vacuum_vacuum_cost_limit: int | None
@@ -827,17 +824,6 @@ class CharmConfig(BaseConfigModel):
         """Check logging_track_functions config option is one of 'none', 'pl', 'all'."""
         if value not in ["none", "pl", "all"]:
             raise ValueError("Value not one of 'none', 'pl', 'all'.")
-
-        return value
-
-    @validator("request_transaction_isolation")
-    @classmethod
-    def request_transaction_isolation_values(cls, value: str) -> str | None:
-        """Check request_transaction_isolation config option is one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'."""
-        if value not in ["serializable", "repeatable read", "read committed", "read uncommitted"]:
-            raise ValueError(
-                "Value not one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'."
-            )
 
         return value
 

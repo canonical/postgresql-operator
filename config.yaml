@@ -524,7 +524,7 @@ options:
       Sets the default statistics target. Allowed values are: from 1 to 10000.
     type: int
     default: 100
-  default_table_access_method:
+  storage_default_table_access_method:
     description: |
       Sets the default table access method for new tables.
       These entries can be created using the CREATE ACCESS METHOD SQL command.
@@ -814,27 +814,6 @@ options:
       Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
     type: string
     default: "none"
-  request_transaction_deferrable:
-    description: |
-      Whether to defer a read-only serializable transaction until it can be executed with no possible serialization failures.
-    type: boolean
-    default: false
-  request_transaction_isolation:
-    description: |
-      Sets the current transaction's isolation level.
-      Allowed values are one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.
-      Read commited or read uncommited is a statement can only see rows committed before it began.
-      Repeatable read is all statements of the current transaction can only see rows committed before 
-      the first query or data-modification statement was executed in this transaction.
-      Serializable is all statements of the current transaction can only see rows committed before the first 
-      query or data-modification statement was executed in this transaction.
-    type: string
-    default: "read committed"
-  request_transaction_read_only:
-    description: |
-      Sets the current transaction's read-only status
-    type: boolean
-    default: false
   request_transform_null_equals:
     description: |
       Treats "expr=NULL" as "expr IS NULL"
