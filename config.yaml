@@ -8,6 +8,23 @@ options:
       either "all", "majority" or a positive integer value.
     type: string
     default: "all"
+  connection_authentication_timeout:
+    description: |
+      Sets the maximum allowed time to complete client authentication.
+      Allowed values are: from 1 to 600.
+    type: int
+    default: 60
+  connection_statement_timeout:
+    description: |
+      Sets the maximum allowed duration of any statement.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  cpu_parallel_leader_participation:
+    description: |
+      Controls whether Gather and Gather Merge also run subplans.
+    type: boolean
+    default: true
   durability_synchronous_commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
@@ -15,6 +32,10 @@ options:
       crashes and there are replicas.
     type: string
     default: "on"
+  experimental_max_connections:
+    type: int
+    description: |
+      [EXPERIMENTAL] Force set max_connections.
   instance_default_text_search_config:
     description: |
       Selects the text search configuration that is used by those variants of the text
@@ -37,6 +58,18 @@ options:
       Allowed values are: “md5” and “scram-sha-256”.
     type: string
     default: "scram-sha-256"
+  instance_synchronize_seqscans:
+    description: |
+      Enable synchronized sequential scans.
+    type: boolean
+    default: true
+  logging_client_min_messages:
+    description: |
+      Sets the message levels that are sent to the client.
+      Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
+      Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
+    type: string
+    default: "notice"
   logging_log_connections:
     description: |
       Logs each successful connection.
@@ -59,6 +92,13 @@ options:
       statement durations).
     type: int
     default: -1
+  logging_track_functions:
+    description: |
+      Collects function-level statistics on database activity.
+      Allowed values are one of 'none', 'pl', 'all'.
+      Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
+    type: string
+    default: "none"
   memory_maintenance_work_mem:
     description: |
       Sets the maximum memory (KB) to be used for maintenance operations.
@@ -96,388 +136,6 @@ options:
       Allowed values are: “on”, “off” and “partition”.
     type: string
     default: "partition"
-  optimizer_from_collapse_limit:
-    description: |
-      Sets the FROM-list size beyond which subqueries are not collapsed.
-      Allowed values are: from 1 to 2147483647.
-    type: int
-    default: 8
-  optimizer_join_collapse_limit:
-    description: |
-      Sets the FROM-list size beyond which JOIN constructs are not flattened.
-      Allowed values are: from 1 to 2147483647.
-    type: int
-    default: 8
-  plugin_citext_enable:
-    default: false
-    type: boolean
-    description: Enable citext extension
-  plugin_debversion_enable:
-    default: false
-    type: boolean
-    description: Enable debversion extension
-  plugin_hstore_enable:
-    default: false
-    type: boolean
-    description: Enable hstore extension
-  plugin_pg_trgm_enable:
-    default: false
-    type: boolean
-    description: Enable pg_trgm extension
-  plugin_plpython3u_enable:
-    default: false
-    type: boolean
-    description: Enable PL/Python extension
-  plugin_unaccent_enable:
-    default: false
-    type: boolean
-    description: Enable unaccent extension
-  plugin_bloom_enable:
-    default: false
-    type: boolean
-    description: Enable bloom extension
-  plugin_btree_gin_enable:
-    default: false
-    type: boolean
-    description: Enable btree_gin extension
-  plugin_btree_gist_enable:
-    default: false
-    type: boolean
-    description: Enable btree_gist extension
-  plugin_cube_enable:
-    default: false
-    type: boolean
-    description: Enable cube extension
-  plugin_dict_int_enable:
-    default: false
-    type: boolean
-    description: Enable dict_int extension
-  plugin_dict_xsyn_enable:
-    default: false
-    type: boolean
-    description: Enable dict_xsyn extension
-  plugin_earthdistance_enable:
-    default: false
-    type: boolean
-    description: Enable earthdistance extension
-  plugin_fuzzystrmatch_enable:
-    default: false
-    type: boolean
-    description: Enable fuzzystrmatch extension
-  plugin_intarray_enable:
-    default: false
-    type: boolean
-    description: Enable intarray extension
-  plugin_isn_enable:
-    default: false
-    type: boolean
-    description: Enable isn extension
-  plugin_lo_enable:
-    default: false
-    type: boolean
-    description: Enable lo extension
-  plugin_ltree_enable:
-    default: false
-    type: boolean
-    description: Enable ltree extension
-  plugin_old_snapshot_enable:
-    default: false
-    type: boolean
-    description: Enable old_snapshot extension
-  plugin_pg_freespacemap_enable:
-    default: false
-    type: boolean
-    description: Enable pg_freespacemap extension
-  plugin_pgrowlocks_enable:
-    default: false
-    type: boolean
-    description: Enable pgrowlocks extension
-  plugin_pgstattuple_enable:
-    default: false
-    type: boolean
-    description: Enable pgstattuple extension
-  plugin_pg_visibility_enable:
-    default: false
-    type: boolean
-    description: Enable pg_visibility extension
-  plugin_seg_enable:
-    default: false
-    type: boolean
-    description: Enable seg extension
-  plugin_tablefunc_enable:
-    default: false
-    type: boolean
-    description: Enable tablefunc extension
-  plugin_tcn_enable:
-    default: false
-    type: boolean
-    description: Enable tcn extension
-  plugin_tsm_system_rows_enable:
-    default: false
-    type: boolean
-    description: Enable tsm_system_rows extension
-  plugin_tsm_system_time_enable:
-    default: false
-    type: boolean
-    description: Enable tsm_system_time extension
-  plugin_uuid_ossp_enable:
-    default: false
-    type: boolean
-    description: Enable uuid_ossp extension
-  plugin_spi_enable:
-    default: false
-    type: boolean
-    description: Enable spi extension
-  plugin_bool_plperl_enable:
-    default: false
-    type: boolean
-    description: Enable bool_plperl extension
-  plugin_hll_enable:
-    default: false
-    type: boolean
-    description: Enable hll extension
-  plugin_hypopg_enable:
-    default: false
-    type: boolean
-    description: Enable hypopg extension
-  plugin_ip4r_enable:
-    default: false
-    type: boolean
-    description: Enable ip4r extension
-  plugin_plperl_enable:
-    default: false
-    type: boolean
-    description: Enable plperl extension
-  plugin_jsonb_plperl_enable:
-    default: false
-    type: boolean
-    description: Enable jsonb_plperl extension
-  plugin_orafce_enable:
-    default: false
-    type: boolean
-    description: Enable orafce extension
-  plugin_pg_similarity_enable:
-    default: false
-    type: boolean
-    description: Enable pg_similarity extension
-  plugin_prefix_enable:
-    default: false
-    type: boolean
-    description: Enable prefix extension
-  plugin_rdkit_enable:
-    default: false
-    type: boolean
-    description: Enable rdkit extension
-  plugin_tds_fdw_enable:
-    default: false
-    type: boolean
-    description: Enable tds_fdw extension
-  plugin_icu_ext_enable:
-    default: false
-    type: boolean
-    description: Enable icu_ext extension
-  plugin_pltcl_enable:
-    default: false
-    type: boolean
-    description: Enable pltcl extension
-  plugin_postgis_enable:
-    default: false
-    type: boolean
-    description: Enable postgis extension
-  plugin_address_standardizer_enable:
-    default: false
-    type: boolean
-    description: Enable address_standardizer extension
-  plugin_postgis_raster_enable:
-    default: false
-    type: boolean
-    description: Enable postgis_raster extension
-  plugin_address_standardizer_data_us_enable:
-    default: false
-    type: boolean
-    description: Enable address_standardizer_data_us extension
-  plugin_postgis_tiger_geocoder_enable:
-    default: false
-    type: boolean
-    description: Enable postgis_tiger_geocoder extension
-  plugin_postgis_topology_enable:
-    default: false
-    type: boolean
-    description: Enable postgis_topology extension
-  plugin_vector_enable:
-    default: false
-    type: boolean
-    description: Enable pgvector extension
-  plugin_timescaledb_enable:
-    default: false
-    type: boolean
-    description: Enable timescaledb extension
-  plugin_audit_enable:
-    default: true
-    type: boolean
-    description: Enable pgAudit extension
-  profile:
-   description: |
-      Profile representing the scope of deployment, and used to tune resource allocation.
-      Allowed values are: “production” and “testing”.
-      Production will tune postgresql for maximum performance while testing will tune for
-      minimal running performance.
-   type: string
-   default: production
-  profile_limit_memory:
-    type: int
-    description: |
-      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
-      If unset, this will be decided according to the default memory limit in the selected profile.
-      Only comes into effect when the `production` profile is selected.
-  request_date_style:
-    description: |
-      Sets the display format for date and time values. Allowed formats are explained
-      in https://www.postgresql.org/docs/14/runtime-config-client.html#GUC-DATESTYLE.
-    type: string
-    default: "ISO, MDY"
-  request_standard_conforming_strings:
-    description: |
-      Causes ... strings to treat backslashes literally.
-    type: boolean
-    default: true
-  request_time_zone:
-    description: |
-      Sets the time zone for displaying and interpreting time stamps.
-      Allowed values are the ones from IANA time zone data, a time zone abbreviation
-      like PST and POSIX-style time zone specifications.
-    type: string
-    default: "UTC"
-  response_lc_monetary:
-    description: |
-      Sets the locale for formatting monetary amounts.
-      Allowed values are the locales available in the unit.
-    type: string
-    default: "C"
-  response_lc_numeric:
-    description: |
-      Sets the locale for formatting numbers.
-      Allowed values are the locales available in the unit.
-    type: string
-    default: "C"
-  response_lc_time:
-    description: |
-      Sets the locale for formatting date and time values.
-      Allowed values are the locales available in the unit.
-    type: string
-    default: "C"
-  vacuum_autovacuum_analyze_scale_factor:
-    description: |
-      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
-      deciding whether to trigger a VACUUM. The default, 0.1, means 10% of table size.
-      Allowed values are: from 0 to 100.
-    type: float
-    default: 0.1
-  vacuum_autovacuum_analyze_threshold:
-    description: |
-      Sets the minimum number of inserted, updated or deleted tuples needed to trigger
-      an ANALYZE in any one table. Allowed values are: from 0 to 2147483647.
-    type: int
-    default: 50
-  vacuum_autovacuum_freeze_max_age:
-    description: |
-      Maximum age (in transactions) before triggering autovacuum on a table to prevent
-      transaction ID wraparound. Allowed values are: from 100000 to 2000000000.
-    type: int
-    default: 200000000
-  vacuum_autovacuum_vacuum_cost_delay:
-    description: |
-      Sets cost delay value (milliseconds) that will be used in automatic VACUUM operations.
-      Allowed values are: from -1 to 100 (-1 tells PostgreSQL to use the regular
-      vacuum_cost_delay value).
-    type: float
-    default: 2.0
-  vacuum_autovacuum_vacuum_scale_factor:
-    description: |
-      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
-      deciding whether to trigger a VACUUM. The default, 0.2, means 20% of table size.
-      Allowed values are: from 0 to 100.
-    type: float
-    default: 0.2
-  vacuum_vacuum_freeze_table_age:
-    description: |
-      Age (in transactions) at which VACUUM should scan whole table to freeze tuples.
-      Allowed values are: from 0 to 2000000000.
-    type: int
-    default: 150000000
-  request_array_nulls:
-    description: |
-      Enable input of NULL elements in arrays.
-    type: boolean
-    default: true
-  connection_authentication_timeout:
-    description: |
-      Sets the maximum allowed time to complete client authentication.
-      Allowed values are: from 1 to 600.
-    type: int
-    default: 60
-  vacuum_autovacuum_naptime:
-    description: |
-      Time to sleep between autovacuum runs.
-      Allowed values are: from 1 to 2147483.
-    type: int
-    default: 60
-  vacuum_autovacuum_vacuum_cost_limit:
-    description: |
-      Vacuum cost amount available before napping, for autovacuum.
-      Allowed values are: from -1 to 10000.
-    type: int
-    default: -1
-  vacuum_autovacuum_vacuum_insert_scale_factor:
-    description: |
-      Number of tuple inserts prior to vacuum as a fraction of reltuples.
-      Allowed values are: from 0 to 100.
-    type: float
-    default: 0.2
-  vacuum_autovacuum_vacuum_insert_threshold:
-    description: |
-      Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.
-      Allowed values are: from -1 to 2147483647.
-    type: int
-    default: 1000
-  vacuum_autovacuum_vacuum_threshold:
-    description: |
-      Minimum number of tuple updates or deletes prior to vacuum.
-      Allowed values are: from 0 to 2147483647.
-    type: int
-    default: 50
-  request_backslash_quote:
-    description: |
-      Sets whether "\'" is allowed in string literals.
-      Allowed values are "safe_encoding" and "on" and "off".
-      Safe_encoding is allow only if client encoding does not allow ASCII \ within a multibyte character.
-    type: string
-    default: "safe_encoding"
-  storage_bgwriter_lru_maxpages:
-    description: |
-      Background writer maximum number of LRU pages to flush per round.
-      Allowed values are: from 0 to 1073741823.
-    type: int
-    default: 100
-  storage_bgwriter_lru_multiplier:
-    description: |
-      Multiple of the average buffer usage to free per round.
-      Allowed values are: from 0 to 10.
-    type: float
-    default: 2.0
-  response_bytea_output:
-    description: |
-      Sets the output format for bytes.
-      Allowed values are: “escape” and “hex”.
-    type: string
-    default: "hex"
-  logging_client_min_messages:
-    description: |
-      Sets the message levels that are sent to the client.
-      Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
-      Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
-    type: string
-    default: "notice"
   optimizer_cpu_index_tuple_cost:
     description: |
       Sets the planner's estimate of the cost of processing each index entry during an index scan.
@@ -502,44 +160,11 @@ options:
       Allowed values are: from 0 to 1.
     type: float
     default: 0.1
-  request_deadlock_timeout:
-    description: |
-      Sets the time to wait on a lock before checking for deadlock.
-      Allowed values are: from 1 to 2147483647.
-    type: int
-    default: 1000
   optimizer_default_statistics_target:
     description: |
       Sets the default statistics target. Allowed values are: from 1 to 10000.
     type: int
     default: 100
-  storage_default_table_access_method:
-    description: |
-      Sets the default table access method for new tables.
-      These entries can be created using the CREATE ACCESS METHOD SQL command.
-    type: string
-    default: "heap"
-  request_default_transaction_isolation:
-    description: |
-      Sets the transaction isolation level of each new transaction.
-      Allowed values are one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.
-      Read commited or read uncommited is a statement can only see rows committed before it began.
-      Repeatable read is all statements of the current transaction can only see rows committed before 
-      the first query or data-modification statement was executed in this transaction.
-      Serializable is all statements of the current transaction can only see rows committed before the first 
-      query or data-modification statement was executed in this transaction.
-    type: string
-    default: "read committed"
-  request_default_transaction_deferrable:
-    description: |
-      Sets the default deferrable status of new transactions.
-    type: boolean
-    default: false
-  request_default_transaction_read_only:
-    description: |
-      Sets the default read-only status of new transactions.
-    type: boolean
-    default: false
   optimizer_enable_async_append:
     description: |
       Enables the planner's use of async append plans.
@@ -640,22 +265,12 @@ options:
       Enables the planner's use of TID scan plans.
     type: boolean
     default: true
-  request_escape_string_warning:
+  optimizer_from_collapse_limit:
     description: |
-      Warn about backslash escapes in ordinary string literals.
-    type: boolean
-    default: true
-  response_exit_on_error:
-    description: |
-      Terminate session on any error.
-    type: boolean
-    default: false
-  response_extra_float_digits:
-    description: |
-      Sets the number of digits displayed for floating-point values.
-      Allowed values are: from -15 to 3.
+      Sets the FROM-list size beyond which subqueries are not collapsed.
+      Allowed values are: from 1 to 2147483647.
     type: int
-    default: 1
+    default: 8
   optimizer_geqo:
     description: |
       Enables genetic query optimization.
@@ -697,24 +312,6 @@ options:
       Allowed values are: from 2 to 2147483647.
     type: int
     default: 12
-  response_gin_fuzzy_search_limit:
-    description: |
-      Sets the maximum allowed result for exact search by GIN.
-      Allowed values are: from 0 to 2147483647.
-    type: int
-    default: 0
-  storage_gin_pending_list_limit:
-    description: |
-      Sets the maximum size of the pending list for GIN index.
-      Allowed values are: from 64 to 2147483647.
-    type: int
-    default: 4096
-  session_idle_in_transaction_session_timeout:
-    description: |
-      Sets the maximum allowed idle time between queries, when in a transaction.
-      Allowed values are: from 0 to 2147483647.
-    type: int
-    default: 0
   optimizer_jit:
     description: |
       Allow JIT compilation.
@@ -738,12 +335,12 @@ options:
       Allowed values are: from -1 to 1.80E+308.
     type: float
     default: 500000.0
-  request_lock_timeout:
+  optimizer_join_collapse_limit:
     description: |
-      Sets the maximum allowed duration of any wait for a lock.
-      Allowed values are: from 0 to 2147483647.
+      Sets the FROM-list size beyond which JOIN constructs are not flattened.
+      Allowed values are: from 1 to 2147483647.
     type: int
-    default: 0
+    default: 8
   optimizer_min_parallel_index_scan_size:
     description: |
       Sets the minimum amount of index data for a parallel scan.
@@ -756,17 +353,6 @@ options:
       Allowed values are: from 0 to 715827882.
     type: int
     default: 1024
-  storage_old_snapshot_threshold:
-    description: |
-      Time before a snapshot is too old to read pages changed after the snapshot was taken.
-      Allowed values are: from -1 to 86400.
-    type: int
-    default: -1
-  cpu_parallel_leader_participation:
-    description: |
-      Controls whether Gather and Gather Merge also run subplans.
-    type: boolean
-    default: true
   optimizer_parallel_setup_cost:
     description: |
       Sets the planner's estimate of the cost of starting up worker processes for parallel query.
@@ -779,35 +365,459 @@ options:
       Allowed values are: from 0 to 1.80E+308.
     type: float
     default: 0.1
-  connection_statement_timeout:
+  plugin_address_standardizer_data_us_enable:
+    default: false
+    type: boolean
+    description: Enable address_standardizer_data_us extension
+  plugin_address_standardizer_enable:
+    default: false
+    type: boolean
+    description: Enable address_standardizer extension
+  plugin_audit_enable:
+    default: true
+    type: boolean
+    description: Enable pgAudit extension
+  plugin_bloom_enable:
+    default: false
+    type: boolean
+    description: Enable bloom extension
+  plugin_bool_plperl_enable:
+    default: false
+    type: boolean
+    description: Enable bool_plperl extension
+  plugin_btree_gin_enable:
+    default: false
+    type: boolean
+    description: Enable btree_gin extension
+  plugin_btree_gist_enable:
+    default: false
+    type: boolean
+    description: Enable btree_gist extension
+  plugin_citext_enable:
+    default: false
+    type: boolean
+    description: Enable citext extension
+  plugin_cube_enable:
+    default: false
+    type: boolean
+    description: Enable cube extension
+  plugin_debversion_enable:
+    default: false
+    type: boolean
+    description: Enable debversion extension
+  plugin_dict_int_enable:
+    default: false
+    type: boolean
+    description: Enable dict_int extension
+  plugin_dict_xsyn_enable:
+    default: false
+    type: boolean
+    description: Enable dict_xsyn extension
+  plugin_earthdistance_enable:
+    default: false
+    type: boolean
+    description: Enable earthdistance extension
+  plugin_fuzzystrmatch_enable:
+    default: false
+    type: boolean
+    description: Enable fuzzystrmatch extension
+  plugin_hll_enable:
+    default: false
+    type: boolean
+    description: Enable hll extension
+  plugin_hstore_enable:
+    default: false
+    type: boolean
+    description: Enable hstore extension
+  plugin_hypopg_enable:
+    default: false
+    type: boolean
+    description: Enable hypopg extension
+  plugin_icu_ext_enable:
+    default: false
+    type: boolean
+    description: Enable icu_ext extension
+  plugin_intarray_enable:
+    default: false
+    type: boolean
+    description: Enable intarray extension
+  plugin_ip4r_enable:
+    default: false
+    type: boolean
+    description: Enable ip4r extension
+  plugin_isn_enable:
+    default: false
+    type: boolean
+    description: Enable isn extension
+  plugin_jsonb_plperl_enable:
+    default: false
+    type: boolean
+    description: Enable jsonb_plperl extension
+  plugin_lo_enable:
+    default: false
+    type: boolean
+    description: Enable lo extension
+  plugin_ltree_enable:
+    default: false
+    type: boolean
+    description: Enable ltree extension
+  plugin_old_snapshot_enable:
+    default: false
+    type: boolean
+    description: Enable old_snapshot extension
+  plugin_orafce_enable:
+    default: false
+    type: boolean
+    description: Enable orafce extension
+  plugin_pg_freespacemap_enable:
+    default: false
+    type: boolean
+    description: Enable pg_freespacemap extension
+  plugin_pg_similarity_enable:
+    default: false
+    type: boolean
+    description: Enable pg_similarity extension
+  plugin_pg_trgm_enable:
+    default: false
+    type: boolean
+    description: Enable pg_trgm extension
+  plugin_pg_visibility_enable:
+    default: false
+    type: boolean
+    description: Enable pg_visibility extension
+  plugin_pgrowlocks_enable:
+    default: false
+    type: boolean
+    description: Enable pgrowlocks extension
+  plugin_pgstattuple_enable:
+    default: false
+    type: boolean
+    description: Enable pgstattuple extension
+  plugin_plperl_enable:
+    default: false
+    type: boolean
+    description: Enable plperl extension
+  plugin_plpython3u_enable:
+    default: false
+    type: boolean
+    description: Enable PL/Python extension
+  plugin_pltcl_enable:
+    default: false
+    type: boolean
+    description: Enable pltcl extension
+  plugin_postgis_enable:
+    default: false
+    type: boolean
+    description: Enable postgis extension
+  plugin_postgis_raster_enable:
+    default: false
+    type: boolean
+    description: Enable postgis_raster extension
+  plugin_postgis_tiger_geocoder_enable:
+    default: false
+    type: boolean
+    description: Enable postgis_tiger_geocoder extension
+  plugin_postgis_topology_enable:
+    default: false
+    type: boolean
+    description: Enable postgis_topology extension
+  plugin_prefix_enable:
+    default: false
+    type: boolean
+    description: Enable prefix extension
+  plugin_rdkit_enable:
+    default: false
+    type: boolean
+    description: Enable rdkit extension
+  plugin_seg_enable:
+    default: false
+    type: boolean
+    description: Enable seg extension
+  plugin_spi_enable:
+    default: false
+    type: boolean
+    description: Enable spi extension
+  plugin_tablefunc_enable:
+    default: false
+    type: boolean
+    description: Enable tablefunc extension
+  plugin_tcn_enable:
+    default: false
+    type: boolean
+    description: Enable tcn extension
+  plugin_tds_fdw_enable:
+    default: false
+    type: boolean
+    description: Enable tds_fdw extension
+  plugin_timescaledb_enable:
+    default: false
+    type: boolean
+    description: Enable timescaledb extension
+  plugin_tsm_system_rows_enable:
+    default: false
+    type: boolean
+    description: Enable tsm_system_rows extension
+  plugin_tsm_system_time_enable:
+    default: false
+    type: boolean
+    description: Enable tsm_system_time extension
+  plugin_unaccent_enable:
+    default: false
+    type: boolean
+    description: Enable unaccent extension
+  plugin_uuid_ossp_enable:
+    default: false
+    type: boolean
+    description: Enable uuid_ossp extension
+  plugin_vector_enable:
+    default: false
+    type: boolean
+    description: Enable pgvector extension
+  profile:
     description: |
-      Sets the maximum allowed duration of any statement.
+      Profile representing the scope of deployment, and used to tune resource allocation.
+      Allowed values are: “production” and “testing”.
+      Production will tune postgresql for maximum performance while testing will tune for
+      minimal running performance.
+    type: string
+    default: production
+  profile_limit_memory:
+    type: int
+    description: |
+      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
+      If unset, this will be decided according to the default memory limit in the selected profile.
+      Only comes into effect when the `production` profile is selected.
+  request_array_nulls:
+    description: |
+      Enable input of NULL elements in arrays.
+    type: boolean
+    default: true
+  request_backslash_quote:
+    description: |
+      Sets whether "\'" is allowed in string literals.
+      Allowed values are "safe_encoding" and "on" and "off".
+      Safe_encoding is allow only if client encoding does not allow ASCII \ within a multibyte character.
+    type: string
+    default: "safe_encoding"
+  request_date_style:
+    description: |
+      Sets the display format for date and time values. Allowed formats are explained
+      in https://www.postgresql.org/docs/14/runtime-config-client.html#GUC-DATESTYLE.
+    type: string
+    default: "ISO, MDY"
+  request_deadlock_timeout:
+    description: |
+      Sets the time to wait on a lock before checking for deadlock.
+      Allowed values are: from 1 to 2147483647.
+    type: int
+    default: 1000
+  request_default_transaction_deferrable:
+    escription: |
+      Sets the default deferrable status of new transactions.
+    type: boolean
+    default: false
+  request_default_transaction_isolation:
+    description: |
+      Sets the transaction isolation level of each new transaction.
+      Allowed values are one of 'serializable', 'repeatable read', 'read committed', 'read uncommitted'.
+      Read commited or read uncommited is a statement can only see rows committed before it began.
+      Repeatable read is all statements of the current transaction can only see rows committed before 
+      the first query or data-modification statement was executed in this transaction.
+      Serializable is all statements of the current transaction can only see rows committed before the first 
+      query or data-modification statement was executed in this transaction.
+    type: string
+    default: "read committed"
+  request_default_transaction_read_only:
+    description: |
+      Sets the default read-only status of new transactions.
+    type: boolean
+    default: false
+  request_escape_string_warning:
+    description: |
+      Warn about backslash escapes in ordinary string literals.
+    type: boolean
+    default: true
+  request_lock_timeout:
+    description: |
+      Sets the maximum allowed duration of any wait for a lock.
       Allowed values are: from 0 to 2147483647.
     type: int
     default: 0
-  instance_synchronize_seqscans:
+  request_standard_conforming_strings:
     description: |
-      Enable synchronized sequential scans.
+      Causes ... strings to treat backslashes literally.
     type: boolean
     default: true
+  request_time_zone:
+    description: |
+      Sets the time zone for displaying and interpreting time stamps.
+      Allowed values are the ones from IANA time zone data, a time zone abbreviation
+      like PST and POSIX-style time zone specifications.
+    type: string
+    default: "UTC"
   request_track_activity_query_size:
     description: |
       Sets the size reserved for pg_stat_activity.query, in bytes.
       Allowed values are: from 100 to 1048576.
     type: int
     default: 1024
-  logging_track_functions:
-    description: |
-      Collects function-level statistics on database activity.
-      Allowed values are one of 'none', 'pl', 'all'.
-      Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
-    type: string
-    default: "none"
   request_transform_null_equals:
     description: |
       Treats "expr=NULL" as "expr IS NULL"
     type: boolean
     default: false
+  request_xmlbinary:
+    description: |
+      Sets how binary values are to be encoded in XML.
+      Allowed values are one of 'base64', 'hex'.
+    type: string
+    default: "base64"
+  request_xmloption:
+    description: |
+      Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
+      Allowed values are one of 'content', 'document'.
+    type: string
+    default: "content"
+  response_bytea_output:
+    description: |
+      Sets the output format for bytes.
+      Allowed values are: “escape” and “hex”.
+    type: string
+    default: "hex"
+  response_exit_on_error:
+    description: |
+      Terminate session on any error.
+    type: boolean
+    default: false
+  response_extra_float_digits:
+    description: |
+      Sets the number of digits displayed for floating-point values.
+      Allowed values are: from -15 to 3.
+    type: int
+    default: 1
+  response_gin_fuzzy_search_limit:
+    description: |
+      Sets the maximum allowed result for exact search by GIN.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  response_lc_monetary:
+    description: |
+      Sets the locale for formatting monetary amounts.
+      Allowed values are the locales available in the unit.
+    type: string
+    default: "C"
+  response_lc_numeric:
+    description: |
+      Sets the locale for formatting numbers.
+      Allowed values are the locales available in the unit.
+    type: string
+    default: "C"
+  response_lc_time:
+    description: |
+      Sets the locale for formatting date and time values.
+      Allowed values are the locales available in the unit.
+    type: string
+    default: "C"
+  session_idle_in_transaction_session_timeout:
+    description: |
+      Sets the maximum allowed idle time between queries, when in a transaction.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 0
+  storage_bgwriter_lru_maxpages:
+    description: |
+      Background writer maximum number of LRU pages to flush per round.
+      Allowed values are: from 0 to 1073741823.
+    type: int
+    default: 100
+  storage_bgwriter_lru_multiplier:
+    description: |
+      Multiple of the average buffer usage to free per round.
+      Allowed values are: from 0 to 10.
+    type: float
+    default: 2.0
+  storage_default_table_access_method:
+    description: |
+      Sets the default table access method for new tables.
+      These entries can be created using the CREATE ACCESS METHOD SQL command.
+    type: string
+    default: "heap"
+  storage_gin_pending_list_limit:
+    description: |
+      Sets the maximum size of the pending list for GIN index.
+      Allowed values are: from 64 to 2147483647.
+    type: int
+    default: 4096
+  storage_old_snapshot_threshold:
+    description: |
+      Time before a snapshot is too old to read pages changed after the snapshot was taken.
+      Allowed values are: from -1 to 86400.
+    type: int
+    default: -1
+  vacuum_autovacuum_analyze_scale_factor:
+    description: |
+      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
+      deciding whether to trigger a VACUUM. The default, 0.1, means 10% of table size.
+      Allowed values are: from 0 to 100.
+    type: float
+    default: 0.1
+  vacuum_autovacuum_analyze_threshold:
+    description: |
+      Sets the minimum number of inserted, updated or deleted tuples needed to trigger
+      an ANALYZE in any one table. Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 50
+  vacuum_autovacuum_freeze_max_age:
+    description: |
+      Maximum age (in transactions) before triggering autovacuum on a table to prevent
+      transaction ID wraparound. Allowed values are: from 100000 to 2000000000.
+    type: int
+    default: 200000000
+  vacuum_autovacuum_naptime:
+    description: |
+      Time to sleep between autovacuum runs.
+      Allowed values are: from 1 to 2147483.
+    type: int
+    default: 60
+  vacuum_autovacuum_vacuum_cost_delay:
+    description: |
+      Sets cost delay value (milliseconds) that will be used in automatic VACUUM operations.
+      Allowed values are: from -1 to 100 (-1 tells PostgreSQL to use the regular
+      vacuum_cost_delay value).
+    type: float
+    default: 2.0
+  vacuum_autovacuum_vacuum_cost_limit:
+    description: |
+      Vacuum cost amount available before napping, for autovacuum.
+      Allowed values are: from -1 to 10000.
+    type: int
+    default: -1
+  vacuum_autovacuum_vacuum_insert_scale_factor:
+    description: |
+      Number of tuple inserts prior to vacuum as a fraction of reltuples.
+      Allowed values are: from 0 to 100.
+    type: float
+    default: 0.2
+  vacuum_autovacuum_vacuum_insert_threshold:
+    description: |
+      Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.
+      Allowed values are: from -1 to 2147483647.
+    type: int
+    default: 1000
+  vacuum_autovacuum_vacuum_scale_factor:
+    description: |
+      Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
+      deciding whether to trigger a VACUUM. The default, 0.2, means 20% of table size.
+      Allowed values are: from 0 to 100.
+    type: float
+    default: 0.2
+  vacuum_autovacuum_vacuum_threshold:
+    description: |
+      Minimum number of tuple updates or deletes prior to vacuum.
+      Allowed values are: from 0 to 2147483647.
+    type: int
+    default: 50
   vacuum_vacuum_cost_delay:
     description: |
       Vacuum cost delay in milliseconds.
@@ -850,6 +860,12 @@ options:
       Allowed values are: from 0 to 1000000000.
     type: int
     default: 50000000
+  vacuum_vacuum_freeze_table_age:
+    description: |
+      Age (in transactions) at which VACUUM should scan whole table to freeze tuples.
+      Allowed values are: from 0 to 2000000000.
+    type: int
+    default: 150000000
   vacuum_vacuum_multixact_failsafe_age:
     description: |
       Multixact age at which VACUUM should trigger failsafe to avoid a wraparound outage.
@@ -868,19 +884,4 @@ options:
       Allowed values are: from 0 to 2000000000.
     type: int
     default: 150000000
-  request_xmlbinary:
-    description: |
-      Sets how binary values are to be encoded in XML.
-      Allowed values are one of 'base64', 'hex'.
-    type: string
-    default: "base64"
-  request_xmloption:
-    description: |
-      Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
-      Allowed values are one of 'content', 'document'.
-    type: string
-    default: "content"
-  experimental_max_connections:
-    type: int
-    description: |
-      [EXPERIMENTAL] Force set max_connections.
+

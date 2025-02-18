@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 42
+LIBPATCH = 43
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -662,6 +662,8 @@ END; $$;"""
         for config, value in config_options.items():
             # Filter config option not related to PostgreSQL parameters.
             if not config.startswith((
+                "connection",
+                "cpu",
                 "durability",
                 "instance",
                 "logging",
@@ -669,11 +671,9 @@ END; $$;"""
                 "optimizer",
                 "request",
                 "response",
-                "vacuum",
+                "session",
                 "storage",
-                "cpu",
-                "connection",
-                "session"
+                "vacuum",
             )):
                 continue
             parameter = "_".join(config.split("_")[1:])

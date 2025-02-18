@@ -19,108 +19,32 @@ class CharmConfig(BaseConfigModel):
     """Manager for the structured configuration."""
 
     synchronous_node_count: Literal["all", "majority"] | PositiveInt
+    connection_authentication_timeout: int | None
+    connection_statement_timeout: int | None
+    cpu_parallel_leader_participation: bool | None
     durability_synchronous_commit: str | None
+    experimental_max_connections: int | None
+    instance_default_text_search_config: str | None
     instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
+    instance_synchronize_seqscans: bool | None
+    logging_client_min_messages: str | None
     logging_log_connections: bool | None
     logging_log_disconnections: bool | None
     logging_log_lock_waits: bool | None
     logging_log_min_duration_statement: int | None
+    logging_track_functions: str | None
     memory_maintenance_work_mem: int | None
     memory_max_prepared_transactions: int | None
     memory_shared_buffers: int | None
     memory_temp_buffers: int | None
     memory_work_mem: int | None
-    profile: str
-    profile_limit_memory: int | None
-    plugin_audit_enable: bool
-    plugin_citext_enable: bool
-    plugin_debversion_enable: bool
-    plugin_hstore_enable: bool
-    plugin_pg_trgm_enable: bool
-    plugin_plpython3u_enable: bool
-    plugin_unaccent_enable: bool
-    plugin_bloom_enable: bool
-    plugin_btree_gin_enable: bool
-    plugin_btree_gist_enable: bool
-    plugin_cube_enable: bool
-    plugin_dict_int_enable: bool
-    plugin_dict_xsyn_enable: bool
-    plugin_earthdistance_enable: bool
-    plugin_fuzzystrmatch_enable: bool
-    plugin_intarray_enable: bool
-    plugin_isn_enable: bool
-    plugin_lo_enable: bool
-    plugin_ltree_enable: bool
-    plugin_old_snapshot_enable: bool
-    plugin_pg_freespacemap_enable: bool
-    plugin_pgrowlocks_enable: bool
-    plugin_pgstattuple_enable: bool
-    plugin_pg_visibility_enable: bool
-    plugin_seg_enable: bool
-    plugin_tablefunc_enable: bool
-    plugin_tcn_enable: bool
-    plugin_tsm_system_rows_enable: bool
-    plugin_tsm_system_time_enable: bool
-    plugin_uuid_ossp_enable: bool
-    plugin_spi_enable: bool
-    plugin_bool_plperl_enable: bool
-    plugin_hll_enable: bool
-    plugin_hypopg_enable: bool
-    plugin_ip4r_enable: bool
-    plugin_plperl_enable: bool
-    plugin_jsonb_plperl_enable: bool
-    plugin_orafce_enable: bool
-    plugin_pg_similarity_enable: bool
-    plugin_prefix_enable: bool
-    plugin_rdkit_enable: bool
-    plugin_tds_fdw_enable: bool
-    plugin_icu_ext_enable: bool
-    plugin_pltcl_enable: bool
-    plugin_postgis_enable: bool
-    plugin_timescaledb_enable: bool
-    plugin_address_standardizer_enable: bool
-    plugin_address_standardizer_data_us_enable: bool
-    plugin_postgis_tiger_geocoder_enable: bool
-    plugin_postgis_topology_enable: bool
-    plugin_postgis_raster_enable: bool
-    plugin_vector_enable: bool
-    request_date_style: str | None
-    request_time_zone: str | None
-    response_lc_monetary: Literal[tuple(SNAP_LOCALES)] | None
-    response_lc_numeric: Literal[tuple(SNAP_LOCALES)] | None
-    response_lc_time: Literal[tuple(SNAP_LOCALES)] | None
-    vacuum_autovacuum_freeze_max_age: int | None
-    experimental_max_connections: int | None
-
-    request_array_nulls: bool | None
-    connection_authentication_timeout: int | None
-    vacuum_autovacuum_analyze_scale_factor: float | None
-    vacuum_autovacuum_analyze_threshold: int | None
-    vacuum_autovacuum_naptime: int | None
-    vacuum_autovacuum_vacuum_cost_delay: float | None
-    vacuum_autovacuum_vacuum_cost_limit: int | None
-    vacuum_autovacuum_vacuum_insert_scale_factor: float | None
-    vacuum_autovacuum_vacuum_insert_threshold: int | None
-    vacuum_autovacuum_vacuum_scale_factor: float | None
-    vacuum_autovacuum_vacuum_threshold: int | None
-    request_backslash_quote: str | None
-    storage_bgwriter_lru_maxpages: int | None
-    storage_bgwriter_lru_multiplier: float | None
-    response_bytea_output: str | None
-    logging_client_min_messages: str | None
     optimizer_constraint_exclusion: str | None
     optimizer_cpu_index_tuple_cost: float | None
     optimizer_cpu_operator_cost: float | None
     optimizer_cpu_tuple_cost: float | None
     optimizer_cursor_tuple_fraction: float | None
-    request_deadlock_timeout: int | None
     optimizer_default_statistics_target: int | None
-    storage_default_table_access_method: str | None
-    instance_default_text_search_config: str | None
-    request_default_transaction_deferrable: bool | None
-    request_default_transaction_isolation: str | None
-    request_default_transaction_read_only: bool | None
     optimizer_enable_async_append: bool | None
     optimizer_enable_bitmapscan: bool | None
     optimizer_enable_gathermerge: bool | None
@@ -141,9 +65,6 @@ class CharmConfig(BaseConfigModel):
     optimizer_enable_seqscan: bool | None
     optimizer_enable_sort: bool | None
     optimizer_enable_tidscan: bool | None
-    request_escape_string_warning: bool | None
-    response_exit_on_error: bool | None
-    response_extra_float_digits: float | None
     optimizer_from_collapse_limit: int | None
     optimizer_geqo: bool | None
     optimizer_geqo_effort: int | None
@@ -152,27 +73,107 @@ class CharmConfig(BaseConfigModel):
     optimizer_geqo_seed: float | None
     optimizer_geqo_selection_bias: float | None
     optimizer_geqo_threshold: int | None
-    response_gin_fuzzy_search_limit: int | None
-    storage_gin_pending_list_limit: int | None
-    session_idle_in_transaction_session_timeout: int | None
     optimizer_jit: bool | None
     optimizer_jit_above_cost: float | None
     optimizer_jit_inline_above_cost: float | None
     optimizer_jit_optimize_above_cost: float | None
     optimizer_join_collapse_limit: int | None
-    request_lock_timeout: int | None
     optimizer_min_parallel_index_scan_size: int | None
     optimizer_min_parallel_table_scan_size: int | None
-    storage_old_snapshot_threshold: int | None
-    cpu_parallel_leader_participation: bool | None
     optimizer_parallel_setup_cost: float | None
     optimizer_parallel_tuple_cost: float | None
+    plugin_address_standardizer_data_us_enable: bool
+    plugin_address_standardizer_enable: bool
+    plugin_audit_enable: bool
+    plugin_bloom_enable: bool
+    plugin_bool_plperl_enable: bool
+    plugin_btree_gin_enable: bool
+    plugin_btree_gist_enable: bool
+    plugin_citext_enable: bool
+    plugin_cube_enable: bool
+    plugin_debversion_enable: bool
+    plugin_dict_int_enable: bool
+    plugin_dict_xsyn_enable: bool
+    plugin_earthdistance_enable: bool
+    plugin_fuzzystrmatch_enable: bool
+    plugin_hll_enable: bool
+    plugin_hstore_enable: bool
+    plugin_hypopg_enable: bool
+    plugin_icu_ext_enable: bool
+    plugin_intarray_enable: bool
+    plugin_ip4r_enable: bool
+    plugin_isn_enable: bool
+    plugin_jsonb_plperl_enable: bool
+    plugin_lo_enable: bool
+    plugin_ltree_enable: bool
+    plugin_old_snapshot_enable: bool
+    plugin_orafce_enable: bool
+    plugin_pg_freespacemap_enable: bool
+    plugin_pg_similarity_enable: bool
+    plugin_pg_trgm_enable: bool
+    plugin_pg_visibility_enable: bool
+    plugin_pgrowlocks_enable: bool
+    plugin_pgstattuple_enable: bool
+    plugin_plperl_enable: bool
+    plugin_plpython3u_enable: bool
+    plugin_pltcl_enable: bool
+    plugin_postgis_enable: bool
+    plugin_postgis_raster_enable: bool
+    plugin_postgis_tiger_geocoder_enable: bool
+    plugin_postgis_topology_enable: bool
+    plugin_prefix_enable: bool
+    plugin_rdkit_enable: bool
+    plugin_seg_enable: bool
+    plugin_spi_enable: bool
+    plugin_tablefunc_enable: bool
+    plugin_tcn_enable: bool
+    plugin_tds_fdw_enable: bool
+    plugin_timescaledb_enable: bool
+    plugin_tsm_system_rows_enable: bool
+    plugin_tsm_system_time_enable: bool
+    plugin_unaccent_enable: bool
+    plugin_uuid_ossp_enable: bool
+    plugin_vector_enable: bool
+    profile: str
+    profile_limit_memory: int | None
+    request_array_nulls: bool | None
+    request_backslash_quote: str | None
+    request_date_style: str | None
+    request_deadlock_timeout: int | None
+    request_default_transaction_deferrable: bool | None
+    request_default_transaction_isolation: str | None
+    request_default_transaction_read_only: bool | None
+    request_escape_string_warning: bool | None
+    request_lock_timeout: int | None
     request_standard_conforming_strings: bool | None
-    connection_statement_timeout: int | None
-    instance_synchronize_seqscans: bool | None
+    request_time_zone: str | None
     request_track_activity_query_size: int | None
-    logging_track_functions: str | None
     request_transform_null_equals: bool | None
+    request_xmlbinary: str | None
+    request_xmloption: str | None
+    response_bytea_output: str | None
+    response_exit_on_error: bool | None
+    response_extra_float_digits: float | None
+    response_gin_fuzzy_search_limit: int | None
+    response_lc_monetary: Literal[tuple(SNAP_LOCALES)] | None
+    response_lc_numeric: Literal[tuple(SNAP_LOCALES)] | None
+    response_lc_time: Literal[tuple(SNAP_LOCALES)] | None
+    session_idle_in_transaction_session_timeout: int | None
+    storage_bgwriter_lru_maxpages: int | None
+    storage_bgwriter_lru_multiplier: float | None
+    storage_default_table_access_method: str | None
+    storage_gin_pending_list_limit: int | None
+    storage_old_snapshot_threshold: int | None
+    vacuum_autovacuum_analyze_scale_factor: float | None
+    vacuum_autovacuum_analyze_threshold: int | None
+    vacuum_autovacuum_freeze_max_age: int | None
+    vacuum_autovacuum_naptime: int | None
+    vacuum_autovacuum_vacuum_cost_delay: float | None
+    vacuum_autovacuum_vacuum_cost_limit: int | None
+    vacuum_autovacuum_vacuum_insert_scale_factor: float | None
+    vacuum_autovacuum_vacuum_insert_threshold: int | None
+    vacuum_autovacuum_vacuum_scale_factor: float | None
+    vacuum_autovacuum_vacuum_threshold: int | None
     vacuum_vacuum_cost_delay: float | None
     vacuum_vacuum_cost_limit: int | None
     vacuum_vacuum_cost_page_dirty: int | None
@@ -184,8 +185,6 @@ class CharmConfig(BaseConfigModel):
     vacuum_vacuum_multixact_failsafe_age: int | None
     vacuum_vacuum_multixact_freeze_min_age: int | None
     vacuum_vacuum_multixact_freeze_table_age: int | None
-    request_xmlbinary: str | None
-    request_xmloption: str | None
 
     @classmethod
     def keys(cls) -> list[str]:
