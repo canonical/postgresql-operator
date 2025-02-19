@@ -82,6 +82,8 @@ class CharmConfig(BaseConfigModel):
     optimizer_min_parallel_table_scan_size: int | None
     optimizer_parallel_setup_cost: float | None
     optimizer_parallel_tuple_cost: float | None
+    profile: str
+    profile_limit_memory: int | None
     plugin_address_standardizer_data_us_enable: bool
     plugin_address_standardizer_enable: bool
     plugin_audit_enable: bool
@@ -134,8 +136,6 @@ class CharmConfig(BaseConfigModel):
     plugin_unaccent_enable: bool
     plugin_uuid_ossp_enable: bool
     plugin_vector_enable: bool
-    profile: str
-    profile_limit_memory: int | None
     request_array_nulls: bool | None
     request_backslash_quote: str | None
     request_date_style: str | None
