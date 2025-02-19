@@ -380,7 +380,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
-        logger.info("endpoint_check")
         if not self._peers:
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None

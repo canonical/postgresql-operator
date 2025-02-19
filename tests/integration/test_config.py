@@ -110,9 +110,7 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "optimizer_parallel_tuple_cost": ["-1", "0.1"]
         },  # config option is between 0 and 1.80E+308
         {"profile": [test_string, "testing"]},  # config option is one of `testing` or `production`
-        {
-           "profile_limit_memory": {"127", "128"}
-        },  # config option is between 128 and 9999999
+        {"profile_limit_memory": {"127", "128"}},  # config option is between 128 and 9999999
         {
             "request_backslash_quote": [test_string, "safe_encoding"]
         },  # config option is one of `safe_encoding` and `on` and `off`
