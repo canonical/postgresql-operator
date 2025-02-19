@@ -149,11 +149,13 @@ class PostgreSQL:
         Returns:
              psycopg2 connection object.
         """
+        logger.info("it's here")
         host = database_host if database_host is not None else self.primary_host
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
             f"password='{self.password}' connect_timeout=1"
         )
+        logger.info("it's okay")
         connection.autocommit = True
         return connection
 
@@ -536,12 +538,14 @@ END; $$;"""
         Returns:
             List of PostgreSQL database users.
         """
+        logger.info("1")
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
         except psycopg2.Error as e:
+            logger.info("eror")
             logger.error(f"Failed to list PostgreSQL database users: {e}")
             raise PostgreSQLListUsersError() from e
 
@@ -662,18 +666,18 @@ END; $$;"""
         for config, value in config_options.items():
             # Filter config option not related to PostgreSQL parameters.
             if not config.startswith((
-                "connection",
-                "cpu",
-                "durability",
-                "instance",
-                "logging",
-                "memory",
+                "connection", # Works
+                "cpu", # Works
+                "durability", # Works
+                "instance", # Works
+                "logging", # Works
+                "memory", # Works
                 "optimizer",
-                "request",
-                "response",
-                "session",
-                "storage",
-                "vacuum",
+                "request", # Works
+                "response", # Works
+                "session", # Works
+                #"storage",
+                #"vacuum",
             )):
                 continue
             parameter = "_".join(config.split("_")[1:])
