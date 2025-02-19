@@ -150,6 +150,7 @@ class PostgreSQL:
              psycopg2 connection object.
         """
         logger.info("it's here")
+        logger.info(self.primary_host)
         host = database_host if database_host is not None else self.primary_host
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
@@ -676,8 +677,8 @@ END; $$;"""
                 "request", # Works
                 "response", # Works
                 "session", # Works
-                #"storage",
-                #"vacuum",
+                "storage",
+                "vacuum",
             )):
                 continue
             parameter = "_".join(config.split("_")[1:])

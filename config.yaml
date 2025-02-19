@@ -8,6 +8,27 @@ options:
       either "all", "majority" or a positive integer value.
     type: string
     default: "all"
+  profile_limit_memory:
+    type: int
+    description: |
+      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
+      If unset, this will be decided according to the default memory limit in the selected profile.
+      Only comes into effect when the `production` profile is selected.
+  profile:
+    description: |
+      Profile representing the scope of deployment, and used to tune resource allocation.
+      Allowed values are: “production” and “testing”.
+      Production will tune postgresql for maximum performance while testing will tune for
+      minimal running performance.
+    type: string
+    default: production
+  memory_shared_buffers:
+    description: |
+      Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
+      to set this value up to 40% of the available memory from the unit, as it is unlikely
+      that an allocation of more than that will work better than a smaller amount.
+      Allowed values are: from 16 to 1073741823.
+    type: int
   connection_authentication_timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -69,7 +90,7 @@ options:
       Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
       Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
     type: string
-    default: "notice"
+    default: "debug1"
   logging_log_connections:
     description: |
       Logs each successful connection.
@@ -111,13 +132,6 @@ options:
       Allowed values are: from 0 to 262143.
     type: int
     default: 0
-  memory_shared_buffers:
-    description: |
-      Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
-      to set this value up to 40% of the available memory from the unit, as it is unlikely
-      that an allocation of more than that will work better than a smaller amount.
-      Allowed values are: from 16 to 1073741823.
-    type: int
   memory_temp_buffers:
     description: |
       Sets the maximum number of temporary buffers (8 kB) used by each session.
@@ -573,20 +587,6 @@ options:
     default: false
     type: boolean
     description: Enable pgvector extension
-  profile:
-   description: |
-      Profile representing the scope of deployment, and used to tune resource allocation.
-      Allowed values are: “production” and “testing”.
-      Production will tune postgresql for maximum performance while testing will tune for
-      minimal running performance.
-   type: string
-   default: production
-  profile_limit_memory:
-    type: int
-    description: |
-      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
-      If unset, this will be decided according to the default memory limit in the selected profile.
-      Only comes into effect when the `production` profile is selected.
   request_array_nulls:
     description: |
       Enable input of NULL elements in arrays.
