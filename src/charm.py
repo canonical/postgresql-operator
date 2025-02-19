@@ -384,7 +384,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
-            for attempt in Retrying(stop=stop_after_delay(5), wait=wait_fixed(3)):
+            for attempt in Retrying(stop=stop_after_delay(5), wait=wait_fixed(5)):
                 with attempt:
                     primary = self._patroni.get_primary()
                     if primary is None and (standby_leader := self._patroni.get_standby_leader()):
@@ -1960,13 +1960,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.config.request_time_zone not in self.postgresql.get_postgresql_timezones():
             raise ValueError("request_time_zone config option has an invalid value")
 
-        if (
-            self.config.storage_default_table_access_method
-            not in self.postgresql.get_postgresql_default_table_access_methods()
-        ):
-            raise ValueError(
-                "storage_default_table_access_method config option has an invalid value"
-            )
+        #if (
+        #    self.config.storage_default_table_access_method
+        #    not in self.postgresql.get_postgresql_default_table_access_methods()
+        #):
+        #    raise ValueError(
+        #        "storage_default_table_access_method config option has an invalid value"
+        #    )
 
     def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""

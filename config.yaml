@@ -6,22 +6,8 @@ options:
     description: |
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
-    type: string
-    default: "all"
-  profile_limit_memory:
     type: int
-    description: |
-      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
-      If unset, this will be decided according to the default memory limit in the selected profile.
-      Only comes into effect when the `production` profile is selected.
-  profile:
-   description: |
-      Profile representing the scope of deployment, and used to tune resource allocation.
-      Allowed values are: “production” and “testing”.
-      Production will tune postgresql for maximum performance while testing will tune for
-      minimal running performance.
-   type: string
-   default: production
+    default: 3
   memory_shared_buffers:
     description: |
       Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
@@ -29,6 +15,20 @@ options:
       that an allocation of more than that will work better than a smaller amount.
       Allowed values are: from 16 to 1073741823.
     type: int
+  profile:
+   description: |
+      Profile representing the scope of deployment, and used to tune resource allocation.
+      Allowed values are: “production” and “testing”.
+      Production will tune postgresql for maximum performance while testing will tune for
+      minimal running performance.
+   type: string
+   default: "production"
+  profile_limit_memory:
+    type: int
+    description: |
+      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
+      If unset, this will be decided according to the default memory limit in the selected profile.
+      Only comes into effect when the `production` profile is selected.
   connection_authentication_timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -737,12 +737,12 @@ options:
       Allowed values are: from 0 to 10.
     type: float
     default: 2.0
-  storage_default_table_access_method:
-    description: |
-      Sets the default table access method for new tables.
-      These entries can be created using the CREATE ACCESS METHOD SQL command.
-    type: string
-    default: "heap"
+  #storage_default_table_access_method:
+  #  description: |
+  #    Sets the default table access method for new tables.
+  #    These entries can be created using the CREATE ACCESS METHOD SQL command.
+  #  type: string
+  # default: "heap"
   storage_gin_pending_list_limit:
     description: |
       Sets the maximum size of the pending list for GIN index.

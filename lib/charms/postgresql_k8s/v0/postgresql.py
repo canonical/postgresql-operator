@@ -154,7 +154,7 @@ class PostgreSQL:
         host = database_host if database_host is not None else self.primary_host
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
-            f"password='{self.password}' connect_timeout=1"
+            f"password='{self.password}' connect_timeout=10"
         )
         logger.info("it's okay")
         connection.autocommit = True
@@ -673,12 +673,12 @@ END; $$;"""
                 "instance", # Works
                 "logging", # Works
                 "memory", # Works
-                "optimizer",
+                #"optimizer",
                 "request", # Works
                 "response", # Works
                 "session", # Works
                 "storage",
-                "vacuum",
+                #"vacuum",
             )):
                 continue
             parameter = "_".join(config.split("_")[1:])
