@@ -491,7 +491,7 @@ END; $$;"""
             Set of PostgreSQL table access methods.
         """
         with self._connect_to_database(
-                database_host=self.current_host
+            database_host=self.current_host
         ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT amname FROM pg_am WHERE amtype = 't';")
             access_methods = cursor.fetchall()
