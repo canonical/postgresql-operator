@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 42
+LIBPATCH = 44
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -539,14 +539,12 @@ END; $$;"""
         Returns:
             List of PostgreSQL database users.
         """
-        logger.info("1")
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
         except psycopg2.Error as e:
-            logger.info("eror")
             logger.error(f"Failed to list PostgreSQL database users: {e}")
             raise PostgreSQLListUsersError() from e
 
@@ -667,18 +665,18 @@ END; $$;"""
         for config, value in config_options.items():
             # Filter config option not related to PostgreSQL parameters.
             if not config.startswith((
-                "connection", # Works
-                "cpu", # Works
-                "durability", # Works
-                "instance", # Works
-                "logging", # Works
-                "memory", # Works
-                #"optimizer",
-                "request", # Works
-                "response", # Works
-                "session", # Works
+                "connection",
+                "cpu",
+                "durability",
+                "instance",
+                "logging",
+                "memory",
+                "optimizer",
+                "request",
+                "response",
+                "session",
                 "storage",
-                #"vacuum",
+                "vacuum",
             )):
                 continue
             parameter = "_".join(config.split("_")[1:])
