@@ -37,6 +37,9 @@ LIBAPI = 0
 # to 0 if you are raising the major API version
 LIBPATCH = 44
 
+# Groups to distinguish database permissions
+PERMISSIONS_GROUP_ADMIN = "admin"
+
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 REQUIRED_PLUGINS = {
@@ -149,14 +152,11 @@ class PostgreSQL:
         Returns:
              psycopg2 connection object.
         """
-        logger.info("it's here")
-        logger.info(self.primary_host)
         host = database_host if database_host is not None else self.primary_host
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
-            f"password='{self.password}' connect_timeout=10"
+            f"password='{self.password}' connect_timeout=1"
         )
-        logger.info("it's okay")
         connection.autocommit = True
         return connection
 
@@ -239,15 +239,17 @@ class PostgreSQL:
             roles = privileges = None
             if extra_user_roles:
                 extra_user_roles = tuple(extra_user_roles.lower().split(","))
-                admin_role = "admin" in extra_user_roles
+                admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [
-                    role for role in extra_user_roles if role in valid_roles and role != "admin"
+                    role
+                    for role in extra_user_roles
+                    if role in valid_roles and role != PERMISSIONS_GROUP_ADMIN
                 ]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
-                    if extra_user_role not in roles and extra_user_role != "admin"
+                    if extra_user_role not in roles and extra_user_role != PERMISSIONS_GROUP_ADMIN
                 }
                 invalid_privileges = [
                     privilege for privilege in privileges if privilege not in valid_privileges
@@ -582,7 +584,7 @@ END; $$;"""
                         )
                     )
                 self.create_user(
-                    "admin",
+                    PERMISSIONS_GROUP_ADMIN,
                     extra_user_roles="pg_read_all_data,pg_write_all_data",
                 )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")

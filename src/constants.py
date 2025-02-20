@@ -6,6 +6,7 @@
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
 DATABASE = "database"
+DATABASE_DEFAULT_NAME = "postgres"
 DATABASE_PORT = "5432"
 LEGACY_DB = "db"
 LEGACY_DB_ADMIN = "db-admin"
