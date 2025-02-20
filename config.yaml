@@ -6,29 +6,8 @@ options:
     description: |
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
-    type: int
-    default: 3
-  memory_shared_buffers:
-    description: |
-      Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
-      to set this value up to 40% of the available memory from the unit, as it is unlikely
-      that an allocation of more than that will work better than a smaller amount.
-      Allowed values are: from 16 to 1073741823.
-    type: int
-  profile:
-   description: |
-      Profile representing the scope of deployment, and used to tune resource allocation.
-      Allowed values are: “production” and “testing”.
-      Production will tune postgresql for maximum performance while testing will tune for
-      minimal running performance.
-   type: string
-   default: "production"
-  profile_limit_memory:
-    type: int
-    description: |
-      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
-      If unset, this will be decided according to the default memory limit in the selected profile.
-      Only comes into effect when the `production` profile is selected.
+    type: string
+    default: "all"
   connection_authentication_timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
@@ -132,6 +111,13 @@ options:
       Allowed values are: from 0 to 262143.
     type: int
     default: 0
+  memory_shared_buffers:
+    description: |
+      Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
+      to set this value up to 40% of the available memory from the unit, as it is unlikely
+      that an allocation of more than that will work better than a smaller amount.
+      Allowed values are: from 16 to 1073741823.
+    type: int
   memory_temp_buffers:
     description: |
       Sets the maximum number of temporary buffers (8 kB) used by each session.
@@ -313,13 +299,13 @@ options:
       GEQO: seed for random path selection.
       Allowed values are: from 0 to 1.
     type: float
-    default: 0
+    default: 0.0
   optimizer_geqo_selection_bias:
     description: |
       GEQO: selective pressure within the population.
       Allowed values are: from 1.5 to 2.
     type: float
-    default: 2
+    default: 2.0
   optimizer_geqo_threshold:
     description: |
       Sets the threshold of FROM items beyond which GEQO is used.
@@ -336,19 +322,19 @@ options:
       Perform JIT compilation if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 100000
+    default: 100000.0
   optimizer_jit_inline_above_cost:
     description: |
       Perform JIT inlining if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 500000
+    default: 500000.0
   optimizer_jit_optimize_above_cost:
     description: |
       Optimize JIT-compiled functions if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 500000
+    default: 500000.0
   optimizer_join_collapse_limit:
     description: |
       Sets the FROM-list size beyond which JOIN constructs are not flattened.
@@ -372,7 +358,7 @@ options:
       Sets the planner's estimate of the cost of starting up worker processes for parallel query.
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 1000
+    default: 1000.0
   optimizer_parallel_tuple_cost:
     description: |
       Sets the planner's estimate of the cost of passing each tuple (row) from worker to leader backend.
@@ -587,6 +573,20 @@ options:
     default: false
     type: boolean
     description: Enable pgvector extension
+  profile:
+    description: |
+      Profile representing the scope of deployment, and used to tune resource allocation.
+      Allowed values are: “production” and “testing”.
+      Production will tune postgresql for maximum performance while testing will tune for
+      minimal running performance.
+    type: string
+    default: "production"
+  profile_limit_memory:
+    type: int
+    description: |
+      Amount of memory in Megabytes to limit PostgreSQL and associated process to.
+      If unset, this will be decided according to the default memory limit in the selected profile.
+      Only comes into effect when the `production` profile is selected.
   request_array_nulls:
     description: |
       Enable input of NULL elements in arrays.
@@ -737,12 +737,12 @@ options:
       Allowed values are: from 0 to 10.
     type: float
     default: 2.0
-  #storage_default_table_access_method:
-  #  description: |
-  #    Sets the default table access method for new tables.
-  #    These entries can be created using the CREATE ACCESS METHOD SQL command.
-  #  type: string
-  # default: "heap"
+  storage_default_table_access_method:
+    description: |
+      Sets the default table access method for new tables.
+      These entries can be created using the CREATE ACCESS METHOD SQL command.
+    type: string
+    default: "heap"
   storage_gin_pending_list_limit:
     description: |
       Sets the maximum size of the pending list for GIN index.

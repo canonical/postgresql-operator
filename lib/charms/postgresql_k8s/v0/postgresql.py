@@ -190,7 +190,7 @@ class PostgreSQL:
                     Identifier(database)
                 )
             )
-            for user_to_grant_access in [user, "admin", *self.system_users]:
+            for user_to_grant_access in [user, PERMISSIONS_GROUP_ADMIN, *self.system_users]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
