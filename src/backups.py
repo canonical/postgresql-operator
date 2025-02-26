@@ -1380,6 +1380,7 @@ Stderr:
 
             s3 = session.resource(
                 "s3",
+                config=botocore.client.Config(signature_version="s3"),
                 endpoint_url=self._construct_endpoint(s3_parameters),
                 verify=(self._tls_ca_chain_filename or None),
             )

@@ -1973,8 +1973,10 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
         _construct_endpoint.return_value = "https://s3.us-east-1.amazonaws.com"
         _named_temporary_file.return_value.__enter__.return_value.name = "/tmp/test-file"
         assert not harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters)
+        assert _resource.call_args_list[0][1]["config"].signature_version == "s3"
         _resource.assert_called_once_with(
             "s3",
+            config=_resource.call_args_list[0][1]["config"],
             endpoint_url="https://s3.us-east-1.amazonaws.com",
             verify=(tls_ca_chain_filename or None),
         )
@@ -1985,8 +1987,10 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
         _resource.side_effect = None
         upload_file.side_effect = S3UploadFailedError
         assert not harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters)
+        assert _resource.call_args_list[0][1]["config"].signature_version == "s3"
         _resource.assert_called_once_with(
             "s3",
+            config=_resource.call_args_list[0][1]["config"],
             endpoint_url="https://s3.us-east-1.amazonaws.com",
             verify=(tls_ca_chain_filename or None),
         )
@@ -1999,8 +2003,10 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
         upload_file.reset_mock()
         upload_file.side_effect = None
         assert harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters)
+        assert _resource.call_args_list[0][1]["config"].signature_version == "s3"
         _resource.assert_called_once_with(
             "s3",
+            config=_resource.call_args_list[0][1]["config"],
             endpoint_url="https://s3.us-east-1.amazonaws.com",
             verify=(tls_ca_chain_filename or None),
         )
