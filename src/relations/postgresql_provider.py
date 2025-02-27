@@ -192,7 +192,12 @@ class PostgreSQLProvider(Object):
         read_only_endpoints = (
             ",".join(f"{x}:{DATABASE_PORT}" for x in replicas_endpoint)
             if len(replicas_endpoint) > 0
-            else ""
+            else f"{self.charm.primary_endpoint}:{DATABASE_PORT}"
+        )
+        read_only_hosts = (
+            ",".join(replicas_endpoint)
+            if len(replicas_endpoint) > 0
+            else f"{self.charm.primary_endpoint}"
         )
 
         tls = "True" if self.charm.is_tls_enabled else "False"
@@ -224,6 +229,10 @@ class PostgreSQLProvider(Object):
             self.database_provides.set_uris(
                 relation_id,
                 f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
+            )
+            self.database_provides.set_read_only_uris(
+                relation_id,
+                f"postgresql://{user}:{password}@{read_only_hosts}:{DATABASE_PORT}/{database}",
             )
 
             self.database_provides.set_tls(relation_id, tls)

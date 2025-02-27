@@ -80,7 +80,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
 
 
-async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
+async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
     """Test that there is no read-only endpoint in a standalone cluster."""
     async with ops_test.fast_forward():
         # Ensure the cluster starts with only one member.
@@ -122,7 +122,7 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
             APPLICATION_APP_NAME,
             FIRST_DATABASE_RELATION_NAME,
             "read-only-endpoints",
-            exists=False,
+            exists=True,
         )
 
 
