@@ -116,7 +116,7 @@ async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTes
             assert password is None
 
         # Try to get the connection string of the database using the read-only endpoint.
-        # It should not be available.
+        # It should be the primary.
         assert await check_relation_data_existence(
             ops_test,
             APPLICATION_APP_NAME,
@@ -124,6 +124,16 @@ async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTes
             "read-only-endpoints",
             exists=True,
         )
+        primary_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
+        for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                data = await get_application_relation_data(
+                    ops_test,
+                    APPLICATION_APP_NAME,
+                    FIRST_DATABASE_RELATION_NAME,
+                    "read-only-endpoints",
+                )
+                assert data == f"{primary_unit.public_address}:5432"
 
 
 async def test_read_only_endpoint_in_scaled_up_cluster(ops_test: OpsTest):
@@ -131,16 +141,24 @@ async def test_read_only_endpoint_in_scaled_up_cluster(ops_test: OpsTest):
     async with ops_test.fast_forward():
         # Scale up the database.
         await scale_application(ops_test, DATABASE_APP_NAME, 2)
+        primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+        replica = next(
+            unit
+            for unit in ops_test.model.applications[DATABASE_APP_NAME].units
+            if unit.name != primary
+        )
 
         # Try to get the connection string of the database using the read-only endpoint.
-        # It should be available again.
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=True,
-        )
+        # It should be the replica unit.
+        for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                data = await get_application_relation_data(
+                    ops_test,
+                    APPLICATION_APP_NAME,
+                    FIRST_DATABASE_RELATION_NAME,
+                    "read-only-endpoints",
+                )
+                assert data == f"{replica.public_address}:5432"
 
 
 async def test_database_relation_with_charm_libraries(ops_test: OpsTest):
@@ -212,7 +230,7 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
                 FIRST_DATABASE_RELATION_NAME,
                 "read-only-endpoints",
             )
-            assert data is None
+            assert data == f"{ops_test.model.units[primary].public_address}:5432"
 
     await start_machine(ops_test, machine)
     await ops_test.model.wait_for_idle(
