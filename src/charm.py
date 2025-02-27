@@ -104,6 +104,7 @@ from relations.async_replication import (
     PostgreSQLAsyncReplication,
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
+from relations.logical_replication import PostgreSQLLogicalReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -204,6 +205,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.tls = PostgreSQLTLS(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
+        self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
