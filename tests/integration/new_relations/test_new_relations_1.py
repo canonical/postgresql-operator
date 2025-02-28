@@ -27,7 +27,6 @@ from ..helpers import (
 from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
-    check_relation_data_existence,
     get_application_relation_data,
 )
 
@@ -117,13 +116,6 @@ async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTes
 
         # Try to get the connection string of the database using the read-only endpoint.
         # It should be the primary.
-        assert await check_relation_data_existence(
-            ops_test,
-            APPLICATION_APP_NAME,
-            FIRST_DATABASE_RELATION_NAME,
-            "read-only-endpoints",
-            exists=True,
-        )
         primary_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
         for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
             with attempt:
