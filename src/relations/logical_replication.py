@@ -1,7 +1,7 @@
 import json
 import logging
 
-from ops import ActionEvent, Object, Relation, RelationChangedEvent, RelationJoinedEvent
+from ops import ActionEvent, Object, RelationChangedEvent, RelationJoinedEvent
 
 from constants import APP_SCOPE, REPLICATION_PASSWORD_KEY, REPLICATION_USER
 
@@ -53,16 +53,31 @@ class PostgreSQLLogicalReplication(Object):
 
         subscriptions_str = event.relation.data[event.app].get("subscriptions", "")
         subscriptions = subscriptions_str.split(",") if subscriptions_str else ()
-        replication_slots = self._get_relation_replication_slots(event.relation)
+        publications = self._get_publications_from_str(self.charm.app_peer_data.get("publications"))
+        relation_replication_slots = self._get_replication_slots_from_str(
+            event.relation.data[self.model.app].get("replication-slots"))
+        global_replication_slots = self._get_replication_slots_from_str(
+            self.charm.app_peer_data.get("replication-slots"))
 
-        for subscription in subscriptions:
-            if subscription not in replication_slots:
-                # TODO: validation on publication existence
-                self._add_replication_slot(event.relation, subscription)
-
-        for publication in replication_slots:
+        for publication in subscriptions:
+            if publication not in publications:
+                logger.error(f"Logical Replication: requested subscription for non-existing publication {publication}")
+                continue
+            if publication not in relation_replication_slots:
+                replication_slot_name = f"{event.relation.id}_{publication}"
+                global_replication_slots[replication_slot_name] = publications[publication]["database"]
+                self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
+                relation_replication_slots[publication] = replication_slot_name
+                event.relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
+        for publication in relation_replication_slots:
             if publication not in subscriptions:
-                self._remove_replication_slot(event.relation, publication)
+                replication_slot_name = relation_replication_slots[publication]
+                del global_replication_slots[replication_slot_name]
+                self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
+                del relation_replication_slots[publication]
+                event.relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
+
+        self.charm.update_config()
 
 #endregion
 
@@ -85,7 +100,17 @@ class PostgreSQLLogicalReplication(Object):
         if publication_name in publications:
             event.fail("Such publication already exists")
             return
-        # TODO: check on schema existence
+        if not self.charm.postgresql.database_exists(publication_db):
+            event.fail(f"No such database {publication_db}")
+            return
+        for schematable in publication_tables.split(","):
+            schematable_split = schematable.split(".")
+            if len(schematable_split) != 2:
+                event.fail("All tables should be in schema.table format")
+                return
+            if not self.charm.postgresql.table_exists(db=publication_db, schema=schematable_split[0], table=schematable_split[1]):
+                event.fail(f"No such table {schematable} in database {publication_db}")
+                return
         publications[publication_name] = {
             "database": publication_db,
             "tables": publication_tables.split(",")
@@ -131,10 +156,35 @@ class PostgreSQLLogicalReplication(Object):
             event.fail("Such subscription already exists")
             return
         publications = self._get_publications_from_str(relation.data[relation.app].get("publications"))
-        # TODO: validation on overlaps and existing scheme
-        if publication_name not in publications:
+        subscribing_publication = publications.get(publication_name)
+        if not subscribing_publication:
             event.fail("No such publication offered")
             return
+        subscribing_database = subscribing_publication["database"]
+
+        if any(
+            any(
+                publication_table in subscribing_publication["tables"]
+                for publication_table in publication_obj["tables"]
+            )
+            for (publication, publication_obj) in publications.items()
+            if publication in subscriptions and publication_obj["database"] == subscribing_database
+        ):
+            event.fail("Tables overlap detected with existing subscriptions")
+            return
+
+        if not self.charm.postgresql.database_exists(subscribing_database):
+            event.fail(f"No such database {subscribing_database}")
+            return
+        for schematable in subscribing_publication["tables"]:
+            schematable_split = schematable.split(".")
+            if not self.charm.postgresql.table_exists(db=subscribing_database, schema=schematable_split[0], table=schematable_split[1]):
+                event.fail(f"No such table {schematable} in database {subscribing_database}")
+                return
+            if not self.charm.postgresql.is_table_empty(db=subscribing_database, schema=schematable_split[0], table=schematable_split[1]):
+                event.fail(f"Table {schematable} in database {subscribing_database} should be empty before subscribing on it")
+                return
+
         subscriptions.append(publication_name)
         relation.data[self.model.app]["subscriptions"] = ",".join(subscriptions)
 
@@ -174,7 +224,7 @@ class PostgreSQLLogicalReplication(Object):
 #endregion
 
     @staticmethod
-    def _get_publications_from_str(publications_str: str | None) -> dict[str, dict[str, any]]:
+    def _get_publications_from_str(publications_str: str | None = None) -> dict[str, dict[str, any]]:
         return json.loads(publications_str or "{}")
 
     def _set_publications(self, publications: dict[str, dict[str, any]]):
@@ -183,34 +233,10 @@ class PostgreSQLLogicalReplication(Object):
         for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
             rel.data[self.model.app]["publications"] = publications_str
 
-    def _get_relation_replication_slots(self, relation: Relation) -> dict[str, str]:
-        return json.loads(relation.data[self.model.app].get("replication-slots", "{}"))
+    @staticmethod
+    def _get_replication_slots_from_str(replication_slots_str: str | None = None) -> dict[str, str]:
+        return json.loads(replication_slots_str or "{}")
 
     @staticmethod
-    def _get_str_list(list_str: str | None) -> list[str]:
+    def _get_str_list(list_str: str | None = None) -> list[str]:
         return list_str.split(",") if list_str else []
-
-    def _add_replication_slot(self, relation: Relation, publication: str):
-        # TODO: overwrite check
-        relation_replication_slots = self._get_relation_replication_slots(relation)
-        global_replication_slots = self._get_str_list(self.charm.app_peer_data.get("replication-slots"))
-
-        # TODO: replication slot random name
-        new_replication_slot_name = publication
-
-        global_replication_slots.append(new_replication_slot_name)
-        self.charm.app_peer_data["replication-slots"] = ",".join(global_replication_slots)
-        relation_replication_slots[publication] = new_replication_slot_name
-        relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
-
-        # TODO: patroni config update
-
-    def _remove_replication_slot(self, relation: Relation, publication: str):
-        relation_replication_slots = self._get_relation_replication_slots(relation)
-        global_replication_slots = self._get_str_list(self.charm.app_peer_data.get("replication-slots"))
-        replication_slot_name = relation_replication_slots[publication]
-        global_replication_slots.remove(replication_slot_name)
-        self.charm.app_peer_data["replication-slots"] = ",".join(global_replication_slots)
-        del relation_replication_slots[publication]
-        relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
-        # TODO: patroni config update

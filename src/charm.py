@@ -1894,6 +1894,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
             no_peers=no_peers,
+            slots=json.loads(self.app_peer_data["replication-slots"]) if "replication-slots" in self.app_peer_data else None
         )
         if no_peers:
             return True

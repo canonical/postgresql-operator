@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 43
+LIBPATCH = 44
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -99,6 +99,15 @@ class PostgreSQLListUsersError(Exception):
 
 class PostgreSQLUpdateUserPasswordError(Exception):
     """Exception raised when updating a user password fails."""
+
+class PostgreSQLDatabaseExistsError(Exception):
+    """Exception raised during database existence check."""
+
+class PostgreSQLTableExistsError(Exception):
+    """Exception raised during table existence check."""
+
+class PostgreSQLIsTableEmptyError(Exception):
+    """Exception raised during table emptiness check."""
 
 
 class PostgreSQL:
@@ -631,6 +640,42 @@ END; $$;"""
         finally:
             if connection:
                 connection.close()
+
+    def database_exists(self, db: str) -> bool:
+        """Check whether specified database exists."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT datname FROM pg_database WHERE datname={};").format(Literal(db))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql database existence: {e}")
+            raise PostgreSQLDatabaseExistsError() from e
+
+    def table_exists(self, db: str | None, schema: str, table: str) -> bool:
+        """Check whether specified table in database exists."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT tablename FROM pg_tables WHERE schemaname={} AND tablename={};").format(Literal(schema), Literal(table))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql table existence: {e}")
+            raise PostgreSQLTableExistsError() from e
+
+    def is_table_empty(self, db: str | None, schema: str, table: str) -> bool:
+        """Check whether table is empty."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT COUNT(1) FROM {};").format(Identifier(schema, table))
+                )
+                return cursor.fetchone()[0] == 0
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check whether table is empty: {e}")
+            raise PostgreSQLIsTableEmptyError() from e
 
     @staticmethod
     def build_postgresql_parameters(

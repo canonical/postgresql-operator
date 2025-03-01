@@ -620,6 +620,7 @@ class Patroni:
         restore_to_latest: bool = False,
         parameters: dict[str, str] | None = None,
         no_peers: bool = False,
+        slots: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -636,6 +637,7 @@ class Patroni:
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
+            slots: replication slots (keys) with assigned database name (values).
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
@@ -678,6 +680,7 @@ class Patroni:
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
             raft_password=self.raft_password,
             patroni_password=self.patroni_password,
+            slots=slots,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
