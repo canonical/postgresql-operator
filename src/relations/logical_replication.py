@@ -3,7 +3,11 @@ import logging
 
 from ops import ActionEvent, Object, RelationChangedEvent, RelationJoinedEvent
 
-from constants import APP_SCOPE, REPLICATION_PASSWORD_KEY, REPLICATION_USER
+from constants import (
+    APP_SCOPE,
+    USER,
+    USER_PASSWORD_KEY,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +23,8 @@ class PostgreSQLLogicalReplication(Object):
                                      self._on_offer_relation_joined)
         self.charm.framework.observe(self.charm.on[LOGICAL_REPLICATION_OFFER_RELATION].relation_changed,
                                      self._on_offer_relation_changed)
+        self.charm.framework.observe(self.charm.on[LOGICAL_REPLICATION_RELATION].relation_changed,
+                                     self._on_relation_changed)
         # Actions
         self.charm.framework.observe(self.charm.on.add_publication_action, self._on_add_publication)
         self.charm.framework.observe(self.charm.on.list_publications_action, self._on_list_publications)
@@ -42,8 +48,10 @@ class PostgreSQLLogicalReplication(Object):
         # TODO: replication-user-secret
         event.relation.data[self.model.app].update({
             "publications": self.charm.app_peer_data.get("publications", ""),
-            "replication-user": REPLICATION_USER,
-            "replication-user-secret": self.charm.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY),
+            # "replication-user": REPLICATION_USER,
+            # "replication-user-secret": self.charm.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY),
+            "replication-user": USER,
+            "replication-user-secret": self.charm.get_secret(APP_SCOPE, USER_PASSWORD_KEY),
             "primary": self.charm.primary_endpoint
         })
 
@@ -66,18 +74,37 @@ class PostgreSQLLogicalReplication(Object):
             if publication not in relation_replication_slots:
                 replication_slot_name = f"{event.relation.id}_{publication}"
                 global_replication_slots[replication_slot_name] = publications[publication]["database"]
-                self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
                 relation_replication_slots[publication] = replication_slot_name
-                event.relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
+        deleting_replication_slots = []
         for publication in relation_replication_slots:
             if publication not in subscriptions:
-                replication_slot_name = relation_replication_slots[publication]
-                del global_replication_slots[replication_slot_name]
-                self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
-                del relation_replication_slots[publication]
-                event.relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
+                deleting_replication_slots.append(publication)
+                del global_replication_slots[relation_replication_slots[publication]]
+        for replication_slot in deleting_replication_slots:
+            del relation_replication_slots[replication_slot]
 
+        self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
+        event.relation.data[self.model.app]["replication-slots"] = json.dumps(relation_replication_slots)
         self.charm.update_config()
+
+    def _on_relation_changed(self, event: RelationChangedEvent):
+        subscriptions_str = event.relation.data[self.model.app].get("subscriptions", "")
+        subscriptions = subscriptions_str.split(",") if subscriptions_str else ()
+        publications = self._get_publications_from_str(event.relation.data[event.app].get("publications"))
+        relation_replication_slots = self._get_replication_slots_from_str(
+            event.relation.data[event.app].get("replication-slots"))
+
+        primary = event.relation.data[event.app].get("primary")
+        replication_user = event.relation.data[event.app].get("replication-user")
+        replication_password = event.relation.data[event.app].get("replication-user-secret")
+        if not primary or not replication_user or not replication_password:
+            logger.warning("Logical Replication: skipping relation changed event as there is no primary, replication-user and replication-secret data")
+            return
+
+        for subscription in subscriptions:
+            db = publications[subscription]["database"]
+            if subscription in relation_replication_slots and not self.charm.postgresql.subscription_exists(subscription, db):
+                self.charm.postgresql.create_subscription(subscription, primary, db, replication_user, replication_password, relation_replication_slots[subscription])
 
 #endregion
 
@@ -103,7 +130,8 @@ class PostgreSQLLogicalReplication(Object):
         if not self.charm.postgresql.database_exists(publication_db):
             event.fail(f"No such database {publication_db}")
             return
-        for schematable in publication_tables.split(","):
+        publication_tables_split = publication_tables.split(",")
+        for schematable in publication_tables_split:
             schematable_split = schematable.split(".")
             if len(schematable_split) != 2:
                 event.fail("All tables should be in schema.table format")
@@ -111,9 +139,10 @@ class PostgreSQLLogicalReplication(Object):
             if not self.charm.postgresql.table_exists(db=publication_db, schema=schematable_split[0], table=schematable_split[1]):
                 event.fail(f"No such table {schematable} in database {publication_db}")
                 return
+        self.charm.postgresql.create_publication(publication_name, publication_tables_split, publication_db)
         publications[publication_name] = {
             "database": publication_db,
-            "tables": publication_tables.split(",")
+            "tables": publication_tables_split
         }
         self._set_publications(publications)
 

@@ -1930,6 +1930,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
         })
 
+        # TODO: better implementation.
+        self._patroni.update_slots_controller_by_patroni(json.loads(self.app_peer_data["replication-slots"]) if "replication-slots" in self.app_peer_data else {})
+
         self._handle_postgresql_restart_need(enable_tls)
 
         # Restart the monitoring service if the password was rotated

@@ -992,6 +992,22 @@ class Patroni:
             timeout=PATRONI_TIMEOUT,
         )
 
+    def update_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
+        requests.patch(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"slots": {
+                slot: {
+                    "database": database,
+                    "plugin": "pgoutput",
+                    "type": "logical",
+                }
+                for slot, database in slots.items()
+            }},
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
+
     @property
     def _synchronous_node_count(self) -> int:
         planned_units = self.charm.app.planned_units()

@@ -109,6 +109,15 @@ class PostgreSQLTableExistsError(Exception):
 class PostgreSQLIsTableEmptyError(Exception):
     """Exception raised during table emptiness check."""
 
+class PostgreSQLCreatePublicationError(Exception):
+    """Exception raised when creating PostgreSQL publication."""
+
+class PostgreSQLSubscriptionExistsError(Exception):
+    """Exception raised during subscription existence check."""
+
+class PostgreSQLCreateSubscriptionError(Exception):
+    """Exception raised when creating PostgreSQL subscription."""
+
 
 class PostgreSQL:
     """Class to encapsulate all operations related to interacting with PostgreSQL instance."""
@@ -653,7 +662,7 @@ END; $$;"""
             logger.error(f"Failed to check Postgresql database existence: {e}")
             raise PostgreSQLDatabaseExistsError() from e
 
-    def table_exists(self, db: str | None, schema: str, table: str) -> bool:
+    def table_exists(self, table: str, schema: str, db: str | None = None) -> bool:
         """Check whether specified table in database exists."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
@@ -665,7 +674,7 @@ END; $$;"""
             logger.error(f"Failed to check Postgresql table existence: {e}")
             raise PostgreSQLTableExistsError() from e
 
-    def is_table_empty(self, db: str | None, schema: str, table: str) -> bool:
+    def is_table_empty(self, table: str, schema: str, db: str | None = None) -> bool:
         """Check whether table is empty."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
@@ -676,6 +685,48 @@ END; $$;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to check whether table is empty: {e}")
             raise PostgreSQLIsTableEmptyError() from e
+
+    def create_publication(self, publication: str, schematables: list[str], db: str | None = None):
+        """Create PostgreSQL publication."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("CREATE PUBLICATION {} FOR TABLE {};").format(
+                        Identifier(publication),
+                        SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables)
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create Postgresql publication: {e}")
+            raise PostgreSQLCreatePublicationError() from e
+
+    def subscription_exists(self, subscription: str, db: str | None = None) -> bool:
+        """Check whether specified subscription in database exists."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT subname FROM pg_subscription WHERE subname={};").format(Literal(subscription))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql subscription existence: {e}")
+            raise PostgreSQLSubscriptionExistsError() from e
+
+    def create_subscription(self, subscription: str, host: str, db: str, user: str, password: str, replication_slot: str):
+        """Create PostgreSQL subscription."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("CREATE SUBSCRIPTION {} CONNECTION {} PUBLICATION {} WITH (copy_data=true,create_slot=false,enabled=true,slot_name={});").format(
+                        Identifier(subscription),
+                        Literal(f"host={host} dbname={db} user={user} password={password}"),
+                        Identifier(subscription),
+                        Identifier(replication_slot)
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create Postgresql subscription: {e}")
+            raise PostgreSQLCreateSubscriptionError() from e
 
     @staticmethod
     def build_postgresql_parameters(
