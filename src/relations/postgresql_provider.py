@@ -230,10 +230,16 @@ class PostgreSQLProvider(Object):
                 relation_id,
                 f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
             )
-            self.database_provides.set_read_only_uris(
-                relation_id,
-                f"postgresql://{user}:{password}@{read_only_hosts}:{DATABASE_PORT}/{database}",
-            )
+            # Make sure that the URI will be a secret
+            if (
+                secret_fields := self.database_provides.fetch_relation_field(
+                    relation_id, "requested-secrets"
+                )
+            ) and "read-only-uris" in secret_fields:
+                self.database_provides.set_read_only_uris(
+                    relation_id,
+                    f"postgresql://{user}:{password}@{read_only_hosts}:{DATABASE_PORT}/{database}",
+                )
 
             self.database_provides.set_tls(relation_id, tls)
             self.database_provides.set_tls_ca(relation_id, ca)
