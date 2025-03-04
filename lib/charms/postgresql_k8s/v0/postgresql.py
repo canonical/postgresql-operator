@@ -112,11 +112,17 @@ class PostgreSQLIsTableEmptyError(Exception):
 class PostgreSQLCreatePublicationError(Exception):
     """Exception raised when creating PostgreSQL publication."""
 
+class PostgreSQLDropPublicationError(Exception):
+    """Exception raised when dropping PostgreSQL publication."""
+
 class PostgreSQLSubscriptionExistsError(Exception):
     """Exception raised during subscription existence check."""
 
 class PostgreSQLCreateSubscriptionError(Exception):
     """Exception raised when creating PostgreSQL subscription."""
+
+class PostgreSQLDropSubscriptionError(Exception):
+    """Exception raised when dropping PostgreSQL subscription."""
 
 
 class PostgreSQL:
@@ -662,7 +668,7 @@ END; $$;"""
             logger.error(f"Failed to check Postgresql database existence: {e}")
             raise PostgreSQLDatabaseExistsError() from e
 
-    def table_exists(self, table: str, schema: str, db: str | None = None) -> bool:
+    def table_exists(self, db: str, schema: str, table: str) -> bool:
         """Check whether specified table in database exists."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
@@ -674,7 +680,7 @@ END; $$;"""
             logger.error(f"Failed to check Postgresql table existence: {e}")
             raise PostgreSQLTableExistsError() from e
 
-    def is_table_empty(self, table: str, schema: str, db: str | None = None) -> bool:
+    def is_table_empty(self, db: str, schema: str, table: str) -> bool:
         """Check whether table is empty."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
@@ -686,13 +692,13 @@ END; $$;"""
             logger.error(f"Failed to check whether table is empty: {e}")
             raise PostgreSQLIsTableEmptyError() from e
 
-    def create_publication(self, publication: str, schematables: list[str], db: str | None = None):
+    def create_publication(self, db: str, name: str, schematables: list[str]) -> None:
         """Create PostgreSQL publication."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     SQL("CREATE PUBLICATION {} FOR TABLE {};").format(
-                        Identifier(publication),
+                        Identifier(name),
                         SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables)
                     )
                 )
@@ -700,7 +706,20 @@ END; $$;"""
             logger.error(f"Failed to create Postgresql publication: {e}")
             raise PostgreSQLCreatePublicationError() from e
 
-    def subscription_exists(self, subscription: str, db: str | None = None) -> bool:
+    def drop_publication(self, db: str, publication: str) -> None:
+        """Drop PostgreSQL publication."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("DROP PUBLICATION IF EXISTS {};").format(
+                        Identifier(publication),
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to drop Postgresql publication: {e}")
+            raise PostgreSQLDropPublicationError() from e
+
+    def subscription_exists(self, db: str, subscription: str) -> bool:
         """Check whether specified subscription in database exists."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
@@ -712,7 +731,7 @@ END; $$;"""
             logger.error(f"Failed to check Postgresql subscription existence: {e}")
             raise PostgreSQLSubscriptionExistsError() from e
 
-    def create_subscription(self, subscription: str, host: str, db: str, user: str, password: str, replication_slot: str):
+    def create_subscription(self, subscription: str, host: str, db: str, user: str, password: str, replication_slot: str) -> None:
         """Create PostgreSQL subscription."""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
@@ -727,6 +746,19 @@ END; $$;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to create Postgresql subscription: {e}")
             raise PostgreSQLCreateSubscriptionError() from e
+
+    def drop_subscription(self, db: str, subscription: str) -> None:
+        """Drop PostgreSQL subscription."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("DROP SUBSCRIPTION IF EXISTS {};").format(
+                        Identifier(subscription),
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to drop Postgresql subscription: {e}")
+            raise PostgreSQLDropSubscriptionError() from e
 
     @staticmethod
     def build_postgresql_parameters(

@@ -993,17 +993,20 @@ class Patroni:
         )
 
     def update_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
+        """TODO: add proper management and deletion of replication slots."""
         requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
-            json={"slots": {
-                slot: {
-                    "database": database,
-                    "plugin": "pgoutput",
-                    "type": "logical",
+            json={
+                "slots": {
+                    slot: {
+                        "database": database,
+                        "plugin": "pgoutput",
+                        "type": "logical",
+                    }
+                    for slot, database in slots.items()
                 }
-                for slot, database in slots.items()
-            }},
+            },
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
