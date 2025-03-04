@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 44
+LIBPATCH = 45
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -223,7 +223,7 @@ class PostgreSQL:
         user: str,
         password: Optional[str] = None,
         admin: bool = False,
-        extra_user_roles: Optional[list[str]] = None,
+        extra_user_roles: Optional[List[str]] = None,
     ) -> None:
         """Creates a database user.
 
