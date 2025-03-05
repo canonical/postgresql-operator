@@ -65,6 +65,14 @@ class PostgreSQLProvider(Object):
             self.database_provides.on.database_requested, self._on_database_requested
         )
 
+    @staticmethod
+    def _sanitize_extra_roles(extra_roles: str | None) -> list[str]:
+        """Standardize and sanitize user extra-roles."""
+        if extra_roles is None:
+            return []
+
+        return [role.lower() for role in extra_roles.split(",")]
+
     def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
         """Generate password and handle user and database creation for the related application."""
         # Check for some conditions before trying to access the PostgreSQL instance.
@@ -84,7 +92,9 @@ class PostgreSQLProvider(Object):
 
         # Retrieve the database name and extra user roles using the charm library.
         database = event.database
-        extra_user_roles = event.extra_user_roles
+
+        # Make sure that certain groups are not in the list
+        extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
 
         try:
             # Creates the user and the database for this specific relation.
@@ -290,9 +300,7 @@ class PostgreSQLProvider(Object):
                 continue
             for data in relation.data.values():
                 extra_user_roles = data.get("extra-user-roles")
-                if extra_user_roles is None:
-                    continue
-                extra_user_roles = extra_user_roles.lower().split(",")
+                extra_user_roles = self._sanitize_extra_roles(extra_user_roles)
                 for extra_user_role in extra_user_roles:
                     if (
                         extra_user_role not in valid_privileges

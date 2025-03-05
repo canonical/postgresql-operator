@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 43
+LIBPATCH = 45
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -223,7 +223,7 @@ class PostgreSQL:
         user: str,
         password: Optional[str] = None,
         admin: bool = False,
-        extra_user_roles: Optional[str] = None,
+        extra_user_roles: Optional[List[str]] = None,
     ) -> None:
         """Creates a database user.
 
@@ -238,7 +238,6 @@ class PostgreSQL:
             admin_role = False
             roles = privileges = None
             if extra_user_roles:
-                extra_user_roles = tuple(extra_user_roles.lower().split(","))
                 admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [
@@ -572,7 +571,7 @@ END; $$;"""
                     )
                 self.create_user(
                     PERMISSIONS_GROUP_ADMIN,
-                    extra_user_roles="pg_read_all_data,pg_write_all_data",
+                    extra_user_roles=["pg_read_all_data", "pg_write_all_data"],
                 )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:
