@@ -749,8 +749,11 @@ END; $$;"""
 
     def drop_subscription(self, db: str, subscription: str) -> None:
         """Drop PostgreSQL subscription."""
+        connection = None
         try:
-            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+            connection = self._connect_to_database(database=db)
+            connection.autocommit = True
+            with connection.cursor() as cursor:
                 cursor.execute(
                     SQL("DROP SUBSCRIPTION IF EXISTS {};").format(
                         Identifier(subscription),
@@ -759,6 +762,9 @@ END; $$;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to drop Postgresql subscription: {e}")
             raise PostgreSQLDropSubscriptionError() from e
+        finally:
+            if connection is not None:
+                connection.close()
 
     @staticmethod
     def build_postgresql_parameters(

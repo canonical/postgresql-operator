@@ -992,21 +992,31 @@ class Patroni:
             timeout=PATRONI_TIMEOUT,
         )
 
-    def update_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
-        """TODO: add proper management and deletion of replication slots."""
+    def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
+        """Synchronises slots controlled by Patroni with the provided state by removing unneeded slots and creating new ones.
+
+        Args:
+            slots: dictionary of slots in the {slot: database} format.
+        """
+        current_config = requests.get(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
+        )
+        slots_patch: dict[str, dict[str, str] | None] = {
+            slot: None for slot in current_config.json().get("slots", ())
+        }
+        for slot, database in slots.items():
+            slots_patch[slot] = {
+                "database": database,
+                "plugin": "pgoutput",
+                "type": "logical",
+            }
         requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
-            json={
-                "slots": {
-                    slot: {
-                        "database": database,
-                        "plugin": "pgoutput",
-                        "type": "logical",
-                    }
-                    for slot, database in slots.items()
-                }
-            },
+            json={"slots": slots_patch},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )

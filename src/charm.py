@@ -1881,6 +1881,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.model.config, self.get_available_memory(), limit_memory
         )
 
+        replication_slots_json = (
+            json.loads(self.app_peer_data["replication-slots"])
+            if "replication-slots" in self.app_peer_data
+            else None
+        )
+
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
@@ -1894,9 +1900,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
             no_peers=no_peers,
-            slots=json.loads(self.app_peer_data["replication-slots"])
-            if "replication-slots" in self.app_peer_data
-            else None,
+            slots=replication_slots_json,
         )
         if no_peers:
             return True
@@ -1932,12 +1936,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
         })
 
-        # TODO: better implementation.
-        self._patroni.update_slots_controller_by_patroni(
-            json.loads(self.app_peer_data["replication-slots"])
-            if "replication-slots" in self.app_peer_data
-            else {}
-        )
+        self._patroni.ensure_slots_controller_by_patroni(replication_slots_json or {})
 
         self._handle_postgresql_restart_need(enable_tls)
 

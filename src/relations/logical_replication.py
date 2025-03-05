@@ -191,16 +191,20 @@ class PostgreSQLLogicalReplication(Object):
         if not (publication_name := event.params.get("name")):
             event.fail("name parameter is required")
             return
-        # TODO: validate to delete only unused publications
         publications = self._get_publications_from_str(
             self.charm.app_peer_data.get("publications")
         )
         if publication_name not in publications:
             event.fail("No such publication")
             return
+        if self._count_publication_connections(publication_name):
+            event.fail("Cannot remove publication while it's in use")
+            return
+        self.charm.postgresql.drop_publication(
+            publications[publication_name]["database"], publication_name
+        )
         del publications[publication_name]
         self._set_publications(publications)
-        # TODO: drop publication
 
     def _on_subscribe(self, event: ActionEvent):
         if not self._subscribe_validation(event):
@@ -261,9 +265,14 @@ class PostgreSQLLogicalReplication(Object):
         if subscription_name not in subscriptions:
             event.fail("No such subscription")
             return
+        self.charm.postgresql.drop_subscription(
+            self._get_publications_from_str(relation.data[relation.app]["publications"])[
+                subscription_name
+            ]["database"],
+            subscription_name,
+        )
         subscriptions.remove(subscription_name)
         relation.data[self.model.app]["subscriptions"] = ",".join(subscriptions)
-        # TODO: unsubscribe
 
     # endregion
 
@@ -347,6 +356,13 @@ class PostgreSQLLogicalReplication(Object):
         self.charm.app_peer_data["publications"] = publications_str
         for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
             rel.data[self.model.app]["publications"] = publications_str
+
+    def _count_publication_connections(self, publication: str) -> int:
+        count = 0
+        for relation in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
+            if publication in self._get_str_list(relation.data[relation.app].get("subscriptions")):
+                count += 1
+        return count
 
     @staticmethod
     def _get_replication_slots_from_str(
