@@ -11,7 +11,7 @@ The charm supports several Juju releases from [2.9 LTS](https://juju.is/docs/juj
 
 | Juju major release | Supported minor versions | Compatible charm revisions |Comment |
 |:--------|:-----|:-----|:-----|
-| ![3.6 LTS] | `3.6.0-beta2` | [363]+ | No known issues, but still in beta. Not recommended for production. |
+| ![3.6 LTS] | `3.6.1+` | [552]+ | `3.6.0` is not recommended, while `3.6.1+` works excellent. Recommended for production!  |
 | [![3.5]](https://juju.is/docs/juju/roadmap#juju-juju-35) | `3.5.1+` | [363]+  | [Known Juju issue](https://bugs.launchpad.net/juju/+bug/2066517) in `3.5.0` |
 | [![3.4]](https://juju.is/docs/juju/roadmap#juju-juju-34) | `3.4.3+` | [363]+ | Know Juju issues with previous minor versions |
 | [![3.3]](https://juju.is/docs/juju/roadmap#juju-juju-33) | `3.3.0+` | from [363] to [430] | No known issues |
@@ -52,6 +52,7 @@ The charm is based on the [charmed-postgresql snap](https://snapcraft.io/charmed
 [3.6 LTS]: https://img.shields.io/badge/3.6_LTS-%23E95420?label=Juju
 
 <!-- LINKS -->
+[552]: /t/16007
 [288]: /t/11876
 [336]: /t/11877
 [363]: /t/13124
