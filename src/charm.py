@@ -16,6 +16,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, get_args
+from urllib.parse import urlparse
 
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -73,6 +74,7 @@ from constants import (
     APP_SCOPE,
     BACKUP_USER,
     DATABASE_DEFAULT_NAME,
+    DATABASE_PORT,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -1316,6 +1318,42 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.start_patroni()
             self.backup.start_stop_pgbackrest_service()
 
+    def _restart_metrics_service(self) -> None:
+        """Restart the monitoring service if the password was rotated."""
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        try:
+            snap_password = postgres_snap.get("exporter.password")
+        except snap.SnapError:
+            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
+            return None
+
+        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
+            self._setup_exporter()
+
+    def _restart_ldap_sync_service(self) -> None:
+        """Restart the LDAP sync service in case any configuration changed."""
+        if not self._patroni.member_started:
+            logger.debug("Restart LDAP sync early exit: Patroni has not started yet")
+            return
+
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+        sync_service = postgres_snap.services["ldap-sync"]
+
+        if not self.is_primary and sync_service["active"]:
+            logger.debug("Stopping LDAP sync service. It must only run in the primary")
+            postgres_snap.stop(services=["ldap-sync"])
+
+        if self.is_primary and not self.is_ldap_enabled:
+            logger.debug("Stopping LDAP sync service")
+            postgres_snap.stop(services=["ldap-sync"])
+            return
+
+        if self.is_primary and self.is_ldap_enabled:
+            self._setup_ldap_sync()
+
     def _setup_exporter(self) -> None:
         """Set up postgresql_exporter options."""
         cache = snap.SnapCache()
@@ -1338,6 +1376,36 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
         self.unit_peer_data.update({"exporter-started": "True"})
+
+    def _setup_ldap_sync(self) -> None:
+        """Set up postgresql_ldap_sync options."""
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        ldap_params = self.get_ldap_parameters()
+        ldap_url = urlparse(ldap_params["ldapurl"])
+        ldap_host = ldap_url.hostname
+        ldap_port = ldap_url.port
+
+        ldap_base_dn = ldap_params["ldapbasedn"]
+        ldap_bind_username = ldap_params["ldapbinddn"]
+        ldap_bind_password = ldap_params["ldapbindpasswd"]
+
+        postgres_snap.set({
+            "ldap-sync.ldap_host": ldap_host,
+            "ldap-sync.ldap_port": ldap_port,
+            "ldap-sync.ldap_base_dn": ldap_base_dn,
+            "ldap-sync.ldap_bind_username": ldap_bind_username,
+            "ldap-sync.ldap_bind_password": ldap_bind_password,
+            "ldap-sync.postgres_host": "127.0.0.1",
+            "ldap-sync.postgres_port": DATABASE_PORT,
+            "ldap-sync.postgres_database": DATABASE_DEFAULT_NAME,
+            "ldap-sync.postgres_username": USER,
+            "ldap-sync.postgres_password": self._get_password(),
+        })
+
+        logger.debug("Starting LDAP sync service")
+        postgres_snap.restart(services=["ldap-sync"])
 
     def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
@@ -1985,20 +2053,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         })
 
         self._handle_postgresql_restart_need(enable_tls)
-
-        # Restart the monitoring service if the password was rotated
-        cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
-
-        try:
-            snap_password = postgres_snap.get("exporter.password")
-        except snap.SnapError:
-            logger.warning(
-                "Early exit update_config: Trying to reset metrics service with no configuration set"
-            )
-            return True
-        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
-            self._setup_exporter()
+        self._restart_metrics_service()
+        self._restart_ldap_sync_service()
 
         return True
 
