@@ -12,6 +12,7 @@ from charms.data_platform_libs.v0.upgrade import (
     DependencyModel,
     UpgradeGrantedEvent,
 )
+from charms.postgresql_k8s.v0.postgresql import ACCESS_GROUPS
 from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -247,6 +248,17 @@ class PostgreSQLUpgrade(DataUpgrade):
                 extra_user_roles="pg_monitor",
             )
         self.charm.postgresql.set_up_database()
+        self._set_up_new_access_roles_for_legacy()
+
+    def _set_up_new_access_roles_for_legacy(self) -> None:
+        """Create missing access groups and their memberships."""
+        access_groups = self.charm.postgresql.list_access_groups()
+        if access_groups == set(ACCESS_GROUPS):
+            return
+
+        self.charm.postgresql.create_access_groups()
+        self.charm.postgresql.grant_internal_access_group_memberships()
+        self.charm.postgresql.grant_relation_access_group_memberships()
 
     @property
     def unit_upgrade_data(self) -> RelationDataContent:
