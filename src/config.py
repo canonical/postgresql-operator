@@ -27,6 +27,7 @@ class CharmConfig(BaseConfigModel):
     ldap_bind_dn: str | None
     ldap_bind_password: str | None
     ldap_search_filter: str | None
+    ldap_map: str | None
     ldap_url: str | None
     logging_log_connections: bool | None
     logging_log_disconnections: bool | None
