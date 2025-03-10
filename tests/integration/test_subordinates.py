@@ -28,7 +28,7 @@ async def check_subordinate_env_vars(ops_test: OpsTest) -> None:
         or not os.environ.get("LANDSCAPE_ACCOUNT_NAME", "").strip()
         or not os.environ.get("LANDSCAPE_REGISTRATION_KEY", "").strip()
     ):
-        pytest.skip("Subordiane configs not set")
+        pytest.skip("Subordinate configs not set")
 
 
 @pytest.mark.abort_on_fail
