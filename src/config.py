@@ -8,7 +8,7 @@ import logging
 from typing import Literal
 
 from charms.data_platform_libs.v0.data_models import BaseConfigModel
-from pydantic import PositiveInt, validator
+from pydantic import PositiveInt, root_validator, validator
 
 from locales import SNAP_LOCALES
 
@@ -23,6 +23,11 @@ class CharmConfig(BaseConfigModel):
     instance_default_text_search_config: str | None
     instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
+    ldap_base_dn: str | None
+    ldap_bind_dn: str | None
+    ldap_bind_password: str | None
+    ldap_search_filter: str | None
+    ldap_url: str | None
     logging_log_connections: bool | None
     logging_log_disconnections: bool | None
     logging_log_lock_waits: bool | None
@@ -115,6 +120,20 @@ class CharmConfig(BaseConfigModel):
         """Return plugin config names in a iterable."""
         return filter(lambda x: x.startswith("plugin_"), cls.keys())
 
+    @root_validator(skip_on_failure=False)
+    @classmethod
+    def check_ldap_search_options(cls, values):
+        """Check all LDAP necessary config options are provided."""
+        ldap_url = values.get("ldap_url")
+        ldap_base_dn = values.get("ldap_base_dn")
+        ldap_bind_dn = values.get("ldap_bind_dn")
+        ldap_bind_password = values.get("ldap_bind_password")
+
+        if ldap_url and not all((ldap_base_dn, ldap_bind_dn, ldap_bind_password)):
+            raise ValueError("To use LDAP: base_dn, bind_dn and bind_password are required")
+
+        return values
+
     @validator("durability_synchronous_commit")
     @classmethod
     def durability_synchronous_commit_values(cls, value: str) -> str | None:
@@ -139,6 +158,15 @@ class CharmConfig(BaseConfigModel):
         """Check instance_max_locks_per_transaction config option is between 64 and 2147483647."""
         if value < 64 or value > 2147483647:
             raise ValueError("Value is not between 64 and 2147483647")
+
+        return value
+
+    @validator("ldap_url")
+    @classmethod
+    def ldap_url_values(cls, value: str) -> str | None:
+        """Check LDAP URL config option does not start with `ldaps`."""
+        if value.startswith("ldaps"):
+            raise ValueError("To use TLS encryption state the normal `ldap` scheme")
 
         return value
 
