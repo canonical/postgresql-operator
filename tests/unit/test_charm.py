@@ -1301,6 +1301,7 @@ def test_update_config(harness):
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
+            enable_ldap=False,
             enable_tls=False,
             backup_id=None,
             stanza=None,
@@ -1325,6 +1326,7 @@ def test_update_config(harness):
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
+            enable_ldap=False,
             enable_tls=True,
             backup_id=None,
             stanza=None,
@@ -2845,3 +2847,52 @@ def test_on_promote_to_primary(harness):
         harness.charm._on_promote_to_primary(event)
         _raft_reinitialisation.assert_called_once_with()
         assert harness.charm.unit_peer_data["raft_candidate"] == "True"
+
+
+def test_get_ldap_parameters(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.config", new_callable=PropertyMock) as _config,
+        patch("charm.PostgresqlOperatorCharm._ldap_config_to_params") as _config_to_params,
+        patch("charm.PostgresqlOperatorCharm._ldap_databag_to_params") as _databag_to_params,
+        patch(
+            target="charm.PostgresqlOperatorCharm.is_cluster_initialised",
+            new_callable=PropertyMock,
+            return_value=True,
+        ) as _cluster_initialised,
+    ):
+        # When LDAP is not configured or related, no params are returned
+        _config.return_value = MagicMock(ldap_url=None)
+
+        harness.charm.get_ldap_parameters()
+        _config_to_params.assert_not_called()
+        _databag_to_params.assert_not_called()
+
+        # When LDAP is configured, params string is built from the config values
+        _config.return_value = MagicMock(ldap_url="ldap://0.0.0.0:3893")
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"ldap_enabled": "False"},
+            )
+
+        harness.charm.get_ldap_parameters()
+        _config_to_params.assert_called_once()
+        _config_to_params.reset_mock()
+        _databag_to_params.assert_not_called()
+        _databag_to_params.reset_mock()
+
+        # When LDAP is related, params string is built from the databag values
+        _config.return_value = MagicMock(ldap_url=None)
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"ldap_enabled": "True"},
+            )
+
+        harness.charm.get_ldap_parameters()
+        _config_to_params.assert_not_called()
+        _config_to_params.reset_mock()
+        _databag_to_params.assert_called_once()
+        _databag_to_params.reset_mock()
