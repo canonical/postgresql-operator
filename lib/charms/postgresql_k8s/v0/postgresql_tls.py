@@ -6,8 +6,9 @@
 This class handles certificate request and renewal through
 the interaction with the TLS Certificates Operator.
 
-This library needs that https://charmhub.io/tls-certificates-interface/libraries/tls_certificates
-library is imported to work.
+This library needs that the following libraries are imported to work:
+- https://charmhub.io/certificate-transfer-interface/libraries/certificate_transfer
+- https://charmhub.io/tls-certificates-interface/libraries/tls_certificates
 
 It also needs the following methods in the charm class:
 — get_hostname_by_unit: to retrieve the DNS hostname of the unit.
@@ -24,6 +25,15 @@ import re
 import socket
 from typing import List, Optional
 
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateAvailableEvent as CertificateAddedEvent,
+)
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateRemovedEvent as CertificateRemovedEvent,
+)
+from charms.certificate_transfer_interface.v0.certificate_transfer import (
+    CertificateTransferRequires,
+)
 from charms.tls_certificates_interface.v2.tls_certificates import (
     CertificateAvailableEvent,
     CertificateExpiringEvent,
@@ -45,11 +55,12 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 13
+LIBPATCH = 14
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
-TLS_RELATION = "certificates"
+TLS_CREATION_RELATION = "certificates"
+TLS_TRANSFER_RELATION = "receive-ca-cert"
 
 
 class PostgreSQLTLS(Object):
@@ -63,18 +74,29 @@ class PostgreSQLTLS(Object):
         self.charm = charm
         self.peer_relation = peer_relation
         self.additional_dns_names = additional_dns_names or []
-        self.certs = TLSCertificatesRequiresV2(self.charm, TLS_RELATION)
+        self.certs_creation = TLSCertificatesRequiresV2(self.charm, TLS_CREATION_RELATION)
+        self.certs_transfer = CertificateTransferRequires(self.charm, TLS_TRANSFER_RELATION)
         self.framework.observe(
             self.charm.on.set_tls_private_key_action, self._on_set_tls_private_key
         )
         self.framework.observe(
-            self.charm.on[TLS_RELATION].relation_joined, self._on_tls_relation_joined
+            self.charm.on[TLS_CREATION_RELATION].relation_joined, self._on_tls_relation_joined
         )
         self.framework.observe(
-            self.charm.on[TLS_RELATION].relation_broken, self._on_tls_relation_broken
+            self.charm.on[TLS_CREATION_RELATION].relation_broken, self._on_tls_relation_broken
         )
-        self.framework.observe(self.certs.on.certificate_available, self._on_certificate_available)
-        self.framework.observe(self.certs.on.certificate_expiring, self._on_certificate_expiring)
+        self.framework.observe(
+            self.certs_creation.on.certificate_available, self._on_certificate_available
+        )
+        self.framework.observe(
+            self.certs_creation.on.certificate_expiring, self._on_certificate_expiring
+        )
+        self.framework.observe(
+            self.certs_transfer.on.certificate_available, self._on_certificate_added
+        )
+        self.framework.observe(
+            self.certs_transfer.on.certificate_removed, self._on_certificate_removed
+        )
 
     def _on_set_tls_private_key(self, event: ActionEvent) -> None:
         """Set the TLS private key, which will be used for requesting the certificate."""
@@ -93,8 +115,8 @@ class PostgreSQLTLS(Object):
         self.charm.set_secret(SCOPE, "key", key.decode("utf-8"))
         self.charm.set_secret(SCOPE, "csr", csr.decode("utf-8"))
 
-        if self.charm.model.get_relation(TLS_RELATION):
-            self.certs.request_certificate_creation(certificate_signing_request=csr)
+        if self.charm.model.get_relation(TLS_CREATION_RELATION):
+            self.certs_creation.request_certificate_creation(certificate_signing_request=csr)
 
     @staticmethod
     def _parse_tls_file(raw_content: str) -> bytes:
@@ -117,6 +139,7 @@ class PostgreSQLTLS(Object):
         self.charm.set_secret(SCOPE, "ca", None)
         self.charm.set_secret(SCOPE, "cert", None)
         self.charm.set_secret(SCOPE, "chain", None)
+
         if not self.charm.update_config():
             logger.debug("Cannot update config at this moment")
             event.defer()
@@ -163,11 +186,51 @@ class PostgreSQLTLS(Object):
             subject=self.charm.get_hostname_by_unit(self.charm.unit.name),
             **self._get_sans(),
         )
-        self.certs.request_certificate_renewal(
+        self.certs_creation.request_certificate_renewal(
             old_certificate_signing_request=old_csr,
             new_certificate_signing_request=new_csr,
         )
         self.charm.set_secret(SCOPE, "csr", new_csr.decode("utf-8"))
+
+    def _on_certificate_added(self, event: CertificateAddedEvent) -> None:
+        """Enable TLS when TLS certificate is added."""
+        relation = self.charm.model.get_relation(TLS_TRANSFER_RELATION, event.relation_id)
+        if relation is None:
+            logger.error("Relationship not established anymore.")
+            return
+
+        secret_name = f"ca-{relation.app.name}"
+        self.charm.set_secret(SCOPE, secret_name, event.ca)
+
+        try:
+            if not self.charm.push_ca_file_into_workload(secret_name):
+                logger.debug("Cannot push TLS certificates at this moment")
+                event.defer()
+                return
+        except (PebbleConnectionError, PathError, ProtocolError, RetryError) as e:
+            logger.error("Cannot push TLS certificates: %r", e)
+            event.defer()
+            return
+
+    def _on_certificate_removed(self, event: CertificateRemovedEvent) -> None:
+        """Disable TLS when TLS certificate is removed."""
+        relation = self.charm.model.get_relation(TLS_TRANSFER_RELATION, event.relation_id)
+        if relation is None:
+            logger.error("Relationship not established anymore.")
+            return
+
+        secret_name = f"ca-{relation.app.name}"
+        self.charm.set_secret(SCOPE, secret_name, None)
+
+        try:
+            if not self.charm.clean_ca_file_from_workload(secret_name):
+                logger.debug("Cannot clean CA certificates at this moment")
+                event.defer()
+                return
+        except (PebbleConnectionError, PathError, ProtocolError, RetryError) as e:
+            logger.error("Cannot clean CA certificates: %r", e)
+            event.defer()
+            return
 
     def _get_sans(self) -> dict:
         """Create a list of Subject Alternative Names for a PostgreSQL unit.
