@@ -21,8 +21,18 @@ UBUNTU_PRO_APP_NAME = "ubuntu-advantage"
 logger = logging.getLogger(__name__)
 
 
+@pytest.fixture(scope="module")
+async def check_subordinate_env_vars(ops_test: OpsTest) -> None:
+    if (
+        not os.environ.get("UBUNTU_PRO_TOKEN", "").strip()
+        or not os.environ.get("LANDSCAPE_ACCOUNT_NAME", "").strip()
+        or not os.environ.get("LANDSCAPE_REGISTRATION_KEY", "").strip()
+    ):
+        pytest.skip("Subordinate configs not set")
+
+
 @pytest.mark.abort_on_fail
-async def test_deploy(ops_test: OpsTest, charm: str):
+async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars):
     await gather(
         ops_test.model.deploy(
             charm,
@@ -60,7 +70,7 @@ async def test_deploy(ops_test: OpsTest, charm: str):
     )
 
 
-async def test_scale_up(ops_test: OpsTest):
+async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
     await scale_application(ops_test, DATABASE_APP_NAME, 4)
 
     await ops_test.model.wait_for_idle(
@@ -68,7 +78,7 @@ async def test_scale_up(ops_test: OpsTest):
     )
 
 
-async def test_scale_down(ops_test: OpsTest):
+async def test_scale_down(ops_test: OpsTest, check_subordinate_env_vars):
     await scale_application(ops_test, DATABASE_APP_NAME, 3)
 
     await ops_test.model.wait_for_idle(
