@@ -5,6 +5,7 @@ from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from charms.postgresql_k8s.v0.postgresql import (
+    ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLGetPostgreSQLVersionError,
@@ -124,10 +125,12 @@ def test_on_database_requested(harness):
 
         # Assert that the correct calls were made.
         user = f"relation-{rel_id}"
+        expected_user_roles = [role.lower() for role in EXTRA_USER_ROLES.split(",")]
+        expected_user_roles.append(ACCESS_GROUP_RELATION)
         postgresql_mock.create_user.assert_called_once_with(
             user,
             "test-password",
-            extra_user_roles=[role.lower() for role in EXTRA_USER_ROLES.split(",")],
+            extra_user_roles=expected_user_roles,
         )
         database_relation = harness.model.get_relation(RELATION_NAME)
         client_relations = [database_relation]
