@@ -1,0 +1,1014 @@
+[32mINFO    [0m pytest_operator.plugin:plugin.py:936 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.3    unsupported  01:50:13Z
+
+App               Version  Status   Scale  Charm             Channel      Rev  Exposed  Message
+landscape-client           blocked      3  landscape-client  latest/edge   71  no       Registration failed!
+pg                14.15    active       3  postgresql                       0  no       
+ubuntu-advantage           active       3  ubuntu-advantage  latest/edge  137  no       Attached (esm-apps,esm-infra)
+
+Unit                   Workload  Agent  Machine  Public address  Ports     Message
+pg/0*                  active    idle   0        10.123.123.205  5432/tcp  Primary
+  landscape-client/1   blocked   idle            10.123.123.205            Registration failed!
+  ubuntu-advantage/2   active    idle            10.123.123.205            Attached (esm-apps,esm-infra)
+pg/1                   active    idle   1        10.123.123.39   5432/tcp  
+  landscape-client/0*  blocked   idle            10.123.123.39             Registration failed!
+  ubuntu-advantage/0*  active    idle            10.123.123.39             Attached (esm-apps,esm-infra)
+pg/2                   active    idle   2        10.123.123.120  5432/tcp  
+  landscape-client/2   blocked   idle            10.123.123.120            Registration failed!
+  ubuntu-advantage/1   active    idle            10.123.123.120            Attached (esm-apps,esm-infra)
+
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.123.123.205  juju-cc7e0a-0  ubuntu@22.04      Running
+1        started  10.123.123.39   juju-cc7e0a-1  ubuntu@22.04      Running
+2        started  10.123.123.120  juju-cc7e0a-2  ubuntu@22.04      Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:942 Juju error logs:
+
+machine-0: 01:34:36 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:36 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-0: 01:34:36 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-pg-0: 01:35:46 ERROR unit.pg/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 445, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 276, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7fb06e9e4460>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 667, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.123.123.205', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fb06e9e4460>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-pg-0/charm/src/cluster.py", line 552, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-pg-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 700, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.123.123.205', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fb06e9e4460>: Failed to establish a new connection: [Errno 111] Connection refused'))
+machine-1: 01:36:04 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:36:04 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-1: 01:36:04 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:36:23 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:36:23 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-pg-2: 01:36:23 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-0: 01:40:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-1: 01:40:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-landscape-client-2: 01:40:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-0: 01:40:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-1: 01:40:13 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-ubuntu-advantage-2: 01:40:36 ERROR unit.unit-ubuntu-advantage-2.juju-log Uncaught exception while in charm code:
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/model.py", line 2183, in _run
+    result = run(args, **kwargs)
+  File "/usr/lib/python3.10/subprocess.py", line 526, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '('/var/lib/juju/tools/unit-ubuntu-advantage-2/config-get', '--format=json')' returned non-zero exit status 1.
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/./src/charm.py", line 427, in <module>
+    main(UbuntuAdvantageCharm)
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/main.py", line 426, in main
+    charm = charm_class(framework)
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/./src/charm.py", line 233, in __init__
+    self._setup_proxy_env()
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/./src/charm.py", line 249, in _setup_proxy_env
+    self.proxy_env["http_proxy"] = self.config.get(
+  File "/usr/lib/python3.10/_collections_abc.py", line 824, in get
+    return self[key]
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/model.py", line 547, in __getitem__
+    return self._data[key]
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/model.py", line 531, in _data
+    data = self._lazy_data = self._load()
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/model.py", line 1092, in _load
+    return self._backend.config_get()
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/model.py", line 2299, in config_get
+    out = self._run('config-get', return_output=True, use_json=True)
+  File "/var/lib/juju/agents/unit-ubuntu-advantage-2/charm/venv/ops/model.py", line 2189, in _run
+    raise ModelError(e.stderr)
+ops.model.ModelError: b'ERROR not implemented for restricted context not implemented\n'
+unit-ubuntu-advantage-2: 01:40:36 ERROR juju.worker.meterstatus error running "meter-status-changed": exit status 1
+unit-landscape-client-2: 01:40:55 CRITICAL unit.landscape-client/2.juju-log   File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 299, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/main.py", line 45, in main
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/_main.py", line 543, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/_main.py", line 529, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/_main.py", line 518, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name, self._juju_context)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/_main.py", line 134, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/framework.py", line 347, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/framework.py", line 857, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/venv/ops/framework.py", line 947, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 253, in _on_config_changed
+    self.run_landscape_client()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 228, in run_landscape_client
+    self.send_registration()
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 216, in send_registration
+    if process_helper([CLIENT_CONFIG_CMD, "--silent"]):
+  File "/var/lib/juju/agents/unit-landscape-client-2/charm/./src/charm.py", line 117, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-2: 01:40:55 CRITICAL unit.landscape-client/2.juju-log 2025-03-11 01:40:49,499 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:49,500 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 2 of 14)
+2025-03-11 01:40:50,002 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:50,002 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 3 of 14)
+2025-03-11 01:40:50,513 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:50,513 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 4 of 14)
+2025-03-11 01:40:50,977 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:50,978 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 5 of 14)
+2025-03-11 01:40:51,416 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:51,417 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 6 of 14)
+2025-03-11 01:40:51,936 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:51,936 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 7 of 14)
+2025-03-11 01:40:52,369 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:52,369 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 8 of 14)
+2025-03-11 01:40:52,799 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:52,799 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 9 of 14)
+2025-03-11 01:40:53,243 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,243 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 10 of 14)
+2025-03-11 01:40:53,696 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,696 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 11 of 14)
+2025-03-11 01:40:54,151 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:54,151 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 12 of 14)
+2025-03-11 01:40:54,611 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:54,612 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 13 of 14)
+2025-03-11 01:40:55,042 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:55,042 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 14 of 14)
+2025-03-11 01:40:55,475 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:55,475 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+
+unit-landscape-client-0: 01:40:56 CRITICAL unit.landscape-client/0.juju-log   File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 299, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/main.py", line 45, in main
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/_main.py", line 543, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/_main.py", line 529, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/_main.py", line 518, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name, self._juju_context)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/_main.py", line 134, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 347, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 857, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/venv/ops/framework.py", line 947, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 253, in _on_config_changed
+    self.run_landscape_client()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 228, in run_landscape_client
+    self.send_registration()
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 216, in send_registration
+    if process_helper([CLIENT_CONFIG_CMD, "--silent"]):
+  File "/var/lib/juju/agents/unit-landscape-client-0/charm/./src/charm.py", line 117, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-0: 01:40:56 CRITICAL unit.landscape-client/0.juju-log 2025-03-11 01:40:49,528 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:49,528 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 2 of 14)
+2025-03-11 01:40:50,033 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:50,034 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 3 of 14)
+2025-03-11 01:40:50,541 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:50,541 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 4 of 14)
+2025-03-11 01:40:50,994 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:50,995 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 5 of 14)
+2025-03-11 01:40:51,434 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:51,434 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 6 of 14)
+2025-03-11 01:40:51,959 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:51,959 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 7 of 14)
+2025-03-11 01:40:52,408 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:52,408 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 8 of 14)
+2025-03-11 01:40:52,851 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:52,852 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 9 of 14)
+2025-03-11 01:40:53,290 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,291 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 10 of 14)
+2025-03-11 01:40:53,746 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,746 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 11 of 14)
+2025-03-11 01:40:54,207 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:54,207 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 12 of 14)
+2025-03-11 01:40:54,655 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:54,656 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 13 of 14)
+2025-03-11 01:40:55,108 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:55,108 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 14 of 14)
+2025-03-11 01:40:55,554 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:55,555 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+
+unit-landscape-client-1: 01:40:58 CRITICAL unit.landscape-client/1.juju-log   File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 299, in <module>
+    main(LandscapeClientCharm)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/main.py", line 45, in main
+    return _main.main(charm_class=charm_class, use_juju_for_storage=use_juju_for_storage)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/_main.py", line 543, in main
+    manager.run()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/_main.py", line 529, in run
+    self._emit()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/_main.py", line 518, in _emit
+    _emit_charm_event(self.charm, self.dispatcher.event_name, self._juju_context)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/_main.py", line 134, in _emit_charm_event
+    event_to_emit.emit(*args, **kwargs)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/framework.py", line 347, in emit
+    framework._emit(event)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/framework.py", line 857, in _emit
+    self._reemit(event_path)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/venv/ops/framework.py", line 947, in _reemit
+    custom_handler(event)
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 253, in _on_config_changed
+    self.run_landscape_client()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 228, in run_landscape_client
+    self.send_registration()
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 216, in send_registration
+    if process_helper([CLIENT_CONFIG_CMD, "--silent"]):
+  File "/var/lib/juju/agents/unit-landscape-client-1/charm/./src/charm.py", line 117, in process_helper
+    log_error("".join(traceback.format_stack()))
+
+unit-landscape-client-1: 01:40:58 CRITICAL unit.landscape-client/1.juju-log 2025-03-11 01:40:51,485 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:51,486 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 2 of 14)
+2025-03-11 01:40:51,986 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:51,986 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 3 of 14)
+2025-03-11 01:40:52,485 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:52,486 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 4 of 14)
+2025-03-11 01:40:53,010 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,010 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 5 of 14)
+2025-03-11 01:40:53,452 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,452 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 6 of 14)
+2025-03-11 01:40:53,906 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:53,906 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 7 of 14)
+2025-03-11 01:40:54,352 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:54,355 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 8 of 14)
+2025-03-11 01:40:54,795 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:54,795 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 9 of 14)
+2025-03-11 01:40:55,225 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:55,225 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 10 of 14)
+2025-03-11 01:40:55,671 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:55,671 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 11 of 14)
+2025-03-11 01:40:56,183 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:56,183 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 12 of 14)
+2025-03-11 01:40:56,638 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:56,638 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 13 of 14)
+2025-03-11 01:40:57,142 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:57,142 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+Retrying... (attempt 14 of 14)
+2025-03-11 01:40:57,615 ERROR    [MainThread] Error contacting the server at https://landscape.canonical.com/message-system.
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+2025-03-11 01:40:57,616 ERROR    [MainThread] Registration failed
+Traceback (most recent call last):
+  File "/usr/lib/python3/dist-packages/landscape/client/configuration.py", line 763, in attempt_registration
+    registration_info = register(
+  File "/usr/lib/python3/dist-packages/landscape/client/registration.py", line 97, in register
+    response = exchange_messages(message, server_url, cainfo=cainfo)
+  File "/usr/lib/python3/dist-packages/landscape/client/exchange.py", line 73, in exchange_messages
+    response_bytes = fetch(
+  File "/usr/lib/python3/dist-packages/landscape/lib/fetch.py", line 139, in fetch
+    raise HTTPCodeError(http_code, body)
+landscape.lib.fetch.HTTPCodeError: Server returned HTTP code 503
+
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1024 Forgetting model main...
