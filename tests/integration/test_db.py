@@ -10,7 +10,6 @@ from mailmanclient import Client
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from . import markers
 from .helpers import (
     APPLICATION_NAME,
     CHARM_BASE,
@@ -20,7 +19,6 @@ from .helpers import (
     check_database_users_existence,
     check_databases_creation,
     deploy_and_relate_application_with_postgresql,
-    deploy_and_relate_bundle_with_postgresql,
     get_leader_unit,
     run_command_on_unit,
 )
