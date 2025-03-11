@@ -287,30 +287,3 @@ async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
     await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
         f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"
     )
-
-
-@markers.juju2
-@pytest.mark.skip(reason="Unstable")
-@markers.amd64_only  # canonical-livepatch-server charm (in bundle) not available for arm64
-async def test_canonical_livepatch_onprem_bundle_db(ops_test: OpsTest) -> None:
-    # Deploy and test the Livepatch onprem bundle (using this PostgreSQL charm
-    # and an overlay to make the Ubuntu Advantage charm work with PostgreSQL).
-    # We intentionally wait for the `✘ sync_token not set` status message as we
-    # aren't providing an Ubuntu Pro token (as this is just a test to ensure
-    # the database works in the context of the relation with the Livepatch charm).
-    overlay = {
-        "applications": {"ubuntu-advantage": {"charm": "ubuntu-advantage", "base": CHARM_BASE}}
-    }
-    await deploy_and_relate_bundle_with_postgresql(
-        ops_test,
-        "canonical-livepatch-onprem",
-        LIVEPATCH_APP_NAME,
-        relation_name="db",
-        status="blocked",
-        status_message="✘ sync_token not set",
-        overlay=overlay,
-    )
-
-    action = await ops_test.model.units.get(f"{LIVEPATCH_APP_NAME}/0").run_action("schema-upgrade")
-    await action.wait()
-    assert action.results.get("Code") == "0", "schema-upgrade action hasn't succeeded"
