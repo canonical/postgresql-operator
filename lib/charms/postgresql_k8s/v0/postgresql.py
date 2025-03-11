@@ -35,7 +35,10 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 43
+LIBPATCH = 47
+
+# Groups to distinguish database permissions
+PERMISSIONS_GROUP_ADMIN = "admin"
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -187,7 +190,7 @@ class PostgreSQL:
                     Identifier(database)
                 )
             )
-            for user_to_grant_access in [user, "admin", *self.system_users]:
+            for user_to_grant_access in [user, PERMISSIONS_GROUP_ADMIN, *self.system_users]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
@@ -220,7 +223,7 @@ class PostgreSQL:
         user: str,
         password: Optional[str] = None,
         admin: bool = False,
-        extra_user_roles: Optional[str] = None,
+        extra_user_roles: Optional[List[str]] = None,
     ) -> None:
         """Creates a database user.
 
@@ -235,16 +238,17 @@ class PostgreSQL:
             admin_role = False
             roles = privileges = None
             if extra_user_roles:
-                extra_user_roles = tuple(extra_user_roles.lower().split(","))
-                admin_role = "admin" in extra_user_roles
+                admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [
-                    role for role in extra_user_roles if role in valid_roles and role != "admin"
+                    role
+                    for role in extra_user_roles
+                    if role in valid_roles and role != PERMISSIONS_GROUP_ADMIN
                 ]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
-                    if extra_user_role not in roles and extra_user_role != "admin"
+                    if extra_user_role not in roles and extra_user_role != PERMISSIONS_GROUP_ADMIN
                 }
                 invalid_privileges = [
                     privilege for privilege in privileges if privilege not in valid_privileges
@@ -300,9 +304,10 @@ class PostgreSQL:
             # Existing objects need to be reassigned in each database
             # before the user can be deleted.
             for database in databases:
-                with self._connect_to_database(
-                    database
-                ) as connection, connection.cursor() as cursor:
+                with (
+                    self._connect_to_database(database) as connection,
+                    connection.cursor() as cursor,
+                ):
                     cursor.execute(
                         SQL("REASSIGN OWNED BY {} TO {};").format(
                             Identifier(user), Identifier(self.user)
@@ -464,9 +469,10 @@ END; $$;"""
         Returns:
             Set of PostgreSQL text search configs.
         """
-        with self._connect_to_database(
-            database_host=self.current_host
-        ) as connection, connection.cursor() as cursor:
+        with (
+            self._connect_to_database(database_host=self.current_host) as connection,
+            connection.cursor() as cursor,
+        ):
             cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
             text_search_configs = cursor.fetchall()
             return {text_search_config[0] for text_search_config in text_search_configs}
@@ -477,9 +483,10 @@ END; $$;"""
         Returns:
             Set of PostgreSQL timezones.
         """
-        with self._connect_to_database(
-            database_host=self.current_host
-        ) as connection, connection.cursor() as cursor:
+        with (
+            self._connect_to_database(database_host=self.current_host) as connection,
+            connection.cursor() as cursor,
+        ):
             cursor.execute("SELECT name FROM pg_timezone_names;")
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
@@ -492,9 +499,10 @@ END; $$;"""
         """
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database(
-                database_host=host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute("SELECT version();")
                 # Split to get only the version number.
                 return cursor.fetchone()[0].split(" ")[1]
@@ -513,9 +521,12 @@ END; $$;"""
             whether TLS is enabled.
         """
         try:
-            with self._connect_to_database(
-                database_host=self.current_host if check_current_host else None
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(
+                    database_host=self.current_host if check_current_host else None
+                ) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute("SHOW ssl;")
                 return "on" in cursor.fetchone()[0]
         except psycopg2.Error:
@@ -571,8 +582,8 @@ END; $$;"""
                         )
                     )
                 self.create_user(
-                    "admin",
-                    extra_user_roles="pg_read_all_data,pg_write_all_data",
+                    PERMISSIONS_GROUP_ADMIN,
+                    extra_user_roles=["pg_read_all_data", "pg_write_all_data"],
                 )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:
@@ -597,9 +608,10 @@ END; $$;"""
         """
         connection = None
         try:
-            with self._connect_to_database(
-                database_host=database_host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=database_host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
@@ -696,9 +708,10 @@ END; $$;"""
             Whether the date style is valid.
         """
         try:
-            with self._connect_to_database(
-                database_host=self.current_host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=self.current_host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
                     SQL(
                         "SET DateStyle to {};",

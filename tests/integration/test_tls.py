@@ -12,9 +12,9 @@ from .ha_tests.helpers import (
     change_patroni_setting,
 )
 from .helpers import (
+    CHARM_BASE,
     DATABASE_APP_NAME,
     METADATA,
-    build_charm,
     change_primary_start_timeout,
     check_tls,
     check_tls_patroni_api,
@@ -41,31 +41,29 @@ else:
     tls_config = {"ca-common-name": "Test CA"}
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_active(ops_test: OpsTest):
+async def test_deploy_active(ops_test: OpsTest, charm):
     """Build the charm and deploy it."""
-    charm = await build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
             charm,
             application_name=APP_NAME,
             num_units=3,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         # No wait between deploying charms, since we can't guarantee users will wait. Furthermore,
         # bundles don't wait between deploying charms.
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
     async with ops_test.fast_forward():
         # Deploy TLS Certificates operator.
         await ops_test.model.deploy(
-            tls_certificates_app_name, config=tls_config, channel=tls_channel
+            tls_certificates_app_name, config=tls_config, channel=tls_channel, base=CHARM_BASE
         )
 
         # Relate it to the PostgreSQL to enable TLS.
@@ -147,7 +145,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await run_command_on_unit(
             ops_test,
             primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/16/bin/postgres",
+            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
         )
         await run_command_on_unit(
             ops_test,

@@ -12,6 +12,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
     APPLICATION_NAME,
+    CHARM_BASE,
 )
 from ..juju_ import juju_major_version
 from .helpers import (
@@ -32,7 +33,6 @@ DUP_APPLICATION_NAME = "postgres-test-dup"
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_app_force_removal(ops_test: OpsTest, charm: str):
     """Remove unit with force while storage is alive."""
@@ -43,6 +43,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             charm,
             application_name=APPLICATION_NAME,
             num_units=1,
+            base=CHARM_BASE,
             storage={"pgdata": {"pool": "lxd-btrfs", "size": 8046}},
             config={"profile": "testing"},
         )
@@ -91,7 +92,6 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
                 assert await is_storage_exists(ops_test, storage_id_str)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
     """Test charm deploy in dirty environment with garbage storage."""
@@ -131,7 +131,6 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
         await ops_test.model.destroy_unit(primary_name)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skipif(juju_major_version < 3, reason="Requires juju 3 or higher")
 async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
@@ -148,6 +147,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             charm,
             application_name=DUP_APPLICATION_NAME,
             num_units=1,
+            base=CHARM_BASE,
             attach_storage=[tag.storage(garbage_storage)],
             config={"profile": "testing"},
         )
@@ -170,7 +170,6 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         )
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skipif(juju_major_version != 2, reason="Requires juju 2")
 async def test_app_resources_conflicts_v2(ops_test: OpsTest, charm: str):
@@ -188,6 +187,7 @@ async def test_app_resources_conflicts_v2(ops_test: OpsTest, charm: str):
             charm,
             application_name=DUP_APPLICATION_NAME,
             num_units=1,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 

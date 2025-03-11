@@ -61,6 +61,7 @@ from cluster import (
     Patroni,
     RemoveRaftMemberFailedError,
     SwitchoverFailedError,
+    SwitchoverNotSyncError,
 )
 from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
@@ -70,6 +71,7 @@ from config import CharmConfig
 from constants import (
     APP_SCOPE,
     BACKUP_USER,
+    DATABASE_DEFAULT_NAME,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -181,7 +183,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on[PEER].relation_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on.secret_changed, self._on_peer_relation_changed)
         self.framework.observe(self.on[PEER].relation_departed, self._on_peer_relation_departed)
-        self.framework.observe(self.on.pgdata_storage_detaching, self._on_pgdata_storage_detaching)
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.get_password_action, self._on_get_password)
         self.framework.observe(self.on.set_password_action, self._on_set_password)
@@ -373,7 +374,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             current_host=self._unit_ip,
             user=USER,
             password=self.get_secret(APP_SCOPE, f"{USER}-password"),
-            database="postgres",
+            database=DATABASE_DEFAULT_NAME,
             system_users=SYSTEM_USERS,
         )
 
@@ -431,10 +432,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def _updated_synchronous_node_count(self, num_units: int | None = None) -> bool:
+    def updated_synchronous_node_count(self) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
         try:
-            self._patroni.update_synchronous_node_count(num_units)
+            self._patroni.update_synchronous_node_count()
             return True
         except RetryError:
             logger.debug("Unable to set synchronous_node_count")
@@ -472,9 +473,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
-        if not self.is_cluster_initialised or not self._updated_synchronous_node_count(
-            len(self._units_ips)
-        ):
+        if not self.is_cluster_initialised or not self.updated_synchronous_node_count():
             logger.debug("Deferring on_peer_relation_departed: cluster not initialized")
             event.defer()
             return
@@ -499,52 +498,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
-
-    def _on_pgdata_storage_detaching(self, _) -> None:
-        # Change the primary if it's the unit that is being removed.
-        try:
-            primary = self._patroni.get_primary(unit_name_pattern=True)
-        except RetryError:
-            # Ignore the event if the primary couldn't be retrieved.
-            # If a switchover is needed, an automatic failover will be triggered
-            # when the unit is removed.
-            logger.debug("Early exit on_pgdata_storage_detaching: primary cannot be retrieved")
-            return
-
-        if self.unit.name != primary:
-            return
-
-        if not self._patroni.are_all_members_ready():
-            logger.warning(
-                "could not switchover because not all members are ready"
-                " - an automatic failover will be triggered"
-            )
-            return
-
-        # Try to switchover to another member and raise an exception if it doesn't succeed.
-        # If it doesn't happen on time, Patroni will automatically run a fail-over.
-        try:
-            # Get the current primary to check if it has changed later.
-            current_primary = self._patroni.get_primary()
-
-            # Trigger the switchover.
-            self._patroni.switchover()
-
-            # Wait for the switchover to complete.
-            self._patroni.primary_changed(current_primary)
-
-            logger.info("successful switchover")
-        except (RetryError, SwitchoverFailedError) as e:
-            logger.warning(
-                f"switchover failed with reason: {e} - an automatic failover will be triggered"
-            )
-            return
-
-        # Only update the connection endpoints if there is a primary.
-        # A cluster can have all members as replicas for some time after
-        # a failed switchover, so wait until the primary is elected.
-        if self.primary_endpoint:
-            self._update_relation_endpoints()
 
     def _stuck_raft_cluster_check(self) -> None:
         """Check for stuck raft cluster and reinitialise if safe."""
@@ -1183,6 +1136,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error("Invalid configuration: %s", str(e))
             return
 
+        if not self.updated_synchronous_node_count():
+            logger.debug("Defer on_config_changed: unable to set synchronous node count")
+            event.defer()
+            return
+
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.unit.status = ActiveStatus()
 
@@ -1194,7 +1152,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Enable and/or disable the extensions.
         self.enable_disable_extensions()
+        self._unblock_extensions()
 
+    def _unblock_extensions(self) -> None:
         # Unblock the charm after extensions are enabled (only if it's blocked due to application
         # charms requesting extensions).
         if self.unit.status.message != EXTENSIONS_BLOCKING_MESSAGE:
@@ -1393,7 +1353,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles="pg_monitor",
+                    extra_user_roles=["pg_monitor"],
                 )
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
@@ -1552,8 +1512,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return
             try:
                 self._patroni.switchover(self._member_name)
-            except SwitchoverFailedError:
+            except SwitchoverNotSyncError:
                 event.fail("Unit is not sync standby")
+            except SwitchoverFailedError:
+                event.fail("Switchover failed or timed out, check the logs for details")
 
     def _on_update_status(self, _) -> None:
         """Update the unit status message and users list in the database."""

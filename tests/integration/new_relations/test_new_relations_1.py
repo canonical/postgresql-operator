@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 import asyncio
@@ -13,8 +12,10 @@ import yaml
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_attempt, wait_fixed
 
-from .. import markers
+from constants import DATABASE_DEFAULT_NAME
+
 from ..helpers import (
+    CHARM_BASE,
     assert_sync_standbys,
     get_leader_unit,
     get_machine_from_unit,
@@ -46,7 +47,6 @@ NO_DATABASE_RELATION_NAME = "no-database"
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 
-@pytest.mark.group("new_relations_tests")
 @pytest.mark.abort_on_fail
 async def test_deploy_charms(ops_test: OpsTest, charm):
     """Deploy both charms (application and database) to use in the tests."""
@@ -58,18 +58,21 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 APPLICATION_APP_NAME,
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
+                base=CHARM_BASE,
                 channel="edge",
             ),
             ops_test.model.deploy(
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 charm,
                 application_name=ANOTHER_DATABASE_APP_NAME,
                 num_units=2,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
         )
@@ -77,7 +80,6 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
     """Test that there is no read-only endpoint in a standalone cluster."""
     async with ops_test.fast_forward():
@@ -124,7 +126,6 @@ async def test_no_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
         )
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_read_only_endpoint_in_scaled_up_cluster(ops_test: OpsTest):
     """Test that there is read-only endpoint in a scaled up cluster."""
     async with ops_test.fast_forward():
@@ -142,7 +143,6 @@ async def test_read_only_endpoint_in_scaled_up_cluster(ops_test: OpsTest):
         )
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_database_relation_with_charm_libraries(ops_test: OpsTest):
     """Test basic functionality of database relation interface."""
     # Get the connection string to connect to the database using the read/write endpoint.
@@ -190,7 +190,6 @@ async def test_database_relation_with_charm_libraries(ops_test: OpsTest):
             cursor.execute("DROP TABLE test;")
 
 
-@pytest.mark.group("new_relations_tests")
 @pytest.mark.abort_on_fail
 async def test_filter_out_degraded_replicas(ops_test: OpsTest):
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
@@ -221,7 +220,6 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
     )
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_user_with_extra_roles(ops_test: OpsTest):
     """Test superuser actions and the request for more permissions."""
     # Get the connection string to connect to the database.
@@ -242,7 +240,6 @@ async def test_user_with_extra_roles(ops_test: OpsTest):
     connection.close()
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: OpsTest):
     """Test that two different application connect to the database with different credentials."""
     # Set some variables to use in this test.
@@ -255,6 +252,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         APPLICATION_APP_NAME,
         application_name=another_application_app_name,
         channel="edge",
+        base=CHARM_BASE,
     )
     await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
 
@@ -281,7 +279,10 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         (another_application_app_name, f"{APPLICATION_APP_NAME.replace('-', '_')}_database"),
     ]:
         connection_string = await build_connection_string(
-            ops_test, application, FIRST_DATABASE_RELATION_NAME, database="postgres"
+            ops_test,
+            application,
+            FIRST_DATABASE_RELATION_NAME,
+            database=DATABASE_DEFAULT_NAME,
         )
         with pytest.raises(psycopg2.Error):
             psycopg2.connect(connection_string)
@@ -295,7 +296,6 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
             psycopg2.connect(connection_string)
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_an_application_can_connect_to_multiple_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters
@@ -326,7 +326,6 @@ async def test_an_application_can_connect_to_multiple_database_clusters(ops_test
     assert application_connection_string != another_application_connection_string
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_an_application_can_connect_to_multiple_aliased_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters
@@ -360,7 +359,6 @@ async def test_an_application_can_connect_to_multiple_aliased_database_clusters(
     assert application_connection_string != another_application_connection_string
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_an_application_can_request_multiple_databases(ops_test: OpsTest):
     """Test that an application can request additional databases using the same interface."""
     # Relate the charms using another relation and wait for them exchanging some connection data.
@@ -381,7 +379,6 @@ async def test_an_application_can_request_multiple_databases(ops_test: OpsTest):
     assert first_database_connection_string != second_database_connection_string
 
 
-@pytest.mark.group("new_relations_tests")
 @pytest.mark.abort_on_fail
 async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest):
     """Test that relation data, like connection data, is updated correctly when scaling."""
@@ -462,7 +459,6 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             psycopg2.connect(primary_connection_string)
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_relation_with_no_database_name(ops_test: OpsTest):
     """Test that a relation with no database name doesn't block the charm."""
     async with ops_test.fast_forward():
@@ -479,13 +475,12 @@ async def test_relation_with_no_database_name(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_admin_role(ops_test: OpsTest):
     """Test that the admin role gives access to all the databases."""
     all_app_names = [DATA_INTEGRATOR_APP_NAME]
     all_app_names.extend(APP_NAMES)
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
+        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
@@ -497,7 +492,7 @@ async def test_admin_role(ops_test: OpsTest):
 
     # Check that the user can access all the databases.
     for database in [
-        "postgres",
+        DATABASE_DEFAULT_NAME,
         f"{APPLICATION_APP_NAME.replace('-', '_')}_database",
         "another_application_database",
     ]:
@@ -521,11 +516,11 @@ async def test_admin_role(ops_test: OpsTest):
                 )
                 assert version == data
 
-                # Write some data (it should fail in the "postgres" database).
+                # Write some data (it should fail in the default database name).
                 random_name = (
                     f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                 )
-                should_fail = database == "postgres"
+                should_fail = database == DATABASE_DEFAULT_NAME
                 cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
                 if should_fail:
                     assert False, (
@@ -543,7 +538,7 @@ async def test_admin_role(ops_test: OpsTest):
 
     # Test the creation and deletion of databases.
     connection_string = await build_connection_string(
-        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database="postgres"
+        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=DATABASE_DEFAULT_NAME
     )
     connection = psycopg2.connect(connection_string)
     connection.autocommit = True
@@ -552,8 +547,10 @@ async def test_admin_role(ops_test: OpsTest):
     cursor.execute(f"CREATE DATABASE {random_name};")
     cursor.execute(f"DROP DATABASE {random_name};")
     try:
-        cursor.execute("DROP DATABASE postgres;")
-        assert False, "the admin extra user role was able to drop the `postgres` system database"
+        cursor.execute(f"DROP DATABASE {DATABASE_DEFAULT_NAME};")
+        assert False, (
+            f"the admin extra user role was able to drop the `{DATABASE_DEFAULT_NAME}` system database"
+        )
     except psycopg2.errors.InsufficientPrivilege:
         # Ignore the error, as the admin extra user role mustn't be able to drop
         # the "postgres" system database.
@@ -562,7 +559,6 @@ async def test_admin_role(ops_test: OpsTest):
         connection.close()
 
 
-@pytest.mark.group("new_relations_tests")
 async def test_invalid_extra_user_roles(ops_test: OpsTest):
     async with ops_test.fast_forward():
         # Remove the relation between the database and the first data integrator.
@@ -576,6 +572,7 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
         await ops_test.model.deploy(
             DATA_INTEGRATOR_APP_NAME,
             application_name=another_data_integrator_app_name,
+            base=CHARM_BASE,
         )
         await ops_test.model.wait_for_idle(
             apps=[another_data_integrator_app_name], status="blocked"
@@ -621,41 +618,3 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
             raise_on_blocked=False,
             timeout=1000,
         )
-
-
-@pytest.mark.group("nextcloud_blocked")
-@markers.amd64_only  # nextcloud charm not available for arm64
-async def test_nextcloud_db_blocked(ops_test: OpsTest, charm: str) -> None:
-    # Deploy Database Charm and Nextcloud
-    await asyncio.gather(
-        ops_test.model.deploy(
-            charm,
-            application_name=DATABASE_APP_NAME,
-            num_units=1,
-            config={"profile": "testing"},
-        ),
-        ops_test.model.deploy(
-            "nextcloud",
-            channel="edge",
-            application_name="nextcloud",
-            num_units=1,
-        ),
-    )
-    await asyncio.gather(
-        ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000),
-        ops_test.model.wait_for_idle(
-            apps=["nextcloud"],
-            status="blocked",
-            raise_on_blocked=False,
-            timeout=2000,
-        ),
-    )
-
-    await ops_test.model.relate("nextcloud:database", f"{DATABASE_APP_NAME}:database")
-
-    await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME, "nextcloud"],
-        status="active",
-        raise_on_blocked=False,
-        timeout=1000,
-    )

@@ -6,7 +6,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import APPLICATION_NAME, build_charm, db_connect, scale_application
+from ..helpers import APPLICATION_NAME, CHARM_BASE, db_connect, scale_application
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -18,20 +18,19 @@ from .helpers import (
 )
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy three unit of PostgreSQL."""
     wait_for_apps = False
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        charm = await build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
                 num_units=3,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             )
     # Deploy the continuous writes application charm if it wasn't already deployed.
@@ -41,6 +40,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
+                base=CHARM_BASE,
                 channel="edge",
             )
 
@@ -49,7 +49,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_timeout) -> None:
     """Kill primary unit, check reelection."""
     app = await app_name(ops_test)
@@ -61,9 +60,7 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
 
     # Remove the primary unit.
     primary_name = await get_primary(ops_test, app)
-    await ops_test.model.destroy_units(
-        primary_name,
-    )
+    await ops_test.model.destroy_units(primary_name)
 
     # Wait and get the primary again (which can be any unit, including the previous primary).
     async with ops_test.fast_forward():
@@ -87,7 +84,6 @@ async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_ti
     await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
 async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     """Write to primary, read data from secondaries (check consistency)."""
     # Locate primary unit.
@@ -104,8 +100,9 @@ async def test_consistency(ops_test: OpsTest, continuous_writes) -> None:
     await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
-async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous_writes) -> None:
+async def test_no_data_replicated_between_clusters(
+    ops_test: OpsTest, charm, continuous_writes
+) -> None:
     """Check that writes in one cluster are not replicated to another cluster."""
     # Locate primary unit.
     app = await app_name(ops_test)
@@ -114,12 +111,12 @@ async def test_no_data_replicated_between_clusters(ops_test: OpsTest, continuous
     # Deploy another cluster.
     new_cluster_app = f"second-{app}"
     if not await app_name(ops_test, new_cluster_app):
-        charm = await build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
                 application_name=new_cluster_app,
                 num_units=2,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             )
             await ops_test.model.wait_for_idle(

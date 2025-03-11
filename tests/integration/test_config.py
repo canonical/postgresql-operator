@@ -7,24 +7,23 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
 from .helpers import (
+    CHARM_BASE,
     DATABASE_APP_NAME,
-    build_charm,
     get_leader_unit,
 )
 
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_config_parameters(ops_test: OpsTest) -> None:
+async def test_config_parameters(ops_test: OpsTest, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test config with wrong parameters."""
     # Build and deploy the PostgreSQL charm.
     async with ops_test.fast_forward():
-        charm = await build_charm(".")
         await ops_test.model.deploy(
             charm,
             num_units=1,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
@@ -33,6 +32,10 @@ async def test_config_parameters(ops_test: OpsTest) -> None:
     test_string = "abcXYZ123"
 
     configs = [
+        {"synchronous_node_count": ["0", "1"]},  # config option is greater than 0
+        {
+            "synchronous_node_count": [test_string, "all"]
+        },  # config option is one of `all`, `minority` or `majority`
         {
             "durability_synchronous_commit": [test_string, "on"]
         },  # config option is one of `on`, `remote_apply` or `remote_write`

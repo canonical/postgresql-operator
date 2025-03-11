@@ -9,9 +9,11 @@ import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from ..helpers import DATABASE_APP_NAME
+from constants import DATABASE_DEFAULT_NAME
+
+from ..helpers import CHARM_BASE, DATABASE_APP_NAME
 from .helpers import build_connection_string
-from .test_new_relations import DATA_INTEGRATOR_APP_NAME
+from .test_new_relations_1 import DATA_INTEGRATOR_APP_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +22,6 @@ APP_NAMES = [DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME]
 FIRST_DATABASE_RELATION_NAME = "database"
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_relations(ops_test: OpsTest, charm):
     """Test that check relation data."""
@@ -29,12 +30,13 @@ async def test_relations(ops_test: OpsTest, charm):
             charm,
             application_name=DATABASE_APP_NAME,
             num_units=1,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=3000)
 
         # Creating first time relation with user role
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME)
+        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
         })
@@ -125,14 +127,14 @@ async def test_relations(ops_test: OpsTest, charm):
 
         for database in [
             DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-            "postgres",
+            DATABASE_DEFAULT_NAME,
         ]:
             logger.info(f"connecting to the following database: {database}")
             connection_string = await build_connection_string(
                 ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=database
             )
             connection = None
-            should_fail = database == "postgres"
+            should_fail = database == DATABASE_DEFAULT_NAME
             try:
                 with (
                     psycopg2.connect(connection_string) as connection,
@@ -142,7 +144,7 @@ async def test_relations(ops_test: OpsTest, charm):
                     data = cursor.fetchone()
                     assert data[0] == "some data"
 
-                    # Write some data (it should fail in the "postgres" database).
+                    # Write some data (it should fail in the default database name).
                     random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                     cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
                     if should_fail:

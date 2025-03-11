@@ -7,7 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
-    build_charm,
+    CHARM_BASE,
     db_connect,
     get_password,
     get_patroni_cluster,
@@ -29,18 +29,17 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy two PostgreSQL clusters."""
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await ops_test.model.deploy(
             charm,
             application_name=FIRST_APPLICATION,
             num_units=3,
+            base=CHARM_BASE,
             storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
             config={"profile": "testing"},
         )
@@ -50,6 +49,7 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             charm,
             application_name=SECOND_APPLICATION,
             num_units=1,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
 
@@ -66,7 +66,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.destroy_unit(second_primary)
 
 
-@pytest.mark.group(1)
 async def test_cluster_restore(ops_test):
     """Recreates the cluster from storage volumes."""
     # Write some data.

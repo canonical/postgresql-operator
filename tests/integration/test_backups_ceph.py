@@ -190,7 +190,6 @@ def cloud_configs(microceph: ConnectionInformation):
     }
 
 
-@pytest.mark.group("ceph")
 @markers.amd64_only
 async def test_backup_ceph(ops_test: OpsTest, cloud_configs, cloud_credentials, charm) -> None:
     """Build and deploy two units of PostgreSQL in microceph, test backup and restore actions."""

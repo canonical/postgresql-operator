@@ -11,6 +11,7 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .helpers import (
+    CHARM_BASE,
     DATABASE_APP_NAME,
     build_connection_string,
     check_database_users_existence,
@@ -36,13 +37,13 @@ DATABASE_UNITS = 3
 RELATION_NAME = "db-admin"
 
 
-@pytest.mark.group(1)
 async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> None:
     """Deploy Landscape Scalable Bundle to test the 'db-admin' relation."""
     await ops_test.model.deploy(
         charm,
         application_name=DATABASE_APP_NAME,
         num_units=DATABASE_UNITS,
+        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 

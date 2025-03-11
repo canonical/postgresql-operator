@@ -212,7 +212,10 @@ class PostgreSQLBackups(Object):
                 for line in system_identifier_from_instance.splitlines()
                 if "Database system identifier" in line
             ).split(" ")[-1]
-            system_identifier_from_stanza = str(stanza.get("db")[0]["system-id"])
+            stanza_dbs = stanza.get("db")
+            system_identifier_from_stanza = (
+                str(stanza_dbs[0]["system-id"]) if len(stanza_dbs) else None
+            )
             if system_identifier_from_instance != system_identifier_from_stanza:
                 logger.debug(
                     f"can_use_s3_repository: incompatible system identifier s3={system_identifier_from_stanza}, local={system_identifier_from_instance}"
