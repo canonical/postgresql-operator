@@ -325,7 +325,10 @@ from opentelemetry.sdk.trace.export import (
     SpanExportResult,
 )
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
-from opentelemetry.trace import INVALID_SPAN, Tracer
+from opentelemetry.trace import (
+    INVALID_SPAN,
+    Tracer,
+)
 from opentelemetry.trace import get_current_span as otlp_get_current_span
 from opentelemetry.trace import (
     get_tracer,
@@ -345,7 +348,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 6
+LIBPATCH = 7
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 

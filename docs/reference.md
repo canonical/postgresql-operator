@@ -1,4 +1,4 @@
-# Overview
+# Reference
 
 The Reference section of our documentation contains pages for technical specifications, APIs, release notes, and other reference material for fast lookup.
 
@@ -7,14 +7,16 @@ The Reference section of our documentation contains pages for technical specific
 |---------------------------|---------------------------------------------------|
 | [Release Notes](/t/11875) | Release notes for major revisions of this charm |
 | [System requirements](/t/11743) | Software and hardware requirements  |
-| [Testing](/t/11773) | Software tests (e.g. smoke, unit, performance...) |
+| [Software testing](/t/11773) | Software tests (e.g. smoke, unit, performance...) |
+| [Performance and resources](/t/11974) | Config profiles related to performance |
 | [Troubleshooting](/t/11864) | Troubleshooting tips and tricks |
-| [Profiles](/t/11974) | Config profiles related to performance |
 | [Plugins/extensions](/t/10946) |  Plugins/extensions supported by each charm revision |
+| [Alert rules](/t/15841) | Pre-configured Prometheus alert rules |
+| [Charm statuses](/t/10844) | Juju application statuses |
 | [Contacts](/t/11863) | Contact information |
 
 
-**In the tabs at the top of the page**, you can find the following automatically generated API references:
+**In the tabs at the top of the page**, you will find the following automatically generated API references:
 
 | Page                                                                       | Description                                             |
 |----------------------------------------------------------------------------|---------------------------------------------------------|
