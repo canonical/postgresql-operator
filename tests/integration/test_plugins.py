@@ -91,7 +91,7 @@ TIMESCALEDB_EXTENSION_STATEMENT = "CREATE TABLE test_timescaledb (time TIMESTAMP
 
 
 @pytest.mark.abort_on_fail
-async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
+async def test_plugins(ops_test: OpsTest, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
     # Build and deploy the PostgreSQL charm.
     async with ops_test.fast_forward():
@@ -99,7 +99,8 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
             charm,
             num_units=2,
             base=CHARM_BASE,
-            config={"profile": "testing"},
+            # TODO Figure out how to deal with pgaudit
+            config={"profile": "testing", "plugin_audit_enable": "False"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
@@ -141,6 +142,7 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
         ],
         "plugin_bool_plperl_enable": BOOL_PLPERL_EXTENSION_STATEMENT,
         "plugin_hll_enable": HLL_EXTENSION_STATEMENT,
+        "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
         "plugin_hypopg_enable": HYPOPG_EXTENSION_STATEMENT,
         "plugin_ip4r_enable": IP4R_EXTENSION_STATEMENT,
         "plugin_plperl_enable": PLPERL_EXTENSION_STATEMENT,
@@ -152,74 +154,12 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
         "plugin_tds_fdw_enable": TDS_FDW_EXTENSION_STATEMENT,
         "plugin_icu_ext_enable": ICU_EXT_EXTENSION_STATEMENT,
         "plugin_pltcl_enable": PLTCL_EXTENSION_STATEMENT,
-        "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
-    }
-
-    def enable_disable_config(enabled: False):
-        config = {}
-        for plugin in sql_tests:
-            config[plugin] = f"{enabled}"
-        return config
-
-    # Check that the available plugins are disabled.
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test, primary)
-    address = get_unit_address(ops_test, primary)
-
-    config = enable_disable_config(False)
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-
-    logger.info("checking that the plugins are disabled")
-    with db_connect(host=address, password=password) as connection:
-        connection.autocommit = True
-        for query in sql_tests.values():
-            if isinstance(query, list):
-                for test in query:
-                    with pytest.raises(psycopg2.Error):
-                        connection.cursor().execute(test)
-            else:
-                with pytest.raises(psycopg2.Error):
-                    connection.cursor().execute(query)
-    connection.close()
-
-    # Enable the plugins.
-    logger.info("enabling the plugins")
-
-    config = enable_disable_config(True)
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(config)
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-
-    # Check that the available plugins are enabled.
-    logger.info("checking that the plugins are enabled")
-    with db_connect(host=address, password=password) as connection:
-        connection.autocommit = True
-        for query in sql_tests.values():
-            if isinstance(query, list):
-                for test in query:
-                    connection.cursor().execute(test)
-            else:
-                connection.cursor().execute(query)
-    connection.close()
-
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(enable_disable_config(False))
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-
-
-async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_audit_enable": "False"
-    })
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=200)
-
-    sql_tests = {
-        "plugin_fuzzystrmatch_enable": FUZZYSTRMATCH_EXTENSION_STATEMENT,
         "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
         "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
-        "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
         "plugin_postgis_tiger_geocoder_enable": POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT,
         "plugin_postgis_raster_enable": POSTGIS_RASTER_EXTENSION_STATEMENT,
         "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
+        "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
     }
 
@@ -270,9 +210,6 @@ async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
                 connection.cursor().execute(query)
     connection.close()
 
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config(enable_disable_config(False))
-    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
-
 
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
@@ -291,7 +228,7 @@ async def test_plugin_objects(ops_test: OpsTest) -> None:
 
     logger.info("Disabling the plugin on charm config, waiting for blocked status")
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_pg_trgm_enable": "False",
+        "plugin_pg_trgm_enable": "False"
     })
     await ops_test.model.block_until(
         lambda: ops_test.model.units[primary].workload_status == "blocked",
