@@ -285,7 +285,8 @@ async def test_plugin_objects(ops_test: OpsTest) -> None:
 
     logger.info("Disabling the plugin on charm config, waiting for blocked status")
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_pg_trgm_enable": "False"
+        "plugin_timescaledb_enable": "False",
+        "plugin_pg_trgm_enable": "False",
     })
     await ops_test.model.block_until(
         lambda: ops_test.model.units[primary].workload_status == "blocked",
