@@ -205,7 +205,7 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
 
 async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_timescaledb_enable": "False"
+        "plugin_audit_enable": "False"
     })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=200)
 
