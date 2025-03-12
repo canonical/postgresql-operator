@@ -204,6 +204,7 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
                 connection.cursor().execute(query)
     connection.close()
 
+
 async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
     sql_tests = {
         "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
@@ -213,7 +214,10 @@ async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
     }
 
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({"plugin_timescaledb_enable": "False"})
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_timescaledb_enable": "False"
+    })
+
     def enable_disable_config(enabled: False):
         config = {}
         for plugin in sql_tests:
@@ -260,6 +264,7 @@ async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
             else:
                 connection.cursor().execute(query)
     connection.close()
+
 
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
