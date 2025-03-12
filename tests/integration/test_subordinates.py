@@ -39,7 +39,6 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
             application_name=DATABASE_APP_NAME,
             num_units=3,
             base=CHARM_BASE,
-            config={"profile": "testing"},
         ),
         ops_test.model.deploy(
             UBUNTU_PRO_APP_NAME,
