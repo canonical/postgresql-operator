@@ -2140,9 +2140,7 @@ def test_delete_password(harness, caplog):
 
         harness.set_leader(True)
         with caplog.at_level(logging.DEBUG):
-            error_message = (
-                "Non-existing secret operator-password was attempted to be removed."
-            )
+            error_message = "Non-existing secret operator-password was attempted to be removed."
 
             harness.charm.remove_secret("app", "operator-password")
             assert error_message in caplog.text
