@@ -295,8 +295,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _translate_field_to_secret_key(self, key: str) -> str:
         """Change 'key' to secrets-compatible key field."""
-        if not JujuVersion.from_environ().has_secrets:
-            return key
         key = SECRET_KEY_OVERRIDES.get(key, key)
         new_key = key.replace("_", "-")
         return new_key.strip("-")
@@ -309,9 +307,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not (peers := self.model.get_relation(PEER)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
-        # Old translation in databag is to be taken
-        if result := self.peer_relation_data(scope).fetch_my_relation_field(peers.id, key):
-            return result
 
         return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
 
@@ -326,8 +321,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not (peers := self.model.get_relation(PEER)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
-        # Old translation in databag is to be deleted
-        self.scoped_peer_data(scope).pop(key, None)
         self.peer_relation_data(scope).set_secret(peers.id, secret_key, value)
 
     def remove_secret(self, scope: Scopes, key: str) -> None:

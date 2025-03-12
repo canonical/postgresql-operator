@@ -152,8 +152,6 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
         "plugin_tds_fdw_enable": TDS_FDW_EXTENSION_STATEMENT,
         "plugin_icu_ext_enable": ICU_EXT_EXTENSION_STATEMENT,
         "plugin_pltcl_enable": PLTCL_EXTENSION_STATEMENT,
-        "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
-        "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
         "plugin_vector_enable": VECTOR_EXTENSION_STATEMENT,
     }
 
@@ -207,6 +205,9 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
 
 async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
     sql_tests = {
+        "plugin_fuzzystrmatch_enable": FUZZYSTRMATCH_EXTENSION_STATEMENT,
+        "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
+        "plugin_address_standardizer_data_us_enable": ADDRESS_STANDARDIZER_DATA_US_EXTENSION_STATEMENT,
         "plugin_postgis_enable": POSTGIS_EXTENSION_STATEMENT,
         "plugin_postgis_tiger_geocoder_enable": POSTGIS_TIGER_GEOCODER_EXTENSION_STATEMENT,
         "plugin_postgis_raster_enable": POSTGIS_RASTER_EXTENSION_STATEMENT,
