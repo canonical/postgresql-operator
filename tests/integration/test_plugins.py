@@ -202,6 +202,9 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
                 connection.cursor().execute(query)
     connection.close()
 
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(enable_disable_config(False))
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
 
 async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
@@ -267,6 +270,9 @@ async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
                 connection.cursor().execute(query)
     connection.close()
 
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config(enable_disable_config(False))
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
+
 
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
@@ -285,7 +291,6 @@ async def test_plugin_objects(ops_test: OpsTest) -> None:
 
     logger.info("Disabling the plugin on charm config, waiting for blocked status")
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_timescaledb_enable": "False",
         "plugin_pg_trgm_enable": "False",
     })
     await ops_test.model.block_until(
