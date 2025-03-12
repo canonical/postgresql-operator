@@ -115,11 +115,11 @@ class PostgreSQLCreatePublicationError(Exception):
 class PostgreSQLDropPublicationError(Exception):
     """Exception raised when dropping PostgreSQL publication."""
 
-class PostgreSQLSubscriptionExistsError(Exception):
-    """Exception raised during subscription existence check."""
-
 class PostgreSQLCreateSubscriptionError(Exception):
     """Exception raised when creating PostgreSQL subscription."""
+
+class PostgreSQLSubscriptionExistsError(Exception):
+    """Exception raised during subscription existence check."""
 
 class PostgreSQLDropSubscriptionError(Exception):
     """Exception raised when dropping PostgreSQL subscription."""
@@ -719,18 +719,6 @@ END; $$;"""
             logger.error(f"Failed to drop Postgresql publication: {e}")
             raise PostgreSQLDropPublicationError() from e
 
-    def subscription_exists(self, db: str, subscription: str) -> bool:
-        """Check whether specified subscription in database exists."""
-        try:
-            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
-                cursor.execute(
-                    SQL("SELECT subname FROM pg_subscription WHERE subname={};").format(Literal(subscription))
-                )
-                return cursor.fetchone() is not None
-        except psycopg2.Error as e:
-            logger.error(f"Failed to check Postgresql subscription existence: {e}")
-            raise PostgreSQLSubscriptionExistsError() from e
-
     def create_subscription(self, subscription: str, host: str, db: str, user: str, password: str, replication_slot: str) -> None:
         """Create PostgreSQL subscription."""
         try:
@@ -746,6 +734,18 @@ END; $$;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to create Postgresql subscription: {e}")
             raise PostgreSQLCreateSubscriptionError() from e
+
+    def subscription_exists(self, db: str, subscription: str) -> bool:
+        """Check whether specified subscription in database exists."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT subname FROM pg_subscription WHERE subname={};").format(Literal(subscription))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql subscription existence: {e}")
+            raise PostgreSQLSubscriptionExistsError() from e
 
     def drop_subscription(self, db: str, subscription: str) -> None:
         """Drop PostgreSQL subscription."""

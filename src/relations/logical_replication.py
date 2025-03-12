@@ -9,7 +9,14 @@ TODO: add description after specification is accepted.
 import json
 import logging
 
-from ops import ActionEvent, Object, RelationChangedEvent, RelationJoinedEvent
+from ops import (
+    ActionEvent,
+    Object,
+    RelationBrokenEvent,
+    RelationChangedEvent,
+    RelationDepartedEvent,
+    RelationJoinedEvent,
+)
 
 from constants import (
     APP_SCOPE,
@@ -39,7 +46,18 @@ class PostgreSQLLogicalReplication(Object):
             self._on_offer_relation_changed,
         )
         self.charm.framework.observe(
+            self.charm.on[LOGICAL_REPLICATION_OFFER_RELATION].relation_broken,
+            self._on_offer_relation_broken,
+        )
+        self.charm.framework.observe(
             self.charm.on[LOGICAL_REPLICATION_RELATION].relation_changed, self._on_relation_changed
+        )
+        self.charm.framework.observe(
+            self.charm.on[LOGICAL_REPLICATION_RELATION].relation_departed,
+            self._on_relation_departed,
+        )
+        self.charm.framework.observe(
+            self.charm.on[LOGICAL_REPLICATION_RELATION].relation_broken, self._on_relation_broken
         )
         # Actions
         self.charm.framework.observe(
@@ -62,7 +80,6 @@ class PostgreSQLLogicalReplication(Object):
     def _on_offer_relation_joined(self, event: RelationJoinedEvent):
         if not self.charm.unit.is_leader():
             return
-
         if not self.charm.primary_endpoint:
             event.defer()
             logger.debug(
@@ -123,47 +140,119 @@ class PostgreSQLLogicalReplication(Object):
         )
         self.charm.update_config()
 
+    def _on_offer_relation_departed(self, event: RelationDepartedEvent):
+        if event.departing_unit == self.charm.unit and self.charm._peers is not None:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+
+    def _on_offer_relation_broken(self, event: RelationBrokenEvent):
+        if not self.charm._peers or self.charm.is_unit_departing:
+            logger.debug(
+                f"{LOGICAL_REPLICATION_OFFER_RELATION}: skipping departing unit in broken event"
+            )
+            return
+        if not self.charm.unit.is_leader():
+            return
+
+        global_replication_slots = self._get_replication_slots_from_str(
+            self.charm.app_peer_data.get("replication-slots")
+        )
+        if len(global_replication_slots) == 0:
+            return
+
+        used_replication_slots = []
+        for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
+            if rel == event.relation:
+                continue
+            used_replication_slots += [
+                v
+                for k, v in self._get_replication_slots_from_str(
+                    rel.data[self.model.app].get("replication-slots")
+                ).items()
+            ]
+
+        deleting_replication_slots = [
+            k for k, v in global_replication_slots.items() if k not in used_replication_slots
+        ]
+        for deleting_replication_slot in deleting_replication_slots:
+            global_replication_slots.pop(deleting_replication_slot, None)
+        self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
+        self.charm.update_config()
+
     def _on_relation_changed(self, event: RelationChangedEvent):
-        subscriptions_str = event.relation.data[self.model.app].get("subscriptions", "")
-        subscriptions = subscriptions_str.split(",") if subscriptions_str else ()
+        if not self._relation_changed_checks(event):
+            return
         publications = self._get_publications_from_str(
             event.relation.data[event.app].get("publications")
         )
-        relation_replication_slots = self._get_replication_slots_from_str(
+        replication_slots = self._get_replication_slots_from_str(
             event.relation.data[event.app].get("replication-slots")
         )
-
-        primary = event.relation.data[event.app].get("primary")
-        replication_user = event.relation.data[event.app].get("replication-user")
-        replication_password = event.relation.data[event.app].get("replication-user-secret")
-        if not primary or not replication_user or not replication_password:
-            logger.warning(
-                "Logical Replication: skipping relation changed event as there is no primary, replication-user and replication-secret data"
-            )
-            return
-
-        for subscription in subscriptions:
+        for subscription in self._get_str_list(
+            event.relation.data[self.model.app].get("subscriptions")
+        ):
             db = publications[subscription]["database"]
-            if (
-                subscription in relation_replication_slots
-                and not self.charm.postgresql.subscription_exists(db, subscription)
+            if subscription in replication_slots and not self.charm.postgresql.subscription_exists(
+                db, subscription
             ):
                 self.charm.postgresql.create_subscription(
                     subscription,
-                    primary,
+                    event.relation.data[event.app]["primary"],
                     db,
-                    replication_user,
-                    replication_password,
-                    relation_replication_slots[subscription],
+                    event.relation.data[event.app]["replication-user"],
+                    event.relation.data[event.app]["replication-user-secret"],
+                    replication_slots[subscription],
                 )
+
+    def _on_relation_departed(self, event: RelationDepartedEvent):
+        if event.departing_unit == self.charm.unit and self.charm._peers is not None:
+            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+
+    def _on_relation_broken(self, event: RelationBrokenEvent):
+        if not self.charm._peers or self.charm.is_unit_departing:
+            logger.debug(
+                f"{LOGICAL_REPLICATION_RELATION}: skipping departing unit in broken event"
+            )
+            return
+        if not self.charm.unit.is_leader():
+            return
+        if not self.charm.primary_endpoint:
+            logger.debug(
+                f"{LOGICAL_REPLICATION_RELATION}: broken event deferred as primary is unavailable right now"
+            )
+            event.defer()
+            return False
+
+        publications = self._get_publications_from_str(
+            event.relation.data[event.app].get("publications")
+        )
+        # TODO: global subscriptions
+        for subscription in self._get_str_list(
+            event.relation.data[self.model.app].get("subscriptions")
+        ):
+            self.charm.postgresql.drop_subscription(
+                publications[subscription]["database"], subscription
+            )
 
     # endregion
 
     # region Actions
 
     def _on_add_publication(self, event: ActionEvent):
+        # TODO: check on max replication slots
         if not self._add_publication_validation(event):
             return
+        if not self.charm.postgresql.database_exists(event.params["database"]):
+            event.fail(f"No such database {event.params['database']}")
+            return
+        for schematable in event.params["tables"].split(","):
+            if len(schematable_split := schematable.split(".")) != 2:
+                event.fail("All tables should be in schema.table format")
+                return
+            if not self.charm.postgresql.table_exists(
+                event.params["database"], schematable_split[0], schematable_split[1]
+            ):
+                event.fail(f"No such table {schematable} in database {event.params['database']}")
+                return
         publications = self._get_publications_from_str(
             self.charm.app_peer_data.get("publications")
         )
@@ -188,6 +277,9 @@ class PostgreSQLLogicalReplication(Object):
         if not self.charm.unit.is_leader():
             event.fail("Publications management can be done only on the leader unit")
             return
+        if not self.charm.primary_endpoint:
+            event.fail("Publication management can be proceeded only with an active primary")
+            return False
         if not (publication_name := event.params.get("name")):
             event.fail("name parameter is required")
             return
@@ -251,13 +343,16 @@ class PostgreSQLLogicalReplication(Object):
 
     def _on_unsubscribe(self, event: ActionEvent):
         if not self.charm.unit.is_leader():
-            event.fail("Subscriptions management can be done only on the leader unit")
+            event.fail("Subscriptions management can be proceeded only on the leader unit")
             return
         if not (relation := self.model.get_relation(LOGICAL_REPLICATION_RELATION)):
             event.fail(
-                "Subscription management can be done only with an active logical replication connection"
+                "Subscription management can be proceeded only with an active logical replication connection"
             )
             return
+        if not self.charm.primary_endpoint:
+            event.fail("Subscription management can be proceeded only with an active primary")
+            return False
         if not (subscription_name := event.params.get("name")):
             event.fail("name parameter is required")
             return
@@ -276,17 +371,40 @@ class PostgreSQLLogicalReplication(Object):
 
     # endregion
 
+    def _relation_changed_checks(self, event: RelationChangedEvent) -> bool:
+        if not self.charm.unit.is_leader():
+            return False
+        if not self.charm.primary_endpoint:
+            logger.debug(
+                f"{LOGICAL_REPLICATION_RELATION}: changed event deferred as primary is unavailable right now"
+            )
+            event.defer()
+            return False
+        if (
+            not event.relation.data[event.app].get("primary")
+            or not event.relation.data[event.app].get("replication-user")
+            or not event.relation.data[event.app].get("replication-user-secret")
+        ):
+            logger.warning(
+                f"{LOGICAL_REPLICATION_RELATION}: skipping changed event as there is no primary, replication-user or replication-user-secret in the remote application data"
+            )
+            return False
+        return True
+
     def _add_publication_validation(self, event: ActionEvent) -> bool:
         if not self.charm.unit.is_leader():
-            event.fail("Publications management can be done only on the leader unit")
+            event.fail("Publications management can be proceeded only on the leader unit")
+            return False
+        if not self.charm.primary_endpoint:
+            event.fail("Publication management can be proceeded only with an active primary")
             return False
         if not (publication_name := event.params.get("name")):
             event.fail("name parameter is required")
             return False
-        if not (publication_db := event.params.get("database")):
+        if not event.params.get("database"):
             event.fail("database parameter is required")
             return False
-        if not (publication_tables := event.params.get("tables")):
+        if not event.params.get("tables"):
             event.fail("tables parameter is required")
             return False
         if publication_name in self._get_publications_from_str(
@@ -294,28 +412,19 @@ class PostgreSQLLogicalReplication(Object):
         ):
             event.fail("Such publication already exists")
             return False
-        if not self.charm.postgresql.database_exists(publication_db):
-            event.fail(f"No such database {publication_db}")
-            return False
-        for schematable in publication_tables.split(","):
-            if len(schematable_split := schematable.split(".")) != 2:
-                event.fail("All tables should be in schema.table format")
-                return False
-            if not self.charm.postgresql.table_exists(
-                publication_db, schematable_split[0], schematable_split[1]
-            ):
-                event.fail(f"No such table {schematable} in database {publication_db}")
-                return False
         return True
 
     def _subscribe_validation(self, event: ActionEvent) -> bool:
         if not self.charm.unit.is_leader():
-            event.fail("Subscriptions management can be done only on the leader unit")
+            event.fail("Subscriptions management can be proceeded only on the leader unit")
             return False
         if not (relation := self.model.get_relation(LOGICAL_REPLICATION_RELATION)):
             event.fail(
-                "Subscription management can be done only with an active logical replication connection"
+                "Subscription management can be proceeded only with an active logical replication connection"
             )
+            return False
+        if not self.charm.primary_endpoint:
+            event.fail("Subscription management can be proceeded only with an active primary")
             return False
         if not (publication_name := event.params.get("name")):
             event.fail("name parameter is required")
