@@ -204,6 +204,11 @@ async def test_plugins_with_pgaudit(ops_test: OpsTest, charm) -> None:
 
 
 async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        "plugin_timescaledb_enable": "False"
+    })
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=200)
+
     sql_tests = {
         "plugin_fuzzystrmatch_enable": FUZZYSTRMATCH_EXTENSION_STATEMENT,
         "plugin_address_standardizer_enable": ADDRESS_STANDARDIZER_EXTENSION_STATEMENT,
@@ -214,10 +219,6 @@ async def test_pluginsout_with_pgaudit(ops_test: OpsTest, charm) -> None:
         "plugin_postgis_topology_enable": POSTGIS_TOPOLOGY_EXTENSION_STATEMENT,
         "plugin_timescaledb_enable": TIMESCALEDB_EXTENSION_STATEMENT,
     }
-
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        "plugin_timescaledb_enable": "False"
-    })
 
     def enable_disable_config(enabled: False):
         config = {}
