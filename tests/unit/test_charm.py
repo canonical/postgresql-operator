@@ -279,7 +279,6 @@ def test_on_config_changed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count", return_value=True
         ) as _updated_synchronous_node_count,
-        patch("relations.db.DbProvides.set_up_relation") as _set_up_relation,
         patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
@@ -291,14 +290,12 @@ def test_on_config_changed(harness):
         _is_cluster_initialised.return_value = False
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_not_called()
-        _set_up_relation.assert_not_called()
 
         # Test when the unit is not the leader.
         _is_cluster_initialised.return_value = True
         harness.charm.on.config_changed.emit()
         _validate_config_options.assert_called_once()
         _enable_disable_extensions.assert_not_called()
-        _set_up_relation.assert_not_called()
 
         # Test unable to connect to db
         _update_config.reset_mock()
@@ -313,7 +310,6 @@ def test_on_config_changed(harness):
             harness.set_leader()
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
-        _set_up_relation.assert_not_called()
 
         # Test when the unit is in a blocked state due to extensions request,
         # but there are no established legacy relations.
@@ -323,35 +319,6 @@ def test_on_config_changed(harness):
         )
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
-        _set_up_relation.assert_not_called()
-
-        # Test when the unit is in a blocked state due to extensions request,
-        # but there are established legacy relations.
-        _enable_disable_extensions.reset_mock()
-        _set_up_relation.return_value = False
-        db_relation_id = harness.add_relation("db", "application")
-        harness.charm.on.config_changed.emit()
-        _enable_disable_extensions.assert_called_once()
-        _set_up_relation.assert_called_once()
-        with harness.hooks_disabled():
-            harness.remove_relation(db_relation_id)
-
-        _enable_disable_extensions.reset_mock()
-        _set_up_relation.reset_mock()
-        harness.add_relation("db-admin", "application")
-        harness.charm.on.config_changed.emit()
-        _enable_disable_extensions.assert_called_once()
-        _set_up_relation.assert_called_once()
-
-        # Test when there are established legacy relations,
-        # but the charm fails to set up one of them.
-        _enable_disable_extensions.reset_mock()
-        _set_up_relation.reset_mock()
-        _set_up_relation.return_value = False
-        harness.add_relation("db", "application")
-        harness.charm.on.config_changed.emit()
-        _enable_disable_extensions.assert_called_once()
-        _set_up_relation.assert_called_once()
 
 
 def test_check_extension_dependencies(harness):
@@ -1827,12 +1794,8 @@ def test_client_relations(harness):
 
     # Test when the charm has some relations.
     harness.add_relation("database", "application")
-    harness.add_relation("db", "legacy-application")
-    harness.add_relation("db-admin", "legacy-admin-application")
     database_relation = harness.model.get_relation("database")
-    db_relation = harness.model.get_relation("db")
-    db_admin_relation = harness.model.get_relation("db-admin")
-    assert harness.charm.client_relations == [database_relation, db_relation, db_admin_relation]
+    assert harness.charm.client_relations == [database_relation]
 
 
 def test_add_cluster_member(harness):
