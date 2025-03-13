@@ -954,8 +954,6 @@ async def add_unit_with_storage(ops_test, app, storage):
     Note: this function exists as a temporary solution until this issue is resolved:
     https://github.com/juju/python-libjuju/issues/695
     """
-    for unit in ops_test.model.applications[app].units:
-        logger.error(f"{unit.name} {unit.agent_status} {unit.workload_status}")
     expected_units = len(ops_test.model.applications[app].units) + 1
     prev_units = [unit.name for unit in ops_test.model.applications[app].units]
     model_name = ops_test.model.info.name
