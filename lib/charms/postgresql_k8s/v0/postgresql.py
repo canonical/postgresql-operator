@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 45
+LIBPATCH = 46
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -483,6 +483,19 @@ END; $$;"""
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
 
+    def get_postgresql_default_table_access_methods(self) -> Set[str]:
+        """Returns the PostgreSQL available table access methods.
+
+        Returns:
+            Set of PostgreSQL table access methods.
+        """
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT amname FROM pg_am WHERE amtype = 't';")
+            access_methods = cursor.fetchall()
+            return {access_method[0] for access_method in access_methods}
+
     def get_postgresql_version(self, current_host=True) -> str:
         """Returns the PostgreSQL version.
 
@@ -653,6 +666,8 @@ END; $$;"""
         for config, value in config_options.items():
             # Filter config option not related to PostgreSQL parameters.
             if not config.startswith((
+                "connection",
+                "cpu",
                 "durability",
                 "instance",
                 "logging",
@@ -660,6 +675,8 @@ END; $$;"""
                 "optimizer",
                 "request",
                 "response",
+                "session",
+                "storage",
                 "vacuum",
             )):
                 continue
