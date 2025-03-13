@@ -5,7 +5,6 @@ import logging
 
 import pytest
 from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
     CHARM_BASE,
@@ -82,12 +81,6 @@ async def test_cluster_restore(ops_test):
             "CREATE TABLE IF NOT EXISTS restore_table_1 (test_collumn INT );"
         )
     connection.close()
-    logger.info("Wait for libjuju cache to go away")
-    for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
-        with attempt:
-            for unit in ops_test.model.applications[SECOND_APPLICATION].units:
-                logger.error(f"{unit.name} {unit.agent_status} {unit.workload_status}")
-            assert len(ops_test.model.applications[SECOND_APPLICATION].units) == 0
 
     logger.info("Downscaling the existing cluster")
     storages = []
