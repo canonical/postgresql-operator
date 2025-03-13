@@ -303,7 +303,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not (peers := self.model.get_relation(PEER)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
-
         return self.peer_relation_data(scope).get_secret(peers.id, secret_key)
 
     def set_secret(self, scope: Scopes, key: str, value: str | None) -> str | None:
@@ -327,7 +326,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not (peers := self.model.get_relation(PEER)):
             return None
         secret_key = self._translate_field_to_secret_key(key)
-
         self.peer_relation_data(scope).delete_relation_data(peers.id, [secret_key])
 
     @property

@@ -519,7 +519,7 @@ async def test_admin_role(ops_test: OpsTest):
                     f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                 )
                 should_fail = database == DATABASE_DEFAULT_NAME
-                cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
+                cursor.execute(f"CREATE SCHEMA test; CREATE TABLE test.{random_name}(data TEXT);")
                 if should_fail:
                     assert False, (
                         f"failed to run a statement in the following database: {database}"
