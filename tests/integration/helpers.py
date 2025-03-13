@@ -30,44 +30,15 @@ from tenacity import (
     wait_fixed,
 )
 
-CHARM_BASE = "ubuntu@24.04"
+from constants import DATABASE_DEFAULT_NAME
+
+CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
 
 logger = logging.getLogger(__name__)
-
-
-async def build_charm(charm_path) -> Path:
-    charm_path = Path(charm_path)
-    architecture = subprocess.run(
-        ["dpkg", "--print-architecture"],
-        capture_output=True,
-        check=True,
-        encoding="utf-8",
-    ).stdout.strip()
-    assert architecture in ("amd64", "arm64")
-    # 24.04 pin is temporary solution while multi-base integration testing not supported by data-platform-workflows
-    packed_charms = list(charm_path.glob(f"*ubuntu@24.04-{architecture}.charm"))
-    if len(packed_charms) == 1:
-        # python-libjuju's model.deploy(), juju deploy, and juju bundle files expect local charms
-        # to begin with `./` or `/` to distinguish them from Charmhub charms.
-        # Therefore, we need to return an absolute path—a relative `pathlib.Path` does not start
-        # with `./` when cast to a str.
-        # (python-libjuju model.deploy() expects a str but will cast any input to a str as a
-        # workaround for pytest-operator's non-compliant `build_charm` return type of
-        # `pathlib.Path`.)
-        return packed_charms[0].resolve(strict=True)
-    elif len(packed_charms) > 1:
-        raise ValueError(
-            f"More than one matching .charm file found at {charm_path=} for {architecture=} and "
-            f"Ubuntu 24.04: {packed_charms}."
-        )
-    else:
-        raise ValueError(
-            f"Unable to find .charm file for {architecture=} and Ubuntu 24.04 at {charm_path=}"
-        )
 
 
 async def build_connection_string(
@@ -528,7 +499,7 @@ async def execute_query_on_unit(
     unit_address: str,
     password: str,
     query: str,
-    database: str = "postgres",
+    database: str = DATABASE_DEFAULT_NAME,
     sslmode: str | None = None,
 ):
     """Execute given PostgreSQL query on a unit.
@@ -882,44 +853,6 @@ def has_relation_exited(
     return True
 
 
-def remove_chown_workaround(original_charm_filename: str, patched_charm_filename: str) -> None:
-    """Remove the chown workaround from the charm."""
-    with (
-        zipfile.ZipFile(original_charm_filename, "r") as charm_file,
-        zipfile.ZipFile(patched_charm_filename, "w") as modified_charm_file,
-    ):
-        # Iterate the input files
-        unix_attributes = {}
-        for charm_info in charm_file.infolist():
-            # Read input file
-            with charm_file.open(charm_info) as file:
-                if charm_info.filename == "src/charm.py":
-                    content = file.read()
-                    # Modify the content of the file by replacing a string
-                    content = (
-                        content.decode()
-                        .replace(
-                            """        try:
-            self._patch_snap_seccomp_profile()
-        except subprocess.CalledProcessError as e:
-            logger.exception(e)
-            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
-            return""",
-                            "",
-                        )
-                        .encode()
-                    )
-                    # Write content.
-                    modified_charm_file.writestr(charm_info.filename, content)
-                else:  # Other file, don't want to modify => just copy it.
-                    content = file.read()
-                    modified_charm_file.writestr(charm_info.filename, content)
-                unix_attributes[charm_info.filename] = charm_info.external_attr >> 16
-
-        for modified_charm_info in modified_charm_file.infolist():
-            modified_charm_info.external_attr = unix_attributes[modified_charm_info.filename] << 16
-
-
 @retry(
     retry=retry_if_result(lambda x: not x),
     stop=stop_after_attempt(10),
@@ -1084,7 +1017,6 @@ def switchover(
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
-    minority_count = len(ops_test.model.applications[app_name].units) // 2
     for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
             response = requests.get(f"http://{primary_ip}:8008/cluster")
@@ -1092,7 +1024,7 @@ def switchover(
             standbys = len([
                 member for member in response.json()["members"] if member["role"] == "sync_standby"
             ])
-            assert standbys >= minority_count
+            assert standbys == len(ops_test.model.applications[app_name].units) - 1
 
 
 async def wait_for_idle_on_blocked(
@@ -1157,6 +1089,7 @@ async def backup_operations(
         charm,
         application_name=database_app_name,
         num_units=2,
+        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 

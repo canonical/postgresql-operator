@@ -1,0 +1,36 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+name: Promote charm
+
+on:
+  workflow_dispatch:
+    inputs:
+      from-risk:
+        description: Promote from this Charmhub risk
+        required: true
+        type: choice
+        options:
+          - edge
+          - beta
+          - candidate
+      to-risk:
+        description: Promote to this Charmhub risk
+        required: true
+        type: choice
+        options:
+          - beta
+          - candidate
+          - stable
+
+jobs:
+  promote:
+    name: Promote charm
+    uses: canonical/data-platform-workflows/.github/workflows/_promote_charm.yaml@v30.2.0
+    with:
+      track: '14'
+      from-risk: ${{ inputs.from-risk }}
+      to-risk: ${{ inputs.to-risk }}
+    secrets:
+      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
+    permissions:
+      contents: write  # Needed to edit GitHub releases

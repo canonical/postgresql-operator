@@ -6,6 +6,7 @@
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
 DATABASE = "database"
+DATABASE_DEFAULT_NAME = "postgres"
 DATABASE_PORT = "5432"
 LEGACY_DB = "db"
 LEGACY_DB_ADMIN = "db-admin"
@@ -34,7 +35,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "138", "x86_64": "139"}},
+        {"revision": {"aarch64": "158", "x86_64": "159"}},
     )
 ]
 

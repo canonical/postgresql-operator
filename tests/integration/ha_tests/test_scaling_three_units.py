@@ -3,14 +3,15 @@
 # See LICENSE file for licensing details.
 import logging
 from asyncio import exceptions, gather, sleep
+from copy import deepcopy
 
 import pytest
 from pytest_operator.plugin import OpsTest
 
 from .. import markers
 from ..helpers import (
+    CHARM_BASE,
     DATABASE_APP_NAME,
-    build_charm,
     get_machine_from_unit,
     stop_machine,
 )
@@ -28,13 +29,11 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy two PostgreSQL clusters."""
     # This is a potentially destructive test, so it shouldn't be run against existing clusters
-    charm = await build_charm(".")
     async with ops_test.fast_forward():
         # Deploy the first cluster with reusable storage
         await gather(
@@ -42,11 +41,13 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
                 charm,
                 application_name=DATABASE_APP_NAME,
                 num_units=3,
+                base=CHARM_BASE,
                 config={"profile": "testing"},
             ),
             ops_test.model.deploy(
                 APPLICATION_NAME,
                 application_name=APPLICATION_NAME,
+                base=CHARM_BASE,
                 channel="edge",
             ),
         )
@@ -54,16 +55,14 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.parametrize(
     "roles",
     [
         ["primaries"],
         ["sync_standbys"],
-        ["replicas"],
-        ["primaries", "replicas"],
-        ["sync_standbys", "replicas"],
+        ["primaries", "sync_standbys"],
+        ["sync_standbys", "sync_standbys"],
     ],
 )
 @pytest.mark.abort_on_fail
@@ -74,8 +73,9 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
     original_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
+    copied_roles = deepcopy(original_roles)
     await start_continuous_writes(ops_test, app)
-    units = [original_roles[role][0] for role in roles]
+    units = [copied_roles[role].pop(0) for role in roles]
     for unit in units:
         logger.info(f"Stopping unit {unit}")
         await stop_machine(ops_test, await get_machine_from_unit(ops_test, unit))
@@ -122,10 +122,10 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     )
     assert len(new_roles["primaries"]) == 1
-    assert len(new_roles["sync_standbys"]) == 1
-    assert len(new_roles["replicas"]) == 1
+    assert len(new_roles["sync_standbys"]) == 2
+    assert len(new_roles["replicas"]) == 0
     if "primaries" in roles:
-        assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
+        assert new_roles["primaries"][0] in original_roles["sync_standbys"]
     else:
         assert new_roles["primaries"][0] == original_roles["primaries"][0]
 

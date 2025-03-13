@@ -35,7 +35,12 @@ from charm import (
     PRIMARY_NOT_REACHABLE_MESSAGE,
     PostgresqlOperatorCharm,
 )
-from cluster import NotReadyError, RemoveRaftMemberFailedError, SwitchoverFailedError
+from cluster import (
+    NotReadyError,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
@@ -271,6 +276,9 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm._validate_config_options"
         ) as _validate_config_options,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch(
+            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count", return_value=True
+        ) as _updated_synchronous_node_count,
         patch("relations.db.DbProvides.set_up_relation") as _set_up_relation,
         patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
@@ -298,6 +306,7 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         assert not _update_config.called
         _validate_config_options.side_effect = None
+        _updated_synchronous_node_count.assert_called_once_with()
 
         # Test after the cluster was initialised.
         with harness.hooks_disabled():
@@ -324,7 +333,8 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
         _set_up_relation.assert_called_once()
-        harness.remove_relation(db_relation_id)
+        with harness.hooks_disabled():
+            harness.remove_relation(db_relation_id)
 
         _enable_disable_extensions.reset_mock()
         _set_up_relation.reset_mock()
@@ -333,7 +343,7 @@ def test_on_config_changed(harness):
         _enable_disable_extensions.assert_called_once()
         _set_up_relation.assert_called_once()
 
-        # Test when  there are established legacy relations,
+        # Test when there are established legacy relations,
         # but the charm fails to set up one of them.
         _enable_disable_extensions.reset_mock()
         _set_up_relation.reset_mock()
@@ -409,6 +419,9 @@ def test_enable_disable_extensions(harness, caplog):
         postgresql_mock.enable_disable_extensions.side_effect = None
         with caplog.at_level(logging.ERROR):
             config = """options:
+  synchronous_node_count:
+    type: string
+    default: "all"
   plugin_citext_enable:
     default: false
     type: boolean
@@ -1822,29 +1835,6 @@ def test_client_relations(harness):
     assert harness.charm.client_relations == [database_relation, db_relation, db_admin_relation]
 
 
-def test_on_pgdata_storage_detaching(harness):
-    with (
-        patch(
-            "charm.PostgresqlOperatorCharm._update_relation_endpoints"
-        ) as _update_relation_endpoints,
-        patch("charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock),
-        patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
-        patch("charm.Patroni.get_primary", return_value="primary") as _get_primary,
-        patch("charm.Patroni.switchover") as _switchover,
-        patch("charm.Patroni.primary_changed") as _primary_changed,
-    ):
-        # Early exit if not primary
-        event = Mock()
-        harness.charm._on_pgdata_storage_detaching(event)
-        assert not _are_all_members_ready.called
-
-        _get_primary.side_effect = [harness.charm.unit.name, "primary"]
-        harness.charm._on_pgdata_storage_detaching(event)
-        _switchover.assert_called_once_with()
-        _primary_changed.assert_called_once_with("primary")
-        _update_relation_endpoints.assert_called_once_with()
-
-
 def test_add_cluster_member(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
@@ -2056,32 +2046,6 @@ def test_scope_obj(harness):
     assert harness.charm._scope_obj("test") is None
 
 
-def test_get_secret_from_databag(harness):
-    """Asserts that get_secret method can read secrets from databag.
-
-    This must be backwards-compatible so it runs on both juju2 and juju3.
-    """
-    with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
-        rel_id = harness.model.get_relation(PEER).id
-        # App level changes require leader privileges
-        harness.set_leader()
-        # Test application scope.
-        assert harness.charm.get_secret("app", "operator_password") is None
-        harness.update_relation_data(
-            rel_id, harness.charm.app.name, {"operator_password": "test-password"}
-        )
-        assert harness.charm.get_secret("app", "operator_password") == "test-password"
-
-        # Unit level changes don't require leader privileges
-        harness.set_leader(False)
-        # Test unit scope.
-        assert harness.charm.get_secret("unit", "operator_password") is None
-        harness.update_relation_data(
-            rel_id, harness.charm.unit.name, {"operator_password": "test-password"}
-        )
-        assert harness.charm.get_secret("unit", "operator_password") == "test-password"
-
-
 def test_on_get_password_secrets(harness):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
@@ -2123,39 +2087,6 @@ def test_get_secret_secrets(harness, scope, field):
         assert harness.charm.get_secret(scope, field) == "test"
 
 
-def test_set_secret_in_databag(harness, only_without_juju_secrets):
-    """Asserts that set_secret method writes to relation databag.
-
-    This is juju2 specific. In juju3, set_secret writes to juju secrets.
-    """
-    with patch("charm.PostgresqlOperatorCharm._on_leader_elected"):
-        rel_id = harness.model.get_relation(PEER).id
-        harness.set_leader()
-
-        # Test application scope.
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
-        harness.charm.set_secret("app", "password", "test-password")
-        assert (
-            harness.get_relation_data(rel_id, harness.charm.app.name)["password"]
-            == "test-password"
-        )
-        harness.charm.set_secret("app", "password", None)
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.app.name)
-
-        # Test unit scope.
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
-        harness.charm.set_secret("unit", "password", "test-password")
-        assert (
-            harness.get_relation_data(rel_id, harness.charm.unit.name)["password"]
-            == "test-password"
-        )
-        harness.charm.set_secret("unit", "password", None)
-        assert "password" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
-
-        with pytest.raises(RuntimeError):
-            harness.charm.set_secret("test", "password", "test")
-
-
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
 def test_set_reset_new_secret(harness, scope, is_leader):
     with (
@@ -2192,7 +2123,7 @@ def test_invalid_secret(harness, scope, is_leader):
         assert harness.charm.get_secret(scope, "somekey") is None
 
 
-def test_delete_password(harness, _has_secrets, caplog):
+def test_delete_password(harness, caplog):
     with (
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
     ):
@@ -2209,14 +2140,7 @@ def test_delete_password(harness, _has_secrets, caplog):
 
         harness.set_leader(True)
         with caplog.at_level(logging.DEBUG):
-            if _has_secrets:
-                error_message = (
-                    "Non-existing secret operator-password was attempted to be removed."
-                )
-            else:
-                error_message = (
-                    "Non-existing field 'operator-password' was attempted to be removed"
-                )
+            error_message = "Non-existing secret operator-password was attempted to be removed."
 
             harness.charm.remove_secret("app", "operator-password")
             assert error_message in caplog.text
@@ -2238,34 +2162,7 @@ def test_delete_password(harness, _has_secrets, caplog):
 
 
 @pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
-def test_migration_from_databag(harness, only_with_juju_secrets, scope, is_leader):
-    """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
-
-    Since it checks for a migration from databag to juju secrets, it's specific to juju3.
-    """
-    with (
-        patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
-    ):
-        rel_id = harness.model.get_relation(PEER).id
-        # App has to be leader, unit can be either
-        harness.set_leader(is_leader)
-
-        # Getting current password
-        entity = getattr(harness.charm, scope)
-        harness.update_relation_data(rel_id, entity.name, {"operator_password": "bla"})
-        assert harness.charm.get_secret(scope, "operator_password") == "bla"
-
-        # Reset new secret
-        harness.charm.set_secret(scope, "operator-password", "blablabla")
-        assert harness.charm.model.get_secret(label=f"{PEER}.postgresql.{scope}")
-        assert harness.charm.get_secret(scope, "operator-password") == "blablabla"
-        assert "operator-password" not in harness.get_relation_data(
-            rel_id, getattr(harness.charm, scope).name
-        )
-
-
-@pytest.mark.parametrize("scope,is_leader", [("app", True), ("unit", True), ("unit", False)])
-def test_migration_from_single_secret(harness, only_with_juju_secrets, scope, is_leader):
+def test_migration_from_single_secret(harness, scope, is_leader):
     """Check if we're moving on to use secrets when live upgrade from databag to Secrets usage.
 
     Since it checks for a migration from databag to juju secrets, it's specific to juju3.
@@ -2367,7 +2264,7 @@ def test_on_peer_relation_departed(harness):
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._get_ips_to_remove") as _get_ips_to_remove,
         patch(
-            "charm.PostgresqlOperatorCharm._updated_synchronous_node_count"
+            "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
         patch("charm.Patroni.remove_raft_member") as _remove_raft_member,
         patch("charm.PostgresqlOperatorCharm._unit_ip") as _unit_ip,
@@ -2446,7 +2343,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(1)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2461,7 +2358,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_not_called()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2477,7 +2374,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_not_called()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2495,7 +2392,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_called_once()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_not_called()
         _update_config.assert_not_called()
@@ -2511,7 +2408,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_not_called()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_has_calls([call(ips_to_remove[0]), call(ips_to_remove[1])])
         assert _update_config.call_count == 2
@@ -2530,7 +2427,7 @@ def test_on_peer_relation_departed(harness):
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
         event.defer.assert_not_called()
-        _updated_synchronous_node_count.assert_called_once_with(2)
+        _updated_synchronous_node_count.assert_called_once_with()
         _get_ips_to_remove.assert_called_once()
         _remove_from_members_ips.assert_called_once()
         _update_config.assert_called_once()
@@ -2785,6 +2682,17 @@ def test_on_promote_to_primary(harness):
         # Unit, no force, switchover failed
         event.params = {"scope": "unit"}
         _switchover.side_effect = SwitchoverFailedError
+
+        harness.charm._on_promote_to_primary(event)
+
+        event.fail.assert_called_once_with(
+            "Switchover failed or timed out, check the logs for details"
+        )
+        event.fail.reset_mock()
+
+        # Unit, no force, not sync
+        event.params = {"scope": "unit"}
+        _switchover.side_effect = SwitchoverNotSyncError
 
         harness.charm._on_promote_to_primary(event)
 

@@ -11,8 +11,8 @@ from pytest_operator.plugin import OpsTest
 
 from . import markers
 from .helpers import (
+    CHARM_BASE,
     METADATA,
-    build_charm,
     check_patroni,
     db_connect,
     get_leader_unit,
@@ -27,23 +27,21 @@ from .helpers import (
 APP_NAME = METADATA["name"]
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_active(ops_test: OpsTest):
+async def test_deploy_active(ops_test: OpsTest, charm):
     """Build the charm and deploy it."""
-    charm = await build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
             charm,
             application_name=APP_NAME,
             num_units=3,
+            base=CHARM_BASE,
             config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
     # Get the initial passwords set for the system users.
@@ -119,7 +117,6 @@ async def test_password_rotation(ops_test: OpsTest):
             assert check_patroni(ops_test, unit.name, restart_time)
 
 
-@pytest.mark.group(1)
 @markers.juju_secrets
 async def test_password_from_secret_same_as_cli(ops_test: OpsTest):
     """Checking if password is same as returned by CLI.
@@ -146,7 +143,6 @@ async def test_password_from_secret_same_as_cli(ops_test: OpsTest):
     assert data[secret_id]["content"]["Data"]["replication-password"] == password
 
 
-@pytest.mark.group(1)
 async def test_empty_password(ops_test: OpsTest) -> None:
     """Test that the password can't be set to an empty string."""
     leader_unit = await get_leader_unit(ops_test, APP_NAME)
@@ -159,7 +155,6 @@ async def test_empty_password(ops_test: OpsTest) -> None:
     assert password == "None"
 
 
-@pytest.mark.group(1)
 async def test_db_connection_with_empty_password(ops_test: OpsTest):
     """Test that user can't connect with empty password."""
     primary = await get_primary(ops_test, f"{APP_NAME}/0")
@@ -168,7 +163,6 @@ async def test_db_connection_with_empty_password(ops_test: OpsTest):
         connection.close()
 
 
-@pytest.mark.group(1)
 async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None:
     """Test that in general, there is no change when password validation fails."""
     leader_unit = await get_leader_unit(ops_test, APP_NAME)
@@ -181,7 +175,6 @@ async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None
     assert password1 == password2
 
 
-@pytest.mark.group(1)
 async def test_no_password_exposed_on_logs(ops_test: OpsTest) -> None:
     """Test that passwords don't get exposed on postgresql logs."""
     for unit in ops_test.model.applications[APP_NAME].units:

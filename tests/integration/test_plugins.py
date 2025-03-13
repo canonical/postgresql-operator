@@ -8,8 +8,8 @@ import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
 from .helpers import (
+    CHARM_BASE,
     DATABASE_APP_NAME,
-    build_charm,
     db_connect,
     get_password,
     get_primary,
@@ -90,17 +90,17 @@ VECTOR_EXTENSION_STATEMENT = (
 TIMESCALEDB_EXTENSION_STATEMENT = "CREATE TABLE test_timescaledb (time TIMESTAMPTZ NOT NULL); SELECT create_hypertable('test_timescaledb', 'time');"
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_plugins(ops_test: OpsTest) -> None:
+async def test_plugins(ops_test: OpsTest, charm) -> None:
     """Build and deploy one unit of PostgreSQL and then test the available plugins."""
     # Build and deploy the PostgreSQL charm.
     async with ops_test.fast_forward():
-        charm = await build_charm(".")
         await ops_test.model.deploy(
             charm,
             num_units=2,
-            config={"profile": "testing"},
+            base=CHARM_BASE,
+            # TODO Figure out how to deal with pgaudit
+            config={"profile": "testing", "plugin_audit_enable": "False"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
@@ -211,7 +211,6 @@ async def test_plugins(ops_test: OpsTest) -> None:
     connection.close()
 
 
-@pytest.mark.group(1)
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")

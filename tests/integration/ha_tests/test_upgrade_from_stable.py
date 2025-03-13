@@ -9,11 +9,9 @@ from pytest_operator.plugin import OpsTest
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
-    build_charm,
     count_switchovers,
     get_leader_unit,
     get_primary,
-    remove_chown_workaround,
 )
 from .helpers import (
     are_writes_increasing,
@@ -26,45 +24,27 @@ logger = logging.getLogger(__name__)
 TIMEOUT = 900
 
 
-@pytest.mark.group(1)
-@pytest.mark.unstable
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
+    # TODO remove once we release to stable
+    pytest.skip("No 16/stable yet.")
     return_code, charm_info, stderr = await ops_test.juju("info", "postgresql", "--format=json")
     if return_code != 0:
         raise Exception(f"failed to get charm info with error: {stderr}")
     # Revisions lower than 315 have a currently broken workaround for chown.
     parsed_charm_info = json.loads(charm_info)
     revision = (
-        parsed_charm_info["channels"]["16"]["stable"][0]["revision"]
+        parsed_charm_info["channels"]["14"]["stable"][0]["revision"]
         if "channels" in parsed_charm_info
-        else parsed_charm_info["channel-map"]["16/stable"]["revision"]
+        else parsed_charm_info["channel-map"]["14/stable"]["revision"]
     )
-    logger.info(f"16/stable revision: {revision}")
-    if int(revision) < 315:
-        original_charm_name = "./postgresql.charm"
-        return_code, _, stderr = await ops_test.juju(
-            "download",
-            "postgresql",
-            "--channel=16/stable",
-            f"--filepath={original_charm_name}",
-        )
-        if return_code != 0:
-            raise Exception(
-                f"failed to download charm from 16/stable channel with error: {stderr}"
-            )
-        patched_charm_name = "./modified_postgresql.charm"
-        remove_chown_workaround(original_charm_name, patched_charm_name)
-        return_code, _, stderr = await ops_test.juju("deploy", patched_charm_name, "-n", "3")
-        if return_code != 0:
-            raise Exception(f"failed to deploy charm from 16/stable channel with error: {stderr}")
-    else:
-        await ops_test.model.deploy(
-            DATABASE_APP_NAME,
-            num_units=3,
-            channel="16/stable",
-        )
+    logger.info(f"14/stable revision: {revision}")
+    await ops_test.model.deploy(
+        DATABASE_APP_NAME,
+        num_units=3,
+        channel="16/stable",
+    )
     await ops_test.model.deploy(
         APPLICATION_NAME,
         num_units=1,
@@ -78,14 +58,14 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
     assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 
 
-@pytest.mark.group(1)
-@pytest.mark.unstable
 @pytest.mark.abort_on_fail
 async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     """Test that the pre-upgrade-check action runs successfully."""
+    # TODO remove once we release to stable
+    pytest.skip("No 16/stable yet.")
     application = ops_test.model.applications[DATABASE_APP_NAME]
     if "pre-upgrade-check" not in await application.get_actions():
-        logger.info("skipping the test because the charm from 16/stable doesn't support upgrade")
+        logger.info("skipping the test because the charm from 14/stable doesn't support upgrade")
         return
 
     logger.info("Get leader unit")
@@ -97,11 +77,11 @@ async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     await action.wait()
 
 
-@pytest.mark.group(1)
-@pytest.mark.unstable
 @pytest.mark.abort_on_fail
-async def test_upgrade_from_stable(ops_test: OpsTest):
+async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     """Test updating from stable channel."""
+    # TODO remove once we release to stable
+    pytest.skip("No 16/stable yet.")
     # Start an application that continuously writes data to the database.
     logger.info("starting continuous writes to the database")
     await start_continuous_writes(ops_test, DATABASE_APP_NAME)
@@ -115,9 +95,6 @@ async def test_upgrade_from_stable(ops_test: OpsTest):
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
     actions = await application.get_actions()
-
-    logger.info("Build charm locally")
-    charm = await build_charm(".")
 
     logger.info("Refresh the charm")
     await application.refresh(path=charm)

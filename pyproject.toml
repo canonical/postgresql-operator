@@ -7,16 +7,16 @@ requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-ops = "^2.17.1"
-boto3 = "^1.35.87"
+ops = "^2.18.1"
+boto3 = "^1.35.99"
 pgconnstr = "^1.0.1"
 requests = "^2.32.3"
 tenacity = "^9.0.0"
 psycopg2 = "^2.9.10"
 pydantic = "^1.10.21"
 jinja2 = "^3.1.5"
-pysyncobj = "^0.3.13"
-psutil = "^6.1.1"
+pysyncobj = "^0.3.14"
+psutil = "^7.0.0"
 
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
@@ -27,7 +27,7 @@ poetry-core = "*"
 # data_platform_libs/v0/data_models.py requires pydantic ^1.10
 pydantic = "^1.10"
 # grafana_agent/v0/cos_agent.py
-cosl = "*"
+cosl = ">=0.0.50"
 # tls_certificates_interface/v2/tls_certificates.py
 cryptography = "*"
 jsonschema = "*"
@@ -38,19 +38,19 @@ opentelemetry-exporter-otlp-proto-http = "1.21.0"
 optional = true
 
 [tool.poetry.group.format.dependencies]
-ruff = "^0.9.3"
+ruff = "^0.9.6"
 
 [tool.poetry.group.lint]
 optional = true
 
 [tool.poetry.group.lint.dependencies]
-codespell = "^2.4.0"
+codespell = "^2.4.1"
 
 [tool.poetry.group.unit]
 optional = true
 
 [tool.poetry.group.unit.dependencies]
-coverage = {extras = ["toml"], version = "^7.6.10"}
+coverage = {extras = ["toml"], version = "^7.6.12"}
 pytest = "^8.3.4"
 pytest-asyncio = "*"
 parameterized = "^0.9.0"
@@ -61,10 +61,7 @@ optional = true
 
 [tool.poetry.group.integration.dependencies]
 pytest = "^8.3.4"
-pytest-github-secrets = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.1.0", subdirectory = "python/pytest_plugins/github_secrets"}
-pytest-operator = "^0.39.0"
-pytest-operator-cache = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.1.0", subdirectory = "python/pytest_plugins/pytest_operator_cache"}
-pytest-operator-groups = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.1.0", subdirectory = "python/pytest_plugins/pytest_operator_groups"}
+pytest-operator = "^0.40.0"
 # renovate caret doesn't work: https://github.com/renovatebot/renovate/issues/26940
 juju = "<=3.6.1.0"
 boto3 = "*"
@@ -73,7 +70,7 @@ landscape-api-py3 = "^0.9.0"
 mailmanclient = "^3.3.5"
 psycopg2-binary = "^2.9.10"
 allure-pytest = "^2.13.5"
-allure-pytest-collection-report = {git = "https://github.com/canonical/data-platform-workflows", tag = "v29.1.0", subdirectory = "python/pytest_plugins/allure_pytest_collection_report"}
+allure-pytest-default-results = "^0.1.2"
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -89,7 +86,7 @@ exclude_lines = [
 minversion = "6.0"
 log_cli_level = "INFO"
 asyncio_mode = "auto"
-markers = ["unstable", "juju2", "juju3", "juju_secrets"]
+markers = ["juju2", "juju3", "juju_secrets"]
 
 # Formatting tools configuration
 [tool.black]

@@ -17,6 +17,7 @@ from locales import SNAP_LOCALES
 
 from .ha_tests.helpers import get_cluster_roles
 from .helpers import (
+    CHARM_BASE,
     DATABASE_APP_NAME,
     STORAGE_PATH,
     check_cluster_members,
@@ -36,7 +37,6 @@ logger = logging.getLogger(__name__)
 UNIT_IDS = [0, 1, 2]
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
 async def test_deploy(ops_test: OpsTest, charm: str):
@@ -49,6 +49,7 @@ async def test_deploy(ops_test: OpsTest, charm: str):
         charm,
         application_name=DATABASE_APP_NAME,
         num_units=3,
+        base=CHARM_BASE,
         config={"profile": "testing"},
     )
 
@@ -59,7 +60,6 @@ async def test_deploy(ops_test: OpsTest, charm: str):
     assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_database_is_up(ops_test: OpsTest, unit_id: int):
@@ -70,7 +70,6 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     assert result.status_code == 200
 
 
-@pytest.mark.group(1)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
     # Query Patroni REST API and check the status that indicates
@@ -83,7 +82,6 @@ async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
     )
 
 
-@pytest.mark.group(1)
 @pytest.mark.parametrize("unit_id", UNIT_IDS)
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Connect to the PostgreSQL instance.
@@ -169,7 +167,6 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert unit.data["port-ranges"][0]["protocol"] == "tcp"
 
 
-@pytest.mark.group(1)
 async def test_postgresql_locales(ops_test: OpsTest) -> None:
     raw_locales = await run_command_on_unit(
         ops_test,
@@ -186,7 +183,6 @@ async def test_postgresql_locales(ops_test: OpsTest) -> None:
     assert locales == SNAP_LOCALES
 
 
-@pytest.mark.group(1)
 async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
     """Test that's possible to change PostgreSQL parameters."""
     await ops_test.model.applications[DATABASE_APP_NAME].set_config({
@@ -234,7 +230,6 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
             connection.close()
 
 
-@pytest.mark.group(1)
 async def test_scale_down_and_up(ops_test: OpsTest):
     """Test data is replicated to new units after a scale up."""
     # Ensure the initial number of units in the application.
@@ -322,7 +317,6 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     await scale_application(ops_test, DATABASE_APP_NAME, initial_scale)
 
 
-@pytest.mark.group(1)
 async def test_switchover_sync_standby(ops_test: OpsTest):
     original_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -340,7 +334,6 @@ async def test_switchover_sync_standby(ops_test: OpsTest):
     assert new_roles["primaries"][0] == original_roles["sync_standbys"][0]
 
 
-@pytest.mark.group(1)
 async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     """Test data persists through a primary deletion."""
     # Set a composite application name in order to test in more than one series at the same time.

@@ -16,7 +16,6 @@ from .. import architecture, markers
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
-    build_charm,
     get_leader_unit,
     get_password,
     get_primary,
@@ -100,7 +99,6 @@ async def second_model_continuous_writes(second_model) -> None:
             assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_deploy_async_replication_setup(
@@ -108,7 +106,6 @@ async def test_deploy_async_replication_setup(
 ) -> None:
     """Build and deploy two PostgreSQL cluster in two separate models to test async replication."""
     if not await app_name(ops_test):
-        charm = await build_charm(".")
         await ops_test.model.deploy(
             charm,
             num_units=CLUSTER_SIZE,
@@ -123,7 +120,6 @@ async def test_deploy_async_replication_setup(
         )
         await ops_test.model.relate(DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME)
     if not await app_name(ops_test, model=second_model):
-        charm = await build_charm(".")
         await second_model.deploy(
             charm,
             num_units=CLUSTER_SIZE,
@@ -147,7 +143,6 @@ async def test_deploy_async_replication_setup(
         )
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_async_replication(
@@ -225,7 +220,6 @@ async def test_async_replication(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_get_data_integrator_credentials(
@@ -238,7 +232,6 @@ async def test_get_data_integrator_credentials(
     data_integrator_credentials = result.results
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_switchover(
@@ -270,7 +263,7 @@ async def test_switchover(
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME, model=second_model)
     assert leader_unit is not None, "No leader unit found"
     logger.info("promoting the second cluster")
-    run_action = await leader_unit.run_action("promote-to-primary", **{"force": True})
+    run_action = await leader_unit.run_action("promote-to-primary", scope="cluster", force=True)
     await run_action.wait()
     assert (run_action.results.get("return-code", None) == 0) or (
         run_action.results.get("Code", None) == "0"
@@ -293,7 +286,6 @@ async def test_switchover(
     await are_writes_increasing(ops_test, extra_model=second_model)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_data_integrator_creds_keep_on_working(
@@ -316,7 +308,6 @@ async def test_data_integrator_creds_keep_on_working(
         connection.close()
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_promote_standby(
@@ -351,7 +342,7 @@ async def test_promote_standby(
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
     assert leader_unit is not None, "No leader unit found"
     logger.info("promoting the first cluster")
-    run_action = await leader_unit.run_action("promote-to-primary")
+    run_action = await leader_unit.run_action("promote-to-primary", scope="cluster")
     await run_action.wait()
     assert (run_action.results.get("return-code", None) == 0) or (
         run_action.results.get("Code", None) == "0"
@@ -394,7 +385,6 @@ async def test_promote_standby(
     await are_writes_increasing(ops_test)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_reestablish_relation(
@@ -452,7 +442,6 @@ async def test_reestablish_relation(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_async_replication_failover_in_main_cluster(
@@ -498,7 +487,6 @@ async def test_async_replication_failover_in_main_cluster(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_async_replication_failover_in_secondary_cluster(
@@ -535,7 +523,6 @@ async def test_async_replication_failover_in_secondary_cluster(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@pytest.mark.group(1)
 @markers.juju3
 @pytest.mark.abort_on_fail
 async def test_scaling(
