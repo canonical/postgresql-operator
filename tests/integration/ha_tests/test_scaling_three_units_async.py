@@ -8,7 +8,6 @@ from copy import deepcopy
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from .. import markers
 from ..helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -29,7 +28,6 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy two PostgreSQL clusters."""
@@ -55,7 +53,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@markers.juju3
 @pytest.mark.parametrize(
     "roles",
     [
