@@ -954,21 +954,21 @@ async def add_unit_with_storage(ops_test, app, storage):
     Note: this function exists as a temporary solution until this issue is resolved:
     https://github.com/juju/python-libjuju/issues/695
     """
-    expected_units = len(ops_test.model.applications[app].units) + 1
-    prev_units = [unit.name for unit in ops_test.model.applications[app].units]
+    original_units = {unit.name for unit in ops_test.model.applications[app].units}
     model_name = ops_test.model.info.name
     add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=2000)
-    assert len(ops_test.model.applications[app].units) == expected_units, (
-        "New unit not added to model"
-    )
+
+    # When removing all units sometimes the last unit remain in the list
+    current_units = {unit.name for unit in ops_test.model.applications[app].units}
+    original_units.intersection_update(current_units)
+    assert original_units.issubset(current_units), "New unit not added to model"
 
     # verify storage attached
-    curr_units = [unit.name for unit in ops_test.model.applications[app].units]
-    new_unit = next(unit for unit in set(curr_units) - set(prev_units))
+    new_unit = (current_units - original_units).pop()
     assert storage_id(ops_test, new_unit) == storage, "unit added with incorrect storage"
 
     # return a reference to newly added unit
