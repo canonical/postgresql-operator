@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 47
+LIBPATCH = 45
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -304,10 +304,9 @@ class PostgreSQL:
             # Existing objects need to be reassigned in each database
             # before the user can be deleted.
             for database in databases:
-                with (
-                    self._connect_to_database(database) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(
                         SQL("REASSIGN OWNED BY {} TO {};").format(
                             Identifier(user), Identifier(self.user)
@@ -322,7 +321,7 @@ class PostgreSQL:
             logger.error(f"Failed to delete user: {e}")
             raise PostgreSQLDeleteUserError() from e
 
-    def enable_disable_extensions(  # noqa: C901
+    def enable_disable_extensions(
         self, extensions: Dict[str, bool], database: Optional[str] = None
     ) -> None:
         """Enables or disables a PostgreSQL extension.
@@ -352,12 +351,10 @@ class PostgreSQL:
 
             # Enable/disabled the extension in each database.
             for database in databases:
-                connection = self._connect_to_database(database=database)
-                connection.autocommit = True
-                with connection.cursor() as cursor:
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
                     for extension, enable in ordered_extensions.items():
-                        if extension == "postgis":
-                            cursor.execute("SET pgaudit.log = 'none';")
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
                             if enable
@@ -379,7 +376,6 @@ class PostgreSQL:
     ) -> List[Composed]:
         """Generates a list of databases privileges statements."""
         statements = []
-        statements.append(SQL("GRANT USAGE, CREATE ON SCHEMA public TO PUBLIC;"))
         if relations_accessing_this_database == 1:
             statements.append(
                 SQL(
@@ -436,10 +432,8 @@ END; $$;"""
                     SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
                         schema, Identifier(user)
                     ),
-                    SQL("GRANT USAGE, CREATE ON SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("GRANT USAGE, CREATE ON SCHEMA {} TO admin;").format(schema),
+                    SQL("GRANT USAGE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
+                    SQL("GRANT CREATE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
                 ])
         return statements
 
@@ -469,10 +463,9 @@ END; $$;"""
         Returns:
             Set of PostgreSQL text search configs.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
             text_search_configs = cursor.fetchall()
             return {text_search_config[0] for text_search_config in text_search_configs}
@@ -483,10 +476,9 @@ END; $$;"""
         Returns:
             Set of PostgreSQL timezones.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT name FROM pg_timezone_names;")
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
@@ -499,10 +491,9 @@ END; $$;"""
         """
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT version();")
                 # Split to get only the version number.
                 return cursor.fetchone()[0].split(" ")[1]
@@ -521,12 +512,9 @@ END; $$;"""
             whether TLS is enabled.
         """
         try:
-            with (
-                self._connect_to_database(
-                    database_host=self.current_host if check_current_host else None
-                ) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=self.current_host if check_current_host else None
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SHOW ssl;")
                 return "on" in cursor.fetchone()[0]
         except psycopg2.Error:
@@ -608,10 +596,9 @@ END; $$;"""
         """
         connection = None
         try:
-            with (
-                self._connect_to_database(database_host=database_host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=database_host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
@@ -708,10 +695,9 @@ END; $$;"""
             Whether the date style is valid.
         """
         try:
-            with (
-                self._connect_to_database(database_host=self.current_host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=self.current_host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     SQL(
                         "SET DateStyle to {};",
