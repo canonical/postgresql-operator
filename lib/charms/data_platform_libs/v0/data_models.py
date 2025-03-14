@@ -168,7 +168,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 4
+LIBPATCH = 5
 
 PYDEPS = ["ops>=2.0.0", "pydantic>=1.10,<2"]
 
@@ -209,7 +209,7 @@ def validate_params(cls: Type[T]):
     """
 
     def decorator(
-        f: Callable[[CharmBase, ActionEvent, Union[T, ValidationError]], G]
+        f: Callable[[CharmBase, ActionEvent, Union[T, ValidationError]], G],
     ) -> Callable[[CharmBase, ActionEvent], G]:
         @wraps(f)
         def event_wrapper(self: CharmBase, event: ActionEvent):
@@ -287,7 +287,7 @@ def parse_relation_data(
                 Optional[Union[UnitModel, ValidationError]],
             ],
             G,
-        ]
+        ],
     ) -> Callable[[CharmBase, RelationEvent], G]:
         @wraps(f)
         def event_wrapper(self: CharmBase, event: RelationEvent):

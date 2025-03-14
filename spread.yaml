@@ -1,0 +1,128 @@
+project: postgresql-operator
+
+backends:
+  # Derived from https://github.com/jnsgruk/zinc-k8s-operator/blob/a21eae8399eb3b9df4ddb934b837af25ef831976/spread.yaml#L11
+  lxd-vm:
+    # TODO: remove after https://github.com/canonical/spread/pull/185 merged & in charmcraft
+    type: adhoc
+    allocate: |
+      hash=$(python3 -c "import hashlib; print(hashlib.sha256('$SPREAD_PASSWORD'.encode()).hexdigest()[:6])")
+      VM_NAME="${VM_NAME:-${SPREAD_SYSTEM//./-}-${hash}}"
+      DISK="${DISK:-20}"
+      CPU="${CPU:-4}"
+      MEM="${MEM:-8}"
+
+      cloud_config="#cloud-config
+      ssh_pwauth: true
+      users:
+        - default
+        - name: runner
+          plain_text_passwd: $SPREAD_PASSWORD
+          lock_passwd: false
+          sudo: ALL=(ALL) NOPASSWD:ALL
+      "
+
+      lxc launch --vm \
+        "${SPREAD_SYSTEM//-/:}" \
+        "${VM_NAME}" \
+        -c user.user-data="${cloud_config}" \
+        -c limits.cpu="${CPU}" \
+        -c limits.memory="${MEM}GiB" \
+        -d root,size="${DISK}GiB"
+
+      # Wait for the runner user
+      while ! lxc exec "${VM_NAME}" -- id -u runner &>/dev/null; do sleep 0.5; done
+
+      # Set the instance address for spread
+      ADDRESS "$(lxc ls -f csv | grep "${VM_NAME}" | cut -d"," -f3 | cut -d" " -f1)"
+    discard: |
+      hash=$(python3 -c "import hashlib; print(hashlib.sha256('$SPREAD_PASSWORD'.encode()).hexdigest()[:6])")
+      VM_NAME="${VM_NAME:-${SPREAD_SYSTEM//./-}-${hash}}"
+      lxc delete --force "${VM_NAME}"
+    environment:
+      CONCIERGE_EXTRA_SNAPS: charmcraft
+      CONCIERGE_EXTRA_DEBS: pipx
+    systems:
+      - ubuntu-24.04:
+          username: runner
+    prepare: |
+      systemctl disable --now unattended-upgrades.service
+      systemctl mask unattended-upgrades.service
+      pipx install charmcraftcache
+      cd "$SPREAD_PATH"
+      charmcraftcache pack -v
+    restore-each: |
+      cd "$SPREAD_PATH"
+      # Revert python-libjuju version override
+      git restore pyproject.toml poetry.lock
+
+      # Use instead of `concierge restore` to save time between tests
+      # For example, with microk8s, using `concierge restore` takes twice as long as this (e.g. 6
+      # min instead of 3 min between every spread job)
+      juju destroy-model --force --no-wait --destroy-storage --no-prompt testing
+      juju kill-controller --no-prompt concierge-lxd
+    restore: |
+      rm -rf "$SPREAD_PATH"
+
+  github-ci:
+    type: adhoc
+    # Only run on CI
+    manual: true
+    # HACK: spread requires runners to be accessible via SSH
+    # Configure local sshd & instruct spread to connect to the same machine spread is running on
+    # (spread cannot provision GitHub Actions runners, so we provision a GitHub Actions runner for
+    # each spread job & select a single job when running spread)
+    # Derived from https://github.com/jnsgruk/zinc-k8s-operator/blob/a21eae8399eb3b9df4ddb934b837af25ef831976/spread.yaml#L47
+    allocate: |
+      sudo tee /etc/ssh/sshd_config.d/10-spread-github-ci.conf << 'EOF'
+      PasswordAuthentication yes
+      PermitEmptyPasswords yes
+      EOF
+
+      ADDRESS localhost
+    # HACK: spread does not pass environment variables set on runner
+    # Manually pass specific environment variables
+    environment:
+      CI: '$(HOST: echo $CI)'
+      AWS_ACCESS_KEY: '$(HOST: echo $AWS_ACCESS_KEY)'
+      AWS_SECRET_KEY: '$(HOST: echo $AWS_SECRET_KEY)'
+      GCP_ACCESS_KEY: '$(HOST: echo $GCP_ACCESS_KEY)'
+      GCP_SECRET_KEY: '$(HOST: echo $GCP_SECRET_KEY)'
+      UBUNTU_PRO_TOKEN: '$(HOST: echo $UBUNTU_PRO_TOKEN)'
+      LANDSCAPE_ACCOUNT_NAME: '$(HOST: echo $LANDSCAPE_ACCOUNT_NAME)'
+      LANDSCAPE_REGISTRATION_KEY: '$(HOST: echo $LANDSCAPE_REGISTRATION_KEY)'
+    systems:
+      - ubuntu-24.04:
+          username: runner
+      - ubuntu-24.04-arm:
+          username: runner
+
+suites:
+  tests/spread/:
+    summary: Spread tests
+
+path: /root/spread_project
+
+kill-timeout: 3h
+environment:
+  PATH: $PATH:$(pipx environment --value PIPX_BIN_DIR)
+  CONCIERGE_JUJU_CHANNEL/juju36: 3.6/stable
+prepare: |
+  snap refresh --hold
+  chown -R root:root "$SPREAD_PATH"
+  cd "$SPREAD_PATH"
+  snap install --classic concierge
+
+  # Install charmcraft & pipx (on lxd-vm backend)
+  concierge prepare --trace
+
+  pipx install tox poetry
+prepare-each: |
+  cd "$SPREAD_PATH"
+  # `concierge prepare` needs to be run for each spread job in case Juju version changed
+  concierge prepare --trace
+
+  # Unable to set constraint on all models because of Juju bug:
+  # https://bugs.launchpad.net/juju/+bug/2065050
+  juju set-model-constraints arch="$(dpkg --print-architecture)"
+# Only restore on lxd backend—no need to restore on CI

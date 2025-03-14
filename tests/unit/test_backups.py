@@ -202,7 +202,7 @@ def test_can_use_s3_repository(harness):
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
-            "charm.Patroni.get_postgresql_version", return_value="14.10"
+            "charm.Patroni.get_postgresql_version", return_value="16.6"
         ) as _get_postgresql_version,
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch(
@@ -296,6 +296,19 @@ def test_can_use_s3_repository(harness):
             same_instance_system_identifier_output,
         ]
         assert harness.charm.backup.can_use_s3_repository() == (True, None)
+
+        # Empty db
+        _execute_command.side_effect = None
+        _execute_command.return_value = (1, "", "")
+        pgbackrest_info_other_cluster_name_backup_output = (
+            0,
+            f'[{{"db": [], "name": "another-model.{harness.charm.cluster_name}"}}]',
+            "",
+        )
+        assert harness.charm.backup.can_use_s3_repository() == (
+            False,
+            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+        )
 
 
 def test_construct_endpoint(harness):

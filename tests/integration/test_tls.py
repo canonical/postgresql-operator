@@ -26,27 +26,19 @@ from .helpers import (
     primary_changed,
     run_command_on_unit,
 )
-from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-if juju_major_version < 3:
-    tls_certificates_app_name = "tls-certificates-operator"
-    tls_channel = "legacy/edge" if architecture.architecture == "arm64" else "legacy/stable"
-    tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-else:
-    tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
-    tls_config = {"ca-common-name": "Test CA"}
+tls_certificates_app_name = "self-signed-certificates"
+tls_channel = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
+tls_config = {"ca-common-name": "Test CA"}
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.skip_if_deployed
-async def test_deploy_active(ops_test: OpsTest):
+async def test_deploy_active(ops_test: OpsTest, charm):
     """Build the charm and deploy it."""
-    charm = await ops_test.build_charm(".")
     async with ops_test.fast_forward():
         await ops_test.model.deploy(
             charm,
@@ -59,7 +51,6 @@ async def test_deploy_active(ops_test: OpsTest):
         # bundles don't wait between deploying charms.
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_tls_enabled(ops_test: OpsTest) -> None:
     """Test that TLS is enabled when relating to the TLS Certificates Operator."""
@@ -148,7 +139,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await run_command_on_unit(
             ops_test,
             primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
+            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/16/bin/postgres",
         )
         await run_command_on_unit(
             ops_test,

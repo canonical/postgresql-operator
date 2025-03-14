@@ -6,6 +6,7 @@
   reviewers: [
     'team:data-platform-postgresql',
   ],
+  "baseBranches": ["main", "/^*\\/edge$/"],
   packageRules: [
     {
       matchPackageNames: [
@@ -13,32 +14,7 @@
       ],
       allowedVersions: '<2.0.0',
     },
-    {
-      matchManagers: [
-        'custom.regex',
-      ],
-      matchDepNames: [
-        'juju',
-      ],
-      matchDatasources: [
-        'pypi',
-      ],
-      allowedVersions: '<3',
-      groupName: 'Juju agents',
-    },
   ],
   customManagers: [
-    {
-      customType: 'regex',
-      fileMatch: [
-        '^\\.github/workflows/[^/]+\\.ya?ml$',
-      ],
-      matchStrings: [
-        '(libjuju: )==(?<currentValue>.*?) +# renovate: latest libjuju 2',
-      ],
-      depNameTemplate: 'juju',
-      datasourceTemplate: 'pypi',
-      versioningTemplate: 'loose',
-    },
   ],
 }

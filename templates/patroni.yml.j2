@@ -59,7 +59,7 @@ bootstrap:
     retry_timeout: 10
     maximum_lag_on_failover: 1048576
     synchronous_mode: true
-    synchronous_node_count: {{ minority_count }}
+    synchronous_node_count: {{ synchronous_node_count }}
     postgresql:
       use_pg_rewind: true
       remove_data_directory_on_rewind_failure: true
@@ -183,12 +183,27 @@ postgresql:
     replication:
       username: replication
       password: {{ replication_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
     rewind:
       username: {{ rewind_user }}
       password: {{ rewind_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      sslcert: {{ conf_path }}/cert.pem
+      sslkey: {{ conf_path }}/key.pem
+      {%- endif %}
 use_unix_socket: true
 {%- if is_creating_backup %}
 tags:

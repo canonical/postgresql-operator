@@ -21,7 +21,7 @@ Any charm using this library should import the `psycopg2` or `psycopg2-binary` d
 
 import logging
 from collections import OrderedDict
-from typing import List, Optional, Set, Tuple
+from typing import Dict, List, Optional, Set, Tuple
 
 import psycopg2
 from ops.model import Relation
@@ -35,7 +35,10 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 41
+LIBPATCH = 45
+
+# Groups to distinguish database permissions
+PERMISSIONS_GROUP_ADMIN = "admin"
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -187,7 +190,7 @@ class PostgreSQL:
                     Identifier(database)
                 )
             )
-            for user_to_grant_access in [user, "admin", *self.system_users]:
+            for user_to_grant_access in [user, PERMISSIONS_GROUP_ADMIN, *self.system_users]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
@@ -220,7 +223,7 @@ class PostgreSQL:
         user: str,
         password: Optional[str] = None,
         admin: bool = False,
-        extra_user_roles: Optional[str] = None,
+        extra_user_roles: Optional[List[str]] = None,
     ) -> None:
         """Creates a database user.
 
@@ -235,16 +238,17 @@ class PostgreSQL:
             admin_role = False
             roles = privileges = None
             if extra_user_roles:
-                extra_user_roles = tuple(extra_user_roles.lower().split(","))
-                admin_role = "admin" in extra_user_roles
+                admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [
-                    role for role in extra_user_roles if role in valid_roles and role != "admin"
+                    role
+                    for role in extra_user_roles
+                    if role in valid_roles and role != PERMISSIONS_GROUP_ADMIN
                 ]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
-                    if extra_user_role not in roles and extra_user_role != "admin"
+                    if extra_user_role not in roles and extra_user_role != PERMISSIONS_GROUP_ADMIN
                 }
                 invalid_privileges = [
                     privilege for privilege in privileges if privilege not in valid_privileges
@@ -318,7 +322,7 @@ class PostgreSQL:
             raise PostgreSQLDeleteUserError() from e
 
     def enable_disable_extensions(
-        self, extensions: dict[str, bool], database: Optional[str] = None
+        self, extensions: Dict[str, bool], database: Optional[str] = None
     ) -> None:
         """Enables or disables a PostgreSQL extension.
 
@@ -566,8 +570,8 @@ END; $$;"""
                         )
                     )
                 self.create_user(
-                    "admin",
-                    extra_user_roles="pg_read_all_data,pg_write_all_data",
+                    PERMISSIONS_GROUP_ADMIN,
+                    extra_user_roles=["pg_read_all_data", "pg_write_all_data"],
                 )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:

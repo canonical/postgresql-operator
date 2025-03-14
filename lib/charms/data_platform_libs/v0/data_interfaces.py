@@ -331,7 +331,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 40
+LIBPATCH = 41
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -609,7 +609,7 @@ SECRET_GROUPS = SecretGroupsAggregate()
 class CachedSecret:
     """Locally cache a secret.
 
-    The data structure is precisely re-using/simulating as in the actual Secret Storage
+    The data structure is precisely reusing/simulating as in the actual Secret Storage
     """
 
     KNOWN_MODEL_ERRORS = [MODEL_ERRORS["no_label_and_uri"], MODEL_ERRORS["owner_no_refresh"]]
@@ -2363,7 +2363,6 @@ class DataPeerData(RequirerData, ProviderData):
     def _delete_relation_data(self, relation: Relation, fields: List[str]) -> None:
         """Delete data available (directily or indirectly -- i.e. secrets) from the relation for owner/this_app."""
         if self.secret_fields and self.deleted_label:
-
             _, normal_fields = self._process_secret_fields(
                 relation,
                 self.secret_fields,

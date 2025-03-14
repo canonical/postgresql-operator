@@ -33,7 +33,7 @@ source venv/bin/activate
 tox run -e format        # update your code according to linting rules
 tox run -e lint          # code style
 tox run -e unit          # unit tests
-tox run -e integration   # integration tests
+charmcraft test lxd-vm:  # integration tests
 tox                      # runs 'lint' and 'unit' environments
 ```
 

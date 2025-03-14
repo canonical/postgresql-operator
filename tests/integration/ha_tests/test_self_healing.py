@@ -62,16 +62,14 @@ DB_PROCESSES = [POSTGRESQL_PROCESS, PATRONI_PROCESS]
 MEDIAN_ELECTION_TIME = 10
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy three unit of PostgreSQL."""
     wait_for_apps = False
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
     # is a pre-existing cluster.
     if not await app_name(ops_test):
         wait_for_apps = True
-        charm = await ops_test.build_charm(".")
         async with ops_test.fast_forward():
             await ops_test.model.deploy(
                 charm,
@@ -96,7 +94,6 @@ async def test_build_and_deploy(ops_test: OpsTest) -> None:
             await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_storage_re_use(ops_test, continuous_writes):
     """Verifies that database units with attached storage correctly repurpose storage.
@@ -144,7 +141,6 @@ async def test_storage_re_use(ops_test, continuous_writes):
     )
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
@@ -179,7 +175,6 @@ async def test_interruption_db_process(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("process", DB_PROCESSES)
 async def test_freeze_db_process(
@@ -221,7 +216,6 @@ async def test_freeze_db_process(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 @pytest.mark.parametrize("process", DB_PROCESSES)
 @pytest.mark.parametrize("signal", ["SIGTERM", "SIGKILL"])
@@ -309,9 +303,8 @@ async def test_full_cluster_restart(
         await check_writes(ops_test)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
-@pytest.mark.unstable
+@pytest.mark.skip(reason="Unstable")
 async def test_forceful_restart_without_data_and_transaction_logs(
     ops_test: OpsTest,
     continuous_writes,
@@ -386,7 +379,6 @@ async def test_forceful_restart_without_data_and_transaction_logs(
     await is_cluster_updated(ops_test, primary_name)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
@@ -475,7 +467,6 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     await is_cluster_updated(ops_test, primary_name, use_ip_from_inside=True)
 
 
-@pytest.mark.group(1)
 @pytest.mark.abort_on_fail
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
