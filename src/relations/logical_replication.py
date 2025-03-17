@@ -107,10 +107,10 @@ class PostgreSQLLogicalReplication(Object):
         publications = self._get_publications_from_str(
             self.charm.app_peer_data.get("publications")
         )
-        relation_replication_slots = self._get_replication_slots_from_str(
+        relation_replication_slots = self._get_dict_from_str(
             event.relation.data[self.model.app].get("replication-slots")
         )
-        global_replication_slots = self._get_replication_slots_from_str(
+        global_replication_slots = self._get_dict_from_str(
             self.charm.app_peer_data.get("replication-slots")
         )
 
@@ -126,13 +126,10 @@ class PostgreSQLLogicalReplication(Object):
                     "database"
                 ]
                 relation_replication_slots[publication] = replication_slot_name
-        deleting_replication_slots = []
-        for publication in relation_replication_slots:
+        for publication in relation_replication_slots.copy():
             if publication not in subscriptions:
-                deleting_replication_slots.append(publication)
                 del global_replication_slots[relation_replication_slots[publication]]
-        for replication_slot in deleting_replication_slots:
-            del relation_replication_slots[replication_slot]
+                del relation_replication_slots[publication]
 
         self.charm.app_peer_data["replication-slots"] = json.dumps(global_replication_slots)
         event.relation.data[self.model.app]["replication-slots"] = json.dumps(
@@ -153,7 +150,7 @@ class PostgreSQLLogicalReplication(Object):
         if not self.charm.unit.is_leader():
             return
 
-        global_replication_slots = self._get_replication_slots_from_str(
+        global_replication_slots = self._get_dict_from_str(
             self.charm.app_peer_data.get("replication-slots")
         )
         if len(global_replication_slots) == 0:
@@ -165,7 +162,7 @@ class PostgreSQLLogicalReplication(Object):
                 continue
             used_replication_slots += [
                 v
-                for k, v in self._get_replication_slots_from_str(
+                for k, v in self._get_dict_from_str(
                     rel.data[self.model.app].get("replication-slots")
                 ).items()
             ]
@@ -184,8 +181,11 @@ class PostgreSQLLogicalReplication(Object):
         publications = self._get_publications_from_str(
             event.relation.data[event.app].get("publications")
         )
-        replication_slots = self._get_replication_slots_from_str(
+        replication_slots = self._get_dict_from_str(
             event.relation.data[event.app].get("replication-slots")
+        )
+        global_subscriptions = self._get_dict_from_str(
+            self.charm.app_peer_data.get("subscriptions")
         )
         for subscription in self._get_str_list(
             event.relation.data[self.model.app].get("subscriptions")
@@ -202,6 +202,8 @@ class PostgreSQLLogicalReplication(Object):
                     event.relation.data[event.app]["replication-user-secret"],
                     replication_slots[subscription],
                 )
+                global_subscriptions[subscription] = db
+                self.charm.app_peer_data["subscriptions"] = json.dumps(global_subscriptions)
 
     def _on_relation_departed(self, event: RelationDepartedEvent):
         if event.departing_unit == self.charm.unit and self.charm._peers is not None:
@@ -222,16 +224,11 @@ class PostgreSQLLogicalReplication(Object):
             event.defer()
             return False
 
-        publications = self._get_publications_from_str(
-            event.relation.data[event.app].get("publications")
-        )
-        # TODO: global subscriptions
-        for subscription in self._get_str_list(
-            event.relation.data[self.model.app].get("subscriptions")
-        ):
-            self.charm.postgresql.drop_subscription(
-                publications[subscription]["database"], subscription
-            )
+        subscriptions = self._get_dict_from_str(self.charm.app_peer_data.get("subscriptions"))
+        for subscription, db in subscriptions.copy().items():
+            self.charm.postgresql.drop_subscription(db, subscription)
+            del subscriptions[subscription]
+            self.charm.app_peer_data["subscriptions"] = json.dumps(subscriptions)
 
     # endregion
 
@@ -309,6 +306,11 @@ class PostgreSQLLogicalReplication(Object):
         subscriptions = self._get_str_list(relation.data[self.model.app].get("subscriptions"))
         if not self.charm.postgresql.database_exists(subscribing_database):
             event.fail(f"No such database {subscribing_database}")
+            return
+        if self.charm.postgresql.subscription_exists(subscribing_database, event.params["name"]):
+            event.fail(
+                f"PostgreSQL subscription with conflicting name {event.params['name']} already exists in the database {subscribing_database}"
+            )
             return
         for schematable in subscribing_publication["tables"]:
             schematable_split = schematable.split(".")
@@ -474,7 +476,7 @@ class PostgreSQLLogicalReplication(Object):
         return count
 
     @staticmethod
-    def _get_replication_slots_from_str(
+    def _get_dict_from_str(
         replication_slots_str: str | None = None,
     ) -> dict[str, str]:
         return json.loads(replication_slots_str or "{}")
