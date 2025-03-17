@@ -18,6 +18,7 @@ from ops import (
     RelationJoinedEvent,
 )
 
+from cluster_topology_observer import ClusterTopologyChangeEvent
 from constants import (
     APP_SCOPE,
     USER,
@@ -58,6 +59,9 @@ class PostgreSQLLogicalReplication(Object):
         )
         self.charm.framework.observe(
             self.charm.on[LOGICAL_REPLICATION_RELATION].relation_broken, self._on_relation_broken
+        )
+        self.charm.framework.observe(
+            self.charm.on.cluster_topology_change, self._on_cluster_topology_change
         )
         # Actions
         self.charm.framework.observe(
@@ -229,6 +233,15 @@ class PostgreSQLLogicalReplication(Object):
             self.charm.postgresql.drop_subscription(db, subscription)
             del subscriptions[subscription]
             self.charm.app_peer_data["subscriptions"] = json.dumps(subscriptions)
+
+    def _on_cluster_topology_change(self, event: ClusterTopologyChangeEvent):
+        if not self.charm.unit.is_leader():
+            return
+        if not self.charm.primary_endpoint:
+            return
+        primary = self.charm.primary_endpoint
+        for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
+            rel.data[self.model.app]["primary"] = primary
 
     # endregion
 
