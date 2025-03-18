@@ -20,6 +20,7 @@ class CharmConfig(BaseConfigModel):
 
     synchronous_node_count: Literal["all", "majority"] | PositiveInt
     durability_synchronous_commit: str | None
+    durability_wal_keep_size: int | None
     instance_default_text_search_config: str | None
     instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
@@ -121,6 +122,15 @@ class CharmConfig(BaseConfigModel):
         """Check durability_synchronous_commit config option is one of `on`, `remote_apply` or `remote_write`."""
         if value not in ["on", "remote_apply", "remote_write"]:
             raise ValueError("Value not one of 'on', 'remote_apply' or 'remote_write'")
+
+        return value
+
+    @validator("durability_wal_keep_size")
+    @classmethod
+    def durability_wal_keep_size_values(cls, value: int) -> int | None:
+        """Check durability_wal_keep_size config option is between 0 and 2147483647."""
+        if value < 0 or value > 2147483647:
+            raise ValueError("Value is not between 0 and 2147483647")
 
         return value
 
