@@ -121,6 +121,9 @@ class PostgreSQLCreateSubscriptionError(Exception):
 class PostgreSQLSubscriptionExistsError(Exception):
     """Exception raised during subscription existence check."""
 
+class PostgreSQLUpdateSubscriptionError(Exception):
+    """Exception raised when updating PostgreSQL subscription."""
+
 class PostgreSQLDropSubscriptionError(Exception):
     """Exception raised when dropping PostgreSQL subscription."""
 
@@ -745,6 +748,20 @@ END; $$;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to check Postgresql subscription existence: {e}")
             raise PostgreSQLSubscriptionExistsError() from e
+
+    def update_subscription(self, db: str, subscription: str, host: str, user: str, password: str):
+        """Update PostgreSQL subscription connection details."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("ALTER SUBSCRIPTION {} CONNECTION {}").format(
+                        Identifier(subscription),
+                        Literal(f"host={host} dbname={db} user={user} password={password}"),
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to update Postgresql subscription: {e}")
+            raise PostgreSQLUpdateSubscriptionError() from e
 
     def drop_subscription(self, db: str, subscription: str) -> None:
         """Drop PostgreSQL subscription."""

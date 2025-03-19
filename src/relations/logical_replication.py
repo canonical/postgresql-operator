@@ -11,16 +11,21 @@ import logging
 
 from ops import (
     ActionEvent,
+    LeaderElectedEvent,
     Object,
     RelationBrokenEvent,
     RelationChangedEvent,
     RelationDepartedEvent,
     RelationJoinedEvent,
+    Secret,
+    SecretChangedEvent,
+    SecretNotFoundError,
 )
 
 from cluster_topology_observer import ClusterTopologyChangeEvent
 from constants import (
     APP_SCOPE,
+    PEER,
     USER,
     USER_PASSWORD_KEY,
 )
@@ -29,6 +34,7 @@ logger = logging.getLogger(__name__)
 
 LOGICAL_REPLICATION_OFFER_RELATION = "logical-replication-offer"
 LOGICAL_REPLICATION_RELATION = "logical-replication"
+SECRET_LABEL = "logical-replication-secret"  # noqa: S105
 
 
 class PostgreSQLLogicalReplication(Object):
@@ -47,6 +53,10 @@ class PostgreSQLLogicalReplication(Object):
             self._on_offer_relation_changed,
         )
         self.charm.framework.observe(
+            self.charm.on[LOGICAL_REPLICATION_OFFER_RELATION].relation_departed,
+            self._on_offer_relation_departed,
+        )
+        self.charm.framework.observe(
             self.charm.on[LOGICAL_REPLICATION_OFFER_RELATION].relation_broken,
             self._on_offer_relation_broken,
         )
@@ -60,9 +70,14 @@ class PostgreSQLLogicalReplication(Object):
         self.charm.framework.observe(
             self.charm.on[LOGICAL_REPLICATION_RELATION].relation_broken, self._on_relation_broken
         )
+        # Events
         self.charm.framework.observe(
             self.charm.on.cluster_topology_change, self._on_cluster_topology_change
         )
+        self.charm.framework.observe(
+            self.charm.on.leader_elected, self._on_cluster_topology_change
+        )
+        self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
         # Actions
         self.charm.framework.observe(
             self.charm.on.add_publication_action, self._on_add_publication
@@ -91,15 +106,11 @@ class PostgreSQLLogicalReplication(Object):
             )
             return
 
-        # TODO: add primary change check
-        # TODO: replication-user-secret
+        secret = self._get_secret()
+        secret.grant(event.relation)
         event.relation.data[self.model.app].update({
             "publications": self.charm.app_peer_data.get("publications", ""),
-            # "replication-user": REPLICATION_USER,
-            # "replication-user-secret": self.charm.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY),
-            "replication-user": USER,
-            "replication-user-secret": self.charm.get_secret(APP_SCOPE, USER_PASSWORD_KEY),
-            "primary": self.charm.primary_endpoint,
+            "secret-id": secret.id,
         })
 
     def _on_offer_relation_changed(self, event: RelationChangedEvent):
@@ -143,7 +154,7 @@ class PostgreSQLLogicalReplication(Object):
 
     def _on_offer_relation_departed(self, event: RelationDepartedEvent):
         if event.departing_unit == self.charm.unit and self.charm._peers is not None:
-            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+            self.charm.unit_peer_data.update({"departing": "True"})
 
     def _on_offer_relation_broken(self, event: RelationBrokenEvent):
         if not self.charm._peers or self.charm.is_unit_departing:
@@ -162,7 +173,7 @@ class PostgreSQLLogicalReplication(Object):
 
         used_replication_slots = []
         for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
-            if rel == event.relation:
+            if rel.id == event.relation.id:
                 continue
             used_replication_slots += [
                 v
@@ -182,6 +193,9 @@ class PostgreSQLLogicalReplication(Object):
     def _on_relation_changed(self, event: RelationChangedEvent):
         if not self._relation_changed_checks(event):
             return
+        secret_content = self.model.get_secret(
+            id=event.relation.data[event.app]["secret-id"], label=SECRET_LABEL
+        ).get_content(refresh=True)
         publications = self._get_publications_from_str(
             event.relation.data[event.app].get("publications")
         )
@@ -200,10 +214,10 @@ class PostgreSQLLogicalReplication(Object):
             ):
                 self.charm.postgresql.create_subscription(
                     subscription,
-                    event.relation.data[event.app]["primary"],
+                    secret_content["logical-replication-primary"],
                     db,
-                    event.relation.data[event.app]["replication-user"],
-                    event.relation.data[event.app]["replication-user-secret"],
+                    secret_content["logical-replication-user"],
+                    secret_content["logical-replication-password"],
                     replication_slots[subscription],
                 )
                 global_subscriptions[subscription] = db
@@ -211,7 +225,7 @@ class PostgreSQLLogicalReplication(Object):
 
     def _on_relation_departed(self, event: RelationDepartedEvent):
         if event.departing_unit == self.charm.unit and self.charm._peers is not None:
-            self.charm._peers.data[self.charm.unit].update({"departing": "True"})
+            self.charm.unit_peer_data.update({"departing": "True"})
 
     def _on_relation_broken(self, event: RelationBrokenEvent):
         if not self.charm._peers or self.charm.is_unit_departing:
@@ -234,14 +248,58 @@ class PostgreSQLLogicalReplication(Object):
             del subscriptions[subscription]
             self.charm.app_peer_data["subscriptions"] = json.dumps(subscriptions)
 
-    def _on_cluster_topology_change(self, event: ClusterTopologyChangeEvent):
+    # endregion
+
+    # region Events
+
+    def _on_cluster_topology_change(self, event: ClusterTopologyChangeEvent | LeaderElectedEvent):
+        if not self.charm.unit.is_leader():
+            return
+        if not len(self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())):
+            return
+        if not self.charm.primary_endpoint:
+            event.defer()
+            return
+        self._get_secret()
+
+    def _on_secret_changed(self, event: SecretChangedEvent):
         if not self.charm.unit.is_leader():
             return
         if not self.charm.primary_endpoint:
+            event.defer()
             return
-        primary = self.charm.primary_endpoint
-        for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
-            rel.data[self.model.app]["primary"] = primary
+
+        if (
+            len(self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()))
+            and event.secret.label == f"{PEER}.{self.model.app.name}.app"
+        ):
+            logger.info("Internal secret changed, updating logical replication secret")
+            self._get_secret()
+
+        if (
+            relation := self.model.get_relation(LOGICAL_REPLICATION_RELATION)
+        ) and event.secret.label == SECRET_LABEL:
+            logger.info("Logical replication secret changed, updating subscriptions")
+            secret_content = self.model.get_secret(
+                id=relation.data[relation.app]["secret-id"], label=SECRET_LABEL
+            ).get_content(refresh=True)
+            replication_slots = self._get_dict_from_str(
+                relation.data[relation.app].get("replication-slots")
+            )
+            publications = self._get_publications_from_str(
+                relation.data[relation.app].get("publications")
+            )
+            for subscription in self._get_str_list(
+                relation.data[self.model.app].get("subscriptions")
+            ):
+                if subscription in replication_slots:
+                    self.charm.postgresql.update_subscription(
+                        publications[subscription]["database"],
+                        subscription,
+                        secret_content["logical-replication-primary"],
+                        secret_content["logical-replication-user"],
+                        secret_content["logical-replication-password"],
+                    )
 
     # endregion
 
@@ -395,13 +453,9 @@ class PostgreSQLLogicalReplication(Object):
             )
             event.defer()
             return False
-        if (
-            not event.relation.data[event.app].get("primary")
-            or not event.relation.data[event.app].get("replication-user")
-            or not event.relation.data[event.app].get("replication-user-secret")
-        ):
+        if not event.relation.data[event.app].get("secret-id"):
             logger.warning(
-                f"{LOGICAL_REPLICATION_RELATION}: skipping changed event as there is no primary, replication-user or replication-user-secret in the remote application data"
+                f"{LOGICAL_REPLICATION_RELATION}: skipping changed event as there is no secret id in the remote application data"
             )
             return False
         return True
@@ -468,6 +522,28 @@ class PostgreSQLLogicalReplication(Object):
             event.fail("Tables overlap detected with existing subscriptions")
             return False
         return True
+
+    def _get_secret(self) -> Secret:
+        """Returns logical replication secret. Updates, if content changed."""
+        shared_content = {
+            "logical-replication-user": USER,
+            "logical-replication-password": self.charm.get_secret(APP_SCOPE, USER_PASSWORD_KEY),
+            "logical-replication-primary": self.charm.primary_endpoint,
+        }
+        try:
+            # Avoid recreating the secret.
+            secret = self.charm.model.get_secret(label=SECRET_LABEL)
+            if not secret.id:
+                # Workaround for the secret id not being set with model uuid.
+                secret._id = f"secret://{self.model.uuid}/{secret.get_info().id.split(':')[1]}"
+            if secret.peek_content() != shared_content:
+                logger.info("Updating outdated secret content")
+                secret.set_content(shared_content)
+            return secret
+        except SecretNotFoundError:
+            logger.debug("Secret not found, creating a new one")
+            pass
+        return self.charm.model.app.add_secret(content=shared_content, label=SECRET_LABEL)
 
     @staticmethod
     def _get_publications_from_str(
