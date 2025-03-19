@@ -6,12 +6,10 @@
 BACKUP_ID_FORMAT = "%Y-%m-%dT%H:%M:%SZ"
 PGBACKREST_BACKUP_ID_FORMAT = "%Y%m%d-%H%M%S"
 DATABASE = "database"
+DATABASE_DEFAULT_NAME = "postgres"
 DATABASE_PORT = "5432"
-LEGACY_DB = "db"
-LEGACY_DB_ADMIN = "db-admin"
 PEER = "database-peers"
-ALL_CLIENT_RELATIONS = [DATABASE, LEGACY_DB, LEGACY_DB_ADMIN]
-ALL_LEGACY_RELATIONS = [LEGACY_DB, LEGACY_DB_ADMIN]
+ALL_CLIENT_RELATIONS = [DATABASE]
 API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
@@ -34,7 +32,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "142", "x86_64": "143"}},
+        {"revision": {"aarch64": "160", "x86_64": "161"}},
     )
 ]
 

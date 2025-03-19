@@ -20,7 +20,13 @@ from tenacity import (
 )
 
 from charm import PostgresqlOperatorCharm
-from cluster import PATRONI_TIMEOUT, Patroni, RemoveRaftMemberFailedError
+from cluster import (
+    PATRONI_TIMEOUT,
+    Patroni,
+    RemoveRaftMemberFailedError,
+    SwitchoverFailedError,
+    SwitchoverNotSyncError,
+)
 from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
@@ -166,11 +172,11 @@ def test_get_postgresql_version(peers_ips, patroni):
         _get_installed_snaps = _snap_client.return_value.get_installed_snaps
         _get_installed_snaps.return_value = [
             {"name": "something"},
-            {"name": "charmed-postgresql", "version": "14.0"},
+            {"name": "charmed-postgresql", "version": "16.6"},
         ]
         version = patroni.get_postgresql_version()
 
-        assert version == "14.0"
+        assert version == "16.6"
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
@@ -315,7 +321,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.Patroni._create_directory"),
     ):
-        _get_postgresql_version.return_value = "14.7"
+        _get_postgresql_version.return_value = "16.6"
 
         # Define variables to render in the template.
         member_name = "postgresql-0"
@@ -325,7 +331,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         rewind_password = "fake-rewind-password"
         raft_password = "fake-raft-password"
         patroni_password = "fake-patroni-password"
-        postgresql_version = "14"
+        postgresql_version = "16"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
@@ -346,7 +352,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             rewind_user=REWIND_USER,
             rewind_password=rewind_password,
             version=postgresql_version,
-            minority_count=patroni.planned_units // 2,
+            synchronous_node_count=0,
             raft_password=raft_password,
             patroni_password=patroni_password,
         )
@@ -472,6 +478,22 @@ def test_switchover(peers_ips, patroni):
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+
+        # Test candidate, not sync
+        response = _post.return_value
+        response.status_code = 412
+        response.text = "candidate name does not match with sync_standby"
+        with pytest.raises(SwitchoverNotSyncError):
+            patroni.switchover("candidate")
+            assert False
+
+        # Test general error
+        response = _post.return_value
+        response.status_code = 412
+        response.text = "something else "
+        with pytest.raises(SwitchoverFailedError):
+            patroni.switchover()
+            assert False
 
 
 def test_update_synchronous_node_count(peers_ips, patroni):
