@@ -1,6 +1,5 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import json
 import logging
 
 import pytest
@@ -27,23 +26,11 @@ TIMEOUT = 900
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    # TODO remove once we release to stable
-    pytest.skip("No 16/stable yet.")
-    return_code, charm_info, stderr = await ops_test.juju("info", "postgresql", "--format=json")
-    if return_code != 0:
-        raise Exception(f"failed to get charm info with error: {stderr}")
-    # Revisions lower than 315 have a currently broken workaround for chown.
-    parsed_charm_info = json.loads(charm_info)
-    revision = (
-        parsed_charm_info["channels"]["14"]["stable"][0]["revision"]
-        if "channels" in parsed_charm_info
-        else parsed_charm_info["channel-map"]["14/stable"]["revision"]
-    )
-    logger.info(f"14/stable revision: {revision}")
     await ops_test.model.deploy(
         DATABASE_APP_NAME,
         num_units=3,
-        channel="16/stable",
+        # TODO move to stable once we release
+        channel="16/beta",
     )
     await ops_test.model.deploy(
         APPLICATION_NAME,
@@ -61,8 +48,6 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
     """Test that the pre-upgrade-check action runs successfully."""
-    # TODO remove once we release to stable
-    pytest.skip("No 16/stable yet.")
     application = ops_test.model.applications[DATABASE_APP_NAME]
     if "pre-upgrade-check" not in await application.get_actions():
         logger.info("skipping the test because the charm from 14/stable doesn't support upgrade")
@@ -80,8 +65,6 @@ async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     """Test updating from stable channel."""
-    # TODO remove once we release to stable
-    pytest.skip("No 16/stable yet.")
     # Start an application that continuously writes data to the database.
     logger.info("starting continuous writes to the database")
     await start_continuous_writes(ops_test, DATABASE_APP_NAME)
