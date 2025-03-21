@@ -8,6 +8,7 @@ TODO: add description after specification is accepted.
 
 import json
 import logging
+import re
 
 from ops import (
     ActionEvent,
@@ -306,7 +307,6 @@ class PostgreSQLLogicalReplication(Object):
     # region Actions
 
     def _on_add_publication(self, event: ActionEvent):
-        # TODO: check on max replication slots
         if not self._add_publication_validation(event):
             return
         if not self.charm.postgresql.database_exists(event.params["database"]):
@@ -335,11 +335,31 @@ class PostgreSQLLogicalReplication(Object):
         self._set_publications(publications)
 
     def _on_list_publications(self, event: ActionEvent):
-        # TODO: table formatting
         if not self.charm.unit.is_leader():
             event.fail("Publications management can be done only on the leader unit")
             return
-        event.set_results({"publications": self.charm.app_peer_data.get("publications", "{}")})
+        publications = [
+            (
+                publication,
+                str(self._count_publication_connections(publication)),
+                publication_obj["database"],
+                ",".join(publication_obj["tables"]),
+            )
+            for publication, publication_obj in self._get_publications_from_str(
+                self.charm.app_peer_data.get("publications")
+            ).items()
+        ]
+        name_len = max([4, *[len(publication[0]) for publication in publications]])
+        database_len = max([8, *[len(publication[2]) for publication in publications]])
+        header = (
+            f"{'name':<{name_len}s} | active_connections | {'database':<{database_len}s} | tables"
+        )
+        res = [header, "-" * len(header)]
+        for name, active_connections, database, tables in publications:
+            res.append(
+                f"{name:<{name_len}s} | {active_connections:<18s} | {database:<{database_len}s} | {tables:s}"
+            )
+        event.set_results({"publications": "\n".join(res)})
 
     def _on_remove_publication(self, event: ActionEvent):
         if not self.charm.unit.is_leader():
@@ -409,10 +429,26 @@ class PostgreSQLLogicalReplication(Object):
                 "Subscription management can be done only with an active logical replication connection"
             )
             return
-        # TODO: table formatting
-        event.set_results({
-            "subscriptions": relation.data[self.model.app].get("subscriptions", "")
-        })
+        publications = self._get_publications_from_str(
+            relation.data[relation.app].get("publications")
+        )
+        subscriptions = [
+            (
+                subscription,
+                publications.get(subscription, {}).get("database"),
+                ",".join(publications.get(subscription, {}).get("tables", ())),
+            )
+            for subscription in self._get_str_list(
+                relation.data[self.model.app].get("subscriptions")
+            )
+        ]
+        name_len = max([4, *[len(subscription[0]) for subscription in subscriptions]])
+        database_len = max([8, *[len(subscription[1]) for subscription in subscriptions]])
+        header = f"{'name':<{name_len}s} | {'database':<{database_len}s} | tables"
+        res = [header, "-" * len(header)]
+        for name, database, tables in subscriptions:
+            res.append(f"{name:<{name_len}s} | {database:<{database_len}s} | {tables:s}")
+        event.set_results({"subscriptions": "\n".join(res)})
 
     def _on_unsubscribe(self, event: ActionEvent):
         if not self.charm.unit.is_leader():
@@ -469,6 +505,9 @@ class PostgreSQLLogicalReplication(Object):
             return False
         if not (publication_name := event.params.get("name")):
             event.fail("name parameter is required")
+            return False
+        if not re.match(r"^[a-zA-Z0-9_]+$", publication_name):
+            event.fail("name should consist of english letters, numbers and underscore")
             return False
         if not event.params.get("database"):
             event.fail("database parameter is required")
