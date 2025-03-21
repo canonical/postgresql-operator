@@ -44,7 +44,11 @@ from constants import (
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
 )
-from relations.logical_replication import LOGICAL_REPLICATION_RELATION
+from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
+from relations.logical_replication import (
+    LOGICAL_REPLICATION_OFFER_RELATION,
+    LOGICAL_REPLICATION_RELATION,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1212,6 +1216,18 @@ Stderr:
             event.fail(error_message)
             return False
 
+        logger.info("Checking that the cluster is not replicating data to a standby cluster")
+        for relation in [
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+        ]:
+            if not relation:
+                continue
+            error_message = "Unit cannot restore backup as the cluster is replicating data to a standby cluster"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return False
+
         logger.info("Checking that this unit was already elected the leader unit")
         if not self.charm.unit.is_leader():
             error_message = "Unit cannot restore backup as it was not elected the leader unit yet"
@@ -1219,9 +1235,11 @@ Stderr:
             event.fail(error_message)
             return False
 
-        if self.model.get_relation(LOGICAL_REPLICATION_RELATION):
+        if self.model.get_relation(LOGICAL_REPLICATION_RELATION) or len(
+            self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())
+        ):
             error_message = (
-                "Cannot proceed with restore with an active logical-replication connection"
+                "Cannot proceed with restore with an active logical replication connection"
             )
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
