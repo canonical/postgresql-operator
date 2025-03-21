@@ -29,7 +29,7 @@ if juju_major_version < 3:
     tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
+    tls_channel = "latest/stable"
     tls_config = {"ca-common-name": "Test CA"}
 
 backup_id, value_before_backup, value_after_backup = "", None, None

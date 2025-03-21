@@ -27,7 +27,7 @@ if juju_major_version < 3:
     TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
 else:
     TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-    TLS_CHANNEL = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
+    TLS_CHANNEL = "latest/stable"
     TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
