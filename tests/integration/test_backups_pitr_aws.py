@@ -325,10 +325,10 @@ async def pitr_backup_operations(
 
 @pytest.mark.abort_on_fail
 async def test_pitr_backup_aws(
-    ops_test: OpsTest, gcp_cloud_configs: tuple[dict, dict], charm
+    ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict], charm
 ) -> None:
     """Build, deploy two units of PostgreSQL and do backup in AWS. Then, write new data into DB, switch WAL file and test point-in-time-recovery restore action."""
-    config, credentials = gcp_cloud_configs
+    config, credentials = aws_cloud_configs
 
     await pitr_backup_operations(
         ops_test,
