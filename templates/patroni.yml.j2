@@ -108,6 +108,15 @@ bootstrap:
         {{key}}: {{value}}
         {%- endfor -%}
         {% endif %}
+    {%- if slots %}
+    slots:
+    {%- for slot, database in slots.items() %}
+      {{slot}}:
+        database: {{database}}
+        plugin: pgoutput
+        type: logical
+    {%- endfor -%}
+    {% endif %}
 
   {%- if restoring_backup %}
   method: pgbackrest
