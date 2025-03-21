@@ -335,9 +335,6 @@ class PostgreSQLLogicalReplication(Object):
         self._set_publications(publications)
 
     def _on_list_publications(self, event: ActionEvent):
-        if not self.charm.unit.is_leader():
-            event.fail("Publications management can be done only on the leader unit")
-            return
         publications = [
             (
                 publication,
