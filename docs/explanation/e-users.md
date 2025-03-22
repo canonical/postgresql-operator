@@ -1,9 +1,10 @@
 # Charm Users explanations
 
-There are two types of users in PostgreSQL:
+There are three types of users in PostgreSQL:
 * Internal users (used by charm operator)
-* Relation/integration users (used by related applications)
+* Relation users (used by related applications)
   * Extra user roles (if default permissions are not enough)
+* Identity users (used when LDAP is enabled)
 
 <a name="internal-users"></a>
 ## Internal users explanations:
@@ -72,7 +73,7 @@ unit-postgresql-1:
 **Note**: the action `set-password` must be executed on juju leader unit (to update peer relation data with new value).
 
 <a name="relation-users"></a>
-## Relation/integration users explanations:
+## Relation users explanations:
 
 The operator created a dedicated user for every application related/integrated with database. Those users are removed on the juju relation/integration removal request. However, DB data stays in place and can be reused on re-created relations (using new user credentials):
 
@@ -100,3 +101,9 @@ postgres=# \du
 When an application charm requests a new user through the relation/integration it can specify that the user should have the `admin` role in the `extra-user-roles` field. The `admin` role enables the new user to read and write to all databases (for the `postgres` system database it can only read data) and also to create and delete non-system databases.
 
 **Note**: `extra-user-roles` is supported by modern interface `postgresql_client` only and missing for legacy `pgsql` interface. Read more about the supported charm interfaces [here](/t/10251).
+
+<a name="identity-users"></a>
+## Identity users explanations:
+The operator considers Identity users all those that are automatically created when the LDAP integration is enabled, or in other words, the [GLAuth](https://charmhub.io/glauth-k8s) charm is related/integrated.
+
+When synchronized from the LDAP server, these users do not have any permissions by default, so the LDAP group they belonged to must be mapped to a PostgreSQL pre-defined authorization role by using the `ldap_map` configuration option.
