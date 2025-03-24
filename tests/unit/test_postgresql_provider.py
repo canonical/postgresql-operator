@@ -271,6 +271,7 @@ def test_update_endpoints_with_event(harness):
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "1.1.1.1:5432",
             "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
             "tls": "False",
         }
@@ -390,11 +391,13 @@ def test_update_endpoints_without_event(harness):
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "1.1.1.1:5432",
             "uris": "postgresql://relation-2:test_password@1.1.1.1:5432/test_db",
             "tls": "False",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
+            "read-only-endpoints": "1.1.1.1:5432",
             "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
             "tls": "False",
         }
