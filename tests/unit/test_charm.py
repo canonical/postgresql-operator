@@ -1274,6 +1274,7 @@ def test_update_config(harness):
         patch(
             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
         ) as _handle_postgresql_restart_need,
+        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
         patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
@@ -1310,6 +1311,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            slots=None,
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
@@ -1334,6 +1336,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            slots=None,
         )
         _handle_postgresql_restart_need.assert_called_once()
         assert "tls" not in harness.get_relation_data(
