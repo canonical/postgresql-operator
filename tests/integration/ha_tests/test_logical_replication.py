@@ -206,7 +206,7 @@ async def test_logical_replication_after_switchover(ops_test: OpsTest):
     assert await _check_test_data(ops_test, SECOND_DATA_INTEGRATOR_APP_NAME, "third"), (
         "logical replication should work with postgresql -> postgresql2"
     )
-    assert await _check_test_data(ops_test, SECOND_DATA_INTEGRATOR_APP_NAME, "third"), (
+    assert await _check_test_data(ops_test, THIRD_DATA_INTEGRATOR_APP_NAME, "third"), (
         "logical replication should work with postgresql -> postgresql3"
     )
 
