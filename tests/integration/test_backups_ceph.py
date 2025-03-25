@@ -14,7 +14,7 @@ import botocore.exceptions
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from . import architecture, markers
+from . import markers
 from .helpers import (
     backup_operations,
 )
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
 tls_certificates_app_name = "self-signed-certificates"
-tls_channel = "latest/edge" if architecture.architecture == "arm64" else "latest/stable"
+tls_channel = "latest/stable"
 tls_config = {"ca-common-name": "Test CA"}
 
 backup_id, value_before_backup, value_after_backup = "", None, None
