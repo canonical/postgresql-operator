@@ -387,7 +387,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             for attempt in Retrying(stop=stop_after_delay(5), wait=wait_fixed(3)):
                 with attempt:
-                    primary = self._patroni.get_primary()
+                    primary = self._patroni.get_primary(
+                        alternative_endpoints=[
+                            self._get_unit_ip(unit) for unit in self._peers.units
+                        ]
+                    )
                     if primary is None and (standby_leader := self._patroni.get_standby_leader()):
                         primary = standby_leader
                     primary_endpoint = self._patroni.get_member_ip(primary)

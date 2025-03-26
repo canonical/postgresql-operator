@@ -195,7 +195,7 @@ def test_primary_endpoint(harness):
         _wait_fixed.assert_called_once_with(3)
 
         _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
-        _patroni.return_value.get_primary.assert_called_once_with()
+        _patroni.return_value.get_primary.assert_called_once_with(alternative_endpoints=[])
 
 
 def test_primary_endpoint_no_peers(harness):
