@@ -1653,7 +1653,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
 
-        if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES and self.unit.status != SNAP_REVISIONS_MISMATCH_MESSAGE:
+        if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE:
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
                 self.enable_disable_extensions()
