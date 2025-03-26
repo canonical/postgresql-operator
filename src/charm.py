@@ -384,25 +384,30 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._peers:
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
-        alternative_endpoints = (
-            None
-            if not self.is_cluster_initialised
-            else [self._get_unit_ip(unit) for unit in self._peers.units]
-        )
-        primary = self._patroni.get_primary(alternative_endpoints=alternative_endpoints)
-        if primary is None and (standby_leader := self._patroni.get_standby_leader()):
-            primary = standby_leader
-        primary_endpoint = self._patroni.get_member_ip(primary)
-        # Force a retry if there is no primary or the member that was
-        # returned is not in the list of the current cluster members
-        # (like when the cluster was not updated yet after a failed switchover).
-        if not primary_endpoint or primary_endpoint not in self._units_ips:
-            # TODO figure out why peer data is not available
-            if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
-                logger.warning("Possibly incoplete peer data: Will not map primary IP to unit IP")
-                return primary_endpoint
-            logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
-            primary_endpoint = None
+        try:
+            alternative_endpoints = (
+                None
+                if not self.is_cluster_initialised
+                else [self._get_unit_ip(unit) for unit in self._peers.units]
+            )
+            primary = self._patroni.get_primary(alternative_endpoints=alternative_endpoints)
+            if primary is None and (standby_leader := self._patroni.get_standby_leader()):
+                primary = standby_leader
+            primary_endpoint = self._patroni.get_member_ip(primary)
+            # Force a retry if there is no primary or the member that was
+            # returned is not in the list of the current cluster members
+            # (like when the cluster was not updated yet after a failed switchover).
+            if not primary_endpoint or primary_endpoint not in self._units_ips:
+                # TODO figure out why peer data is not available
+                if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                    logger.warning(
+                        "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                    )
+                    return primary_endpoint
+                logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
+                primary_endpoint = None
+        except RetryError:
+            return None
         return primary_endpoint
 
     def get_hostname_by_unit(self, _) -> str:
