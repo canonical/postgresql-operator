@@ -408,7 +408,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 primary_endpoint = None
         except RetryError:
             return None
-        return primary_endpoint
+        else:
+            return primary_endpoint
 
     def get_hostname_by_unit(self, _) -> str:
         """Create a DNS name for a PostgreSQL unit.
