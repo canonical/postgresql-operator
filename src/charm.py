@@ -386,9 +386,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         try:
             alternative_endpoints = (
-                None
-                if not self.is_cluster_initialised
-                else [self._get_unit_ip(unit) for unit in self._peers.units]
+                None if not self.is_cluster_initialised else list(self._peer_members_ips)
             )
             for attempt in Retrying(stop=stop_after_delay(5), wait=wait_fixed(3)):
                 with attempt:
