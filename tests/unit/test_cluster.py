@@ -11,8 +11,6 @@ from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
 from tenacity import (
-    AttemptManager,
-    RetryCallState,
     RetryError,
     Retrying,
     stop_after_delay,
@@ -95,49 +93,59 @@ def patroni(harness, peers_ips):
 
 
 def test_get_alternative_patroni_url(peers_ips, patroni):
-    # Mock tenacity attempt.
-    retry = Retrying()
-    retry_state = RetryCallState(retry, None, None, None)
-    attempt = AttemptManager(retry_state)
-
     # Test the first URL that is returned (it should have the current unit IP).
-    url = patroni._get_alternative_patroni_url(attempt)
+    url = next(patroni._get_alternative_patroni_url())
     assert url == f"http://{patroni.unit_ip}:8008"
 
-    # Test returning the other servers URLs.
-    for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
-        attempt.retry_state.attempt_number = attempt_number
-        url = patroni._get_alternative_patroni_url(attempt)
-        assert url.split("http://")[1].split(":8008")[0] in peers_ips
+    other_urls = list(patroni._get_alternative_patroni_url())
+    for ip in list(peers_ips):
+        assert f"http://{ip}:8008" in other_urls
+        assert f"https://{ip}:8008" in other_urls
+
+    # Test alternatives
+    assert [
+        f"http://{patroni.unit_ip}:8008",
+        "http://a:8008",
+        "http://b:8008",
+        "http://c:8008",
+        f"https://{patroni.unit_ip}:8008",
+        "https://a:8008",
+        "https://b:8008",
+        "https://c:8008",
+    ] == list(patroni._get_alternative_patroni_url(["a", "b", "c"]))
 
 
 def test_get_member_ip(peers_ips, patroni):
     with (
         patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._get_alternative_patroni_url") as _get_alternative_patroni_url,
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test error on trying to get the member IP.
-        _get_alternative_patroni_url.side_effect = "http://server2"
+        _patroni_url.return_value = "http://server2"
+        patroni.unit_ip = "server2"
+        patroni.peers_ips = []
         with pytest.raises(RetryError):
             patroni.get_member_ip(patroni.member_name)
             assert False
 
         # Test using an alternative Patroni URL.
-        _get_alternative_patroni_url.side_effect = [
-            "http://server3",
-            "http://server2",
-            "http://server1",
+        _patroni_url.return_value = "http://server3"
+        patroni.unit_ip = "server3"
+        patroni.peers_ips = [
+            "server2",
+            "server1",
         ]
         ip = patroni.get_member_ip(patroni.member_name)
         assert ip == "1.1.1.1"
 
         # Test using the current Patroni URL.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        _patroni_url.return_value = "http://server1"
+        patroni.unit_ip = "server1"
+        patroni.peers_ips = []
         ip = patroni.get_member_ip(patroni.member_name)
         assert ip == "1.1.1.1"
 
         # Test when not having that specific member in the cluster.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
         assert ip is None
 
@@ -184,30 +192,36 @@ def test_get_postgresql_version(peers_ips, patroni):
 def test_get_primary(peers_ips, patroni):
     with (
         patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._get_alternative_patroni_url") as _get_alternative_patroni_url,
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test error on trying to get the member IP.
-        _get_alternative_patroni_url.side_effect = "http://server2"
+        _patroni_url.return_value = "http://server2"
+        patroni.unit_ip = "server2"
+        patroni.peers_ips = []
         with pytest.raises(RetryError):
             patroni.get_primary(patroni.member_name)
             assert False
 
         # Test using an alternative Patroni URL.
-        _get_alternative_patroni_url.side_effect = [
-            "http://server3",
-            "http://server2",
-            "http://server1",
+        _patroni_url.return_value = "http://server3"
+        patroni.unit_ip = "server3"
+        patroni.peers_ips = [
+            "server2",
+            "server1",
         ]
         primary = patroni.get_primary()
         assert primary == "postgresql-0"
 
         # Test using the current Patroni URL.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        _patroni_url.return_value = "http://server1"
+        patroni.unit_ip = "server1"
+        patroni.peers_ips = []
         primary = patroni.get_primary()
         assert primary == "postgresql-0"
 
         # Test requesting the primary in the unit name pattern.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        patroni.unit_ip = "server1"
+        patroni.peers_ips = []
         primary = patroni.get_primary(unit_name_pattern=True)
         assert primary == "postgresql/0"
 
@@ -235,6 +249,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     with (
         patch("requests.get") as _get,
         patch("charm.Patroni.get_primary"),
+        patch("charm.Patroni.get_member_ip"),
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
     ):
         # Test when replication is healthy.
