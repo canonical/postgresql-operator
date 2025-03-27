@@ -944,6 +944,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Get all members IPs and remove the current unit IP from the list.
         addresses = {self._get_unit_ip(unit) for unit in self._peers.units}
         addresses.add(self._unit_ip)
+        if None in addresses:
+            addresses.remove(None)
         return addresses
 
     @property

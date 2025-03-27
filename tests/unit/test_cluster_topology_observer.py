@@ -32,7 +32,7 @@ class MockCharm(CharmBase):
 
     @property
     def _patroni(self) -> Patroni:
-        return Mock(_patroni_url="http://1.1.1.1:8008/", verify=True)
+        return Mock(_patroni_url="http://1.1.1.1:8008/", peers_ips={}, verify=True)
 
     @property
     def _peers(self) -> Relation | None:
