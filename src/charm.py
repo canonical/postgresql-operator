@@ -1532,8 +1532,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ) and not self._was_restore_successful():
             return
 
-        # if self._handle_processes_failures():
-        #     return
+        if self._handle_processes_failures():
+            return
 
         self.postgresql_client_relation.oversee_users()
         if self.primary_endpoint:
@@ -1671,13 +1671,23 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
-            try:
-                self._patroni.restart_patroni()
-                logger.info("restarted PostgreSQL because it was not running")
-                return True
-            except RetryError:
-                logger.error("failed to restart PostgreSQL after checking that it was not running")
-                return False
+            if self._member_name in self._patroni.cluster_members:
+                try:
+                    logger.warning("Inactive member detected. Reinitialising unit.")
+                    self.unit.status = MaintenanceStatus("reinitialising replica")
+                    self._patroni.reinitialize_postgresql()
+                    return True
+                except RetryError:
+                    logger.error("failed to restart PostgreSQL after checking that it was not running")
+                    return False
+            else:
+                try:
+                    self._patroni.restart_patroni()
+                    logger.info("restarted PostgreSQL because it was not running")
+                    return True
+                except RetryError:
+                    logger.error("failed to restart PostgreSQL after checking that it was not running")
+                    return False
 
         return False
 
@@ -1711,16 +1721,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # (stuck with the "awaiting for member to start" message).
         if not self._patroni.member_started and self._patroni.is_member_isolated:
             self._patroni.restart_patroni()
-            return True
-
-        if (
-            not self.has_raft_keys()
-            and self._unit_ip in self.members_ips
-            and self._patroni.member_inactive
-        ):
-            logger.warning("Inactive member detected. Reinitialising unit.")
-            self.unit.status = MaintenanceStatus("reinitialising replica")
-            self._patroni.reinitialize_postgresql()
             return True
 
         return False
