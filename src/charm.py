@@ -1579,7 +1579,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                             right_workloads_revisions = False
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
-                    "An exception occurred when checking %s snap revision. Reason: %s", snap_name, str(e)
+                    "An exception occurred when checking %s snap revision. Reason: %s",
+                    snap_name,
+                    str(e),
                 )
                 right_workloads_revisions = False
         return right_workloads_revisions
@@ -1653,7 +1655,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
 
-        if self.is_blocked and self.unit.status.message not in S3_BLOCK_MESSAGES and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE:
+        if (
+            self.is_blocked
+            and self.unit.status.message not in S3_BLOCK_MESSAGES
+            and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE
+        ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
                 self.enable_disable_extensions()
@@ -1678,7 +1684,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self._patroni.reinitialize_postgresql()
                     return True
                 except RetryError:
-                    logger.error("failed to restart PostgreSQL after checking that it was not running")
+                    logger.error(
+                        "failed to reinitialise PostgreSQL after checking that replica bootstrap failed"
+                    )
                     return False
             else:
                 try:
@@ -1686,7 +1694,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     logger.info("restarted PostgreSQL because it was not running")
                     return True
                 except RetryError:
-                    logger.error("failed to restart PostgreSQL after checking that it was not running")
+                    logger.error(
+                        "failed to restart PostgreSQL after checking that it was not running"
+                    )
                     return False
 
         return False
