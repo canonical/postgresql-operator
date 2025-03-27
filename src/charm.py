@@ -114,6 +114,7 @@ logger = logging.getLogger(__name__)
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 EXTENSION_OBJECT_MESSAGE = "Cannot disable plugins: Existing objects depend on it. See logs"
+SNAP_REVISIONS_MISMATCH_MESSAGE = "Workloads revisions are not the expected ones"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
@@ -1522,6 +1523,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_run_on_update_status():
             return
 
+        if not self._ensure_right_workloads_revisions():
+            self.unit.status = BlockedStatus(SNAP_REVISIONS_MISMATCH_MESSAGE)
+            return
+
         if (
             self.is_cluster_restoring_backup or self.is_cluster_restoring_to_time
         ) and not self._was_restore_successful():
@@ -1546,6 +1551,40 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+    def _ensure_right_workloads_revisions(self) -> bool:
+        """Ensure the workloads revisions are the expected ones."""
+        right_workloads_revisions = True
+        for snap_name, snap_version in SNAP_PACKAGES:
+            try:
+                snap_cache = snap.SnapCache()
+                snap_package = snap_cache[snap_name]
+                if not snap_package.present:
+                    right_workloads_revisions = False
+                else:
+                    if revision := snap_version.get("revision"):
+                        try:
+                            revision = revision[platform.machine()]
+                        except IndexError:
+                            logger.error("Unavailable snap architecture %s", platform.machine())
+                            right_workloads_revisions = False
+                            continue
+                        if snap_package.revision != revision:
+                            logger.error("Snap revision mismatch for %s: ", snap_name)
+                            right_workloads_revisions = False
+                            continue
+                        channel = snap_version.get("channel", "")
+                        if channel != "" and snap_package.channel != channel:
+                            logger.error("Snap channel is not the expected one for %s", snap_name)
+                            right_workloads_revisions = False
+            except (snap.SnapError, snap.SnapNotFoundError) as e:
+                logger.error(
+                    "An exception occurred when checking %s snap revision. Reason: %s",
+                    snap_name,
+                    str(e),
+                )
+                right_workloads_revisions = False
+        return right_workloads_revisions
 
     def _was_restore_successful(self) -> bool:
         if self.is_cluster_restoring_to_time and all(self.is_pitr_failed()):
@@ -1616,7 +1655,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
 
-        if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES:
+        if (
+            self.is_blocked
+            and self.unit.status.message not in S3_BLOCK_MESSAGES
+            and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE
+        ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
                 self.enable_disable_extensions()
@@ -1634,13 +1677,27 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
-            try:
-                self._patroni.restart_patroni()
-                logger.info("restarted PostgreSQL because it was not running")
-                return True
-            except RetryError:
-                logger.error("failed to restart PostgreSQL after checking that it was not running")
-                return False
+            if self._member_name in self._patroni.cluster_members:
+                try:
+                    logger.warning("Inactive member detected. Reinitialising unit.")
+                    self.unit.status = MaintenanceStatus("reinitialising replica")
+                    self._patroni.reinitialize_postgresql()
+                    return True
+                except RetryError:
+                    logger.error(
+                        "failed to reinitialise PostgreSQL after checking that replica bootstrap failed"
+                    )
+                    return False
+            else:
+                try:
+                    self._patroni.restart_patroni()
+                    logger.info("restarted PostgreSQL because it was not running")
+                    return True
+                except RetryError:
+                    logger.error(
+                        "failed to restart PostgreSQL after checking that it was not running"
+                    )
+                    return False
 
         return False
 
