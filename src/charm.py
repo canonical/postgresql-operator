@@ -661,6 +661,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def _has_member_started(self) -> bool:
+        """Returns whether the Patroni cluster member has started."""
+        while True:
+            if self._patroni.member_inactive:
+                return False
+            elif not self._patroni.member_started:
+                logger.debug("Waiting for Patroni to start")
+                sleep(5)
+            else:
+                break
+        return True
+
     def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
         if not self._peer_relation_changed_checks(event):
@@ -695,17 +707,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._patroni.start_patroni()
 
         # Assert the member is up and running before marking the unit as active.
-        while True:
-            if self._patroni.member_inactive:
-                logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
-                self.unit.status = WaitingStatus("awaiting for member to start")
-                event.defer()
-                return
-            elif not self._patroni.member_started:
-                logger.debug("Waiting for Patroni to start")
-                sleep(5)
-            else:
-                break
+        if not self._has_member_started():
+            logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
+            self.unit.status = WaitingStatus("awaiting for member to start")
+            event.defer()
+            return
 
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
@@ -1338,17 +1344,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         # Assert the member is up and running before marking it as initialised.
-        while True:
-            if self._patroni.member_inactive:
-                logger.debug("Deferring on_start: awaiting for member to start")
-                self.unit.status = WaitingStatus("awaiting for member to start")
-                event.defer()
-                return
-            elif not self._patroni.member_started:
-                logger.debug("Waiting for Patroni to start")
-                sleep(5)
-            else:
-                break
+        if not self._has_member_started():
+            logger.debug("Deferring on_start: awaiting for member to start")
+            self.unit.status = WaitingStatus("awaiting for member to start")
+            event.defer()
+            return
 
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
