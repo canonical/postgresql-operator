@@ -620,10 +620,15 @@ def test_on_start(harness):
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch("charm.PostgreSQLProvider.update_endpoints"),
         patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch("charm.sleep", return_value=None) as _sleep,
         patch(
             "charm.Patroni.member_started",
             new_callable=PropertyMock,
         ) as _member_started,
+        patch(
+            "charm.Patroni.member_inactive",
+            new_callable=PropertyMock,
+        ) as _member_inactive,
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
@@ -643,7 +648,8 @@ def test_on_start(harness):
         _reboot_on_detached_storage.assert_called_once()
 
         # Test before the passwords are generated.
-        _member_started.return_value = False
+        _member_inactive.return_value = True
+        _member_started.return_value = True
         _get_password.return_value = None
         harness.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
@@ -678,7 +684,7 @@ def test_on_start(harness):
 
         # Test the event of an error happening when trying to create the default postgres user.
         _restart_services_after_reboot.reset_mock()
-        _member_started.return_value = True
+        _member_inactive.return_value = False
         harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _oversee_users.assert_not_called()
@@ -1497,7 +1503,9 @@ def test_on_peer_relation_changed(harness):
         ) as _member_replication_lag,
         patch("charm.PostgresqlOperatorCharm.is_standby_leader") as _is_standby_leader,
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
+        patch("charm.sleep", return_value=None) as _sleep,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch("charm.Patroni.member_inactive", new_callable=PropertyMock) as _member_inactive,
         patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm._update_member_ip") as _update_member_ip,
@@ -1537,6 +1545,7 @@ def test_on_peer_relation_changed(harness):
         _reconfigure_cluster.reset_mock()
         _reconfigure_cluster.return_value = True
         _update_member_ip.return_value = False
+        _member_inactive.return_value = False
         _member_started.return_value = True
         _primary_endpoint.return_value = "192.0.2.0"
         harness.model.unit.status = WaitingStatus("awaiting for cluster to start")
@@ -1571,14 +1580,13 @@ def test_on_peer_relation_changed(harness):
 
         # Test event is early exiting when in blocked status.
         _update_config.side_effect = None
-        _member_started.return_value = False
+        _member_inactive.return_value = True
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_not_called()
 
         # Test when Patroni hasn't started yet in the unit.
         harness.model.unit.status = ActiveStatus()
         _update_config.side_effect = None
-        _member_started.return_value = False
         harness.charm._on_peer_relation_changed(mock_event)
         _start_patroni.assert_called_once()
         _update_new_unit_status.assert_not_called()
@@ -1587,7 +1595,7 @@ def test_on_peer_relation_changed(harness):
         # Test when Patroni has already started but this is a replica with a
         # huge or unknown lag.
         relation = harness.model.get_relation(PEER, rel_id)
-        _member_started.return_value = True
+        _member_inactive.return_value = False
         for values in itertools.product([True, False], ["0", "1000", "1001", "unknown"]):
             _defer.reset_mock()
             _start_stop_pgbackrest_service.reset_mock()
@@ -1607,7 +1615,6 @@ def test_on_peer_relation_changed(harness):
 
         # Test when it was not possible to start the pgBackRest service yet.
         relation = harness.model.get_relation(PEER, rel_id)
-        _member_started.return_value = True
         _defer.reset_mock()
         _coordinate_stanza_fields.reset_mock()
         _start_stop_pgbackrest_service.return_value = False
