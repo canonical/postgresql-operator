@@ -695,11 +695,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._patroni.start_patroni()
 
         # Assert the member is up and running before marking the unit as active.
-        if not self._patroni.member_started:
-            logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
-            self.unit.status = WaitingStatus("awaiting for member to start")
-            event.defer()
-            return
+        while True:
+            if not self._patroni.member_started:
+                if self._patroni.member_inactive:
+                    logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
+                    self.unit.status = WaitingStatus("awaiting for member to start")
+                    event.defer()
+                    return
+                else:
+                    logger.debug("Waiting for Patroni to start")
+                    sleep(5)
+            else:
+                break
 
         # Restart the workload if it's stuck on the starting state after a timeline divergence
         # due to a backup that was restored.
