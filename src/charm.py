@@ -696,15 +696,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Assert the member is up and running before marking the unit as active.
         while True:
-            if not self._patroni.member_started:
-                if self._patroni.member_inactive:
-                    logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
-                    self.unit.status = WaitingStatus("awaiting for member to start")
-                    event.defer()
-                    return
-                else:
-                    logger.debug("Waiting for Patroni to start")
-                    sleep(5)
+            if self._patroni.member_inactive:
+                logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
+                self.unit.status = WaitingStatus("awaiting for member to start")
+                event.defer()
+                return
+            elif not self._patroni.member_started:
+                logger.debug("Waiting for Patroni to start")
+                sleep(5)
             else:
                 break
 
@@ -1340,15 +1339,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Assert the member is up and running before marking it as initialised.
         while True:
-            if not self._patroni.member_started:
-                if self._patroni.member_inactive:
-                    logger.debug("Deferring on_start: awaiting for member to start")
-                    self.unit.status = WaitingStatus("awaiting for member to start")
-                    event.defer()
-                    return
-                else:
-                    logger.debug("Waiting for Patroni to start")
-                    sleep(5)
+            if self._patroni.member_inactive:
+                logger.debug("Deferring on_start: awaiting for member to start")
+                self.unit.status = WaitingStatus("awaiting for member to start")
+                event.defer()
+                return
+            elif not self._patroni.member_started:
+                logger.debug("Waiting for Patroni to start")
+                sleep(5)
             else:
                 break
 
