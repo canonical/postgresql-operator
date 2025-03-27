@@ -18,6 +18,10 @@ PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 LOG_FILE_PATH = "/var/log/cluster_topology_observer.log"
 
 
+class UnreachableUnitsError(Exception):
+    """Cannot reach any known cluster member."""
+
+
 def dispatch(run_cmd, unit, charm_dir):
     """Use the input juju-run command to dispatch a :class:`ClusterTopologyChangeEvent`."""
     dispatch_sub_cmd = "JUJU_DISPATCH_PATH=hooks/cluster_topology_change {}/dispatch"
@@ -51,11 +55,12 @@ def main():
                     context=context,
                 )
                 cluster_status = json.loads(resp.read())
+                break
             except Exception as e:
                 print(f"Failed to contact {url} with {e}")
                 continue
         if not cluster_status:
-            raise Exception("Unable to reach cluster members")
+            raise UnreachableUnitsError("Unable to reach cluster members")
         current_cluster_topology = {}
         urls = []
         for member in cluster_status["members"]:
