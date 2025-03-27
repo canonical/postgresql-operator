@@ -1532,8 +1532,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ) and not self._was_restore_successful():
             return
 
-        if self._handle_processes_failures():
-            return
+        # if self._handle_processes_failures():
+        #     return
 
         self.postgresql_client_relation.oversee_users()
         if self.primary_endpoint:
@@ -1653,7 +1653,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: upgrade in progress")
             return False
 
-        if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE:
+        if self.is_blocked and self.unit.status.message not in S3_BLOCK_MESSAGES and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE:
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
                 self.enable_disable_extensions()
@@ -1711,6 +1711,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # (stuck with the "awaiting for member to start" message).
         if not self._patroni.member_started and self._patroni.is_member_isolated:
             self._patroni.restart_patroni()
+            return True
+
+        if (
+            not self.has_raft_keys()
+            and self._unit_ip in self.members_ips
+            and self._patroni.member_inactive
+        ):
+            logger.warning("Inactive member detected. Reinitialising unit.")
+            self.unit.status = MaintenanceStatus("reinitialising replica")
+            self._patroni.reinitialize_postgresql()
             return True
 
         return False
