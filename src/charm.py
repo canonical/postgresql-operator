@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from time import sleep
 from typing import Literal, get_args
 
 import psycopg2
@@ -1331,11 +1332,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         # Assert the member is up and running before marking it as initialised.
-        if not self._patroni.member_started:
-            logger.debug("Deferring on_start: awaiting for member to start")
-            self.unit.status = WaitingStatus("awaiting for member to start")
-            event.defer()
-            return
+        while True:
+            if not self._patroni.member_started:
+                if self._patroni.member_inactive:
+                    logger.debug("Deferring on_start: awaiting for member to start")
+                    self.unit.status = WaitingStatus("awaiting for member to start")
+                    event.defer()
+                    return
+                else:
+                    logger.debug("Waiting for Patroni to start")
+                    sleep(5)
+            else:
+                break
 
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
