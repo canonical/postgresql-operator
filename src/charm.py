@@ -372,30 +372,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
-            for attempt in Retrying(stop=stop_after_delay(5), wait=wait_fixed(3)):
-                with attempt:
-                    primary = self._patroni.get_primary()
-                    if primary is None and (standby_leader := self._patroni.get_standby_leader()):
-                        primary = standby_leader
-                    primary_endpoint = self._patroni.get_member_ip(primary)
-                    # Force a retry if there is no primary or the member that was
-                    # returned is not in the list of the current cluster members
-                    # (like when the cluster was not updated yet after a failed switchover).
-                    if not primary_endpoint or primary_endpoint not in self._units_ips:
-                        # TODO figure out why peer data is not available
-                        if (
-                            primary_endpoint
-                            and len(self._units_ips) == 1
-                            and len(self._peers.units) > 1
-                        ):
-                            logger.warning(
-                                "Possibly incoplete peer data: Will not map primary IP to unit IP"
-                            )
-                            return primary_endpoint
-                        logger.debug(
-                            "primary endpoint early exit: Primary IP not in cached peer list."
-                        )
-                        primary_endpoint = None
+            primary = self._patroni.get_primary()
+            if primary is None and (standby_leader := self._patroni.get_standby_leader()):
+                primary = standby_leader
+            primary_endpoint = self._patroni.get_member_ip(primary)
+            # Force a retry if there is no primary or the member that was
+            # returned is not in the list of the current cluster members
+            # (like when the cluster was not updated yet after a failed switchover).
+            if not primary_endpoint or primary_endpoint not in self._units_ips:
+                # TODO figure out why peer data is not available
+                if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                    logger.warning(
+                        "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                    )
+                    return primary_endpoint
+                logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
+                primary_endpoint = None
         except RetryError:
             return None
         else:
@@ -939,6 +931,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Get all members IPs and remove the current unit IP from the list.
         addresses = {self._get_unit_ip(unit) for unit in self._peers.units}
         addresses.add(self._unit_ip)
+        if None in addresses:
+            addresses.remove(None)
         return addresses
 
     @property
