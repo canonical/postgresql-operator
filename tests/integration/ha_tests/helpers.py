@@ -240,13 +240,17 @@ async def is_cluster_updated(
 
     # Verify that no writes to the database were missed after stopping the writes.
     logger.info("checking that no writes to the database were missed after stopping the writes")
-    total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
 
     # Verify that old primary is up-to-date.
     logger.info("checking that the former primary is up to date with the cluster after restarting")
-    assert await is_secondary_up_to_date(
-        ops_test, primary_name, total_expected_writes, use_ip_from_inside
-    ), "secondary not up to date with the cluster after restarting."
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            assert await is_secondary_up_to_date(
+                ops_test, primary_name, total_expected_writes, use_ip_from_inside
+            ), "secondary not up to date with the cluster after restarting."
 
 
 async def check_writes(

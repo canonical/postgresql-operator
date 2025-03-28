@@ -1,7 +1,9 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import signal
-from unittest.mock import Mock, PropertyMock, patch
+import sys
+from json import dumps
+from unittest.mock import Mock, PropertyMock, call, patch, sentinel
 
 import pytest
 from ops.charm import CharmBase
@@ -13,25 +15,7 @@ from cluster_topology_observer import (
     ClusterTopologyChangeCharmEvents,
     ClusterTopologyObserver,
 )
-from scripts.cluster_topology_observer import dispatch
-
-
-# This method will be used by the mock to replace requests.get
-def mocked_requests_get(*args, **kwargs):
-    class MockResponse:
-        def __init__(self, json_data):
-            self.json_data = json_data
-
-        def json(self):
-            return self.json_data
-
-    data = {
-        "http://server1/cluster": {
-            "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
-        }
-    }
-    if args[0] in data:
-        return MockResponse(data[args[0]])
+from scripts.cluster_topology_observer import UnreachableUnitsError, dispatch, main
 
 
 class MockCharm(CharmBase):
@@ -48,7 +32,7 @@ class MockCharm(CharmBase):
 
     @property
     def _patroni(self) -> Patroni:
-        return Mock(_patroni_url="http://1.1.1.1:8008/", verify=True)
+        return Mock(_patroni_url="http://1.1.1.1:8008/", peers_ips={}, verify=True)
 
     @property
     def _peers(self) -> Relation | None:
@@ -152,4 +136,55 @@ def test_dispatch(harness):
             "-u",
             harness.charm.unit.name,
             f"JUJU_DISPATCH_PATH=hooks/cluster_topology_change {charm_dir}/dispatch",
+        ])
+
+
+def test_main():
+    with (
+        patch.object(
+            sys,
+            "argv",
+            ["cmd", "http://server1:8008,http://server2:8008", "run_cmd", "unit/0", "charm_dir"],
+        ),
+        patch("scripts.cluster_topology_observer.sleep", return_value=None),
+        patch("scripts.cluster_topology_observer.urlopen") as _urlopen,
+        patch("scripts.cluster_topology_observer.subprocess") as _subprocess,
+        patch(
+            "scripts.cluster_topology_observer.create_default_context",
+            return_value=sentinel.sslcontext,
+        ),
+    ):
+        response1 = {
+            "members": [
+                {"name": "unit-2", "api_url": "http://server3:8008/patroni", "role": "standby"},
+                {"name": "unit-0", "api_url": "http://server1:8008/patroni", "role": "leader"},
+            ]
+        }
+        mock1 = Mock()
+        mock1.read.return_value = dumps(response1)
+        response2 = {
+            "members": [
+                {"name": "unit-2", "api_url": "https://server3:8008/patroni", "role": "leader"},
+            ]
+        }
+        mock2 = Mock()
+        mock2.read.return_value = dumps(response2)
+        _urlopen.side_effect = [mock1, Exception, mock2]
+        with pytest.raises(UnreachableUnitsError):
+            main()
+        assert _urlopen.call_args_list == [
+            # Iteration 1. server2 is not called
+            call("http://server1:8008/cluster", timeout=5, context=sentinel.sslcontext),
+            # Iteration 2 local unit server1 is called first
+            call("http://server1:8008/cluster", timeout=5, context=sentinel.sslcontext),
+            call("http://server3:8008/cluster", timeout=5, context=sentinel.sslcontext),
+            # Iteration 3 Last known member is server3
+            call("https://server3:8008/cluster", timeout=5, context=sentinel.sslcontext),
+        ]
+
+        _subprocess.run.assert_called_once_with([
+            "run_cmd",
+            "-u",
+            "unit/0",
+            "JUJU_DISPATCH_PATH=hooks/cluster_topology_change charm_dir/dispatch",
         ])
