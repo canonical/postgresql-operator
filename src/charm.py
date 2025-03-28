@@ -923,16 +923,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return self.app_peer_data.get("ldap_enabled", "False") == "True"
 
     @property
-    def is_ldap_config_provided(self) -> bool:
-        """Return whether this unit has LDAP config provided."""
-        return self.config.ldap_url is not None
-
-    @property
     def is_ldap_enabled(self) -> bool:
         """Return whether this unit has LDAP enabled."""
-        # fmt: off
-        return self.is_cluster_initialised and \
-            (self.is_ldap_charm_related or self.is_ldap_config_provided)
+        return self.is_ldap_charm_related and self.is_cluster_initialised
 
     @property
     def is_primary(self) -> bool:
@@ -2210,27 +2203,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 plugins.append(ext)
         return plugins
 
-    def _ldap_config_to_params(self) -> dict:
-        """Maps the charm configuration options into the Patroni template expected fields."""
-        params = {
-            "ldapbasedn": self.config.ldap_base_dn,
-            "ldapbinddn": self.config.ldap_bind_dn,
-            "ldapbindpasswd": self.config.ldap_bind_password,
-            "ldaptls": self.is_tls_enabled,
-            "ldapurl": self.config.ldap_url,
-        }
+    def get_ldap_parameters(self) -> dict:
+        """Returns the LDAP configuration to use."""
+        if not self.is_cluster_initialised:
+            return {}
+        if not self.is_ldap_charm_related:
+            logger.debug("LDAP is not enabled")
+            return {}
 
-        # LDAP authentication parameters that are exclusive to
-        # one of the two supported modes (simple bind or search+bind)
-        # must be put at the very end of the parameters string
-        params.update({
-            "ldapsearchfilter": self.config.ldap_search_filter,
-        })
-
-        return params
-
-    def _ldap_databag_to_params(self) -> dict:
-        """Maps the charm configuration options into the Patroni template expected fields."""
         data = self.ldap.get_relation_data()
         if data is None:
             return {}
@@ -2249,24 +2229,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         params.update({
             "ldapsearchfilter": self.config.ldap_search_filter,
         })
-
-        return params
-
-    def get_ldap_parameters(self) -> dict:
-        """Returns the LDAP configuration to use.
-
-        The charm configuration options take preference over the GLAuth relationship data
-        """
-        params = {}
-
-        if not self.is_ldap_enabled:
-            logger.debug("LDAP is not enabled")
-        elif self.is_ldap_config_provided:
-            logger.debug("LDAP is enabled by the charm configuration")
-            params = self._ldap_config_to_params()
-        elif self.is_ldap_charm_related:
-            logger.debug("LDAP is enabled by another charm relation")
-            params = self._ldap_databag_to_params()
 
         return params
 
