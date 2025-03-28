@@ -620,6 +620,7 @@ class Patroni:
         restore_to_latest: bool = False,
         parameters: dict[str, str] | None = None,
         no_peers: bool = False,
+        slots: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -636,6 +637,7 @@ class Patroni:
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
+            slots: replication slots (keys) with assigned database name (values).
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
@@ -678,6 +680,7 @@ class Patroni:
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
             raft_password=self.raft_password,
             patroni_password=self.patroni_password,
+            slots=slots,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
@@ -985,6 +988,35 @@ class Patroni:
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"postgresql": {"parameters": parameters}},
+            auth=self._patroni_auth,
+            timeout=PATRONI_TIMEOUT,
+        )
+
+    def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
+        """Synchronises slots controlled by Patroni with the provided state by removing unneeded slots and creating new ones.
+
+        Args:
+            slots: dictionary of slots in the {slot: database} format.
+        """
+        current_config = requests.get(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
+        )
+        slots_patch: dict[str, dict[str, str] | None] = {
+            slot: None for slot in current_config.json().get("slots", ())
+        }
+        for slot, database in slots.items():
+            slots_patch[slot] = {
+                "database": database,
+                "plugin": "pgoutput",
+                "type": "logical",
+            }
+        requests.patch(
+            f"{self._patroni_url}/config",
+            verify=self.verify,
+            json={"slots": slots_patch},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
