@@ -21,7 +21,6 @@ from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
-    AttemptManager,
     RetryError,
     Retrying,
     retry,
@@ -233,11 +232,12 @@ class Patroni:
             IP address of the cluster member.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+        attempts = 2 * len(self.peers_ips) + 2
+        urls = self._get_alternative_patroni_url()
+        for attempt in Retrying(stop=stop_after_attempt(attempts)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
                 cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    f"{next(urls)}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
@@ -257,11 +257,12 @@ class Patroni:
                 couldn't be retrieved yet.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+        attempts = 2 * len(self.peers_ips) + 2
+        urls = self._get_alternative_patroni_url()
+        for attempt in Retrying(stop=stop_after_attempt(attempts)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
                 cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    f"{next(urls)}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
@@ -284,11 +285,15 @@ class Patroni:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+        if alternative_endpoints:
+            attempts = 2 * len(alternative_endpoints) + 2
+        else:
+            attempts = 2 * len(self.peers_ips) + 2
+        urls = self._get_alternative_patroni_url(alternative_endpoints)
+        for attempt in Retrying(stop=stop_after_attempt(attempts)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
                 cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    f"{next(urls)}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
@@ -314,11 +319,12 @@ class Patroni:
             standby leader pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+        attempts = 2 * len(self.peers_ips) + 2
+        urls = self._get_alternative_patroni_url()
+        for attempt in Retrying(stop=stop_after_attempt(attempts)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
                 cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    f"{next(urls)}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                     verify=self.verify,
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
@@ -338,11 +344,12 @@ class Patroni:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+        attempts = 2 * len(self.peers_ips) + 2
+        urls = self._get_alternative_patroni_url()
+        for attempt in Retrying(stop=stop_after_attempt(attempts)):
             with attempt:
-                url = self._get_alternative_patroni_url(attempt)
                 r = requests.get(
-                    f"{url}/cluster",
+                    f"{next(urls)}/cluster",
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
@@ -352,33 +359,26 @@ class Patroni:
                         sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
         return sync_standbys
 
-    def _get_alternative_patroni_url(
-        self, attempt: AttemptManager, alternative_endpoints: list[str] | None = None
-    ) -> str:
+    def _get_alternative_patroni_url(self, alternative_endpoints: list[str] | None = None) -> str:
         """Get an alternative REST API URL from another member each time.
 
         When the Patroni process is not running in the current unit it's needed
         to use a URL from another cluster member REST API to do some operations.
         """
-        if alternative_endpoints is not None:
-            return self._patroni_url.replace(
-                self.unit_ip, alternative_endpoints[attempt.retry_state.attempt_number - 1]
-            )
-        attempt_number = attempt.retry_state.attempt_number
-        if attempt_number > 1:
-            url = self._patroni_url
-            # Build the URL using http and later using https for each peer.
-            if (attempt_number - 1) <= len(self.peers_ips):
-                url = url.replace("https://", "http://")
-                unit_number = attempt_number - 2
-            else:
-                url = url.replace("http://", "https://")
-                unit_number = attempt_number - 2 - len(self.peers_ips)
-            other_unit_ip = list(self.peers_ips)[unit_number]
-            url = url.replace(self.unit_ip, other_unit_ip)
+        if not alternative_endpoints:
+            alternative_endpoints = list(self.peers_ips)
+        urls = [self._patroni_url]
+        urls += [
+            self._patroni_url.replace(self.unit_ip, endpoint) for endpoint in alternative_endpoints
+        ]
+        if self.tls_enabled:
+            default_schema = "https"
+            new_schema = "http"
         else:
-            url = self._patroni_url
-        return url
+            default_schema = "http"
+            new_schema = "https"
+        urls += [url.replace(default_schema, new_schema) for url in urls]
+        yield from urls
 
     def are_all_members_ready(self) -> bool:
         """Check if all members are correctly running Patroni and PostgreSQL.
