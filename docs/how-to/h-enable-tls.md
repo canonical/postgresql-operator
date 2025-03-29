@@ -32,15 +32,9 @@ First, deploy the TLS charm:
 juju deploy self-signed-certificates
 ```
 
-To enable TLS on `postgresql`, integrate the two applications:
+To enable TLS integrate (formerly known as “relate”) the two applications:
 ```shell
-juju integrate self-signed-certificates postgresql
-```
-
-## Disable TLS
-Disable TLS by removing the integration.
-```shell
-juju remove-relation self-signed-certificates postgresql
+juju integrate postgresql:certificates self-signed-certificates:certificates
 ```
 
 ## Check certificates in use
@@ -79,4 +73,10 @@ Updates can also be done with auto-generated keys:
 juju run postgresql/0 set-tls-private-key
 juju run postgresql/1 set-tls-private-key
 juju run postgresql/2 set-tls-private-key
+```
+
+## Disable TLS
+Disable TLS by removing the integration.
+```shell
+juju remove-relation postgresql:certificates self-signed-certificates:certificates
 ```
