@@ -1517,7 +1517,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_run_on_update_status():
             return
 
-        if not self._ensure_right_workloads_revisions():
+        if not self._ensure_correct_snap_revision():
             self.unit.status = BlockedStatus(SNAP_REVISION_MISMATCH_MESSAGE)
             return
 
@@ -1546,8 +1546,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart topology observer if it is gone
         self._observer.start_observer()
 
-    def _ensure_right_workloads_revisions(self) -> bool:
-        """Ensure the workloads revisions are the expected ones."""
+    def _ensure_correct_snap_revision(self) -> bool:
+        """Ensure the snap revision is the expected one."""
         right_workloads_revisions = True
         for snap_name, snap_version in SNAP_PACKAGES:
             try:
