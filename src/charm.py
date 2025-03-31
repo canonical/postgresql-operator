@@ -114,7 +114,7 @@ logger = logging.getLogger(__name__)
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
 EXTENSION_OBJECT_MESSAGE = "Cannot disable plugins: Existing objects depend on it. See logs"
-SNAP_REVISIONS_MISMATCH_MESSAGE = "Snap(s) revision(s) mismatch"
+SNAP_REVISION_MISMATCH_MESSAGE = "Snap revision mismatch"
 
 Scopes = Literal[APP_SCOPE, UNIT_SCOPE]
 PASSWORD_USERS = [*SYSTEM_USERS, "patroni"]
@@ -1518,7 +1518,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if not self._ensure_right_workloads_revisions():
-            self.unit.status = BlockedStatus(SNAP_REVISIONS_MISMATCH_MESSAGE)
+            self.unit.status = BlockedStatus(SNAP_REVISION_MISMATCH_MESSAGE)
             return
 
         if (
@@ -1549,22 +1549,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _ensure_right_workloads_revisions(self) -> bool:
         """Ensure the workloads revisions are the expected ones."""
         right_workloads_revisions = True
-        resolution_message = f"""
-Check the latest unit shown in the following command, which will be the primary unit:
-
-sudo -H -u snap_daemon charmed-postgresql.patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml history {self.app.name}
-
-Then, run the following commands to fix the issue (first in the primary, then in each replica):
-
-# List which services are active.
-sudo snap services charmed-postgresql
-
-# Refresh the snap to the right revision.
-sudo snap refresh charmed-postgresql --revision EXPECTED-REVISION-NUMBER
-
-# Start the patroni and the other previously active services again.
-sudo snap start charmed-postgresql.patroni
-        """
         for snap_name, snap_version in SNAP_PACKAGES:
             try:
                 snap_cache = snap.SnapCache()
@@ -1586,18 +1570,22 @@ sudo snap start charmed-postgresql.patroni
                                 revision,
                                 snap_package.revision,
                             )
-                            logger.error(resolution_message)
-                            right_workloads_revisions = False
-                            continue
-                        channel = snap_version.get("channel", "")
-                        if channel != "" and snap_package.channel != channel:
-                            logger.error(
-                                "Snap channel mismatch for %s: expected % but found %s",
-                                snap_name,
-                                channel,
-                                snap_package.channel,
-                            )
-                            logger.error(resolution_message)
+                            logger.error(f"""
+Check the latest unit shown in the following command, which will be the primary unit:
+
+sudo -H -u snap_daemon charmed-postgresql.patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml history {self.app.name}
+
+Then, run the following commands to fix the issue (first in the primary, then in each replica):
+
+# List which services are active.
+sudo snap services charmed-postgresql
+
+# Refresh the snap to the right revision.
+sudo snap refresh charmed-postgresql --revision EXPECTED-REVISION-NUMBER
+
+# Start the patroni and the other previously active services again.
+sudo snap start charmed-postgresql.patroni
+                            """)
                             right_workloads_revisions = False
             except (snap.SnapError, snap.SnapNotFoundError) as e:
                 logger.error(
@@ -1680,7 +1668,7 @@ sudo snap start charmed-postgresql.patroni
         if (
             self.is_blocked
             and self.unit.status.message not in S3_BLOCK_MESSAGES
-            and self.unit.status.message != SNAP_REVISIONS_MISMATCH_MESSAGE
+            and self.unit.status.message != SNAP_REVISION_MISMATCH_MESSAGE
         ):
             # If charm was failing to disable plugin, try again (user may have removed the objects)
             if self.unit.status.message == EXTENSION_OBJECT_MESSAGE:
