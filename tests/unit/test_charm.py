@@ -931,14 +931,15 @@ def test_on_update_status(harness):
         ) as _primary_endpoint,
         patch("charm.PostgreSQLProvider.oversee_users") as _oversee_users,
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True),
-        patch("charm.Patroni.last_postgresql_logs") as _last_postgresql_logs,
-        patch("charm.Patroni.patroni_logs") as _patroni_logs,
         patch("charm.Patroni.get_member_status") as _get_member_status,
         patch(
             "charm.PostgreSQLBackups.can_use_s3_repository", return_value=(True, None)
         ) as _can_use_s3_repository,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
+        patch("charm.PostgresqlOperatorCharm._was_restore_successful") as _was_restore_successful,
+        patch(
+            "charm.PostgresqlOperatorCharm._ensure_correct_snap_revision"
+        ) as _ensure_correct_snap_revision,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test before the cluster is initialised.
@@ -955,7 +956,14 @@ def test_on_update_status(harness):
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
 
+        # Test when the snap revision is not correct.
+        harness.charm.unit.status = ActiveStatus()
+        _ensure_correct_snap_revision.return_value = False
+        harness.charm.on.update_status.emit()
+        _set_primary_status_message.assert_not_called()
+
         # Test the point-in-time-recovery fail.
+        _ensure_correct_snap_revision.return_value = True
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id,
@@ -966,13 +974,11 @@ def test_on_update_status(harness):
                     "restore-to-time": "valid",
                 },
             )
-        harness.charm.unit.status = ActiveStatus()
-        _patroni_logs.return_value = "2022-02-24 02:00:00 UTC patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
+        _was_restore_successful.return_value = False
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_not_called()
-        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
 
-        # Test with the unit in a status different that blocked.
+        # Test when everything is ok.
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id,
@@ -1011,6 +1017,85 @@ def test_on_update_status(harness):
         _start_observer.assert_called_once()
 
 
+def test_was_restore_successful(harness):
+    with (
+        patch("charm.Patroni.last_postgresql_logs") as _last_postgresql_logs,
+        patch("charm.Patroni.patroni_logs") as _patroni_logs,
+        patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
+    ):
+        rel_id = harness.model.get_relation(PEER).id
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "valid",
+                    "restore-to-time": "valid",
+                },
+            )
+        harness.charm.unit.status = ActiveStatus()
+        _patroni_logs.return_value = "2022-02-24 02:00:00 UTC patroni.exceptions.PatroniFatalException: Failed to bootstrap cluster"
+        assert not harness.charm._was_restore_successful()
+        assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
+
+
+def test_handle_processes_failures(harness):
+    with (
+        patch("charm.Patroni.restart_patroni") as _restart_patroni,
+        patch("charm.Patroni.reinitialize_postgresql") as _reinitialize_postgresql,
+        patch("charm.Patroni.cluster_members", new_callable=PropertyMock) as _cluster_members,
+        patch("charm.Patroni.member_inactive", new_callable=PropertyMock) as _member_inactive,
+    ):
+        # Test when the member IP is not listed in relation data, or it's active.
+        rel_id = harness.model.get_relation(PEER).id
+        member_ip = str(harness.model.get_binding(PEER).network.bind_address)
+        harness.update_relation_data(rel_id, harness.charm.app.name, {"members_ips": "[]"})
+        _member_inactive.return_value = True
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_not_called()
+
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"members_ips": f'["{member_ip}"]'}
+        )
+        _member_inactive.return_value = False
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_not_called()
+
+        # Test when the member is part of the cluster.
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"members_ips": f'["{member_ip}"]'}
+        )
+        _member_inactive.return_value = True
+        _cluster_members.return_value = [harness.charm.unit.name.replace("/", "-")]
+        assert harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_called_once()
+        _restart_patroni.assert_not_called()
+
+        # Test when the reinitialisation of the member fails.
+        _reinitialize_postgresql.reset_mock()
+        _reinitialize_postgresql.side_effect = RetryError(last_attempt=1)
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_called_once()
+        _restart_patroni.assert_not_called()
+
+        # Test when the member is not part of the cluster.
+        _reinitialize_postgresql.reset_mock()
+        _cluster_members.return_value = []
+        assert harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_called_once()
+
+        # Test when the restart of the member fails.
+        _restart_patroni.reset_mock()
+        _restart_patroni.side_effect = RetryError(last_attempt=1)
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_called_once()
+
+
 def test_on_update_status_after_restore_operation(harness):
     with (
         patch("charm.ClusterTopologyObserver.start_observer"),
@@ -1039,6 +1124,7 @@ def test_on_update_status_after_restore_operation(harness):
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.get_member_status") as _get_member_status,
         patch("upgrade.PostgreSQLUpgrade.idle", return_value=True),
+        patch("charm.PostgresqlOperatorCharm._ensure_correct_snap_revision", return_value=True),
     ):
         _get_current_timeline.return_value = "2"
         rel_id = harness.model.get_relation(PEER).id
