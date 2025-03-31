@@ -1040,6 +1040,62 @@ def test_was_restore_successful(harness):
         assert harness.charm.unit.status.message == CANNOT_RESTORE_PITR
 
 
+def test_handle_processes_failures(harness):
+    with (
+        patch("charm.Patroni.restart_patroni") as _restart_patroni,
+        patch("charm.Patroni.reinitialize_postgresql") as _reinitialize_postgresql,
+        patch("charm.Patroni.cluster_members", new_callable=PropertyMock) as _cluster_members,
+        patch("charm.Patroni.member_inactive", new_callable=PropertyMock) as _member_inactive,
+    ):
+        # Test when the member IP is not listed in relation data, or it's active.
+        rel_id = harness.model.get_relation(PEER).id
+        member_ip = str(harness.model.get_binding(PEER).network.bind_address)
+        harness.update_relation_data(rel_id, harness.charm.app.name, {"members_ips": "[]"})
+        _member_inactive.return_value = True
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_not_called()
+
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"members_ips": f'["{member_ip}"]'}
+        )
+        _member_inactive.return_value = False
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_not_called()
+
+        # Test when the member is part of the cluster.
+        harness.update_relation_data(
+            rel_id, harness.charm.app.name, {"members_ips": f'["{member_ip}"]'}
+        )
+        _member_inactive.return_value = True
+        _cluster_members.return_value = [harness.charm.unit.name.replace("/", "-")]
+        assert harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_called_once()
+        _restart_patroni.assert_not_called()
+
+        # Test when the reinitialisation of the member fails.
+        _reinitialize_postgresql.reset_mock()
+        _reinitialize_postgresql.side_effect = RetryError(last_attempt=1)
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_called_once()
+        _restart_patroni.assert_not_called()
+
+        # Test when the member is not part of the cluster.
+        _reinitialize_postgresql.reset_mock()
+        _cluster_members.return_value = []
+        assert harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_called_once()
+
+        # Test when the restart of the member fails.
+        _restart_patroni.reset_mock()
+        _restart_patroni.side_effect = RetryError(last_attempt=1)
+        assert not harness.charm._handle_processes_failures()
+        _reinitialize_postgresql.assert_not_called()
+        _restart_patroni.assert_called_once()
+
+
 def test_on_update_status_after_restore_operation(harness):
     with (
         patch("charm.ClusterTopologyObserver.start_observer"),
