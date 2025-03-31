@@ -1580,13 +1580,23 @@ sudo snap start charmed-postgresql.patroni
                             right_workloads_revisions = False
                             continue
                         if snap_package.revision != revision:
-                            logger.error("Snap revision mismatch for %s: expected %s but found %s", snap_name, revision, snap_package.revision)
+                            logger.error(
+                                "Snap revision mismatch for %s: expected %s but found %s",
+                                snap_name,
+                                revision,
+                                snap_package.revision,
+                            )
                             logger.error(resolution_message)
                             right_workloads_revisions = False
                             continue
                         channel = snap_version.get("channel", "")
                         if channel != "" and snap_package.channel != channel:
-                            logger.error("Snap channel mismatch for %s: expected % but found %s", snap_name, channel, snap_package.channel)
+                            logger.error(
+                                "Snap channel mismatch for %s: expected % but found %s",
+                                snap_name,
+                                channel,
+                                snap_package.channel,
+                            )
                             logger.error(resolution_message)
                             right_workloads_revisions = False
             except (snap.SnapError, snap.SnapNotFoundError) as e:
