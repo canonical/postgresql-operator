@@ -11,12 +11,9 @@ from charms.glauth_k8s.v0.ldap import (
     LdapRequirer,
     LdapUnavailableEvent,
 )
-from charms.postgresql_k8s.v0.postgresql_tls import (
-    TLS_TRANSFER_RELATION,
-)
 from ops import Relation
 from ops.framework import Object
-from ops.model import ActiveStatus, BlockedStatus
+from ops.model import ActiveStatus
 
 logger = logging.getLogger(__name__)
 
@@ -36,28 +33,12 @@ class PostgreSQLLDAP(Object):
         self.framework.observe(self.ldap.on.ldap_unavailable, self._on_ldap_unavailable)
 
     @property
-    def ca_transferred(self) -> bool:
-        """Return whether the CA certificate has been transferred."""
-        ca_transferred_relations = self.model.relations[TLS_TRANSFER_RELATION]
-
-        for relation in ca_transferred_relations:
-            if relation.app.name == self._relation.app.name:
-                return True
-
-        return False
-
-    @property
     def _relation(self) -> Relation:
         """Return the relation object."""
         return self.model.get_relation(self.relation_name)
 
-    def _on_ldap_ready(self, event: LdapReadyEvent) -> None:
+    def _on_ldap_ready(self, _: LdapReadyEvent) -> None:
         """Handler for the LDAP ready event."""
-        if not self.ca_transferred:
-            self.charm.unit.status = BlockedStatus("LDAP insecure. Send LDAP server certificate")
-            event.defer()
-            return
-
         logger.debug("Enabling LDAP connection")
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({"ldap_enabled": "True"})
