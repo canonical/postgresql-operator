@@ -17,10 +17,9 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 
-@pytest.mark.abort_on_fail
 async def test_snap_revision_mismatch(ops_test: OpsTest, charm) -> None:
     """Test snap revision mismatch."""
-    (await ops_test.model.deploy(charm, config={"profile": "testing"}),)
+    await ops_test.model.deploy(charm, config={"profile": "testing"})
     async with ops_test.fast_forward():
         logger.info("Waiting for the database to become active")
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active")
