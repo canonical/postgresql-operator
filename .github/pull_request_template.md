@@ -3,5 +3,5 @@
 ## Solution
 
 ## Checklist
-- [ ] I have checked and added or updated relevant documentation.
+- [ ] I have added or updated relevant documentation.
 
