@@ -3,7 +3,6 @@
 
 from unittest.mock import (
     MagicMock,
-    PropertyMock,
     patch,
 )
 
@@ -29,36 +28,16 @@ def harness():
     harness.cleanup()
 
 
-def test_on_ldap_ready_with_certificate(harness):
+def test_on_ldap_ready(harness):
     mock_event = MagicMock()
 
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.PostgreSQLLDAP.ca_transferred", new_callable=PropertyMock) as _ca_transferred,
-    ):
-        _ca_transferred.return_value = True
+    with patch("charm.PostgresqlOperatorCharm.update_config") as _update_config:
         harness.charm.ldap._on_ldap_ready(mock_event)
         _update_config.assert_called_once()
 
         peer_rel_id = harness.model.get_relation(PEER).id
         app_databag = harness.get_relation_data(peer_rel_id, harness.charm.app)
         assert "ldap_enabled" in app_databag
-
-
-def test_on_ldap_ready_without_certificate(harness):
-    mock_event = MagicMock()
-
-    with (
-        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
-        patch("charm.PostgreSQLLDAP.ca_transferred", new_callable=PropertyMock) as _ca_transferred,
-    ):
-        _ca_transferred.return_value = False
-        harness.charm.ldap._on_ldap_ready(mock_event)
-        _update_config.assert_not_called()
-
-        peer_rel_id = harness.model.get_relation(PEER).id
-        app_databag = harness.get_relation_data(peer_rel_id, harness.charm.app)
-        assert "ldap_enabled" not in app_databag
 
 
 def test_on_ldap_unavailable(harness):
