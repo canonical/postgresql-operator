@@ -9,6 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from ..architecture import architecture
 from ..helpers import (
     CHARM_BASE,
     db_connect,
@@ -17,6 +18,7 @@ from ..helpers import (
     get_unit_address,
     run_command_on_unit,
 )
+from ..markers import amd64_only
 from .conftest import APPLICATION_NAME
 from .helpers import (
     METADATA,
@@ -68,6 +70,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     wait_for_apps = False
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
     # is a pre-existing cluster.
+    storage = {"pgdata": {"pool": "lxd-btrfs", "size": 2048}} if architecture == "amd64" else None
     if not await app_name(ops_test):
         wait_for_apps = True
         async with ops_test.fast_forward():
@@ -75,7 +78,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
                 charm,
                 num_units=3,
                 base=CHARM_BASE,
-                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+                storage=storage,
                 config={"profile": "testing"},
             )
     # Deploy the continuous writes application charm if it wasn't already deployed.
@@ -95,6 +98,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
 
 
 @pytest.mark.abort_on_fail
+@amd64_only
 async def test_storage_re_use(ops_test, continuous_writes):
     """Verifies that database units with attached storage correctly repurpose storage.
 
