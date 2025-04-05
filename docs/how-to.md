@@ -4,7 +4,7 @@ The following guides cover key processes and common tasks for managing and using
 
 ## Deployment and setup
 
-The following guides walk you through the details of how to install different cloud services and bootstrap them to Juju:
+Installation of different cloud services with Juju:
 * [Sunbeam]
 * [LXD]
 * [MAAS]
@@ -13,7 +13,7 @@ The following guides walk you through the details of how to install different cl
 * [Azure]
 * [Multi-availability zones (AZ)][Multi-AZ]
 
-The following guides cover some specific deployment scenarios and architectures:
+Specific deployment scenarios and architectures:
 * [Terraform]
 * [Air-gapped]
 * [TLS VIP access]
@@ -54,7 +54,7 @@ The following guides cover some specific deployment scenarios and architectures:
 
 ## Development
 
-This section is aimed at charm developers looking to support PostgreSQL integrations with their charm.
+This section is for charm developers looking to support PostgreSQL integrations with their charm.
 
 * [Integrate with your charm]
 * [Migrate data via pg_dump]
