@@ -96,6 +96,7 @@ from constants import (
     TLS_KEY_FILE,
     TRACING_PROTOCOL,
     UNIT_SCOPE,
+    UPDATE_CERTS_BIN_PATH,
     USER,
     USER_PASSWORD_KEY,
 )
@@ -191,6 +192,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
+
+        self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["pgdata"].location
 
         self.upgrade = PostgreSQLUpgrade(
@@ -1801,6 +1804,33 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return self.update_config()
         except Exception:
             logger.exception("TLS files failed to push. Error in config update")
+            return False
+
+    def push_ca_file_into_workload(self, secret_name: str) -> bool:
+        """Move CA certificates file into the PostgreSQL storage path."""
+        certs = self.get_secret(UNIT_SCOPE, secret_name)
+        if certs is not None:
+            certs_file = Path(self._certs_path, f"{secret_name}.crt")
+            certs_file.write_text(certs)
+            subprocess.check_call([UPDATE_CERTS_BIN_PATH])  # noqa: S603
+
+        try:
+            return self.update_config()
+        except Exception:
+            logger.exception("CA file failed to push. Error in config update")
+            return False
+
+    def clean_ca_file_from_workload(self, secret_name: str) -> bool:
+        """Cleans up CA certificates from the PostgreSQL storage path."""
+        certs_file = Path(self._certs_path, f"{secret_name}.crt")
+        certs_file.unlink()
+
+        subprocess.check_call([UPDATE_CERTS_BIN_PATH])  # noqa: S603
+
+        try:
+            return self.update_config()
+        except Exception:
+            logger.exception("CA file failed to clean. Error in config update")
             return False
 
     def _reboot_on_detached_storage(self, event: EventBase) -> None:
