@@ -41,7 +41,13 @@ from cluster import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
+from constants import (
+    PEER,
+    POSTGRESQL_SNAP_NAME,
+    SECRET_INTERNAL_LABEL,
+    SNAP_PACKAGES,
+    UPDATE_CERTS_BIN_PATH,
+)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -1764,6 +1770,42 @@ def test_push_tls_files_to_workload(harness):
             _render_file.reset_mock()
             assert not (harness.charm.push_tls_files_to_workload())
             assert _render_file.call_count == 2
+
+
+def test_push_ca_file_into_workload(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("pathlib.Path.write_text") as _write_text,
+        patch("subprocess.check_call") as _check_call,
+    ):
+        harness.charm.set_secret("unit", "ca-app", "test-ca")
+
+        assert harness.charm.push_ca_file_into_workload("ca-app")
+        _write_text.assert_called_once()
+        _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
+        _update_config.assert_called_once()
+
+
+def test_clean_ca_file_from_workload(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("pathlib.Path.write_text") as _write_text,
+        patch("pathlib.Path.unlink") as _unlink,
+        patch("subprocess.check_call") as _check_call,
+    ):
+        harness.charm.set_secret("unit", "ca-app", "test-ca")
+
+        assert harness.charm.push_ca_file_into_workload("ca-app")
+        _write_text.assert_called_once()
+        _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
+        _update_config.assert_called_once()
+
+        _check_call.reset_mock()
+        _update_config.reset_mock()
+
+        assert harness.charm.clean_ca_file_from_workload("ca-app")
+        _unlink.assert_called_once()
+        _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
 
 
 def test_is_workload_running(harness):
