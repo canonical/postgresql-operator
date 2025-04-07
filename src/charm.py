@@ -23,6 +23,7 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
+    ACCESS_GROUPS,
     REQUIRED_PLUGINS,
     PostgreSQL,
     PostgreSQLCreateUserError,
@@ -1359,6 +1360,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self.postgresql.set_up_database()
+
+        access_groups = self.postgresql.list_access_groups()
+        if access_groups != set(ACCESS_GROUPS):
+            self.postgresql.create_access_groups()
+            self.postgresql.grant_internal_access_group_memberships()
 
         self.postgresql_client_relation.oversee_users()
 
