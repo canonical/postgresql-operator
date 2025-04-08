@@ -9,6 +9,9 @@ TODO: add description after specification is accepted.
 import json
 import logging
 import re
+from typing import (
+    Any,
+)
 
 from ops import (
     ActionEvent,
@@ -176,15 +179,12 @@ class PostgreSQLLogicalReplication(Object):
         for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
             if rel.id == event.relation.id:
                 continue
-            used_replication_slots += [
-                v
-                for k, v in self._get_dict_from_str(
-                    rel.data[self.model.app].get("replication-slots")
-                ).items()
-            ]
+            used_replication_slots += self._get_dict_from_str(
+                rel.data[self.model.app].get("replication-slots")
+            ).values()
 
         deleting_replication_slots = [
-            k for k, v in global_replication_slots.items() if k not in used_replication_slots
+            k for k in global_replication_slots if k not in used_replication_slots
         ]
         for deleting_replication_slot in deleting_replication_slots:
             global_replication_slots.pop(deleting_replication_slot, None)
@@ -584,10 +584,10 @@ class PostgreSQLLogicalReplication(Object):
     @staticmethod
     def _get_publications_from_str(
         publications_str: str | None = None,
-    ) -> dict[str, dict[str, any]]:
+    ) -> dict[str, dict[str, Any]]:
         return json.loads(publications_str or "{}")
 
-    def _set_publications(self, publications: dict[str, dict[str, any]]):
+    def _set_publications(self, publications: dict[str, dict[str, Any]]):
         publications_str = json.dumps(publications)
         self.charm.app_peer_data["publications"] = publications_str
         for rel in self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ()):
