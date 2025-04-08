@@ -615,9 +615,9 @@ def test_on_start(harness):
         patch("charm.PostgreSQLProvider.update_endpoints"),
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch(
-            "charm.Patroni.member_started",
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
-        ) as _member_started,
+        ) as _primary_endpoint,
         patch("charm.Patroni.bootstrap_cluster") as _bootstrap_cluster,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
@@ -637,7 +637,7 @@ def test_on_start(harness):
         _reboot_on_detached_storage.assert_called_once()
 
         # Test before the passwords are generated.
-        _member_started.return_value = False
+        _primary_endpoint.return_value = None
         _get_password.return_value = None
         harness.charm.on.start.emit()
         _bootstrap_cluster.assert_not_called()
@@ -672,7 +672,7 @@ def test_on_start(harness):
 
         # Test the event of an error happening when trying to create the default postgres user.
         _restart_services_after_reboot.reset_mock()
-        _member_started.return_value = True
+        _primary_endpoint.return_value = "endpoint"
         harness.charm.on.start.emit()
         _postgresql.create_user.assert_called_once()
         _oversee_users.assert_not_called()
@@ -756,7 +756,7 @@ def test_on_start_replica(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
-def test_on_start_no_patroni_member(harness):
+def test_on_start_no_primary_endpoint(harness):
     with (
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.snap.SnapCache") as _snap_cache,
@@ -767,10 +767,13 @@ def test_on_start_no_patroni_member(harness):
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint", new_callable=PropertyMock
+        ) as _primary_endpoint,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
     ):
         # Mock the passwords.
-        patroni.return_value.member_started = False
+        _primary_endpoint.return_value = None
         _get_password.return_value = "fake-operator-password"
         bootstrap_cluster = patroni.return_value.bootstrap_cluster
         bootstrap_cluster.return_value = True
@@ -782,7 +785,7 @@ def test_on_start_no_patroni_member(harness):
         bootstrap_cluster.assert_called_once()
         _postgresql.create_user.assert_not_called()
         assert isinstance(harness.model.unit.status, WaitingStatus)
-        assert harness.model.unit.status.message == "awaiting for member to start"
+        assert harness.model.unit.status.message == "awaiting for primary endpoint to be ready"
 
 
 def test_on_start_after_blocked_state(harness):
