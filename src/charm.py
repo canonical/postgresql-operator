@@ -1324,10 +1324,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = BlockedStatus("failed to start Patroni")
             return
 
-        # Assert the member is up and running before marking it as initialised.
-        if not self._patroni.member_started:
-            logger.debug("Deferring on_start: awaiting for member to start")
-            self.unit.status = WaitingStatus("awaiting for member to start")
+        # Assert the primary is up and running before marking it as initialised.
+        if not self.primary_endpoint:
+            logger.debug("Deferring on_start: awaiting for primary endpoint to be ready")
+            self.unit.status = WaitingStatus("awaiting for primary endpoint to be ready")
             event.defer()
             return
 
