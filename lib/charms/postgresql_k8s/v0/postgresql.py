@@ -626,6 +626,7 @@ END; $$;"""
         Returns:
             List of PostgreSQL database access groups.
         """
+        connection = None
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(
@@ -646,6 +647,7 @@ END; $$;"""
         Returns:
             List of PostgreSQL database users.
         """
+        connection = None
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
@@ -664,6 +666,7 @@ END; $$;"""
         Returns:
             List of PostgreSQL database users.
         """
+        connection = None
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(
