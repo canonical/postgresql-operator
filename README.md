@@ -163,7 +163,8 @@ juju remove-relation postgresql self-signed-certificates
 
 ## Security
 
-Security issues in the Charmed PostgreSQL Operator can be reported through [LaunchPad](https://wiki.ubuntu.com/DebuggingSecurity#How%20to%20File). Please do not use GitHub to submit security issues.
+Security issues in the Charmed PostgreSQL Operator can be reported through [private security reports](https://github.com/canonical/postgresql-operator/security/advisories/new) on GitHub.
+For more information, see the [Security policy](SECURITY.md).
 
 ## Contributing
 
