@@ -1,0 +1,45 @@
+# Copyright 2025 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+name: Weekly TICS scan
+
+on:
+  push:
+  schedule:
+    - cron: "0 2 * * 6" # Every Saturday 2:00 AM UTC
+  workflow_dispatch:
+
+jobs:
+  TICS:
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Create and activate virtual environment
+        run: |
+          python3 -m venv .venv
+          . .venv/bin/activate
+          pip install flake8 poetry pylint pytest tox
+          poetry install --all-groups
+          echo PATH="$PATH" >> "$GITHUB_ENV"
+
+      - name: Run coverage tests
+        run: |
+          tox -e unit
+
+      - name: Move results to the necessary folder for TICS
+        run: |
+          mkdir -p .cover
+          mv coverage.xml .cover/cobertura.xml
+
+      - name: TICS GitHub Action
+        uses: tiobe/tics-github-action@v3
+        with:
+          mode: qserver
+          project: postgresql-operator
+          viewerUrl: https://canonical.tiobe.com/tiobeweb/TICS/api/cfg?name=default
+          branchdir: ${{ env.GITHUB_WORKSPACE }}
+          ticsAuthToken: ${{ secrets.TICSAUTHTOKEN }}
+          installTics: true
+          calc: ALL
