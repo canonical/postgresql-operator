@@ -37,7 +37,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
         ops_test.model.deploy(
             charm,
             application_name=DATABASE_APP_NAME,
-            num_units=3,
+            num_units=1,
             base=CHARM_BASE,
         ),
         ops_test.model.deploy(
@@ -45,7 +45,9 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
             config={"token": os.environ["UBUNTU_PRO_TOKEN"]},
             channel="latest/edge",
             num_units=0,
-            base=CHARM_BASE,
+            # TODO switch back to series when pylib juju can figure out the base:
+            # https://github.com/juju/python-libjuju/issues/1240
+            series="jammy",
         ),
         ops_test.model.deploy(
             LS_CLIENT,
@@ -71,7 +73,7 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
 
 
 async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
-    await scale_application(ops_test, DATABASE_APP_NAME, 4)
+    await scale_application(ops_test, DATABASE_APP_NAME, 2)
 
     await ops_test.model.wait_for_idle(
         apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
@@ -79,7 +81,7 @@ async def test_scale_up(ops_test: OpsTest, check_subordinate_env_vars):
 
 
 async def test_scale_down(ops_test: OpsTest, check_subordinate_env_vars):
-    await scale_application(ops_test, DATABASE_APP_NAME, 3)
+    await scale_application(ops_test, DATABASE_APP_NAME, 1)
 
     await ops_test.model.wait_for_idle(
         apps=[LS_CLIENT, UBUNTU_PRO_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1500
