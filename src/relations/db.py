@@ -7,6 +7,7 @@ import logging
 from collections.abc import Iterable
 
 from charms.postgresql_k8s.v0.postgresql import (
+    ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLGetPostgreSQLVersionError,
@@ -198,10 +199,11 @@ class DbProvides(Object):
             # non-leader units when the cluster topology changes.
             self.charm.set_secret(APP_SCOPE, user, password)
             self.charm.set_secret(APP_SCOPE, f"{user}-database", database)
+            self.charm.postgresql.create_user(
+                user, password, self.admin, extra_user_roles=[ACCESS_GROUP_RELATION]
+            )
 
-            self.charm.postgresql.create_user(user, password, self.admin)
             plugins = self.charm.get_plugins()
-
             self.charm.postgresql.create_database(
                 database, user, plugins=plugins, client_relations=self.charm.client_relations
             )
