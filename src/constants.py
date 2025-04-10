@@ -32,7 +32,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "160", "x86_64": "161"}},
+        {"revision": {"aarch64": "160", "x86_64": "166"}},
     )
 ]
 
@@ -79,7 +79,7 @@ ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
 TRACING_PROTOCOL = "otlp_http"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
-PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
+PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"', "set_user": '"set_user"'}
 
 SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
 

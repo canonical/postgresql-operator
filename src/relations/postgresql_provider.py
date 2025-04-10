@@ -100,7 +100,7 @@ class PostgreSQLProvider(Object):
             # Creates the user and the database for this specific relation.
             user = f"relation-{event.relation.id}"
             password = new_password()
-            self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
+            self.charm.postgresql.create_user(user, password, roles=extra_user_roles)
             plugins = self.charm.get_plugins()
 
             self.charm.postgresql.create_database(
@@ -294,7 +294,7 @@ class PostgreSQLProvider(Object):
         Args:
             relation_id: current relation to be skipped.
         """
-        valid_privileges, valid_roles = self.charm.postgresql.list_valid_privileges_and_roles()
+        valid_roles = self.charm.postgresql.list_roles()
         for relation in self.charm.model.relations.get(self.relation_name, []):
             if relation.id == relation_id:
                 continue
@@ -302,9 +302,6 @@ class PostgreSQLProvider(Object):
                 extra_user_roles = data.get("extra-user-roles")
                 extra_user_roles = self._sanitize_extra_roles(extra_user_roles)
                 for extra_user_role in extra_user_roles:
-                    if (
-                        extra_user_role not in valid_privileges
-                        and extra_user_role not in valid_roles
-                    ):
+                    if extra_user_role not in valid_roles:
                         return True
         return False

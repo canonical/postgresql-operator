@@ -1058,6 +1058,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             MONITORING_PASSWORD_KEY,
             RAFT_PASSWORD_KEY,
             PATRONI_PASSWORD_KEY,
+            "dba-user-password",
         ):
             if self.get_secret(APP_SCOPE, key) is None:
                 self.set_secret(APP_SCOPE, key, new_password())
@@ -1301,23 +1302,34 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        self.postgresql.enable_disable_extensions({"set_user": True}, database="postgres")
+
+        # TODO: add exception handling
+        self.postgresql.create_predefined_roles()
+
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
-            if "postgres" not in users:
-                self.postgresql.create_user("postgres", new_password(), admin=True)
-                # Create the backup user.
+            # TODO: find out where the 'postgres' user is used
+            # if "postgres" not in users:
+            #     self.postgresql.create_user("postgres", new_password(), admin=True)
+            # Create the backup user.
+            if "dba_user" not in users:
+                self.postgresql.create_user(
+                    "dba_user", self.get_secret(APP_SCOPE, "dba-user-password"), roles=["charmed_dba"]
+                )
+            # TODO: move predefined roles into constants
             if BACKUP_USER not in users:
-                self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
+                self.postgresql.create_user(BACKUP_USER, new_password(), roles=["charmed_backup"])
             if MONITORING_USER not in users:
                 # Create the monitoring user.
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles=["pg_monitor"],
+                    roles=["charmed_stats"],
                 )
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
@@ -2109,6 +2121,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for plugin in self.config.plugin_keys()
             if self.config[plugin]
         ]
+        plugins.append("set_user")
         plugins = [PLUGIN_OVERRIDES.get(plugin, plugin) for plugin in plugins]
         if "spi" in plugins:
             plugins.remove("spi")
