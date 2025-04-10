@@ -25,7 +25,9 @@ This guide shows how to integrate Charmed PostgreSQL with both charmed and non-c
 
 Integrations with charmed applications are supported via the modern [`postgresql_client`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/postgresql_client/v0/README.md) interface, and the legacy `psql` interface from the [original version](https://launchpad.net/postgresql-charm) of the charm.
 
-> You can see which existing charms are compatible with PostgreSQL in the [Integrations](https://charmhub.io/postgresql/integrations) tab.
+[note]
+You can see which existing charms are compatible with PostgreSQL in the [Integrations](https://charmhub.io/postgresql/integrations) tab.
+[/note]
 
 ### Modern `postgresql_client` interface
 To integrate with a charmed application that supports the `postgresql_client` interface, run
@@ -41,7 +43,7 @@ juju remove-relation postgresql <charm>
 ### Legacy `pgsql` interface
 [note type="caution"]
 Note that this interface is **deprecated**.
-See more information in [Explanation > Legacy charm](/t/10690).
+See the [legacy charm explanation page](/t/10690).
 [/note]
 
 To integrate via the legacy interface, run
