@@ -55,6 +55,8 @@ async def test_deploy(ops_test: OpsTest, charm: str, check_subordinate_env_vars)
                 "account-name": os.environ["LANDSCAPE_ACCOUNT_NAME"],
                 "registration-key": os.environ["LANDSCAPE_REGISTRATION_KEY"],
                 "ppa": "ppa:landscape/self-hosted-beta",
+                "http-proxy": os.environ["HTTP_PROXY"],
+                "https-proxy": os.environ["HTTPS_PROXY"],
             },
             channel="latest/edge",
             num_units=0,
