@@ -100,6 +100,23 @@ class PostgreSQLBackups(Object):
             return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
         return ""
 
+    def _get_s3_session_resource(self, s3_parameters: dict):
+        session = boto3.session.Session(
+            aws_access_key_id=s3_parameters["access-key"],
+            aws_secret_access_key=s3_parameters["secret-key"],
+            region_name=s3_parameters["region"],
+        )
+        return session.resource(
+            "s3",
+            endpoint_url=self._construct_endpoint(s3_parameters),
+            verify=(self._tls_ca_chain_filename or None),
+            config=botocore.client.Config(
+                # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
+                request_checksum_calculation="when_required",
+                response_checksum_validation="when_required",
+            ),
+        )
+
     def _are_backup_settings_ok(self) -> tuple[bool, str | None]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
@@ -258,18 +275,9 @@ class PostgreSQLBackups(Object):
 
         bucket_name = s3_parameters["bucket"]
         region = s3_parameters.get("region")
-        session = boto3.session.Session(
-            aws_access_key_id=s3_parameters["access-key"],
-            aws_secret_access_key=s3_parameters["secret-key"],
-            region_name=s3_parameters["region"],
-        )
 
         try:
-            s3 = session.resource(
-                "s3",
-                endpoint_url=self._construct_endpoint(s3_parameters),
-                verify=(self._tls_ca_chain_filename or None),
-            )
+            s3 = self._get_s3_session_resource(s3_parameters)
         except ValueError as e:
             logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
             raise e
@@ -1372,17 +1380,7 @@ Stderr:
         processed_s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
-            session = boto3.session.Session(
-                aws_access_key_id=s3_parameters["access-key"],
-                aws_secret_access_key=s3_parameters["secret-key"],
-                region_name=s3_parameters["region"],
-            )
-
-            s3 = session.resource(
-                "s3",
-                endpoint_url=self._construct_endpoint(s3_parameters),
-                verify=(self._tls_ca_chain_filename or None),
-            )
+            s3 = self._get_s3_session_resource(s3_parameters)
             bucket = s3.Bucket(bucket_name)
 
             with tempfile.NamedTemporaryFile() as temp_file:
@@ -1415,16 +1413,7 @@ Stderr:
         processed_s3_path = os.path.join(s3_parameters["path"], s3_path).lstrip("/")
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
-            session = boto3.session.Session(
-                aws_access_key_id=s3_parameters["access-key"],
-                aws_secret_access_key=s3_parameters["secret-key"],
-                region_name=s3_parameters["region"],
-            )
-            s3 = session.resource(
-                "s3",
-                endpoint_url=self._construct_endpoint(s3_parameters),
-                verify=(self._tls_ca_chain_filename or None),
-            )
+            s3 = self._get_s3_session_resource(s3_parameters)
             bucket = s3.Bucket(bucket_name)
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
