@@ -56,11 +56,10 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
         # TODO have a better way to bootstrap clusters with existing storage
-        primary = await get_primary(
-            ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
-        )
         for user in ["monitoring", "operator", "replication", "rewind"]:
-            password = await get_password(ops_test, database_app_name=FIRST_APPLICATION, username=user)
+            password = await get_password(
+                ops_test, database_app_name=FIRST_APPLICATION, username=user
+            )
             second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
             await set_password(
                 ops_test, database_app_name=SECOND_APPLICATION, username=user, password=password
