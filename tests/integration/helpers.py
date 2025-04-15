@@ -144,7 +144,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
 
     # Retrieve all users in the database.
     users_in_db = await execute_query_on_unit(
@@ -170,7 +170,7 @@ async def check_databases_creation(ops_test: OpsTest, databases: list[str]) -> N
         databases: List of database names that should have been created
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
@@ -586,7 +586,7 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> list[str]:
         ops_test: The ops test framework
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
     unit_address = await unit.get_public_address()
 
     output = await execute_query_on_unit(
@@ -744,7 +744,7 @@ async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test)
     # Get the IP addresses of the other units to check that they
     # are connecting to the primary unit (if unit_name is the
     # primary unit name) using encrypted connections.
@@ -809,7 +809,7 @@ async def check_tls_replication(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test)
 
     # Check for the all replicas using encrypted connection
     output = await execute_query_on_unit(
@@ -1142,7 +1142,7 @@ async def backup_operations(
             break
 
     # Write some data.
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
     with db_connect(host=address, password=password) as connection:

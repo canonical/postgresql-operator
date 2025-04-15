@@ -86,7 +86,7 @@ async def pitr_backup_operations(
         if unit.name != primary:
             replica = unit.name
             break
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     address = get_unit_address(ops_test, primary)
 
     logger.info("1: creating table")

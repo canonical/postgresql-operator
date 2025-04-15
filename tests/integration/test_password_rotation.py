@@ -45,12 +45,12 @@ async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
     # Get the initial passwords set for the system users.
     any_unit_name = ops_test.model.applications[APP_NAME].units[0].name
-    superuser_password = await get_password(ops_test, any_unit_name)
-    replication_password = await get_password(ops_test, any_unit_name, "replication")
-    monitoring_password = await get_password(ops_test, any_unit_name, "monitoring")
-    backup_password = await get_password(ops_test, any_unit_name, "backup")
-    rewind_password = await get_password(ops_test, any_unit_name, "rewind")
-    patroni_password = await get_password(ops_test, any_unit_name, "patroni")
+    superuser_password = await get_password(ops_test)
+    replication_password = await get_password(ops_test, "replication")
+    monitoring_password = await get_password(ops_test, "monitoring")
+    backup_password = await get_password(ops_test, "backup")
+    rewind_password = await get_password(ops_test, "rewind")
+    patroni_password = await get_password(ops_test, "patroni")
 
     # Change both passwords.
     await set_password(ops_test)
@@ -76,15 +76,15 @@ async def test_password_rotation(ops_test: OpsTest):
     await set_password(ops_test, username="rewind", password=new_rewind_password)
     await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=1000)
 
-    new_superuser_password = await get_password(ops_test, any_unit_name)
+    new_superuser_password = await get_password(ops_test)
     assert superuser_password != new_superuser_password
-    assert new_replication_password == await get_password(ops_test, any_unit_name, "replication")
+    assert new_replication_password == await get_password(ops_test, "replication")
     assert replication_password != new_replication_password
-    assert new_monitoring_password == await get_password(ops_test, any_unit_name, "monitoring")
+    assert new_monitoring_password == await get_password(ops_test, "monitoring")
     assert monitoring_password != new_monitoring_password
-    assert new_backup_password == await get_password(ops_test, any_unit_name, "backup")
+    assert new_backup_password == await get_password(ops_test, "backup")
     assert backup_password != new_backup_password
-    assert new_rewind_password == await get_password(ops_test, any_unit_name, "rewind")
+    assert new_rewind_password == await get_password(ops_test, "rewind")
     assert rewind_password != new_rewind_password
 
     # Restart Patroni on any non-leader unit and check that
