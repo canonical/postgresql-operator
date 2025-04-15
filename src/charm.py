@@ -1424,6 +1424,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         replication_offer_relation = self.model.get_relation(REPLICATION_OFFER_RELATION)
+        other_cluster_primary_ip = ""
         if (
             replication_offer_relation is not None
             and not self.async_replication.is_primary_cluster()
