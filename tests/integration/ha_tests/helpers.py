@@ -27,6 +27,7 @@ from ..helpers import (
     APPLICATION_NAME,
     db_connect,
     execute_query_on_unit,
+    get_password,
     get_patroni_cluster,
     get_unit_address,
     run_command_on_unit,
@@ -280,7 +281,7 @@ async def count_writes(
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app, down_unit)
+    password = await get_password(ops_test, app)
     members = []
     for model in [ops_test.model, extra_model]:
         if model is None:
@@ -514,22 +515,6 @@ async def get_sync_standby(ops_test: OpsTest, model: Model, application_name: st
             return member["name"]
 
 
-async def get_password(ops_test: OpsTest, app: str, down_unit: str | None = None) -> str:
-    """Use the charm action to retrieve the password from provided application.
-
-    Returns:
-        string with the password stored on the peer relation databag.
-    """
-    # Can retrieve from any unit running unit, so we pick the first.
-    for unit in ops_test.model.applications[app].units:
-        if unit.name != down_unit:
-            unit_name = unit.name
-            break
-    action = await ops_test.model.units.get(unit_name).run_action("get-password")
-    action = await action.wait()
-    return action.results["password"]
-
-
 async def get_unit_ip(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Wrapper for getting unit ip.
 
@@ -556,7 +541,7 @@ async def is_connection_possible(
 ) -> bool:
     """Test a connection to a PostgreSQL server."""
     app = unit_name.split("/")[0]
-    password = await get_password(ops_test, app, unit_name)
+    password = await get_password(ops_test, app)
     address = await (
         get_ip_from_inside_the_unit(ops_test, unit_name)
         if use_ip_from_inside

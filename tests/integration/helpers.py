@@ -169,7 +169,6 @@ async def check_databases_creation(ops_test: OpsTest, databases: list[str]) -> N
         ops_test: The ops test framework
         databases: List of database names that should have been created
     """
-    unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     password = await get_password(ops_test)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
@@ -626,17 +625,22 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return raw_hostname.strip()
 
 
-async def get_password(ops_test: OpsTest, username: str = "operator") -> str:
+async def get_password(
+    ops_test: OpsTest,
+    username: str = "operator",
+    database_app_name: str = DATABASE_APP_NAME,
+) -> str:
     """Retrieve a user password from the secret.
 
     Args:
         ops_test: ops_test instance.
         username: the user to get the password.
+        database_app_name: the app for getting the secret
 
     Returns:
         the user password.
     """
-    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{DATABASE_APP_NAME}.app")
+    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{database_app_name}.app")
     password = secret.get(f"{username}-password")
 
     return password
@@ -985,15 +989,18 @@ async def set_password(ops_test: OpsTest, username: str = "operator", password: 
     """
     secret_name = "system_users_secret"
 
-    secret_id = await ops_test.model.add_secret(
-        name=secret_name, data_args=[f"{username}={password}"]
-    )
-    await ops_test.model.grant_secret(secret_name=secret_name, application=DATABASE_APP_NAME)
+    try:
+        secret_id = await ops_test.model.add_secret(
+            name=secret_name, data_args=[f"{username}={password}"]
+        )
+        await ops_test.model.grant_secret(secret_name=secret_name, application=DATABASE_APP_NAME)
 
-    # update the application config to include the secret
-    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
-        SYSTEM_USERS_PASSWORD_CONFIG: secret_id
-    })
+        # update the application config to include the secret
+        await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+            SYSTEM_USERS_PASSWORD_CONFIG: secret_id
+        })
+    except Exception:
+        await ops_test.model.update_secret(name=secret_name, data_args=[f"{username}={password}"])
 
 
 async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
@@ -1142,7 +1149,7 @@ async def backup_operations(
             break
 
     # Write some data.
-    password = await get_password(ops_test)
+    password = await get_password(ops_test, database_app_name)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
     with db_connect(host=address, password=password) as connection:
