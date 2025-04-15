@@ -13,7 +13,6 @@ from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
-    PostgreSQLUpdateUserPasswordError,
 )
 from ops import Unit
 from ops.framework import EventBase
@@ -86,9 +85,9 @@ def test_on_install(harness):
         pg_snap.alias.assert_any_call("patronictl")
 
         assert _check_call.call_count == 3
-        _check_call.assert_any_call("mkdir -p /home/snap_daemon".split())
-        _check_call.assert_any_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-        _check_call.assert_any_call("usermod -d /home/snap_daemon snap_daemon".split())
+        _check_call.assert_any_call(["mkdir", "-p", "/home/snap_daemon"])
+        _check_call.assert_any_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])
+        _check_call.assert_any_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
