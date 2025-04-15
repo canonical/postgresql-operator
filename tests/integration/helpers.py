@@ -1006,7 +1006,9 @@ async def set_password(
             SYSTEM_USERS_PASSWORD_CONFIG: secret_id
         })
     except Exception:
-        await ops_test.model.update_secret(name=secret_name, data_args=[f"{username}={password}"])
+        await ops_test.model.update_secret(
+            name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
+        )
 
 
 async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
