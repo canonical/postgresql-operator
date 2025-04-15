@@ -142,7 +142,7 @@ async def test_no_password_change_on_invalid_password(ops_test: OpsTest) -> None
     """Test that in general, there is no change when password validation fails."""
     password1 = await get_password(ops_test, username="replication")
     # The password has to be minimum 3 characters
-    await set_password(ops_test, username="replication", password="ca" * 1000000)
+    await set_password(ops_test, username="replication", password="1")
     password2 = await get_password(ops_test, username="replication")
     # The password didn't change
     assert password1 == password2
