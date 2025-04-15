@@ -30,13 +30,18 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME
+from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+
+
+class SecretNotFoundError(Exception):
+    """Raised when a secret is not found."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -621,21 +626,38 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return raw_hostname.strip()
 
 
-async def get_password(ops_test: OpsTest, unit_name: str, username: str = "operator") -> str:
-    """Retrieve a user password using the action.
+async def get_password(ops_test: OpsTest, username: str = "operator") -> str:
+    """Retrieve a user password from the secret.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: the name of the unit.
         username: the user to get the password.
 
     Returns:
         the user password.
     """
-    unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-password", **{"username": username})
-    result = await action.wait()
-    return result.results["password"]
+    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{DATABASE_APP_NAME}.app")
+    password = secret.get(f"{username}-password")
+
+    return password
+
+
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> dict[str, str]:
+    secrets_raw = await ops_test.juju("list-secrets")
+    secret_ids = [
+        secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
+    ]
+
+    for secret_id in secret_ids:
+        secret_data_raw = await ops_test.juju(
+            "show-secret", "--format", "json", "--reveal", secret_id
+        )
+        secret_data = json.loads(secret_data_raw[1])
+
+        if label == secret_data[secret_id].get("label"):
+            return secret_data[secret_id]["content"]["Data"]
+
+    raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
 @retry(
@@ -949,14 +971,11 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     )
 
 
-async def set_password(
-    ops_test: OpsTest, unit_name: str, username: str = "operator", password: str | None = None
-):
-    """Set a user password using the action.
+async def set_password(ops_test: OpsTest, username: str = "operator", password: str | None = None):
+    """Set a user password via secret.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: the name of the unit.
         username: the user to set the password.
         password: optional password to use
             instead of auto-generating
@@ -964,13 +983,17 @@ async def set_password(
     Returns:
         the results from the action.
     """
-    unit = ops_test.model.units.get(unit_name)
-    parameters = {"username": username}
-    if password is not None:
-        parameters["password"] = password
-    action = await unit.run_action("set-password", **parameters)
-    result = await action.wait()
-    return result.results
+    secret_name = "system_users_secret"
+
+    secret_id = await ops_test.model.add_secret(
+        name=secret_name, data_args=[f"{username}={password}"]
+    )
+    await ops_test.model.grant_secret(secret_name=secret_name, application=DATABASE_APP_NAME)
+
+    # update the application config to include the secret
+    await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        SYSTEM_USERS_PASSWORD_CONFIG: secret_id
+    })
 
 
 async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
