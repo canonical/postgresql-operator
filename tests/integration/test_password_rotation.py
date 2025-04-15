@@ -44,7 +44,6 @@ async def test_deploy_active(ops_test: OpsTest, charm):
 async def test_password_rotation(ops_test: OpsTest):
     """Test password rotation action."""
     # Get the initial passwords set for the system users.
-    any_unit_name = ops_test.model.applications[APP_NAME].units[0].name
     superuser_password = await get_password(ops_test)
     replication_password = await get_password(ops_test, "replication")
     monitoring_password = await get_password(ops_test, "monitoring")

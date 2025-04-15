@@ -86,7 +86,6 @@ async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Connect to the PostgreSQL instance.
     # Retrieving the operator user password using the action.
-    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     password = await get_password(ops_test)
 
     # Connect to PostgreSQL.
@@ -192,7 +191,6 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         "experimental_max_connections": "200",
     })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
-    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     password = await get_password(ops_test)
 
     # Connect to PostgreSQL.
