@@ -281,7 +281,7 @@ async def count_writes(
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
     members = []
     for model in [ops_test.model, extra_model]:
         if model is None:
@@ -541,7 +541,7 @@ async def is_connection_possible(
 ) -> bool:
     """Test a connection to a PostgreSQL server."""
     app = unit_name.split("/")[0]
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
     address = await (
         get_ip_from_inside_the_unit(ops_test, unit_name)
         if use_ip_from_inside
@@ -766,7 +766,7 @@ async def is_secondary_up_to_date(
     Retries over the period of one minute to give secondary adequate time to copy over data.
     """
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
     host = await next(
         (
             get_ip_from_inside_the_unit(ops_test, unit.name)
@@ -1020,7 +1020,7 @@ async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
     """Creates database with specified name."""
     unit = ops_test.model.applications[app].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
 
     conn = db_connect(unit_address, password)
     conn.autocommit = True
@@ -1034,7 +1034,7 @@ async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
     """Returns True if database with specified name already exists."""
     unit = ops_test.model.applications[app].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
 
     assert password is not None
 

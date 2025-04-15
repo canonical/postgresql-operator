@@ -975,7 +975,12 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     )
 
 
-async def set_password(ops_test: OpsTest, username: str = "operator", password: str | None = None):
+async def set_password(
+    ops_test: OpsTest,
+    username: str = "operator",
+    password: str | None = None,
+    database_app_name: str = DATABASE_APP_NAME,
+):
     """Set a user password via secret.
 
     Args:
@@ -983,6 +988,7 @@ async def set_password(ops_test: OpsTest, username: str = "operator", password: 
         username: the user to set the password.
         password: optional password to use
             instead of auto-generating
+        database_app_name: name of the app for the secret
 
     Returns:
         the results from the action.
@@ -993,10 +999,10 @@ async def set_password(ops_test: OpsTest, username: str = "operator", password: 
         secret_id = await ops_test.model.add_secret(
             name=secret_name, data_args=[f"{username}={password}"]
         )
-        await ops_test.model.grant_secret(secret_name=secret_name, application=DATABASE_APP_NAME)
+        await ops_test.model.grant_secret(secret_name=secret_name, application=database_app_name)
 
         # update the application config to include the secret
-        await ops_test.model.applications[DATABASE_APP_NAME].set_config({
+        await ops_test.model.applications[database_app_name].set_config({
             SYSTEM_USERS_PASSWORD_CONFIG: secret_id
         })
     except Exception:
@@ -1149,7 +1155,7 @@ async def backup_operations(
             break
 
     # Write some data.
-    password = await get_password(ops_test, database_app_name)
+    password = await get_password(ops_test, database_app_name=database_app_name)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
     with db_connect(host=address, password=password) as connection:

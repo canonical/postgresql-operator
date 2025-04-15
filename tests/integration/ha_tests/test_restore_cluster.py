@@ -60,9 +60,11 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
         )
         for user in ["monitoring", "operator", "replication", "rewind"]:
-            password = await get_password(ops_test, primary, user)
+            password = await get_password(ops_test, database_app_name=FIRST_APPLICATION, username=user)
             second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
-            await set_password(ops_test, second_primary, user, password)
+            await set_password(
+                ops_test, database_app_name=SECOND_APPLICATION, username=user, password=password
+            )
         await ops_test.model.destroy_unit(second_primary)
 
 
@@ -72,7 +74,7 @@ async def test_cluster_restore(ops_test):
     primary = await get_primary(
         ops_test, ops_test.model.applications[FIRST_APPLICATION].units[0].name
     )
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test, database_app_name=FIRST_APPLICATION)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
     with db_connect(host=address, password=password) as connection:
