@@ -75,6 +75,10 @@ The snap "charmed-postgresql" also ships list of tools used by charm:
 
 The charm "[PostgreSQL Test App](https://charmhub.io/postgresql-test-app)" is a Canonical test application to validate the charm installation / functionality and perform the basic performance tests.
 
+### GLAuth
+
+GLAuth is a secure, easy-to-use and open-sourced LDAP server which provides capabilities to centrally manage accounts across infrastructures. The charm is only available for Kubernetes clouds, under the [GLAuth-K8s operator](https://charmhub.io/glauth-k8s) page, so a cross-controller relation is needed in order to integrate both charms.
+
 ### Grafana
 
 Grafana is an open-source visualization tools that allows to query, visualize, alert on, and visualize metrics from mixed datasources in configurable dashboards for observability. This charms is shipped with its own Grafana dashboard and supports integration with the [Grafana Operator](https://charmhub.io/grafana-k8s) to simplify observability. Please follow [COS Monitoring](/t/10600) setup.
