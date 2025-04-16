@@ -4,7 +4,6 @@
 """Postgres client relation hooks & helpers."""
 
 import logging
-from os import replace
 import typing
 
 from charms.data_platform_libs.v0.data_interfaces import (
@@ -202,7 +201,7 @@ class PostgreSQLProvider(Object):
             else:
                 logger.info("Stale relation user detected: %s", user)
 
-    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
+    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:  # noqa: C901
         """Set the read/write and read-only endpoints."""
         if not self.charm.unit.is_leader():
             return
