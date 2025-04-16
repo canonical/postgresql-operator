@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Literal, Optional, get_args
 
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -71,6 +71,7 @@ from config import CharmConfig
 from constants import (
     APP_SCOPE,
     BACKUP_USER,
+    DATABASE,
     DATABASE_DEFAULT_NAME,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
@@ -396,7 +397,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 # TODO figure out why peer data is not available
                 if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
                     logger.warning(
-                        "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                        "Possibly incomplete peer data: Will not map primary IP to unit IP"
                     )
                     return primary_endpoint
                 logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
@@ -1014,6 +1015,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _unit_ip(self) -> str:
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
+
+    @property
+    def _database_ip(self) -> str:
+        """Database endpoint address."""
+        return str(self.model.get_binding(DATABASE).network.bind_address)
+
+    def unit_address_for_relation(
+        self, relation_name: str, unit_name: Optional[str] = None
+    ) -> Optional[str]:
+        """Return the address of the unit for a given relation.
+
+        Uses recorded IP addresses for endpoints stored in peer databag
+        """
+        unit = next(u for u in self.app_units if u.name == unit_name)
+
+        return self._peers.data[unit].get(f"{relation_name}-address")
 
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
