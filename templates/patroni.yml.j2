@@ -129,7 +129,7 @@ bootstrap:
   {%- endif %}
 
 postgresql:
-  listen: '{{ self_ip }}:5432'
+  listen: {% for ip in listen_ips %}{{ ip }}{%- if not loop.last %},{% endif %}{% endfor %}:5432
   connect_address: '{{ self_ip }}:5432'
   # Path to PostgreSQL binaries used in the database bootstrap process.
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
