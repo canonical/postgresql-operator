@@ -4,6 +4,8 @@
 """Postgres client relation hooks & helpers."""
 
 import logging
+from os import replace
+import typing
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -19,7 +21,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
+from ops.charm import RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
@@ -34,6 +36,10 @@ from utils import new_password
 logger = logging.getLogger(__name__)
 
 
+if typing.TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
+
+
 class PostgreSQLProvider(Object):
     """Defines functionality for the 'provides' side of the 'postgresql-client' relation.
 
@@ -42,7 +48,7 @@ class PostgreSQLProvider(Object):
         - relation-broken
     """
 
-    def __init__(self, charm: CharmBase, relation_name: str = "database") -> None:
+    def __init__(self, charm: "PostgresqlOperatorCharm", relation_name: str = "database") -> None:
         """Constructor for PostgreSQLClientProvides object.
 
         Args:
@@ -58,6 +64,9 @@ class PostgreSQLProvider(Object):
         self.framework.observe(
             charm.on[self.relation_name].relation_changed,
             self._on_relation_changed_event,
+        )
+        self.framework.observe(
+            charm.on[self.relation_name].relation_created, self.register_address_for_endpoint
         )
         self.charm = charm
 
@@ -78,6 +87,15 @@ class PostgreSQLProvider(Object):
         extra_roles_list = [role for role in extra_roles_list if role not in ACCESS_GROUPS]
         return extra_roles_list
 
+    def register_address_for_endpoint(self, _) -> None:
+        """Register the address for the endpoint.
+
+        If spaces are defined for endpoint, address are registered for the unit in peer relation.
+        """
+        address = str(self.model.get_binding(self.relation_name).network.bind_address)
+        self.charm.unit_peer_data[f"{self.relation_name}-address"] = address
+        logger.debug(f"{address=} set for relation={self.relation_name}")
+
     def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
         """Generate password and handle user and database creation for the related application."""
         # Check for some conditions before trying to access the PostgreSQL instance.
@@ -96,7 +114,7 @@ class PostgreSQLProvider(Object):
             return
 
         # Retrieve the database name and extra user roles using the charm library.
-        database = event.database
+        database = event.database or ""
 
         # Make sure the relation access-group is added to the list
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
@@ -195,26 +213,41 @@ class PostgreSQLProvider(Object):
         rel_data = self.database_provides.fetch_relation_data(
             relations_ids, ["external-node-connectivity", "database"]
         )
+
+        # skip if no relation data
+        if not rel_data:
+            return
+
         secret_data = self.database_provides.fetch_my_relation_data(relations_ids, ["password"])
 
-        # If there are no replicas, remove the read-only endpoint.
-        replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
-        replicas_endpoint.sort()
-        cluster_state = self.charm._patroni.are_replicas_up()
-        if cluster_state:
-            replicas_endpoint = [
-                replica for replica in replicas_endpoint if cluster_state.get(replica, False)
-            ]
-        read_only_endpoints = (
-            ",".join(f"{x}:{DATABASE_PORT}" for x in replicas_endpoint)
-            if len(replicas_endpoint) > 0
-            else f"{self.charm.primary_endpoint}:{DATABASE_PORT}"
-        )
-        read_only_hosts = (
-            ",".join(replicas_endpoint)
-            if len(replicas_endpoint) > 0
-            else f"{self.charm.primary_endpoint}"
-        )
+        # Get cluster status
+        online_members = self.charm._patroni.online_cluster_members()
+
+        # populate rw/ro endpoints
+        primary_unit_ip, rw_endpoint, ro_hosts, ro_endpoints = "", "", "", ""
+        for member in online_members:
+            if member["role"] == "leader":
+                primary_unit_ip = self.charm.unit_address_for_relation(
+                    self.relation_name, member["name"].replace("-", "/")
+                )
+                rw_endpoint = f"{primary_unit_ip}:{DATABASE_PORT}"
+            else:
+                replica_ip = self.charm.unit_address_for_relation(
+                    self.relation_name, member["name"].replace("-", "/")
+                )
+                if not replica_ip:
+                    continue
+                if ro_hosts:
+                    ro_hosts = f"{ro_hosts},{replica_ip}"
+                    ro_endpoints = f"{ro_endpoints},{replica_ip}:{DATABASE_PORT}"
+                else:
+                    ro_hosts = replica_ip
+                    ro_endpoints = f"{replica_ip}:{DATABASE_PORT}"
+        else:
+            if not ro_hosts and primary_unit_ip:
+                # If there are no replicas, fallback to primary
+                ro_endpoints = rw_endpoint
+                ro_hosts = primary_unit_ip
 
         tls = "True" if self.charm.is_tls_enabled else "False"
         if tls == "True":
@@ -232,19 +265,19 @@ class PostgreSQLProvider(Object):
             # Set the read/write endpoint.
             self.database_provides.set_endpoints(
                 relation_id,
-                f"{self.charm.primary_endpoint}:{DATABASE_PORT}",
+                rw_endpoint,
             )
 
             # Set the read-only endpoint.
             self.database_provides.set_read_only_endpoints(
                 relation_id,
-                read_only_endpoints,
+                ro_endpoints,
             )
 
             # Set connection string URI.
             self.database_provides.set_uris(
                 relation_id,
-                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
+                f"postgresql://{user}:{password}@{rw_endpoint}/{database}",
             )
             # Make sure that the URI will be a secret
             if (
@@ -254,7 +287,7 @@ class PostgreSQLProvider(Object):
             ) and "read-only-uris" in secret_fields:
                 self.database_provides.set_read_only_uris(
                     relation_id,
-                    f"postgresql://{user}:{password}@{read_only_hosts}:{DATABASE_PORT}/{database}",
+                    f"postgresql://{user}:{password}@{ro_hosts}:{DATABASE_PORT}/{database}",
                 )
 
             self.database_provides.set_tls(relation_id, tls)
