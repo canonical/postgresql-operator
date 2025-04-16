@@ -384,7 +384,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 # TODO figure out why peer data is not available
                 if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
                     logger.warning(
-                        "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                        "Possibly incomplete peer data: Will not map primary IP to unit IP"
                     )
                     return primary_endpoint
                 logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
@@ -1307,6 +1307,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._can_connect_to_postgresql:
             logger.debug("Deferring on_start: awaiting for database to start")
             self.unit.status = WaitingStatus("awaiting for database to start")
+            event.defer()
+            return
+
+        if not self.primary_endpoint:
+            logger.debug("Deferrring on_start: awaitng start of the primary")
+            self.unit.status = WaitingStatus("awaiting start of the primary")
             event.defer()
             return
 
