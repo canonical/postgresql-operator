@@ -244,7 +244,7 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.charm.postgresql.create_user(
                 MONITORING_USER,
                 self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                extra_user_roles="pg_monitor",
+                roles=["charmed_stats"],
             )
         self.charm.postgresql.set_up_database()
 

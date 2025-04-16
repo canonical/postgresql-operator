@@ -24,7 +24,8 @@ MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 # List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
+# TODO: Add BACKUP_USER and MONITORING_USER
+SYSTEM_USERS = [REPLICATION_USER, REWIND_USER, USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
@@ -32,7 +33,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "169", "x86_64": "170"}},
+        {"revision": {"aarch64": "160", "x86_64": "166"}},
     )
 ]
 
@@ -79,7 +80,7 @@ ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE = (
 TRACING_PROTOCOL = "otlp_http"
 
 BACKUP_TYPE_OVERRIDES = {"full": "full", "differential": "diff", "incremental": "incr"}
-PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"'}
+PLUGIN_OVERRIDES = {"audit": "pgaudit", "uuid_ossp": '"uuid-ossp"', "set_user": '"set_user"'}
 
 SPI_MODULE = ["refint", "autoinc", "insert_username", "moddatetime"]
 
