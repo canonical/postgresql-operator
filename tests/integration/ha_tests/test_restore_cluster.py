@@ -60,16 +60,15 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             password = await get_password(
                 ops_test, database_app_name=FIRST_APPLICATION, username=user
             )
-            second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
             await set_password(
                 ops_test, database_app_name=SECOND_APPLICATION, username=user, password=password
             )
+            # wait for the password changes to be processed
+            await ops_test.model.wait_for_idle(
+                apps=[SECOND_APPLICATION], status="active", timeout=1500
+            )
 
-        # wait for the password changes to be processed
-        await ops_test.model.wait_for_idle(
-            apps=[SECOND_APPLICATION], status="active", timeout=1500
-        )
-
+        second_primary = ops_test.model.applications[SECOND_APPLICATION].units[0].name
         await ops_test.model.destroy_unit(second_primary)
 
 
