@@ -188,7 +188,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
-        self._storage_path = self.meta.storages["pgdata"].location
+        self._storage_path = self.meta.storages["data"].location
 
         self.upgrade = PostgreSQLUpgrade(
             self,
@@ -1328,7 +1328,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.postgresql.set_up_database()
+        self.postgresql.set_up_database(temp_location="/var/snap/charmed-postgresql/common/temp")
 
         self.postgresql_client_relation.oversee_users()
 
