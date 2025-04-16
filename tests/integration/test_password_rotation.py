@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
-import json
 import re
 import time
 
@@ -9,7 +8,6 @@ import psycopg2
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from . import markers
 from .helpers import (
     CHARM_BASE,
     METADATA,
