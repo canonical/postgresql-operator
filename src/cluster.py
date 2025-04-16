@@ -648,6 +648,8 @@ class Patroni:
                 if not role.startswith("pg_") and role.endswith("_owner")
             ])
             if self.charm.is_cluster_initialised
+            and self.charm.primary_endpoint is not None
+            and self.charm._can_connect_to_postgresql
             else None
         )
 
