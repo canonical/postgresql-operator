@@ -35,7 +35,19 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 46
+LIBPATCH = 50
+
+# Groups to distinguish HBA access
+ACCESS_GROUP_IDENTITY = "identity_access"
+ACCESS_GROUP_INTERNAL = "internal_access"
+ACCESS_GROUP_RELATION = "relation_access"
+
+# List of access groups to filter role assignments by
+ACCESS_GROUPS = [
+    ACCESS_GROUP_IDENTITY,
+    ACCESS_GROUP_INTERNAL,
+    ACCESS_GROUP_RELATION,
+]
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -57,8 +69,16 @@ for dependencies in REQUIRED_PLUGINS.values():
 logger = logging.getLogger(__name__)
 
 
+class PostgreSQLAssignGroupError(Exception):
+    """Exception raised when assigning to a group fails."""
+
+
 class PostgreSQLCreateDatabaseError(Exception):
     """Exception raised when creating a database fails."""
+
+
+class PostgreSQLCreateGroupError(Exception):
+    """Exception raised when creating a group fails."""
 
 
 class PostgreSQLCreateUserError(Exception):
@@ -91,6 +111,10 @@ class PostgreSQLGetCurrentTimelineError(Exception):
 
 class PostgreSQLGetPostgreSQLVersionError(Exception):
     """Exception raised when retrieving PostgreSQL version fails."""
+
+
+class PostgreSQLListGroupsError(Exception):
+    """Exception raised when retrieving PostgreSQL groups list fails."""
 
 
 class PostgreSQLListUsersError(Exception):
@@ -129,7 +153,7 @@ class PostgreSQL:
                 if enable:
                     cursor.execute("ALTER SYSTEM SET pgaudit.log = 'ROLE,DDL,MISC,MISC_SET';")
                     cursor.execute("ALTER SYSTEM SET pgaudit.log_client TO off;")
-                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off")
+                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off;")
                 else:
                     cursor.execute("ALTER SYSTEM RESET pgaudit.log;")
                     cursor.execute("ALTER SYSTEM RESET pgaudit.log_client;")
@@ -159,6 +183,24 @@ class PostgreSQL:
         )
         connection.autocommit = True
         return connection
+
+    def create_access_groups(self) -> None:
+        """Create access groups to distinguish HBA authentication methods."""
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                for group in ACCESS_GROUPS:
+                    cursor.execute(
+                        SQL("CREATE ROLE {} NOLOGIN;").format(
+                            Identifier(group),
+                        )
+                    )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create access groups: {e}")
+            raise PostgreSQLCreateGroupError() from e
+        finally:
+            if connection is not None:
+                connection.close()
 
     def create_database(
         self,
@@ -321,6 +363,50 @@ class PostgreSQL:
             logger.error(f"Failed to delete user: {e}")
             raise PostgreSQLDeleteUserError() from e
 
+    def grant_internal_access_group_memberships(self) -> None:
+        """Grant membership to the internal access-group to existing internal users."""
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                for user in self.system_users:
+                    cursor.execute(
+                        SQL("GRANT {} TO {};").format(
+                            Identifier(ACCESS_GROUP_INTERNAL),
+                            Identifier(user),
+                        )
+                    )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to grant internal access group memberships: {e}")
+            raise PostgreSQLAssignGroupError() from e
+        finally:
+            if connection is not None:
+                connection.close()
+
+    def grant_relation_access_group_memberships(self) -> None:
+        """Grant membership to the relation access-group to existing relation users."""
+        rel_users = self.list_users_from_relation()
+        if not rel_users:
+            return
+
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                rel_groups = SQL(",").join(Identifier(group) for group in [ACCESS_GROUP_RELATION])
+                rel_users = SQL(",").join(Identifier(user) for user in rel_users)
+
+                cursor.execute(
+                    SQL("GRANT {groups} TO {users};").format(
+                        groups=rel_groups,
+                        users=rel_users,
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to grant relation access group memberships: {e}")
+            raise PostgreSQLAssignGroupError() from e
+        finally:
+            if connection is not None:
+                connection.close()
+
     def enable_disable_extensions(
         self, extensions: Dict[str, bool], database: Optional[str] = None
     ) -> None:
@@ -348,6 +434,8 @@ class PostgreSQL:
                 ordered_extensions[plugin] = extensions.get(plugin, False)
             for extension, enable in extensions.items():
                 ordered_extensions[extension] = enable
+
+            self._configure_pgaudit(False)
 
             # Enable/disabled the extension in each database.
             for database in databases:
@@ -534,12 +622,34 @@ END; $$;"""
             # Connection errors happen when PostgreSQL has not started yet.
             return False
 
+    def list_access_groups(self) -> Set[str]:
+        """Returns the list of PostgreSQL database access groups.
+
+        Returns:
+            List of PostgreSQL database access groups.
+        """
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT groname FROM pg_catalog.pg_group WHERE groname LIKE '%_access';"
+                )
+                access_groups = cursor.fetchall()
+                return {group[0] for group in access_groups}
+        except psycopg2.Error as e:
+            logger.error(f"Failed to list PostgreSQL database access groups: {e}")
+            raise PostgreSQLListGroupsError() from e
+        finally:
+            if connection is not None:
+                connection.close()
+
     def list_users(self) -> Set[str]:
         """Returns the list of PostgreSQL database users.
 
         Returns:
             List of PostgreSQL database users.
         """
+        connection = None
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
@@ -548,6 +658,30 @@ END; $$;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to list PostgreSQL database users: {e}")
             raise PostgreSQLListUsersError() from e
+        finally:
+            if connection is not None:
+                connection.close()
+
+    def list_users_from_relation(self) -> Set[str]:
+        """Returns the list of PostgreSQL database users that were created by a relation.
+
+        Returns:
+            List of PostgreSQL database users.
+        """
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT usename FROM pg_catalog.pg_user WHERE usename LIKE 'relation_id_%';"
+                )
+                usernames = cursor.fetchall()
+                return {username[0] for username in usernames}
+        except psycopg2.Error as e:
+            logger.error(f"Failed to list PostgreSQL database users: {e}")
+            raise PostgreSQLListUsersError() from e
+        finally:
+            if connection is not None:
+                connection.close()
 
     def list_valid_privileges_and_roles(self) -> Tuple[Set[str], Set[str]]:
         """Returns two sets with valid privileges and roles.
@@ -645,6 +779,42 @@ END; $$;"""
                 connection.close()
 
     @staticmethod
+    def build_postgresql_group_map(group_map: Optional[str]) -> List[Tuple]:
+        """Build the PostgreSQL authorization group-map.
+
+        Args:
+            group_map: serialized group-map with the following format:
+                <ldap_group_1>=<psql_group_1>,
+                <ldap_group_2>=<psql_group_2>,
+                ...
+
+        Returns:
+            List of LDAP group to PostgreSQL group tuples.
+        """
+        if group_map is None:
+            return []
+
+        group_mappings = group_map.split(",")
+        group_mappings = (mapping.strip() for mapping in group_mappings)
+        group_map_list = []
+
+        for mapping in group_mappings:
+            mapping_parts = mapping.split("=")
+            if len(mapping_parts) != 2:
+                raise ValueError("The group-map must contain value pairs split by commas")
+
+            ldap_group = mapping_parts[0]
+            psql_group = mapping_parts[1]
+
+            if psql_group in [*ACCESS_GROUPS, PERMISSIONS_GROUP_ADMIN]:
+                logger.warning(f"Tried to assign LDAP users to forbidden group: {psql_group}")
+                continue
+
+            group_map_list.append((ldap_group, psql_group))
+
+        return group_map_list
+
+    @staticmethod
     def build_postgresql_parameters(
         config_options: dict, available_memory: int, limit_memory: Optional[int] = None
     ) -> Optional[dict]:
@@ -723,3 +893,34 @@ END; $$;"""
             return True
         except psycopg2.Error:
             return False
+
+    def validate_group_map(self, group_map: Optional[str]) -> bool:
+        """Validate the PostgreSQL authorization group-map.
+
+        Args:
+            group_map: serialized group-map with the following format:
+                <ldap_group_1>=<psql_group_1>,
+                <ldap_group_2>=<psql_group_2>,
+                ...
+
+        Returns:
+            Whether the group-map is valid.
+        """
+        if group_map is None:
+            return True
+
+        try:
+            group_map = self.build_postgresql_group_map(group_map)
+        except ValueError:
+            return False
+
+        for _, psql_group in group_map:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                query = SQL("SELECT TRUE FROM pg_roles WHERE rolname={};")
+                query = query.format(Literal(psql_group))
+                cursor.execute(query)
+
+                if cursor.fetchone() is None:
+                    return False
+
+        return True
