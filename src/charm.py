@@ -1021,6 +1021,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Database endpoint address."""
         return str(self.model.get_binding(DATABASE).network.bind_address)
 
+    @property
+    def listen_ips(self) -> list[str]:
+        """Return the IPs to listen on.
+
+        This is used to configure the PostgreSQL server.
+        Peer relation IP must be first in list.
+        ref.: https://patroni.readthedocs.io/en/latest/yaml_configuration.html#postgresql
+        """
+        if self._unit_ip == self._database_ip:
+            return [self._unit_ip]
+
+        return [self._unit_ip, self._database_ip]
+
     def unit_address_for_relation(
         self, relation_name: str, unit_name: Optional[str] = None
     ) -> Optional[str]:

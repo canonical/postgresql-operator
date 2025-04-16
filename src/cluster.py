@@ -681,6 +681,7 @@ class Patroni:
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
+            listen_ips=self.charm.listen_ips,
             superuser=USER,
             superuser_password=self.superuser_password,
             replication_password=self.replication_password,
