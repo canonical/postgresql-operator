@@ -649,7 +649,7 @@ class Patroni:
                 if not role.startswith("pg_") and role.endswith("_owner")
             ])
             if self.charm._is_workload_running
-            else ""
+            else None
         )
 
         # Render the template file with the correct values.

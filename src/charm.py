@@ -1290,7 +1290,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
         self.unit_peer_data.update({"exporter-started": "True"})
 
-    def _start_primary(self, event: StartEvent) -> None:
+    def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
@@ -1301,6 +1301,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._patroni.member_started:
             logger.debug("Deferring on_start: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
+            event.defer()
+            return
+
+        if not self._can_connect_to_postgresql:
+            logger.debug("Deferring on_start: awaiting for database to start")
+            self.unit.status = WaitingStatus("awaiting for database to start")
             event.defer()
             return
 
