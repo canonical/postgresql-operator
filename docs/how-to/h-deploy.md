@@ -21,7 +21,7 @@ Then, either continue with the `juju` client **or** use the `terraform juju` cli
 
 To deploy with the `juju` client:
 ```shell
-juju deploy postgresql
+juju deploy postgresql -n <number_of_replicas>
 ```
 > See also: [`juju deploy` command](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/deploy/)
 
