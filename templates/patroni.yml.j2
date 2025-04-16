@@ -126,9 +126,12 @@ bootstrap:
   initdb:
   - encoding: UTF8
   - data-checksums
+  - waldir: /var/snap/charmed-postgresql/common/logs
   {%- endif %}
 
 postgresql:
+  basebackup:
+    - waldir: /var/snap/charmed-postgresql/common/logs
   listen: '{{ self_ip }}:5432'
   connect_address: '{{ self_ip }}:5432'
   # Path to PostgreSQL binaries used in the database bootstrap process.
@@ -147,6 +150,7 @@ postgresql:
     ssl_cert_file: {{ conf_path }}/cert.pem
     ssl_key_file: {{ conf_path }}/key.pem
     {%- endif %}
+    temp_tablespaces: temp
     unix_socket_directories: /tmp
     {%- if pg_parameters %}
     {%- for key, value in pg_parameters.items() %}

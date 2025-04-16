@@ -55,9 +55,18 @@ requires:
     optional: true
 
 storage:
-  pgdata:
+  # archive:
+  #   type: filesystem
+  #   location: /var/snap/charmed-postgresql/current/tmp/pgbackrest
+  data:
     type: filesystem
-    location: /var/snap/charmed-postgresql/common
+    location: /var/snap/charmed-postgresql/common/data
+  logs:
+    type: filesystem
+    location: /var/snap/charmed-postgresql/common/logs
+  temp:
+    type: filesystem
+    location: /var/snap/charmed-postgresql/common/temp
 
 assumes:
   - juju
