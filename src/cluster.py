@@ -640,6 +640,18 @@ class Patroni:
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
+
+        # TODO: use can_connect_to_postgresql without retry
+        nosuperuser_target_allowlist = (
+            ",".join([
+                f"+{role}"
+                for role in self.charm.postgresql.list_roles()
+                if not role.startswith("pg_") and role.endswith("_owner")
+            ])
+            if self.charm._is_workload_running
+            else ""
+        )
+
         # Render the template file with the correct values.
         rendered = template.render(
             conf_path=PATRONI_CONF_PATH,
@@ -678,6 +690,7 @@ class Patroni:
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
             raft_password=self.raft_password,
             patroni_password=self.patroni_password,
+            nosuperuser_target_allowlist=nosuperuser_target_allowlist,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

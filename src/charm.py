@@ -25,6 +25,7 @@ from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
     REQUIRED_PLUGINS,
     PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLGetCurrentTimelineError,
@@ -1145,7 +1146,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit enable_disable_extensions: standby cluster")
             return
         original_status = self.unit.status
-        extensions = {}
+        # Always want set_user to be enabled
+        extensions = {"set_user": True}
         # collect extensions
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
@@ -1302,10 +1304,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.postgresql.enable_disable_extensions({"set_user": True}, database="postgres")
+        try:
+            # Needed to create predefined roles with set_user execution privileges
+            self.postgresql.enable_disable_extensions({"set_user": True}, database="postgres")
+        except Exception as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to enable set-user extension")
+            return
 
-        # TODO: add exception handling
-        self.postgresql.create_predefined_roles()
+        try:
+            self.postgresql.create_predefined_roles()
+        except PostgreSQLCreatePredefinedRolesError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to create pre-defined roles")
+            return
 
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
@@ -1313,13 +1325,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
-            # TODO: find out where the 'postgres' user is used
-            # if "postgres" not in users:
-            #     self.postgresql.create_user("postgres", new_password(), admin=True)
-            # Create the backup user.
+            # Create the dba user.
+            # TODO: move 'dba_user' and 'dba-user-password' to constants
             if "dba_user" not in users:
                 self.postgresql.create_user(
-                    "dba_user", self.get_secret(APP_SCOPE, "dba-user-password"), roles=["charmed_dba"]
+                    "dba_user",
+                    self.get_secret(APP_SCOPE, "dba-user-password"),
+                    roles=["charmed_dba"],
                 )
             # TODO: move predefined roles into constants
             if BACKUP_USER not in users:
@@ -2113,21 +2125,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"Last completed transaction was at {log_time[-1]}")
         else:
             logger.error("Can't tell last completed transaction time")
-
-    def get_plugins(self) -> list[str]:
-        """Return a list of installed plugins."""
-        plugins = [
-            "_".join(plugin.split("_")[1:-1])
-            for plugin in self.config.plugin_keys()
-            if self.config[plugin]
-        ]
-        plugins.append("set_user")
-        plugins = [PLUGIN_OVERRIDES.get(plugin, plugin) for plugin in plugins]
-        if "spi" in plugins:
-            plugins.remove("spi")
-            for ext in SPI_MODULE:
-                plugins.append(ext)
-        return plugins
 
 
 if __name__ == "__main__":

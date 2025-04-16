@@ -100,12 +100,17 @@ class PostgreSQLProvider(Object):
             # Creates the user and the database for this specific relation.
             user = f"relation-{event.relation.id}"
             password = new_password()
-            self.charm.postgresql.create_user(user, password, roles=extra_user_roles)
-            plugins = self.charm.get_plugins()
 
-            self.charm.postgresql.create_database(
-                database, user, plugins=plugins, client_relations=self.charm.client_relations
+            database_created = self.charm.postgresql.create_database(database)
+
+            # TODO: change role to database_admin once we determine how to auto-escalate
+            # privileges to database_owner upon login
+            self.charm.postgresql.create_user(
+                user, password, roles=[*extra_user_roles, f"{database}_owner"]
             )
+
+            if database_created:
+                self.charm.update_config()
 
             # Share the credentials with the application.
             self.database_provides.set_credentials(event.relation.id, user, password)

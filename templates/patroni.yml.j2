@@ -102,7 +102,6 @@ bootstrap:
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
-        shared_preload_libraries: 'timescaledb,pgaudit,set_user'
 
   {%- if restoring_backup %}
   method: pgbackrest
@@ -156,6 +155,9 @@ postgresql:
     set_user.block_log_statement: on
     set_user.exit_on_error: on
     set_user.superuser_allowlist: '+dba'
+    {%- if nosuperuser_target_allowlist %}
+    set_user.nosuperuser_target_allowlist: '{{ nosuperuser_target_allowlist }}'
+    {% endif %}
   pgpass: /tmp/pgpass
   pg_hba:
     - local all backup peer map=operator

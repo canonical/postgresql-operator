@@ -24,7 +24,8 @@ MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 # List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
+# TODO: Add BACKUP_USER and MONITORING_USER
+SYSTEM_USERS = [REPLICATION_USER, REWIND_USER, USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
