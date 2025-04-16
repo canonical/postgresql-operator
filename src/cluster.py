@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Any
 
 import psutil
+import psycopg2
 import requests
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
@@ -641,16 +642,19 @@ class Patroni:
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
 
-        # TODO: use can_connect_to_postgresql without retry
-        nosuperuser_target_allowlist = (
-            ",".join([
-                f"+{role}"
-                for role in self.charm.postgresql.list_roles()
-                if not role.startswith("pg_") and role.endswith("_owner")
-            ])
-            if self.charm._is_workload_running
-            else None
-        )
+        try:
+            nosuperuser_target_allowlist = (
+                ",".join([
+                    f"+{role}"
+                    for role in self.charm.postgresql.list_roles()
+                    if not role.startswith("pg_") and role.endswith("_owner")
+                ])
+                if self.charm._is_workload_running
+                and self.charm.postgresql.get_postgresql_timezones()
+                else None
+            )
+        except psycopg2.OperationalError:
+            nosuperuser_target_allowlist = None
 
         # Render the template file with the correct values.
         rendered = template.render(
