@@ -1,4 +1,4 @@
-> [Charmed PostgreSQL K8s Tutorial](/t/9707) >  1. Set up the environment
+> [Charmed PostgreSQL VM Tutorial](/t/9707) >  1. Set up the environment
 
 # Set up the environment
 

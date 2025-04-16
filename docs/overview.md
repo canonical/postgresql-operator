@@ -77,6 +77,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-enable-monitoring | [Enable monitoring](/t/10600) |
 | 3 | h-enable-alert-rules | [Enable alert rules](/t/13084) |
 | 3 | h-enable-tracing | [Enable tracing](/t/14521) |
+| 3 | h-enable-profiling | [Enable profiling](/t/17172) |
 | 2 | h-upgrade | [Upgrade](/t/12086) |
 | 3 | h-upgrade-minor | [Perform a minor upgrade](/t/12089) |
 | 3 | h-rollback-minor | [Perform a minor rollback](/t/12090) |
@@ -94,20 +95,21 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | r-software-testing | [Software testing](/t/11773) |
 | 2 | r-performance | [Performance and resources](/t/11974) |
 | 2 | r-troubleshooting | [Troubleshooting](/t/11864) |
+| 3 | r-sos-report | [SOS report](/t/17228) |
 | 2 | r-plugins-extensions | [Plugins/extensions](/t/10946) |
 | 2 | r-alert-rules | [Alert rules](/t/15841) |
 | 2 | r-statuses | [Statuses](/t/10844) |
 | 2 | r-contacts | [Contacts](/t/11863) |
 | 1 | explanation | [Explanation](/t/16768) |
 | 2 | e-architecture | [Architecture](/t/11857) |
-| 2 | e-security | [Security](/t/16852) |
-| 2 | e-cryptography | [Cryptography](/t/16853) |
 | 2 | e-interfaces-endpoints | [Interfaces and endpoints](/t/10251) |
+| 2 | e-juju-details | [Juju](/t/11985) |
+| 2 | e-legacy-charm | [Legacy charm](/t/10690) |
 | 2 | e-connection-pooling| [Connection pooling](/t/15777) |
 | 2 | e-users | [Users](/t/10798) |
 | 2 | e-logs | [Logs](/t/12099) |
-| 2 | e-juju-details | [Juju](/t/11985) |
-| 2 | e-legacy-charm | [Legacy charm](/t/10690) |
+| 2 | e-security | [Security](/t/16852) |
+| 3 | e-cryptography | [Cryptography](/t/16853) |
 | 1 | search | [Search](https://canonical.com/data/docs/postgresql/iaas) |
 
 [/details]
