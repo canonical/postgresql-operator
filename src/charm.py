@@ -744,9 +744,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.unit.is_leader():
             return
 
-        if admin_secret_id := self.config.system_users:  # noqa: SIM102
-            if admin_secret_id == event.secret.id:
+        if (admin_secret_id := self.config.system_users) and admin_secret_id == event.secret.id:
+            try:
                 self._update_admin_password(admin_secret_id)
+            except PostgreSQLUpdateUserPasswordError:
+                event.defer()
 
     # Split off into separate function, because of complexity _on_peer_relation_changed
     def _start_stop_pgbackrest_service(self, event: HookEvent) -> None:
@@ -1091,8 +1093,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.unit.status = BlockedStatus("Password setting for system users failed.")
                 event.defer()
 
-        # this list is not consistent with `SYSTEM_USERS` -> todo: check if correct
-        # backup-user is missing here, raft-user is missing in `SYSTEM_USERS`
         # The leader sets the needed passwords if they weren't set before.
         for key in (
             USER_PASSWORD_KEY,
@@ -1106,9 +1106,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 if key in system_user_passwords:
                     # use provided passwords for system-users if available
                     self.set_secret(APP_SCOPE, key, system_user_passwords[key])
+                    logger.info(f"Using configured password for {key}")
                 else:
                     # generate a password for this user if not provided
                     self.set_secret(APP_SCOPE, key, new_password())
+                    logger.info(f"Generated new password for {key}")
 
         if self.has_raft_keys():
             self._raft_reinitialisation()
@@ -1183,7 +1185,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.enable_disable_extensions()
 
         if admin_secret_id := self.config.system_users:
-            self._update_admin_password(admin_secret_id)
+            try:
+                self._update_admin_password(admin_secret_id)
+            except PostgreSQLUpdateUserPasswordError:
+                event.defer()
 
     def enable_disable_extensions(self, database: str | None = None) -> None:
         """Enable/disable PostgreSQL extensions set through config options.
@@ -1418,10 +1423,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self._patroni.are_all_members_ready():
             # Ensure all members are ready before reloading Patroni configuration to avoid errors
             # e.g. API not responding in one instance because PostgreSQL / Patroni are not ready
-            logger.error(
+            raise PostgreSQLUpdateUserPasswordError(
                 "Failed changing the password: Not all members healthy or finished initial sync."
             )
-            return
 
         replication_offer_relation = self.model.get_relation(REPLICATION_OFFER_RELATION)
         other_cluster_primary_ip = ""
