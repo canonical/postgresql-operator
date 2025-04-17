@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 47
+LIBPATCH = 50
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -153,7 +153,7 @@ class PostgreSQL:
                 if enable:
                     cursor.execute("ALTER SYSTEM SET pgaudit.log = 'ROLE,DDL,MISC,MISC_SET';")
                     cursor.execute("ALTER SYSTEM SET pgaudit.log_client TO off;")
-                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off")
+                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off;")
                 else:
                     cursor.execute("ALTER SYSTEM RESET pgaudit.log;")
                     cursor.execute("ALTER SYSTEM RESET pgaudit.log_client;")
@@ -434,6 +434,8 @@ class PostgreSQL:
                 ordered_extensions[plugin] = extensions.get(plugin, False)
             for extension, enable in extensions.items():
                 ordered_extensions[extension] = enable
+
+            self._configure_pgaudit(False)
 
             # Enable/disabled the extension in each database.
             for database in databases:
@@ -777,6 +779,42 @@ END; $$;"""
                 connection.close()
 
     @staticmethod
+    def build_postgresql_group_map(group_map: Optional[str]) -> List[Tuple]:
+        """Build the PostgreSQL authorization group-map.
+
+        Args:
+            group_map: serialized group-map with the following format:
+                <ldap_group_1>=<psql_group_1>,
+                <ldap_group_2>=<psql_group_2>,
+                ...
+
+        Returns:
+            List of LDAP group to PostgreSQL group tuples.
+        """
+        if group_map is None:
+            return []
+
+        group_mappings = group_map.split(",")
+        group_mappings = (mapping.strip() for mapping in group_mappings)
+        group_map_list = []
+
+        for mapping in group_mappings:
+            mapping_parts = mapping.split("=")
+            if len(mapping_parts) != 2:
+                raise ValueError("The group-map must contain value pairs split by commas")
+
+            ldap_group = mapping_parts[0]
+            psql_group = mapping_parts[1]
+
+            if psql_group in [*ACCESS_GROUPS, PERMISSIONS_GROUP_ADMIN]:
+                logger.warning(f"Tried to assign LDAP users to forbidden group: {psql_group}")
+                continue
+
+            group_map_list.append((ldap_group, psql_group))
+
+        return group_map_list
+
+    @staticmethod
     def build_postgresql_parameters(
         config_options: dict, available_memory: int, limit_memory: Optional[int] = None
     ) -> Optional[dict]:
@@ -855,3 +893,34 @@ END; $$;"""
             return True
         except psycopg2.Error:
             return False
+
+    def validate_group_map(self, group_map: Optional[str]) -> bool:
+        """Validate the PostgreSQL authorization group-map.
+
+        Args:
+            group_map: serialized group-map with the following format:
+                <ldap_group_1>=<psql_group_1>,
+                <ldap_group_2>=<psql_group_2>,
+                ...
+
+        Returns:
+            Whether the group-map is valid.
+        """
+        if group_map is None:
+            return True
+
+        try:
+            group_map = self.build_postgresql_group_map(group_map)
+        except ValueError:
+            return False
+
+        for _, psql_group in group_map:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                query = SQL("SELECT TRUE FROM pg_roles WHERE rolname={};")
+                query = query.format(Literal(psql_group))
+                cursor.execute(query)
+
+                if cursor.fetchone() is None:
+                    return False
+
+        return True
