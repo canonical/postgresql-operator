@@ -86,8 +86,7 @@ async def test_exporter_is_up(ops_test: OpsTest, unit_id: int):
 async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     # Connect to the PostgreSQL instance.
     # Retrieving the operator user password using the action.
-    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    password = await get_password(ops_test, any_unit_name)
+    password = await get_password(ops_test)
 
     # Connect to PostgreSQL.
     host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
@@ -192,8 +191,7 @@ async def test_postgresql_parameters_change(ops_test: OpsTest) -> None:
         "experimental_max_connections": "200",
     })
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", idle_period=30)
-    any_unit_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
-    password = await get_password(ops_test, any_unit_name)
+    password = await get_password(ops_test)
 
     # Connect to PostgreSQL.
     for unit_id in UNIT_IDS:
@@ -255,7 +253,7 @@ async def test_scale_down_and_up(ops_test: OpsTest):
     leader_unit = await find_unit(ops_test, leader=True, application=DATABASE_APP_NAME)
 
     # Trigger a switchover if the primary and the leader are not the same unit.
-    patroni_password = await get_password(ops_test, primary, "patroni")
+    patroni_password = await get_password(ops_test, "patroni")
 
     if primary != leader_unit.name:
         switchover(ops_test, primary, patroni_password, leader_unit.name)
@@ -341,7 +339,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
         with attempt:
             primary = await get_primary(ops_test, any_unit_name)
-            password = await get_password(ops_test, primary)
+            password = await get_password(ops_test)
 
     # Write data to primary IP.
     host = get_unit_address(ops_test, primary)

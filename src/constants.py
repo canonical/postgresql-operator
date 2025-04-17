@@ -66,6 +66,7 @@ RAFT_PASSWORD_KEY = "raft-password"  # noqa: S105
 PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
 SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
 SECRET_DELETED_LABEL = "None"  # noqa: S105
+SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105
 
 APP_SCOPE = "app"
 UNIT_SCOPE = "unit"

@@ -44,10 +44,7 @@ async def loop_wait(ops_test: OpsTest) -> None:
     initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
     yield
     # Rollback to the initial configuration.
-    app = await app_name(ops_test)
-    patroni_password = await get_password(
-        ops_test, ops_test.model.applications[app].units[0].name, "patroni"
-    )
+    patroni_password = await get_password(ops_test, "patroni")
     await change_patroni_setting(
         ops_test, "loop_wait", initial_loop_wait, patroni_password, use_random_unit=True
     )
@@ -57,10 +54,7 @@ async def loop_wait(ops_test: OpsTest) -> None:
 async def primary_start_timeout(ops_test: OpsTest) -> None:
     """Temporary change the primary start timeout configuration."""
     # Change the parameter that makes the primary reelection faster.
-    app = await app_name(ops_test)
-    patroni_password = await get_password(
-        ops_test, ops_test.model.applications[app].units[0].name, "patroni"
-    )
+    patroni_password = await get_password(ops_test, "patroni")
     initial_primary_start_timeout = await get_patroni_setting(ops_test, "primary_start_timeout")
     await change_patroni_setting(ops_test, "primary_start_timeout", 0, patroni_password)
     yield
@@ -104,7 +98,7 @@ async def wal_settings(ops_test: OpsTest) -> None:
     for unit in ops_test.model.applications[app].units:
         # Start Patroni if it was previously stopped.
         await run_command_on_unit(ops_test, unit.name, "snap start charmed-postgresql.patroni")
-        patroni_password = await get_password(ops_test, unit.name, "patroni")
+        patroni_password = await get_password(ops_test, "patroni")
 
         # Rollback to the initial settings.
         await change_wal_settings(

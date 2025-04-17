@@ -63,8 +63,10 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
 
     # Ensure replication is working correctly.
     address = get_unit_address(ops_test, new_unit_name)
-    password = await get_password(ops_test, new_unit_name)
-    patroni_password = await get_password(ops_test, new_unit_name, "patroni")
+    password = await get_password(ops_test, database_app_name=database_app_name)
+    patroni_password = await get_password(
+        ops_test, username="patroni", database_app_name=database_app_name
+    )
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"

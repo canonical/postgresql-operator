@@ -143,7 +143,7 @@ async def test_restore_on_new_cluster(
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test, database_app_name=database_app_name)
     address = get_unit_address(ops_test, unit_name)
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
