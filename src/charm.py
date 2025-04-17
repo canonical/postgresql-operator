@@ -1444,7 +1444,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
         elif self.model.get_relation(REPLICATION_CONSUMER_RELATION) is not None:
             logger.error(
-                "Failed changing the password: This action can be ran only in the cluster from the offer side."
+                "Failed changing the password: This can be ran only in the cluster from the offer side."
             )
             self.unit.status = BlockedStatus("Password update for system users failed.")
             return
