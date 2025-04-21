@@ -525,7 +525,9 @@ async def get_password(ops_test: OpsTest, app: str, down_unit: str | None = None
         if unit.name != down_unit:
             unit_name = unit.name
             break
-    action = await ops_test.model.units.get(unit_name).run_action("get-password")
+    action = await ops_test.model.units.get(unit_name).run_action(
+        "get-password", username="operator"
+    )
     action = await action.wait()
     return action.results["password"]
 
