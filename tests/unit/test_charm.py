@@ -1270,6 +1270,7 @@ def test_restart(harness):
 def test_update_config(harness):
     with (
         patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap_refreshed", return_value=True),
         patch("charm.snap.SnapCache"),
         patch(
             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"

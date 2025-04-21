@@ -112,7 +112,7 @@ from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
-from utils import new_password
+from utils import new_password, snap_refreshed
 
 logger = logging.getLogger(__name__)
 
@@ -1318,11 +1318,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.start_patroni()
             self.backup.start_stop_pgbackrest_service()
 
-    def _restart_metrics_service(self) -> None:
+    def _restart_metrics_service(self, postgres_snap: snap.Snap) -> None:
         """Restart the monitoring service if the password was rotated."""
-        cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
-
         try:
             snap_password = postgres_snap.get("exporter.password")
         except snap.SnapError:
@@ -1330,16 +1327,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
 
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
-            self._setup_exporter()
+            self._setup_exporter(postgres_snap)
 
-    def _restart_ldap_sync_service(self) -> None:
+    def _restart_ldap_sync_service(self, postgres_snap: snap.Snap) -> None:
         """Restart the LDAP sync service in case any configuration changed."""
         if not self._patroni.member_started:
             logger.debug("Restart LDAP sync early exit: Patroni has not started yet")
             return
 
-        cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
         sync_service = postgres_snap.services["ldap-sync"]
 
         if not self.is_primary and sync_service["active"]:
@@ -1352,35 +1347,31 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if self.is_primary and self.is_ldap_enabled:
-            self._setup_ldap_sync()
+            self._setup_ldap_sync(postgres_snap)
 
-    def _setup_exporter(self) -> None:
+    def _setup_exporter(self, postgres_snap: snap.Snap | None = None) -> None:
         """Set up postgresql_exporter options."""
-        cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
-
-        if postgres_snap.revision != next(
-            filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
-        )[1]["revision"].get(platform.machine()):
-            logger.debug(
-                "Early exit _setup_exporter: snap was not refreshed to the right version yet"
-            )
-            return
+        if postgres_snap is None:
+            cache = snap.SnapCache()
+            postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
         postgres_snap.set({
             "exporter.user": MONITORING_USER,
             "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
         })
+
         if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
+
         self.unit_peer_data.update({"exporter-started": "True"})
 
-    def _setup_ldap_sync(self) -> None:
+    def _setup_ldap_sync(self, postgres_snap: snap.Snap | None = None) -> None:
         """Set up postgresql_ldap_sync options."""
-        cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+        if postgres_snap is None:
+            cache = snap.SnapCache()
+            postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
         ldap_params = self.get_ldap_parameters()
         ldap_url = urlparse(ldap_params["ldapurl"])
@@ -2053,8 +2044,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         })
 
         self._handle_postgresql_restart_need(enable_tls)
-        self._restart_metrics_service()
-        self._restart_ldap_sync_service()
+
+        cache = snap.SnapCache()
+        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        if not snap_refreshed(postgres_snap.revision):
+            logger.debug("Early exit: snap was not refreshed to the right version yet")
+            return True
+
+        self._restart_metrics_service(postgres_snap)
+        self._restart_ldap_sync_service(postgres_snap)
 
         return True
 
