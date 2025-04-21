@@ -1424,7 +1424,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         If no user is provided, the password of the operator user is returned.
         """
-        username = event.params.get("username", USER)
+        if not (username := event.params.get("username")):
+            event.fail("The action requires a username")
+            return
         if username not in PASSWORD_USERS and self.is_ldap_enabled:
             event.fail("The action can be run only for system users when LDAP is enabled")
             return
@@ -1444,13 +1446,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.fail("The action can be run only on leader unit")
             return
 
-        username = event.params.get("username", USER)
-        if username not in SYSTEM_USERS and self.is_ldap_enabled:
-            event.fail("The action can be run only for system users when LDAP is enabled")
+        if not (username := event.params.get("username")):
+            event.fail("The action requires a username")
             return
         if username not in SYSTEM_USERS:
             event.fail(
-                f"The action can be run only for system users:"
+                "The action can be run only for system users when LDAP is enabled"
+                if self.is_ldap_enabled
+                else "The action can be run only for system users:"
                 f" {', '.join(SYSTEM_USERS)} not {username}"
             )
             return
