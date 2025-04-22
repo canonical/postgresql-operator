@@ -42,7 +42,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             application_name=APPLICATION_NAME,
             num_units=1,
             base=CHARM_BASE,
-            storage={"pgdata": {"pool": "lxd-btrfs", "size": 8046}},
+            storage={"data": {"pool": "lxd-btrfs", "size": 8046}},
             config={"profile": "testing"},
         )
 
@@ -61,7 +61,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         storage_id_str = storage_id(ops_test, primary_name)
 
         # Check if storage exists after application deployed
-        logger.info("werifing is storage exists")
+        logger.info("verifying if storage exists")
         for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_storage_exists(ops_test, storage_id_str)
@@ -113,7 +113,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
         assert storage_id_str == garbage_storage
 
         # Check if storage exists after application deployed
-        logger.info("werifing is storage exists")
+        logger.info("verifying if storage exists")
         for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 assert await is_storage_exists(ops_test, storage_id_str)

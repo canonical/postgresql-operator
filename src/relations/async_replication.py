@@ -186,7 +186,7 @@ class PostgreSQLAsyncReplication(Object):
             raise Exception(error)
         if system_identifier != relation.data[relation.app].get("system-id"):
             # Store current data in a tar.gz file.
-            logger.info("Creating backup of pgdata folder")
+            logger.info("Creating backup of data folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
             # Input is hardcoded
             subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_PATH}".split())  # noqa: S603
@@ -648,8 +648,8 @@ class PostgreSQLAsyncReplication(Object):
             unit=next(unit for unit in relation.units if unit.app == relation.app),
         )
 
-    def _reinitialise_pgdata(self) -> None:
-        """Reinitialise the pgdata folder."""
+    def _reinitialise_data_directories(self) -> None:
+        """Reinitialise the data directories."""
         try:
             path = Path(POSTGRESQL_DATA_PATH)
             if path.exists() and path.is_dir():
@@ -712,10 +712,10 @@ class PostgreSQLAsyncReplication(Object):
                 if not self._configure_standby_cluster(event):
                     return False
 
-            # Remove and recreate the pgdata folder to enable replication of the data from the
+            # Remove and recreate the data folder to enable replication of the data from the
             # primary cluster.
-            logger.info("Removing and recreating pgdata folder")
-            self._reinitialise_pgdata()
+            logger.info("Removing and recreating data folder")
+            self._reinitialise_data_directories()
 
             # Remove previous cluster information to make it possible to initialise a new cluster.
             logger.info("Removing previous cluster information")
