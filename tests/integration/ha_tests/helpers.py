@@ -695,7 +695,7 @@ async def get_primary(ops_test: OpsTest, app, down_unit: str | None = None) -> s
 async def list_wal_files(ops_test: OpsTest, app: str) -> set:
     """Returns the list of WAL segment files in each unit."""
     units = [unit.name for unit in ops_test.model.applications[app].units]
-    command = "ls -1 /var/snap/charmed-postgresql/common/var/lib/postgresql/pg_wal/"
+    command = "ls -1 /var/snap/charmed-postgresql/common/logs/"
     files = {}
     for unit in units:
         stdout = await run_command_on_unit(ops_test, unit, command)

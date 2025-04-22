@@ -537,15 +537,13 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
         _getpwnam.assert_called_once_with("snap_daemon")
 
         _chown.assert_any_call(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            "/var/snap/charmed-postgresql/common/data",
             uid=sentinel.uid,
             gid=sentinel.gid,
         )
 
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
-        _chmod.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
-        )
+        _chmod.assert_called_once_with("/var/snap/charmed-postgresql/common/data", 488)
 
 
 def test_member_started_true(peers_ips, patroni):

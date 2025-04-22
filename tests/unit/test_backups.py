@@ -462,7 +462,7 @@ def test_empty_data_files(harness):
         _rmtree.assert_not_called()
 
         # Test when the removal of the data files fails.
-        path = PosixPath("/var/snap/charmed-postgresql/common/var/lib/postgresql")
+        path = PosixPath("/var/snap/charmed-postgresql/common/data")
         _exists.return_value = True
         _is_dir.return_value = True
         _rmtree.side_effect = OSError
@@ -507,7 +507,7 @@ def test_execute_command(harness):
         patch("pwd.getpwnam") as _getpwnam,
     ):
         # Test when the command fails.
-        command = "rm -r /var/lib/postgresql/data/pgdata".split()
+        command = "rm -r /var/snap/charmed-postgresql/common/data".split()
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         assert harness.charm.backup._execute_command(command) == (1, "", "fake stderr")
         _run.assert_called_once_with(
@@ -1741,7 +1741,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             and len(harness.charm.peer_members_endpoints) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
-            data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql",
+            data_path="/var/snap/charmed-postgresql/common/data",
             log_path="/var/snap/charmed-postgresql/common/var/log/pgbackrest",
             region="us-east-1",
             endpoint="https://storage.googleapis.com",
