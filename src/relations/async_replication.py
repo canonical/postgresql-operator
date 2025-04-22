@@ -446,7 +446,7 @@ class PostgreSQLAsyncReplication(Object):
 
         relation = self._relation
 
-        # Check if all units from the other cluster  published their pod IPs in the relation data.
+        # Check if all units from the other cluster published their IPs in the relation data.
         # If not, fail the action telling that all units must publish their pod addresses in the
         # relation data.
         for unit in relation.units:
