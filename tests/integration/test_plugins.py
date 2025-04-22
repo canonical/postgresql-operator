@@ -99,8 +99,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
             charm,
             num_units=2,
             base=CHARM_BASE,
-            # TODO Figure out how to deal with pgaudit
-            config={"profile": "testing", "plugin_audit_enable": "False"},
+            config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
