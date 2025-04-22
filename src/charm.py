@@ -24,6 +24,7 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
+    ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,
     PostgreSQL,
@@ -1381,6 +1382,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ldap_base_dn = ldap_params["ldapbasedn"]
         ldap_bind_username = ldap_params["ldapbinddn"]
         ldap_bind_password = ldap_params["ldapbindpasswd"]
+        ldap_group_mappings = self.postgresql.build_postgresql_group_map(self.config.ldap_map)
 
         postgres_snap.set({
             "ldap-sync.ldap_host": ldap_host,
@@ -1388,6 +1390,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "ldap-sync.ldap_base_dn": ldap_base_dn,
             "ldap-sync.ldap_bind_username": ldap_bind_username,
             "ldap-sync.ldap_bind_password": ldap_bind_password,
+            "ldap-sync.ldap_group_identity": json.dumps(ACCESS_GROUP_IDENTITY),
+            "ldap-sync.ldap_group_mappings": json.dumps(ldap_group_mappings),
             "ldap-sync.postgres_host": "127.0.0.1",
             "ldap-sync.postgres_port": DATABASE_PORT,
             "ldap-sync.postgres_database": DATABASE_DEFAULT_NAME,
@@ -2066,6 +2070,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             raise ValueError(
                 "instance_default_text_search_config config option has an invalid value"
             )
+
+        if not self.postgresql.validate_group_map(self.config.ldap_map):
+            raise ValueError("ldap_map config option has an invalid value")
 
         if not self.postgresql.validate_date_style(self.config.request_date_style):
             raise ValueError("request_date_style config option has an invalid value")
