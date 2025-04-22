@@ -65,6 +65,7 @@ class PostgreSQLProvider(Object):
         self.framework.observe(
             charm.on[self.relation_name].relation_created, self.register_address_for_endpoint
         )
+        self.framework.observe(charm.on.config_changed, self.register_address_for_endpoint)
         self.charm = charm
 
         # Charm events defined in the database provides charm library.
