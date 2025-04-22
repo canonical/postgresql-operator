@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 50
+LIBPATCH = 51
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -258,7 +258,7 @@ class PostgreSQL:
             raise PostgreSQLCreateDatabaseError() from e
 
         # Enable preset extensions
-        self.enable_disable_extensions({plugin: True for plugin in plugins}, database)
+        self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
 
     def create_user(
         self,
