@@ -1066,6 +1066,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return str(self.model.get_binding(DATABASE).network.bind_address)
 
     @property
+    def _replication_offer_ip(self) -> str:
+        """Async replication consumer endpoint address."""
+        return str(self.model.get_binding(REPLICATION_OFFER_RELATION).network.bind_address)
+
+    @property
+    def _replication_consumer_ip(self) -> str:
+        """Async replication consumer endpoint address."""
+        return str(self.model.get_binding(REPLICATION_CONSUMER_RELATION).network.bind_address)
+
+    @property
     def listen_ips(self) -> list[str]:
         """Return the IPs to listen on.
 
@@ -1073,10 +1083,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Peer relation IP must be first in list.
         ref.: https://patroni.readthedocs.io/en/latest/yaml_configuration.html#postgresql
         """
-        if self._unit_ip == self._database_ip:
-            return [self._unit_ip]
+        ips_set = {
+            self._unit_ip,
+            self._database_ip,
+            self._replication_offer_ip,
+            self._replication_consumer_ip,
+        }
+        if len(ips_set) == 1:
+            # single space deployment
+            return list(self._unit_ip)
 
-        return [self._unit_ip, self._database_ip]
+        non_peer_ips = ips_set - {self._unit_ip}
+
+        return list(self._unit_ip) + list(non_peer_ips)
 
     def unit_address_for_relation(
         self, relation_name: str, unit_name: Optional[str] = None
