@@ -29,6 +29,8 @@ class CharmConfig(BaseConfigModel):
     instance_max_locks_per_transaction: int | None
     instance_password_encryption: str | None
     instance_synchronize_seqscans: bool | None
+    ldap_map: str | None
+    ldap_search_filter: str | None
     logging_client_min_messages: str | None
     logging_log_connections: bool | None
     logging_log_disconnections: bool | None

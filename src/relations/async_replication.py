@@ -668,9 +668,7 @@ class PostgreSQLAsyncReplication(Object):
                         elif os.path.isdir(item_path):
                             shutil.rmtree(item_path)
         except OSError as e:
-            raise Exception(
-                f"Failed to remove contents from {path} with error: {e!s}"
-            ) from e
+            raise Exception(f"Failed to remove contents from {path} with error: {e!s}") from e
 
     @property
     def _relation(self) -> Relation:
