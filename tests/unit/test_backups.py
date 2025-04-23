@@ -64,7 +64,7 @@ def test_tls_ca_chain_filename(harness):
         )
     assert (
         harness.charm.backup._tls_ca_chain_filename
-        == "/var/snap/charmed-postgresql/common/data/db/pgbackrest-tls-ca-chain.crt"
+        == "/var/snap/charmed-postgresql/common/var/lib/postgresql/pgbackrest-tls-ca-chain.crt"
     )
 
 
