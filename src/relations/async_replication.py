@@ -650,18 +650,27 @@ class PostgreSQLAsyncReplication(Object):
 
     def _reinitialise_pgdata(self) -> None:
         """Reinitialise the data folder."""
+        paths = [
+            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_DATA_PATH,
+            "/var/snap/charmed-postgresql/common/data/logs",
+            "/var/snap/charmed-postgresql/common/data/temp",
+        ]
+        path = None
         try:
-            path = Path(POSTGRESQL_DATA_PATH)
-            if path.exists() and path.is_dir():
-                shutil.rmtree(path)
+            for path in paths:
+                path_object = Path(path)
+                if path_object.exists() and path_object.is_dir():
+                    for item in os.listdir(path):
+                        item_path = os.path.join(path, item)
+                        if os.path.isfile(item_path) or os.path.islink(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
         except OSError as e:
             raise Exception(
-                f"Failed to remove contents of the data directory with error: {e!s}"
+                f"Failed to remove contents from {path} with error: {e!s}"
             ) from e
-        os.mkdir(POSTGRESQL_DATA_PATH)
-        # Expected permissions
-        os.chmod(POSTGRESQL_DATA_PATH, 0o750)  # noqa: S103
-        self.charm._patroni._change_owner(POSTGRESQL_DATA_PATH)
 
     @property
     def _relation(self) -> Relation:
