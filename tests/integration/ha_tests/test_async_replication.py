@@ -356,7 +356,7 @@ async def test_promote_standby(
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     primary = await get_primary(ops_test, any_unit)
     address = get_unit_address(ops_test, primary)
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     database_name = f"{APPLICATION_NAME.replace('-', '_')}_database"
     connection = None
     try:
