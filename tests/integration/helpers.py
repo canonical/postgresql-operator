@@ -30,13 +30,18 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME
+from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+
+
+class SecretNotFoundError(Exception):
+    """Raised when a secret is not found."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -139,7 +144,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
 
     # Retrieve all users in the database.
     users_in_db = await execute_query_on_unit(
@@ -164,8 +169,7 @@ async def check_databases_creation(ops_test: OpsTest, databases: list[str]) -> N
         ops_test: The ops test framework
         databases: List of database names that should have been created
     """
-    unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
@@ -581,7 +585,7 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> list[str]:
         ops_test: The ops test framework
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
     unit_address = await unit.get_public_address()
 
     output = await execute_query_on_unit(
@@ -621,21 +625,43 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return raw_hostname.strip()
 
 
-async def get_password(ops_test: OpsTest, unit_name: str, username: str = "operator") -> str:
-    """Retrieve a user password using the action.
+async def get_password(
+    ops_test: OpsTest,
+    username: str = "operator",
+    database_app_name: str = DATABASE_APP_NAME,
+) -> str:
+    """Retrieve a user password from the secret.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: the name of the unit.
         username: the user to get the password.
+        database_app_name: the app for getting the secret
 
     Returns:
         the user password.
     """
-    unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-password", **{"username": username})
-    result = await action.wait()
-    return result.results["password"]
+    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{database_app_name}.app")
+    password = secret.get(f"{username}-password")
+
+    return password
+
+
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> dict[str, str]:
+    secrets_raw = await ops_test.juju("list-secrets")
+    secret_ids = [
+        secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
+    ]
+
+    for secret_id in secret_ids:
+        secret_data_raw = await ops_test.juju(
+            "show-secret", "--format", "json", "--reveal", secret_id
+        )
+        secret_data = json.loads(secret_data_raw[1])
+
+        if label == secret_data[secret_id].get("label"):
+            return secret_data[secret_id]["content"]["Data"]
+
+    raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
 @retry(
@@ -722,7 +748,7 @@ async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test)
     # Get the IP addresses of the other units to check that they
     # are connecting to the primary unit (if unit_name is the
     # primary unit name) using encrypted connections.
@@ -787,7 +813,7 @@ async def check_tls_replication(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test)
 
     # Check for the all replicas using encrypted connection
     output = await execute_query_on_unit(
@@ -950,27 +976,39 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
 
 
 async def set_password(
-    ops_test: OpsTest, unit_name: str, username: str = "operator", password: str | None = None
+    ops_test: OpsTest,
+    username: str = "operator",
+    password: str | None = None,
+    database_app_name: str = DATABASE_APP_NAME,
 ):
-    """Set a user password using the action.
+    """Set a user password via secret.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: the name of the unit.
         username: the user to set the password.
         password: optional password to use
             instead of auto-generating
+        database_app_name: name of the app for the secret
 
     Returns:
         the results from the action.
     """
-    unit = ops_test.model.units.get(unit_name)
-    parameters = {"username": username}
-    if password is not None:
-        parameters["password"] = password
-    action = await unit.run_action("set-password", **parameters)
-    result = await action.wait()
-    return result.results
+    secret_name = "system_users_secret"
+
+    try:
+        secret_id = await ops_test.model.add_secret(
+            name=secret_name, data_args=[f"{username}={password}"]
+        )
+        await ops_test.model.grant_secret(secret_name=secret_name, application=database_app_name)
+
+        # update the application config to include the secret
+        await ops_test.model.applications[database_app_name].set_config({
+            SYSTEM_USERS_PASSWORD_CONFIG: secret_id
+        })
+    except Exception:
+        await ops_test.model.update_secret(
+            name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
+        )
 
 
 async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
@@ -1121,7 +1159,7 @@ async def backup_operations(
             break
 
     # Write some data.
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test, database_app_name=database_app_name)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
     with db_connect(host=address, password=password) as connection:

@@ -773,6 +773,14 @@ options:
       Allowed values are: from -1 to 86400.
     type: int
     default: -1
+  system-users:
+    type: secret
+    description: |
+      Configure the internal system users and their passwords. The passwords will
+      be auto-generated if this option is not set. It is for internal use only
+      and SHOULD NOT be used by applications. This needs to be a Juju Secret URI pointing
+      to a secret that contains the following content: `<username>: <password>`.
+      Possible users: backup, monitoring, operator, replication, rewind.
   vacuum_autovacuum_analyze_scale_factor:
     description: |
       Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
