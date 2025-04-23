@@ -1067,5 +1067,4 @@ class Patroni:
         logger.debug(f"new patroni service file: {new_patroni_service}")
         with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
             patroni_service_file.write(new_patroni_service)
-        # Input is hardcoded
-        subprocess.run(["/bin/systemctl", "daemon-reload"])  # noqa: S603
+        subprocess.run(["/bin/systemctl", "daemon-reload"])
