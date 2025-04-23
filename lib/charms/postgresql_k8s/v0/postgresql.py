@@ -104,6 +104,9 @@ class PostgreSQLUpdateUserPasswordError(Exception):
 class PostgreSQLCreatePredefinedRolesError(Exception):
     """Exception raised when creating predefined roles."""
 
+class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
+    """Exception raised when granting database privileges to user."""
+
 
 class PostgreSQL:
     """Class to encapsulate all operations related to interacting with PostgreSQL instance."""
@@ -164,7 +167,7 @@ class PostgreSQL:
         connection.autocommit = True
         return connection
 
-    def create_database(self, database: str,) -> bool:
+    def create_database(self, database: str) -> bool:
         """Creates a new database and grant privileges to a user on it.
 
         Args:
@@ -230,9 +233,27 @@ $$ LANGUAGE plpgsql security definer;
             password: password to be assigned to the user.
             roles: roles to be assigned to the user.
         """
+        createdb_enabled, createrole_enabled = False, False
+        if "pgbouncer" in roles:
+            createdb_enabled, createrole_enabled = True, True
+            roles.remove("pgbouncer")
+
         if "admin" in roles:
-            roles.remove("admin")
+            createdb_enabled = True
             roles.append("charmed_dml")
+            roles.remove("admin")
+
+        if "CREATEDB" in roles:
+            createdb_enabled = True
+            roles.remove("CREATEDB")
+
+        if "CREATEROLE" in roles:
+            createrole_enabled = True
+            roles.remove("CREATEROLE")
+
+        if "SUPERUSER" in roles:
+            logger.warning("SUPERUSER privileges not allowed via extra-user-roles")
+            roles.remove("SUPERUSER")
 
         try:
             existing_roles = self.list_roles()
@@ -249,9 +270,10 @@ $$ LANGUAGE plpgsql security definer;
                     user_query = "ALTER ROLE {} "
                 else:
                     user_query = "CREATE ROLE {} "
-                user_query += f"WITH LOGIN ENCRYPTED PASSWORD '{password}' {'IN ROLE ' if roles else ''}"
+                user_query += f"WITH LOGIN {'CREATEDB' if createdb_enabled else ''} {'CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}' {'IN ROLE ' if roles else ''}"
                 if roles:
-                    user_query += f"{' '.join(roles)}"
+                    user_query += f"{', '.join(roles)}"
+
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(SQL(f"{user_query};").format(Identifier(user)))
@@ -276,7 +298,7 @@ $$ LANGUAGE plpgsql security definer;
                 "CREATE ROLE charmed_replica NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN REPLICATION",
             ],
             "charmed_backup": [
-                "CREATE ROLE charmed_backup NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN",
+                "CREATE ROLE charmed_backup NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
                 "GRANT charmed_stats TO charmed_backup",
                 "GRANT execute ON FUNCTION pg_backup_start TO charmed_backup",
                 "GRANT execute ON FUNCTION pg_backup_stop TO charmed_backup",
@@ -304,9 +326,22 @@ $$ LANGUAGE plpgsql security definer;
 
                     for query in queries:
                         cursor.execute(SQL(query))
+
+                # TODO: see if we need charmed_replica role at all
+                # cursor.execute(SQL("ALTER ROLE replication NOREPLICATION;"))
+                # cursor.execute(SQL("GRANT charmed_replica TO replication;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+
+    def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
+        """Grant the specified priviliges on the provided database for the user."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("GRANT {} ON DATABASE {} TO {};").format(Identifier(", ".join(privileges)), Identifier(database), Identifier(user)))
+        except psycopg2.Error as e:
+            logger.error(f"Faield to grant privileges to user: {e}")
+            raise PostgreSQLGrantDatabasePrivilegesToUserError() from e
 
     def delete_user(self, user: str) -> None:
         """Deletes a database user.
@@ -319,7 +354,19 @@ $$ LANGUAGE plpgsql security definer;
         if user not in users:
             return
 
+        roles = self.list_roles()
+
         try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("SELECT datname FROM pg_database WHERE datistemplate = false;"))
+                databases = [row[0] for row in cursor.fetchall()]
+
+            for database in databases:
+                with self._connect_to_database(database) as connection, connection.cursor() as cursor:
+                    inheriting_role = f"{database}_owner" if f"{database}_owner" in roles else self.user
+                    cursor.execute(SQL("REASSIGN OWNED BY {} TO {};").format(Identifier(user), Identifier(inheriting_role)))
+                    cursor.execute(SQL("DROP OWNED BY {};").format(Identifier(user)))
+
             # Delete the user.
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(SQL("DROP ROLE {};").format(Identifier(user)))

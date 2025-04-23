@@ -29,6 +29,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
@@ -1348,6 +1349,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # TODO: move predefined roles into constants
             if BACKUP_USER not in users:
                 self.postgresql.create_user(BACKUP_USER, new_password(), roles=["charmed_backup"])
+                self.postgresql.grant_database_privileges_to_user(
+                    BACKUP_USER, "postgres", ["connect"]
+                )
             if MONITORING_USER not in users:
                 # Create the monitoring user.
                 self.postgresql.create_user(
@@ -1355,6 +1359,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                     roles=["charmed_stats"],
                 )
+        except PostgreSQLGrantDatabasePrivilegesToUserError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to grant database privileges to user")
+            return
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
