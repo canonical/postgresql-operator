@@ -64,7 +64,7 @@ def test_tls_ca_chain_filename(harness):
         )
     assert (
         harness.charm.backup._tls_ca_chain_filename
-        == "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"
+        == "/var/snap/charmed-postgresql/common/data/db/pgbackrest-tls-ca-chain.crt"
     )
 
 
@@ -507,7 +507,7 @@ def test_execute_command(harness):
         patch("pwd.getpwnam") as _getpwnam,
     ):
         # Test when the command fails.
-        command = ["rm", "-r", "/var/lib/postgresql/data/pgdata"]
+        command = ["rm", "-r", "/var/snap/charmed-postgresql/common/data/db"]
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         assert harness.charm.backup._execute_command(command) == (1, "", "fake stderr")
         _run.assert_called_once_with(
