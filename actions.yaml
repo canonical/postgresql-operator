@@ -20,14 +20,6 @@ create-replication:
       default: default
 get-primary:
   description: Get the unit which is the primary/leader in the replication.
-get-password:
-  description: Get the system user's password, which is used by charm.
-    It is for internal charm users and SHOULD NOT be used by applications.
-  params:
-    username:
-      type: string
-      description: The username, the default value 'operator'.
-        Possible values - operator, replication, rewind, patroni.
 list-backups:
   description: Lists backups in s3 storage.
 pre-upgrade-check:
@@ -53,17 +45,6 @@ restore:
     restore-to-time:
       type: string
       description: Point-in-time-recovery target in PSQL format.
-set-password:
-  description: Change the system user's password, which is used by charm.
-    It is for internal charm users and SHOULD NOT be used by applications.
-  params:
-    username:
-      type: string
-      description: The username, the default value 'operator'.
-        Possible values - operator, replication, rewind.
-    password:
-      type: string
-      description: The password will be auto-generated if this option is not specified.
 set-tls-private-key:
   description: Set the private key, which will be used for certificate signing requests (CSR). Run for each unit separately.
   params:

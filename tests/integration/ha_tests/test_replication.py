@@ -132,7 +132,7 @@ async def test_no_data_replicated_between_clusters(
     await check_writes(ops_test)
 
     # Verify that the data from the first cluster wasn't replicated to the second cluster.
-    password = await get_password(ops_test, app=new_cluster_app)
+    password = await get_password(ops_test, database_app_name=new_cluster_app)
     for unit in ops_test.model.applications[new_cluster_app].units:
         try:
             with (

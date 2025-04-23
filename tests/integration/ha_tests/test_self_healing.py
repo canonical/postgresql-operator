@@ -9,6 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from .. import markers
 from ..helpers import (
     CHARM_BASE,
     db_connect,
@@ -234,9 +235,7 @@ async def test_full_cluster_restart(
     """
     # Locate primary unit.
     app = await app_name(ops_test)
-    patroni_password = await get_password(
-        ops_test, ops_test.model.applications[app].units[0].name, "patroni"
-    )
+    patroni_password = await get_password(ops_test, "patroni")
 
     # Change the loop wait setting to make Patroni wait more time before restarting PostgreSQL.
     initial_loop_wait = await get_patroni_setting(ops_test, "loop_wait")
@@ -354,7 +353,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
         # Rotate the WAL segments.
         files = await list_wal_files(ops_test, app)
         host = get_unit_address(ops_test, new_primary_name)
-        password = await get_password(ops_test, new_primary_name)
+        password = await get_password(ops_test)
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
@@ -380,6 +379,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
 
 @pytest.mark.abort_on_fail
+@markers.amd64_only
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
     # Locate primary unit.
@@ -468,6 +468,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
 
 @pytest.mark.abort_on_fail
+@markers.amd64_only
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
 ):

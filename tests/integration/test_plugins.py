@@ -99,8 +99,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
             charm,
             num_units=2,
             base=CHARM_BASE,
-            # TODO Figure out how to deal with pgaudit
-            config={"profile": "testing", "plugin_audit_enable": "False"},
+            config={"profile": "testing"},
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
 
@@ -171,7 +170,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
 
     # Check that the available plugins are disabled.
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     address = get_unit_address(ops_test, primary)
 
     config = enable_disable_config(False)
@@ -214,7 +213,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     address = get_unit_address(ops_test, primary)
 
     logger.info("Creating an index object which depends on the pg_trgm config")
