@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 49
+LIBPATCH = 51
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -153,7 +153,7 @@ class PostgreSQL:
                 if enable:
                     cursor.execute("ALTER SYSTEM SET pgaudit.log = 'ROLE,DDL,MISC,MISC_SET';")
                     cursor.execute("ALTER SYSTEM SET pgaudit.log_client TO off;")
-                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off")
+                    cursor.execute("ALTER SYSTEM SET pgaudit.log_parameter TO off;")
                 else:
                     cursor.execute("ALTER SYSTEM RESET pgaudit.log;")
                     cursor.execute("ALTER SYSTEM RESET pgaudit.log_client;")
@@ -258,7 +258,7 @@ class PostgreSQL:
             raise PostgreSQLCreateDatabaseError() from e
 
         # Enable preset extensions
-        self.enable_disable_extensions({plugin: True for plugin in plugins}, database)
+        self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
 
     def create_user(
         self,
@@ -434,6 +434,8 @@ class PostgreSQL:
                 ordered_extensions[plugin] = extensions.get(plugin, False)
             for extension, enable in extensions.items():
                 ordered_extensions[extension] = enable
+
+            self._configure_pgaudit(False)
 
             # Enable/disabled the extension in each database.
             for database in databases:
