@@ -1078,9 +1078,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
         try:
             # Input is hardcoded
-            subprocess.check_call("mkdir -p /home/snap_daemon".split())  # noqa: S603
-            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())  # noqa: S603
-            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())  # noqa: S603
+            subprocess.check_call(["mkdir", "-p", "/home/snap_daemon"])  # noqa: S607
+            subprocess.check_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])  # noqa: S607
+            subprocess.check_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])  # noqa: S607
         except subprocess.CalledProcessError:
             logger.exception("Unable to create snap_daemon home dir")
 
@@ -1933,8 +1933,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.error("Data directory not attached. Reboot unit.")
         self.unit.status = WaitingStatus("Data directory not attached")
         with contextlib.suppress(subprocess.CalledProcessError):
-            # Call is constant
-            subprocess.check_call(["/usr/bin/systemctl", "reboot"])  # noqa: S603
+            subprocess.check_call(["/usr/bin/systemctl", "reboot"])
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
