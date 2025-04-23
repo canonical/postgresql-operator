@@ -115,7 +115,7 @@ from relations.async_replication import (
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
-from utils import new_password, snap_refreshed
+from utils import label2name, new_password, snap_refreshed
 
 logger = logging.getLogger(__name__)
 
@@ -872,7 +872,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Raises:
             NotReadyError if either the new member or the current members are not ready.
         """
-        unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
+        unit = self.model.get_unit(label2name(member))
         member_ip = self._get_unit_ip(unit)
 
         if not self._patroni.are_all_members_ready():

@@ -30,7 +30,7 @@ from constants import (
     DATABASE_PORT,
     ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
 )
-from utils import new_password
+from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
 
@@ -228,12 +228,12 @@ class PostgreSQLProvider(Object):
         for member in online_members:
             if member["role"] == "leader":
                 primary_unit_ip = self.charm.unit_address_for_relation(
-                    self.relation_name, member["name"].replace("-", "/")
+                    self.relation_name, label2name(member["name"])
                 )
                 rw_endpoint = f"{primary_unit_ip}:{DATABASE_PORT}"
             else:
                 replica_ip = self.charm.unit_address_for_relation(
-                    self.relation_name, member["name"].replace("-", "/")
+                    self.relation_name, label2name(member["name"])
                 )
                 if not replica_ip:
                     continue

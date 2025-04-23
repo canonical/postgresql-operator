@@ -48,6 +48,7 @@ from constants import (
     TLS_CA_FILE,
     USER,
 )
+from utils import label2name
 
 logger = logging.getLogger(__name__)
 
@@ -321,7 +322,7 @@ class Patroni:
                 primary = member["name"]
                 if unit_name_pattern:
                     # Change the last dash to / in order to match unit name pattern.
-                    primary = "/".join(primary.rsplit("-", 1))
+                    primary = label2name(primary)
                 return primary
 
     def get_standby_leader(
@@ -354,7 +355,7 @@ class Patroni:
                         standby_leader = member["name"]
                         if unit_name_pattern:
                             # Change the last dash to / in order to match unit name pattern.
-                            standby_leader = "/".join(standby_leader.rsplit("-", 1))
+                            standby_leader = label2name(standby_leader)
                         return standby_leader
 
     def get_sync_standby_names(self) -> list[str]:
@@ -372,7 +373,7 @@ class Patroni:
                 )
                 for member in r.json()["members"]:
                     if member["role"] == "sync_standby":
-                        sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
+                        sync_standbys.append(label2name(member["name"]))
         return sync_standbys
 
     def _get_alternative_patroni_url(
