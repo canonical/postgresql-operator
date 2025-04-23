@@ -1,14 +1,22 @@
 # Explanation
 
-This section contains pages with more detailed explanations that provide additional context about some of the key concepts behind the PostgreSQL charm:
+This section contains pages with more detailed explanations that provide additional context about key concepts behind the PostgreSQL charm.
 
+## Core concepts and design
 * [Architecture]
 * [Interfaces and endpoints]
+* [Juju]
+* [Legacy charm]
+
+## Operational concepts
 * [Connection pooling]
 * [Users]
 * [Logs]
-* [Juju]
-* [Legacy charm]
+
+## Security and hardening
+* [Security hardening guide][Security]
+  * [Cryptography]
+
 
 <!-- Links -->
 
@@ -19,3 +27,5 @@ This section contains pages with more detailed explanations that provide additio
 [Juju]: /t/11985
 [Legacy charm]: /t/10690
 [Connection pooling]: /t/15777
+[Security]: /t/16852
+[Cryptography]: /t/16853

@@ -41,7 +41,13 @@ from cluster import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from constants import PEER, POSTGRESQL_SNAP_NAME, SECRET_INTERNAL_LABEL, SNAP_PACKAGES
+from constants import (
+    PEER,
+    POSTGRESQL_SNAP_NAME,
+    SECRET_INTERNAL_LABEL,
+    SNAP_PACKAGES,
+    UPDATE_CERTS_BIN_PATH,
+)
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -86,9 +92,9 @@ def test_on_install(harness):
         pg_snap.alias.assert_any_call("patronictl")
 
         assert _check_call.call_count == 3
-        _check_call.assert_any_call("mkdir -p /home/snap_daemon".split())
-        _check_call.assert_any_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())
-        _check_call.assert_any_call("usermod -d /home/snap_daemon snap_daemon".split())
+        _check_call.assert_any_call(["mkdir", "-p", "/home/snap_daemon"])
+        _check_call.assert_any_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])
+        _check_call.assert_any_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
@@ -1264,10 +1270,17 @@ def test_restart(harness):
 def test_update_config(harness):
     with (
         patch("subprocess.check_output", return_value=b"C"),
+        patch("charm.snap_refreshed", return_value=True),
         patch("charm.snap.SnapCache"),
         patch(
             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
         ) as _handle_postgresql_restart_need,
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_metrics_service"
+        ) as _restart_metrics_service,
+        patch(
+            "charm.PostgresqlOperatorCharm._restart_ldap_sync_service"
+        ) as _restart_ldap_sync_service,
         patch("charm.Patroni.bulk_update_parameters_controller_by_patroni"),
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
@@ -1295,6 +1308,7 @@ def test_update_config(harness):
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
+            enable_ldap=False,
             enable_tls=False,
             backup_id=None,
             stanza=None,
@@ -1306,10 +1320,14 @@ def test_update_config(harness):
             no_peers=False,
         )
         _handle_postgresql_restart_need.assert_called_once_with(False)
+        _restart_ldap_sync_service.assert_called_once()
+        _restart_metrics_service.assert_called_once()
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
         # Test with TLS files available.
         _handle_postgresql_restart_need.reset_mock()
+        _restart_ldap_sync_service.reset_mock()
+        _restart_metrics_service.reset_mock()
         harness.update_relation_data(
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it change.
@@ -1319,6 +1337,7 @@ def test_update_config(harness):
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
+            enable_ldap=False,
             enable_tls=True,
             backup_id=None,
             stanza=None,
@@ -1330,6 +1349,8 @@ def test_update_config(harness):
             no_peers=False,
         )
         _handle_postgresql_restart_need.assert_called_once()
+        _restart_ldap_sync_service.assert_called_once()
+        _restart_metrics_service.assert_called_once()
         assert "tls" not in harness.get_relation_data(
             rel_id, harness.charm.unit.name
         )  # The "tls" flag is set in handle_postgresql_restart_need.
@@ -1339,6 +1360,8 @@ def test_update_config(harness):
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it change.
         _handle_postgresql_restart_need.reset_mock()
+        _restart_ldap_sync_service.reset_mock()
+        _restart_metrics_service.reset_mock()
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
         assert harness.get_relation_data(rel_id, harness.charm.unit.name)["tls"] == "enabled"
@@ -1349,6 +1372,8 @@ def test_update_config(harness):
         )  # Mock some data in the relation to test that it doesn't change.
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
+        _restart_ldap_sync_service.assert_not_called()
+        _restart_metrics_service.assert_not_called()
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
 
 
@@ -1420,6 +1445,7 @@ def test_validate_config_options(harness):
     ):
         _charm_lib.return_value.get_postgresql_text_search_configs.return_value = []
         _charm_lib.return_value.validate_date_style.return_value = False
+        _charm_lib.return_value.validate_group_map.return_value = False
         _charm_lib.return_value.get_postgresql_timezones.return_value = []
 
         # Test instance_default_text_search_config exception
@@ -1437,6 +1463,17 @@ def test_validate_config_options(harness):
         _charm_lib.return_value.get_postgresql_text_search_configs.return_value = [
             "pg_catalog.test"
         ]
+
+        # Test ldap_map exception
+        with harness.hooks_disabled():
+            harness.update_config({"ldap_map": "ldap_group="})
+
+        with pytest.raises(ValueError) as e:
+            harness.charm._validate_config_options()
+        assert str(e.value) == "ldap_map config option has an invalid value"
+
+        _charm_lib.return_value.validate_group_map.assert_called_once_with("ldap_group=")
+        _charm_lib.return_value.validate_group_map.return_value = True
 
         # Test request_date_style exception
         with harness.hooks_disabled():
@@ -1764,6 +1801,42 @@ def test_push_tls_files_to_workload(harness):
             _render_file.reset_mock()
             assert not (harness.charm.push_tls_files_to_workload())
             assert _render_file.call_count == 2
+
+
+def test_push_ca_file_into_workload(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("pathlib.Path.write_text") as _write_text,
+        patch("subprocess.check_call") as _check_call,
+    ):
+        harness.charm.set_secret("unit", "ca-app", "test-ca")
+
+        assert harness.charm.push_ca_file_into_workload("ca-app")
+        _write_text.assert_called_once()
+        _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
+        _update_config.assert_called_once()
+
+
+def test_clean_ca_file_from_workload(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("pathlib.Path.write_text") as _write_text,
+        patch("pathlib.Path.unlink") as _unlink,
+        patch("subprocess.check_call") as _check_call,
+    ):
+        harness.charm.set_secret("unit", "ca-app", "test-ca")
+
+        assert harness.charm.push_ca_file_into_workload("ca-app")
+        _write_text.assert_called_once()
+        _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
+        _update_config.assert_called_once()
+
+        _check_call.reset_mock()
+        _update_config.reset_mock()
+
+        assert harness.charm.clean_ca_file_from_workload("ca-app")
+        _unlink.assert_called_once()
+        _check_call.assert_called_once_with([UPDATE_CERTS_BIN_PATH])
 
 
 def test_is_workload_running(harness):
@@ -2803,3 +2876,35 @@ def test_on_promote_to_primary(harness):
         harness.charm._on_promote_to_primary(event)
         _raft_reinitialisation.assert_called_once_with()
         assert harness.charm.unit_peer_data["raft_candidate"] == "True"
+
+
+def test_get_ldap_parameters(harness):
+    with (
+        patch("charm.PostgreSQLLDAP.get_relation_data") as _get_relation_data,
+        patch(
+            target="charm.PostgresqlOperatorCharm.is_cluster_initialised",
+            new_callable=PropertyMock,
+            return_value=True,
+        ) as _cluster_initialised,
+    ):
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"ldap_enabled": "False"},
+            )
+
+        harness.charm.get_ldap_parameters()
+        _get_relation_data.assert_not_called()
+        _get_relation_data.reset_mock()
+
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                harness.model.get_relation(PEER).id,
+                harness.charm.app.name,
+                {"ldap_enabled": "True"},
+            )
+
+        harness.charm.get_ldap_parameters()
+        _get_relation_data.assert_called_once()
+        _get_relation_data.reset_mock()

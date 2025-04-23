@@ -11,6 +11,8 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseRequestedEvent,
 )
 from charms.postgresql_k8s.v0.postgresql import (
+    ACCESS_GROUP_RELATION,
+    ACCESS_GROUPS,
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
@@ -80,7 +82,10 @@ class PostgreSQLProvider(Object):
         if extra_roles is None:
             return []
 
-        return [role.lower() for role in extra_roles.split(",")]
+        # Make sure the access-groups are not in the list
+        extra_roles_list = [role.lower() for role in extra_roles.split(",")]
+        extra_roles_list = [role for role in extra_roles_list if role not in ACCESS_GROUPS]
+        return extra_roles_list
 
     def register_address_for_endpoint(self, _) -> None:
         """Register the address for the endpoint.
@@ -111,8 +116,9 @@ class PostgreSQLProvider(Object):
         # Retrieve the database name and extra user roles using the charm library.
         database = event.database or ""
 
-        # Make sure that certain groups are not in the list
+        # Make sure the relation access-group is added to the list
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
+        extra_user_roles.append(ACCESS_GROUP_RELATION)
 
         try:
             # Creates the user and the database for this specific relation.

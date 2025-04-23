@@ -48,9 +48,9 @@ from constants import (
     APP_SCOPE,
     PATRONI_CONF_PATH,
     PEER,
+    POSTGRESQL_DATA_PATH,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
-    POSTGRESQL_DATA_PATH,
 )
 
 logger = logging.getLogger(__name__)
