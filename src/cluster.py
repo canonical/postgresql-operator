@@ -162,6 +162,17 @@ class Patroni:
         """Patroni REST API URL."""
         return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
 
+    @staticmethod
+    def _dict_to_hba_string(_dict: dict[str, Any]) -> str:
+        """Transform a dictionary into a Host Based Authentication valid string."""
+        for key, value in _dict.items():
+            if isinstance(value, bool):
+                _dict[key] = int(value)
+            if isinstance(value, str):
+                _dict[key] = f'"{value}"'
+
+        return " ".join(f"{key}={value}" for key, value in _dict.items())
+
     def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""
         # Render the configuration files and start the cluster.
@@ -610,6 +621,7 @@ class Patroni:
         self,
         connectivity: bool = False,
         is_creating_backup: bool = False,
+        enable_ldap: bool = False,
         enable_tls: bool = False,
         stanza: str | None = None,
         restore_stanza: str | None = None,
@@ -626,6 +638,7 @@ class Patroni:
         Args:
             connectivity: whether to allow external connections to the database.
             is_creating_backup: whether this unit is creating a backup.
+            enable_ldap: whether to enable LDAP authentication.
             enable_tls: whether to enable TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
@@ -640,6 +653,9 @@ class Patroni:
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
+
+        ldap_params = self.charm.get_ldap_parameters()
+
         # Render the template file with the correct values.
         rendered = template.render(
             conf_path=PATRONI_CONF_PATH,
@@ -648,6 +664,7 @@ class Patroni:
             log_path=PATRONI_LOGS_PATH,
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
+            enable_ldap=enable_ldap,
             enable_tls=enable_tls,
             member_name=self.member_name,
             partner_addrs=self.charm.async_replication.get_partner_addresses()
@@ -677,6 +694,7 @@ class Patroni:
             primary_cluster_endpoint=self.charm.async_replication.get_primary_cluster_endpoint(),
             extra_replication_endpoints=self.charm.async_replication.get_standby_endpoints(),
             raft_password=self.raft_password,
+            ldap_parameters=self._dict_to_hba_string(ldap_params),
             patroni_password=self.patroni_password,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
@@ -1049,5 +1067,4 @@ class Patroni:
         logger.debug(f"new patroni service file: {new_patroni_service}")
         with open(PATRONI_SERVICE_DEFAULT_PATH, "w") as patroni_service_file:
             patroni_service_file.write(new_patroni_service)
-        # Input is hardcoded
-        subprocess.run(["/bin/systemctl", "daemon-reload"])  # noqa: S603
+        subprocess.run(["/bin/systemctl", "daemon-reload"])
