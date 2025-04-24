@@ -86,6 +86,7 @@ from constants import (
     PATRONI_PASSWORD_KEY,
     PEER,
     PLUGIN_OVERRIDES,
+    POSTGRESQL_DATA_PATH,
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
     REPLICATION_PASSWORD_KEY,
@@ -1723,6 +1724,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
+            data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
+            if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
+                os.remove(os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"))
+                logger.error("PostgreSQL data directory is not empty. Removing pg_wal")
+                return True
             try:
                 self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")
