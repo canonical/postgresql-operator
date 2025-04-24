@@ -16,6 +16,7 @@ import time
 from datetime import datetime
 from pathlib import Path
 from typing import Literal, get_args
+from urllib.parse import urlparse
 
 import psycopg2
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -23,6 +24,8 @@ from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
+    ACCESS_GROUP_IDENTITY,
+    ACCESS_GROUPS,
     REQUIRED_PLUGINS,
     PostgreSQL,
     PostgreSQLCreatePredefinedRolesError,
@@ -76,6 +79,7 @@ from constants import (
     APP_SCOPE,
     BACKUP_USER,
     DATABASE_DEFAULT_NAME,
+    DATABASE_PORT,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -99,9 +103,11 @@ from constants import (
     TLS_KEY_FILE,
     TRACING_PROTOCOL,
     UNIT_SCOPE,
+    UPDATE_CERTS_BIN_PATH,
     USER,
     USER_PASSWORD_KEY,
 )
+from ldap import PostgreSQLLDAP
 from relations.async_replication import (
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
@@ -110,7 +116,7 @@ from relations.async_replication import (
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
-from utils import new_password
+from utils import new_password, snap_refreshed
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +141,7 @@ class CannotConnectError(Exception):
         PostgreSQL,
         PostgreSQLAsyncReplication,
         PostgreSQLBackups,
+        PostgreSQLLDAP,
         PostgreSQLProvider,
         PostgreSQLTLS,
         PostgreSQLUpgrade,
@@ -192,6 +199,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
+
+        self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["pgdata"].location
 
         self.upgrade = PostgreSQLUpgrade(
@@ -202,6 +211,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
+        self.ldap = PostgreSQLLDAP(self, "ldap")
         self.tls = PostgreSQLTLS(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.restart_manager = RollingOpsManager(
@@ -927,6 +937,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
 
     @property
+    def is_connectivity_enabled(self) -> bool:
+        """Return whether this unit can be connected externally."""
+        return self.unit_peer_data.get("connectivity", "on") == "on"
+
+    @property
+    def is_ldap_charm_related(self) -> bool:
+        """Return whether this unit has an LDAP charm related."""
+        return self.app_peer_data.get("ldap_enabled", "False") == "True"
+
+    @property
+    def is_ldap_enabled(self) -> bool:
+        """Return whether this unit has LDAP enabled."""
+        return self.is_ldap_charm_related and self.is_cluster_initialised
+
+    @property
     def is_primary(self) -> bool:
         """Return whether this unit is the primary instance."""
         return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
@@ -1074,9 +1099,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
         try:
             # Input is hardcoded
-            subprocess.check_call("mkdir -p /home/snap_daemon".split())  # noqa: S603
-            subprocess.check_call("chown snap_daemon:snap_daemon /home/snap_daemon".split())  # noqa: S603
-            subprocess.check_call("usermod -d /home/snap_daemon snap_daemon".split())  # noqa: S603
+            subprocess.check_call(["mkdir", "-p", "/home/snap_daemon"])  # noqa: S607
+            subprocess.check_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])  # noqa: S607
+            subprocess.check_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])  # noqa: S607
         except subprocess.CalledProcessError:
             logger.exception("Unable to create snap_daemon home dir")
 
@@ -1324,28 +1349,88 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.start_patroni()
             self.backup.start_stop_pgbackrest_service()
 
-    def _setup_exporter(self) -> None:
-        """Set up postgresql_exporter options."""
-        cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+    def _restart_metrics_service(self, postgres_snap: snap.Snap) -> None:
+        """Restart the monitoring service if the password was rotated."""
+        try:
+            snap_password = postgres_snap.get("exporter.password")
+        except snap.SnapError:
+            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
+            return None
 
-        if postgres_snap.revision != next(
-            filter(lambda snap_package: snap_package[0] == POSTGRESQL_SNAP_NAME, SNAP_PACKAGES)
-        )[1]["revision"].get(platform.machine()):
-            logger.debug(
-                "Early exit _setup_exporter: snap was not refreshed to the right version yet"
-            )
+        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
+            self._setup_exporter(postgres_snap)
+
+    def _restart_ldap_sync_service(self, postgres_snap: snap.Snap) -> None:
+        """Restart the LDAP sync service in case any configuration changed."""
+        if not self._patroni.member_started:
+            logger.debug("Restart LDAP sync early exit: Patroni has not started yet")
             return
+
+        sync_service = postgres_snap.services["ldap-sync"]
+
+        if not self.is_primary and sync_service["active"]:
+            logger.debug("Stopping LDAP sync service. It must only run in the primary")
+            postgres_snap.stop(services=["ldap-sync"])
+
+        if self.is_primary and not self.is_ldap_enabled:
+            logger.debug("Stopping LDAP sync service")
+            postgres_snap.stop(services=["ldap-sync"])
+            return
+
+        if self.is_primary and self.is_ldap_enabled:
+            self._setup_ldap_sync(postgres_snap)
+
+    def _setup_exporter(self, postgres_snap: snap.Snap | None = None) -> None:
+        """Set up postgresql_exporter options."""
+        if postgres_snap is None:
+            cache = snap.SnapCache()
+            postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
         postgres_snap.set({
             "exporter.user": MONITORING_USER,
             "exporter.password": self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
         })
+
         if postgres_snap.services[MONITORING_SNAP_SERVICE]["active"] is False:
             postgres_snap.start(services=[MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[MONITORING_SNAP_SERVICE])
+
         self.unit_peer_data.update({"exporter-started": "True"})
+
+    def _setup_ldap_sync(self, postgres_snap: snap.Snap | None = None) -> None:
+        """Set up postgresql_ldap_sync options."""
+        if postgres_snap is None:
+            cache = snap.SnapCache()
+            postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+
+        ldap_params = self.get_ldap_parameters()
+        ldap_url = urlparse(ldap_params["ldapurl"])
+        ldap_host = ldap_url.hostname
+        ldap_port = ldap_url.port
+
+        ldap_base_dn = ldap_params["ldapbasedn"]
+        ldap_bind_username = ldap_params["ldapbinddn"]
+        ldap_bind_password = ldap_params["ldapbindpasswd"]
+        ldap_group_mappings = self.postgresql.build_postgresql_group_map(self.config.ldap_map)
+
+        postgres_snap.set({
+            "ldap-sync.ldap_host": ldap_host,
+            "ldap-sync.ldap_port": ldap_port,
+            "ldap-sync.ldap_base_dn": ldap_base_dn,
+            "ldap-sync.ldap_bind_username": ldap_bind_username,
+            "ldap-sync.ldap_bind_password": ldap_bind_password,
+            "ldap-sync.ldap_group_identity": json.dumps(ACCESS_GROUP_IDENTITY),
+            "ldap-sync.ldap_group_mappings": json.dumps(ldap_group_mappings),
+            "ldap-sync.postgres_host": "127.0.0.1",
+            "ldap-sync.postgres_port": DATABASE_PORT,
+            "ldap-sync.postgres_database": DATABASE_DEFAULT_NAME,
+            "ldap-sync.postgres_username": USER,
+            "ldap-sync.postgres_password": self._get_password(),
+        })
+
+        logger.debug("Starting LDAP sync service")
+        postgres_snap.restart(services=["ldap-sync"])
 
     def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
         """Bootstrap the cluster."""
@@ -1429,6 +1514,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         self.postgresql.set_up_database()
+
+        access_groups = self.postgresql.list_access_groups()
+        if access_groups != set(ACCESS_GROUPS):
+            self.postgresql.create_access_groups()
+            self.postgresql.grant_internal_access_group_memberships()
 
         self.postgresql_client_relation.oversee_users()
 
@@ -1845,6 +1935,33 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.exception("TLS files failed to push. Error in config update")
             return False
 
+    def push_ca_file_into_workload(self, secret_name: str) -> bool:
+        """Move CA certificates file into the PostgreSQL storage path."""
+        certs = self.get_secret(UNIT_SCOPE, secret_name)
+        if certs is not None:
+            certs_file = Path(self._certs_path, f"{secret_name}.crt")
+            certs_file.write_text(certs)
+            subprocess.check_call([UPDATE_CERTS_BIN_PATH])  # noqa: S603
+
+        try:
+            return self.update_config()
+        except Exception:
+            logger.exception("CA file failed to push. Error in config update")
+            return False
+
+    def clean_ca_file_from_workload(self, secret_name: str) -> bool:
+        """Cleans up CA certificates from the PostgreSQL storage path."""
+        certs_file = Path(self._certs_path, f"{secret_name}.crt")
+        certs_file.unlink()
+
+        subprocess.check_call([UPDATE_CERTS_BIN_PATH])  # noqa: S603
+
+        try:
+            return self.update_config()
+        except Exception:
+            logger.exception("CA file failed to clean. Error in config update")
+            return False
+
     def _reboot_on_detached_storage(self, event: EventBase) -> None:
         """Reboot on detached storage.
 
@@ -1857,8 +1974,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.error("Data directory not attached. Reboot unit.")
         self.unit.status = WaitingStatus("Data directory not attached")
         with contextlib.suppress(subprocess.CalledProcessError):
-            # Call is constant
-            subprocess.check_call(["/usr/bin/systemctl", "reboot"])  # noqa: S603
+            subprocess.check_call(["/usr/bin/systemctl", "reboot"])
 
     def _restart(self, event: RunWithLock) -> None:
         """Restart PostgreSQL."""
@@ -1923,8 +2039,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
-            connectivity=self.unit_peer_data.get("connectivity", "on") == "on",
+            connectivity=self.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
+            enable_ldap=self.is_ldap_enabled,
             enable_tls=enable_tls,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
@@ -1978,19 +2095,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._handle_postgresql_restart_need(enable_tls)
 
-        # Restart the monitoring service if the password was rotated
         cache = snap.SnapCache()
         postgres_snap = cache[POSTGRESQL_SNAP_NAME]
 
-        try:
-            snap_password = postgres_snap.get("exporter.password")
-        except snap.SnapError:
-            logger.warning(
-                "Early exit update_config: Trying to reset metrics service with no configuration set"
-            )
+        if not snap_refreshed(postgres_snap.revision):
+            logger.debug("Early exit: snap was not refreshed to the right version yet")
             return True
-        if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
-            self._setup_exporter()
+
+        self._restart_metrics_service(postgres_snap)
+        self._restart_ldap_sync_service(postgres_snap)
 
         return True
 
@@ -2003,6 +2116,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             raise ValueError(
                 "instance_default_text_search_config config option has an invalid value"
             )
+
+        if not self.postgresql.validate_group_map(self.config.ldap_map):
+            raise ValueError("ldap_map config option has an invalid value")
 
         if not self.postgresql.validate_date_style(self.config.request_date_style):
             raise ValueError("request_date_style config option has an invalid value")
@@ -2180,6 +2296,35 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"Last completed transaction was at {log_time[-1]}")
         else:
             logger.error("Can't tell last completed transaction time")
+
+    def get_ldap_parameters(self) -> dict:
+        """Returns the LDAP configuration to use."""
+        if not self.is_cluster_initialised:
+            return {}
+        if not self.is_ldap_charm_related:
+            logger.debug("LDAP is not enabled")
+            return {}
+
+        data = self.ldap.get_relation_data()
+        if data is None:
+            return {}
+
+        params = {
+            "ldapbasedn": data.base_dn,
+            "ldapbinddn": data.bind_dn,
+            "ldapbindpasswd": data.bind_password,
+            "ldaptls": data.starttls,
+            "ldapurl": data.urls[0],
+        }
+
+        # LDAP authentication parameters that are exclusive to
+        # one of the two supported modes (simple bind or search+bind)
+        # must be put at the very end of the parameters string
+        params.update({
+            "ldapsearchfilter": self.config.ldap_search_filter,
+        })
+
+        return params
 
 
 if __name__ == "__main__":
