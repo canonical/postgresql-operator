@@ -149,16 +149,18 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         # Reducing the update status frequency to speed up the triggering of deferred events.
         await ops_test.model.set_config({"update-status-hook-interval": "10s"})
 
-        logger.info("waiting for duplicate application to be blocked")
+        logger.info("waiting for duplicate application to be waiting")
         try:
             await ops_test.model.wait_for_idle(
-                apps=[DUP_DATABASE_APP_NAME], timeout=1000, status="blocked"
+                apps=[DUP_DATABASE_APP_NAME], timeout=60, idle_period=30, status="waiting"
             )
         except asyncio.TimeoutError:
-            logger.info("Application is not in blocked state. Checking logs...")
+            logger.info("Application is not in waiting state. Checking logs...")
 
-        # Since application have postgresql db in storage from external application it should not be able to connect due to new password
-        logger.info("checking operator password auth")
-        assert not await check_password_auth(
-            ops_test, ops_test.model.applications[DUP_DATABASE_APP_NAME].units[0].name
-        )
+        for attempt in Retrying(stop=stop_after_delay(60 * 10), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                # Since application have postgresql db in storage from external application it should not be able to connect due to new password
+                logger.info("checking operator password auth")
+                assert not await check_password_auth(
+                    ops_test, ops_test.model.applications[DUP_DATABASE_APP_NAME].units[0].name
+                )

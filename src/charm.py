@@ -1588,7 +1588,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
             for user, password in list(updated_passwords.items()):
-                if user not in SYSTEM_USERS:
+                if user not in [*SYSTEM_USERS, BACKUP_USER]:
                     logger.error(
                         f"Can only update system users: {', '.join(SYSTEM_USERS)} not {user}"
                     )

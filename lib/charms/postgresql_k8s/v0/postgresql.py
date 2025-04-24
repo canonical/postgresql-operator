@@ -321,7 +321,7 @@ $$ LANGUAGE plpgsql security definer;
                     user_query = "ALTER ROLE {} "
                 else:
                     user_query = "CREATE ROLE {} "
-                user_query += f"WITH LOGIN {'CREATEDB' if createdb_enabled else ''} {'CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}' {'IN ROLE ' if roles else ''}"
+                user_query += f"WITH LOGIN{' CREATEDB' if createdb_enabled else ''}{' CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}' {'IN ROLE ' if roles else ''}"
                 if roles:
                     user_query += f"{', '.join(roles)}"
 
