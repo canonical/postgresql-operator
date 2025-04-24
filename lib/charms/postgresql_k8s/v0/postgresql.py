@@ -275,6 +275,7 @@ $$ LANGUAGE plpgsql security definer;
             password: password to be assigned to the user.
             roles: roles to be assigned to the user.
         """
+
         createdb_enabled, createrole_enabled = False, False
         if "pgbouncer" in roles:
             createdb_enabled, createrole_enabled = True, True
@@ -289,9 +290,17 @@ $$ LANGUAGE plpgsql security definer;
             createdb_enabled = True
             roles.remove("CREATEDB")
 
+        if "createdb" in roles:
+            createdb_enabled = True
+            roles.remove("createdb")
+
         if "CREATEROLE" in roles:
             createrole_enabled = True
             roles.remove("CREATEROLE")
+
+        if "createrole" in roles:
+            createrole_enabled = True
+            roles.remove("createrole")
 
         if "SUPERUSER" in roles:
             logger.warning("SUPERUSER privileges not allowed via extra-user-roles")
