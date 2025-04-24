@@ -1,6 +1,5 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-from pathlib import PosixPath
 from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
@@ -453,6 +452,10 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
 def test_empty_data_files(harness):
     with (
         patch("shutil.rmtree") as _rmtree,
+        patch("os.path.isdir", return_value=True) as _isdir,
+        patch("os.path.islink", return_value=False) as _islink,
+        patch("os.path.isfile", return_value=False) as _isfile,
+        patch("os.listdir", return_value=["test_file.txt"]) as _listdir,
         patch("pathlib.Path.is_dir") as _is_dir,
         patch("pathlib.Path.exists") as _exists,
     ):
@@ -462,18 +465,24 @@ def test_empty_data_files(harness):
         _rmtree.assert_not_called()
 
         # Test when the removal of the data files fails.
-        path = PosixPath("/var/snap/charmed-postgresql/common/var/lib/postgresql")
         _exists.return_value = True
         _is_dir.return_value = True
         _rmtree.side_effect = OSError
         assert not harness.charm.backup._empty_data_files()
-        _rmtree.assert_called_once_with(path)
+        _rmtree.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/data/archive/test_file.txt"
+        )
 
         # Test when data files are successfully removed.
         _rmtree.reset_mock()
         _rmtree.side_effect = None
         assert harness.charm.backup._empty_data_files()
-        _rmtree.assert_called_once_with(path)
+        _rmtree.assert_has_calls([
+            call("/var/snap/charmed-postgresql/common/data/archive/test_file.txt"),
+            call("/var/snap/charmed-postgresql/common/var/lib/postgresql/test_file.txt"),
+            call("/var/snap/charmed-postgresql/common/data/logs/test_file.txt"),
+            call("/var/snap/charmed-postgresql/common/data/temp/test_file.txt"),
+        ])
 
 
 def test_change_connectivity_to_database(harness):

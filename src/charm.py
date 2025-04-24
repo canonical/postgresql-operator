@@ -1727,7 +1727,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
                 os.remove(os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"))
-                logger.error("PostgreSQL data directory is not empty. Removing pg_wal")
+                logger.info("PostgreSQL data directory was not empty. Removed pg_wal")
                 return True
             try:
                 self._patroni.restart_patroni()
