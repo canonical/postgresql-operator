@@ -63,7 +63,7 @@ def test_tls_ca_chain_filename(harness):
         )
     assert (
         harness.charm.backup._tls_ca_chain_filename
-        == "/var/snap/charmed-postgresql/common/var/lib/postgresql/pgbackrest-tls-ca-chain.crt"
+        == "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"
     )
 
 
@@ -331,7 +331,7 @@ def test_construct_endpoint(harness):
 
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
-    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+    ["", "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"],
 )
 def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
     with (
@@ -1700,7 +1700,7 @@ def test_pre_restore_checks(harness):
 
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
-    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+    ["", "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"],
 )
 def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
     with (
@@ -1962,7 +1962,7 @@ def test_start_stop_pgbackrest_service(harness):
 
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
-    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+    ["", "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"],
 )
 def test_upload_content_to_s3(harness, tls_ca_chain_filename):
     with (

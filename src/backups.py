@@ -97,7 +97,7 @@ class PostgreSQLBackups(Object):
         """Returns the path to the TLS CA chain file."""
         s3_parameters, _ = self._retrieve_s3_parameters()
         if s3_parameters.get("tls-ca-chain") is not None:
-            return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
+            return f"{PGBACKREST_CONF_PATH}/pgbackrest-tls-ca-chain.crt"
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
