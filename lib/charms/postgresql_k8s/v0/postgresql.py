@@ -235,7 +235,7 @@ class PostgreSQL:
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_admin")))
             cursor.execute(SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(Identifier(database)))
 
-            for user_to_grant_access in self.system_users:
+            for user_to_grant_access in [*self.system_users, "charmed_instance_admin"]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
@@ -284,6 +284,7 @@ $$ LANGUAGE plpgsql security definer;
         if "admin" in roles:
             createdb_enabled = True
             roles.append("charmed_dml")
+            roles.append("charmed_instance_admin")
             roles.remove("admin")
 
         if "CREATEDB" in roles:
@@ -345,9 +346,6 @@ $$ LANGUAGE plpgsql security definer;
             "charmed_dml": [
                 "CREATE ROLE charmed_dml NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data",
             ],
-            "charmed_replica": [
-                "CREATE ROLE charmed_replica NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN REPLICATION",
-            ],
             "charmed_backup": [
                 "CREATE ROLE charmed_backup NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
                 "GRANT charmed_stats TO charmed_backup",
@@ -362,6 +360,10 @@ $$ LANGUAGE plpgsql security definer;
                 "GRANT execute ON FUNCTION set_user(text, text) TO charmed_dba",
                 "GRANT execute ON FUNCTION set_user_u(text) TO charmed_dba",
             ],
+            "charmed_instance_admin": [
+                "CREATE ROLE charmed_instance_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
+                "GRANT connect ON DATABASE postgres TO charmed_instance_admin",
+            ]
         }
 
         existing_roles = self.list_roles()
@@ -377,10 +379,6 @@ $$ LANGUAGE plpgsql security definer;
 
                     for query in queries:
                         cursor.execute(SQL(query))
-
-                # TODO: see if we need charmed_replica role at all
-                # cursor.execute(SQL("ALTER ROLE replication NOREPLICATION;"))
-                # cursor.execute(SQL("GRANT charmed_replica TO replication;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e

@@ -157,6 +157,23 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.set_unit_failed()
             return
 
+        try:
+            # Needed to create predefined roles with set_user execution privileges
+            self.charm.postgresql.enable_disable_extensions(
+                {"set_user": True}, database="postgres"
+            )
+        except Exception as e:
+            logger.exception(e)
+            self.set_unit_failed()
+            return
+
+        try:
+            self.charm.postgresql.create_predefined_roles()
+        except Exception as e:
+            logger.exception(e)
+            self.set_unit_failed()
+            return
+
         self.charm._setup_exporter()
         self.charm.backup.start_stop_pgbackrest_service()
 
