@@ -854,14 +854,16 @@ def test_on_set_password(harness):
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
         patch("charm.PostgresqlOperatorCharm._on_leader_elected"),
+        patch("charm.new_password", return_value="newpass"),
     ):
         # Create a mock event.
         mock_event = MagicMock(params={})
 
         # Set some values for the other mocks.
-        _are_all_members_ready.side_effect = [False, True, True, True, True]
-        _postgresql.update_user_password = PropertyMock(
-            side_effect=[PostgreSQLUpdateUserPasswordError, None, None, None]
+        _are_all_members_ready.return_value = False
+        _postgresql.update_user_password = PropertyMock()
+        _postgresql.update_user_password.return_value.side_effect = (
+            PostgreSQLUpdateUserPasswordError
         )
 
         # Test trying to set a password through a non leader unit.
@@ -878,6 +880,7 @@ def test_on_set_password(harness):
         _set_secret.assert_not_called()
 
         # Test without providing the username option but without all cluster members ready.
+        _are_all_members_ready.return_value = True
         mock_event.reset_mock()
         del mock_event.params["username"]
         harness.charm._on_set_password(mock_event)
@@ -891,14 +894,17 @@ def test_on_set_password(harness):
         _set_secret.assert_not_called()
 
         # Test without providing the username option.
+        mock_event.reset_mock()
+        _postgresql.update_user_password.return_value.side_effect = None
         harness.charm._on_set_password(mock_event)
-        assert _set_secret.call_args_list[0][0][1] == "operator-password"
+        mock_event.fail.assert_called_once()
+        _set_secret.assert_not_called()
 
         # Also test providing the username option.
         _set_secret.reset_mock()
         mock_event.params["username"] = "replication"
         harness.charm._on_set_password(mock_event)
-        assert _set_secret.call_args_list[0][0][1] == "replication-password"
+        _set_secret.assert_called_once_with("app", "replication-password", "newpass")
 
         # And test providing both the username and password options.
         _set_secret.reset_mock()
