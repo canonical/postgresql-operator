@@ -206,7 +206,7 @@ class PostgreSQLAsyncReplication(Object):
         return True
 
     def get_all_primary_cluster_endpoints(self) -> list[str]:
-        """Return all the primary cluster endpoints."""
+        """Return all the primary cluster endpoints from the standby cluster."""
         relation = self._relation
         primary_cluster = self._get_primary_cluster()
         # List the primary endpoints only for the standby cluster.
@@ -563,7 +563,7 @@ class PostgreSQLAsyncReplication(Object):
 
     def _on_async_relation_joined(self, _) -> None:
         """Publish this unit address in the relation data."""
-        # store unit address for relation in peer databag
+        # store unit address in relation data
         self._relation.data[self.charm.unit].update({"unit-address": self._unit_ip})
 
         # Set the counter for new units.
@@ -647,9 +647,8 @@ class PostgreSQLAsyncReplication(Object):
         sync_standby_names = self.charm._patroni.get_sync_standby_names()
         if len(sync_standby_names) > 0:
             unit = self.model.get_unit(sync_standby_names[0])
-            return self.charm.unit_address_for_relation(self._relation.name, unit.name)
-        else:
-            return self.charm.unit_address_for_relation(self._relation.name, self.charm.unit.name)
+            return self.charm._get_unit_ip(unit, self._relation.name)
+        return self.charm._get_unit_ip(self.charm.unit, self._relation.name)
 
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
@@ -676,7 +675,7 @@ class PostgreSQLAsyncReplication(Object):
         self.charm._patroni._change_owner(POSTGRESQL_DATA_PATH)
 
     @property
-    def _relation(self) -> Relation:
+    def _relation(self) -> typing.Optional[Relation]:
         """Return the relation object."""
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),

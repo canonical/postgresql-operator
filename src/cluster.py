@@ -12,7 +12,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
 import psutil
 import requests
@@ -57,6 +57,9 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 PATRONI_TIMEOUT = 10
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 
 class RaftPostgresqlNotUpError(Exception):
@@ -121,7 +124,7 @@ class Patroni:
 
     def __init__(
         self,
-        charm,
+        charm: "PostgresqlOperatorCharm",
         unit_ip: str,
         cluster_name: str,
         member_name: str,

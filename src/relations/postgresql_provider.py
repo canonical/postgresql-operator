@@ -64,10 +64,6 @@ class PostgreSQLProvider(Object):
             charm.on[self.relation_name].relation_changed,
             self._on_relation_changed_event,
         )
-        self.framework.observe(
-            charm.on[self.relation_name].relation_created, self.register_address_for_endpoint
-        )
-        self.framework.observe(charm.on.config_changed, self.register_address_for_endpoint)
         self.charm = charm
 
         # Charm events defined in the database provides charm library.
@@ -86,15 +82,6 @@ class PostgreSQLProvider(Object):
         extra_roles_list = [role.lower() for role in extra_roles.split(",")]
         extra_roles_list = [role for role in extra_roles_list if role not in ACCESS_GROUPS]
         return extra_roles_list
-
-    def register_address_for_endpoint(self, _) -> None:
-        """Register the address for the endpoint.
-
-        If spaces are defined for endpoint, address are registered for the unit in peer relation.
-        """
-        address = str(self.model.get_binding(self.relation_name).network.bind_address)
-        self.charm.unit_peer_data[f"{self.relation_name}-address"] = address
-        logger.debug(f"{address=} set for relation={self.relation_name}")
 
     def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
         """Generate password and handle user and database creation for the related application."""
@@ -226,15 +213,12 @@ class PostgreSQLProvider(Object):
         # populate rw/ro endpoints
         primary_unit_ip, rw_endpoint, ro_hosts, ro_endpoints = "", "", "", ""
         for member in online_members:
+            unit = self.model.get_unit(label2name(member["name"]))
             if member["role"] == "leader":
-                primary_unit_ip = self.charm.unit_address_for_relation(
-                    self.relation_name, label2name(member["name"])
-                )
+                primary_unit_ip = self.charm._get_unit_ip(unit, self.relation_name)
                 rw_endpoint = f"{primary_unit_ip}:{DATABASE_PORT}"
             else:
-                replica_ip = self.charm.unit_address_for_relation(
-                    self.relation_name, label2name(member["name"])
-                )
+                replica_ip = self.charm._get_unit_ip(unit, self.relation_name)
                 if not replica_ip:
                     continue
                 if ro_hosts:
