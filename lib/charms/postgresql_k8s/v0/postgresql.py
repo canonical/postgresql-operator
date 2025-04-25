@@ -498,6 +498,15 @@ $$ LANGUAGE plpgsql security definer;
 
             self._configure_pgaudit(False)
 
+            if "set_user" in ordered_extensions:
+                for database in databases:
+                    with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                        try:
+                            cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
+                        except psycopg2.Error:
+                            logger.exception(f"Unable to create extension set_user in {database}")
+                del ordered_extensions["set_user"]
+
             # Enable/disabled the extension in each database.
             for database in databases:
                 with self._connect_to_database(
@@ -693,10 +702,6 @@ $$ LANGUAGE plpgsql security definer;
         connection = None
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='admin';")
-                if cursor.fetchone() is not None:
-                    return
-
                 # Allow access to the postgres database only to the system users.
                 cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
                 cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
