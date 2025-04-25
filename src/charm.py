@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, Optional, get_args
+from typing import Literal, get_args
 from urllib.parse import urlparse
 
 import psycopg2
@@ -89,6 +89,8 @@ from constants import (
     PLUGIN_OVERRIDES,
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
     REWIND_PASSWORD_KEY,
     SECRET_DELETED_LABEL,
@@ -107,11 +109,7 @@ from constants import (
     USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP
-from relations.async_replication import (
-    REPLICATION_CONSUMER_RELATION,
-    REPLICATION_OFFER_RELATION,
-    PostgreSQLAsyncReplication,
-)
+from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -888,19 +886,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_unit_ip(self, unit: Unit) -> str | None:
-        """Get the IP address of a specific unit."""
-        # Check if host is current host.
-        ip = None
-        if unit == self.unit:
-            ip = self.model.get_binding(PEER).network.bind_address
-        # Check if host is a peer.
-        elif unit in self._peers.data:
-            ip = self._peers.data[unit].get("private-address")
-        # Return None if the unit is not a peer neither the current unit.
-        if ip:
-            return str(ip)
-        return None
+    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> str:
+        """Get the IP address of a specific unit.
+
+        Args:
+            unit: The unit to get the IP address for.
+            relation_name: The name of the relation to use for getting the IP address.
+        """
+        return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
 
     @property
     def _hosts(self) -> set:
@@ -1091,22 +1084,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         }
         if len(ips_set) == 1:
             # single space deployment
-            return list(self._unit_ip)
+            return [self._unit_ip]
 
         non_peer_ips = ips_set - {self._unit_ip}
 
-        return list(self._unit_ip) + list(non_peer_ips)
+        return [self._unit_ip, *list(non_peer_ips)]
 
-    def unit_address_for_relation(
-        self, relation_name: str, unit_name: Optional[str] = None
-    ) -> Optional[str]:
-        """Return the address of the unit for a given relation.
-
-        Uses recorded IP addresses for endpoints stored in peer databag
-        """
-        unit = next(u for u in self.app_units if u.name == unit_name)
-
-        return self._peers.data[unit].get(f"{relation_name}-address")
+    def update_endpoint_addresses(self) -> None:
+        """Update ip addresses for relation endpoints on unit peer databag."""
+        logger.debug("Updating relation endpoints addresses")
+        self.unit_peer_data.update({
+            f"{PEER}-address": self._unit_ip,
+            f"{DATABASE}-address": self._database_ip,
+            f"{REPLICATION_OFFER_RELATION}-address": self._replication_offer_ip,
+            f"{REPLICATION_CONSUMER_RELATION}-address": self._replication_consumer_ip,
+        })
 
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
@@ -1219,6 +1211,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_config_changed(self, event) -> None:
         """Handle configuration changes, like enabling plugins."""
+        if not self._peers:
+            # update endpoint addresses
+            logger.debug("Defer on_config_changed: no peer relation")
+            event.defer()
+            return
+        self.update_endpoint_addresses()
+
         if not self.is_cluster_initialised:
             logger.debug("Defer on_config_changed: cluster not initialised yet")
             event.defer()
