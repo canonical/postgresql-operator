@@ -83,6 +83,7 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
     PEER,
+    PGPARAMS_DEFAULTS,
     PLUGIN_OVERRIDES,
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
@@ -1996,6 +1997,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         pg_parameters = self.postgresql.build_postgresql_parameters(
             self.model.config, self.get_available_memory(), limit_memory
         )
+        for pg_param in pg_parameters:
+            if PGPARAMS_DEFAULTS.get(pg_param) == pg_parameters[pg_param]:
+                del pg_parameters[pg_param]
 
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
