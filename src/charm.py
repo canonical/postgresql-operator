@@ -1209,7 +1209,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             self.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
-    def _on_config_changed(self, event) -> None:
+    def _on_config_changed(self, event) -> None:  # noqa: C901
         """Handle configuration changes, like enabling plugins."""
         if not self._peers:
             # update endpoint addresses
