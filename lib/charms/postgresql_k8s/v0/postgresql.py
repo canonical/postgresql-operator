@@ -132,6 +132,10 @@ class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
     """Exception raised when granting database privileges to user."""
 
 
+class PostgreSQLEnsureUserPrivilegesToDatabaseError(Exception):
+    """Exception raised when ensuring user privileges to database."""
+
+
 class PostgreSQL:
     """Class to encapsulate all operations related to interacting with PostgreSQL instance."""
 
@@ -233,6 +237,7 @@ class PostgreSQL:
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_owner")))
             cursor.execute(SQL("ALTER DATABASE {} OWNER TO {}").format(Identifier(database), Identifier(f"{database}_owner")))
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_admin")))
+
             cursor.execute(SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(Identifier(database)))
 
             for user_to_grant_access in [*self.system_users, "charmed_instance_admin"]:
@@ -261,6 +266,88 @@ $$ LANGUAGE plpgsql security definer;
         finally:
             cursor.close()
             connection.close()
+
+    def ensure_user_privileges_to_database(self, database: str, user: str, relations_accessing_this_database: int) -> None:
+        """Ensures created user has appropriate privileges to the database."""
+
+        try:
+            with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LINKE 'pg_%' and schema_name <> 'information_schema';")
+                schemas = [row[0] for row in cursor.fetchall()]
+                statements = self._generate_database_privileges_statements(relations_accessing_this_database, schemas, f"{database}_owner", user)
+                for statement in statements:
+                    cursor.execute(statement)
+        except psycopg2.Error as e:
+            logger.error(f"Failed to ensure user privileges to database: {e}")
+            raise PostgreSQLEnsureUserPrivilegesToDatabaseError() from e
+
+    def _generate_database_privileges_statements(self, relations_accessing_this_database: int, schemas: list[str], owner_user: str, user: str) -> list[Composed]:
+        """Generates a list of database privileges statements."""
+        statements = []
+        if relations_accessing_this_database == 1:
+            # TODO: eliminate this condition if it is possible to auto-escalate
+            # all db_admin users to db_owner upon login with set_user and login_hook
+            # (since then, all resources created will be owned by db_owner)
+            # necessary to transfer ownership from relation user to database owner role
+            statements.append(
+                SQL(
+                    """DO $$
+DECLARE r RECORD;
+BEGIN
+  FOR r IN (SELECT statement FROM (SELECT 1 AS index,'ALTER TABLE '|| schemaname || '."' || tablename ||'" OWNER TO {};' AS statement
+FROM pg_tables WHERE NOT schemaname IN ('pg_catalog', 'information_schema')
+UNION SELECT 2 AS index,'ALTER SEQUENCE '|| sequence_schema || '."' || sequence_name ||'" OWNER TO {};' AS statement
+FROM information_schema.sequences WHERE NOT sequence_schema IN ('pg_catalog', 'information_schema')
+UNION SELECT 3 AS index,'ALTER FUNCTION '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'f'
+UNION SELECT 4 AS index,'ALTER PROCEDURE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'p'
+UNION SELECT 5 AS index,'ALTER AGGREGATE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'a'
+UNION SELECT 6 AS index,'ALTER VIEW '|| schemaname || '."' || viewname ||'" OWNER TO {};' AS statement
+FROM pg_catalog.pg_views WHERE NOT schemaname IN ('pg_catalog', 'information_schema')) AS statements ORDER BY index) LOOP
+      EXECUTE format(r.statement);
+  END LOOP;
+END; $$;"""
+                ).format(
+                    Identifier(owner_user),
+                    Identifier(owner_user),
+                    Identifier(owner_user),
+                    Identifier(owner_user),
+                    Identifier(owner_user),
+                    Identifier(owner_user),
+                )
+            )
+            statements.append(
+                SQL(
+                    "UPDATE pg_catalog.pg_largeobject_metadata\n"
+                    "SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = {})\n"
+                    "WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = {});"
+                ).format(Literal(owner_user), Literal(self.owner_user))
+            )
+            for schema in schemas:
+                statements.append(
+                    SQL("ALTER SCHEMA {} OWNER TO {};").format(
+                        Identifier(schema), Identifier(owner_user)
+                    )
+                )
+        else:
+            for schema in schemas:
+                schema = Identifier(schema)
+                statements.extend([
+                    SQL("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} TO {};").format(
+                        schema, Identifier(user)
+                    ),
+                    SQL("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} TO {};").format(
+                        schema, Identifier(user)
+                    ),
+                    SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
+                        schema, Identifier(user)
+                    ),
+                    SQL("GRANT USAGE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
+                    SQL("GRANT CREATE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
+                ])
+        return statements
 
     def create_user(
         self,
