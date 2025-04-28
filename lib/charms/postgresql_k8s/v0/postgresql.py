@@ -272,7 +272,7 @@ $$ LANGUAGE plpgsql security definer;
 
         try:
             with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LINKE 'pg_%' and schema_name <> 'information_schema';")
+                cursor.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' and schema_name <> 'information_schema';")
                 schemas = [row[0] for row in cursor.fetchall()]
                 statements = self._generate_database_privileges_statements(relations_accessing_this_database, schemas, f"{database}_owner", user)
                 for statement in statements:
