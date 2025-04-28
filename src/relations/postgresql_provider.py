@@ -103,6 +103,10 @@ class PostgreSQLProvider(Object):
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
         extra_user_roles.append(ACCESS_GROUP_RELATION)
 
+        if self.check_for_invalid_extra_user_roles(event.relation):
+            self.charm.unit.status = BlockedStatus(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+            return
+
         try:
             # Creates the user and the database for this specific relation.
             user = f"relation-{event.relation.id}"
@@ -317,7 +321,13 @@ class PostgreSQLProvider(Object):
         Args:
             relation_id: current relation to be skipped.
         """
-        valid_roles = self.charm.postgresql.list_roles()
+        valid_roles = [
+            *self.charm.postgresql.list_roles(),
+            "pgbouncer",
+            "admin",
+            "createdb",
+            "createrole",
+        ]
         for relation in self.charm.model.relations.get(self.relation_name, []):
             if relation.id == relation_id:
                 continue

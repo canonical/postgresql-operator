@@ -375,25 +375,17 @@ END; $$;"""
             roles.append("charmed_instance_admin")
             roles.remove("admin")
 
-        if "CREATEDB" in roles:
-            createdb_enabled = True
-            roles.remove("CREATEDB")
-
         if "createdb" in roles:
             createdb_enabled = True
             roles.remove("createdb")
-
-        if "CREATEROLE" in roles:
-            createrole_enabled = True
-            roles.remove("CREATEROLE")
 
         if "createrole" in roles:
             createrole_enabled = True
             roles.remove("createrole")
 
-        if "SUPERUSER" in roles:
-            logger.warning("SUPERUSER privileges not allowed via extra-user-roles")
-            roles.remove("SUPERUSER")
+        if "superuser" in roles:
+            logger.warning("superuser privileges not allowed via extra-user-roles")
+            roles.remove("superuser")
 
         try:
             existing_roles = self.list_roles()
