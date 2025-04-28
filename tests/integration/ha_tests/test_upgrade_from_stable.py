@@ -26,11 +26,16 @@ TIMEOUT = 900
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    await ops_test.model.deploy(
+    await ops_test.juju(
+        "deploy",
         DATABASE_APP_NAME,
-        num_units=3,
+        "-n",
+        3,
         # TODO move to stable once we release
-        channel="16/beta",
+        "--channel",
+        "16/beta/multiple-storages",
+        "--base",
+        "ubuntu@24.04",
     )
     await ops_test.model.deploy(
         APPLICATION_NAME,
