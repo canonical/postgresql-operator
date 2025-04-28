@@ -8,7 +8,7 @@ This page summarizes resources for setting up deployments where an external appl
 
 There are many possible ways to connect the Charmed PostgreSQL database from outside of the LAN where the database cluster is located. The available options are heavily dependent on the cloud/hardware/virtualization in use. 
 
-One of the possible options is to use [virtual IP addresses (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address) which the charm PgBouncer provides with assistance from the charm/interface `hacluster`. Please follow the [PgBouncer documentation](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable) for such configuration.
+One of the possible options is to use [virtual IP addresses (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address) which the charm PgBouncer provides with assistance from the charm/interface `hacluster`. Please follow the [PgBouncer documentation](https://charmhub.io/pgbouncer/docs/h-external-access) for such configuration.
 
 > See also: [How to deploy for external TLS VIP access](/t/16576).
 

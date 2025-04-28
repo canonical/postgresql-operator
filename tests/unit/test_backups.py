@@ -342,6 +342,7 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
         ) as _tls_ca_chain_filename,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
+        patch("backups.botocore.client.Config") as _config,
     ):
         # Test when there are missing S3 parameters.
         _retrieve_s3_parameters.return_value = ([], ["bucket", "access-key", "secret-key"])
@@ -366,13 +367,22 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
 
         # Test when the bucket already exists.
         _resource.reset_mock()
+        _config.reset_mock()
         _resource.side_effect = None
         head_bucket = _resource.return_value.Bucket.return_value.meta.client.head_bucket
         create = _resource.return_value.Bucket.return_value.create
         wait_until_exists = _resource.return_value.Bucket.return_value.wait_until_exists
         harness.charm.backup._create_bucket_if_not_exists()
         _resource.assert_called_once_with(
-            "s3", endpoint_url="test-endpoint", verify=(tls_ca_chain_filename or None)
+            "s3",
+            endpoint_url="test-endpoint",
+            verify=(tls_ca_chain_filename or None),
+            config=_config.return_value,
+        )
+        _config.assert_called_once_with(
+            # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
         )
         head_bucket.assert_called_once()
         create.assert_not_called()
@@ -497,7 +507,7 @@ def test_execute_command(harness):
         patch("pwd.getpwnam") as _getpwnam,
     ):
         # Test when the command fails.
-        command = "rm -r /var/lib/postgresql/data/pgdata".split()
+        command = ["rm", "-r", "/var/lib/postgresql/data/pgdata"]
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         assert harness.charm.backup._execute_command(command) == (1, "", "fake stderr")
         _run.assert_called_once_with(
@@ -1950,6 +1960,7 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
         patch("tempfile.NamedTemporaryFile") as _named_temporary_file,
         patch("charm.PostgreSQLBackups._construct_endpoint") as _construct_endpoint,
         patch("boto3.session.Session.resource") as _resource,
+        patch("backups.botocore.client.Config") as _config,
         patch(
             "charm.PostgreSQLBackups._tls_ca_chain_filename",
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
@@ -1977,11 +1988,18 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
             "s3",
             endpoint_url="https://s3.us-east-1.amazonaws.com",
             verify=(tls_ca_chain_filename or None),
+            config=_config.return_value,
+        )
+        _config.assert_called_once_with(
+            # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
         )
         _named_temporary_file.assert_not_called()
         upload_file.assert_not_called()
 
         _resource.reset_mock()
+        _config.reset_mock()
         _resource.side_effect = None
         upload_file.side_effect = S3UploadFailedError
         assert not harness.charm.backup._upload_content_to_s3(content, s3_path, s3_parameters)
@@ -1989,12 +2007,19 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
             "s3",
             endpoint_url="https://s3.us-east-1.amazonaws.com",
             verify=(tls_ca_chain_filename or None),
+            config=_config.return_value,
+        )
+        _config.assert_called_once_with(
+            # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
         )
         _named_temporary_file.assert_called_once()
         upload_file.assert_called_once_with("/tmp/test-file", "test-path/test-file.")
 
         # Test when the upload succeeds
         _resource.reset_mock()
+        _config.reset_mock()
         _named_temporary_file.reset_mock()
         upload_file.reset_mock()
         upload_file.side_effect = None
@@ -2003,6 +2028,12 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
             "s3",
             endpoint_url="https://s3.us-east-1.amazonaws.com",
             verify=(tls_ca_chain_filename or None),
+            config=_config.return_value,
+        )
+        _config.assert_called_once_with(
+            # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
+            request_checksum_calculation="when_required",
+            response_checksum_validation="when_required",
         )
         _named_temporary_file.assert_called_once()
         upload_file.assert_called_once_with("/tmp/test-file", "test-path/test-file.")

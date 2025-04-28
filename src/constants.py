@@ -35,7 +35,7 @@ POSTGRESQL_SNAP_NAME = "charmed-postgresql"
 SNAP_PACKAGES = [
     (
         POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "156", "x86_64": "155"}},
+        {"revision": {"aarch64": "168", "x86_64": "167"}},
     )
 ]
 
@@ -55,6 +55,8 @@ PGBACKREST_LOGS_PATH = f"{SNAP_LOGS_PATH}/pgbackrest"
 POSTGRESQL_CONF_PATH = f"{SNAP_CONF_PATH}/postgresql"
 POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
 POSTGRESQL_LOGS_PATH = f"{SNAP_LOGS_PATH}/postgresql"
+
+UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
 

@@ -1,6 +1,6 @@
 # Reference
 
-The Reference section of our documentation contains pages for technical specifications, APIs, release notes, and other reference material for fast lookup.
+Technical specifications, APIs, release notes, and other reference material for fast lookup.
 
 **In the left sidebar navigation**, you will find the following references:
 | Page                      | Description                                       |
@@ -20,8 +20,7 @@ The Reference section of our documentation contains pages for technical specific
 
 | Page                                                                       | Description                                             |
 |----------------------------------------------------------------------------|---------------------------------------------------------|
-| [Resources](https://charmhub.io/postgresql/resources)                         | :construction:  Under construction                                      |
 | [Integrations](https://charmhub.io/postgresql/integrations)                   | Integration/relation interfaces supported by this charm |
 | [Libraries](https://charmhub.io/postgresql/libraries) | VM charm library is empty as charm uses [K8s library](https://charmhub.io/postgresql-k8s/libraries/) (more info [here](/t/11857)) |
-| [Configuration](https://charmhub.io/postgresql/configuration)                 | Application configuration parameters (more info [here](https://juju.is/docs/juju/configuration?&_ga=2.95573596.1153611399.1713171630-773562698.1708605078#heading--application-configuration))                                        |
+| [Configuration](https://charmhub.io/postgresql/configuration)                 | Application configuration parameters                   |
 | [Actions](https://charmhub.io/postgresql/actions)                             | Juju actions supported by this charm                    |
