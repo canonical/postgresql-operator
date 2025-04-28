@@ -287,8 +287,9 @@ $$ LANGUAGE plpgsql security definer;
         if relations_accessing_this_database == 1:
             # TODO: eliminate this condition if it is possible to auto-escalate
             # all db_admin users to db_owner upon login with set_user and login_hook
-            # (since then, all resources created will be owned by db_owner)
-            # necessary to transfer ownership from relation user to database owner role
+            # (since then, all resources created will be owned by db_owner).
+            # this section is necessary to transfer ownership from relation user to
+            # the database owner role
             statements.append(
                 SQL(
                     """DO $$
@@ -323,7 +324,7 @@ END; $$;"""
                     "UPDATE pg_catalog.pg_largeobject_metadata\n"
                     "SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = {})\n"
                     "WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = {});"
-                ).format(Literal(owner_user), Literal(self.owner_user))
+                ).format(Literal(owner_user), Literal(owner_user))
             )
             for schema in schemas:
                 statements.append(
