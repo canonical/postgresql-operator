@@ -136,6 +136,10 @@ class PostgreSQLEnsureUserPrivilegesToDatabaseError(Exception):
     """Exception raised when ensuring user privileges to database."""
 
 
+class PostgreSQLSetUpDDLRoleError(Exception):
+    """Exception raised when setting up DDL role for a database."""
+
+
 class PostgreSQL:
     """Class to encapsulate all operations related to interacting with PostgreSQL instance."""
 
@@ -237,6 +241,7 @@ class PostgreSQL:
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_owner")))
             cursor.execute(SQL("ALTER DATABASE {} OWNER TO {}").format(Identifier(database), Identifier(f"{database}_owner")))
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_admin")))
+            cursor.execute(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(Identifier(database), Identifier(f"{database}_admin")))
 
             cursor.execute(SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(Identifier(database)))
 
@@ -256,7 +261,9 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql security definer;
 """).format(Identifier(f"set_user_{database}_owner"), Literal(f"{database}_owner")))
-                database_cursor.execute(SQL("ALTER FUNCTION {} OWNER TO {};").format(Identifier(f"set_user_{database}_owner"), Identifier("charmed_dba")))
+                database_cursor.execute(SQL("ALTER FUNCTION {} OWNER TO charmed_dba;").format(Identifier(f"set_user_{database}_owner")))
+                database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION set_user(text) TO charmed_dba;"))
+                database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION reset_user() TO charmed_dba;"))
                 database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION {} TO {};").format(Identifier(f"set_user_{database}_owner"), Identifier(f"{database}_admin")))
 
             return True
@@ -300,7 +307,7 @@ FROM pg_tables WHERE NOT schemaname IN ('pg_catalog', 'information_schema')
 UNION SELECT 2 AS index,'ALTER SEQUENCE '|| sequence_schema || '."' || sequence_name ||'" OWNER TO {};' AS statement
 FROM information_schema.sequences WHERE NOT sequence_schema IN ('pg_catalog', 'information_schema')
 UNION SELECT 3 AS index,'ALTER FUNCTION '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'f'
+FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'f' AND p.prosecdef IS false
 UNION SELECT 4 AS index,'ALTER PROCEDURE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
 FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'p'
 UNION SELECT 5 AS index,'ALTER AGGREGATE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
@@ -339,16 +346,94 @@ END; $$;"""
                     SQL("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} TO {};").format(
                         schema, Identifier(user)
                     ),
+                    SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON TABLES TO {};".format(schema, Identifier(user))),
                     SQL("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} TO {};").format(
                         schema, Identifier(user)
                     ),
+                    SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON SEQUENCES TO {};".format(schema, Identifier(user))),
                     SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
                         schema, Identifier(user)
                     ),
+                    SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON FUNCTION TO {};".format(schema, Identifier(user))),
                     SQL("GRANT USAGE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
                     SQL("GRANT CREATE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
                 ])
         return statements
+    
+    def set_up_ddl_role(self, database: str, ddl_username: str, ddl_password: str) -> None:
+        """Sets up the DDL role for the provided database."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("BEGIN;"))
+                cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
+                cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE LOGIN NOREPLICATION ENCRYPTED PASSWORD {};").format(Identifier(ddl_username), Literal(ddl_password)))
+                cursor.execute(SQL("GRANT CONNECT, CREATE ON DATABASE {} TO {};").format(Identifier(database), Identifier(ddl_username)))
+                cursor.execute(SQL("COMMIT;"))
+
+            with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("""CREATE OR REPLACE FUNCTION update_permissions(S TEXT DEFAULT NULL)
+RETURNS VOID AS $$
+DECLARE
+    r RECORD;
+    query TEXT;
+    cur REFCURSOR;
+    db_name TEXT;
+    ddl_role TEXT;
+    admin_role TEXT;
+    obj TEXT;
+    objs TEXT[] := ARRAY['TABLES', 'SEQUENCES', 'FUNCTIONS'];
+    db_query TEXT := 'SELECT current_database()';
+    sch_query TEXT := 'SELECT nspname FROM pg_namespace WHERE nspname = %L';
+    all_sch_query TEXT := 'SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE ''pg_%'' AND nspname <> ''information_schema'' ORDER BY nspname';
+    sch_cre TEXT := 'GRANT USAGE, CREATE ON SCHEMA %I TO %I';
+    sch_all TEXT := 'GRANT ALL PRIVILEGES ON SCHEMA %I TO %I';
+    obj_all TEXT := 'GRANT ALL PRIVILEGES ON ALL %s IN SCHEMA %I TO %I';
+    obj_def TEXT := 'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT ALL ON %s TO %I';
+BEGIN
+    IF s IS NULL OR s = '' THEN
+        query := all_sch_query;
+    ELSE
+        query := format(sch_query, s);
+    END IF;
+    EXECUTE db_query INTO db_name;
+    ddl_role = db_name || '_ddl';
+    admin_role = db_name || '_owner';
+
+    OPEN cur FOR EXECUTE query;
+    LOOP
+        FETCH cur INTO r;
+        EXIT WHEN NOT FOUND;
+            RAISE NOTICE 'Setting permissions on schema %', r;
+            EXECUTE format(sch_cre, r.nspname, ddl_role);
+            EXECUTE format(sch_all, r.nspname, admin_role);
+            FOREACH obj IN ARRAY objs LOOP
+                EXECUTE format(obj_all, obj, r.nspname, admin_role);
+                EXECUTE format(obj_def, ddl_role, r.nspname, obj, admin_role);
+            END LOOP;
+    END LOOP;
+    CLOSE cur;
+EXCEPTION WHEN OTHERS THEN
+    RAISE NOTICE 'An error occured: % %', SQLERRM, SQLSTATE;
+END;
+$$ LANGUAGE plpgsql security definer;
+"""))
+
+                cursor.execute(SQL("""CREATE OR REPLACE FUNCTION update_permissions_on_create_schema()
+RETURNS event_trigger AS $$
+BEGIN
+    PERFORM update_permissions();
+END;
+$$ LANGUAGE plpgsql;
+"""))
+
+                cursor.execute(SQL("""CREATE EVENT TRIGGER on_create_schema
+ON ddl_command_end
+WHEN TAG IN ('CREATE SCHEMA')
+EXECUTE FUNCTION update_permissions_on_create_schema();
+"""))
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create {database} ddl role: {e}")
+            raise PostgreSQLSetUpDDLRoleError() from e
 
     def create_user(
         self,
@@ -439,6 +524,8 @@ END; $$;"""
                 "GRANT execute ON FUNCTION set_user(text) TO charmed_dba",
                 "GRANT execute ON FUNCTION set_user(text, text) TO charmed_dba",
                 "GRANT execute ON FUNCTION set_user_u(text) TO charmed_dba",
+                "GRANT execute ON FUNCTION reset_user() TO charmed_dba",
+                "GRANT execute ON FUNCTION reset_user(text) TO charmed_dba",
             ],
             "charmed_instance_admin": [
                 "CREATE ROLE charmed_instance_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",

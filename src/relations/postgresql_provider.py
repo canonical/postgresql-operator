@@ -19,6 +19,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLEnsureUserPrivilegesToDatabaseError,
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
+    PostgreSQLSetUpDDLRoleError,
 )
 from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
@@ -114,10 +115,17 @@ class PostgreSQLProvider(Object):
 
             database_created = self.charm.postgresql.create_database(database)
 
+            if database_created:
+                ddl_user = f"{database}_ddl"
+                ddl_password = new_password()
+                self.charm.postgresql.set_up_ddl_role(database, ddl_user, ddl_password)
+
+                self.charm.set_secret(APP_SCOPE, f"{database}-ddl-password", ddl_password)
+
             # TODO: change role to database_admin once we determine how to auto-escalate
             # privileges to database_owner upon login
             self.charm.postgresql.create_user(
-                user, password, roles=[*extra_user_roles, f"{database}_owner"]
+                user, password, roles=[*extra_user_roles, f"{database}_admin"]
             )
 
             relations_accessing_this_database = 0
@@ -153,6 +161,7 @@ class PostgreSQLProvider(Object):
             PostgreSQLCreateUserError,
             PostgreSQLGetPostgreSQLVersionError,
             PostgreSQLEnsureUserPrivilegesToDatabaseError,
+            PostgreSQLSetUpDDLRoleError,
         ) as e:
             logger.exception(e)
             self.charm.unit.status = BlockedStatus(

@@ -656,7 +656,7 @@ class Patroni:
 
         nosuperuser_target_allowlist = (
             ",".join([
-                f"+{role}"
+                role
                 for role in self.charm.postgresql.list_roles()
                 if not role.startswith("pg_") and role.endswith("_owner")
             ])
