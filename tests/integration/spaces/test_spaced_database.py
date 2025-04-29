@@ -66,6 +66,10 @@ def test_integrate_with_spaces(juju: jubilant.Juju):
     status = juju.status()
 
     unit = next(iter(status.apps[APP_NAME].units))
+
+    # remove default route on client so traffic can't be routed through default interface
+    logger.info("Flush default routes on client")
+    juju.exec("sudo ip route flush default", unit=unit)
     logger.info(f"Check for continuous writes on {unit=}")
     juju.run(unit, "start-continuous-writes")
     sleep(10)
@@ -95,7 +99,8 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
 
     status = juju.status()
     unit = next(iter(status.apps[ISOLATED_APP_NAME].units))
-    # remove default route on client so traffic cant be routed through default interface
+    # remove default route on client so traffic can't be routed through default interface
+    logger.info("Flush default routes on client")
     juju.exec("sudo ip route flush default", unit=unit)
 
     with pytest.raises(jubilant.TaskError):

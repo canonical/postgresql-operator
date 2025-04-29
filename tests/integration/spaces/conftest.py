@@ -8,7 +8,6 @@ import subprocess
 import jubilant
 import pytest
 
-
 DEFAULT_LXD_NETWORK = "lxdbr0"
 RAW_DNSMASQ = """dhcp-option=3
 dhcp-option=6"""
@@ -18,17 +17,23 @@ logger = logging.getLogger(__name__)
 
 @pytest.fixture(scope="module")
 def juju(request: pytest.FixtureRequest):
-    """Fixture for creating a temporary Juju model."""
+    """Pytest fixture that wraps :meth:`jubilant.with_model`.
+
+    This adds command line parameter ``--keep-models`` (see help for details).
+    """
+    model = request.config.getoption("--model")
     keep_models = bool(request.config.getoption("--keep-models"))
 
-    with jubilant.temp_model(keep=keep_models) as juju:
-        juju.wait_timeout = 15 * 60
+    if model:
+        juju = jubilant.Juju(model=model)  # type: ignore
+        yield juju
+    else:
+        with jubilant.temp_model(keep=keep_models) as juju:
+            yield juju
 
-        yield juju  # run the test
-
-        if request.session.testsfailed:
-            log = juju.debug_log(limit=1000)
-            print(log, end="")
+    if request.session.testsfailed:
+        log = juju.debug_log(limit=1000)
+        print(log, end="")
 
 
 def _lxd_network(name: str, subnet: str, external: bool = True):
