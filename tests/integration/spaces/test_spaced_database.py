@@ -20,19 +20,12 @@ logger = logging.getLogger(__name__)
 def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
     """Deploy the charm with the LXD spaces."""
     # Deploy the charm with the LXD spaces
-    # TODO: use juju.deploy once bind is supported
-    juju.cli(
-        "deploy",
+    juju.deploy(
         charm,
-        PG_NAME,
-        "--constraints",
-        "spaces=client,peers",
-        "--bind",
-        "database_peers=peers",
-        "--bind",
-        "database=client",
-        "-n",
-        "3",
+        app=PG_NAME,
+        constraints={"spaces": "client,peers"},
+        bind={"database_peers": "peers", "database": "client"},
+        num_units=3,
     )
 
     juju.deploy(
@@ -40,6 +33,7 @@ def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
         app=APP_NAME,
         channel="latest/edge",
         constraints={"spaces": "client"},
+        bind={"database": "client"},
         config={"sleep_interval": 1000},
     )
     # Wait for the deployment to complete
@@ -49,8 +43,6 @@ def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
         delay=10,
         successes=3,
     )
-    # bind after app is up
-    juju.cli("bind", APP_NAME, "database=client")
 
 
 def test_integrate_with_spaces(juju: jubilant.Juju):
@@ -87,9 +79,9 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
         app=ISOLATED_APP_NAME,
         channel="latest/edge",
         constraints={"spaces": "isolated"},
+        bind={"database": "isolated"},
     )
     juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_active)
-    juju.cli("bind", ISOLATED_APP_NAME, "database=isolated")
 
     # Relate the database to the application
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")
