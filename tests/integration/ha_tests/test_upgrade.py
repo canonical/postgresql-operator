@@ -38,7 +38,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         "-n",
         3,
         "--channel",
-        "16/edge/multiple-storages",
+        "16/edge/multiple-storages-test-os-pool",
         "--config",
         "profile=testing",
         "--base",

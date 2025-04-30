@@ -33,7 +33,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         3,
         # TODO move to stable once we release
         "--channel",
-        "16/beta/multiple-storages",
+        "16/beta/multiple-storages-test-os-pool",
         "--base",
         "ubuntu@24.04",
     )
