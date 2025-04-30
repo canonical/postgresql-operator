@@ -284,6 +284,7 @@ def test_on_config_changed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
+        patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -325,6 +326,7 @@ def test_check_extension_dependencies(harness):
         patch("charm.Patroni.get_primary") as _get_primary,
         patch("subprocess.check_output", return_value=b"C"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()),
+        patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
     ):
         _get_primary.return_value = harness.charm.unit
 
@@ -1775,7 +1777,7 @@ def test_add_cluster_member(harness):
         patch("charm.PostgresqlOperatorCharm._add_to_members_ips") as _add_to_members_ips,
         patch("charm.Patroni.are_all_members_ready") as _are_all_members_ready,
     ):
-        harness.charm.add_cluster_member("postgresql/0")
+        harness.charm.add_cluster_member("postgresql-0")
 
         _add_to_members_ips.assert_called_once_with("1.1.1.1")
         _update_config.assert_called_once_with()
@@ -1783,7 +1785,7 @@ def test_add_cluster_member(harness):
 
         # Charm blocks when update_config fails
         _update_config.side_effect = RetryError(last_attempt=None)
-        harness.charm.add_cluster_member("postgresql/0")
+        harness.charm.add_cluster_member("postgresql-0")
         _update_config.assert_called_once_with()
         assert isinstance(harness.charm.unit.status, BlockedStatus)
         assert harness.charm.unit.status.message == "failed to update cluster members on member"
@@ -1792,7 +1794,7 @@ def test_add_cluster_member(harness):
         # Not ready error if not all members are ready
         _are_all_members_ready.return_value = False
         with pytest.raises(NotReadyError):
-            harness.charm.add_cluster_member("postgresql/0")
+            harness.charm.add_cluster_member("postgresql-0")
 
 
 def test_stuck_raft_cluster_check(harness):
@@ -1880,7 +1882,12 @@ def test_stuck_raft_cluster_rejoin(harness):
         # Raises primary flag
         with harness.hooks_disabled():
             harness.update_relation_data(
-                rel_id, harness.charm.unit.name, {"raft_primary": "test_primary"}
+                rel_id,
+                harness.charm.unit.name,
+                {
+                    "raft_primary": "test_primary",
+                    f"{PEER}-address": "192.0.2.0",
+                },
             )
             harness.update_relation_data(
                 rel_id,

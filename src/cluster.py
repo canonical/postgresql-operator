@@ -308,7 +308,7 @@ class Patroni:
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
-    ) -> str:
+    ) -> Optional[str]:
         """Get primary instance.
 
         Args:
@@ -319,14 +319,14 @@ class Patroni:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = self.cluster_status(alternative_endpoints)
-        for member in cluster_status:
-            if member["role"] == "leader":
-                primary = member["name"]
-                if unit_name_pattern:
-                    # Change the last dash to / in order to match unit name pattern.
-                    primary = label2name(primary)
-                return primary
+        if cluster_status := self.cluster_status(alternative_endpoints):
+            for member in cluster_status:
+                if member["role"] == "leader":
+                    primary = member["name"]
+                    if unit_name_pattern:
+                        # Change the last dash to / in order to match unit name pattern.
+                        primary = label2name(primary)
+                    return primary
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
