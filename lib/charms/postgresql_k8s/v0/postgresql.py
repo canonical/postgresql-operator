@@ -337,12 +337,13 @@ DECLARE
     cur REFCURSOR;
     db_name TEXT;
     ddl_role TEXT;
-    admin_role TEXT;
+    owner_role TEXT;
     obj TEXT;
     objs TEXT[] := ARRAY['TABLES', 'SEQUENCES', 'FUNCTIONS'];
     db_query TEXT := 'SELECT current_database()';
     sch_query TEXT := 'SELECT nspname FROM pg_namespace WHERE nspname = %L';
     all_sch_query TEXT := 'SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE ''pg_%'' AND nspname <> ''information_schema'' ORDER BY nspname';
+    sch_rev TEXT := 'REVOKE ALL ON SCHEMA %I FROM %I';
     sch_cre TEXT := 'GRANT USAGE, CREATE ON SCHEMA %I TO %I';
     sch_all TEXT := 'GRANT ALL PRIVILEGES ON SCHEMA %I TO %I';
     obj_all TEXT := 'GRANT ALL PRIVILEGES ON ALL %s IN SCHEMA %I TO %I';
@@ -356,19 +357,29 @@ BEGIN
 
     EXECUTE db_query INTO db_name;
     ddl_role = db_name || '_ddl';
-    admin_role = db_name || '_owner';
+    owner_role = db_name || '_owner';
 
     OPEN cur FOR EXECUTE query;
     LOOP
         FETCH cur INTO r;
         EXIT WHEN NOT FOUND;
             RAISE NOTICE 'Setting permissions on schema %', r;
+            EXECUTE format(sch_rev, r.nspname, ddl_role);
             EXECUTE format(sch_cre, r.nspname, ddl_role);
-            EXECUTE format(sch_all, r.nspname, admin_role);
+            EXECUTE format(sch_all, r.nspname, owner_role);
+
+            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM PUBLIC', ddl_role, r.nspname);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE SELECT, UPDATE ON SEQUENCES FROM PUBLIC', ddl_role, r.nspname);
+            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC', ddl_role, r.nspname);
+
             FOREACH obj IN ARRAY objs LOOP
-                EXECUTE format(obj_all, obj, r.nspname, admin_role);
-                EXECUTE format(obj_def, ddl_role, r.nspname, obj, admin_role);
+                EXECUTE format(obj_all, obj, r.nspname, owner_role);
+                EXECUTE format(obj_def, ddl_role, r.nspname, obj, owner_role);
             END LOOP;
+
+            EXECUTE format('REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA %I FROM %I', r.nspname, ddl_role);
+            EXECUTE format('REVOKE SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA %I FROM %I', r.nspname, ddl_role);
+            EXECUTE format('REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA %I FROM %I', r.nspname, ddl_role);
     END LOOP;
     CLOSE cur;
 EXCEPTION WHEN OTHERS THEN
@@ -399,6 +410,7 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
         user: str,
         password: Optional[str] = None,
         roles: Optional[List[str]] = None,
+        database: Optional[str] = None,
     ) -> None:
         """Creates a database user.
 
@@ -449,6 +461,13 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
                 user_query += f"WITH LOGIN{' CREATEDB' if createdb_enabled else ''}{' CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}' {'IN ROLE ' if roles else ''}"
                 if roles:
                     user_query += f"{', '.join(roles)}"
+
+                # TODO: revoke createdb and/or createrole attributes when no longer needed (in delete_user)
+                if createdb_enabled and database:
+                    cursor.execute(SQL("ALTER ROLE {} WITH CREATEDB;").format(Identifier(f"{database}_owner")))
+
+                if createdb_enabled and database:
+                    cursor.execute(SQL("ALTER ROLE {} WITH CREATEROLE;").format(Identifier(f"{database}_owner")))
 
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
