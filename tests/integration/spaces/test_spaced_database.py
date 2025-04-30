@@ -24,7 +24,7 @@ def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
         charm,
         app=PG_NAME,
         constraints={"spaces": "client,peers"},
-        bind={"database_peers": "peers", "database": "client"},
+        bind={"database-peers": "peers", "database": "client"},
         num_units=3,
     )
 
