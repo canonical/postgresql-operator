@@ -654,17 +654,6 @@ class Patroni:
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
 
-        nosuperuser_target_allowlist = (
-            ",".join([
-                role
-                for role in self.charm.postgresql.list_roles()
-                if not role.startswith("pg_") and role.endswith("_owner")
-            ])
-            if self.charm.is_cluster_initialised
-            and self.charm.primary_endpoint is not None
-            and self.charm._can_connect_to_postgresql
-            else None
-        )
         ldap_params = self.charm.get_ldap_parameters()
 
         # Render the template file with the correct values.
@@ -707,7 +696,6 @@ class Patroni:
             raft_password=self.raft_password,
             ldap_parameters=self._dict_to_hba_string(ldap_params),
             patroni_password=self.patroni_password,
-            nosuperuser_target_allowlist=nosuperuser_target_allowlist,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

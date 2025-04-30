@@ -132,10 +132,6 @@ class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
     """Exception raised when granting database privileges to user."""
 
 
-class PostgreSQLEnsureUserPrivilegesToDatabaseError(Exception):
-    """Exception raised when ensuring user privileges to database."""
-
-
 class PostgreSQLSetUpDDLRoleError(Exception):
     """Exception raised when setting up DDL role for a database."""
 
@@ -240,12 +236,12 @@ class PostgreSQL:
             cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_owner")))
             cursor.execute(SQL("ALTER DATABASE {} OWNER TO {}").format(Identifier(database), Identifier(f"{database}_owner")))
-            cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_admin")))
+            cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE {};").format(Identifier(f"{database}_admin"), Identifier(f"{database}_owner")))
             cursor.execute(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(Identifier(database), Identifier(f"{database}_admin")))
 
             cursor.execute(SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(Identifier(database)))
 
-            for user_to_grant_access in [*self.system_users, "charmed_instance_admin"]:
+            for user_to_grant_access in [*self.system_users, "charmed_instance_admin", "charmed_dba"]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
@@ -253,18 +249,66 @@ class PostgreSQL:
                 )
 
             with self._connect_to_database(database=database) as database_connection, database_connection.cursor() as database_cursor:
-                database_cursor.execute(SQL("""CREATE OR REPLACE FUNCTION {}() RETURNS TEXT AS $$
+                database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user_u(text) FROM {};").format(Identifier(f"{database}_owner")))
+                database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user_u(text) FROM {};").format(Identifier(f"{database}_admin")))
+
+                database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user(text) FROM {};").format(Identifier(f"{database}_owner")))
+                database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user(text) FROM {};").format(Identifier(f"{database}_admin")))
+
+                database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM {};").format(Identifier(f"{database}_owner")))
+                database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM {};").format(Identifier(f"{database}_admin")))
+
+                database_cursor.execute(SQL("""CREATE OR REPLACE FUNCTION login_hook.login() RETURNS VOID AS $$
+DECLARE
+    ex_state TEXT;
+    ex_message TEXT;
+    ex_detail TEXT;
+    ex_hint TEXT;
+    ex_context TEXT;
+    cur_user TEXT;
+    db_admin_role TEXT;
+    db_name TEXT;
+    db_owner_role TEXT;
+    db_query TEXT := 'SELECT current_database()';
+    is_user_admin BOOLEAN;
+    is_user_admin_query TEXT := 'SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)';
+    set_role_query TEXT := 'SET ROLE %L';
 BEGIN
-    -- Restricting search_path when using security definer IS recommended
-    SET LOCAL search_path = public;
-    RETURN set_user({});
-END;
-$$ LANGUAGE plpgsql security definer;
-""").format(Identifier(f"set_user_{database}_owner"), Literal(f"{database}_owner")))
-                database_cursor.execute(SQL("ALTER FUNCTION {} OWNER TO charmed_dba;").format(Identifier(f"set_user_{database}_owner")))
-                database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION set_user(text) TO charmed_dba;"))
-                database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION reset_user() TO charmed_dba;"))
-                database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION {} TO {};").format(Identifier(f"set_user_{database}_owner"), Identifier(f"{database}_admin")))
+    IF NOT login_hook.is_executing_login_hook()
+    THEN
+        RAISE EXCEPTION 'The login_hook.login() function should only be invoked by the login_hook code';
+    END IF;
+
+    cur_user := (SELECT current_user);
+
+    EXECUTE db_query INTO db_name;
+    db_admin_role = db_name || '_admin';
+
+    EXECUTE format(is_user_admin_query, db_admin_role, cur_user) INTO is_user_admin;
+
+    BEGIN
+        IF is_user_admin = true THEN
+            db_owner_role = db_name || '_owner';
+            EXECUTE format(set_role_query, db_owner_role);
+        END IF;
+	EXCEPTION
+	   WHEN OTHERS THEN
+	       GET STACKED DIAGNOSTICS ex_state   = RETURNED_SQLSTATE
+	                             , ex_message = MESSAGE_TEXT
+	                             , ex_detail  = PG_EXCEPTION_DETAIL
+	                             , ex_hint    = PG_EXCEPTION_HINT
+	                             , ex_context = PG_EXCEPTION_CONTEXT;
+	       RAISE LOG e'Error in login_hook.login()\nsqlstate: %\nmessage : %\ndetail  : %\nhint    : %\ncontext : %'
+	               , ex_state
+	               , ex_message
+	               , ex_detail
+	               , ex_hint
+	               , ex_context;
+    END;
+END
+$$ LANGUAGE plpgsql;
+"""))
+                database_cursor.execute(SQL("GRANT EXECUTE ON FUNCTION login_hook.login() TO PUBLIC;"))
 
             return True
         except psycopg2.Error as e:
@@ -273,92 +317,6 @@ $$ LANGUAGE plpgsql security definer;
         finally:
             cursor.close()
             connection.close()
-
-    def ensure_user_privileges_to_database(self, database: str, user: str, relations_accessing_this_database: int) -> None:
-        """Ensures created user has appropriate privileges to the database."""
-
-        try:
-            with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' and schema_name <> 'information_schema';")
-                schemas = [row[0] for row in cursor.fetchall()]
-                statements = self._generate_database_privileges_statements(relations_accessing_this_database, schemas, f"{database}_owner", user)
-                for statement in statements:
-                    cursor.execute(statement)
-        except psycopg2.Error as e:
-            logger.error(f"Failed to ensure user privileges to database: {e}")
-            raise PostgreSQLEnsureUserPrivilegesToDatabaseError() from e
-
-    def _generate_database_privileges_statements(self, relations_accessing_this_database: int, schemas: list[str], owner_user: str, user: str) -> list[Composed]:
-        """Generates a list of database privileges statements."""
-        statements = []
-        if relations_accessing_this_database == 1:
-            # TODO: eliminate this condition if it is possible to auto-escalate
-            # all db_admin users to db_owner upon login with set_user and login_hook
-            # (since then, all resources created will be owned by db_owner).
-            # this section is necessary to transfer ownership from relation user to
-            # the database owner role
-            statements.append(
-                SQL(
-                    """DO $$
-DECLARE r RECORD;
-BEGIN
-  FOR r IN (SELECT statement FROM (SELECT 1 AS index,'ALTER TABLE '|| schemaname || '."' || tablename ||'" OWNER TO {};' AS statement
-FROM pg_tables WHERE NOT schemaname IN ('pg_catalog', 'information_schema')
-UNION SELECT 2 AS index,'ALTER SEQUENCE '|| sequence_schema || '."' || sequence_name ||'" OWNER TO {};' AS statement
-FROM information_schema.sequences WHERE NOT sequence_schema IN ('pg_catalog', 'information_schema')
-UNION SELECT 3 AS index,'ALTER FUNCTION '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'f' AND p.prosecdef IS false
-UNION SELECT 4 AS index,'ALTER PROCEDURE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'p'
-UNION SELECT 5 AS index,'ALTER AGGREGATE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'a'
-UNION SELECT 6 AS index,'ALTER VIEW '|| schemaname || '."' || viewname ||'" OWNER TO {};' AS statement
-FROM pg_catalog.pg_views WHERE NOT schemaname IN ('pg_catalog', 'information_schema')) AS statements ORDER BY index) LOOP
-      EXECUTE format(r.statement);
-  END LOOP;
-END; $$;"""
-                ).format(
-                    Identifier(owner_user),
-                    Identifier(owner_user),
-                    Identifier(owner_user),
-                    Identifier(owner_user),
-                    Identifier(owner_user),
-                    Identifier(owner_user),
-                )
-            )
-            statements.append(
-                SQL(
-                    "UPDATE pg_catalog.pg_largeobject_metadata\n"
-                    "SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = {})\n"
-                    "WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = {});"
-                ).format(Literal(owner_user), Literal(owner_user))
-            )
-            for schema in schemas:
-                statements.append(
-                    SQL("ALTER SCHEMA {} OWNER TO {};").format(
-                        Identifier(schema), Identifier(owner_user)
-                    )
-                )
-        else:
-            for schema in schemas:
-                schema = Identifier(schema)
-                statements.extend([
-                    SQL("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON TABLES TO {};".format(schema, Identifier(user))),
-                    SQL("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON SEQUENCES TO {};".format(schema, Identifier(user))),
-                    SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("ALTER DEFAULT PRIVILEGES IN SCHEMA {} GRANT ALL ON FUNCTION TO {};".format(schema, Identifier(user))),
-                    SQL("GRANT USAGE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
-                    SQL("GRANT CREATE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
-                ])
-        return statements
     
     def set_up_ddl_role(self, database: str, ddl_username: str, ddl_password: str) -> None:
         """Sets up the DDL role for the provided database."""
@@ -395,6 +353,7 @@ BEGIN
     ELSE
         query := format(sch_query, s);
     END IF;
+
     EXECUTE db_query INTO db_name;
     ddl_role = db_name || '_ddl';
     admin_role = db_name || '_owner';
@@ -524,8 +483,7 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
                 "GRANT execute ON FUNCTION set_user(text) TO charmed_dba",
                 "GRANT execute ON FUNCTION set_user(text, text) TO charmed_dba",
                 "GRANT execute ON FUNCTION set_user_u(text) TO charmed_dba",
-                "GRANT execute ON FUNCTION reset_user() TO charmed_dba",
-                "GRANT execute ON FUNCTION reset_user(text) TO charmed_dba",
+                "GRANT connect ON DATABASE postgres TO charmed_dba",
             ],
             "charmed_instance_admin": [
                 "CREATE ROLE charmed_instance_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
@@ -673,6 +631,19 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
                         except psycopg2.Error:
                             logger.exception(f"Unable to create extension set_user in {database}")
                 del ordered_extensions["set_user"]
+
+            if "login_hook" in ordered_extensions:
+                for database in databases:
+                    if database == "postgres":
+                        logger.info("Skipping creating extension login_hook in database postgres")
+                        continue
+
+                    with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                        try:
+                            cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
+                        except psycopg2.Error:
+                            logger.exception(f"Unable to create extension login_hook in {database}")
+                del ordered_extensions["login_hook"]
 
             # Enable/disabled the extension in each database.
             for database in databases:

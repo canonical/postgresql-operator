@@ -1228,8 +1228,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit enable_disable_extensions: standby cluster")
             return
         original_status = self.unit.status
-        # Always want set_user to be enabled
-        extensions = {"set_user": True}
+        # Always want set_user and login_hook to be enabled
+        extensions = {"set_user": True, "login_hook": True}
         # collect extensions
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
@@ -1588,6 +1588,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
             for user, password in list(updated_passwords.items()):
+                # TODO: generalize and add ddl users here
                 if user not in [*SYSTEM_USERS, BACKUP_USER]:
                     logger.error(
                         f"Can only update system users: {', '.join(SYSTEM_USERS)} not {user}"
