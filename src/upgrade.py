@@ -12,7 +12,7 @@ from charms.data_platform_libs.v0.upgrade import (
     DependencyModel,
     UpgradeGrantedEvent,
 )
-from charms.postgresql_k8s.v0.postgresql import ACCESS_GROUPS
+from charms.postgresql_k8s.v1.postgresql import ACCESS_GROUPS
 from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
