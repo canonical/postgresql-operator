@@ -22,6 +22,7 @@ from urllib.parse import urlparse
 
 import charm_refresh
 import ops
+import ops.log
 import psycopg2
 import tomli
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
@@ -211,6 +212,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def __init__(self, *args):
         super().__init__(*args)
+        # Show logger name (module name) in logs
+        root_logger = logging.getLogger()
+        for handler in root_logger.handlers:
+            if isinstance(handler, ops.log.JujuLogHandler):
+                handler.setFormatter(logging.Formatter("{name}:{message}", style="{"))
 
         self.peer_relation_app = DataPeerData(
             self.model,
