@@ -51,7 +51,7 @@ parts:
     source: .
     after:
       - poetry-deps
-    poetry-export-extra-args: ['--only', 'main,charm-libs']
+    poetry-export-extra-args: ['--only', 'main,charm-libs', '--without-hashes'] # TODO: re-enable hashes
     build-packages:
       - libffi-dev  # Needed to build Python dependencies with Rust from source
       - libssl-dev  # Needed to build Python dependencies with Rust from source
@@ -82,10 +82,12 @@ parts:
       cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
   # "files" part name is arbitrary; use for consistency
   files:
+    # TODO: set charm version in refresh_versions.toml
     plugin: dump
     source: .
     stage:
       - LICENSE
+      - refresh_versions.toml
       - scripts
       - templates
   libpq:

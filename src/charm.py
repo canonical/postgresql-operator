@@ -5,9 +5,11 @@
 """Charmed Machine Operator for the PostgreSQL database."""
 
 import contextlib
+import dataclasses
 import json
 import logging
 import os
+import pathlib
 import platform
 import re
 import subprocess
@@ -18,7 +20,10 @@ from pathlib import Path
 from typing import Literal, Optional, get_args
 from urllib.parse import urlparse
 
+import charm_refresh
+import ops
 import psycopg2
+import tomli
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
@@ -88,7 +93,6 @@ from constants import (
     PEER,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
-    POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
@@ -97,7 +101,6 @@ from constants import (
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
-    SNAP_PACKAGES,
     SPI_MODULE,
     SYSTEM_USERS,
     TLS_CA_FILE,
@@ -113,8 +116,7 @@ from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
-from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
-from utils import label2name, new_password, snap_refreshed
+from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
 
@@ -130,6 +132,62 @@ class CannotConnectError(Exception):
     """Cannot run smoke check on connected Database."""
 
 
+@dataclasses.dataclass(eq=False)
+class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
+    _charm: "PostgresqlOperatorCharm"
+
+    @staticmethod
+    def run_pre_refresh_checks_after_1_unit_refreshed() -> None:
+        pass
+
+    def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
+        if not self._charm._patroni.are_all_members_ready():
+            raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
+        if self._charm._patroni.is_creating_backup:
+            raise charm_refresh.PrecheckFailed("Backup in progress")
+        # TODO: switch primary to lowest unit number
+
+    @classmethod
+    def is_compatible(
+        cls,
+        *,
+        old_charm_version: charm_refresh.CharmVersion,
+        new_charm_version: charm_refresh.CharmVersion,
+        old_workload_version: str,
+        new_workload_version: str,
+    ) -> bool:
+        # Check charm version compatibility
+        if not super().is_compatible(
+            old_charm_version=old_charm_version,
+            new_charm_version=new_charm_version,
+            old_workload_version=old_workload_version,
+            new_workload_version=new_workload_version,
+        ):
+            return False
+
+        # Check workload version compatibility
+        old_major, old_minor = (int(component) for component in old_workload_version.split("."))
+        new_major, new_minor = (int(component) for component in new_workload_version.split("."))
+        if old_major != new_major:
+            return False
+        return new_minor >= old_minor
+
+    def refresh_snap(
+        self, *, snap_name: str, snap_revision: str, refresh: charm_refresh.Machines
+    ) -> None:
+        # Update the configuration.
+        self._charm.unit.status = MaintenanceStatus("updating configuration")
+        self._charm.update_config()
+        self._charm.updated_synchronous_node_count()
+
+        # TODO add graceful shutdown before refreshing snap?
+
+        self._charm.unit.status = MaintenanceStatus("refreshing the snap")
+        self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
+
+        self._charm._post_snap_refresh(refresh)
+
+
 @trace_charm(
     tracing_endpoint="tracing_endpoint",
     extra_types=(
@@ -142,7 +200,6 @@ class CannotConnectError(Exception):
         PostgreSQLLDAP,
         PostgreSQLProvider,
         PostgreSQLTLS,
-        PostgreSQLUpgrade,
         RollingOpsManager,
     ),
 )
@@ -154,16 +211,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def __init__(self, *args):
         super().__init__(*args)
-
-        # Support for disabling the operator.
-        disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
-        if disable_file.exists():
-            logger.warning(
-                f"\n\tDisable file `{disable_file.resolve()}` found, the charm will skip all events."
-                "\n\tTo resume normal operations, please remove the file."
-            )
-            self.unit.status = BlockedStatus("Disabled")
-            sys.exit(0)
 
         self.peer_relation_app = DataPeerData(
             self.model,
@@ -200,12 +247,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._certs_path = "/usr/local/share/ca-certificates"
         self._storage_path = self.meta.storages["data"].location
 
-        self.upgrade = PostgreSQLUpgrade(
-            self,
-            model=get_postgresql_dependencies_model(),
-            relation_name="upgrade",
-            substrate="vm",
-        )
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
@@ -214,6 +255,36 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
+
+        self.refresh = charm_refresh.Machines | None
+        try:
+            self.refresh = charm_refresh.Machines(
+                _PostgreSQLRefresh(
+                    workload_name="PostgreSQL",
+                    # TODO update url
+                    refresh_user_docs_url="https://charmhub.io/postgresql-k8s/docs/h-upgrade-intro",
+                    _charm=self,
+                )
+            )
+        except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            self.refresh = None
+
+        # Support for disabling the operator.
+        disable_file = Path(f"{os.environ.get('CHARM_DIR')}/disable")
+        if disable_file.exists():
+            logger.warning(
+                f"\n\tDisable file `{disable_file.resolve()}` found, the charm will skip all events."
+                "\n\tTo resume normal operations, please remove the file."
+            )
+            self.unit.status = BlockedStatus("Disabled")
+            sys.exit(0)
+
+        if self.refresh is not None and not self.refresh.next_unit_allowed_to_refresh:
+            if self.refresh.in_progress:
+                self._post_snap_refresh(self.refresh)
+            else:
+                self.refresh.next_unit_allowed_to_refresh = True
+
         self._observer.start_observer()
         self._rotate_logs.start_log_rotation()
         self._grafana_agent = COSAgentProvider(
@@ -225,10 +296,45 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.on.secret_changed,
                 self.on.secret_remove,
             ],
-            log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
+            log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
         self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+
+    def _post_snap_refresh(self, refresh: charm_refresh.Machines):
+        """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
+
+        Called after snap refresh
+        """
+        if not self._patroni.start_patroni():
+            self.unit.status = ops.BlockedStatus("Failed to start PostgreSQL")
+            return
+
+        self._setup_exporter()
+        self.backup.start_stop_pgbackrest_service()
+
+        # Wait until the database initialise.
+        self.unit.status = WaitingStatus("waiting for database initialisation")
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(6), wait=wait_fixed(10)):
+                with attempt:
+                    # Check if the member hasn't started or hasn't joined the cluster yet.
+                    if (
+                        not self._patroni.member_started
+                        or self.unit.name.replace("/", "-") not in self._patroni.cluster_members
+                        or not self._patroni.is_replication_healthy()
+                    ):
+                        logger.debug(
+                            "Instance not yet back in the cluster."
+                            f" Retry {attempt.retry_state.attempt_number}/6"
+                        )
+                        raise Exception()
+        except RetryError:
+            logger.debug(
+                "Did not allow next unit to refresh: member not ready or not joined the cluster yet"
+            )
+        else:
+            refresh.next_unit_allowed_to_refresh = True
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -1121,13 +1227,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Install the charmed PostgreSQL snap.
         try:
-            self._install_snap_packages(packages=SNAP_PACKAGES)
+            self._install_snap_package(revision=None)
         except snap.SnapError:
             self.unit.status = BlockedStatus("failed to install snap packages")
             return
 
         cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+        postgres_snap = cache[charm_refresh.snap_name()]
         try:
             postgres_snap.alias("patronictl")
         except snap.SnapError:
@@ -1226,8 +1332,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        if not self.upgrade.idle:
-            logger.debug("Defer on_config_changed: upgrade in progress")
+        if self.refresh is None:
+            logger.debug("Defer on_config_changed: Refresh could be in progress")
+            event.defer()
+            return
+        if self.refresh.in_progress:
+            logger.debug("Defer on_config_changed: Refresh in progress")
             event.defer()
             return
         try:
@@ -1337,9 +1447,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._reboot_on_detached_storage(event)
             return False
 
-        # Safeguard against starting while upgrading.
-        if not self.upgrade.idle:
-            logger.debug("Defer on_start: Cluster is upgrading")
+        # Safeguard against starting while refreshing.
+        if self.refresh is None:
+            logger.debug("Defer on_start: Refresh could be in progress")
+            event.defer()
+            return False
+        if self.refresh.in_progress:
+            # TODO: we should probably start workload if scale up while refresh in progress
+            logger.debug("Defer on_start: Refresh in progress")
             event.defer()
             return False
 
@@ -1431,7 +1546,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Set up postgresql_exporter options."""
         if postgres_snap is None:
             cache = snap.SnapCache()
-            postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+            postgres_snap = cache[charm_refresh.snap_name()]
 
         postgres_snap.set({
             "exporter.user": MONITORING_USER,
@@ -1449,7 +1564,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Set up postgresql_ldap_sync options."""
         if postgres_snap is None:
             cache = snap.SnapCache()
-            postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+            postgres_snap = cache[charm_refresh.snap_name()]
 
         ldap_params = self.get_ldap_parameters()
         ldap_url = urlparse(ldap_params["ldapurl"])
@@ -1753,8 +1868,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit on_update_status: Raft recovery in progress")
             return False
 
-        if not self.upgrade.idle:
-            logger.debug("Early exit on_update_status: upgrade in progress")
+        if self.refresh is None:
+            logger.debug("Early exit on_update_status: Refresh could be in progress")
+            return False
+        if self.refresh.in_progress:
+            logger.debug("Early exit on_update_status: Refresh in progress")
             return False
 
         if self.is_blocked and self.unit.status not in S3_BLOCK_MESSAGES:
@@ -1881,38 +1999,42 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         return self.get_secret(APP_SCOPE, REPLICATION_PASSWORD_KEY)
 
-    def _install_snap_packages(self, packages: list[str], refresh: bool = False) -> None:
-        """Installs package(s) to container.
+    def _install_snap_package(
+        self, *, revision: str | None, refresh: charm_refresh.Machines | None = None
+    ) -> None:
+        """Installs PostgreSQL snap.
 
         Args:
-            packages: list of packages to install.
-            refresh: whether to refresh the snap if it's
-                already present.
+            revision: snap revision to install.
+            refresh: refresh class; will refresh installed snap if not `None`
         """
-        for snap_name, snap_version in packages:
+        if revision is None:
+            if refresh is not None:
+                raise ValueError
+            # TODO: consider using `self.refresh.pinned_snap_revision` instead (requires waiting
+            # for refresh peer relation to be ready before installing snap)
+            with pathlib.Path("refresh_versions.toml").open("rb") as file:
+                revisions = tomli.load(file)["snap"]["revisions"]
             try:
-                snap_cache = snap.SnapCache()
-                snap_package = snap_cache[snap_name]
-
-                if not snap_package.present or refresh:
-                    if revision := snap_version.get("revision"):
-                        try:
-                            revision = revision[platform.machine()]
-                        except Exception:
-                            logger.error("Unavailable snap architecture %s", platform.machine())
-                            raise
-                        channel = snap_version.get("channel", "")
-                        snap_package.ensure(
-                            snap.SnapState.Latest, revision=revision, channel=channel
-                        )
-                        snap_package.hold()
-                    else:
-                        snap_package.ensure(snap.SnapState.Latest, channel=snap_version["channel"])
-            except (snap.SnapError, snap.SnapNotFoundError) as e:
-                logger.error(
-                    "An exception occurred when installing %s. Reason: %s", snap_name, str(e)
-                )
+                revision = revisions[platform.machine()]
+            except KeyError:
+                logger.error("Unavailable snap architecture %s", platform.machine())
                 raise
+        try:
+            snap_cache = snap.SnapCache()
+            snap_package = snap_cache[charm_refresh.snap_name()]
+            if not snap_package.present or refresh is not None:
+                snap_package.ensure(snap.SnapState.Present, revision=revision)
+                if refresh is not None:
+                    refresh.update_snap_revision()
+                snap_package.hold()
+        except (snap.SnapError, snap.SnapNotFoundError) as e:
+            logger.error(
+                "An exception occurred when installing %s. Reason: %s",
+                charm_refresh.snap_name(),
+                str(e),
+            )
+            raise
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
@@ -2110,9 +2232,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._handle_postgresql_restart_need(enable_tls)
 
         cache = snap.SnapCache()
-        postgres_snap = cache[POSTGRESQL_SNAP_NAME]
+        postgres_snap = cache[charm_refresh.snap_name()]
 
-        if not snap_refreshed(postgres_snap.revision):
+        # TODO what to do if self.refresh is none?
+        if (
+            self.refresh is not None
+            and postgres_snap.revision != self.refresh.pinned_snap_revision
+        ):
             logger.debug("Early exit: snap was not refreshed to the right version yet")
             return True
 

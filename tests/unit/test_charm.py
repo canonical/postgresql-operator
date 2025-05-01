@@ -7,6 +7,7 @@ import platform
 import subprocess
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
+import charm_refresh
 import psycopg2
 import pytest
 from charms.operator_libs_linux.v2 import snap
@@ -42,7 +43,6 @@ from cluster import (
 )
 from constants import (
     PEER,
-    POSTGRESQL_SNAP_NAME,
     SECRET_INTERNAL_LABEL,
     SNAP_PACKAGES,
     UPDATE_CERTS_BIN_PATH,
@@ -80,7 +80,7 @@ def test_on_install(harness):
         # Test without storage.
         harness.charm.on.install.emit()
         _reboot_on_detached_storage.assert_called_once()
-        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+        pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
 
         # Test without adding Patroni resource.
         harness.charm.on.install.emit()
@@ -116,7 +116,7 @@ def test_on_install_failed_to_create_home(harness):
         # Test without storage.
         harness.charm.on.install.emit()
         _reboot_on_detached_storage.assert_called_once()
-        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+        pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
         _check_call.side_effect = [subprocess.CalledProcessError(-1, ["test"])]
 
         # Test without adding Patroni resource.
@@ -1714,7 +1714,7 @@ def test_clean_ca_file_from_workload(harness):
 
 def test_is_workload_running(harness):
     with patch("charm.snap.SnapCache") as _snap_cache:
-        pg_snap = _snap_cache.return_value[POSTGRESQL_SNAP_NAME]
+        pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
 
         pg_snap.present = False
         assert not (harness.charm._is_workload_running)
