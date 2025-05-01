@@ -234,12 +234,13 @@ class PostgreSQL:
                 return False
 
             cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
+            cursor.execute(SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(Identifier(database)))
+
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;").format(Identifier(f"{database}_owner")))
             cursor.execute(SQL("ALTER DATABASE {} OWNER TO {}").format(Identifier(database), Identifier(f"{database}_owner")))
+
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE {};").format(Identifier(f"{database}_admin"), Identifier(f"{database}_owner")))
             cursor.execute(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(Identifier(database), Identifier(f"{database}_admin")))
-
-            cursor.execute(SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(Identifier(database)))
 
             for user_to_grant_access in [*self.system_users, "charmed_instance_admin", "charmed_dba"]:
                 cursor.execute(
@@ -258,6 +259,10 @@ class PostgreSQL:
                 database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM {};").format(Identifier(f"{database}_owner")))
                 database_cursor.execute(SQL("REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM {};").format(Identifier(f"{database}_admin")))
 
+                database_cursor.execute(SQL("ALTER DEFAULT PRIVILEGES FOR ROLE {} GRANT SELECT ON TABLES TO {};").format(Identifier(f"{database}_owner"), Identifier(f"{database}_admin")))
+                database_cursor.execute(SQL("ALTER DEFAULT PRIVILEGES FOR ROLE {} GRANT EXECUTE ON FUNCTIONS TO {};").format(Identifier(f"{database}_owner"), Identifier(f"{database}_admin")))
+                database_cursor.execute(SQL("ALTER DEFAULT PRIVILEGES FOR ROLE {} GRANT SELECT ON SEQUENCES TO {};").format(Identifier(f"{database}_owner"), Identifier(f"{database}_admin")))
+
                 database_cursor.execute(SQL("""CREATE OR REPLACE FUNCTION login_hook.login() RETURNS VOID AS $$
 DECLARE
     ex_state TEXT;
@@ -269,10 +274,7 @@ DECLARE
     db_admin_role TEXT;
     db_name TEXT;
     db_owner_role TEXT;
-    db_query TEXT := 'SELECT current_database()';
     is_user_admin BOOLEAN;
-    is_user_admin_query TEXT := 'SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)';
-    set_role_query TEXT := 'SET ROLE %L';
 BEGIN
     IF NOT login_hook.is_executing_login_hook()
     THEN
@@ -281,15 +283,15 @@ BEGIN
 
     cur_user := (SELECT current_user);
 
-    EXECUTE db_query INTO db_name;
+    EXECUTE 'SELECT current_database()' INTO db_name;
     db_admin_role = db_name || '_admin';
 
-    EXECUTE format(is_user_admin_query, db_admin_role, cur_user) INTO is_user_admin;
+    EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', db_admin_role, cur_user) INTO is_user_admin;
 
     BEGIN
-        IF is_user_admin = true THEN
+        IF is_user_admin THEN
             db_owner_role = db_name || '_owner';
-            EXECUTE format(set_role_query, db_owner_role);
+            EXECUTE format('SET ROLE %L', db_owner_role);
         END IF;
 	EXCEPTION
 	   WHEN OTHERS THEN
@@ -458,9 +460,14 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
                     user_query = "ALTER ROLE {} "
                 else:
                     user_query = "CREATE ROLE {} "
-                user_query += f"WITH LOGIN{' CREATEDB' if createdb_enabled else ''}{' CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}' {'IN ROLE ' if roles else ''}"
+                user_query += f"WITH LOGIN{' CREATEDB' if createdb_enabled else ''}{' CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}'{' IN ROLE ' if roles else ''}"
                 if roles:
                     user_query += f"{', '.join(roles)}"
+
+                cursor.execute(SQL("BEGIN;"))
+                cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
+                cursor.execute(SQL(f"{user_query};").format(Identifier(user)))
+                cursor.execute(SQL("COMMIT;"))
 
                 # TODO: revoke createdb and/or createrole attributes when no longer needed (in delete_user)
                 if createdb_enabled and database:
@@ -468,11 +475,6 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
 
                 if createdb_enabled and database:
                     cursor.execute(SQL("ALTER ROLE {} WITH CREATEROLE;").format(Identifier(f"{database}_owner")))
-
-                cursor.execute(SQL("BEGIN;"))
-                cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
-                cursor.execute(SQL(f"{user_query};").format(Identifier(user)))
-                cursor.execute(SQL("COMMIT;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError() from e
@@ -833,7 +835,7 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT usename FROM pg_catalog.pg_user WHERE usename LIKE 'relation_id_%';"
+                    "SELECT usename FROM pg_catalog.pg_user WHERE usename LIKE 'relation-%';"
                 )
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
