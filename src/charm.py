@@ -146,7 +146,22 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
         if self._charm._patroni.is_creating_backup:
             raise charm_refresh.PrecheckFailed("Backup in progress")
-        # TODO: switch primary to lowest unit number
+
+        # Switch primary to last unit to refresh
+        if self._charm._peers is None:
+            # This should not happen since `charm_refresh.PeerRelationNotReady` should've been
+            # raised, so this code would not run
+            raise ValueError
+        all_units = (unit.name for unit in (*self._charm._peers.units, self._charm.unit))
+        def unit_number(unit_name: str):
+            _, number = unit_name.split("/")
+            return int(number)
+        # Lowest unit number is last to refresh
+        name_of_lowest_unit_number = sorted(all_units, key=unit_number)[0]
+        try:
+            self._charm._patroni.switchover(candidate=name_of_lowest_unit_number.replace("/", "-"))
+        except SwitchoverFailedError:
+            raise charm_refresh.PrecheckFailed("Unable to switch primary")
 
     @classmethod
     def is_compatible(
