@@ -134,7 +134,7 @@ class PostgreSQLAsyncReplication(Object):
             if standby_leader is not None:
                 try:
                     self.charm._patroni.promote_standby_cluster()
-                    if self.charm._app_status.message == READ_ONLY_MODE_BLOCKING_MESSAGE:
+                    if self.charm.app.status.message == READ_ONLY_MODE_BLOCKING_MESSAGE:
                         self.charm._peers.data[self.charm.app].update({
                             "promoted-cluster-counter": ""
                         })
@@ -595,7 +595,7 @@ class PostgreSQLAsyncReplication(Object):
     def promote_to_primary(self, event: ActionEvent) -> None:
         """Promote this cluster to the primary cluster."""
         if (
-            self.charm._app_status.message != READ_ONLY_MODE_BLOCKING_MESSAGE
+            self.charm.app.status.message != READ_ONLY_MODE_BLOCKING_MESSAGE
             and self._get_primary_cluster() is None
         ):
             event.fail(
