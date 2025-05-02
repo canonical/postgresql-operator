@@ -17,6 +17,7 @@ from typing import Any
 import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
+from charms.postgresql_k8s.v1.postgresql import ROLE_DBA
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -696,6 +697,7 @@ class Patroni:
             raft_password=self.raft_password,
             ldap_parameters=self._dict_to_hba_string(ldap_params),
             patroni_password=self.patroni_password,
+            dba_role=ROLE_DBA,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 

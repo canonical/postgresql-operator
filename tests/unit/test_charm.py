@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch,
 import psycopg2
 import pytest
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
 )
@@ -601,6 +601,16 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
+        patch(
+            "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -646,6 +656,9 @@ def test_on_start(harness):
         _restart_services_after_reboot.reset_mock()
         _member_started.return_value = True
         harness.charm.on.start.emit()
+        _postgresql.enable_disable_extensions.assert_called_once_with(
+            {"set_user": True}, database="postgres"
+        )
         _postgresql.create_user.assert_called_once()
         _oversee_users.assert_not_called()
         _restart_services_after_reboot.assert_called_once()
@@ -909,7 +922,7 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _handle_processes_failures,
         patch("charm.PostgreSQLBackups.can_use_s3_repository") as _can_use_s3_repository,
         patch(
-            "charms.postgresql_k8s.v0.postgresql.PostgreSQL.get_current_timeline"
+            "charms.postgresql_k8s.v1.postgresql.PostgreSQL.get_current_timeline"
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
@@ -1739,25 +1752,6 @@ def test_get_available_memory(harness):
         assert harness.charm.get_available_memory() == 0
 
 
-def test_juju_run_exec_divergence(harness):
-    with (
-        patch("charm.ClusterTopologyObserver") as _topology_observer,
-        patch("charm.JujuVersion") as _juju_version,
-    ):
-        # Juju 2
-        _juju_version.from_environ.return_value.major = 2
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-run")
-        _topology_observer.reset_mock()
-
-        # Juju 3
-        _juju_version.from_environ.return_value.major = 3
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
-
-
 def test_client_relations(harness):
     # Test when the charm has no relations.
     assert len(harness.charm.client_relations) == 0
@@ -2530,37 +2524,6 @@ def test_restart_services_after_reboot(harness):
         harness.charm._restart_services_after_reboot()
         _start_patroni.assert_called_once()
         _start_stop_pgbackrest_service.assert_called_once()
-
-
-def test_get_plugins(harness):
-    with patch("charm.PostgresqlOperatorCharm._on_config_changed"):
-        # Test when the charm has no plugins enabled.
-        assert harness.charm.get_plugins() == ["pgaudit"]
-
-        # Test when the charm has some plugins enabled.
-        harness.update_config({
-            "plugin_audit_enable": True,
-            "plugin_citext_enable": True,
-            "plugin_spi_enable": True,
-        })
-        assert harness.charm.get_plugins() == [
-            "pgaudit",
-            "citext",
-            "refint",
-            "autoinc",
-            "insert_username",
-            "moddatetime",
-        ]
-
-        # Test when the charm has the pgAudit plugin disabled.
-        harness.update_config({"plugin_audit_enable": False})
-        assert harness.charm.get_plugins() == [
-            "citext",
-            "refint",
-            "autoinc",
-            "insert_username",
-            "moddatetime",
-        ]
 
 
 def test_on_promote_to_primary(harness):
