@@ -295,10 +295,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             self.refresh = charm_refresh.Machines(
                 _PostgreSQLRefresh(
-                    workload_name="PostgreSQL",
-                    # TODO update url
-                    refresh_user_docs_url="https://charmhub.io/postgresql-k8s/docs/h-upgrade-intro",
-                    _charm=self,
+                    workload_name="PostgreSQL", charm_name="postgresql", _charm=self
                 )
             )
         except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
