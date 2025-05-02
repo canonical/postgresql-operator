@@ -4,7 +4,7 @@
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
@@ -103,7 +103,7 @@ def test_on_database_requested(harness):
             side_effect=[None, PostgreSQLCreateUserError, None, None]
         )
         postgresql_mock.create_database = PropertyMock(
-            side_effect=[None, PostgreSQLCreateDatabaseError, None]
+            side_effect=[None, None, PostgreSQLCreateDatabaseError, None]
         )
         postgresql_mock.get_postgresql_version = PropertyMock(
             side_effect=[
@@ -111,6 +111,7 @@ def test_on_database_requested(harness):
                 PostgreSQLGetPostgreSQLVersionError,
             ]
         )
+        postgresql_mock.list_roles.return_value = []
 
         # Request a database before the database is ready.
         request_database(harness)
@@ -127,19 +128,14 @@ def test_on_database_requested(harness):
         user = f"relation-{rel_id}"
         expected_user_roles = [role.lower() for role in EXTRA_USER_ROLES.split(",")]
         expected_user_roles.append(ACCESS_GROUP_RELATION)
+        expected_user_roles.append(f"{DATABASE}_admin")
         postgresql_mock.create_user.assert_called_once_with(
             user,
             "test-password",
-            extra_user_roles=expected_user_roles,
+            roles=expected_user_roles,
+            database=DATABASE,
         )
-        database_relation = harness.model.get_relation(RELATION_NAME)
-        client_relations = [database_relation]
-        postgresql_mock.create_database.assert_called_once_with(
-            DATABASE,
-            user,
-            plugins=["pgaudit"],
-            client_relations=client_relations,
-        )
+        postgresql_mock.create_database.assert_called_once_with(DATABASE)
         postgresql_mock.get_postgresql_version.assert_called_once()
         _update_endpoints.assert_called_once()
 

@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 TIMEOUT = 15 * 60
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
-# NOTE: We are unable to test set_user_u('operator') as dba_user because psycopg2
+# NOTE: We are unable to test set_user_u('operator') as dba user because psycopg2
 # runs every query in a transaction and running set_user() is not supported in transactions.
 
 

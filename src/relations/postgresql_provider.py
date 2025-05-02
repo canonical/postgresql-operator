@@ -114,14 +114,6 @@ class PostgreSQLProvider(Object):
 
             database_created = self.charm.postgresql.create_database(database)
 
-            # TODO: possibly delete if DDL role needs to be postponed to a future PR
-            # if database_created:
-            #     ddl_user = f"{database}_ddl"
-            #     ddl_password = new_password()
-            #     self.charm.postgresql.set_up_ddl_role(database, ddl_user, ddl_password)
-
-            #     self.charm.set_secret(APP_SCOPE, f"{database}-ddl-password", ddl_password)
-
             self.charm.postgresql.create_user(
                 user, password, roles=[*extra_user_roles, f"{database}_admin"], database=database
             )

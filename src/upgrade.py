@@ -12,7 +12,7 @@ from charms.data_platform_libs.v0.upgrade import (
     DependencyModel,
     UpgradeGrantedEvent,
 )
-from charms.postgresql_k8s.v1.postgresql import ACCESS_GROUPS
+from charms.postgresql_k8s.v1.postgresql import ACCESS_GROUPS, ROLE_STATS
 from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -190,6 +190,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                 "Defer on_upgrade_granted: member not ready or not joined the cluster yet"
             )
             event.defer()
+            return
 
         self.set_unit_completed()
 
@@ -245,7 +246,7 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.charm.postgresql.create_user(
                 MONITORING_USER,
                 self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                roles=["charmed_stats"],
+                roles=[ROLE_STATS],
             )
         self.charm.postgresql.set_up_database()
         self._set_up_new_access_roles_for_legacy()

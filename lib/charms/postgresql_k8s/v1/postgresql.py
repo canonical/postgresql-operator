@@ -42,6 +42,13 @@ ACCESS_GROUP_IDENTITY = "identity_access"
 ACCESS_GROUP_INTERNAL = "internal_access"
 ACCESS_GROUP_RELATION = "relation_access"
 
+ROLE_STATS = "charmed_stats"
+ROLE_READ = "charmed_read"
+ROLE_DML = "charmed_dml"
+ROLE_BACKUP = "charmed_backup"
+ROLE_DBA = "charmed_dba"
+ROLE_INSTANCE_ADMIN = "charmed_instance_admin"
+
 # List of access groups to filter role assignments by
 ACCESS_GROUPS = [
     ACCESS_GROUP_IDENTITY,
@@ -242,7 +249,7 @@ class PostgreSQL:
             cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE {};").format(Identifier(f"{database}_admin"), Identifier(f"{database}_owner")))
             cursor.execute(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(Identifier(database), Identifier(f"{database}_admin")))
 
-            for user_to_grant_access in [*self.system_users, "charmed_instance_admin", "charmed_dba"]:
+            for user_to_grant_access in [*self.system_users, ROLE_INSTANCE_ADMIN, ROLE_DBA]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
@@ -319,93 +326,6 @@ $$ LANGUAGE plpgsql;
         finally:
             cursor.close()
             connection.close()
-    
-    def set_up_ddl_role(self, database: str, ddl_username: str, ddl_password: str) -> None:
-        """Sets up the DDL role for the provided database."""
-        try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute(SQL("BEGIN;"))
-                cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
-                cursor.execute(SQL("CREATE ROLE {} NOSUPERUSER NOCREATEDB NOCREATEROLE LOGIN NOREPLICATION ENCRYPTED PASSWORD {};").format(Identifier(ddl_username), Literal(ddl_password)))
-                cursor.execute(SQL("GRANT CONNECT, CREATE ON DATABASE {} TO {};").format(Identifier(database), Identifier(ddl_username)))
-                cursor.execute(SQL("COMMIT;"))
-
-            with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
-                cursor.execute(SQL("""CREATE OR REPLACE FUNCTION update_permissions(S TEXT DEFAULT NULL)
-RETURNS VOID AS $$
-DECLARE
-    r RECORD;
-    query TEXT;
-    cur REFCURSOR;
-    db_name TEXT;
-    ddl_role TEXT;
-    owner_role TEXT;
-    obj TEXT;
-    objs TEXT[] := ARRAY['TABLES', 'SEQUENCES', 'FUNCTIONS'];
-    db_query TEXT := 'SELECT current_database()';
-    sch_query TEXT := 'SELECT nspname FROM pg_namespace WHERE nspname = %L';
-    all_sch_query TEXT := 'SELECT nspname FROM pg_namespace WHERE nspname NOT LIKE ''pg_%'' AND nspname <> ''information_schema'' ORDER BY nspname';
-    sch_rev TEXT := 'REVOKE ALL ON SCHEMA %I FROM %I';
-    sch_cre TEXT := 'GRANT USAGE, CREATE ON SCHEMA %I TO %I';
-    sch_all TEXT := 'GRANT ALL PRIVILEGES ON SCHEMA %I TO %I';
-    obj_all TEXT := 'GRANT ALL PRIVILEGES ON ALL %s IN SCHEMA %I TO %I';
-    obj_def TEXT := 'ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I GRANT ALL ON %s TO %I';
-BEGIN
-    IF s IS NULL OR s = '' THEN
-        query := all_sch_query;
-    ELSE
-        query := format(sch_query, s);
-    END IF;
-
-    EXECUTE db_query INTO db_name;
-    ddl_role = db_name || '_ddl';
-    owner_role = db_name || '_owner';
-
-    OPEN cur FOR EXECUTE query;
-    LOOP
-        FETCH cur INTO r;
-        EXIT WHEN NOT FOUND;
-            RAISE NOTICE 'Setting permissions on schema %', r;
-            EXECUTE format(sch_rev, r.nspname, ddl_role);
-            EXECUTE format(sch_cre, r.nspname, ddl_role);
-            EXECUTE format(sch_all, r.nspname, owner_role);
-
-            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON TABLES FROM PUBLIC', ddl_role, r.nspname);
-            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE SELECT, UPDATE ON SEQUENCES FROM PUBLIC', ddl_role, r.nspname);
-            EXECUTE format('ALTER DEFAULT PRIVILEGES FOR ROLE %I IN SCHEMA %I REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC', ddl_role, r.nspname);
-
-            FOREACH obj IN ARRAY objs LOOP
-                EXECUTE format(obj_all, obj, r.nspname, owner_role);
-                EXECUTE format(obj_def, ddl_role, r.nspname, obj, owner_role);
-            END LOOP;
-
-            EXECUTE format('REVOKE SELECT, INSERT, UPDATE, DELETE, TRUNCATE ON ALL TABLES IN SCHEMA %I FROM %I', r.nspname, ddl_role);
-            EXECUTE format('REVOKE SELECT, UPDATE ON ALL SEQUENCES IN SCHEMA %I FROM %I', r.nspname, ddl_role);
-            EXECUTE format('REVOKE EXECUTE ON ALL FUNCTIONS IN SCHEMA %I FROM %I', r.nspname, ddl_role);
-    END LOOP;
-    CLOSE cur;
-EXCEPTION WHEN OTHERS THEN
-    RAISE NOTICE 'An error occured: % %', SQLERRM, SQLSTATE;
-END;
-$$ LANGUAGE plpgsql security definer;
-"""))
-
-                cursor.execute(SQL("""CREATE OR REPLACE FUNCTION update_permissions_on_create_schema()
-RETURNS event_trigger AS $$
-BEGIN
-    PERFORM update_permissions();
-END;
-$$ LANGUAGE plpgsql;
-"""))
-
-                cursor.execute(SQL("""CREATE EVENT TRIGGER on_create_schema
-ON ddl_command_end
-WHEN TAG IN ('CREATE SCHEMA')
-EXECUTE FUNCTION update_permissions_on_create_schema();
-"""))
-        except psycopg2.Error as e:
-            logger.error(f"Failed to create {database} ddl role: {e}")
-            raise PostgreSQLSetUpDDLRoleError() from e
 
     def create_user(
         self,
@@ -429,8 +349,8 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
 
         if "admin" in roles:
             createdb_enabled = True
-            roles.append("charmed_dml")
-            roles.append("charmed_instance_admin")
+            roles.append(ROLE_DML)
+            roles.append(ROLE_INSTANCE_ADMIN)
             roles.remove("admin")
 
         if "createdb" in roles:
@@ -482,33 +402,33 @@ EXECUTE FUNCTION update_permissions_on_create_schema();
     def create_predefined_roles(self) -> None:
         """Create predefined roles."""
         role_to_queries = {
-            "charmed_stats": [
-                "CREATE ROLE charmed_stats NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
+            ROLE_STATS: [
+                f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
             ],
-            "charmed_read": [
-                "CREATE ROLE charmed_read NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_read_all_data",
+            ROLE_READ: [
+                f"CREATE ROLE {ROLE_READ} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_read_all_data",
             ],
-            "charmed_dml": [
-                "CREATE ROLE charmed_dml NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data",
+            ROLE_DML: [
+                f"CREATE ROLE {ROLE_DML} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data",
             ],
-            "charmed_backup": [
-                "CREATE ROLE charmed_backup NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
-                "GRANT charmed_stats TO charmed_backup",
-                "GRANT execute ON FUNCTION pg_backup_start TO charmed_backup",
-                "GRANT execute ON FUNCTION pg_backup_stop TO charmed_backup",
-                "GRANT execute ON FUNCTION pg_create_restore_point TO charmed_backup",
-                "GRANT execute ON FUNCTION pg_switch_wal TO charmed_backup",
+            ROLE_BACKUP: [
+                f"CREATE ROLE {ROLE_BACKUP} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
+                f"GRANT {ROLE_STATS} TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_backup_start TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_backup_stop TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
-            "charmed_dba": [
-                "CREATE ROLE charmed_dba NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
-                "GRANT execute ON FUNCTION set_user(text) TO charmed_dba",
-                "GRANT execute ON FUNCTION set_user(text, text) TO charmed_dba",
-                "GRANT execute ON FUNCTION set_user_u(text) TO charmed_dba",
-                "GRANT connect ON DATABASE postgres TO charmed_dba",
+            ROLE_DBA: [
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
+                f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA}",
+                f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA}",
+                f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA}",
+                f"GRANT connect ON DATABASE postgres TO {ROLE_DBA}",
             ],
-            "charmed_instance_admin": [
-                "CREATE ROLE charmed_instance_admin NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
-                "GRANT connect ON DATABASE postgres TO charmed_instance_admin",
+            ROLE_INSTANCE_ADMIN: [
+                f"CREATE ROLE {ROLE_INSTANCE_ADMIN} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
+                f"GRANT connect ON DATABASE postgres TO {ROLE_INSTANCE_ADMIN}",
             ]
         }
 

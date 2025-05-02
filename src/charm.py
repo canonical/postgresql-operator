@@ -28,6 +28,9 @@ from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_DBA,
+    ROLE_STATS,
     PostgreSQL,
     PostgreSQLCreatePredefinedRolesError,
     PostgreSQLCreateUserError,
@@ -80,6 +83,8 @@ from constants import (
     BACKUP_USER,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
+    DBA_PASSWORD_KEY,
+    DBA_USER,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -180,9 +185,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             deleted_label=SECRET_DELETED_LABEL,
         )
 
-        juju_version = self.model.juju_version
-        run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
-        self._observer = ClusterTopologyObserver(self, run_cmd)
+        self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -1128,7 +1131,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             MONITORING_PASSWORD_KEY,
             RAFT_PASSWORD_KEY,
             PATRONI_PASSWORD_KEY,
-            "dba-user-password",
+            DBA_PASSWORD_KEY,
         ):
             if self.get_secret(APP_SCOPE, key) is None:
                 if key in system_user_passwords:
@@ -1480,16 +1483,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
             # Create the dba user.
-            # TODO: move 'dba_user' and 'dba-user-password' to constants
-            if "dba_user" not in users:
+            if DBA_USER not in users:
                 self.postgresql.create_user(
-                    "dba_user",
-                    self.get_secret(APP_SCOPE, "dba-user-password"),
-                    roles=["charmed_dba"],
+                    DBA_USER,
+                    self.get_secret(APP_SCOPE, DBA_PASSWORD_KEY),
+                    roles=[ROLE_DBA],
                 )
             # TODO: move predefined roles into constants
             if BACKUP_USER not in users:
-                self.postgresql.create_user(BACKUP_USER, new_password(), roles=["charmed_backup"])
+                self.postgresql.create_user(BACKUP_USER, new_password(), roles=[ROLE_BACKUP])
                 self.postgresql.grant_database_privileges_to_user(
                     BACKUP_USER, "postgres", ["connect"]
                 )
@@ -1498,7 +1500,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    roles=["charmed_stats"],
+                    roles=[ROLE_STATS],
                 )
         except PostgreSQLGrantDatabasePrivilegesToUserError as e:
             logger.exception(e)
@@ -1584,14 +1586,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
+            updateable_users = [*SYSTEM_USERS, BACKUP_USER, DBA_USER]
+
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
             for user, password in list(updated_passwords.items()):
-                # TODO: generalize and add ddl users here
-                if user not in [*SYSTEM_USERS, BACKUP_USER]:
+                if user not in updateable_users:
                     logger.error(
-                        f"Can only update system users: {', '.join(SYSTEM_USERS)} not {user}"
+                        f"Can only update users: {', '.join(updateable_users)} not {user}"
                     )
                     updated_passwords.pop(user)
                     continue
