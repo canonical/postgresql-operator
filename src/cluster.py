@@ -950,7 +950,7 @@ class Patroni:
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].host == member_ip
         ):
-            self.charm.unit.status = BlockedStatus("Raft majority loss, run: promote-to-primary")
+            self.charm.unit_status = BlockedStatus("Raft majority loss, run: promote-to-primary")
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
             self.charm.unit_peer_data.update(data_flags)

@@ -627,12 +627,12 @@ class PostgreSQLBackups(Object):
         """
         # Enable stanza initialisation if the backup settings were fixed after being invalid
         # or pointing to a repository where there are backups from another cluster.
-        if self.charm.is_blocked and self.charm.unit.status.message not in S3_BLOCK_MESSAGES:
+        if self.charm.is_blocked and self.charm.unit_status.message not in S3_BLOCK_MESSAGES:
             logger.warning("couldn't initialize stanza due to a blocked status, deferring event")
             event.defer()
             return False
 
-        self.charm.unit.status = MaintenanceStatus("initialising stanza")
+        self.charm.unit_status = MaintenanceStatus("initialising stanza")
 
         # Create the stanza.
         try:
@@ -691,7 +691,7 @@ class PostgreSQLBackups(Object):
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
 
-        self.charm.unit.status = MaintenanceStatus("checking stanza")
+        self.charm.unit_status = MaintenanceStatus("checking stanza")
 
         try:
             # If the tls is enabled, it requires all the units in the cluster to run the pgBackRest service to
@@ -775,7 +775,7 @@ class PostgreSQLBackups(Object):
             return
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
-        if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
+        if self.charm.unit_status.message == CANNOT_RESTORE_PITR:
             logger.info("Cannot change S3 configuration in bad PITR restore status")
             event.defer()
             return
@@ -860,7 +860,7 @@ class PostgreSQLBackups(Object):
             "s3-initialization-done": "",
             "s3-initialization-block-message": "",
         })
-        if self.charm.is_blocked and self.charm.unit.status.message in S3_BLOCK_MESSAGES:
+        if self.charm.is_blocked and self.charm.unit_status.message in S3_BLOCK_MESSAGES:
             self.charm._set_primary_status_message()
 
     def _on_create_backup_action(self, event) -> None:
@@ -917,7 +917,7 @@ Juju Version: {juju_version!s}
             # the Patroni configuration.
             self._change_connectivity_to_database(connectivity=False)
 
-        self.charm.unit.status = MaintenanceStatus("creating backup")
+        self.charm.unit_status = MaintenanceStatus("creating backup")
         # Set flag due to missing in progress backups on JSON output
         # (reference: https://github.com/pgbackrest/pgbackrest/issues/2007)
         self.charm.update_config(is_creating_backup=True)
@@ -930,7 +930,7 @@ Juju Version: {juju_version!s}
             self._change_connectivity_to_database(connectivity=True)
 
         self.charm.update_config(is_creating_backup=False)
-        self.charm.unit.status = ActiveStatus()
+        self.charm.unit_status = ActiveStatus()
 
     def _run_backup(
         self,
@@ -1087,7 +1087,7 @@ Stderr:
             event.fail(error_message)
             return
 
-        self.charm.unit.status = MaintenanceStatus("restoring backup")
+        self.charm.unit_status = MaintenanceStatus("restoring backup")
 
         # Stop the database service before performing the restore.
         logger.info("Stopping database service")
@@ -1214,7 +1214,7 @@ Stderr:
             return False
 
         logger.info("Checking if cluster is in blocked state")
-        if self.charm.is_blocked and self.charm.unit.status.message not in [
+        if self.charm.is_blocked and self.charm.unit_status.message not in [
             ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE,
             CANNOT_RESTORE_PITR,
         ]:

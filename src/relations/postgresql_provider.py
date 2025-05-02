@@ -139,7 +139,7 @@ class PostgreSQLProvider(Object):
             PostgreSQLGetPostgreSQLVersionError,
         ) as e:
             logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
+            self.charm.unit_status = BlockedStatus(
                 e.message
                 if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
                 else f"Failed to initialize {self.relation_name} relation"
@@ -290,9 +290,9 @@ class PostgreSQLProvider(Object):
         """# Clean up Blocked status if it's due to extensions request."""
         if (
             self.charm.is_blocked
-            and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+            and self.charm.unit_status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ) and not self.check_for_invalid_extra_user_roles(relation.id):
-            self.charm.unit.status = ActiveStatus()
+            self.charm.unit_status = ActiveStatus()
 
         self._update_unit_status_on_blocking_endpoint_simultaneously()
 
@@ -303,17 +303,17 @@ class PostgreSQLProvider(Object):
             return
 
         if self._check_multiple_endpoints():
-            self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
+            self.charm.unit_status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
             return
 
     def _update_unit_status_on_blocking_endpoint_simultaneously(self):
         """Clean up Blocked status if this is due related of multiple endpoints."""
         if (
             self.charm.is_blocked
-            and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
+            and self.charm.unit_status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
             and not self._check_multiple_endpoints()
         ):
-            self.charm.unit.status = ActiveStatus()
+            self.charm.unit_status = ActiveStatus()
 
     def check_for_invalid_extra_user_roles(self, relation_id: int) -> bool:
         """Checks if there are relations with invalid extra user roles.

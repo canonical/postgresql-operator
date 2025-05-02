@@ -29,7 +29,7 @@ class RotateLogs(Object):
     def start_log_rotation(self):
         """Start the rotate logs running in a new process."""
         if (
-            not isinstance(self._charm.unit.status, ActiveStatus)
+            not isinstance(self._charm.unit_status, ActiveStatus)
             or self._charm._peers is None
             or not os.path.exists(PGBACKREST_LOGROTATE_FILE)
         ):
