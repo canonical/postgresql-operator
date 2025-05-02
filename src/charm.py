@@ -148,6 +148,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             raise charm_refresh.PrecheckFailed("Backup in progress")
 
         # Switch primary to last unit to refresh
+
         if self._charm._peers is None:
             # This should not happen since `charm_refresh.PeerRelationNotReady` should've been
             # raised, so this code would not run
@@ -159,12 +160,21 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             return int(number)
 
         # Lowest unit number is last to refresh
-        name_of_lowest_unit_number = sorted(all_units, key=unit_number)[0]
-        try:
-            self._charm._patroni.switchover(candidate=name_of_lowest_unit_number.replace("/", "-"))
-        except SwitchoverFailedError as e:
-            logger.warning(f"switchover failed with reason: {e}")
-            raise charm_refresh.PrecheckFailed("Unable to switch primary")
+        last_unit_to_refresh = sorted(all_units, key=unit_number)[0].replace("/", "-")
+        if self._charm._patroni.get_primary() == last_unit_to_refresh:
+            logging.info(
+                f"Unit {last_unit_to_refresh} was already primary during pre-refresh check"
+            )
+        else:
+            try:
+                self._charm._patroni.switchover(candidate=last_unit_to_refresh)
+            except SwitchoverFailedError as e:
+                logger.warning(f"switchover failed with reason: {e}")
+                raise charm_refresh.PrecheckFailed("Unable to switch primary")
+            else:
+                logging.info(
+                    f"Switched primary to unit {last_unit_to_refresh} during pre-refresh check"
+                )
 
     @classmethod
     def is_compatible(
