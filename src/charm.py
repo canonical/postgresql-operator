@@ -153,14 +153,17 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             # raised, so this code would not run
             raise ValueError
         all_units = (unit.name for unit in (*self._charm._peers.units, self._charm.unit))
+
         def unit_number(unit_name: str):
             _, number = unit_name.split("/")
             return int(number)
+
         # Lowest unit number is last to refresh
         name_of_lowest_unit_number = sorted(all_units, key=unit_number)[0]
         try:
             self._charm._patroni.switchover(candidate=name_of_lowest_unit_number.replace("/", "-"))
-        except SwitchoverFailedError:
+        except SwitchoverFailedError as e:
+            logger.warning(f"switchover failed with reason: {e}")
             raise charm_refresh.PrecheckFailed("Unable to switch primary")
 
     @classmethod
