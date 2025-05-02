@@ -178,7 +178,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     ) -> None:
         # Update the configuration.
         self._charm.unit.status = MaintenanceStatus("updating configuration")
-        self._charm.update_config()
+        self._charm.update_config(refresh=refresh)
         self._charm.updated_synchronous_node_count()
 
         # TODO add graceful shutdown before refreshing snap?
@@ -262,7 +262,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             charm=self, relation="restart", callback=self._restart
         )
 
-        self.refresh = charm_refresh.Machines | None
+        self.refresh: charm_refresh.Machines | None
         try:
             self.refresh = charm_refresh.Machines(
                 _PostgreSQLRefresh(
@@ -2167,8 +2167,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
-    def update_config(self, is_creating_backup: bool = False, no_peers: bool = False) -> bool:
+    def update_config(
+        self,
+        is_creating_backup: bool = False,
+        no_peers: bool = False,
+        *,
+        refresh: charm_refresh.Machines | None = None,
+    ) -> bool:
         """Updates Patroni config file based on the existence of the TLS files."""
+        if refresh is None:
+            refresh = self.refresh
+
         enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:
@@ -2240,11 +2249,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
 
-        # TODO what to do if self.refresh is none?
-        if (
-            self.refresh is not None
-            and postgres_snap.revision != self.refresh.pinned_snap_revision
-        ):
+        # TODO what to do if refresh is none?
+        if refresh is not None and postgres_snap.revision != refresh.pinned_snap_revision:
             logger.debug("Early exit: snap was not refreshed to the right version yet")
             return True
 
