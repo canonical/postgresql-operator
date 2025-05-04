@@ -914,12 +914,13 @@ def storage_type(ops_test, app):
             return line.split()[3]
 
 
-def storage_id(ops_test, unit_name):
-    """Retrieves  storage id associated with provided unit.
+def get_storage_ids(ops_test, unit_name):
+    """Retrieves  storages ids associated with provided unit.
 
     Note: this function exists as a temporary solution until this issue is ported to libjuju 2:
     https://github.com/juju/python-libjuju/issues/694
     """
+    storage_ids = []
     model_name = ops_test.model.info.name
     proc = subprocess.check_output(f"juju storage --model={model_name}".split())
     proc = proc.decode("utf-8")
@@ -934,18 +935,22 @@ def storage_id(ops_test, unit_name):
             continue
 
         if line.split()[0] == unit_name:
-            return line.split()[1]
+            storage_ids.append(line.split()[1])
+    return storage_ids
 
 
-async def add_unit_with_storage(ops_test, app, storage):
-    """Adds unit with storage.
+async def add_unit_with_storage(ops_test, app, storages):
+    """Adds unit with storages.
 
     Note: this function exists as a temporary solution until this issue is resolved:
     https://github.com/juju/python-libjuju/issues/695
     """
     original_units = {unit.name for unit in ops_test.model.applications[app].units}
     model_name = ops_test.model.info.name
-    add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
+    add_unit_cmd = f"add-unit {app} --model={model_name}"
+    for storage in storages:
+        add_unit_cmd = add_unit_cmd + f" --attach-storage={storage}"
+    add_unit_cmd = add_unit_cmd.split()
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
@@ -958,7 +963,9 @@ async def add_unit_with_storage(ops_test, app, storage):
 
     # verify storage attached
     new_unit = (current_units - original_units).pop()
-    assert storage_id(ops_test, new_unit) == storage, "unit added with incorrect storage"
+    assert sorted(get_storage_ids(ops_test, new_unit)) == sorted(storages), (
+        "unit added with incorrect storage"
+    )
 
     # return a reference to newly added unit
     for unit in ops_test.model.applications[app].units:
@@ -1050,8 +1057,8 @@ async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
     return db in query
 
 
-async def get_any_deatached_storage(ops_test: OpsTest) -> str:
-    """Returns any of the current available deatached storage."""
+async def get_detached_storages(ops_test: OpsTest) -> list[str]:
+    """Returns the current available detached storage."""
     return_code, storages_list, stderr = await ops_test.juju(
         "storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", "--format=json"
     )
@@ -1059,9 +1066,13 @@ async def get_any_deatached_storage(ops_test: OpsTest) -> str:
         raise Exception(f"failed to get storages info with error: {stderr}")
 
     parsed_storages_list = json.loads(storages_list)
+    detached_storages = []
     for storage_name, storage in parsed_storages_list["storage"].items():
         if (str(storage["status"]["current"]) == "detached") and (str(storage["life"] == "alive")):
-            return storage_name
+            detached_storages.append(storage_name)
+
+    if len(detached_storages) > 0:
+        return detached_storages
 
     raise Exception("failed to get deatached storage")
 

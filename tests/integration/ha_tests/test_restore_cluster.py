@@ -17,8 +17,8 @@ from ..helpers import (
 )
 from .helpers import (
     add_unit_with_storage,
+    get_storage_ids,
     reused_full_cluster_recovery_storage,
-    storage_id,
 )
 
 FIRST_APPLICATION = "first-cluster"
@@ -91,7 +91,7 @@ async def test_cluster_restore(ops_test):
     logger.info("Downscaling the existing cluster")
     storages = []
     for unit in ops_test.model.applications[FIRST_APPLICATION].units:
-        storages.append(storage_id(ops_test, unit.name))
+        storages.append(get_storage_ids(ops_test, unit.name))
         await ops_test.model.destroy_unit(unit.name)
 
     await ops_test.model.remove_application(FIRST_APPLICATION, block_until_done=True)
