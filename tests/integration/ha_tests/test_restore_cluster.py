@@ -40,7 +40,12 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             application_name=FIRST_APPLICATION,
             num_units=3,
             base=CHARM_BASE,
-            storage={"data": {"pool": "lxd-btrfs", "size": 2048}},
+            storage={
+                "archive": {"pool": "lxd-btrfs", "size": 8046},
+                "data": {"pool": "lxd-btrfs", "size": 8046},
+                "logs": {"pool": "lxd-btrfs", "size": 8046},
+                "temp": {"pool": "lxd-btrfs", "size": 8046},
+            },
             config={"profile": "testing"},
         )
 
