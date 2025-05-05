@@ -15,6 +15,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from time import sleep
 from typing import Literal, get_args
 from urllib.parse import urlparse
 
@@ -662,6 +663,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def _has_member_started(self) -> bool:
+        """Returns whether the Patroni cluster member has started."""
+        while True:
+            if self._patroni.member_inactive:
+                return False
+            elif not self._patroni.member_started:
+                logger.debug("Waiting for Patroni to start")
+                sleep(5)
+            else:
+                break
+        return True
+
     def _on_peer_relation_changed(self, event: HookEvent):
         """Reconfigure cluster members when something changes."""
         if not self._peer_relation_changed_checks(event):
@@ -696,7 +709,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._patroni.start_patroni()
 
         # Assert the member is up and running before marking the unit as active.
-        if not self._patroni.member_started:
+        if not self._has_member_started():
             logger.debug("Deferring on_peer_relation_changed: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
@@ -1410,7 +1423,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         # Assert the member is up and running before marking it as initialised.
-        if not self._patroni.member_started:
+        if not self._has_member_started():
             logger.debug("Deferring on_start: awaiting for member to start")
             self.unit.status = WaitingStatus("awaiting for member to start")
             event.defer()
