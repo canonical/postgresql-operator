@@ -197,7 +197,7 @@ class PostgreSQLAsyncReplication(Object):
             raise Exception(error)
         if system_identifier != relation.data[relation.app].get("system-id"):
             # Store current data in a tar.gz file.
-            logger.info("Creating backup of pgdata folder")
+            logger.info("Creating backup of data folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
             # Input is hardcoded
             subprocess.check_call(f"tar -zcf {filename} {POSTGRESQL_DATA_PATH}".split())  # noqa: S603
@@ -660,19 +660,26 @@ class PostgreSQLAsyncReplication(Object):
         )
 
     def _reinitialise_pgdata(self) -> None:
-        """Reinitialise the pgdata folder."""
+        """Reinitialise the data folder."""
+        paths = [
+            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_DATA_PATH,
+            "/var/snap/charmed-postgresql/common/data/logs",
+            "/var/snap/charmed-postgresql/common/data/temp",
+        ]
+        path = None
         try:
-            path = Path(POSTGRESQL_DATA_PATH)
-            if path.exists() and path.is_dir():
-                shutil.rmtree(path)
+            for path in paths:
+                path_object = Path(path)
+                if path_object.exists() and path_object.is_dir():
+                    for item in os.listdir(path):
+                        item_path = os.path.join(path, item)
+                        if os.path.isfile(item_path) or os.path.islink(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
         except OSError as e:
-            raise Exception(
-                f"Failed to remove contents of the data directory with error: {e!s}"
-            ) from e
-        os.mkdir(POSTGRESQL_DATA_PATH)
-        # Expected permissions
-        os.chmod(POSTGRESQL_DATA_PATH, 0o750)  # noqa: S103
-        self.charm._patroni._change_owner(POSTGRESQL_DATA_PATH)
+            raise Exception(f"Failed to remove contents from {path} with error: {e!s}") from e
 
     @property
     def _relation(self) -> typing.Optional[Relation]:
@@ -723,9 +730,9 @@ class PostgreSQLAsyncReplication(Object):
                 if not self._configure_standby_cluster(event):
                     return False
 
-            # Remove and recreate the pgdata folder to enable replication of the data from the
+            # Remove and recreate the data folder to enable replication of the data from the
             # primary cluster.
-            logger.info("Removing and recreating pgdata folder")
+            logger.info("Removing and recreating data folder")
             self._reinitialise_pgdata()
 
             # Remove previous cluster information to make it possible to initialise a new cluster.

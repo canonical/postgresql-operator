@@ -97,7 +97,7 @@ class PostgreSQLBackups(Object):
         """Returns the path to the TLS CA chain file."""
         s3_parameters, _ = self._retrieve_s3_parameters()
         if s3_parameters.get("tls-ca-chain") is not None:
-            return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
+            return f"{PGBACKREST_CONF_PATH}/pgbackrest-tls-ca-chain.crt"
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
@@ -327,12 +327,25 @@ class PostgreSQLBackups(Object):
 
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
+        paths = [
+            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_DATA_PATH,
+            "/var/snap/charmed-postgresql/common/data/logs",
+            "/var/snap/charmed-postgresql/common/data/temp",
+        ]
+        path = None
         try:
-            path = Path(POSTGRESQL_DATA_PATH)
-            if path.exists() and path.is_dir():
-                shutil.rmtree(path)
+            for path in paths:
+                path_object = Path(path)
+                if path_object.exists() and path_object.is_dir():
+                    for item in os.listdir(path):
+                        item_path = os.path.join(path, item)
+                        if os.path.isfile(item_path) or os.path.islink(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
         except OSError as e:
-            logger.warning(f"Failed to remove contents of the data directory with error: {e!s}")
+            logger.warning(f"Failed to remove contents from {path} with error: {e!s}")
             return False
 
         return True
