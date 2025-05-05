@@ -209,6 +209,10 @@ class PostgreSQLProvider(Object):
 
         # Get cluster status
         online_members = self.charm._patroni.online_cluster_members()
+        # Filter out-of-sync members
+        online_members = [
+            member for member in online_members if not member.get("tags", {}).get("nosync", False)
+        ]
 
         # populate rw/ro endpoints
         primary_unit_ip, rw_endpoint, ro_hosts, ro_endpoints = "", "", "", ""
