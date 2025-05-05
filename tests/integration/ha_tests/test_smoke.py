@@ -2,10 +2,10 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 
 import pytest
+from juju import tag
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
@@ -18,7 +18,6 @@ from .helpers import (
     check_db,
     check_password_auth,
     create_db,
-    deploy_with_storage,
     get_detached_storages,
     get_storage_ids,
     is_postgresql_ready,
@@ -107,6 +106,8 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 garbage_storages = await get_detached_storages(ops_test)
+                assert len(garbage_storages) == 4
+                logger.info(f"Collected storages: {garbage_storages}")
 
         logger.info("add unit with attached storage")
         await add_unit_with_storage(ops_test, APPLICATION_NAME, garbage_storages)
@@ -146,30 +147,29 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
     """Test application deploy in dirty environment with garbage storage from another application."""
     async with ops_test.fast_forward():
         logger.info("checking garbage storage")
-        garbage_storage = None
+        garbage_storages = None
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
-                garbage_storage = await get_detached_storages(ops_test)
+                garbage_storages = await get_detached_storages(ops_test)
+                assert len(garbage_storages) == 4
+                logger.info(f"Collected storages: {garbage_storages}")
 
         logger.info("deploying duplicate application with attached storage")
-        await deploy_with_storage(
-            ops_test,
+        await ops_test.model.deploy(
             charm,
-            DUP_APPLICATION_NAME,
-            garbage_storage,
-            {"profile": "testing"},
-            "ubuntu@24.04",
+            application_name=DUP_APPLICATION_NAME,
+            num_units=1,
+            base=CHARM_BASE,
+            attach_storage=[tag.storage(storage) for storage in garbage_storages],
+            config={"profile": "testing"},
         )
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
-        async with ops_test.fast_forward():
-            logger.info("waiting for duplicate application to be blocked")
-            try:
-                await ops_test.model.wait_for_idle(
-                    apps=[DUP_APPLICATION_NAME], timeout=1000, status="blocked"
-                )
-            except asyncio.TimeoutError:
-                logger.info("Application is not in blocked state. Checking logs...")
+        async with ops_test.fast_forward("60s"):
+            logger.info("waiting for duplicate application to be waiting")
+            await ops_test.model.wait_for_idle(
+                apps=[DUP_APPLICATION_NAME], timeout=1000, status="waiting", idle_period=30
+            )
 
         # Since application have postgresql db in storage from external application it should not be able to connect due to new password
         logger.info("checking operator password auth")

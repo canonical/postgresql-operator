@@ -931,7 +931,6 @@ def get_storage_ids(ops_test, unit_name):
         if len(line) == 0:
             continue
 
-        logger.info(line)
         if "detached" in line:
             continue
 
@@ -972,19 +971,6 @@ async def add_unit_with_storage(ops_test, app, storages):
     for unit in ops_test.model.applications[app].units:
         if unit.name == new_unit:
             return unit
-
-
-async def deploy_with_storage(ops_test, charm, app, storages, config, base):
-    """Deploy with storages."""
-    model_name = ops_test.model.info.name
-    add_unit_cmd = ["deploy", charm, app, f"--model={model_name}", f"--base={base}"]
-    for key, val in config.items():
-        add_unit_cmd.append(f"--config={key}={val}")
-    for storage in storages:
-        add_unit_cmd.append(f"--attach-storage={storage}")
-    logger.info(f"Deploying with: {add_unit_cmd}")
-    return_code, _, _ = await ops_test.juju(*add_unit_cmd)
-    assert return_code == 0, "Failed to add unit with storage"
 
 
 async def reused_replica_storage(ops_test: OpsTest, unit_name) -> bool:
