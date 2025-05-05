@@ -976,7 +976,7 @@ async def add_unit_with_storage(ops_test, app, storages):
 async def deploy_with_storage(ops_test, charm, app, storages, config, base):
     """Deploy with storages."""
     model_name = ops_test.model.info.name
-    add_unit_cmd = ["deploy", f"./{charm}", app, f"--model={model_name}", f"--base={base}"]
+    add_unit_cmd = ["deploy", charm, app, f"--model={model_name}", f"--base={base}"]
     for key, val in config.items():
         add_unit_cmd.append(f"--config={key}={val}")
     for storage in storages:
