@@ -931,6 +931,7 @@ def get_storage_ids(ops_test, unit_name):
         if len(line) == 0:
             continue
 
+        logger.info(line)
         if "detached" in line:
             continue
 
