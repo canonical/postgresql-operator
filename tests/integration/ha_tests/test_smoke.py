@@ -6,7 +6,6 @@ import asyncio
 import logging
 
 import pytest
-from juju import tag
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
@@ -19,6 +18,7 @@ from .helpers import (
     check_db,
     check_password_auth,
     create_db,
+    deploy_with_storage,
     get_detached_storages,
     get_storage_ids,
     is_postgresql_ready,
@@ -152,13 +152,13 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
                 garbage_storage = await get_detached_storages(ops_test)
 
         logger.info("deploying duplicate application with attached storage")
-        await ops_test.model.deploy(
+        await deploy_with_storage(
+            ops_test,
             charm,
-            application_name=DUP_APPLICATION_NAME,
-            num_units=1,
-            base=CHARM_BASE,
-            attach_storage=[tag.storage(storage) for storage in garbage_storage],
-            config={"profile": "testing"},
+            DUP_APPLICATION_NAME,
+            garbage_storage,
+            {"profile": "testing"},
+            CHARM_BASE,
         )
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
