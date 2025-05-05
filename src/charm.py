@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Literal, Optional, get_args
 from urllib.parse import urlparse
 
 import psycopg2
@@ -886,14 +886,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> str:
+    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> Optional[str]:
         """Get the IP address of a specific unit.
 
         Args:
             unit: The unit to get the IP address for.
             relation_name: The name of the relation to use for getting the IP address.
         """
-        return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+        try:
+            return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+        except KeyError:
+            return None
 
     @property
     def _hosts(self) -> set:
