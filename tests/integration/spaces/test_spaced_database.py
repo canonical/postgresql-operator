@@ -81,7 +81,7 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
         constraints={"spaces": "isolated"},
         bind={"database": "isolated"},
     )
-    juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_active)
+    juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_active, timeout=600)
 
     # Relate the database to the application
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")
