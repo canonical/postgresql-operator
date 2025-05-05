@@ -157,7 +157,7 @@ jobs:
       - name: juju status
         timeout-minutes: 1
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}
-        run: sudo juju status --color --relations | tee ~/logs/juju-status.txt
+        run: sudo juju status --color --relations --storage | tee ~/logs/juju-status.txt
       - name: juju debug-log
         timeout-minutes: 3
         if: ${{ !contains(matrix.job.spread_job, 'juju29') && (success() || (failure() && steps.spread.outcome == 'failure')) }}

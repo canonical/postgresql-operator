@@ -162,15 +162,14 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         )
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
-        await ops_test.model.set_config({"update-status-hook-interval": "10s"})
-
-        logger.info("waiting for duplicate application to be blocked")
-        try:
-            await ops_test.model.wait_for_idle(
-                apps=[DUP_APPLICATION_NAME], timeout=1000, status="blocked"
-            )
-        except asyncio.TimeoutError:
-            logger.info("Application is not in blocked state. Checking logs...")
+        async with ops_test.fast_forward():
+            logger.info("waiting for duplicate application to be blocked")
+            try:
+                await ops_test.model.wait_for_idle(
+                    apps=[DUP_APPLICATION_NAME], timeout=1000, status="blocked"
+                )
+            except asyncio.TimeoutError:
+                logger.info("Application is not in blocked state. Checking logs...")
 
         # Since application have postgresql db in storage from external application it should not be able to connect due to new password
         logger.info("checking operator password auth")
