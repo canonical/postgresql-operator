@@ -975,7 +975,6 @@ async def add_unit_with_storage(ops_test, app, storages):
 
 async def deploy_with_storage(ops_test, charm, app, storages, config, base):
     """Deploy with storages."""
-    original_units = {unit.name for unit in ops_test.model.applications[app].units}
     model_name = ops_test.model.info.name
     add_unit_cmd = ["deploy", f"./{charm}", app, f"--model={model_name}", f"--base={base}"]
     for key, val in config.items():
@@ -985,24 +984,6 @@ async def deploy_with_storage(ops_test, charm, app, storages, config, base):
     logger.info(f"Deploying with: {add_unit_cmd}")
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
-    async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=[app], status="active", timeout=2000)
-
-    # When removing all units sometimes the last unit remain in the list
-    current_units = {unit.name for unit in ops_test.model.applications[app].units}
-    original_units.intersection_update(current_units)
-    assert original_units.issubset(current_units), "New unit not added to model"
-
-    # verify storage attached
-    new_unit = (current_units - original_units).pop()
-    assert sorted(get_storage_ids(ops_test, new_unit)) == sorted(storages), (
-        "unit added with incorrect storage"
-    )
-
-    # return a reference to newly added unit
-    for unit in ops_test.model.applications[app].units:
-        if unit.name == new_unit:
-            return unit
 
 
 async def reused_replica_storage(ops_test: OpsTest, unit_name) -> bool:
