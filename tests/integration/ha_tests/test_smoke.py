@@ -158,7 +158,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             DUP_APPLICATION_NAME,
             garbage_storage,
             {"profile": "testing"},
-            CHARM_BASE,
+            "ubuntu@24.04",
         )
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
