@@ -62,9 +62,22 @@ requires:
     optional: true
 
 storage:
-  pgdata:
+  archive:
     type: filesystem
-    location: /var/snap/charmed-postgresql/common
+    description: Storage mount used for holding local backups (before typically sending them to remote object storage) when relevant/needed.
+    location: /var/snap/charmed-postgresql/common/data/archive
+  data:
+    type: filesystem
+    description: Storage mount used for storing all tables, indexes, and so on (except those from temporary tablespaces).
+    location: /var/snap/charmed-postgresql/common/var/lib/postgresql
+  logs:
+    type: filesystem
+    description: Storage mount used for storing all the logs that are part of the transactional commit path (WAL files).
+    location: /var/snap/charmed-postgresql/common/data/logs
+  temp:
+    type: filesystem
+    description: Storage mount used for storing temporary tablespaces (where typically sort operations happen).
+    location: /var/snap/charmed-postgresql/common/data/temp
 
 assumes:
   - juju

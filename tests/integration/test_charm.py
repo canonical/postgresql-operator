@@ -133,7 +133,7 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert settings["archive_mode"] == "on"
     assert settings["autovacuum"] == "on"
     assert settings["cluster_name"] == DATABASE_APP_NAME
-    assert settings["data_directory"] == f"{STORAGE_PATH}/var/lib/postgresql"
+    assert settings["data_directory"] == STORAGE_PATH
     assert settings["data_checksums"] == "on"
     assert settings["fsync"] == "on"
     assert settings["full_page_writes"] == "on"

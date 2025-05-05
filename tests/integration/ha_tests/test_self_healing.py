@@ -35,6 +35,7 @@ from .helpers import (
     get_controller_machine,
     get_patroni_setting,
     get_primary,
+    get_storage_ids,
     get_unit_ip,
     is_cluster_updated,
     is_connection_possible,
@@ -48,7 +49,6 @@ from .helpers import (
     reused_replica_storage,
     send_signal_to_process,
     start_continuous_writes,
-    storage_id,
     storage_type,
     update_restart_condition,
     wait_network_restore,
@@ -76,7 +76,12 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
                 charm,
                 num_units=3,
                 base=CHARM_BASE,
-                storage={"pgdata": {"pool": "lxd-btrfs", "size": 2048}},
+                storage={
+                    "archive": {"pool": "lxd-btrfs", "size": 2048},
+                    "data": {"pool": "lxd-btrfs", "size": 2048},
+                    "logs": {"pool": "lxd-btrfs", "size": 2048},
+                    "temp": {"pool": "lxd-btrfs", "size": 2048},
+                },
                 config={"profile": "testing"},
             )
     # Deploy the continuous writes application charm if it wasn't already deployed.
@@ -121,7 +126,7 @@ async def test_storage_re_use(ops_test, continuous_writes):
     for unit in ops_test.model.applications[app].units:
         if await is_replica(ops_test, unit.name):
             break
-    unit_storage_id = storage_id(ops_test, unit.name)
+    unit_storage_id = get_storage_ids(ops_test, unit.name)
     expected_units = len(ops_test.model.applications[app].units) - 1
     await ops_test.model.destroy_unit(unit.name)
     await ops_test.model.wait_for_idle(

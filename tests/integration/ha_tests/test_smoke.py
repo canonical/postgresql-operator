@@ -19,10 +19,10 @@ from .helpers import (
     check_db,
     check_password_auth,
     create_db,
-    get_any_deatached_storage,
+    get_detached_storages,
+    get_storage_ids,
     is_postgresql_ready,
     is_storage_exists,
-    storage_id,
 )
 
 TEST_DATABASE_NAME = "test_database"
@@ -42,7 +42,12 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             application_name=APPLICATION_NAME,
             num_units=1,
             base=CHARM_BASE,
-            storage={"pgdata": {"pool": "lxd-btrfs", "size": 8046}},
+            storage={
+                "archive": {"pool": "lxd-btrfs", "size": 8046},
+                "data": {"pool": "lxd-btrfs", "size": 8046},
+                "logs": {"pool": "lxd-btrfs", "size": 8046},
+                "temp": {"pool": "lxd-btrfs", "size": 8046},
+            },
             config={"profile": "testing"},
         )
 
@@ -58,13 +63,16 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
                 assert await is_postgresql_ready(ops_test, primary_name)
 
         logger.info("getting storage id")
-        storage_id_str = storage_id(ops_test, primary_name)
+        storage_ids = get_storage_ids(ops_test, primary_name)
 
         # Check if storage exists after application deployed
         logger.info("werifing is storage exists")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                assert await is_storage_exists(ops_test, storage_id_str)
+        for storage_id in storage_ids:
+            for attempt in Retrying(
+                stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
+            ):
+                with attempt:
+                    assert await is_storage_exists(ops_test, storage_id)
 
         # Create test database to check there is no resources conflicts
         logger.info("creating db")
@@ -82,9 +90,12 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
 
         # Storage should remain
         logger.info("werifing is storage exists")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                assert await is_storage_exists(ops_test, storage_id_str)
+        for storage_id in storage_ids:
+            for attempt in Retrying(
+                stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
+            ):
+                with attempt:
+                    assert await is_storage_exists(ops_test, storage_id)
 
 
 @pytest.mark.abort_on_fail
@@ -92,13 +103,13 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
     """Test charm deploy in dirty environment with garbage storage."""
     async with ops_test.fast_forward():
         logger.info("checking garbage storage")
-        garbage_storage = None
+        garbage_storages = None
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
-                garbage_storage = await get_any_deatached_storage(ops_test)
+                garbage_storages = await get_detached_storages(ops_test)
 
         logger.info("add unit with attached storage")
-        await add_unit_with_storage(ops_test, APPLICATION_NAME, garbage_storage)
+        await add_unit_with_storage(ops_test, APPLICATION_NAME, garbage_storages)
 
         primary_name = ops_test.model.applications[APPLICATION_NAME].units[0].name
 
@@ -108,15 +119,19 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
                 assert await is_postgresql_ready(ops_test, primary_name)
 
         logger.info("getting storage id")
-        storage_id_str = storage_id(ops_test, primary_name)
+        storage_ids = get_storage_ids(ops_test, primary_name)
 
-        assert storage_id_str == garbage_storage
+        for storage_id in storage_ids:
+            assert storage_id in garbage_storages
 
         # Check if storage exists after application deployed
         logger.info("werifing is storage exists")
-        for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
-            with attempt:
-                assert await is_storage_exists(ops_test, storage_id_str)
+        for storage_id in storage_ids:
+            for attempt in Retrying(
+                stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
+            ):
+                with attempt:
+                    assert await is_storage_exists(ops_test, storage_id)
 
         # Check that test database exists for new unit
         logger.info("checking db")
@@ -134,7 +149,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         garbage_storage = None
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
-                garbage_storage = await get_any_deatached_storage(ops_test)
+                garbage_storage = await get_detached_storages(ops_test)
 
         logger.info("deploying duplicate application with attached storage")
         await ops_test.model.deploy(
@@ -142,7 +157,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             application_name=DUP_APPLICATION_NAME,
             num_units=1,
             base=CHARM_BASE,
-            attach_storage=[tag.storage(garbage_storage)],
+            attach_storage=[tag.storage(storage) for storage in garbage_storage],
             config={"profile": "testing"},
         )
 

@@ -86,6 +86,7 @@ from constants import (
     PATRONI_PASSWORD_KEY,
     PEER,
     PLUGIN_OVERRIDES,
+    POSTGRESQL_DATA_PATH,
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
     REPLICATION_PASSWORD_KEY,
@@ -197,9 +198,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
-
         self._certs_path = "/usr/local/share/ca-certificates"
-        self._storage_path = self.meta.storages["pgdata"].location
+        self._storage_path = self.meta.storages["data"].location
 
         self.upgrade = PostgreSQLUpgrade(
             self,
@@ -1469,7 +1469,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.postgresql.set_up_database()
+        self.postgresql.set_up_database(
+            temp_location="/var/snap/charmed-postgresql/common/data/temp"
+        )
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):
@@ -1722,6 +1724,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Restart the PostgreSQL process if it was frozen (in that case, the Patroni
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
+            data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
+            if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
+                os.remove(os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"))
+                logger.info("PostgreSQL data directory was not empty. Removed pg_wal")
+                return True
             try:
                 self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")

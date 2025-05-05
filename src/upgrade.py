@@ -247,7 +247,9 @@ class PostgreSQLUpgrade(DataUpgrade):
                 self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                 extra_user_roles="pg_monitor",
             )
-        self.charm.postgresql.set_up_database()
+        self.charm.postgresql.set_up_database(
+            temp_location="/var/snap/charmed-postgresql/common/data/temp"
+        )
         self._set_up_new_access_roles_for_legacy()
 
     def _set_up_new_access_roles_for_legacy(self) -> None:
