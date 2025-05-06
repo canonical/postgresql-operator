@@ -102,7 +102,6 @@ bootstrap:
         log_truncate_on_rotation: 'on'
         logging_collector: 'on'
         wal_level: logical
-        shared_preload_libraries: 'timescaledb,pgaudit'
 
   {%- if restoring_backup %}
   method: pgbackrest
@@ -138,7 +137,8 @@ postgresql:
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
   data_dir: {{ data_path }}
   parameters:
-    shared_preload_libraries: 'timescaledb,pgaudit'
+    shared_preload_libraries: 'timescaledb,pgaudit,set_user'
+    session_preload_libraries: 'login_hook'
     {%- if enable_pgbackrest_archiving %}
     archive_command: 'pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ stanza }} archive-push %p'
     {% else %}
@@ -157,6 +157,9 @@ postgresql:
     {{key}}: {{value}}
     {%- endfor -%}
     {% endif %}
+    set_user.block_log_statement: on
+    set_user.exit_on_error: on
+    set_user.superuser_allowlist: '{{ dba_role }}'
   pgpass: /tmp/pgpass
   pg_hba:
     - local all backup peer map=operator

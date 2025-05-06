@@ -9,7 +9,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
     DatabaseRequestedEvent,
 )
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_RELATION,
     ACCESS_GROUPS,
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
@@ -102,15 +102,18 @@ class PostgreSQLProvider(Object):
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
         extra_user_roles.append(ACCESS_GROUP_RELATION)
 
+        if self.check_for_invalid_extra_user_roles(event.relation):
+            self.charm.unit.status = BlockedStatus(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+            return
+
         try:
             # Creates the user and the database for this specific relation.
             user = f"relation-{event.relation.id}"
             password = new_password()
-            self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
-            plugins = self.charm.get_plugins()
+            self.charm.postgresql.create_user(user, password, roles=extra_user_roles)
 
             self.charm.postgresql.create_database(
-                database, user, plugins=plugins, client_relations=self.charm.client_relations
+                database, user, client_relations=self.charm.client_relations
             )
 
             # Share the credentials with the application.
@@ -137,7 +140,7 @@ class PostgreSQLProvider(Object):
             self.charm.unit.status = BlockedStatus(
                 e.message
                 if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
-                else f"Failed to initialize {self.relation_name} relation"
+                else f"Failed to initialize relation {self.relation_name}"
             )
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
@@ -272,6 +275,11 @@ class PostgreSQLProvider(Object):
             and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ) and not self.check_for_invalid_extra_user_roles(relation.id):
             self.charm.unit.status = ActiveStatus()
+        if (
+            self.charm.is_blocked
+            and "Failed to initialize relation" in self.charm.unit.status.message
+        ):
+            self.charm.unit.status = ActiveStatus()
 
         self._update_unit_status_on_blocking_endpoint_simultaneously()
 
@@ -300,7 +308,13 @@ class PostgreSQLProvider(Object):
         Args:
             relation_id: current relation to be skipped.
         """
-        valid_privileges, valid_roles = self.charm.postgresql.list_valid_privileges_and_roles()
+        valid_roles = [
+            *self.charm.postgresql.list_roles(),
+            "admin",
+            "createdb",
+            "createrole",
+            "superuser",
+        ]
         for relation in self.charm.model.relations.get(self.relation_name, []):
             if relation.id == relation_id:
                 continue
@@ -308,9 +322,6 @@ class PostgreSQLProvider(Object):
                 extra_user_roles = data.get("extra-user-roles")
                 extra_user_roles = self._sanitize_extra_roles(extra_user_roles)
                 for extra_user_role in extra_user_roles:
-                    if (
-                        extra_user_role not in valid_privileges
-                        and extra_user_role not in valid_roles
-                    ):
+                    if extra_user_role not in valid_roles:
                         return True
         return False

@@ -11,8 +11,8 @@ from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from ..helpers import (
-    APPLICATION_NAME,
     CHARM_BASE,
+    DATABASE_APP_NAME,
 )
 from .helpers import (
     add_unit_with_storage,
@@ -26,7 +26,7 @@ from .helpers import (
 )
 
 TEST_DATABASE_NAME = "test_database"
-DUP_APPLICATION_NAME = "postgres-test-dup"
+DUP_DATABASE_APP_NAME = "postgres-test-dup"
 
 logger = logging.getLogger(__name__)
 
@@ -39,7 +39,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         logger.info("deploying charm")
         await ops_test.model.deploy(
             charm,
-            application_name=APPLICATION_NAME,
+            application_name=DATABASE_APP_NAME,
             num_units=1,
             base=CHARM_BASE,
             storage={
@@ -52,10 +52,10 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         )
 
         logger.info("waiting for idle")
-        await ops_test.model.wait_for_idle(apps=[APPLICATION_NAME], status="active", timeout=1500)
-        assert ops_test.model.applications[APPLICATION_NAME].units[0].workload_status == "active"
+        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500)
+        assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
 
-        primary_name = ops_test.model.applications[APPLICATION_NAME].units[0].name
+        primary_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
 
         logger.info("waiting for postgresql")
         for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
@@ -66,7 +66,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         storage_ids = get_storage_ids(ops_test, primary_name)
 
         # Check if storage exists after application deployed
-        logger.info("werifing is storage exists")
+        logger.info("verifying is storage exists")
         for storage_id in storage_ids:
             for attempt in Retrying(
                 stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
@@ -76,11 +76,11 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
 
         # Create test database to check there is no resources conflicts
         logger.info("creating db")
-        await create_db(ops_test, APPLICATION_NAME, TEST_DATABASE_NAME)
+        await create_db(ops_test, DATABASE_APP_NAME, TEST_DATABASE_NAME)
 
         # Check that test database is not exists for new unit
         logger.info("checking db")
-        assert await check_db(ops_test, APPLICATION_NAME, TEST_DATABASE_NAME)
+        assert await check_db(ops_test, DATABASE_APP_NAME, TEST_DATABASE_NAME)
 
         # Destroy charm
         logger.info("force removing charm")
@@ -89,7 +89,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         )
 
         # Storage should remain
-        logger.info("werifing is storage exists")
+        logger.info("verifying is storage exists")
         for storage_id in storage_ids:
             for attempt in Retrying(
                 stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
@@ -109,9 +109,9 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
                 garbage_storages = await get_detached_storages(ops_test)
 
         logger.info("add unit with attached storage")
-        await add_unit_with_storage(ops_test, APPLICATION_NAME, garbage_storages)
+        await add_unit_with_storage(ops_test, DATABASE_APP_NAME, garbage_storages)
 
-        primary_name = ops_test.model.applications[APPLICATION_NAME].units[0].name
+        primary_name = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
 
         logger.info("waiting for postgresql")
         for attempt in Retrying(stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True):
@@ -125,7 +125,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
             assert storage_id in garbage_storages
 
         # Check if storage exists after application deployed
-        logger.info("werifing is storage exists")
+        logger.info("verifying is storage exists")
         for storage_id in storage_ids:
             for attempt in Retrying(
                 stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
@@ -135,7 +135,7 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
 
         # Check that test database exists for new unit
         logger.info("checking db")
-        assert await check_db(ops_test, APPLICATION_NAME, TEST_DATABASE_NAME)
+        assert await check_db(ops_test, DATABASE_APP_NAME, TEST_DATABASE_NAME)
 
         logger.info("removing charm")
         await ops_test.model.destroy_unit(primary_name)
@@ -154,7 +154,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         logger.info("deploying duplicate application with attached storage")
         await ops_test.model.deploy(
             charm,
-            application_name=DUP_APPLICATION_NAME,
+            application_name=DUP_DATABASE_APP_NAME,
             num_units=1,
             base=CHARM_BASE,
             attach_storage=[tag.storage(storage) for storage in garbage_storage],
@@ -164,16 +164,17 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         # Reducing the update status frequency to speed up the triggering of deferred events.
         await ops_test.model.set_config({"update-status-hook-interval": "10s"})
 
-        logger.info("waiting for duplicate application to be blocked")
+        logger.info("waiting for duplicate application to be waiting")
         try:
             await ops_test.model.wait_for_idle(
-                apps=[DUP_APPLICATION_NAME], timeout=1000, status="blocked"
+                apps=[DUP_DATABASE_APP_NAME], timeout=60, idle_period=30, status="waiting"
             )
         except asyncio.TimeoutError:
-            logger.info("Application is not in blocked state. Checking logs...")
+            logger.info("Application is not in waiting state. Checking logs...")
 
-        # Since application have postgresql db in storage from external application it should not be able to connect due to new password
-        logger.info("checking operator password auth")
-        assert not await check_password_auth(
-            ops_test, ops_test.model.applications[DUP_APPLICATION_NAME].units[0].name
-        )
+        for attempt in Retrying(stop=stop_after_delay(60 * 10), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                # Since application have postgresql db in storage from external application it should not be able to connect due to new password
+                assert not await check_password_auth(
+                    ops_test, ops_test.model.applications[DUP_DATABASE_APP_NAME].units[0].name
+                )

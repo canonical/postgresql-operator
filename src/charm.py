@@ -23,21 +23,26 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_DBA,
+    ROLE_STATS,
     PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
-from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from ops import JujuVersion, main
+from ops import main
 from ops.charm import (
     ActionEvent,
     HookEvent,
@@ -78,6 +83,8 @@ from constants import (
     BACKUP_USER,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
+    DBA_PASSWORD_KEY,
+    DBA_USER,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -179,9 +186,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             deleted_label=SECRET_DELETED_LABEL,
         )
 
-        juju_version = JujuVersion.from_environ()
-        run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
-        self._observer = ClusterTopologyObserver(self, run_cmd)
+        self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -414,7 +419,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 # TODO figure out why peer data is not available
                 if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
                     logger.warning(
-                        "Possibly incoplete peer data: Will not map primary IP to unit IP"
+                        "Possibly incomplete peer data: Will not map primary IP to unit IP"
                     )
                     return primary_endpoint
                 logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
@@ -1126,6 +1131,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             MONITORING_PASSWORD_KEY,
             RAFT_PASSWORD_KEY,
             PATRONI_PASSWORD_KEY,
+            DBA_PASSWORD_KEY,
         ):
             if self.get_secret(APP_SCOPE, key) is None:
                 if key in system_user_passwords:
@@ -1225,7 +1231,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit enable_disable_extensions: standby cluster")
             return
         original_status = self.unit.status
-        extensions = {}
+        # Always want set_user and login_hook to be enabled
+        extensions = {"set_user": True, "login_hook": True}
         # collect extensions
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
@@ -1428,7 +1435,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug("Starting LDAP sync service")
         postgres_snap.restart(services=["ldap-sync"])
 
-    def _start_primary(self, event: StartEvent) -> None:
+    def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
@@ -1442,24 +1449,61 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if not self._can_connect_to_postgresql:
+            logger.debug("Deferring on_start: awaiting for database to start")
+            self.unit.status = WaitingStatus("awaiting for database to start")
+            event.defer()
+            return
+
+        if not self.primary_endpoint:
+            logger.debug("Deferrring on_start: awaitng start of the primary")
+            self.unit.status = WaitingStatus("awaiting start of the primary")
+            event.defer()
+            return
+
+        try:
+            # Needed to create predefined roles with set_user execution privileges
+            self.postgresql.enable_disable_extensions({"set_user": True}, database="postgres")
+        except Exception as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to enable set-user extension")
+            return
+
+        try:
+            self.postgresql.create_predefined_roles()
+        except PostgreSQLCreatePredefinedRolesError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to create pre-defined roles")
+            return
+
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
-            if "postgres" not in users:
-                self.postgresql.create_user("postgres", new_password(), admin=True)
+            # Create the dba user.
+            if DBA_USER not in users:
+                self.postgresql.create_user(
+                    DBA_USER, self.get_secret(APP_SCOPE, DBA_PASSWORD_KEY), roles=[ROLE_DBA]
+                )
                 # Create the backup user.
             if BACKUP_USER not in users:
-                self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
+                self.postgresql.create_user(BACKUP_USER, new_password(), roles=[ROLE_BACKUP])
+                self.postgresql.grant_database_privileges_to_user(
+                    BACKUP_USER, "postgres", ["connect"]
+                )
             if MONITORING_USER not in users:
                 # Create the monitoring user.
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles=["pg_monitor"],
+                    roles=[ROLE_STATS],
                 )
+        except PostgreSQLGrantDatabasePrivilegesToUserError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to grant database privileges to user")
+            return
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create postgres user")
@@ -1542,13 +1586,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
+            updateable_users = [*SYSTEM_USERS, BACKUP_USER, DBA_USER]
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
             for user, password in list(updated_passwords.items()):
-                if user not in SYSTEM_USERS:
+                if user not in updateable_users:
                     logger.error(
-                        f"Can only update system users: {', '.join(SYSTEM_USERS)} not {user}"
+                        f"Can only update system users: {', '.join(updateable_users)} not {user}"
                     )
                     updated_passwords.pop(user)
                     continue
@@ -2259,20 +2304,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"Last completed transaction was at {log_time[-1]}")
         else:
             logger.error("Can't tell last completed transaction time")
-
-    def get_plugins(self) -> list[str]:
-        """Return a list of installed plugins."""
-        plugins = [
-            "_".join(plugin.split("_")[1:-1])
-            for plugin in self.config.plugin_keys()
-            if self.config[plugin]
-        ]
-        plugins = [PLUGIN_OVERRIDES.get(plugin, plugin) for plugin in plugins]
-        if "spi" in plugins:
-            plugins.remove("spi")
-            for ext in SPI_MODULE:
-                plugins.append(ext)
-        return plugins
 
     def get_ldap_parameters(self) -> dict:
         """Returns the LDAP configuration to use."""
