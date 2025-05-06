@@ -43,10 +43,10 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             num_units=1,
             base=CHARM_BASE,
             storage={
-                "archive": {"pool": "lxd-btrfs", "size": 8046},
-                "data": {"pool": "lxd-btrfs", "size": 8046},
-                "logs": {"pool": "lxd-btrfs", "size": 8046},
-                "temp": {"pool": "lxd-btrfs", "size": 8046},
+                "archive": {"pool": "lxd-btrfs", "size": 2048},
+                "data": {"pool": "lxd-btrfs", "size": 2048},
+                "logs": {"pool": "lxd-btrfs", "size": 2048},
+                "temp": {"pool": "lxd-btrfs", "size": 2048},
             },
             config={"profile": "testing"},
         )
@@ -66,7 +66,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         storage_ids = get_storage_ids(ops_test, primary_name)
 
         # Check if storage exists after application deployed
-        logger.info("verifying is storage exists")
+        logger.info("verifying that storage exists")
         for storage_id in storage_ids:
             for attempt in Retrying(
                 stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
@@ -89,7 +89,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
         )
 
         # Storage should remain
-        logger.info("verifying is storage exists")
+        logger.info("verifying that storage exists")
         for storage_id in storage_ids:
             for attempt in Retrying(
                 stop=stop_after_delay(15 * 3), wait=wait_fixed(3), reraise=True
@@ -107,6 +107,8 @@ async def test_charm_garbage_ignorance(ops_test: OpsTest, charm: str):
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
                 garbage_storages = await get_detached_storages(ops_test)
+                assert len(garbage_storages) == 4
+                logger.info(f"Collected storages: {garbage_storages}")
 
         logger.info("add unit with attached storage")
         await add_unit_with_storage(ops_test, DATABASE_APP_NAME, garbage_storages)
@@ -146,10 +148,12 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
     """Test application deploy in dirty environment with garbage storage from another application."""
     async with ops_test.fast_forward():
         logger.info("checking garbage storage")
-        garbage_storage = None
+        garbage_storages = None
         for attempt in Retrying(stop=stop_after_delay(30 * 3), wait=wait_fixed(3), reraise=True):
             with attempt:
-                garbage_storage = await get_detached_storages(ops_test)
+                garbage_storages = await get_detached_storages(ops_test)
+                assert len(garbage_storages) == 4
+                logger.info(f"Collected storages: {garbage_storages}")
 
         logger.info("deploying duplicate application with attached storage")
         await ops_test.model.deploy(
@@ -157,7 +161,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             application_name=DUP_DATABASE_APP_NAME,
             num_units=1,
             base=CHARM_BASE,
-            attach_storage=[tag.storage(storage) for storage in garbage_storage],
+            attach_storage=[tag.storage(storage) for storage in garbage_storages],
             config={"profile": "testing"},
         )
 
