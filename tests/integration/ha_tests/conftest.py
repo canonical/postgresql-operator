@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
+import logging
 import os
 import subprocess
 from asyncio import gather
 
-import logger
 import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -26,6 +26,8 @@ from .helpers import (
 DEFAULT_LXD_NETWORK = "lxdbr0"
 RAW_DNSMASQ = """dhcp-option=3
 dhcp-option=6"""
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.fixture()
