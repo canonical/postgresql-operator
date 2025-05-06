@@ -33,7 +33,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         3,
         # TODO move to stable once we release refresh v3
         "--channel",
-        "16/edge/test-refresh-v3-workload1",
+        "16/edge/test-refresh-v3-workload2",
         "--base",
         "ubuntu@24.04",
     )
