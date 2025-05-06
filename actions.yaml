@@ -24,6 +24,7 @@ list-backups:
   description: Lists backups in s3 storage.
 pre-refresh-check:
   description: Check if charm is ready to refresh
+  additionalProperties: false
 force-refresh-start:
   description: |
     Potential of data loss and downtime
@@ -53,7 +54,7 @@ force-refresh-start:
         Potential of data loss and downtime during and after refresh
         
         If `false`, allow refresh to PostgreSQL container version that has not been validated to work with the charm revision
-  required: []
+  additionalProperties: false
 resume-refresh:
   description: |
     Refresh next unit(s) (after you have manually verified that refreshed units are healthy)
@@ -75,7 +76,7 @@ resume-refresh:
         
         Warning: if first unit to refresh is unhealthy, consider running `force-refresh-start` action on that unit instead of using this parameter.
         If first unit to refresh is unhealthy because compatibility checks, pre-refresh checks, or workload container checks are failing, this parameter is more destructive than the `force-refresh-start` action.
-  required: []
+  additionalProperties: false
 promote-to-primary:
   description: Promotes the cluster of choice to a primary cluster. Must be ran against the leader unit when promoting a cluster
    or against the unit to be promoted within the cluster.
