@@ -64,7 +64,7 @@ MEDIAN_ELECTION_TIME = 10
 
 
 @pytest.mark.abort_on_fail
-async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
+async def test_build_and_deploy(ops_test: OpsTest, lxd_spaces, charm) -> None:
     """Build and deploy three unit of PostgreSQL."""
     wait_for_apps = False
     # It is possible for users to provide their own cluster for HA testing. Hence, check if there
