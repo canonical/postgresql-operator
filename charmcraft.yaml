@@ -24,10 +24,10 @@ parts:
       # Use environment variable instead of `--break-system-packages` to avoid failing on older
       # versions of pip that do not recognize `--break-system-packages`
       # `--user` needed (in addition to `--break-system-packages`) for Ubuntu >=24.04
-      PIP_BREAK_SYSTEM_PACKAGES=true python3 -m pip install --user --upgrade pip==25.1  # renovate: charmcraft-pip-latest
+      PIP_BREAK_SYSTEM_PACKAGES=true python3 -m pip install --user --upgrade pip==25.1.1  # renovate: charmcraft-pip-latest
 
       # Use uv to install poetry so that a newer version of Python can be installed if needed by poetry
-      curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/uv/releases/download/0.6.17/uv-installer.sh | sh  # renovate: charmcraft-uv-latest
+      curl --proto '=https' --tlsv1.2 -LsSf https://github.com/astral-sh/uv/releases/download/0.7.2/uv-installer.sh | sh  # renovate: charmcraft-uv-latest
       # poetry 2.0.0 requires Python >=3.9
       if ! "$HOME/.local/bin/uv" python find '>=3.9'
       then
@@ -35,7 +35,7 @@ parts:
         # (to reduce the number of Python versions we use)
         "$HOME/.local/bin/uv" python install 3.10.12  # renovate: charmcraft-python-ubuntu-22.04
       fi
-      "$HOME/.local/bin/uv" tool install --no-python-downloads --python '>=3.9' poetry==2.1.2 --with poetry-plugin-export==1.9.0  # renovate: charmcraft-poetry-latest
+      "$HOME/.local/bin/uv" tool install --no-python-downloads --python '>=3.9' poetry==2.1.3 --with poetry-plugin-export==1.9.0  # renovate: charmcraft-poetry-latest
 
       ln -sf "$HOME/.local/bin/poetry" /usr/local/bin/poetry
   # "charm-poetry" part name is arbitrary; use for consistency
