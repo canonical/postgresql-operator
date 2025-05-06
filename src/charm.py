@@ -87,7 +87,9 @@ from constants import (
     POSTGRESQL_SNAP_NAME,
     RAFT_PASSWORD_KEY,
     REPLICATION_PASSWORD_KEY,
+    REPLICATION_USER,
     REWIND_PASSWORD_KEY,
+    REWIND_USER,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
@@ -2011,6 +2013,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
             no_peers=no_peers,
+            user_databases_map=self.relations_user_databases_map,
         )
         if no_peers:
             return True
@@ -2137,6 +2140,27 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for relation in self.model.relations.get(relation_name, []):
                 relations.append(relation)
         return relations
+
+    @property
+    def relations_user_databases_map(self) -> dict:
+        """Returns a user->databases map for all relations."""
+        if (
+            not self.is_cluster_initialised
+            or not self._patroni.member_started
+            or self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled)
+            != set(ACCESS_GROUPS)
+        ):
+            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
+        user_database_map = {}
+        for user in self.postgresql.list_users(
+            group="relation_access", current_host=self.is_connectivity_enabled
+        ):
+            user_database_map[user] = ",".join(
+                self.postgresql.list_accessible_databases_for_user(
+                    user, current_host=self.is_connectivity_enabled
+                )
+            )
+        return user_database_map
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None

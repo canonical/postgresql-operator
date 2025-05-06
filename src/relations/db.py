@@ -111,6 +111,16 @@ class DbProvides(Object):
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.unit.is_leader():
+            if (
+                not self.charm._patroni.member_started
+                or f"relation_id_{event.relation.id}"
+                not in self.charm.postgresql.list_users(current_host=True)
+            ):
+                logger.debug("Deferring on_relation_changed: user was not created yet")
+                event.defer()
+                return
+
+            self.charm.update_config()
             return
 
         if self._check_multiple_endpoints():
@@ -218,6 +228,8 @@ class DbProvides(Object):
         self.update_endpoints(relation)
 
         self._update_unit_status(relation)
+
+        self.charm.update_config()
 
         return True
 

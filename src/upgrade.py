@@ -253,7 +253,9 @@ class PostgreSQLUpgrade(DataUpgrade):
     def _set_up_new_access_roles_for_legacy(self) -> None:
         """Create missing access groups and their memberships."""
         access_groups = self.charm.postgresql.list_access_groups()
-        if access_groups == set(ACCESS_GROUPS):
+        if access_groups == set(ACCESS_GROUPS) and sorted(
+            self.charm.postgresql.list_users_from_relation()
+        ) == sorted(self.charm.postgresql.list_users(group="relation_access")):
             return
 
         self.charm.postgresql.create_access_groups()
