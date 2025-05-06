@@ -1080,7 +1080,6 @@ async def get_detached_storages(ops_test: OpsTest) -> list[str]:
 async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
     """Checks if "operator" password is valid for current postgresql db."""
     complete_command = [
-        ops_test,
         "exec",
         "--unit",
         unit_name,
