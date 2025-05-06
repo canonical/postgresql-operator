@@ -82,9 +82,20 @@ parts:
       cp requirements.txt "$CRAFT_PART_INSTALL/requirements.txt"
   # "files" part name is arbitrary; use for consistency
   files:
-    # TODO: set charm version in refresh_versions.toml
     plugin: dump
     source: .
+    after:
+      - poetry-deps  # Ensure poetry is installed
+    build-packages:
+      - git
+    override-build: |
+      # Set `charm_version` in refresh_versions.toml from git tag
+      python3 -m venv refresh-version-venv
+      source refresh-version-venv/bin/activate
+      poetry install --only build-refresh-version
+      write-charm-version
+
+      craftctl default
     stage:
       - LICENSE
       - refresh_versions.toml

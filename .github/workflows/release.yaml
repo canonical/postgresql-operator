@@ -1,6 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-name: Release to Charmhub
+name: Release to Charmhub edge
 
 on:
   push:
@@ -16,8 +16,18 @@ on:
       - '.github/workflows/sync_docs.yaml'
 
 jobs:
+  tag:
+    name: Create charm refresh compatibility version git tag
+    uses: canonical/data-platform-workflows/.github/workflows/tag_charm_edge.yaml@v32.0.0
+    with:
+      track: '16'
+    permissions:
+      contents: write  # Needed to create git tag
+
   ci-tests:
     name: Tests
+    needs:
+      - tag
     uses: ./.github/workflows/ci.yaml
     secrets: inherit
     permissions:
@@ -26,10 +36,11 @@ jobs:
   release:
     name: Release charm
     needs:
+      - tag
       - ci-tests
     uses: canonical/data-platform-workflows/.github/workflows/release_charm_edge.yaml@v32.0.0
     with:
-      track: '16'
+      track: ${{ needs.tag.outputs.track }}
       artifact-prefix: ${{ needs.ci-tests.outputs.artifact-prefix }}
     secrets:
       charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
