@@ -113,31 +113,26 @@ def test_get_alternative_patroni_url(peers_ips, patroni):
 
 def test_get_member_ip(peers_ips, patroni):
     with (
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._get_alternative_patroni_url") as _get_alternative_patroni_url,
+        patch("requests.get", side_effect=mocked_requests_get),
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test error on trying to get the member IP.
-        _get_alternative_patroni_url.side_effect = "http://server2"
+        _patroni_url.return_value = "http://server2"
         with pytest.raises(RetryError):
             patroni.get_member_ip(patroni.member_name)
             assert False
 
         # Test using an alternative Patroni URL.
-        _get_alternative_patroni_url.side_effect = [
-            "http://server3",
-            "http://server2",
-            "http://server1",
-        ]
+        _patroni_url.return_value = "http://server1"
+
         ip = patroni.get_member_ip(patroni.member_name)
         assert ip == "1.1.1.1"
 
         # Test using the current Patroni URL.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip(patroni.member_name)
         assert ip == "1.1.1.1"
 
         # Test when not having that specific member in the cluster.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
         assert ip is None
 
@@ -201,31 +196,22 @@ def test_dict_to_hba_string(harness, patroni):
 
 def test_get_primary(peers_ips, patroni):
     with (
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._get_alternative_patroni_url") as _get_alternative_patroni_url,
+        patch("requests.get", side_effect=mocked_requests_get),
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test error on trying to get the member IP.
-        _get_alternative_patroni_url.side_effect = "http://server2"
+        _patroni_url.return_value = "http://server2"
         with pytest.raises(RetryError):
             patroni.get_primary(patroni.member_name)
             assert False
 
-        # Test using an alternative Patroni URL.
-        _get_alternative_patroni_url.side_effect = [
-            "http://server3",
-            "http://server2",
-            "http://server1",
-        ]
-        primary = patroni.get_primary()
-        assert primary == "postgresql-0"
-
         # Test using the current Patroni URL.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        _patroni_url.return_value = "http://server1"
         primary = patroni.get_primary()
         assert primary == "postgresql-0"
 
         # Test requesting the primary in the unit name pattern.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        _patroni_url.return_value = "http://server1"
         primary = patroni.get_primary(unit_name_pattern=True)
         assert primary == "postgresql/0"
 
@@ -338,6 +324,11 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.Patroni._create_directory"),
+        patch(
+            "charm.PostgresqlOperatorCharm.listen_ips",
+            new_callable=PropertyMock,
+            return_value=["1.1.1.1", "192.168.0.1"],
+        ),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -364,6 +355,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             peers_ips=peers_ips,
             scope=scope,
             self_ip=patroni.unit_ip,
+            listen_ips=["1.1.1.1", "192.168.0.1"],
             superuser="operator",
             superuser_password=superuser_password,
             replication_password=replication_password,
