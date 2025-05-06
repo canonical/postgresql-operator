@@ -378,7 +378,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if refresh is not None and refresh.unit_status_higher_priority:
             return
         if (
-            status == ops.ActiveStatus()
+            isinstance(status, ops.ActiveStatus)
             and refresh is not None
             and refresh.unit_status_lower_priority()
         ):
@@ -411,7 +411,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else:
                 # Clear refresh status from unit status
                 self._set_primary_status_message()
-        elif self.unit.status == ops.ActiveStatus() and self.refresh.unit_status_lower_priority():
+        elif (
+            isinstance(self.unit.status, ops.ActiveStatus)
+            and self.refresh is not None
+            and self.refresh.unit_status_lower_priority()
+        ):
             self.unit.status = self.refresh.unit_status_lower_priority()
             new_refresh_unit_status = self.refresh.unit_status_lower_priority().message
         path.write_text(json.dumps(new_refresh_unit_status))
