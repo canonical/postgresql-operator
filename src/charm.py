@@ -210,6 +210,8 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         self._charm.updated_synchronous_node_count()
 
         # TODO add graceful shutdown before refreshing snap?
+        # TODO future improvement: if snap refresh fails (i.e. same snap revision installed) after
+        # graceful shutdown, restart workload
 
         self._charm.set_unit_status(MaintenanceStatus("refreshing the snap"), refresh=refresh)
         self._charm._install_snap_package(revision=snap_revision, refresh=refresh)
