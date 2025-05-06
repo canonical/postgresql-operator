@@ -383,6 +383,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             and refresh.unit_status_lower_priority()
         ):
             self.unit.status = refresh.unit_status_lower_priority()
+            pathlib.Path(".last_refresh_unit_status.json").write_text(
+                json.dumps(refresh.unit_status_lower_priority().message)
+            )
             return
         self.unit.status = status
 
@@ -408,6 +411,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else:
                 # Clear refresh status from unit status
                 self._set_primary_status_message()
+        elif self.unit.status == ops.ActiveStatus() and self.refresh.unit_status_lower_priority():
+            self.unit.status = self.refresh.unit_status_lower_priority()
+            new_refresh_unit_status = self.refresh.unit_status_lower_priority().message
         path.write_text(json.dumps(new_refresh_unit_status))
 
     def patroni_scrape_config(self) -> list[dict]:
