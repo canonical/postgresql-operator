@@ -2329,7 +2329,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
 
-        # TODO what to do if refresh is none?
+        # TODO handle case of scale up while refresh in progress & `refresh` is None
         if refresh is not None and postgres_snap.revision != refresh.pinned_snap_revision:
             logger.debug("Early exit: snap was not refreshed to the right version yet")
             return True
