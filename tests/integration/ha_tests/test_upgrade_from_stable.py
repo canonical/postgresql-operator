@@ -31,9 +31,9 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         DATABASE_APP_NAME,
         "-n",
         3,
-        # TODO move to stable once we release
+        # TODO move to stable once we release refresh v3
         "--channel",
-        "16/beta/multiple-storages",
+        "16/edge/test-refresh-v3-workload1",
         "--base",
         "ubuntu@24.04",
     )
@@ -51,19 +51,14 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
-    """Test that the pre-upgrade-check action runs successfully."""
-    application = ops_test.model.applications[DATABASE_APP_NAME]
-    if "pre-upgrade-check" not in await application.get_actions():
-        logger.info("skipping the test because the charm from 14/stable doesn't support upgrade")
-        return
-
+async def test_pre_refresh_check(ops_test: OpsTest) -> None:
+    """Test that the pre-refresh-check action runs successfully."""
     logger.info("Get leader unit")
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
     assert leader_unit is not None, "No leader unit found"
 
-    logger.info("Run pre-upgrade-check action")
-    action = await leader_unit.run_action("pre-upgrade-check")
+    logger.info("Run pre-refresh-check action")
+    action = await leader_unit.run_action("pre-refresh-check")
     await action.wait()
 
 
@@ -82,17 +77,28 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     initial_number_of_switchovers = count_switchovers(ops_test, primary_name)
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
-    actions = await application.get_actions()
 
     logger.info("Refresh the charm")
     await application.refresh(path=charm)
 
     logger.info("Wait for upgrade to start")
-    await ops_test.model.block_until(
-        lambda: ("waiting" if "pre-upgrade-check" in actions else "maintenance")
-        in {unit.workload_status for unit in application.units},
-        timeout=TIMEOUT,
+    await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
+
+    logger.info("Wait for first unit to upgrade")
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        )
+
+    logger.info("Run resume-refresh action")
+    # Highest to lowest unit number
+    refresh_order = sorted(
+        (unit.name for unit in application.units),
+        key=lambda name: int(name.split("/")[1]),
+        reverse=True,
     )
+    action = await refresh_order[1].run_action("resume-refresh")
+    await action.wait()
 
     logger.info("Wait for upgrade to complete")
     async with ops_test.fast_forward("60s"):
@@ -109,10 +115,8 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     logger.info("checking whether no writes were lost")
     await check_writes(ops_test)
 
-    # Check the number of switchovers.
-    if "pre-upgrade-check" in actions:
-        logger.info("checking the number of switchovers")
-        final_number_of_switchovers = count_switchovers(ops_test, primary_name)
-        assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
-            "Number of switchovers is greater than 2"
-        )
+    logger.info("checking the number of switchovers")
+    final_number_of_switchovers = count_switchovers(ops_test, primary_name)
+    assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
+        "Number of switchovers is greater than 2"
+    )
