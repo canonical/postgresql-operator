@@ -1570,8 +1570,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
 
-        self.unit.set_workload_version(self._patroni.get_postgresql_version())
-
         # Open port
         try:
             self.unit.open_port("tcp", 5432)
