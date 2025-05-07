@@ -186,6 +186,8 @@ class PostgreSQLUpgrade(DataUpgrade):
                         )
                         raise Exception()
 
+                    self.charm.update_config()
+
                     self.set_unit_completed()
 
                     # Ensures leader gets its own relation-changed when it upgrades

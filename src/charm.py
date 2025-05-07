@@ -2153,12 +2153,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def relations_user_databases_map(self) -> dict:
         """Returns a user->databases map for all relations."""
-        if (
-            not self.is_cluster_initialised
-            or not self._patroni.member_started
-            or self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled)
-            != set(ACCESS_GROUPS)
-        ):
+        if not self.is_cluster_initialised or not self._patroni.member_started:
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
         for user in self.postgresql.list_users_from_relation(
@@ -2172,6 +2167,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
             if any(True for relation in self.client_relations if relation.name == "db-admin"):
                 user_database_map["landscape"] = "all"
+        if self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled) != set(
+            ACCESS_GROUPS
+        ):
+            user_database_map.update({USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"})
         return user_database_map
 
     def override_patroni_restart_condition(
