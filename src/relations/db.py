@@ -113,7 +113,7 @@ class DbProvides(Object):
         if not self.charm.unit.is_leader():
             if (
                 not self.charm._patroni.member_started
-                or f"relation_id_{event.relation.id}"
+                or f"relation-{event.relation.id}"
                 not in self.charm.postgresql.list_users(current_host=True)
             ):
                 logger.debug("Deferring on_relation_changed: user was not created yet")

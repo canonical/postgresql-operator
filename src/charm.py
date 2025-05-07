@@ -184,6 +184,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
         self._observer = ClusterTopologyObserver(self, run_cmd)
         self._rotate_logs = RotateLogs(self)
+        self.framework.observe(
+            self.on.authorisation_rules_change, self._on_authorisation_rules_change
+        )
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
@@ -234,6 +237,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             tracing_protocols=[TRACING_PROTOCOL],
         )
         self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+
+    def _on_authorisation_rules_change(self, _):
+        """Handle authorisation rules change event."""
+        timestamp = datetime.now()
+        self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
+        logger.debug(f"authorisation rules changed at {timestamp}")
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -2152,8 +2161,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ):
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
-        for user in self.postgresql.list_users(
-            group="relation_access", current_host=self.is_connectivity_enabled
+        for user in self.postgresql.list_users_from_relation(
+            current_host=self.is_connectivity_enabled
         ):
             user_database_map[user] = ",".join(
                 self.postgresql.list_accessible_databases_for_user(

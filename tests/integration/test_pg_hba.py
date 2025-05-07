@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import logging
 import re
+from time import sleep
 
 import psycopg2
 import pytest
@@ -33,7 +34,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
         if DATABASE_APP_NAME not in ops_test.model.applications:
             await ops_test.model.deploy(
                 charm,
-                num_units=1,
+                num_units=2,
                 base=CHARM_BASE,
                 config={"profile": "testing"},
             )
@@ -55,7 +56,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
             await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
 
         await ops_test.model.wait_for_idle(
-            apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
+            apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active", timeout=1000
         )
 
         primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
@@ -102,6 +103,8 @@ async def test_pg_hba(ops_test: OpsTest, charm):
         finally:
             if connection:
                 connection.close()
+
+        sleep(30)
 
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
             try:

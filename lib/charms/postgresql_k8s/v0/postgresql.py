@@ -731,15 +731,22 @@ END; $$;"""
             if connection is not None:
                 connection.close()
 
-    def list_users_from_relation(self) -> Set[str]:
+    def list_users_from_relation(self, current_host=False) -> Set[str]:
         """Returns the list of PostgreSQL database users that were created by a relation.
+
+        Args:
+            current_host: whether to check the current host
+                instead of the primary host.
 
         Returns:
             List of PostgreSQL database users.
         """
         connection = None
+        host = self.current_host if current_host else None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT usename "
                     "FROM pg_catalog.pg_user "
@@ -777,6 +784,7 @@ END; $$;"""
             with self._connect_to_database(
                 database="template1"
             ) as connection, connection.cursor() as cursor:
+                # Create database function and event trigger to identify users created by PgBouncer.
                 cursor.execute(
                     "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
                 )
@@ -794,47 +802,43 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           insert_value TEXT;
           changes INTEGER = 0;
         BEGIN
-          CREATE TABLE IF NOT EXISTS debug1 (current_moment TIMESTAMP WITH TIME ZONE, lines boolean);
-          INSERT INTO debug1 (current_moment, lines) SELECT now(),pg_is_in_recovery();
+          -- Don't execute on replicas.
           IF NOT pg_is_in_recovery() THEN
+            -- Load the current authorisation rules.
             DROP TABLE IF EXISTS pg_hba;
             CREATE TEMPORARY TABLE pg_hba (lines TEXT);
             SELECT setting INTO hba_file FROM pg_settings WHERE name = 'hba_file';
             copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
             EXECUTE copy_command;
+            -- Build a list of the relation users and the databases they can access.
             DROP TABLE IF EXISTS relation_users;
             CREATE TEMPORARY TABLE relation_users AS
-              SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename LIKE 'relation_id_%' OR usename LIKE 'pgbouncer_auth_relation_id_%' OR usename LIKE '%_user_%_%') AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
-            CREATE TABLE IF NOT EXISTS debug2 (current_moment TIMESTAMP WITH TIME ZONE, username VARCHAR, databases VARCHAR);
-            INSERT INTO debug2 (current_moment, username, databases) SELECT now(),* FROM relation_users;
+              SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename NOT IN ('backup', 'monitoring', 'operator', 'postgres', 'replication', 'rewind')) AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
             IF (SELECT COUNT(lines) FROM pg_hba WHERE lines LIKE 'hostssl %') > 0 THEN
               connection_type := 'hostssl';
             ELSE
               connection_type := 'host';
             END IF;
+            -- Add the new users to the pg_hba file.
             FOR rec IN SELECT * FROM relation_users
             LOOP
               insert_value := connection_type || ' ' || rec.databases || ' ' || rec.user || ' 0.0.0.0/0 md5';
-              RAISE NOTICE 'insert_value: %', insert_value;
               IF (SELECT COUNT(lines) FROM pg_hba WHERE lines = insert_value) = 0 THEN
                 INSERT INTO pg_hba (lines) VALUES (insert_value);
                 changes := changes + 1;
               END IF;
             END LOOP;
+            -- Remove users that don't exist anymore from the pg_hba file.
             FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
             LOOP
               DELETE FROM pg_hba WHERE lines = rec.lines;
               changes := changes + 1;
             END LOOP;
-            CREATE TABLE IF NOT EXISTS debug3 (current_moment TIMESTAMP WITH TIME ZONE, changes INTEGER);
-            INSERT INTO debug3 (current_moment, changes) SELECT now(),changes;
-            RAISE NOTICE 'changes: %', changes;
+            -- Apply the changes to the pg_hba file.
             IF changes > 0 THEN
               copy_command='COPY pg_hba TO ''' || hba_file || '''' ;
               EXECUTE copy_command;
               PERFORM pg_reload_conf();
-              CREATE TABLE IF NOT EXISTS debug (current_moment TIMESTAMP WITH TIME ZONE, lines TEXT);
-              INSERT INTO debug (current_moment, lines) SELECT now(),lines FROM pg_hba;
             END IF;
           END IF;
         END;

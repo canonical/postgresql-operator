@@ -130,7 +130,7 @@ def test_dispatch(harness):
     with patch("subprocess.run") as _run:
         command = "test-command"
         charm_dir = "/path"
-        dispatch(command, harness.charm.unit.name, charm_dir)
+        dispatch(command, harness.charm.unit.name, charm_dir, "cluster_topology_change")
         _run.assert_called_once_with([
             command,
             "-u",
@@ -141,6 +141,7 @@ def test_dispatch(harness):
 
 def test_main():
     with (
+        patch("scripts.cluster_topology_observer.check_for_authorisation_rules_changes"),
         patch.object(
             sys,
             "argv",
