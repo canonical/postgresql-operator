@@ -100,9 +100,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
     logger.info("Run resume-refresh action")
     # Highest to lowest unit number
     refresh_order = sorted(
-        (unit.name for unit in application.units),
-        key=lambda name: int(name.split("/")[1]),
-        reverse=True,
+        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
     )
     action = await refresh_order[1].run_action("resume-refresh")
     await action.wait()
