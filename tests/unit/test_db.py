@@ -83,6 +83,8 @@ def request_database(_harness):
 
 def test_on_relation_changed(harness):
     with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
+        patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.DbProvides.set_up_relation") as _set_up_relation,
         patch.object(EventBase, "defer") as _defer,
         patch(
@@ -92,7 +94,8 @@ def test_on_relation_changed(harness):
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
     ):
         # Set some side effects to test multiple situations.
-        _member_started.side_effect = [False, True, True, True, True, True]
+        _member_started.side_effect = [True, False, True, True]
+        postgresql_mock.list_users.return_value = {"relation-0"}
         _primary_endpoint.side_effect = [
             None,
             {"1.1.1.1"},
@@ -181,6 +184,7 @@ def test_get_extensions(harness):
 
 def test_set_up_relation(harness):
     with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("relations.db.DbProvides._update_unit_status") as _update_unit_status,

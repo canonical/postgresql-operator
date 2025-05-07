@@ -22,12 +22,17 @@ class ClusterTopologyChangeEvent(EventBase):
     """A custom event for cluster topology changes."""
 
 
+class AuthorisationRulesChangeEvent(EventBase):
+    """A custom event for authorisation rules changes."""
+
+
 class ClusterTopologyChangeCharmEvents(CharmEvents):
     """A CharmEvents extension for cluster topology changes.
 
     Includes :class:`ClusterTopologyChangeEvent` in those that can be handled.
     """
 
+    authorisation_rules_change = EventSource(AuthorisationRulesChangeEvent)
     cluster_topology_change = EventSource(ClusterTopologyChangeEvent)
 
 
