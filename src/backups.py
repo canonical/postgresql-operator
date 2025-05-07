@@ -631,7 +631,7 @@ class PostgreSQLBackups(Object):
             event.defer()
             return False
 
-        self.charm.unit.status = MaintenanceStatus("initialising stanza")
+        self.charm.set_unit_status(MaintenanceStatus("initialising stanza"))
 
         # Create the stanza.
         try:
@@ -690,7 +690,7 @@ class PostgreSQLBackups(Object):
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
 
-        self.charm.unit.status = MaintenanceStatus("checking stanza")
+        self.charm.set_unit_status(MaintenanceStatus("checking stanza"))
 
         try:
             # If the tls is enabled, it requires all the units in the cluster to run the pgBackRest service to
@@ -915,7 +915,7 @@ Juju Version: {self.charm.model.juju_version!s}
             # the Patroni configuration.
             self._change_connectivity_to_database(connectivity=False)
 
-        self.charm.unit.status = MaintenanceStatus("creating backup")
+        self.charm.set_unit_status(MaintenanceStatus("creating backup"))
         # Set flag due to missing in progress backups on JSON output
         # (reference: https://github.com/pgbackrest/pgbackrest/issues/2007)
         self.charm.update_config(is_creating_backup=True)
@@ -928,7 +928,7 @@ Juju Version: {self.charm.model.juju_version!s}
             self._change_connectivity_to_database(connectivity=True)
 
         self.charm.update_config(is_creating_backup=False)
-        self.charm.unit.status = ActiveStatus()
+        self.charm.set_unit_status(ActiveStatus())
 
     def _run_backup(
         self,
@@ -1085,7 +1085,7 @@ Stderr:
             event.fail(error_message)
             return
 
-        self.charm.unit.status = MaintenanceStatus("restoring backup")
+        self.charm.set_unit_status(MaintenanceStatus("restoring backup"))
 
         # Stop the database service before performing the restore.
         logger.info("Stopping database service")

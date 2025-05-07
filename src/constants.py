@@ -10,6 +10,8 @@ DATABASE_DEFAULT_NAME = "postgres"
 DATABASE_PORT = "5432"
 PEER = "database-peers"
 ALL_CLIENT_RELATIONS = [DATABASE]
+REPLICATION_CONSUMER_RELATION = "replication"
+REPLICATION_OFFER_RELATION = "replication-offer"
 API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
@@ -28,13 +30,6 @@ SYSTEM_USERS = [REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
-POSTGRESQL_SNAP_NAME = "charmed-postgresql"
-SNAP_PACKAGES = [
-    (
-        POSTGRESQL_SNAP_NAME,
-        {"revision": {"aarch64": "181", "x86_64": "182"}},
-    )
-]
 
 SNAP_COMMON_PATH = "/var/snap/charmed-postgresql/common"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"

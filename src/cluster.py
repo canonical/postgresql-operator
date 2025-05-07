@@ -12,8 +12,9 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
+import charm_refresh
 import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
@@ -43,11 +44,11 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     TLS_CA_FILE,
     USER,
 )
+from utils import label2name
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +57,9 @@ PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 RUNNING_STATES = ["running", "streaming"]
 
 PATRONI_TIMEOUT = 10
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 
 class RaftPostgresqlNotUpError(Exception):
@@ -102,12 +106,25 @@ class UpdateSyncNodeCountError(Exception):
     """Raised when updating synchronous_node_count failed for some reason."""
 
 
+class ClusterMember(TypedDict):
+    """Type for cluster member."""
+
+    name: str
+    role: str
+    state: str
+    api_url: str
+    host: str
+    port: int
+    timeline: int
+    lag: int
+
+
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
     def __init__(
         self,
-        charm,
+        charm: "PostgresqlOperatorCharm",
         unit_ip: str,
         cluster_name: str,
         member_name: str,
@@ -231,10 +248,30 @@ class Patroni:
         """Return the PostgreSQL version from the system."""
         client = snap.SnapClient()
         for snp in client.get_installed_snaps():
-            if snp["name"] == POSTGRESQL_SNAP_NAME:
+            if snp["name"] == charm_refresh.snap_name():
                 return snp["version"]
 
-    def get_member_ip(self, member_name: str) -> str:
+    def cluster_status(
+        self, alternative_endpoints: Optional[list] = None
+    ) -> Optional[list[ClusterMember]]:
+        """Query the cluster status."""
+        # Request info from cluster endpoint (which returns all members of the cluster).
+        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+            with attempt:
+                if alternative_endpoints:
+                    request_url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
+                else:
+                    request_url = self._patroni_url
+
+                cluster_status = requests.get(
+                    f"{request_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
+                    verify=self.verify,
+                    timeout=API_REQUEST_TIMEOUT,
+                    auth=self._patroni_auth,
+                )
+                return cluster_status.json()["members"]
+
+    def get_member_ip(self, member_name: str) -> Optional[str]:
         """Get cluster member IP address.
 
         Args:
@@ -243,19 +280,13 @@ class Patroni:
         Returns:
             IP address of the cluster member.
         """
-        # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                for member in cluster_status.json()["members"]:
-                    if member["name"] == member_name:
-                        return member["host"]
+        cluster_status = self.cluster_status()
+        if not cluster_status:
+            return
+
+        for member in cluster_status:
+            if member["name"] == member_name:
+                return member["host"]
 
     def get_member_status(self, member_name: str) -> str:
         """Get cluster member status.
@@ -268,23 +299,16 @@ class Patroni:
                 couldn't be retrieved yet.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                for member in cluster_status.json()["members"]:
-                    if member["name"] == member_name:
-                        return member["state"]
+        cluster_status = self.cluster_status()
+        if cluster_status:
+            for member in cluster_status:
+                if member["name"] == member_name:
+                    return member["state"]
         return ""
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
-    ) -> str:
+    ) -> Optional[str]:
         """Get primary instance.
 
         Args:
@@ -295,22 +319,14 @@ class Patroni:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
-                cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                for member in cluster_status.json()["members"]:
-                    if member["role"] == "leader":
-                        primary = member["name"]
-                        if unit_name_pattern:
-                            # Change the last dash to / in order to match unit name pattern.
-                            primary = "/".join(primary.rsplit("-", 1))
-                        return primary
+        if cluster_status := self.cluster_status(alternative_endpoints):
+            for member in cluster_status:
+                if member["role"] == "leader":
+                    primary = member["name"]
+                    if unit_name_pattern:
+                        # Change the last dash to / in order to match unit name pattern.
+                        primary = label2name(primary)
+                    return primary
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
@@ -342,7 +358,7 @@ class Patroni:
                         standby_leader = member["name"]
                         if unit_name_pattern:
                             # Change the last dash to / in order to match unit name pattern.
-                            standby_leader = "/".join(standby_leader.rsplit("-", 1))
+                            standby_leader = label2name(standby_leader)
                         return standby_leader
 
     def get_sync_standby_names(self) -> list[str]:
@@ -360,7 +376,7 @@ class Patroni:
                 )
                 for member in r.json()["members"]:
                     if member["role"] == "sync_standby":
-                        sync_standbys.append("/".join(member["name"].rsplit("-", 1)))
+                        sync_standbys.append(label2name(member["name"]))
         return sync_standbys
 
     def _get_alternative_patroni_url(
@@ -557,6 +573,18 @@ class Patroni:
 
         return len(cluster_status.json()["members"]) == 0
 
+    def online_cluster_members(self) -> list[ClusterMember]:
+        """Return list of online cluster members."""
+        try:
+            cluster_status = self.cluster_status()
+        except RetryError:
+            logger.exception("Unable to get the state of the cluster")
+            return []
+        if not cluster_status:
+            return []
+
+        return [member for member in cluster_status if member["state"] in RUNNING_STATES]
+
     def are_replicas_up(self) -> dict[str, bool] | None:
         """Check if cluster members are running or streaming."""
         try:
@@ -674,6 +702,7 @@ class Patroni:
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
+            listen_ips=self.charm.listen_ips,
             superuser=USER,
             superuser_password=self.superuser_password,
             replication_password=self.replication_password,
@@ -921,7 +950,9 @@ class Patroni:
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].host == member_ip
         ):
-            self.charm.unit.status = BlockedStatus("Raft majority loss, run: promote-to-primary")
+            self.charm.set_unit_status(
+                BlockedStatus("Raft majority loss, run: promote-to-primary")
+            )
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
             self.charm.unit_peer_data.update(data_flags)

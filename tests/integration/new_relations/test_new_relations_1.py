@@ -209,10 +209,9 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
     machine = await get_machine_from_unit(ops_test, replica)
     await stop_machine(ops_test, machine)
 
-    # Topology observer runs every half a minute
-    await asyncio.sleep(60)
-
     for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
+        # Topology observer runs every half a minute
+        await asyncio.sleep(60)
         with attempt:
             data = await get_application_relation_data(
                 ops_test,

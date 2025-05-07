@@ -21,6 +21,7 @@ import os
 import pwd
 import shutil
 import subprocess
+import typing
 from datetime import datetime
 from pathlib import Path
 from subprocess import run
@@ -48,22 +49,25 @@ from constants import (
     PATRONI_CONF_PATH,
     PEER,
     POSTGRESQL_DATA_PATH,
+    REPLICATION_CONSUMER_RELATION,
+    REPLICATION_OFFER_RELATION,
 )
 
 logger = logging.getLogger(__name__)
 
 
 READ_ONLY_MODE_BLOCKING_MESSAGE = "Standalone read-only cluster"
-REPLICATION_CONSUMER_RELATION = "replication"
-REPLICATION_OFFER_RELATION = "replication-offer"
 # Labels are not confidential
 SECRET_LABEL = "async-replication-secret"  # noqa: S105
+
+if typing.TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 
 class PostgreSQLAsyncReplication(Object):
     """Defines the async-replication management logic."""
 
-    def __init__(self, charm):
+    def __init__(self, charm: "PostgresqlOperatorCharm"):
         """Constructor."""
         super().__init__(charm, "postgresql")
         self.charm = charm
@@ -109,6 +113,13 @@ class PostgreSQLAsyncReplication(Object):
 
         self.framework.observe(self.charm.on.secret_changed, self._on_secret_changed)
 
+    @property
+    def _unit_ip(self) -> str:
+        """Return this unit IP address for the replication relation."""
+        if self._relation.name == REPLICATION_OFFER_RELATION:
+            return self.charm._replication_offer_ip
+        return self.charm._replication_consumer_ip
+
     def _can_promote_cluster(self, event: ActionEvent) -> bool:
         """Check if the cluster can be promoted."""
         if not self.charm.is_cluster_initialised:
@@ -127,7 +138,7 @@ class PostgreSQLAsyncReplication(Object):
                         self.charm._peers.data[self.charm.app].update({
                             "promoted-cluster-counter": ""
                         })
-                        self._set_app_status()
+                        self.set_app_status()
                         self.charm._set_primary_status_message()
                 except (StandbyClusterAlreadyPromotedError, ClusterNotPromotedError) as e:
                     event.fail(str(e))
@@ -195,13 +206,13 @@ class PostgreSQLAsyncReplication(Object):
         return True
 
     def get_all_primary_cluster_endpoints(self) -> list[str]:
-        """Return all the primary cluster endpoints."""
+        """Return all the primary cluster endpoints from the standby cluster."""
         relation = self._relation
         primary_cluster = self._get_primary_cluster()
         # List the primary endpoints only for the standby cluster.
         if relation is None or primary_cluster is None or self.charm.app == primary_cluster:
             return []
-        return [
+        return [  # type: ignore
             relation.data[unit].get("unit-address")
             for relation in [
                 self.model.get_relation(REPLICATION_OFFER_RELATION),
@@ -310,7 +321,7 @@ class PostgreSQLAsyncReplication(Object):
         # List the standby endpoints only for the primary cluster.
         if relation is None or primary_cluster is None or self.charm.app != primary_cluster:
             return []
-        return [
+        return [  # type: ignore
             relation.data[unit].get("unit-address")
             for relation in [
                 self.model.get_relation(REPLICATION_OFFER_RELATION),
@@ -375,8 +386,8 @@ class PostgreSQLAsyncReplication(Object):
                             "cluster_initialised": "True"
                         })
                     elif self._is_following_promoted_cluster():
-                        self.charm.unit.status = WaitingStatus(
-                            "Waiting for the database to be started in all units"
+                        self.charm.set_unit_status(
+                            WaitingStatus("Waiting for the database to be started in all units")
                         )
                         event.defer()
                         return
@@ -387,12 +398,12 @@ class PostgreSQLAsyncReplication(Object):
                     self.charm._patroni.reload_patroni_configuration()
                 raise NotReadyError()
             else:
-                self.charm.unit.status = WaitingStatus(
-                    "Still starting the database in the standby leader"
+                self.charm.set_unit_status(
+                    WaitingStatus("Still starting the database in the standby leader")
                 )
                 event.defer()
         except NotReadyError:
-            self.charm.unit.status = WaitingStatus("Waiting for the database to start")
+            self.charm.set_unit_status(WaitingStatus("Waiting for the database to start"))
             logger.debug("Deferring on_async_relation_changed: database hasn't started yet.")
             event.defer()
 
@@ -427,7 +438,7 @@ class PostgreSQLAsyncReplication(Object):
             self.charm._set_primary_status_message()
 
         if self.charm.unit.is_leader():
-            self._set_app_status()
+            self.set_app_status()
 
     def _handle_replication_change(self, event: ActionEvent) -> bool:
         if not self._can_promote_cluster(event):
@@ -435,13 +446,13 @@ class PostgreSQLAsyncReplication(Object):
 
         relation = self._relation
 
-        # Check if all units from the other cluster  published their pod IPs in the relation data.
+        # Check if all units from the other cluster published their IPs in the relation data.
         # If not, fail the action telling that all units must publish their pod addresses in the
         # relation data.
         for unit in relation.units:
             if "unit-address" not in relation.data[unit]:
                 event.fail(
-                    "All units from the other cluster must publish their pod addresses in the relation data."
+                    "All units from the other cluster must publish their unit addresses in the relation data."
                 )
                 return False
 
@@ -493,7 +504,7 @@ class PostgreSQLAsyncReplication(Object):
         if self.charm._patroni.get_standby_leader() is not None:
             if self.charm.unit.is_leader():
                 self.charm._peers.data[self.charm.app].update({"promoted-cluster-counter": "0"})
-                self._set_app_status()
+                self.set_app_status()
         else:
             if self.charm.unit.is_leader():
                 self.charm._peers.data[self.charm.app].update({"promoted-cluster-counter": ""})
@@ -502,7 +513,7 @@ class PostgreSQLAsyncReplication(Object):
     def _on_async_relation_changed(self, event: RelationChangedEvent) -> None:
         """Update the Patroni configuration if one of the clusters was already promoted."""
         if self.charm.unit.is_leader():
-            self._set_app_status()
+            self.set_app_status()
 
         primary_cluster = self._get_primary_cluster()
         logger.debug("Primary cluster: %s", primary_cluster)
@@ -527,8 +538,8 @@ class PostgreSQLAsyncReplication(Object):
             == self._get_highest_promoted_cluster_counter_value()
             for unit in self.charm._peers.units
         ):
-            self.charm.unit.status = WaitingStatus(
-                "Waiting for the database to be stopped in all units"
+            self.charm.set_unit_status(
+                WaitingStatus("Waiting for the database to be stopped in all units")
             )
             logger.debug("Deferring on_async_relation_changed: not all units stopped.")
             event.defer()
@@ -552,7 +563,8 @@ class PostgreSQLAsyncReplication(Object):
 
     def _on_async_relation_joined(self, _) -> None:
         """Publish this unit address in the relation data."""
-        self._relation.data[self.charm.unit].update({"unit-address": self.charm._unit_ip})
+        # store unit address in relation data
+        self._relation.data[self.charm.unit].update({"unit-address": self._unit_ip})
 
         # Set the counter for new units.
         highest_promoted_cluster_counter = self._get_highest_promoted_cluster_counter_value()
@@ -578,7 +590,7 @@ class PostgreSQLAsyncReplication(Object):
         self._relation.data[self.charm.app].update({"name": event.params["name"]})
 
         # Set the status.
-        self.charm.unit.status = MaintenanceStatus("Creating replication...")
+        self.charm.set_unit_status(MaintenanceStatus("Creating replication..."))
 
     def promote_to_primary(self, event: ActionEvent) -> None:
         """Promote this cluster to the primary cluster."""
@@ -595,7 +607,7 @@ class PostgreSQLAsyncReplication(Object):
             return
 
         # Set the status.
-        self.charm.unit.status = MaintenanceStatus("Creating replication...")
+        self.charm.set_unit_status(MaintenanceStatus("Creating replication..."))
 
     def _on_secret_changed(self, event: SecretChangedEvent) -> None:
         """Update the internal secret when the relation secret changes."""
@@ -630,14 +642,13 @@ class PostgreSQLAsyncReplication(Object):
                 event.defer()
 
     @property
-    def _primary_cluster_endpoint(self) -> str:
+    def _primary_cluster_endpoint(self) -> typing.Optional[str]:
         """Return the endpoint from one of the sync-standbys, or from the primary if there is no sync-standby."""
         sync_standby_names = self.charm._patroni.get_sync_standby_names()
         if len(sync_standby_names) > 0:
             unit = self.model.get_unit(sync_standby_names[0])
-            return self.charm._get_unit_ip(unit)
-        else:
-            return self.charm._get_unit_ip(self.charm.unit)
+            return self.charm._get_unit_ip(unit, self._relation.name)
+        return self.charm._get_unit_ip(self.charm.unit, self._relation.name)
 
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
@@ -671,7 +682,7 @@ class PostgreSQLAsyncReplication(Object):
             raise Exception(f"Failed to remove contents from {path} with error: {e!s}") from e
 
     @property
-    def _relation(self) -> Relation:
+    def _relation(self) -> typing.Optional[Relation]:
         """Return the relation object."""
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),
@@ -680,8 +691,14 @@ class PostgreSQLAsyncReplication(Object):
             if relation is not None:
                 return relation
 
-    def _set_app_status(self) -> None:
+    def set_app_status(self) -> None:
         """Set the app status."""
+        if self.charm.refresh is not None and self.charm.refresh.app_status_higher_priority:
+            self.charm.app.status = self.charm.refresh.app_status_higher_priority
+            return
+        if self.charm._peers is None:
+            # TODO set active status?
+            return
         if self.charm._peers.data[self.charm.app].get("promoted-cluster-counter") == "0":
             self.charm.app.status = BlockedStatus(READ_ONLY_MODE_BLOCKING_MESSAGE)
             return
@@ -747,7 +764,7 @@ class PostgreSQLAsyncReplication(Object):
         relation = self._relation
         if relation is None:
             return
-        relation.data[self.charm.unit].update({"unit-address": self.charm._unit_ip})
+        relation.data[self.charm.unit].update({"unit-address": self._unit_ip})
         if self.is_primary_cluster() and self.charm.unit.is_leader():
             self._update_primary_cluster_data()
 
@@ -810,14 +827,16 @@ class PostgreSQLAsyncReplication(Object):
         if not self.charm.unit.is_leader() and standby_leader is None:
             if self.charm._patroni.is_member_isolated:
                 self.charm._patroni.restart_patroni()
-                self.charm.unit.status = WaitingStatus("Restarting Patroni to rejoin the cluster")
+                self.charm.set_unit_status(
+                    WaitingStatus("Restarting Patroni to rejoin the cluster")
+                )
                 logger.debug(
                     "Deferring on_async_relation_changed: restarting Patroni to rejoin the cluster."
                 )
                 event.defer()
                 return True
-            self.charm.unit.status = WaitingStatus(
-                "Waiting for the standby leader start the database"
+            self.charm.set_unit_status(
+                WaitingStatus("Waiting for the standby leader start the database")
             )
             logger.debug("Deferring on_async_relation_changed: standby leader hasn't started yet.")
             event.defer()
