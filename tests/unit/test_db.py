@@ -95,7 +95,7 @@ def test_on_relation_changed(harness):
     ):
         # Set some side effects to test multiple situations.
         _member_started.side_effect = [True, False, True, True]
-        postgresql_mock.list_users.return_value = {"relation_id_0"}
+        postgresql_mock.list_users.return_value = {"relation-0"}
         _primary_endpoint.side_effect = [
             None,
             {"1.1.1.1"},
