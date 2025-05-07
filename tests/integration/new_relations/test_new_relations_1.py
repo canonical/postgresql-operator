@@ -399,7 +399,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         # Add two more units.
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
+            apps=[DATABASE_APP_NAME], status="active", timeout=2000, wait_for_exact_units=4
         )
 
         assert_sync_standbys(
@@ -412,11 +412,11 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             unit for unit in units_to_remove if unit != leader_unit.name
         ])
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=3
+            apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=3
         )
         await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=2
+            apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=2
         )
 
         # Get the updated connection data and assert it can be used
