@@ -44,7 +44,7 @@ class PostgreSQLLDAP(Object):
             self.charm.app_peer_data.update({"ldap_enabled": "True"})
 
         self.charm.update_config()
-        self.charm.unit.status = ActiveStatus()
+        self.charm.set_unit_status(ActiveStatus())
 
     def _on_ldap_unavailable(self, _: LdapUnavailableEvent) -> None:
         """Handler for the LDAP unavailable event."""

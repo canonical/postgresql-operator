@@ -1,13 +1,16 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import json
 import logging
+import pathlib
+import platform
 import shutil
 import zipfile
 from pathlib import Path
 
 import pytest
+import tomli
+import tomli_w
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
@@ -17,7 +20,6 @@ from ..helpers import (
     get_leader_unit,
     get_primary,
 )
-from ..new_relations.helpers import get_application_relation_data
 from .helpers import (
     are_writes_increasing,
     check_writes,
@@ -38,7 +40,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         "-n",
         3,
         "--channel",
-        "16/edge/multiple-storages",
+        "16/edge/test-refresh-v3-workload2",  # TODO remove branch
         "--config",
         "profile=testing",
         "--base",
@@ -58,14 +60,14 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
-    """Test that the pre-upgrade-check action runs successfully."""
+async def test_pre_refresh_check(ops_test: OpsTest) -> None:
+    """Test that the pre-refresh-check action runs successfully."""
     logger.info("Get leader unit")
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
     assert leader_unit is not None, "No leader unit found"
 
-    logger.info("Run pre-upgrade-check action")
-    action = await leader_unit.run_action("pre-upgrade-check")
+    logger.info("Run pre-refresh-check action")
+    action = await leader_unit.run_action("pre-refresh-check")
     await action.wait()
 
 
@@ -88,10 +90,21 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
     await application.refresh(path=charm)
 
     logger.info("Wait for upgrade to start")
-    await ops_test.model.block_until(
-        lambda: "waiting" in {unit.workload_status for unit in application.units},
-        timeout=TIMEOUT,
+    await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
+
+    logger.info("Wait for first unit to upgrade")
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        )
+
+    logger.info("Run resume-refresh action")
+    # Highest to lowest unit number
+    refresh_order = sorted(
+        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
     )
+    action = await refresh_order[1].run_action("resume-refresh")
+    await action.wait()
 
     logger.info("Wait for upgrade to complete")
     async with ops_test.fast_forward("60s"):
@@ -129,8 +142,8 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
     assert leader_unit is not None, "No leader unit found"
 
-    logger.info("Run pre-upgrade-check action")
-    action = await leader_unit.run_action("pre-upgrade-check")
+    logger.info("Run pre-refresh-check action")
+    action = await leader_unit.run_action("pre-refresh-check")
     await action.wait()
 
     filename = Path(charm).name
@@ -138,7 +151,7 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     shutil.copy(charm, fault_charm)
 
     logger.info("Inject dependency fault")
-    await inject_dependency_fault(ops_test, DATABASE_APP_NAME, fault_charm)
+    await inject_dependency_fault(fault_charm)
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
 
@@ -146,27 +159,20 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     await application.refresh(path=fault_charm)
 
     logger.info("Wait for upgrade to fail")
-    async with ops_test.fast_forward("60s"):
-        await ops_test.model.block_until(
-            lambda: "blocked" in {unit.workload_status for unit in application.units},
-            timeout=TIMEOUT,
-        )
+    await ops_test.model.block_until(
+        lambda: application.status == "blocked"
+        and "incompatible" in application.status_message.lower(),
+        timeout=TIMEOUT,
+    )
 
     logger.info("Ensure continuous_writes while in failure state on remaining units")
     await are_writes_increasing(ops_test)
-
-    logger.info("Re-run pre-upgrade-check action")
-    action = await leader_unit.run_action("pre-upgrade-check")
-    await action.wait()
 
     logger.info("Re-refresh the charm")
     await application.refresh(path=charm)
 
     logger.info("Wait for upgrade to start")
-    await ops_test.model.block_until(
-        lambda: "waiting" in {unit.workload_status for unit in application.units},
-        timeout=TIMEOUT,
-    )
+    await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
 
     logger.info("Wait for application to recover")
     async with ops_test.fast_forward("60s"):
@@ -186,20 +192,14 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     fault_charm.unlink()
 
 
-async def inject_dependency_fault(
-    ops_test: OpsTest, application_name: str, charm_file: str | Path
-) -> None:
+async def inject_dependency_fault(charm_file: str | Path) -> None:
     """Inject a dependency fault into the PostgreSQL charm."""
-    # Query running dependency to overwrite with incompatible version.
-    dependencies = await get_application_relation_data(
-        ops_test, application_name, "upgrade", "dependencies"
-    )
-    loaded_dependency_dict = json.loads(dependencies)
-    if "snap" not in loaded_dependency_dict:
-        loaded_dependency_dict["snap"] = {"dependencies": {}, "name": "charmed-postgresql"}
-    loaded_dependency_dict["snap"]["upgrade_supported"] = "^15"
-    loaded_dependency_dict["snap"]["version"] = "15.0"
+    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+        versions = tomli.load(file)
 
-    # Overwrite dependency.json with incompatible version.
+    versions["charm"] = "16/0.0.0"
+    versions["snap"]["revisions"][platform.machine()] = "1"
+
+    # Overwrite refresh_versions.toml with incompatible version.
     with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
-        charm_zip.writestr("src/dependency.json", json.dumps(loaded_dependency_dict))
+        charm_zip.writestr("refresh_versions.toml", tomli_w.dumps(versions))
