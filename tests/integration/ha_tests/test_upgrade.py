@@ -159,11 +159,11 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     await application.refresh(path=fault_charm)
 
     logger.info("Wait for upgrade to fail")
-    async with ops_test.fast_forward("60s"):
-        await ops_test.model.block_until(
-            lambda: "blocked" in {unit.workload_status for unit in application.units},
-            timeout=TIMEOUT,
-        )
+    await ops_test.model.block_until(
+        lambda: application.status == "blocked"
+        and "incompatible" in application.status_message.lower(),
+        timeout=TIMEOUT,
+    )
 
     logger.info("Ensure continuous_writes while in failure state on remaining units")
     await are_writes_increasing(ops_test)
