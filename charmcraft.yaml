@@ -89,6 +89,9 @@ parts:
     build-packages:
       - git
     override-build: |
+      # Workaround for https://github.com/canonical/charmcraft/issues/2273
+      git restore charmcraft.yaml
+
       # Set `charm_version` in refresh_versions.toml from git tag
       python3 -m venv refresh-version-venv
       source refresh-version-venv/bin/activate
