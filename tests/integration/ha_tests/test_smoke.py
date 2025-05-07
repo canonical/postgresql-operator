@@ -165,10 +165,10 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
         )
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
-        async with ops_test.fast_forward("60s"):
+        async with ops_test.fast_forward("120s"):
             logger.info("waiting for duplicate application to be waiting")
             await ops_test.model.wait_for_idle(
-                apps=[DUP_APPLICATION_NAME], timeout=1000, status="waiting", idle_period=30
+                apps=[DUP_APPLICATION_NAME], timeout=1000, status="waiting", idle_period=10
             )
 
         # Since application have postgresql db in storage from external application it should not be able to connect due to new password
