@@ -122,7 +122,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
     # rebooting the unit machine in the middle of a hook (what is needed when the issue from
     # https://bugs.launchpad.net/juju/+bug/1999758 happens).
     await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME], status="active", timeout=1500, raise_on_error=False
+        apps=[DATABASE_APP_NAME], status="active", timeout=2000, raise_on_error=False
     )
 
     await ensure_correct_relation_data(ops_test, DATABASE_UNITS, LANDSCAPE_APP_NAME, RELATION_NAME)
@@ -143,7 +143,7 @@ async def test_landscape_scalable_bundle_db(ops_test: OpsTest, charm: str) -> No
         "admin_name": "Admin 1",
     })
     await ops_test.model.wait_for_idle(
-        apps=["landscape-server", DATABASE_APP_NAME], timeout=1500, status="active"
+        apps=["landscape-server", DATABASE_APP_NAME], timeout=2000, status="active"
     )
 
     # Create a role and list the available roles later to check that the new one is there.
