@@ -3,6 +3,7 @@
 
 import logging
 import pathlib
+import platform
 import shutil
 import zipfile
 from pathlib import Path
@@ -197,6 +198,7 @@ async def inject_dependency_fault(charm_file: str | Path) -> None:
         versions = tomli.load(file)
 
     versions["charm"] = "16/0.0.0"
+    versions["snap"]["revisions"][platform.machine()] = "1"
 
     # Overwrite refresh_versions.toml with incompatible version.
     with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
