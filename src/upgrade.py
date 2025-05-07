@@ -245,7 +245,7 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.charm.postgresql.create_user(
                 MONITORING_USER,
                 self.charm.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                roles=[ROLE_STATS],
+                extra_user_roles=[ROLE_STATS],
             )
         self.charm.postgresql.set_up_database(
             temp_location="/var/snap/charmed-postgresql/common/data/temp"

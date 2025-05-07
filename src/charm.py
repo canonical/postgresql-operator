@@ -1481,7 +1481,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.postgresql.create_user("postgres", new_password(), admin=True)
             # Create the backup user.
             if BACKUP_USER not in users:
-                self.postgresql.create_user(BACKUP_USER, new_password(), roles=[ROLE_BACKUP])
+                self.postgresql.create_user(
+                    BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
+                )
                 self.postgresql.grant_database_privileges_to_user(
                     BACKUP_USER, "postgres", ["connect"]
                 )
@@ -1490,7 +1492,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    roles=[ROLE_STATS],
+                    extra_user_roles=[ROLE_STATS],
                 )
         except PostgreSQLGrantDatabasePrivilegesToUserError as e:
             logger.exception(e)
