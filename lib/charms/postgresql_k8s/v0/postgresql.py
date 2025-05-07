@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 54
+LIBPATCH = 53
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"

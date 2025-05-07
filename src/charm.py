@@ -1457,14 +1457,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            # Needed to create predefined roles with set_user execution privileges
-            self.postgresql.enable_disable_extensions({"set_user": True}, database="postgres")
-        except Exception as e:
-            logger.exception(e)
-            self.unit.status = BlockedStatus("Failed to enable set-user extension")
-            return
-
-        try:
             self.postgresql.create_predefined_roles()
         except PostgreSQLCreatePredefinedRolesError as e:
             logger.exception(e)
