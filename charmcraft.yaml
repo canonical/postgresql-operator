@@ -90,8 +90,9 @@ parts:
       - git
     override-build: |
       # Set `charm_version` in refresh_versions.toml from git tag
-      python3 -m venv refresh-version-venv
-      source refresh-version-venv/bin/activate
+      # Create venv in `..` so that git working tree is not dirty
+      python3 -m venv ../refresh-version-venv
+      source ../refresh-version-venv/bin/activate
       poetry install --only build-refresh-version
       write-charm-version
 
