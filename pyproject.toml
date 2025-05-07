@@ -7,7 +7,7 @@ requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-ops = "^2.20.0"
+ops = "^2.21.1"
 boto3 = "^1.38.4"
 pgconnstr = "^1.0.1"
 requests = "^2.32.3"
@@ -17,14 +17,12 @@ pydantic = "^1.10.22"
 jinja2 = "^3.1.6"
 pysyncobj = "^0.3.14"
 psutil = "^7.0.0"
+charm-refresh = "^3.0.0.1"
 
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
 ops = ">=2.0.0"
-# data_platform_libs/v0/upgrade.py
-poetry-core = "*"
-# data_platform_libs/v0/upgrade.py requires pydantic ^1.10
-# data_platform_libs/v0/data_models.py requires pydantic ^1.10
+# data_platform_libs/v0/data_models.py
 pydantic = "^1.10"
 # grafana_agent/v0/cos_agent.py
 cosl = ">=0.0.50"
@@ -74,6 +72,14 @@ mailmanclient = "^3.3.5"
 psycopg2-binary = "^2.9.10"
 allure-pytest = "^2.14.1"
 allure-pytest-default-results = "^0.1.2"
+tomli = "^2.2.1"
+tomli-w = "^1.2.0"
+
+[tool.poetry.group.build-refresh-version]
+optional = true
+
+[tool.poetry.group.build-refresh-version.dependencies]
+charm-refresh-build-version = "^0.1.1"
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -133,6 +139,7 @@ extend-ignore = [
   "D408",
   "D409",
   "D413",
+  "B904",
 ]
 # Ignore E501 because using black creates errors with this
 # Ignore D107 Missing docstring in __init__
