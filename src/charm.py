@@ -23,13 +23,11 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v0.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
-from charms.postgresql_k8s.v1.postgresql import (
+from charms.postgresql_k8s.v0.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,
     ROLE_BACKUP,
-    ROLE_DBA,
     ROLE_STATS,
     PostgreSQL,
     PostgreSQLCreatePredefinedRolesError,
@@ -40,6 +38,7 @@ from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
+from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import main
@@ -83,8 +82,6 @@ from constants import (
     BACKUP_USER,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
-    DBA_PASSWORD_KEY,
-    DBA_USER,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -1131,7 +1128,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             MONITORING_PASSWORD_KEY,
             RAFT_PASSWORD_KEY,
             PATRONI_PASSWORD_KEY,
-            DBA_PASSWORD_KEY,
         ):
             if self.get_secret(APP_SCOPE, key) is None:
                 if key in system_user_passwords:
@@ -1231,8 +1227,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Early exit enable_disable_extensions: standby cluster")
             return
         original_status = self.unit.status
-        # Always want set_user and login_hook to be enabled
-        extensions = {"set_user": True, "login_hook": True}
+        extensions = {}
         # collect extensions
         for plugin in self.config.plugin_keys():
             enable = self.config[plugin]
@@ -1482,12 +1477,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
-            # Create the dba user.
-            if DBA_USER not in users:
-                self.postgresql.create_user(
-                    DBA_USER, self.get_secret(APP_SCOPE, DBA_PASSWORD_KEY), roles=[ROLE_DBA]
-                )
-                # Create the backup user.
+            if "postgres" not in users:
+                self.postgresql.create_user("postgres", new_password(), admin=True)
+            # Create the backup user.
             if BACKUP_USER not in users:
                 self.postgresql.create_user(BACKUP_USER, new_password(), roles=[ROLE_BACKUP])
                 self.postgresql.grant_database_privileges_to_user(
@@ -1586,7 +1578,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            updateable_users = [*SYSTEM_USERS, BACKUP_USER, DBA_USER]
+            updateable_users = [*SYSTEM_USERS, BACKUP_USER]
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
@@ -2304,6 +2296,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info(f"Last completed transaction was at {log_time[-1]}")
         else:
             logger.error("Can't tell last completed transaction time")
+
+    def get_plugins(self) -> list[str]:
+        """Return a list of installed plugins."""
+        plugins = [
+            "_".join(plugin.split("_")[1:-1])
+            for plugin in self.config.plugin_keys()
+            if self.config[plugin]
+        ]
+        plugins = [PLUGIN_OVERRIDES.get(plugin, plugin) for plugin in plugins]
+        if "spi" in plugins:
+            plugins.remove("spi")
+            for ext in SPI_MODULE:
+                plugins.append(ext)
+        return plugins
 
     def get_ldap_parameters(self) -> dict:
         """Returns the LDAP configuration to use."""

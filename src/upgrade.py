@@ -12,7 +12,7 @@ from charms.data_platform_libs.v0.upgrade import (
     DependencyModel,
     UpgradeGrantedEvent,
 )
-from charms.postgresql_k8s.v1.postgresql import ACCESS_GROUPS, ROLE_STATS
+from charms.postgresql_k8s.v0.postgresql import ACCESS_GROUPS, ROLE_STATS
 from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
@@ -152,8 +152,8 @@ class PostgreSQLUpgrade(DataUpgrade):
         self.charm.unit.status = MaintenanceStatus("refreshing the snap")
         self.charm._install_snap_packages(packages=SNAP_PACKAGES, refresh=True)
 
-        if not self.charm._patroni.restart_patroni():
-            logger.error("failed to restart the database")
+        if not self.charm._patroni.start_patroni():
+            logger.error("failed to start the database")
             self.set_unit_failed()
             return
 
@@ -185,18 +185,17 @@ class PostgreSQLUpgrade(DataUpgrade):
                             f" Retry {attempt.retry_state.attempt_number}/6"
                         )
                         raise Exception()
+
+                    self.set_unit_completed()
+
+                    # Ensures leader gets its own relation-changed when it upgrades
+                    if self.charm.unit.is_leader():
+                        self.on_upgrade_changed(event)
         except RetryError:
             logger.debug(
                 "Defer on_upgrade_granted: member not ready or not joined the cluster yet"
             )
             event.defer()
-            return
-
-        self.set_unit_completed()
-
-        # Ensures leader gets its own relation-changed when it upgrades
-        if self.charm.unit.is_leader():
-            self.on_upgrade_changed(event)
 
     @override
     def pre_upgrade_check(self) -> None:
@@ -252,15 +251,6 @@ class PostgreSQLUpgrade(DataUpgrade):
             temp_location="/var/snap/charmed-postgresql/common/data/temp"
         )
         self._set_up_new_access_roles_for_legacy()
-
-        try:
-            # Needed to create predefined roles with set_user execution privileges
-            self.charm.postgresql.enable_disable_extensions(
-                {"set_user": True}, database="postgres"
-            )
-        except Exception as e:
-            logger.exception(e)
-            return
 
         try:
             self.charm.postgresql.create_predefined_roles()

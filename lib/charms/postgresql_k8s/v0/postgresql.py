@@ -31,23 +31,16 @@ from psycopg2.sql import SQL, Composed, Identifier, Literal
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 1
+LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 0
+LIBPATCH = 54
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
 ACCESS_GROUP_INTERNAL = "internal_access"
 ACCESS_GROUP_RELATION = "relation_access"
-
-ROLE_STATS = "charmed_stats"
-ROLE_READ = "charmed_read"
-ROLE_DML = "charmed_dml"
-ROLE_BACKUP = "charmed_backup"
-ROLE_DBA = "charmed_dba"
-ROLE_INSTANCE_ADMIN = "charmed_instance_admin"
 
 # List of access groups to filter role assignments by
 ACCESS_GROUPS = [
@@ -55,6 +48,11 @@ ACCESS_GROUPS = [
     ACCESS_GROUP_INTERNAL,
     ACCESS_GROUP_RELATION,
 ]
+
+ROLE_STATS = "charmed_stats"
+ROLE_READ = "charmed_read"
+ROLE_DML = "charmed_dml"
+ROLE_BACKUP = "charmed_backup"
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -134,6 +132,10 @@ class PostgreSQLUpdateUserPasswordError(Exception):
 
 class PostgreSQLCreatePredefinedRolesError(Exception):
     """Exception raised when creating predefined roles."""
+
+
+class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
+    """Exception raised when granting database privileges to user."""
 
 
 class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
@@ -221,43 +223,43 @@ class PostgreSQL:
         self,
         database: str,
         user: str,
+        plugins: Optional[List[str]] = None,
         client_relations: Optional[List[Relation]] = None,
     ) -> None:
         """Creates a new database and grant privileges to a user on it.
 
         Args:
-            database: database to be created
+            database: database to be created.
+            user: user that will have access to the database.
+            plugins: extensions to enable in the new database.
+            client_relations: current established client relations.
         """
+        plugins = plugins if plugins else []
         client_relations = client_relations if client_relations else []
         try:
             connection = self._connect_to_database()
             cursor = connection.cursor()
-
             cursor.execute(
                 SQL("SELECT datname FROM pg_database WHERE datname={};").format(Literal(database))
             )
             if cursor.fetchone() is None:
                 cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
-
             cursor.execute(
                 SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
                     Identifier(database)
                 )
             )
-
-            for user_to_grant_access in [user, *self.system_users, ROLE_INSTANCE_ADMIN, ROLE_DBA]:
+            for user_to_grant_access in [user, PERMISSIONS_GROUP_ADMIN, *self.system_users]:
                 cursor.execute(
                     SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
                         Identifier(database), Identifier(user_to_grant_access)
                     )
                 )
-
             relations_accessing_this_database = 0
             for relation in client_relations:
                 for data in relation.data.values():
                     if data.get("database") == database:
                         relations_accessing_this_database += 1
-
             with self._connect_to_database(database=database) as conn, conn.cursor() as curs:
                 curs.execute(
                     "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' and schema_name <> 'information_schema';"
@@ -272,11 +274,15 @@ class PostgreSQL:
             logger.error(f"Failed to create database: {e}")
             raise PostgreSQLCreateDatabaseError() from e
 
+        # Enable preset extensions
+        self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
+
     def create_user(
         self,
         user: str,
         password: Optional[str] = None,
-        roles: Optional[List[str]] = None,
+        admin: bool = False,
+        extra_user_roles: Optional[List[str]] = None,
     ) -> None:
         """Creates a database user.
 
@@ -284,55 +290,60 @@ class PostgreSQL:
             user: user to be created.
             password: password to be assigned to the user.
             admin: whether the user should have additional admin privileges.
-            roles: roles to be assigned to the user
+            extra_user_roles: additional privileges and/or roles to be assigned to the user.
         """
-
-        superuser_enabled, createdb_enabled, createrole_enabled = False, False, False
-        if "admin" in roles:
-            createdb_enabled, createrole_enabled = True, True
-            roles.append(ROLE_DML)
-            roles.append(ROLE_INSTANCE_ADMIN)
-            roles.remove("admin")
-
-        if "createdb" in roles:
-            createdb_enabled = True
-            roles.remove("createdb")
-
-        if "createrole" in roles:
-            createrole_enabled = True
-            roles.remove("createrole")
-
-        if "superuser" in roles:
-            superuser_enabled = True
-            roles.remove("superuser")
-
         try:
-            existing_roles = self.list_roles()
-            invalid_roles = [role for role in roles if role not in existing_roles]
-            if invalid_roles:
-                logger.error(f"Invalid roles: {', '.join(invalid_roles)}")
-                raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+            # Separate roles and privileges from the provided extra user roles.
+            admin_role = False
+            roles = privileges = None
+            if extra_user_roles:
+                admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
+                valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
+                roles = [
+                    role
+                    for role in extra_user_roles
+                    if role in valid_roles and role != PERMISSIONS_GROUP_ADMIN
+                ]
+                privileges = {
+                    extra_user_role
+                    for extra_user_role in extra_user_roles
+                    if extra_user_role not in roles and extra_user_role != PERMISSIONS_GROUP_ADMIN
+                }
+                invalid_privileges = [
+                    privilege for privilege in privileges if privilege not in valid_privileges
+                ]
+                if len(invalid_privileges) > 0:
+                    logger.error(f"Invalid extra user roles: {', '.join(privileges)}")
+                    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
 
             with self._connect_to_database() as connection, connection.cursor() as cursor:
+                # Create or update the user.
                 cursor.execute(
                     SQL("SELECT TRUE FROM pg_roles WHERE rolname={};").format(Literal(user))
                 )
                 if cursor.fetchone() is not None:
-                    user_query = "ALTER ROLE {}"
+                    user_definition = "ALTER ROLE {}"
                 else:
-                    user_query = "CREATE ROLE {}"
-                user_query += f"WITH LOGIN{' SUPERUSER' if superuser_enabled else ''}{' CREATEDB' if createdb_enabled else ''}{' CREATEROLE' if createrole_enabled else ''} ENCRYPTED PASSWORD '{password}'{' IN ROLE ' if roles else ''}"
-                if roles:
-                    user_query += f"{', '.join(roles)}"
-
+                    user_definition = "CREATE ROLE {}"
+                user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
+                if privileges:
+                    user_definition += f" {' '.join(privileges)}"
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
-                cursor.execute(SQL(f"{user_query};").format(Identifier(user)))
+                cursor.execute(SQL(f"{user_definition};").format(Identifier(user)))
                 cursor.execute(SQL("COMMIT;"))
+
+                # Add extra user roles to the new user.
+                if roles:
+                    for role in roles:
+                        cursor.execute(
+                            SQL("GRANT {} TO {};").format(Identifier(role), Identifier(user))
+                        )
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError() from e
-        
+
+
     def create_predefined_roles(self) -> None:
         """Create predefined roles."""
         role_to_queries = {
@@ -353,20 +364,9 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
-            ROLE_DBA: [
-                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
-                f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA}",
-                f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA}",
-                f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA}",
-                f"GRANT connect ON DATABASE postgres TO {ROLE_DBA}",
-            ],
-            ROLE_INSTANCE_ADMIN: [
-                f"CREATE ROLE {ROLE_INSTANCE_ADMIN} NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION",
-                f"GRANT connect ON DATABASE postgres TO {ROLE_INSTANCE_ADMIN}",
-            ],
         }
 
-        existing_roles = self.list_roles()
+        _, existing_roles = self.list_valid_privileges_and_roles()
 
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
@@ -382,7 +382,6 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
-        
 
     def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
         """Grant the specified priviliges on the provided database for the user."""
@@ -404,11 +403,10 @@ class PostgreSQL:
         if user not in users:
             return
 
-        roles = self.list_roles()
-
+        # List all databases.
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute(SQL("SELECT datname FROM pg_database WHERE datistemplate = false;"))
+                cursor.execute("SELECT datname FROM pg_database WHERE datistemplate = false;")
                 databases = [row[0] for row in cursor.fetchall()]
 
             # Existing objects need to be reassigned in each database
@@ -494,7 +492,7 @@ class PostgreSQL:
             else:
                 # Retrieve all the databases.
                 with self._connect_to_database() as connection, connection.cursor() as cursor:
-                    cursor.execute("SELECT datname FROM pg_database WHERE datname <> 'template0';")
+                    cursor.execute("SELECT datname FROM pg_database WHERE NOT datistemplate;")
                     databases = {database[0] for database in cursor.fetchall()}
 
             ordered_extensions = OrderedDict()
@@ -504,28 +502,6 @@ class PostgreSQL:
                 ordered_extensions[extension] = enable
 
             self._configure_pgaudit(False)
-
-            if "set_user" in ordered_extensions:
-                for database in databases:
-                    with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
-                        try:
-                            cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
-                        except psycopg2.Error:
-                            logger.exception(f"Unable to create extension set_user in {database}")
-                del ordered_extensions["set_user"]
-
-            if "login_hook" in ordered_extensions:
-                for database in databases:
-                    if database == "postgres":
-                        logger.info("Skipping creating extension login_hook in database postgres")
-                        continue
-
-                    with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
-                        try:
-                            cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
-                        except psycopg2.Error:
-                            logger.exception(f"Unable to create extension login_hook in {database}")
-                del ordered_extensions["login_hook"]
 
             # Enable/disabled the extension in each database.
             for database in databases:
@@ -762,7 +738,9 @@ END; $$;"""
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT usename FROM pg_catalog.pg_user WHERE usename LIKE 'relation_id_%';"
+                    "SELECT usename "
+                    "FROM pg_catalog.pg_user "
+                    "WHERE usename LIKE 'relation_id_%' OR usename LIKE 'relation-%';"
                 )
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
@@ -773,32 +751,30 @@ END; $$;"""
             if connection is not None:
                 connection.close()
 
-    def list_roles(self) -> Tuple[Set[str], Set[str]]:
-        """Returns valid roles in the database.
+    def list_valid_privileges_and_roles(self) -> Tuple[Set[str], Set[str]]:
+        """Returns two sets with valid privileges and roles.
 
         Returns:
-            A set containing the existing roles in the database.
+            Tuple containing two sets: the first with valid privileges
+                and the second with valid roles.
         """
         with self._connect_to_database() as connection, connection.cursor() as cursor:
             cursor.execute("SELECT rolname FROM pg_roles;")
-            return {row[0] for row in cursor.fetchall() if row[0]}
+            return {
+                "createdb",
+                "createrole",
+                "superuser",
+            }, {role[0] for role in cursor.fetchall() if role[0]}
 
-    def set_up_database(self, temp_location: Optional[str] = None) -> None:
+    def set_up_database(self) -> None:
         """Set up postgres database with the right permissions."""
         connection = None
-        cursor = None
         try:
-            connection = self._connect_to_database()
-            cursor = connection.cursor()
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='admin';")
+                if cursor.fetchone() is not None:
+                    return
 
-            if temp_location is not None:
-                cursor.execute("SELECT TRUE FROM pg_tablespace WHERE spcname='temp';")
-                if cursor.fetchone() is None:
-                    cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
-                    cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
-
-            cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='admin';")
-            if cursor.fetchone() is None:
                 # Allow access to the postgres database only to the system users.
                 cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
                 cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
@@ -808,12 +784,15 @@ END; $$;"""
                             Identifier(user)
                         )
                     )
+                self.create_user(
+                    PERMISSIONS_GROUP_ADMIN,
+                    extra_user_roles=["pg_read_all_data", "pg_write_all_data"],
+                )
+                cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:
             logger.error(f"Failed to set up databases: {e}")
             raise PostgreSQLDatabasesSetupError() from e
         finally:
-            if cursor is not None:
-                cursor.close()
             if connection is not None:
                 connection.close()
 

@@ -103,7 +103,7 @@ def test_on_upgrade_granted(harness):
             "charm.PostgreSQLBackups.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
         patch("charm.PostgresqlOperatorCharm._setup_exporter") as _setup_exporter,
-        patch("charm.Patroni.restart_patroni") as _restart_patroni,
+        patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
@@ -112,7 +112,7 @@ def test_on_upgrade_granted(harness):
     ):
         # Test when the charm fails to start Patroni.
         mock_event = MagicMock()
-        _restart_patroni.return_value = False
+        _start_patroni.return_value = False
         harness.charm.upgrade._on_upgrade_granted(mock_event)
         _update_config.assert_called_once()
         _install_snap_packages.assert_called_once_with(packages=SNAP_PACKAGES, refresh=True)
@@ -124,7 +124,7 @@ def test_on_upgrade_granted(harness):
 
         # Test when the member hasn't started yet.
         _set_unit_failed.reset_mock()
-        _restart_patroni.return_value = True
+        _start_patroni.return_value = True
         _member_started.return_value = False
         harness.charm.upgrade._on_upgrade_granted(mock_event)
         assert _member_started.call_count == 6
