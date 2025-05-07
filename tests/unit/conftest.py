@@ -3,10 +3,12 @@
 # See LICENSE file for licensing details.
 import pathlib
 import platform
+import shutil
 from unittest.mock import PropertyMock
 
 import pytest
 import tomli
+import tomli_w
 from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 
 
@@ -48,3 +50,18 @@ class _MockRefresh:
 @pytest.fixture(autouse=True)
 def patch(monkeypatch):
     monkeypatch.setattr("charm_refresh.Machines", _MockRefresh)
+
+    # Add charm version to refresh_versions.toml
+    path = pathlib.Path("refresh_versions.toml")
+    backup = pathlib.Path("refresh_versions.toml.backup")
+    shutil.copy(path, backup)
+    with path.open("rb") as file:
+        versions = tomli.load(file)
+    versions["charm"] = "16/0.0.0"
+    with path.open("wb") as file:
+        tomli_w.dump(versions, file)
+
+    yield
+
+    path.unlink()
+    shutil.move(backup, path)
