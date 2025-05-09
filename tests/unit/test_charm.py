@@ -319,6 +319,15 @@ def test_on_config_changed(harness):
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
 
+        # Test when there is an error related to the config options.
+        _update_member_ip.reset_mock()
+        _enable_disable_extensions.reset_mock()
+        harness.charm.unit.status = BlockedStatus("Configuration Error")
+        harness.charm.on.config_changed.emit()
+        assert isinstance(harness.model.unit.status, ActiveStatus)
+        _update_member_ip.assert_called_once()
+        _enable_disable_extensions.assert_called_once()
+
         # Test when the unit has updated its member IP.
         _update_member_ip.reset_mock()
         _enable_disable_extensions.reset_mock()
