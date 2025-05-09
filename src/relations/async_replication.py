@@ -697,7 +697,6 @@ class PostgreSQLAsyncReplication(Object):
             self.charm.app.status = self.charm.refresh.app_status_higher_priority
             return
         if self.charm._peers is None:
-            # TODO set active status?
             return
         if self.charm._peers.data[self.charm.app].get("promoted-cluster-counter") == "0":
             self.charm.app.status = BlockedStatus(READ_ONLY_MODE_BLOCKING_MESSAGE)
