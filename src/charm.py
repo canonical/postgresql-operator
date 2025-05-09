@@ -852,9 +852,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
-        if self._update_member_ip():
-            return False
-
         # Don't update this member before it's part of the members list.
         if self._unit_ip not in self.members_ips:
             logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
@@ -1446,6 +1443,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
+
+        if self._update_member_ip():
+            # Update the sync-standby endpoint in the async replication data.
+            self.async_replication.update_async_replication_data()
+            return
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
