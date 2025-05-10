@@ -1,19 +1,12 @@
-[note]
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#heading--juju-3-0-0---22-oct-2022).
-[/note]
-
-[note]
-LDAP is available on channels: `14/edge` and `16/edge`, from revision `600`.
-[/note]
-
-
 # How to enable LDAP authentication
 
 LDAP (*Lightweight Directory Access Protocol*) enables centralized authentication for PostgreSQL clusters, reducing the overhead of managing local credentials and access policies.
 
 This guide goes over the steps to integrate LDAP as an authentication method with the PostgreSQL charm, all within the Juju ecosystem.
+
+## Prerequisites
+* Charmed PostgreSQL channel `14/edge` or `16/edge` (revision `600` or higher)
+* Juju `v3.6` or higher
 
 ## Deploy an LDAP server in a K8s environment
 
