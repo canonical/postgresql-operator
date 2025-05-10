@@ -1,109 +1,173 @@
-# Users
+# Roles 
 
-There are three types of users in PostgreSQL:
-* Internal users (used by charm operator)
-* Relation users (used by related applications)
-  * Extra user roles (if default permissions are not enough)
-* Identity users (used when LDAP is enabled)
+> **Note**: check the separate [Users](/t/10798) explanations first.
 
-<a name="internal-users"></a>
-## Internal users explanations:
+There are several definitions of Roles in Charmed PostgreSQL:
+* Predefined PostgreSQL roles
+* Instance level DB/relation-specific roles
+  *  LDAP-specific roles 
+* Extra user roles relation flag
 
-The operator uses the following internal DB users:
-
-* `postgres` - the [initial/default](https://charmhub.io/postgresql/docs/t-manage-passwords) PostgreSQL user. Used for very initial bootstrap only.
-* `operator` - the user that charm.py uses to manage database/cluster.
-* `replication` - the user performs replication between database PostgreSQL cluster members.
-* `rewind` - the internal user for synchronizing a PostgreSQL cluster with another copy of the same cluster.
-* `monitoring` - the user for [COS integration](https://charmhub.io/postgresql/docs/h-enable-monitoring).
-* `backups` - the user to [perform/list/restore backups](https://charmhub.io/postgresql/docs/h-create-and-list-backups).
-
-The full list of internal users is available in charm [source code](https://github.com/canonical/postgresql-operator/blob/main/src/constants.py). The full dump of internal users (on the newly installed charm):
+## Predefined PostgreSQL 16 Roles
 
 ```shell
-postgres=# \du
-                                      List of roles
-  Role name  |                         Attributes                         |  Member of   
--------------+------------------------------------------------------------+--------------
- backup      | Superuser                                                  | {}
- monitoring  |                                                            | {pg_monitor}
- operator    | Superuser, Create role, Create DB, Replication, Bypass RLS | {}
- postgres    | Superuser                                                  | {}
- replication | Replication                                                | {}
- rewind      |                                                            | {}
+test123=> SELECT * FROM pg_roles;
+           rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+-----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+ pg_database_owner           | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6171
+ pg_read_all_data            | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6181
+ pg_write_all_data           | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6182
+ pg_monitor                  | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3373
+ pg_read_all_settings        | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3374
+ pg_read_all_stats           | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3375
+ pg_stat_scan_tables         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3377
+ pg_read_server_files        | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4569
+ pg_write_server_files       | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4570
+ pg_execute_server_program   | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4571
+ pg_signal_backend           | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4200
+ pg_checkpoint               | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4544
+ pg_use_reserved_connections | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4550
+ pg_create_subscription      | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6304
+...
 ```
-**Note**: it is forbidden to use/manage described above users! They are dedicated to the operators logic! Please use [data-integrator](https://charmhub.io/postgresql/docs/t-integrations) charm to generate/manage/remove an external credentials.
 
-It is allowed to rotate passwords for *internal* users using action 'set-password':
+## Charmed PostgreSQL 16 Roles
+
+Charmed PostgreSQL 16 introduced the following instance level predefined roles:
+
+* charmed_stats (inherit from pg_monitor)
+* charmed_read (inherit from pg_read_all_data)
+* charmed_dml (inherit from pg_write_all_data)
+* charmed_backup (inherit from pg_checkpoint)
+* charmed_dba (WIP)
+* charmed_instance_admin (WIP)
+
 ```shell
-> juju show-action postgresql set-password
-Change the system user's password, which is used by charm. It is for internal charm users and SHOULD NOT be used by applications.
-
-Arguments
-password:
-  type: string
-  description: The password will be auto-generated if this option is not specified.
-username:
-  type: string
-  description: The username, the default value 'operator'. Possible values - operator, replication, rewind.
+test123=> SELECT * FROM pg_roles;
+           rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+-----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+...
+ charmed_stats               | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16386
+ charmed_read                | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16388
+ charmed_dml                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16390
+ charmed_backup              | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16392
+...
 ```
-For example, to generate a new random password for *internal* user:
+
+## Charmed PostgreSQL 14 Roles
+
+Charmed PostgreSQL 14 ships the minimal necessary roles logic: each application relation got a user with dedicated role matching the resources owner. It can be fine-tuned using extra-users-roles relation flag.  In general the following roles available for track `14`:
+
+* Predefined PostgreSQL Roles
+* Predefined Charmed PostgreSQL Roles
+  * Charmed PostgreSQL LDAP Roles (rev 600+)
+
+### Predefined PostgreSQL 14 Roles
 
 ```shell
-> juju run-action --wait postgresql/leader set-password username=operator
-
-unit-postgresql-1:
-  UnitId: postgresql/1
-  id: "2"
-  results:
-    password: k4qqnWSZJZrcMt4B
-  status: completed
+postgres=# SELECT * FROM pg_roles;
+          rolname          | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+---------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+ pg_database_owner         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6171
+ pg_read_all_data          | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6181
+ pg_write_all_data         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6182
+ pg_monitor                | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3373
+ pg_read_all_settings      | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3374
+ pg_read_all_stats         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3375
+ pg_stat_scan_tables       | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3377
+ pg_read_server_files      | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4569
+ pg_write_server_files     | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4570
+ pg_execute_server_program | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4571
+ pg_signal_backend         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4200
+...
 ```
-To set a predefined password for the specific user, run:
-```shell
-> juju run-action --wait postgresql/leader set-password username=operator password=newpassword
 
-unit-postgresql-1:
-  UnitId: postgresql/1
-  id: "4"
-  results:
-    password: newpassword
-  status: completed
-```
-**Note**: the action `set-password` must be executed on juju leader unit (to update peer relation data with new value).
-
-<a name="relation-users"></a>
-## Relation users explanations:
-
-The operator created a dedicated user for every application related/integrated with database. Those users are removed on the juju relation/integration removal request. However, DB data stays in place and can be reused on re-created relations (using new user credentials):
+### Predefined Charmed PostgreSQL 14 Roles
 
 ```shell
-postgres=# \du
-                                      List of roles
-  Role name  |                         Attributes                         |  Member of   
--------------+------------------------------------------------------------+--------------
- ..
- relation-6  |                                                            | {}
- relation-8  |                                                            | {}
+postgres=# SELECT * FROM pg_roles;
+          rolname          | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+---------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
  ...
+ operator                  | t        | t          | t             | t           | t           | t              |           -1 | ********    |               | t            |           |    10
+ replication               | f        | t          | f             | f           | t           | t              |           -1 | ********    |               | f            |           | 16384
+ rewind                    | f        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16385
+ postgres                  | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16386
+ backup                    | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16387
+ monitoring                | f        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16388
+ admin                     | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16389
+...
 ```
 
-**Note**: If password rotation is needed for users used in relations, it is needed to remove the relation and create it again:
+### Relation specific Roles
+
+For each application/relation the dedicated user is been created (with matching role and all all resources ownership). The resources ownership is being updated on each re-relation for new users/roles regeneration. Example of simple application relation to PostgreSQL and creating table:
+
 ```shell
-> juju remove-relation postgresql myclientapp
-> juju wait-for application postgresql
-> juju relate postgresql myclientapp
+postgres=# SELECT * FROM pg_roles;
+          rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+...
+ relation_id_12             | f        | t          | t             | t           | t           | f              |           -1 | ********    |               | f            |           | 16416
+...
+
+postgres=# SELECT * FROM pg_user;
+          usename           | usesysid | usecreatedb | usesuper | userepl | usebypassrls |  passwd  | valuntil | useconfig 
+----------------------------+----------+-------------+----------+---------+--------------+----------+----------+-----------
+ ...
+ relation_id_12             |    16416 | t           | f        | f       | f            | ******** |          | 
+...
+
+mydb=# \d+
+             List of relations
+ Schema |  Name   | Type  |     Owner      | ...
+--------+---------+-------+----------------+ ...
+ public | mytable | table | relation_id_12 | ...
+
 ```
 
-<a name="extra-user-roles"></a>
-### Extra user roles
+When the same application is being related through PgBouncer, the extra users/roles created following the same logic as above:
 
-When an application charm requests a new user through the relation/integration it can specify that the user should have the `admin` role in the `extra-user-roles` field. The `admin` role enables the new user to read and write to all databases (for the `postgres` system database it can only read data) and also to create and delete non-system databases.
+```shell
+postgres=# SELECT * FROM pg_roles;
+          rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+...
+ relation-14                | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16403
+ pgbouncer_auth_relation_14 | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16410
+ relation_id_13             | f        | t          | t             | t           | t           | f              |           -1 | ********    |               | f            |           | 16417
+...
 
-**Note**: `extra-user-roles` is supported by modern interface `postgresql_client` only and missing for legacy `pgsql` interface. Read more about the supported charm interfaces [here](/t/10251).
+postgres=# SELECT * FROM pg_user;
+          usename           | usesysid | usecreatedb | usesuper | userepl | usebypassrls |  passwd  | valuntil | useconfig 
+----------------------------+----------+-------------+----------+---------+--------------+----------+----------+-----------
+ ...
+ relation-14                |    16403 | f           | t        | f       | f            | ******** |          | 
+ pgbouncer_auth_relation_14 |    16410 | f           | t        | f       | f            | ******** |          | 
+ relation_id_13             |    16417 | t           | f        | f       | f            | ******** |          | 
+...
 
-<a name="identity-users"></a>
-## Identity users explanations:
-The operator considers Identity users all those that are automatically created when the LDAP integration is enabled, or in other words, the [GLAuth](https://charmhub.io/glauth-k8s) charm is related/integrated.
+mydb=# \d+
+               List of relations
+ Schema |  Name   | Type  |     Owner      | ... 
+--------+---------+-------+----------------+ ...
+ public | mytable | table | relation_id_13 | ...
+```
 
-When synchronized from the LDAP server, these users do not have any permissions by default, so the LDAP group they belonged to must be mapped to a PostgreSQL pre-defined authorization role by using the `ldap_map` configuration option.
+In this case there several records created to:
+ * `relation_id_13` - for relation between Application and PgBouncer
+ * `relation-14` - for relation between PgBouncer and PostgreSQL
+ * `pgbouncer_auth_relation_14` - to authenticate end-users which connects PgBouncer
+
+### Charmed PostgreSQL LDAP Roles
+
+To map LDAP users to PostgreSQL users, the dedicated LDAP groups have to be created before hand using [Data Integrator](https://charmhub.io/data-integrator) charm.
+The result of such mapping will be a new PostgreSQL Roles:
+
+```shell
+postgres=# SELECT * FROM pg_roles;
+    rolname    | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+...
+ myrole        | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16422
+```
