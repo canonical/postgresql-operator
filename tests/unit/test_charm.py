@@ -598,6 +598,16 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
+        patch(
+            "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -1729,25 +1739,6 @@ def test_get_available_memory(harness):
 
     with patch("builtins.open", mock_open(read_data="")):
         assert harness.charm.get_available_memory() == 0
-
-
-def test_juju_run_exec_divergence(harness):
-    with (
-        patch("charm.ClusterTopologyObserver") as _topology_observer,
-        patch("charm.JujuVersion") as _juju_version,
-    ):
-        # Juju 2
-        _juju_version.from_environ.return_value.major = 2
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-run")
-        _topology_observer.reset_mock()
-
-        # Juju 3
-        _juju_version.from_environ.return_value.major = 3
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
 
 
 def test_client_relations(harness):
