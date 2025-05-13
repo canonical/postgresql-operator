@@ -104,8 +104,8 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
                 .units[0]
                 .run_action("promote-to-primary", scope="unit", force=True)
             )
-            action_result = await run_action.wait()
-            logger.info(f"promote-to-primary action result: {action_result}")
+            action = await run_action.wait()
+            logger.info(f"promote-to-primary action result: {action.results}")
         except exceptions.TimeoutError:
             # Check if Patroni self healed
             assert (
