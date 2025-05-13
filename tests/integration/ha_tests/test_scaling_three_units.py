@@ -96,7 +96,7 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
                 timeout=600,
             )
 
-            await sleep(15)
+            await sleep(60)
 
             run_action = (
                 await ops_test.model.applications[DATABASE_APP_NAME]
