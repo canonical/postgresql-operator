@@ -40,7 +40,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         "-n",
         3,
         "--channel",
-        "16/edge/test-refresh-v3-workload2",  # TODO remove branch
+        "16/edge",
         "--config",
         "profile=testing",
         "--base",
