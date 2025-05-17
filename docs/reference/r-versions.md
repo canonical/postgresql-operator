@@ -20,6 +20,8 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
 
 ### Supported features
 
+* [Juju Spaces support]
+* [Multiple Juju storage support]
 * [LDAP integration] (also supported by PostgreSQL `14`)
 * [SoS report integration] (also supported by PostgreSQL `14`)
 * [Recovery improvements] (also supported by PostgreSQL `14`)
@@ -32,10 +34,8 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
   * [Profiling via Parca]
   * [Tracing via Tempo]
 * Improved [security hardening]
-* (WIP) [Multiple Juju storage support]
-* (WIP) [Juju Spaces support]
-* (WIP) Refresh v3 lib support <!--VM only-->
-* (WIP) Improved built-in roles 
+* (WIP) [Improved built-in roles](/t/17725) 
+* New "juju refresh" library (Refresh v3)
 
 <!--
 Saving the following items for release notes:
