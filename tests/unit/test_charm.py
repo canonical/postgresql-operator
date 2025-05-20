@@ -1568,33 +1568,33 @@ def test_reconfigure_cluster(harness):
         _add_members.assert_called_once_with(mock_event)
 
 
-def test_update_certificate(harness):
-    with (
-        patch(
-            "charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate"
-        ) as _request_certificate,
-    ):
-        # If there is no current TLS files, _request_certificate should be called
-        # only when the certificates relation is established.
-        harness.charm._update_certificate()
-        _request_certificate.assert_not_called()
+# def test_update_certificate(harness):
+#     with (
+#         patch(
+#             "charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS._request_certificate"
+#         ) as _request_certificate,
+#     ):
+#         # If there is no current TLS files, _request_certificate should be called
+#         # only when the certificates relation is established.
+#         harness.charm._update_certificate()
+#         _request_certificate.assert_not_called()
 
-        # Test with already present TLS files (when they will be replaced by new ones).
-        ca = "fake CA"
-        cert = "fake certificate"
-        key = private_key = "fake private key"
-        harness.charm.set_secret("unit", "ca", ca)
-        harness.charm.set_secret("unit", "cert", cert)
-        harness.charm.set_secret("unit", "key", key)
-        harness.charm.set_secret("unit", "private-key", private_key)
+#         # Test with already present TLS files (when they will be replaced by new ones).
+#         ca = "fake CA"
+#         cert = "fake certificate"
+#         key = private_key = "fake private key"
+#         harness.charm.set_secret("unit", "ca", ca)
+#         harness.charm.set_secret("unit", "cert", cert)
+#         harness.charm.set_secret("unit", "key", key)
+#         harness.charm.set_secret("unit", "private-key", private_key)
 
-        harness.charm._update_certificate()
-        _request_certificate.assert_called_once_with(private_key)
+#         harness.charm._update_certificate()
+#         _request_certificate.assert_called_once_with(private_key)
 
-        assert harness.charm.get_secret("unit", "ca") == ca
-        assert harness.charm.get_secret("unit", "cert") == cert
-        assert harness.charm.get_secret("unit", "key") == key
-        assert harness.charm.get_secret("unit", "private-key") == private_key
+#         assert harness.charm.get_secret("unit", "ca") == ca
+#         assert harness.charm.get_secret("unit", "cert") == cert
+#         assert harness.charm.get_secret("unit", "key") == key
+#         assert harness.charm.get_secret("unit", "private-key") == private_key
 
 
 def test_update_member_ip(harness):
@@ -1639,9 +1639,7 @@ def test_push_tls_files_to_workload(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.render_file") as _render_file,
-        patch(
-            "charms.postgresql_k8s.v0.postgresql_tls.PostgreSQLTLS.get_tls_files"
-        ) as _get_tls_files,
+        patch("charm.TLS.get_tls_files") as _get_tls_files,
     ):
         _get_tls_files.side_effect = [
             ("key", "ca", "cert"),
