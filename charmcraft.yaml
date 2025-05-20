@@ -84,8 +84,22 @@ parts:
   files:
     plugin: dump
     source: .
+    after:
+      - poetry-deps  # Ensure poetry is installed
+    build-packages:
+      - git
+    override-build: |
+      # Set `charm_version` in refresh_versions.toml from git tag
+      # Create venv in `..` so that git working tree is not dirty
+      python3 -m venv ../refresh-version-venv
+      source ../refresh-version-venv/bin/activate
+      poetry install --only build-refresh-version
+      write-charm-version
+
+      craftctl default
     stage:
       - LICENSE
+      - refresh_versions.toml
       - scripts
       - templates
   libpq:

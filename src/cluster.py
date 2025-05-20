@@ -14,6 +14,7 @@ import subprocess
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
+import charm_refresh
 import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
@@ -43,7 +44,6 @@ from constants import (
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    POSTGRESQL_SNAP_NAME,
     REWIND_USER,
     TLS_CA_FILE,
     USER,
@@ -248,7 +248,7 @@ class Patroni:
         """Return the PostgreSQL version from the system."""
         client = snap.SnapClient()
         for snp in client.get_installed_snaps():
-            if snp["name"] == POSTGRESQL_SNAP_NAME:
+            if snp["name"] == charm_refresh.snap_name():
                 return snp["version"]
 
     def cluster_status(
@@ -950,7 +950,9 @@ class Patroni:
         if not raft_status["has_quorum"] and (
             not raft_status["leader"] or raft_status["leader"].host == member_ip
         ):
-            self.charm.unit.status = BlockedStatus("Raft majority loss, run: promote-to-primary")
+            self.charm.set_unit_status(
+                BlockedStatus("Raft majority loss, run: promote-to-primary")
+            )
             logger.warning("Remove raft member: Stuck raft cluster detected")
             data_flags = {"raft_stuck": "True"}
             self.charm.unit_peer_data.update(data_flags)
