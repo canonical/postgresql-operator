@@ -1,4 +1,4 @@
-# Charm Users explanations
+# Users
 
 There are three types of users in PostgreSQL:
 * Internal users (used by charm operator)
