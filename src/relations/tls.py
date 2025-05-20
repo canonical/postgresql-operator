@@ -20,13 +20,12 @@ It also needs the following methods in the charm class:
 
 import logging
 import socket
+from hashlib import shake_128
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
     CertificateRequestAttributes,
-    PrivateKey,
     TLSCertificatesRequiresV4,
-    generate_private_key,
 )
 from ops import (
     RelationBrokenEvent,
@@ -50,8 +49,9 @@ class TLS(Object):
         self.charm = charm
         self.peer_relation = peer_relation
         common_name = f"{self.charm.unit.name}-{self.charm.model.uuid}"
-        private_key = self._get_private_key()
         unit_id = self.charm.unit.name.split("/")[1]
+        # TODO check and add spaces ips
+        addresses = {socket.gethostbyname(socket.gethostname())}
 
         self.certificate = TLSCertificatesRequiresV4(
             self.charm,
@@ -59,18 +59,13 @@ class TLS(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset({
-                        # self.charm.model.get_binding(self.peer_relation).network.bind_address
-                    }),
+                    sans_ip=frozenset(addresses),
                     sans_dns=frozenset({
                         f"{self.charm.app.name}-{unit_id}",
-                        # self.charm.get_hostname_by_unit(self.charm.unit.name),
                         socket.getfqdn(),
                     }),
                 ),
             ],
-            private_key=private_key,
-            # refresh_events=[self.refresh_tls_certificates_event],
         )
 
         self.framework.observe(
@@ -104,17 +99,6 @@ class TLS(Object):
             logger.debug("Cannot update config at this moment")
             event.defer()
 
-    def _get_private_key(self) -> PrivateKey | None:
-        if not self.charm.app_peer_data:
-            return None
-
-        if private_key := self.charm.get_secret(SCOPE, "key"):
-            key = PrivateKey(raw=private_key)
-        else:
-            key = generate_private_key()
-            self.charm.set_secret(SCOPE, "key", str(key))
-        return key
-
     def get_tls_files(self) -> (str | None, str | None, str | None):
         """Prepare TLS files in special PostgreSQL way.
 
@@ -133,3 +117,8 @@ class TLS(Object):
             cert = str(certs[0].certificate)
             ca_file = str(certs[0].ca)
         return key, ca_file, cert
+
+    def get_cert_hash(self) -> str:
+        """Generate hash of the cert chain."""
+        _, ca_file, cert = self.get_tls_files()
+        return shake_128((str(ca_file) + str(cert)).encode()).hexdigest(16)

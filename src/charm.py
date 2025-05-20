@@ -1022,7 +1022,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
             self._patroni.stop_patroni()
-            self._update_certificate()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -2054,14 +2053,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except (RetryError, ConnectionError) as e:
             logger.error(f"failed to get primary with error {e}")
 
-    def _update_certificate(self) -> None:
-        """Updates the TLS certificate if the unit IP changes."""
-        # Request the certificate only if there is already one. If there isn't,
-        # the certificate will be generated in the relation joined event when
-        # relating to the TLS Certificates Operator.
-        if all(self.tls.get_tls_files()):
-            self.tls._request_certificate(self.get_secret("unit", "private-key"))
-
     @property
     def is_blocked(self) -> bool:
         """Returns whether the unit is in a blocked state."""
@@ -2370,7 +2361,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
-            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+            restart_postgresql = self.unit_peer_data.get("cert_hash") != self.tls.get_cert_hash()
         else:
             restart_postgresql = False
         try:
@@ -2389,7 +2380,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+        self.unit_peer_data.update({
+            "tls": "enabled" if enable_tls else "",
+            "cert_hash": self.tls.get_cert_hash(),
+        })
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed
