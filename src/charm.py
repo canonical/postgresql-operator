@@ -110,6 +110,7 @@ from relations.async_replication import (
     PostgreSQLAsyncReplication,
 )
 from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
+from relations.logical_replication import PostgreSQLLogicalReplication
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
@@ -214,6 +215,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.ldap = PostgreSQLLDAP(self, "ldap")
         self.tls = PostgreSQLTLS(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
+        self.logical_replication = PostgreSQLLogicalReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
         )
@@ -1997,6 +1999,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.model.config, self.get_available_memory(), limit_memory
         )
 
+        replication_slots_json = (
+            json.loads(self.app_peer_data["replication-slots"])
+            if "replication-slots" in self.app_peer_data
+            else None
+        )
+
         # Update and reload configuration based on TLS files availability.
         self._patroni.render_patroni_yml_file(
             connectivity=self.is_connectivity_enabled,
@@ -2011,6 +2019,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
             no_peers=no_peers,
+            slots=replication_slots_json,
         )
         if no_peers:
             return True
@@ -2046,6 +2055,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
             "wal_keep_size": self.config.durability_wal_keep_size,
         })
+
+        self._patroni.ensure_slots_controller_by_patroni(replication_slots_json or {})
 
         self._handle_postgresql_restart_need(enable_tls)
 

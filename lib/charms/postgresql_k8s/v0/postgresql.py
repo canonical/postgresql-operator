@@ -124,6 +124,33 @@ class PostgreSQLListUsersError(Exception):
 class PostgreSQLUpdateUserPasswordError(Exception):
     """Exception raised when updating a user password fails."""
 
+class PostgreSQLDatabaseExistsError(Exception):
+    """Exception raised during database existence check."""
+
+class PostgreSQLTableExistsError(Exception):
+    """Exception raised during table existence check."""
+
+class PostgreSQLIsTableEmptyError(Exception):
+    """Exception raised during table emptiness check."""
+
+class PostgreSQLCreatePublicationError(Exception):
+    """Exception raised when creating PostgreSQL publication."""
+
+class PostgreSQLDropPublicationError(Exception):
+    """Exception raised when dropping PostgreSQL publication."""
+
+class PostgreSQLCreateSubscriptionError(Exception):
+    """Exception raised when creating PostgreSQL subscription."""
+
+class PostgreSQLSubscriptionExistsError(Exception):
+    """Exception raised during subscription existence check."""
+
+class PostgreSQLUpdateSubscriptionError(Exception):
+    """Exception raised when updating PostgreSQL subscription."""
+
+class PostgreSQLDropSubscriptionError(Exception):
+    """Exception raised when dropping PostgreSQL subscription."""
+
 
 class PostgreSQL:
     """Class to encapsulate all operations related to interacting with PostgreSQL instance."""
@@ -788,6 +815,134 @@ END; $$;"""
         finally:
             if connection:
                 connection.close()
+
+    def database_exists(self, db: str) -> bool:
+        """Check whether specified database exists."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT datname FROM pg_database WHERE datname={};").format(Literal(db))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql database existence: {e}")
+            raise PostgreSQLDatabaseExistsError() from e
+
+    def table_exists(self, db: str, schema: str, table: str) -> bool:
+        """Check whether specified table in database exists."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT tablename FROM pg_tables WHERE schemaname={} AND tablename={};").format(Literal(schema), Literal(table))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql table existence: {e}")
+            raise PostgreSQLTableExistsError() from e
+
+    def is_table_empty(self, db: str, schema: str, table: str) -> bool:
+        """Check whether table is empty."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT COUNT(1) FROM {};").format(Identifier(schema, table))
+                )
+                return cursor.fetchone()[0] == 0
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check whether table is empty: {e}")
+            raise PostgreSQLIsTableEmptyError() from e
+
+    def create_publication(self, db: str, name: str, schematables: list[str]) -> None:
+        """Create PostgreSQL publication."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("CREATE PUBLICATION {} FOR TABLE {};").format(
+                        Identifier(name),
+                        SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables)
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create Postgresql publication: {e}")
+            raise PostgreSQLCreatePublicationError() from e
+
+    def drop_publication(self, db: str, publication: str) -> None:
+        """Drop PostgreSQL publication."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("DROP PUBLICATION IF EXISTS {};").format(
+                        Identifier(publication),
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to drop Postgresql publication: {e}")
+            raise PostgreSQLDropPublicationError() from e
+
+    def create_subscription(self, subscription: str, host: str, db: str, user: str, password: str, replication_slot: str) -> None:
+        """Create PostgreSQL subscription."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("CREATE SUBSCRIPTION {} CONNECTION {} PUBLICATION {} WITH (copy_data=true,create_slot=false,enabled=true,slot_name={});").format(
+                        Identifier(subscription),
+                        Literal(f"host={host} dbname={db} user={user} password={password}"),
+                        Identifier(subscription),
+                        Identifier(replication_slot)
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create Postgresql subscription: {e}")
+            raise PostgreSQLCreateSubscriptionError() from e
+
+    def subscription_exists(self, db: str, subscription: str) -> bool:
+        """Check whether specified subscription in database exists."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("SELECT subname FROM pg_subscription WHERE subname={};").format(Literal(subscription))
+                )
+                return cursor.fetchone() is not None
+        except psycopg2.Error as e:
+            logger.error(f"Failed to check Postgresql subscription existence: {e}")
+            raise PostgreSQLSubscriptionExistsError() from e
+
+    def update_subscription(self, db: str, subscription: str, host: str, user: str, password: str):
+        """Update PostgreSQL subscription connection details."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("ALTER SUBSCRIPTION {} CONNECTION {}").format(
+                        Identifier(subscription),
+                        Literal(f"host={host} dbname={db} user={user} password={password}"),
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to update Postgresql subscription: {e}")
+            raise PostgreSQLUpdateSubscriptionError() from e
+
+    def drop_subscription(self, db: str, subscription: str) -> None:
+        """Drop PostgreSQL subscription."""
+        try:
+            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL("ALTER SUBSCRIPTION {} DISABLE;").format(
+                        Identifier(subscription),
+                    )
+                )
+                cursor.execute(
+                    SQL("ALTER SUBSCRIPTION {} SET (slot_name=NONE);").format(
+                        Identifier(subscription),
+                    )
+                )
+                cursor.execute(
+                    SQL("DROP SUBSCRIPTION {};").format(
+                        Identifier(subscription),
+                    )
+                )
+        except psycopg2.Error as e:
+            logger.error(f"Failed to drop Postgresql subscription: {e}")
+            raise PostgreSQLDropSubscriptionError() from e
 
     @staticmethod
     def build_postgresql_group_map(group_map: Optional[str]) -> List[Tuple]:
