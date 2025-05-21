@@ -48,15 +48,19 @@ class TLS(Object):
         self.peer_relation = peer_relation
         unit_id = self.charm.unit.name.split("/")[1]
         host = f"{self.charm.app.name}-{unit_id}"
-        common_name = self.charm.unit_peer_data.get("database-address") or host
-        addresses = {
-            self.charm.unit_peer_data.get("database-address"),
-            self.charm.unit_peer_data.get("database-peers-address"),
-            self.charm.unit_peer_data.get("replication-address"),
-            self.charm.unit_peer_data.get("replication-offer-address"),
-            self.charm.unit_peer_data.get("private-address"),
-        }
-        addresses -= {None}
+        if self.charm.unit_peer_data:
+            common_name = self.charm.unit_peer_data.get("database-address") or host
+            addresses = {
+                self.charm.unit_peer_data.get("database-address"),
+                self.charm.unit_peer_data.get("database-peers-address"),
+                self.charm.unit_peer_data.get("replication-address"),
+                self.charm.unit_peer_data.get("replication-offer-address"),
+                self.charm.unit_peer_data.get("private-address"),
+            }
+            addresses -= {None}
+        else:
+            common_name = host
+            addresses = {}
 
         self.client_certificate = TLSCertificatesRequiresV4(
             self.charm,
@@ -107,7 +111,9 @@ class TLS(Object):
             )
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
-        if not self.client_certificate.relation or not self.peer_certificate.relation:
+        if not self.model.get_relation(TLS_CLIENT_RELATION) or self.model.get_relation(
+            TLS_PEER_RELATION
+        ):
             # TODO block
             pass
 
