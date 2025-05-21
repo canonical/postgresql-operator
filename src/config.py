@@ -58,7 +58,7 @@ class CharmConfig(BaseConfigModel):
     memory_temp_buffers: int | None = Field(ge=100, le=1073741823, default=None)
     memory_work_mem: int | None = Field(ge=64, le=2147483647, default=None)
     optimizer_constraint_exclusion: Literal["on", "off", "partition"] | None = Field(default=None)
-    optimizer_cpu_index_tuple_cost: float | None = Field(default=None)
+    optimizer_cpu_index_tuple_cost: float | None = Field(ge=0, le=1.80e308, default=None)
     optimizer_cpu_operator_cost: float | None = Field(ge=0, le=1.80e308, default=None)
     optimizer_cpu_tuple_cost: float | None = Field(ge=0, le=1.80e308, default=None)
     optimizer_cursor_tuple_fraction: float | None = Field(ge=0, le=1, default=None)
