@@ -5,7 +5,6 @@
 
 import logging
 import socket
-from hashlib import shake_128
 from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
@@ -50,17 +49,21 @@ class TLS(Object):
         host = f"{self.charm.app.name}-{unit_id}"
         if self.charm.unit_peer_data:
             common_name = self.charm.unit_peer_data.get("database-address") or host
-            addresses = {
+            client_addresses = {
                 self.charm.unit_peer_data.get("database-address"),
+            }
+            peer_addresses = {
                 self.charm.unit_peer_data.get("database-peers-address"),
                 self.charm.unit_peer_data.get("replication-address"),
                 self.charm.unit_peer_data.get("replication-offer-address"),
                 self.charm.unit_peer_data.get("private-address"),
             }
-            addresses -= {None}
+            client_addresses -= {None}
+            peer_addresses -= {None}
         else:
             common_name = host
-            addresses = {}
+            client_addresses = set()
+            peer_addresses = set()
 
         self.client_certificate = TLSCertificatesRequiresV4(
             self.charm,
@@ -68,11 +71,11 @@ class TLS(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset(addresses),
+                    sans_ip=frozenset(client_addresses),
                     sans_dns=frozenset({
                         host,
                         socket.getfqdn(),
-                        *addresses,
+                        *client_addresses,
                     }),
                 ),
             ],
@@ -84,11 +87,11 @@ class TLS(Object):
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
-                    sans_ip=frozenset(addresses),
+                    sans_ip=frozenset(peer_addresses),
                     sans_dns=frozenset({
                         host,
                         socket.getfqdn(),
-                        *addresses,
+                        *peer_addresses,
                     }),
                 ),
             ],
@@ -170,8 +173,3 @@ class TLS(Object):
             cert = str(certs[0].certificate)
             ca_file = str(certs[0].ca)
         return key, ca_file, cert
-
-    def get_cert_hash(self) -> str:
-        """Generate hash of the cert chain."""
-        _, ca_file, cert = self.get_client_tls_files()
-        return shake_128((str(ca_file) + str(cert)).encode()).hexdigest(16)

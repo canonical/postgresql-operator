@@ -2096,7 +2096,6 @@ def test_handle_postgresql_restart_need(harness):
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
         ) as _is_tls_enabled,
-        patch("charm.TLS.get_cert_hash") as _get_cert_hash,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
     ):
         rel_id = harness.model.get_relation(PEER).id
@@ -2110,16 +2109,8 @@ def test_handle_postgresql_restart_need(harness):
                 harness.update_relation_data(
                     rel_id,
                     harness.charm.unit.name,
-                    {
-                        "postgresql_restarted": ("True" if values[4] else ""),
-                        "cert_hash": "cert_hash",
-                    },
+                    {"postgresql_restarted": ("True" if values[4] else "")},
                 )
-
-            if values[1] != values[2]:
-                _get_cert_hash.return_value = "different_hash"
-            else:
-                _get_cert_hash.return_value = "cert_hash"
 
             _is_tls_enabled.return_value = values[1]
             postgresql_mock.is_tls_enabled = PropertyMock(return_value=values[2])
