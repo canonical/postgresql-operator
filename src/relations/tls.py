@@ -45,19 +45,26 @@ class TLS(Object):
         self.charm = charm
         self.peer_relation = peer_relation
         unit_id = self.charm.unit.name.split("/")[1]
-        # TODO check and add spaces ips
-        ip = socket.gethostbyname(socket.gethostname())
-        addresses = {ip}
+        host = f"{self.charm.app.name}-{unit_id}"
+        common_name = self.charm.unit_peer_data.get("database-address") or host
+        addresses = {
+            self.charm.unit_peer_data.get("database-address"),
+            self.charm.unit_peer_data.get("database-peers-address"),
+            self.charm.unit_peer_data.get("replication-address"),
+            self.charm.unit_peer_data.get("replication-offer-address"),
+            self.charm.unit_peer_data.get("private-address"),
+        }
+        addresses -= {None}
 
         self.certificate = TLSCertificatesRequiresV4(
             self.charm,
             TLS_CREATION_RELATION,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=ip,
+                    common_name=common_name,
                     sans_ip=frozenset(addresses),
                     sans_dns=frozenset({
-                        f"{self.charm.app.name}-{unit_id}",
+                        host,
                         socket.getfqdn(),
                         *addresses,
                     }),
