@@ -689,15 +689,13 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     return action.results["primary"]
 
 
-async def get_tls_ca(
-    ops_test: OpsTest,
-    unit_name: str,
-) -> str:
+async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client") -> str:
     """Returns the TLS CA used by the unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        relation: TLS relation to get the CA from
 
     Returns:
         TLS CA or an empty string if there is no CA.
@@ -712,7 +710,9 @@ async def get_tls_ca(
     ]
     if len(relation_data) == 0:
         return ""
-    return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
+    return json.loads(relation_data[0]["application-data"][f"{relation}-certificates"])[0].get(
+        "ca"
+    )
 
 
 @retry(
@@ -838,7 +838,7 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled on Patroni REST API.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    tls_ca = await get_tls_ca(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name, "peer")
 
     # If there is no TLS CA in the relation, something is wrong in
     # the relation between the TLS Certificates Operator and PostgreSQL.
