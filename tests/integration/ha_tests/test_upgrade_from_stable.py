@@ -1,10 +1,10 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-
-import pytest
 import shutil
 from pathlib import Path
+
+import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (

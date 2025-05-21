@@ -217,9 +217,11 @@ def create_valid_upgrade_charm(charm_file: str | Path) -> None:
 
     Refreshes require a new snap revision to avoid no-oping.
     """
-    with zipfile.ZipFile(charm_file, mode="r") as charm_zip:
-        with charm_zip.open("refresh_versions.toml") as file:
-            versions = tomli.load(file)
+    with (
+        zipfile.ZipFile(charm_file, mode="r") as charm_zip,
+        charm_zip.open("refresh_versions.toml") as file,
+    ):
+        versions = tomli.load(file)
 
     packed_charm_version = versions["charm"]
     charm_version_components = packed_charm_version.split(".post")
