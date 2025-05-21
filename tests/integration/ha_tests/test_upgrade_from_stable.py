@@ -1,8 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
-import shutil
-from pathlib import Path
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -19,7 +17,6 @@ from .helpers import (
     check_writes,
     start_continuous_writes,
 )
-from .test_upgrade import create_valid_upgrade_charm
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +33,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         3,
         # TODO move to stable once we release refresh v3 to stable
         "--channel",
-        "16/candidate",
+        "16/edge",
         "--base",
         "ubuntu@24.04",
     )
@@ -81,17 +78,30 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
 
-    logger.info("Update workload minor version in the charm")
-    filename = Path(charm).name
-    temporary_charm = Path("/tmp", f"{filename}.temporary.charm")
-    shutil.copy(charm, temporary_charm)
-    create_valid_upgrade_charm(temporary_charm)
-
     logger.info("Refresh the charm")
-    await application.refresh(path=temporary_charm)
+    await application.refresh(path=charm)
 
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
+
+    logger.info("Wait for refresh to block due to compatibility checks")
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        )
+
+    assert "Refresh incompatible" in application.status_message, (
+        "Application refresh not blocked due to incompatibility"
+    )
+
+    # Highest to lowest unit number
+    refresh_order = sorted(
+        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
+    )
+    action = await refresh_order[0].run_action(
+        "force-refresh-start", **{"check-compatibility": False}
+    )
+    await action.wait()
 
     logger.info("Wait for first unit to upgrade")
     async with ops_test.fast_forward("60s"):
@@ -100,10 +110,6 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
         )
 
     logger.info("Run resume-refresh action")
-    # Highest to lowest unit number
-    refresh_order = sorted(
-        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
-    )
     action = await refresh_order[1].run_action("resume-refresh")
     await action.wait()
 
@@ -127,5 +133,3 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
         "Number of switchovers is greater than 2"
     )
-
-    temporary_charm.unlink()

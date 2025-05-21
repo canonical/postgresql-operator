@@ -85,17 +85,30 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
 
-    logger.info("Update workload minor version in the charm")
-    filename = Path(charm).name
-    temporary_charm = Path("/tmp", f"{filename}.temporary.charm")
-    shutil.copy(charm, temporary_charm)
-    create_valid_upgrade_charm(temporary_charm)
-
     logger.info("Refresh the charm")
-    await application.refresh(path=temporary_charm)
+    await application.refresh(path=charm)
 
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
+
+    logger.info("Wait for refresh to block due to compatibility checks")
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        )
+
+    assert "Refresh incompatible" in application.status_message, (
+        "Application refresh not blocked due to incompatibility"
+    )
+
+    # Highest to lowest unit number
+    refresh_order = sorted(
+        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
+    )
+    action = await refresh_order[0].run_action(
+        "force-refresh-start", **{"check-compatibility": False}
+    )
+    await action.wait()
 
     logger.info("Wait for first unit to upgrade")
     async with ops_test.fast_forward("60s"):
@@ -104,10 +117,6 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
         )
 
     logger.info("Run resume-refresh action")
-    # Highest to lowest unit number
-    refresh_order = sorted(
-        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
-    )
     action = await refresh_order[1].run_action("resume-refresh")
     await action.wait()
 
@@ -131,8 +140,6 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
     assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
         "Number of switchovers is greater than 2"
     )
-
-    temporary_charm.unlink()
 
 
 @pytest.mark.abort_on_fail
@@ -208,31 +215,5 @@ async def inject_dependency_fault(charm_file: str | Path) -> None:
     versions["snap"]["revisions"][platform.machine()] = "1"
 
     # Overwrite refresh_versions.toml with incompatible version.
-    with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
-        charm_zip.writestr("refresh_versions.toml", tomli_w.dumps(versions))
-
-
-def create_valid_upgrade_charm(charm_file: str | Path) -> None:
-    """Create a valid postgresql charm for upgrade.
-
-    Refreshes require a new snap revision to avoid no-oping.
-    """
-    with (
-        zipfile.ZipFile(charm_file, mode="r") as charm_zip,
-        charm_zip.open("refresh_versions.toml") as file,
-    ):
-        versions = tomli.load(file)
-
-    packed_charm_version = versions["charm"]
-    charm_version_components = packed_charm_version.split(".post")
-    major, minor, patch = charm_version_components[0].split(".")
-    versions["charm"] = f"{major}.{int(minor) + 1}.{patch}"
-
-    old_workload_version = versions["workload"]
-    major, minor = old_workload_version.split(".")
-    versions["workload"] = f"{major}.{int(minor) + 1}"
-
-    # Overwrite refresh_versions.toml with a bump in the workload minor version
-    # and charm minor version
     with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
         charm_zip.writestr("refresh_versions.toml", tomli_w.dumps(versions))
