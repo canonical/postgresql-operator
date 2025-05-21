@@ -1,7 +1,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""TLS transfer Handler."""
+"""TLS Transfer Handler."""
 
 import logging
 

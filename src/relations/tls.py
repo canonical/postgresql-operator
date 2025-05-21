@@ -1,26 +1,12 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-"""In this class we manage certificates relation.
-
-This class handles certificate request and renewal through
-the interaction with the TLS Certificates Operator.
-
-This library needs that the following libraries are imported to work:
-- https://charmhub.io/certificate-transfer-interface/libraries/certificate_transfer
-- https://charmhub.io/tls-certificates-interface/libraries/tls_certificates
-
-It also needs the following methods in the charm class:
-— get_hostname_by_unit: to retrieve the DNS hostname of the unit.
-— get_secret: to retrieve TLS files from secrets.
-— push_tls_files_to_workload: to push TLS files to the workload container and enable TLS.
-— set_secret: to store TLS files as secrets.
-— update_config: to disable TLS when relation with the TLS Certificates Operator is broken.
-"""
+"""TLS Handler."""
 
 import logging
 import socket
 from hashlib import shake_128
+from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     CertificateAvailableEvent,
@@ -28,23 +14,33 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     TLSCertificatesRequiresV4,
 )
 from ops import (
+    EventSource,
     RelationBrokenEvent,
     RelationCreatedEvent,
 )
-from ops.framework import Object
+from ops.framework import EventBase, Object
 from ops.pebble import ConnectionError as PebbleConnectionError
 from ops.pebble import PathError, ProtocolError
 from tenacity import RetryError
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
 TLS_CREATION_RELATION = "certificates"
 
 
+class RefreshTLSCertificatesEvent(EventBase):
+    """Event for refreshing peer TLS certificates."""
+
+
 class TLS(Object):
     """In this class we manage certificates relation."""
 
-    def __init__(self, charm, peer_relation: str):
+    refresh_tls_certificates_event = EventSource(RefreshTLSCertificatesEvent)
+
+    def __init__(self, charm: "PostgresqlOperatorCharm", peer_relation: str):
         super().__init__(charm, "client-relations")
         self.charm = charm
         self.peer_relation = peer_relation
@@ -67,6 +63,7 @@ class TLS(Object):
                     }),
                 ),
             ],
+            refresh_events=[self.refresh_tls_certificates_event],
         )
 
         self.framework.observe(

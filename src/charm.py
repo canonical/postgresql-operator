@@ -1022,6 +1022,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit_peer_data.update({"ip-to-remove": stored_ip})
             self.unit_peer_data.update({"ip": current_ip})
             self._patroni.stop_patroni()
+            self._update_certificate()
             return True
         else:
             self.unit_peer_data.update({"ip-to-remove": ""})
@@ -2052,6 +2053,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 self.set_unit_status(ActiveStatus())
         except (RetryError, ConnectionError) as e:
             logger.error(f"failed to get primary with error {e}")
+
+    def _update_certificate(self) -> None:
+        """Updates the TLS certificate if the unit IP changes."""
+        # Request the certificate only if there is already one. If there isn't,
+        # the certificate will be generated in the relation joined event when
+        # relating to the TLS Certificates Operator.
+        if all(self.tls.get_tls_files()):
+            self.tls.refresh_tls_certificates_event.emit()
 
     @property
     def is_blocked(self) -> bool:

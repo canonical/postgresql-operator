@@ -1568,8 +1568,27 @@ def test_reconfigure_cluster(harness):
         _add_members.assert_called_once_with(mock_event)
 
 
+def test_update_certificate(harness):
+    with (
+        patch("charm.TLS.get_tls_files") as _get_tls_files,
+        patch("charm.TLS.refresh_tls_certificates_event") as _refresh_tls_certificates_event,
+    ):
+        # If there is no current TLS files, _request_certificate should be called
+        # only when the certificates relation is established.
+        _get_tls_files.return_value = (None, None, None)
+        harness.charm._update_certificate()
+        _refresh_tls_certificates_event.emit.assert_not_called()
+
+        # Test with already present TLS files (when they will be replaced by new ones).
+        _get_tls_files.return_value = (sentinel.key, sentinel.ca, sentinel.cert)
+
+        harness.charm._update_certificate()
+        _refresh_tls_certificates_event.emit.assert_called_once_with()
+
+
 def test_update_member_ip(harness):
     with (
+        patch("charm.PostgresqlOperatorCharm._update_certificate") as _update_certificate,
         patch("charm.Patroni.stop_patroni") as _stop_patroni,
     ):
         rel_id = harness.model.get_relation(PEER).id
@@ -1586,6 +1605,7 @@ def test_update_member_ip(harness):
         relation_data = harness.get_relation_data(rel_id, harness.charm.unit.name)
         assert relation_data.get("ip-to-remove") is None
         _stop_patroni.assert_not_called()
+        _update_certificate.assert_not_called()
 
         # Test when the IP address of the unit has changed.
         with harness.hooks_disabled():
@@ -1601,6 +1621,7 @@ def test_update_member_ip(harness):
         assert relation_data.get("ip") == "192.0.2.0"
         assert relation_data.get("ip-to-remove") == "2.2.2.2"
         _stop_patroni.assert_called_once()
+        _update_certificate.assert_called_once()
 
 
 def test_push_tls_files_to_workload(harness):
