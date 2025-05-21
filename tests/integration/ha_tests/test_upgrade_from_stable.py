@@ -3,6 +3,8 @@
 import logging
 
 import pytest
+import shutil
+from pathlib import Path
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
@@ -17,6 +19,7 @@ from .helpers import (
     check_writes,
     start_continuous_writes,
 )
+from .test_upgrade import create_valid_upgrade_charm
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +34,9 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         DATABASE_APP_NAME,
         "-n",
         3,
-        # TODO move to stable once we release refresh v3
+        # TODO move to stable once we release refresh v3 to stable
         "--channel",
-        "16/edge/test-refresh-v3-workload2",
+        "16/candidate",
         "--base",
         "ubuntu@24.04",
     )
@@ -78,8 +81,14 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
 
+    logger.info("Update workload minor version in the charm")
+    filename = Path(charm).name
+    temporary_charm = Path(".", f"{filename}.temporary.charm")
+    shutil.copy(charm, temporary_charm)
+    create_valid_upgrade_charm(temporary_charm)
+
     logger.info("Refresh the charm")
-    await application.refresh(path=charm)
+    await application.refresh(path=temporary_charm)
 
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
@@ -118,3 +127,5 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
         "Number of switchovers is greater than 2"
     )
+
+    temporary_charm.unlink()

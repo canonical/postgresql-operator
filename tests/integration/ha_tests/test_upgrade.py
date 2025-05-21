@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 import logging
-import pathlib
 import platform
 import shutil
 import zipfile
@@ -40,7 +39,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         "-n",
         3,
         "--channel",
-        "16/edge/test-refresh-v3-workload2",  # TODO remove branch
+        "16/edge",
         "--config",
         "profile=testing",
         "--base",
@@ -86,8 +85,14 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
 
+    logger.info("Update workload minor version in the charm")
+    filename = Path(charm).name
+    temporary_charm = Path("/tmp", f"{filename}.temporary.charm")
+    shutil.copy(charm, temporary_charm)
+    create_valid_upgrade_charm(temporary_charm)
+
     logger.info("Refresh the charm")
-    await application.refresh(path=charm)
+    await application.refresh(path=temporary_charm)
 
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
@@ -127,6 +132,8 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
         "Number of switchovers is greater than 2"
     )
 
+    temporary_charm.unlink()
+
 
 @pytest.mark.abort_on_fail
 async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
@@ -147,7 +154,7 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     await action.wait()
 
     filename = Path(charm).name
-    fault_charm = Path("/tmp/", filename)
+    fault_charm = Path("/tmp", f"{filename}.fault.charm")
     shutil.copy(charm, fault_charm)
 
     logger.info("Inject dependency fault")
@@ -194,12 +201,36 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
 
 async def inject_dependency_fault(charm_file: str | Path) -> None:
     """Inject a dependency fault into the PostgreSQL charm."""
-    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+    with Path("refresh_versions.toml").open("rb") as file:
         versions = tomli.load(file)
 
     versions["charm"] = "16/0.0.0"
     versions["snap"]["revisions"][platform.machine()] = "1"
 
     # Overwrite refresh_versions.toml with incompatible version.
+    with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
+        charm_zip.writestr("refresh_versions.toml", tomli_w.dumps(versions))
+
+
+def create_valid_upgrade_charm(charm_file: str | Path) -> None:
+    """Create a valid postgresql charm for upgrade.
+
+    Refreshes require a new snap revision to avoid no-oping.
+    """
+    with zipfile.ZipFile(charm_file, mode="r") as charm_zip:
+        with charm_zip.open("refresh_versions.toml") as file:
+            versions = tomli.load(file)
+
+    packed_charm_version = versions["charm"]
+    charm_version_components = packed_charm_version.split(".post")
+    major, minor, patch = charm_version_components[0].split(".")
+    versions["charm"] = f"{major}.{int(minor) + 1}.{patch}"
+
+    old_workload_version = versions["workload"]
+    major, minor = old_workload_version.split(".")
+    versions["workload"] = f"{major}.{int(minor) + 1}"
+
+    # Overwrite refresh_versions.toml with a bump in the workload minor version
+    # and charm minor version
     with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
         charm_zip.writestr("refresh_versions.toml", tomli_w.dumps(versions))
