@@ -83,7 +83,7 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
 
     logger.info("Update workload minor version in the charm")
     filename = Path(charm).name
-    temporary_charm = Path(".", f"{filename}.temporary.charm")
+    temporary_charm = Path("/tmp", f"{filename}.temporary.charm")
     shutil.copy(charm, temporary_charm)
     create_valid_upgrade_charm(temporary_charm)
 
