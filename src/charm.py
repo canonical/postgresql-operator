@@ -231,6 +231,8 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         PostgreSQLBackups,
         PostgreSQLLDAP,
         PostgreSQLProvider,
+        TLS,
+        TLSTransfer,
         RollingOpsManager,
     ),
 )
@@ -1152,7 +1154,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_tls_files())
+        return all((*self.tls.get_client_tls_files(), *self.tls.get_peer_tls_files()))
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -2059,7 +2061,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Request the certificate only if there is already one. If there isn't,
         # the certificate will be generated in the relation joined event when
         # relating to the TLS Certificates Operator.
-        if all(self.tls.get_tls_files()):
+        if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
             self.tls.refresh_tls_certificates_event.emit()
 
     @property
@@ -2144,13 +2146,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
-        key, ca, cert = self.tls.get_tls_files()
+        key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+
+        key, ca, cert = self.tls.get_peer_tls_files()
+        if key is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+        if ca is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+        if cert is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
 
         try:
             return self.update_config()

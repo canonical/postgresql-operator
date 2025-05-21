@@ -1570,17 +1570,17 @@ def test_reconfigure_cluster(harness):
 
 def test_update_certificate(harness):
     with (
-        patch("charm.TLS.get_tls_files") as _get_tls_files,
+        patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.refresh_tls_certificates_event") as _refresh_tls_certificates_event,
     ):
         # If there is no current TLS files, _request_certificate should be called
         # only when the certificates relation is established.
-        _get_tls_files.return_value = (None, None, None)
+        _get_client_tls_files.return_value = (None, None, None)
         harness.charm._update_certificate()
         _refresh_tls_certificates_event.emit.assert_not_called()
 
         # Test with already present TLS files (when they will be replaced by new ones).
-        _get_tls_files.return_value = (sentinel.key, sentinel.ca, sentinel.cert)
+        _get_client_tls_files.return_value = (sentinel.key, sentinel.ca, sentinel.cert)
 
         harness.charm._update_certificate()
         _refresh_tls_certificates_event.emit.assert_called_once_with()
@@ -1628,9 +1628,16 @@ def test_push_tls_files_to_workload(harness):
     with (
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.render_file") as _render_file,
-        patch("charm.TLS.get_tls_files") as _get_tls_files,
+        patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
+        patch("charm.TLS.get_peer_tls_files") as _get_peer_tls_files,
     ):
-        _get_tls_files.side_effect = [
+        _get_client_tls_files.side_effect = [
+            ("key", "ca", "cert"),
+            ("key", "ca", None),
+            ("key", None, "cert"),
+            (None, "ca", "cert"),
+        ]
+        _get_peer_tls_files.side_effect = [
             ("key", "ca", "cert"),
             ("key", "ca", None),
             ("key", None, "cert"),
@@ -1640,13 +1647,13 @@ def test_push_tls_files_to_workload(harness):
 
         # Test when all TLS files are available.
         assert harness.charm.push_tls_files_to_workload()
-        assert _render_file.call_count == 3
+        assert _render_file.call_count == 6
 
         # Test when not all TLS files are available.
         for _ in range(3):
             _render_file.reset_mock()
             assert not (harness.charm.push_tls_files_to_workload())
-            assert _render_file.call_count == 2
+            assert _render_file.call_count == 4
 
 
 def test_push_ca_file_into_workload(harness):

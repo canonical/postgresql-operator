@@ -61,7 +61,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Relate it to the PostgreSQL to enable TLS.
         await ops_test.model.relate(
-            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
+            f"{DATABASE_APP_NAME}:client-certificates", f"{tls_certificates_app_name}:certificates"
+        )
+        await ops_test.model.relate(
+            f"{DATABASE_APP_NAME}:peer-certificates", f"{tls_certificates_app_name}:certificates"
         )
         await ops_test.model.wait_for_idle(status="active", timeout=1500, raise_on_error=False)
 
@@ -170,7 +173,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
+            f"{DATABASE_APP_NAME}:client-certificates", f"{tls_certificates_app_name}:certificates"
+        )
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}:peer-certificates", f"{tls_certificates_app_name}:certificates"
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 

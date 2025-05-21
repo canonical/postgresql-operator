@@ -28,7 +28,9 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
-TLS_CREATION_RELATION = "certificates"
+TLS_CLIENT_RELATION = "client-certificates"
+TLS_PEER_RELATION = "peer-certificates"
+TLS_RELS = (TLS_CLIENT_RELATION, TLS_PEER_RELATION)
 
 
 class RefreshTLSCertificatesEvent(EventBase):
@@ -56,9 +58,25 @@ class TLS(Object):
         }
         addresses -= {None}
 
-        self.certificate = TLSCertificatesRequiresV4(
+        self.client_certificate = TLSCertificatesRequiresV4(
             self.charm,
-            TLS_CREATION_RELATION,
+            TLS_CLIENT_RELATION,
+            certificate_requests=[
+                CertificateRequestAttributes(
+                    common_name=common_name,
+                    sans_ip=frozenset(addresses),
+                    sans_dns=frozenset({
+                        host,
+                        socket.getfqdn(),
+                        *addresses,
+                    }),
+                ),
+            ],
+            refresh_events=[self.refresh_tls_certificates_event],
+        )
+        self.peer_certificate = TLSCertificatesRequiresV4(
+            self.charm,
+            TLS_PEER_RELATION,
             certificate_requests=[
                 CertificateRequestAttributes(
                     common_name=common_name,
@@ -74,19 +92,24 @@ class TLS(Object):
         )
 
         self.framework.observe(
-            self.certificate.on.certificate_available,
+            self.client_certificate.on.certificate_available,
+            self._on_certificate_available,
+        )
+        self.framework.observe(
+            self.peer_certificate.on.certificate_available,
             self._on_certificate_available,
         )
 
-        self.framework.observe(
-            self.charm.on[TLS_CREATION_RELATION].relation_created, self._on_relation_created
-        )
-        self.framework.observe(
-            self.charm.on[TLS_CREATION_RELATION].relation_broken, self._on_certificates_broken
-        )
+        for rel in TLS_RELS:
+            self.framework.observe(self.charm.on[rel].relation_created, self._on_relation_created)
+            self.framework.observe(
+                self.charm.on[rel].relation_broken, self._on_certificates_broken
+            )
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
-        pass
+        if not self.client_certificate.relation or not self.peer_certificate.relation:
+            # TODO block
+            pass
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         try:
@@ -104,7 +127,7 @@ class TLS(Object):
             logger.debug("Cannot update config at this moment")
             event.defer()
 
-    def get_tls_files(self) -> (str | None, str | None, str | None):
+    def get_client_tls_files(self) -> (str | None, str | None, str | None):
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
@@ -115,7 +138,26 @@ class TLS(Object):
         ca_file = None
         cert = None
         key = None
-        certs, private_key = self.certificate.get_assigned_certificates()
+        certs, private_key = self.client_certificate.get_assigned_certificates()
+        if private_key:
+            key = str(private_key)
+        if certs:
+            cert = str(certs[0].certificate)
+            ca_file = str(certs[0].ca)
+        return key, ca_file, cert
+
+    def get_peer_tls_files(self) -> (str | None, str | None, str | None):
+        """Prepare TLS files in special PostgreSQL way.
+
+        PostgreSQL needs three files:
+        — CA file should have a full chain.
+        — Key file should have private key.
+        — Certificate file should have certificate without certificate chain.
+        """
+        ca_file = None
+        cert = None
+        key = None
+        certs, private_key = self.peer_certificate.get_assigned_certificates()
         if private_key:
             key = str(private_key)
         if certs:
@@ -125,5 +167,5 @@ class TLS(Object):
 
     def get_cert_hash(self) -> str:
         """Generate hash of the cert chain."""
-        _, ca_file, cert = self.get_tls_files()
+        _, ca_file, cert = self.get_client_tls_files()
         return shake_128((str(ca_file) + str(cert)).encode()).hexdigest(16)
