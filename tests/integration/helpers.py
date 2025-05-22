@@ -701,18 +701,15 @@ async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client"
         TLS CA or an empty string if there is no CA.
     """
     raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    endpoint = f"{relation}-certificates"
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
-    relation_data = [
-        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
-    ]
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == endpoint]
     if len(relation_data) == 0:
         return ""
-    return json.loads(relation_data[0]["application-data"][f"{relation}-certificates"])[0].get(
-        "ca"
-    )
+    return json.loads(relation_data[0]["application-data"][endpoint])[0].get("ca")
 
 
 @retry(
