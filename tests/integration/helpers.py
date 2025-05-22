@@ -709,7 +709,7 @@ async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client"
     relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == endpoint]
     if len(relation_data) == 0:
         return ""
-    return json.loads(relation_data[0]["application-data"][endpoint])[0].get("ca")
+    return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
 
 
 @retry(
