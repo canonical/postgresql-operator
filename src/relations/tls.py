@@ -13,6 +13,7 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     TLSCertificatesRequiresV4,
 )
 from ops import (
+    BlockedStatus,
     EventSource,
     RelationBrokenEvent,
     RelationCreatedEvent,
@@ -30,10 +31,11 @@ SCOPE = "unit"
 TLS_CLIENT_RELATION = "client-certificates"
 TLS_PEER_RELATION = "peer-certificates"
 TLS_RELS = (TLS_CLIENT_RELATION, TLS_PEER_RELATION)
+MISSING_TLS_RELATION_MESSAGE = "Charm is not integrated to both certificate relations"
 
 
 class RefreshTLSCertificatesEvent(EventBase):
-    """Event for refreshing peer TLS certificates."""
+    """Event for refreshing TLS certificates."""
 
 
 class TLS(Object):
@@ -114,11 +116,12 @@ class TLS(Object):
             )
 
     def _on_relation_created(self, event: RelationCreatedEvent) -> None:
-        if not self.model.get_relation(TLS_CLIENT_RELATION) or self.model.get_relation(
+        if not self.model.get_relation(TLS_CLIENT_RELATION) or not self.model.get_relation(
             TLS_PEER_RELATION
         ):
-            # TODO block
-            pass
+            self.charm.set_unit_status(BlockedStatus(MISSING_TLS_RELATION_MESSAGE))
+        else:
+            self.charm._set_primary_status_message()
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         try:
@@ -132,6 +135,12 @@ class TLS(Object):
             return
 
     def _on_certificates_broken(self, event: RelationBrokenEvent) -> None:
+        if self.model.get_relation(TLS_CLIENT_RELATION) or self.model.get_relation(
+            TLS_PEER_RELATION
+        ):
+            self.charm.set_unit_status(BlockedStatus(MISSING_TLS_RELATION_MESSAGE))
+        else:
+            self.charm._set_primary_status_message()
         if not self.charm.update_config():
             logger.debug("Cannot update config at this moment")
             event.defer()
