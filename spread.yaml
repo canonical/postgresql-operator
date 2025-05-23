@@ -76,9 +76,10 @@ backends:
     allocate: |
       sudo tee /etc/ssh/sshd_config.d/10-spread-github-ci.conf << 'EOF'
       PasswordAuthentication yes
+      PermitEmptyPasswords yes
       EOF
 
-      echo "qweqwe" | sudo passwd -s runner
+      sudo passwd -d runner
 
       ADDRESS localhost
     # HACK: spread does not pass environment variables set on runner
@@ -95,10 +96,8 @@ backends:
     systems:
       - ubuntu-24.04:
           username: runner
-          password: qweqwe
       - ubuntu-24.04-arm:
           username: runner
-          password: qweqwe
 
 suites:
   tests/spread/:
