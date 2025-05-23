@@ -2,7 +2,6 @@
 # See LICENSE file for licensing details.
 
 import logging
-import pathlib
 import platform
 import shutil
 import zipfile
@@ -40,7 +39,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         "-n",
         3,
         "--channel",
-        "16/edge/test-refresh-v3-workload2",  # TODO remove branch
+        "16/edge",
         "--config",
         "profile=testing",
         "--base",
@@ -92,6 +91,25 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
 
+    logger.info("Wait for refresh to block due to compatibility checks")
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        )
+
+    assert "Refresh incompatible" in application.status_message, (
+        "Application refresh not blocked due to incompatibility"
+    )
+
+    # Highest to lowest unit number
+    refresh_order = sorted(
+        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
+    )
+    action = await refresh_order[0].run_action(
+        "force-refresh-start", **{"check-compatibility": False}
+    )
+    await action.wait()
+
     logger.info("Wait for first unit to upgrade")
     async with ops_test.fast_forward("60s"):
         await ops_test.model.wait_for_idle(
@@ -99,10 +117,6 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
         )
 
     logger.info("Run resume-refresh action")
-    # Highest to lowest unit number
-    refresh_order = sorted(
-        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
-    )
     action = await refresh_order[1].run_action("resume-refresh")
     await action.wait()
 
@@ -147,7 +161,7 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
     await action.wait()
 
     filename = Path(charm).name
-    fault_charm = Path("/tmp/", filename)
+    fault_charm = Path("/tmp", f"{filename}.fault.charm")
     shutil.copy(charm, fault_charm)
 
     logger.info("Inject dependency fault")
@@ -194,7 +208,7 @@ async def test_fail_and_rollback(ops_test, charm, continuous_writes) -> None:
 
 async def inject_dependency_fault(charm_file: str | Path) -> None:
     """Inject a dependency fault into the PostgreSQL charm."""
-    with pathlib.Path("refresh_versions.toml").open("rb") as file:
+    with Path("refresh_versions.toml").open("rb") as file:
         versions = tomli.load(file)
 
     versions["charm"] = "16/0.0.0"

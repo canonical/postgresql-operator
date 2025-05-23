@@ -31,9 +31,9 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         DATABASE_APP_NAME,
         "-n",
         3,
-        # TODO move to stable once we release refresh v3
+        # TODO move to stable once we release refresh v3 to stable
         "--channel",
-        "16/edge/test-refresh-v3-workload2",
+        "16/edge",
         "--base",
         "ubuntu@24.04",
     )
@@ -84,6 +84,25 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     logger.info("Wait for upgrade to start")
     await ops_test.model.block_until(lambda: application.status == "blocked", timeout=TIMEOUT)
 
+    logger.info("Wait for refresh to block due to compatibility checks")
+    async with ops_test.fast_forward("60s"):
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        )
+
+    assert "Refresh incompatible" in application.status_message, (
+        "Application refresh not blocked due to incompatibility"
+    )
+
+    # Highest to lowest unit number
+    refresh_order = sorted(
+        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
+    )
+    action = await refresh_order[0].run_action(
+        "force-refresh-start", **{"check-compatibility": False}
+    )
+    await action.wait()
+
     logger.info("Wait for first unit to upgrade")
     async with ops_test.fast_forward("60s"):
         await ops_test.model.wait_for_idle(
@@ -91,10 +110,6 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
         )
 
     logger.info("Run resume-refresh action")
-    # Highest to lowest unit number
-    refresh_order = sorted(
-        application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
-    )
     action = await refresh_order[1].run_action("resume-refresh")
     await action.wait()
 
