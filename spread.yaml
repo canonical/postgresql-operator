@@ -74,6 +74,11 @@ backends:
     # each spread job & select a single job when running spread)
     # Derived from https://github.com/jnsgruk/zinc-k8s-operator/blob/a21eae8399eb3b9df4ddb934b837af25ef831976/spread.yaml#L47
     allocate: |
+      sudo tee /etc/ssh/sshd_config.d/10-spread-github-ci.conf << 'EOF'
+      PasswordAuthentication no
+      AuthenticationMethods publickey
+      EOF
+
       ssh-keygen -t ecdsa -b 256 -N "" -f ~/.ssh/id_ecdsa
       cp ~/.ssh/id_ecdsa.pub ~/.ssh/authorized_keys
 
