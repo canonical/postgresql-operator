@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Literal, get_args
+from typing import Literal, Optional, get_args
 from urllib.parse import urlparse
 
 import psycopg2
@@ -74,6 +74,7 @@ from config import CharmConfig
 from constants import (
     APP_SCOPE,
     BACKUP_USER,
+    DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
     METRICS_PORT,
@@ -115,7 +116,7 @@ from relations.db import EXTENSIONS_BLOCKING_MESSAGE, DbProvides
 from relations.postgresql_provider import PostgreSQLProvider
 from rotate_logs import RotateLogs
 from upgrade import PostgreSQLUpgrade, get_postgresql_dependencies_model
-from utils import new_password, snap_refreshed
+from utils import label2name, new_password, snap_refreshed
 
 logger = logging.getLogger(__name__)
 
@@ -407,12 +408,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         try:
             primary = self._patroni.get_primary()
+            logger.error(f"Primary: {primary}")
             if primary is None and (standby_leader := self._patroni.get_standby_leader()):
                 primary = standby_leader
             primary_endpoint = self._patroni.get_member_ip(primary)
+            logger.error(f"Primary endpoint: {primary_endpoint}")
             # Force a retry if there is no primary or the member that was
             # returned is not in the list of the current cluster members
             # (like when the cluster was not updated yet after a failed switchover).
+            logger.error(f"self._units_ips: {self._units_ips}")
             if not primary_endpoint or primary_endpoint not in self._units_ips:
                 # TODO figure out why peer data is not available
                 if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
@@ -863,7 +867,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         Raises:
             NotReadyError if either the new member or the current members are not ready.
         """
-        unit = self.model.get_unit("/".join(member.rsplit("-", 1)))
+        unit = self.model.get_unit(label2name(member))
         member_ip = self._get_unit_ip(unit)
 
         if not self._patroni.are_all_members_ready():
@@ -879,19 +883,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.unit.status = BlockedStatus("failed to update cluster members on member")
 
-    def _get_unit_ip(self, unit: Unit) -> str | None:
-        """Get the IP address of a specific unit."""
-        # Check if host is current host.
-        ip = None
-        if unit == self.unit:
-            ip = self.model.get_binding(PEER).network.bind_address
-        # Check if host is a peer.
-        elif unit in self._peers.data:
-            ip = self._peers.data[unit].get("private-address")
-        # Return None if the unit is not a peer neither the current unit.
-        if ip:
-            return str(ip)
-        return None
+    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> Optional[str]:
+        """Get the IP address of a specific unit.
+
+        Args:
+            unit: The unit to get the IP address for.
+            relation_name: The name of the relation to use for getting the IP address.
+        """
+        try:
+            return str(self._peers.data[unit].get(f"{relation_name}-address", ""))
+        except KeyError:
+            return None
 
     @property
     def _hosts(self) -> set:
@@ -1051,6 +1053,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Current unit ip."""
         return str(self.model.get_binding(PEER).network.bind_address)
 
+    @property
+    def _database_ip(self) -> str:
+        """Database endpoint address."""
+        return str(self.model.get_binding(DATABASE).network.bind_address)
+
+    def update_endpoint_addresses(self) -> None:
+        """Update ip addresses for relation endpoints on unit peer databag."""
+        logger.debug("Updating relation endpoints addresses")
+        self.unit_peer_data.update({
+            f"{PEER}-address": self._unit_ip,
+            f"{DATABASE}-address": self._database_ip,
+        })
+
     def _on_cluster_topology_change(self, _):
         """Updates endpoints and (optionally) certificates when the cluster topology changes."""
         logger.info("Cluster topology changed")
@@ -1144,6 +1159,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_config_changed(self, event) -> None:
         """Handle configuration changes, like enabling plugins."""
+        if not self._peers:
+            # update endpoint addresses
+            logger.debug("Defer on_config_changed: no peer relation")
+            event.defer()
+            return
+        self.update_endpoint_addresses()
+
         if not self.is_cluster_initialised:
             logger.debug("Defer on_config_changed: cluster not initialised yet")
             event.defer()
