@@ -75,15 +75,10 @@ backends:
     # Derived from https://github.com/jnsgruk/zinc-k8s-operator/blob/a21eae8399eb3b9df4ddb934b837af25ef831976/spread.yaml#L47
     allocate: |
       sudo tee /etc/ssh/sshd_config.d/10-spread-github-ci.conf << 'EOF'
-      PasswordAuthentication no
-      AuthenticationMethods publickey
+      PasswordAuthentication yes
       EOF
 
-      ssh-keygen -t ecdsa -b 256 -N "" -f ~/.ssh/id_ecdsa
-      cp ~/.ssh/id_ecdsa.pub ~/.ssh/authorized_keys
-      sudo chown runner:runner /home/runner/.ssh/authorized_keys
-      chmod 700 ~/.ssh
-      chmod 600 ~/.ssh/authorized_keys
+      sudo passwd runner -s < 'qweqwe'
 
       ADDRESS localhost
     # HACK: spread does not pass environment variables set on runner
@@ -100,8 +95,10 @@ backends:
     systems:
       - ubuntu-24.04:
           username: runner
+          password: qweqwe
       - ubuntu-24.04-arm:
           username: runner
+          password: qweqwe
 
 suites:
   tests/spread/:
