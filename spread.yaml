@@ -78,7 +78,7 @@ backends:
       PasswordAuthentication yes
       EOF
 
-      echo "runner:$SPREAD_PASSWORD" | chpasswd
+      echo "runner:$SPREAD_PASSWORD" | sudo chpasswd
 
       ADDRESS localhost
     # HACK: spread does not pass environment variables set on runner
@@ -95,8 +95,10 @@ backends:
     systems:
       - ubuntu-24.04:
           username: runner
+          password: $SPREAD_PASSWORD
       - ubuntu-24.04-arm:
           username: runner
+          password: $SPREAD_PASSWORD
 
 suites:
   tests/spread/:
