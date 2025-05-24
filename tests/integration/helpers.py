@@ -689,27 +689,24 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     return action.results["primary"]
 
 
-async def get_tls_ca(
-    ops_test: OpsTest,
-    unit_name: str,
-) -> str:
+async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client") -> str:
     """Returns the TLS CA used by the unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        relation: TLS relation to get the CA from
 
     Returns:
         TLS CA or an empty string if there is no CA.
     """
     raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    endpoint = f"{relation}-certificates"
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
-    relation_data = [
-        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
-    ]
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == endpoint]
     if len(relation_data) == 0:
         return ""
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
@@ -838,7 +835,7 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled on Patroni REST API.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    tls_ca = await get_tls_ca(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name, "peer")
 
     # If there is no TLS CA in the relation, something is wrong in
     # the relation between the TLS Certificates Operator and PostgreSQL.
@@ -1132,7 +1129,10 @@ async def backup_operations(
     )
 
     await ops_test.model.relate(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.relate(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)

@@ -40,7 +40,6 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
-from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import JujuVersion, main
@@ -116,6 +115,8 @@ from constants import (
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
+from relations.tls import TLS
+from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
@@ -230,7 +231,8 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         PostgreSQLBackups,
         PostgreSQLLDAP,
         PostgreSQLProvider,
-        PostgreSQLTLS,
+        TLS,
+        TLSTransfer,
         RollingOpsManager,
     ),
 )
@@ -287,7 +289,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        self.tls = PostgreSQLTLS(self, PEER)
+        self.tls = TLS(self, PEER)
+        self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -1151,7 +1154,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_tls_files())
+        return all((*self.tls.get_client_tls_files(), *self.tls.get_peer_tls_files()))
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -2058,8 +2061,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Request the certificate only if there is already one. If there isn't,
         # the certificate will be generated in the relation joined event when
         # relating to the TLS Certificates Operator.
-        if all(self.tls.get_tls_files()):
-            self.tls._request_certificate(self.get_secret("unit", "private-key"))
+        if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
+            self.tls.refresh_tls_certificates_event.emit()
 
     @property
     def is_blocked(self) -> bool:
@@ -2143,13 +2146,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
-        key, ca, cert = self.tls.get_tls_files()
+        key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+
+        key, ca, cert = self.tls.get_peer_tls_files()
+        if key is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+        if ca is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+        if cert is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
 
         try:
             return self.update_config()
