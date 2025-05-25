@@ -24,7 +24,6 @@ from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
-    AttemptManager,
     RetryError,
     Retrying,
     retry,
