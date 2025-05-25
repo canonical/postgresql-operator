@@ -11,6 +11,7 @@ import pwd
 import re
 import shutil
 import subprocess
+from asyncio import gather, run
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
@@ -18,6 +19,7 @@ import charm_refresh
 import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
+from httpx import AsyncClient, BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -175,6 +177,10 @@ class Patroni:
         return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
     @property
+    def _patroni_async_auth(self) -> BasicAuth:
+        return BasicAuth(username="patroni", password=self.patroni_password)
+
+    @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
@@ -255,21 +261,8 @@ class Patroni:
         self, alternative_endpoints: Optional[list] = None
     ) -> Optional[list[ClusterMember]]:
         """Query the cluster status."""
-        # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                if alternative_endpoints:
-                    request_url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
-                else:
-                    request_url = self._patroni_url
-
-                cluster_status = requests.get(
-                    f"{request_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                return cluster_status.json()["members"]
+        response = self.parallel_patroni_request("get", PATRONI_CLUSTER_STATUS_ENDPOINT)
+        return response["members"]
 
     def get_member_ip(self, member_name: str) -> Optional[str]:
         """Get cluster member IP address.
@@ -305,6 +298,24 @@ class Patroni:
                 if member["name"] == member_name:
                     return member["state"]
         return ""
+
+    async def _async_request(self, method, uri, data=None):
+        for scheme in ("http", "https"):
+            urls = [f"{scheme}://{ip}{uri}" for ip in (self.unit_ip, *self.peers_ips)]
+        async with AsyncClient(auth=self._patroni_async_auth) as client:
+            caller = getattr(client, method)
+            if method == "get":
+                _results = await gather(*[
+                    caller(url, timeout=API_REQUEST_TIMEOUT) for url in urls
+                ])
+            else:
+                _results = await gather(*[
+                    caller(url, data=data, timeout=API_REQUEST_TIMEOUT) for url in urls
+                ])
+
+    def parallel_patroni_request(self, method, uri, data=None) -> dict:
+        """Call all possible patroni endpoints in parallel."""
+        return run(self._async_request(method, uri, data))
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
