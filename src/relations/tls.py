@@ -139,6 +139,8 @@ class TLS(Object):
             TLS_PEER_RELATION
         ):
             self.charm.set_unit_status(BlockedStatus(MISSING_TLS_RELATION_MESSAGE))
+            # Don't trigger update_config if TLS rels are in partial state
+            return
         else:
             self.charm._set_primary_status_message()
         if not self.charm.update_config():
