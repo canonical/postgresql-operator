@@ -19,8 +19,8 @@ from typing import TYPE_CHECKING, Any, Optional, TypedDict
 import charm_refresh
 import psutil
 import requests
+from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout
 from charms.operator_libs_linux.v2 import snap
-from httpx import AsyncClient, BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -123,6 +123,17 @@ class ClusterMember(TypedDict):
     lag: int
 
 
+async def _aiohttp_get_request(session, ssl_ctx, url):
+    try:
+        async with session.get(url, ssl=ssl_ctx) as response:
+            if response.status > 299:
+                logger.debug("Call failed with status code {response.status}: {response.text()}")
+                return
+            return await response.json()
+    except (ClientError, ValueError):
+        return None
+
+
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
@@ -180,7 +191,7 @@ class Patroni:
 
     @property
     def _patroni_async_auth(self) -> BasicAuth:
-        return BasicAuth(username="patroni", password=self.patroni_password)
+        return BasicAuth("patroni", password=self.patroni_password)
 
     @property
     def _patroni_url(self) -> str:
@@ -301,19 +312,20 @@ class Patroni:
         return ""
 
     async def _async_get_request(self, uri, data=None):
-        ctx = ssl.create_default_context()
+        ssl_ctx = ssl.create_default_context()
         try:
-            ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
+            ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
         except FileNotFoundError:
             logger.debug("No CA file in expected location.")
-        async with AsyncClient(
-            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ctx
-        ) as client:
+        async with ClientSession(
+            auth=self._patroni_async_auth,
+            timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),
+        ) as session:
             tasks = [
-                create_task(client.get(f"http://{ip}:8008{uri}"))
+                create_task(_aiohttp_get_request(session, ssl_ctx, f"http://{ip}:8008{uri}"))
                 for ip in (self.unit_ip, *self.peers_ips)
             ] + [
-                create_task(client.get(f"https://{ip}:8008{uri}"))
+                create_task(_aiohttp_get_request(session, ssl_ctx, f"https://{ip}:8008{uri}"))
                 for ip in (self.unit_ip, *self.peers_ips)
             ]
             while tasks:
@@ -323,16 +335,11 @@ class Patroni:
                     if task.exception():
                         continue
                     if result := task.result():
-                        if result.status_code > 299:
-                            logger.debug(
-                                "Call failed with status code {result.status_code}: {result.text}"
-                            )
-                            continue
                         if unfinished:
                             for task in unfinished:
                                 task.cancel()
                             await wait(unfinished)
-                        return result.json()
+                        return result
 
                 tasks = unfinished
 
