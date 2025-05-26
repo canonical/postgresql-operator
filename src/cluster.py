@@ -12,7 +12,7 @@ import re
 import shutil
 import ssl
 import subprocess
-from asyncio import as_completed, run
+from asyncio import FIRST_COMPLETED, create_task, run, wait
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
@@ -20,7 +20,7 @@ import charm_refresh
 import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
-from httpx import AsyncClient, BasicAuth, HTTPError
+from httpx import AsyncClient, BasicAuth
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -310,19 +310,31 @@ class Patroni:
             auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ctx
         ) as client:
             tasks = [
-                client.get(f"http://{ip}:8008{uri}") for ip in (self.unit_ip, *self.peers_ips)
-            ] + [client.get(f"https://{ip}:8008{uri}") for ip in (self.unit_ip, *self.peers_ips)]
-            for coro in as_completed(tasks):
-                try:
-                    result = await coro
-                    if result.status_code > 299:
-                        logger.debug(
-                            "Call failed with status code {result.status_code}: {result.text}"
-                        )
+                create_task(client.get(f"http://{ip}:8008{uri}"))
+                for ip in (self.unit_ip, *self.peers_ips)
+            ] + [
+                create_task(client.get(f"https://{ip}:8008{uri}"))
+                for ip in (self.unit_ip, *self.peers_ips)
+            ]
+            while tasks:
+                finished, unfinished = await wait(tasks, return_when=FIRST_COMPLETED)
+
+                for task in finished:
+                    if task.exception():
                         continue
-                    return result.json()
-                except HTTPError:
-                    continue
+                    if result := task.result():
+                        if result.status_code > 299:
+                            logger.debug(
+                                "Call failed with status code {result.status_code}: {result.text}"
+                            )
+                            continue
+                        if unfinished:
+                            for task in unfinished:
+                                task.cancel()
+                            await wait(unfinished)
+                        return result.json()
+
+                tasks = unfinished
 
     def parallel_patroni_get_request(self, uri) -> dict:
         """Call all possible patroni endpoints in parallel."""
