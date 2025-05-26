@@ -516,7 +516,12 @@ class Patroni:
         except RetryError:
             return True
 
-        return response["state"] not in [*RUNNING_STATES, "creating replica", "starting", "restarting"]
+        return response["state"] not in [
+            *RUNNING_STATES,
+            "creating replica",
+            "starting",
+            "restarting",
+        ]
 
     @property
     def member_replication_lag(self) -> str:
