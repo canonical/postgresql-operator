@@ -121,17 +121,6 @@ class ClusterMember(TypedDict):
     lag: int
 
 
-async def _aiohttp_get_request(session, ssl_ctx, url):
-    try:
-        async with session.get(url, ssl=ssl_ctx) as response:
-            if response.status > 299:
-                logger.debug("Call failed with status code {response.status}: {response.text()}")
-                return
-            return await response.json()
-    except (ClientError, ValueError):
-        return None
-
-
 class Patroni:
     """This class handles the bootstrap of a PostgreSQL database through Patroni."""
 
@@ -311,7 +300,7 @@ class Patroni:
                     return member["state"]
         return ""
 
-    async def _async_get_request(self, uri, endpoints):
+    async def _aiohttp_get_request(self, url):
         ssl_ctx = ssl.create_default_context()
         try:
             ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
@@ -321,16 +310,24 @@ class Patroni:
             auth=self._patroni_async_auth,
             timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),
         ) as session:
-            tasks = [
-                _aiohttp_get_request(session, ssl_ctx, f"http://{ip}:8008{uri}")
-                for ip in endpoints
-            ] + [
-                _aiohttp_get_request(session, ssl_ctx, f"https://{ip}:8008{uri}")
-                for ip in endpoints
-            ]
-            for routine in as_completed(tasks):
-                if result := await routine:
-                    return result
+            try:
+                async with session.get(url, ssl=ssl_ctx) as response:
+                    if response.status > 299:
+                        logger.debug(
+                            "Call failed with status code {response.status}: {response.text()}"
+                        )
+                        return
+                    return await response.json()
+            except (ClientError, ValueError):
+                return None
+
+    async def _async_get_request(self, uri, endpoints):
+        tasks = [self._aiohttp_get_request(f"http://{ip}:8008{uri}") for ip in endpoints] + [
+            self._aiohttp_get_request(f"https://{ip}:8008{uri}") for ip in endpoints
+        ]
+        for routine in as_completed(tasks):
+            if result := await routine:
+                return result
 
     def parallel_patroni_get_request(self, uri: str, endpoints: list[str] | None = None) -> dict:
         """Call all possible patroni endpoints in parallel."""
