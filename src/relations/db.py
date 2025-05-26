@@ -334,7 +334,7 @@ class DbProvides(Object):
 
         postgresql_version = None
         try:
-            postgresql_version = self.charm.postgresql.get_postgresql_version()
+            postgresql_version = self.charm.postgresql.get_postgresql_version(current_host=False)
         except PostgreSQLGetPostgreSQLVersionError:
             logger.exception(
                 f"Failed to retrieve the PostgreSQL version to initialise/update {self.relation_name} relation"
