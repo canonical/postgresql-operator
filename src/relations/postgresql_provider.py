@@ -154,18 +154,14 @@ class PostgreSQLProvider(Object):
             event.defer()
             return
 
-        has_member_started = self.charm._patroni.member_started
         user = f"relation-{event.relation.id}"
-        if (
-            not has_member_started
-            and (
-                self.charm.primary_endpoint is None
-                or user not in self.charm.postgresql.list_users()
-            )
-        ) or (
-            has_member_started and user not in self.charm.postgresql.list_users(current_host=True)
-        ):
-            logger.debug("Deferring on_relation_changed: user was not created yet")
+        try:
+            if user not in self.charm.postgresql.list_users():
+                logger.debug("Deferring on_relation_changed: user was not created yet")
+                event.defer()
+                return
+        except PostgreSQLListUsersError:
+            logger.debug("Deferring on_relation_changed: failed to list users")
             event.defer()
             return
 
