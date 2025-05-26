@@ -10,6 +10,7 @@ import os
 import pwd
 import re
 import shutil
+import ssl
 import subprocess
 from asyncio import as_completed, run
 from pathlib import Path
@@ -298,8 +299,13 @@ class Patroni:
         return ""
 
     async def _async_get_request(self, uri, data=None):
+        ctx = ssl.create_default_context()
+        try:
+            ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
+        except FileNotFoundError:
+            logger.debug("No CA file in expected location.")
         async with AsyncClient(
-            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT
+            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ctx
         ) as client:
             tasks = [
                 client.get(f"http://{ip}:8008{uri}") for ip in (self.unit_ip, *self.peers_ips)
