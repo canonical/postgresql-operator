@@ -427,7 +427,7 @@ async def deploy_and_relate_bundle_with_postgresql(
                 else:
                     await ops_test.juju("deploy", patched.name)
 
-    async with ops_test.fast_forward(fast_interval="30s"):
+    async with ops_test.fast_forward(fast_interval="60s"):
         # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
             main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
