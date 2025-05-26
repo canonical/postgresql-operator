@@ -224,6 +224,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     with (
         patch("requests.get") as _get,
         patch("charm.Patroni.get_primary"),
+        patch("charm.Patroni.get_member_ip"),
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
     ):
         # Test when replication is healthy.

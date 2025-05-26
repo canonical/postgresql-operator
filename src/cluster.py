@@ -12,7 +12,7 @@ import re
 import shutil
 import ssl
 import subprocess
-from asyncio import FIRST_COMPLETED, create_task, run, wait
+from asyncio import as_completed, run
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
@@ -53,8 +53,6 @@ from constants import (
 from utils import label2name
 
 logger = logging.getLogger(__name__)
-logging.getLogger("httpx").setLevel(logging.WARNING)
-logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
@@ -272,7 +270,9 @@ class Patroni:
 
     def cluster_status(self, alternative_endpoints: Optional[list] = None) -> list[ClusterMember]:
         """Query the cluster status."""
-        if response := self.parallel_patroni_get_request(f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}"):
+        if response := self.parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
+        ):
             return response["members"]
         return []
 
@@ -311,7 +311,7 @@ class Patroni:
                     return member["state"]
         return ""
 
-    async def _async_get_request(self, uri, data=None):
+    async def _async_get_request(self, uri, endpoints):
         ssl_ctx = ssl.create_default_context()
         try:
             ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
@@ -322,30 +322,21 @@ class Patroni:
             timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),
         ) as session:
             tasks = [
-                create_task(_aiohttp_get_request(session, ssl_ctx, f"http://{ip}:8008{uri}"))
-                for ip in (self.unit_ip, *self.peers_ips)
+                _aiohttp_get_request(session, ssl_ctx, f"http://{ip}:8008{uri}")
+                for ip in endpoints
             ] + [
-                create_task(_aiohttp_get_request(session, ssl_ctx, f"https://{ip}:8008{uri}"))
-                for ip in (self.unit_ip, *self.peers_ips)
+                _aiohttp_get_request(session, ssl_ctx, f"https://{ip}:8008{uri}")
+                for ip in endpoints
             ]
-            while tasks:
-                finished, unfinished = await wait(tasks, return_when=FIRST_COMPLETED)
+            for routine in as_completed(tasks):
+                if result := await routine:
+                    return result
 
-                for task in finished:
-                    if task.exception():
-                        continue
-                    if result := task.result():
-                        if unfinished:
-                            for task in unfinished:
-                                task.cancel()
-                            await wait(unfinished)
-                        return result
-
-                tasks = unfinished
-
-    def parallel_patroni_get_request(self, uri) -> dict:
+    def parallel_patroni_get_request(self, uri: str, endpoints: list[str] | None = None) -> dict:
         """Call all possible patroni endpoints in parallel."""
-        return run(self._async_get_request(uri))
+        if not endpoints:
+            endpoints = (self.unit_ip, *self.peers_ips)
+        return run(self._async_get_request(uri, endpoints))
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
@@ -382,26 +373,24 @@ class Patroni:
             standby leader pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if response := self.parallel_patroni_get_request(f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}"):
-            for member in response["members"]:
-                if member["role"] == "standby_leader":
-                    if check_whether_is_running and member["state"] not in RUNNING_STATES:
-                        logger.warning(f"standby leader {member['name']} is not running")
-                        continue
-                    standby_leader = member["name"]
-                    if unit_name_pattern:
-                        # Change the last dash to / in order to match unit name pattern.
-                        standby_leader = label2name(standby_leader)
-                    return standby_leader
+        for member in self.cluster_status():
+            if member["role"] == "standby_leader":
+                if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                    logger.warning(f"standby leader {member['name']} is not running")
+                    continue
+                standby_leader = member["name"]
+                if unit_name_pattern:
+                    # Change the last dash to / in order to match unit name pattern.
+                    standby_leader = label2name(standby_leader)
+                return standby_leader
 
     def get_sync_standby_names(self) -> list[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if response := self.parallel_patroni_get_request(f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}"):
-            for member in response["members"]:
-                if member["role"] == "sync_standby":
-                    sync_standbys.append(label2name(member["name"]))
+        for member in self.cluster_status():
+            if member["role"] == "sync_standby":
+                sync_standbys.append(label2name(member["name"]))
         return sync_standbys
 
     def are_all_members_ready(self) -> bool:
