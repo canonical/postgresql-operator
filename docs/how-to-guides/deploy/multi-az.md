@@ -1,5 +1,3 @@
-(how-to-guides-deploy-multi-az)=
-
 # Deploy on multiple availability zones (AZ) 
 
 During the deployment to hardware/VMs, it is important to spread all the

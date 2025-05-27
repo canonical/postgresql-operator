@@ -1,5 +1,3 @@
-(how-to-guides-cross-regional-async-replication-integrate-with-a-client-app)=
-
 # Integrate with a client application
 
 This guide will show you how to integrate a client application with a cross-regional async setup using an example PostgreSQL deployment with two servers: one in Rome and one in Lisbon.

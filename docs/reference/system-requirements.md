@@ -1,6 +1,3 @@
-(reference-system-requirements)=
-
-
 # System requirements
 
 The following are the minimum software and hardware requirements to run Charmed PostgreSQL on VM.

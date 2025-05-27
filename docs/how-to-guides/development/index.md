@@ -1,4 +1,3 @@
-(how-to-guides-development-index)=
 # Development
 
 ```{toctree}

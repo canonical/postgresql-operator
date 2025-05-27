@@ -1,6 +1,3 @@
-(explanation-security-index)=
-
-
 # Security hardening guide
 
 This document provides an overview of security features and guidance for hardening the security of [Charmed PostgreSQL](https://charmhub.io/postgresql) deployments, including setting up and managing a secure environment.

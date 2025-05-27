@@ -1,6 +1,3 @@
-(explanation-connection-pooling)=
-
-
 # Connection pooling 
 
 Connection pooling is a strategy to reduce the amount of active connections and the costs of reopening connections. It requires maintaining a set of persistently opened connections, called a pool, that can be reused by clients.

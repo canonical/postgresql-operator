@@ -1,5 +1,3 @@
-(how-to-guides-deploy-juju-storage)=
-
 # Deploy on Juju storage
 
 Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilize data volume provided by different [clouds](https://documentation.ubuntu.com/juju/3.6/reference/cloud/#cloud) while keeping the same UI/UX for end users.
@@ -268,9 +266,7 @@ Deployed "postgresql" from charm-hub charm "postgresql", revision 613 in channel
 > juju status
 ...
 Unit           Workload  Agent  Machine  Public address  Ports     Message
-postgresql/1*  active    idle   1        10.189.210.179  5432/tcp  Primary
-
-# Check the old data access once deployment completed (use new App IP!):
+postgresql/1*  active    idle   1        10.189.210.179  5432/tcp  Primary# Check the old data access once deployment completed (use new App IP!):
 > PGPASSWORD=I8mkza6vIhD2w1Rh psql -h 10.189.210.179 -U operator -d postgres -c "\d"
         List of relations
  Schema | Name | Type  |  Owner   

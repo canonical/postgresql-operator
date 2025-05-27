@@ -1,6 +1,3 @@
-(how-to-guides-upgrade-perform-a-minor-rollback)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.0`
 

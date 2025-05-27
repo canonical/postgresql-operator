@@ -1,6 +1,3 @@
-(how-to-guides-monitoring-cos-enable-alert-rules)=
-
-
 # How to enable COS Alert Rules
 
 This guide will show how to set up [Pushover](https://pushover.net/) to receive alert notifications from the COS Alert Manager with [Awesome Alert Rules](https://samber.github.io/awesome-prometheus-alerts/).

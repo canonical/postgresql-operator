@@ -1,6 +1,3 @@
-(how-to-guides-monitoring-cos-enable-profiling)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v3.1`
 

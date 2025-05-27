@@ -1,4 +1,3 @@
-(how-to-guides-monitoring-cos-index)=
 # Monitoring (COS)
 
 ```{toctree}

@@ -1,5 +1,3 @@
-(how-to-guides-deploy-index)=
-
 # How to deploy
 
 This page aims to provide an introduction to the PostgreSQL deployment process and lists all the related guides. It contains the following sections:

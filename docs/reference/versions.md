@@ -1,6 +1,3 @@
-(reference-versions)=
-
-
 # PostgreSQL major versions
 
 Charmed PostgreSQL is shipped in following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track): 

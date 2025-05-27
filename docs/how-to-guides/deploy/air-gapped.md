@@ -1,5 +1,3 @@
-(how-to-guides-deploy-air-gapped)=
-
 # Deploy in an offline or air-gapped environment
 
 An air-gapped environment refers to a system that does not have access to the public internet.

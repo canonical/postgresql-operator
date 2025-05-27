@@ -1,6 +1,3 @@
-(reference-contacts)=
-
-
 # Contact
 
 Charmed PostgreSQL is an open source project that warmly welcomes community contributions, suggestions, fixes, and constructive feedback:

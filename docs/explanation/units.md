@@ -1,6 +1,3 @@
-(explanation-units)=
-
-
 # PostgreSQL units
 
 Each [HA](https://en.wikipedia.org/wiki/High_availability)/[DR](https://en.wikipedia.org/wiki/IT_disaster_recovery) implementation has a primary and secondary (standby) site(s).

@@ -1,6 +1,3 @@
-(reference-troubleshooting-cli-helpers)=
-
-
 # CLI helpers
 
 This page describes some useful low-level tools shipped withing Charmed PostgreSQL for advanced troubleshooting.

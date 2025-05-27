@@ -1,6 +1,3 @@
-(how-to-guides-integrate-with-another-application)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.0`
 

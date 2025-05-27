@@ -1,6 +1,3 @@
-(explanation-juju)=
-
-
 # Juju
 
 [Juju](https://juju.is/) is an open source orchestration engine for software operators that enables the deployment, integration and lifecycle management of applications at any scale, on any infrastructure using charms.

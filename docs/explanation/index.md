@@ -1,6 +1,3 @@
-(explanation-index)=
-
-
 # Explanation
 
 This section contains pages with more detailed explanations that provide additional context about key concepts behind the PostgreSQL charm.

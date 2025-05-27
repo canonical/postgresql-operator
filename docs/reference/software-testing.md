@@ -1,6 +1,3 @@
-(reference-software-testing)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.1`
 

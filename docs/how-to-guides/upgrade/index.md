@@ -1,6 +1,3 @@
-(how-to-guides-upgrade-index)=
-
-
 # Upgrade
 
 Currently, the charm supports PostgreSQL major version 14 only. Therefore, in-place upgrades/rollbacks are not possible for major versions. 

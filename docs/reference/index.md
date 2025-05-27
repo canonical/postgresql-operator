@@ -1,6 +1,3 @@
-(reference-index)=
-
-
 # Reference
 
 Technical specifications, APIs, release notes, and other reference material for fast lookup.

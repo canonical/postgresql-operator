@@ -1,5 +1,3 @@
-(explanation-legacy-charm)=
-
 # Charm types: "legacy" vs "modern"
 
 There are [two types of charms](https://juju.is/docs/sdk/charm-taxonomy#charm-types-by-generation) stored under the same charm name `postgresql`:

@@ -1,5 +1,3 @@
-(how-to-guides-deploy-tls-vip-access)=
-
 # Deploy for external TLS VIP access
 
 This guide goes over an example deployment of PostgreSQL, PgBouncer and HAcluster that require external TLS/SSL access via [Virtual IP (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address).   

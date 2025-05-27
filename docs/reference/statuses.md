@@ -1,6 +1,3 @@
-(reference-statuses)=
-
-
 # Charm statuses
 
 > :warning: **WARNING** : This is an work-in-progress article. Do NOT use it in production! Contact [Canonical Data Platform team](https://chat.charmhub.io/charmhub/channels/data-platform) if you are interested in the topic.

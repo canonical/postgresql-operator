@@ -1,5 +1,3 @@
-(how-to-guides-deploy-sunbeam)=
-
 # How to deploy on Sunbeam
 
 > **Duration** : Up to 60 minutes depending on internet download speed.
@@ -31,13 +29,13 @@ To summarize, the relevant sections are:
 
 ## Deploy Charmed PostgreSQL
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
-```shell
+```terminal
 juju add-model postgresql
 juju deploy postgresql --base ubuntu@22.04 -n 3
 ```
 
 Sample output of `juju status --watch 1s`:
-```shell
+```terminal
 Model       Controller     Cloud/Region       Version  SLA          Timestamp
 postgresql  my-controller  sunbeam/RegionOne  3.5.4    unsupported  19:42:44Z
 
@@ -57,13 +55,14 @@ Machine  State    Address          Inst id                               Base   
 
 ## (Optional) Access the OpenStack dashboard 
 Follow the official guide: [Accessing the OpenStack dashboard].
-```{note}
+
+````{note}
 When using a Multipass VM, you may need to manually route OpenStack IPs. For example:
-```
+```terminal
 sudo ip route add 10.10.10.0/24 via 10.76.203.210 
 ```
 where `10.76.203.210` is the IP of the Multipass VM and  `10.10.10.0` is the network returned by `sunbeam dashboard-url`. 
-```
+````
 
 The image below is an example of the OpenStack dashboard view (bastion + juju controller + 3 `postgresql` nodes):
 

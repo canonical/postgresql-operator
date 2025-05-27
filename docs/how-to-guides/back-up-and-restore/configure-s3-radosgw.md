@@ -1,6 +1,3 @@
-(how-to-guides-back-up-and-restore-configure-s3-radosgw)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.0`
 

@@ -1,5 +1,3 @@
-(how-to-guides-deploy-gce)=
-
 # How to deploy on GCE
 
 [Google Compute Engine](https://cloud.google.com/products/compute) is a popular subsidiary of Google that provides on-demand cloud computing platforms on a metered pay-as-you-go basis. Access the GCloud web console at [console.cloud.google.com](https://console.cloud.google.com/compute/instances).

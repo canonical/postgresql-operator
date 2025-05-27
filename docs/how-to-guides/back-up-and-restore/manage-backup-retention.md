@@ -1,6 +1,3 @@
-(how-to-guides-back-up-and-restore-manage-backup-retention)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.0`
 

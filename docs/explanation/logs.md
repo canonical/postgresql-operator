@@ -1,6 +1,3 @@
-(explanation-logs)=
-
-
 # Logs
 
 The list of all the charm components are well described in the "[Architecture](/explanation/architecture)".

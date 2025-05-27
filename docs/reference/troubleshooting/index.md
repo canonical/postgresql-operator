@@ -1,5 +1,3 @@
-(reference-troubleshooting-index)=
-
 # Troubleshooting
 
 ```{caution}

@@ -1,6 +1,3 @@
-(how-to-guides-development-migrate-data-via-pg-dump)=
-
-
 # Migrate database data using `pg_dump` / `pg_restore`
 
 This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to-guides/development/integrate-with-your-charm). 

@@ -1,6 +1,3 @@
-(how-to-guides-monitoring-cos-enable-monitoring)=
-
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.0`
 

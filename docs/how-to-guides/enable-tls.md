@@ -1,5 +1,3 @@
-(how-to-guides-enable-tls)=
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.1`
 

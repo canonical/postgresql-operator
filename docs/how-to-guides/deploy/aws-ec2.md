@@ -1,5 +1,3 @@
-(how-to-guides-deploy-aws-ec2)=
-
 # How to deploy on AWS EC2
 
 [Amazon Web Services](https://aws.amazon.com/) is a popular subsidiary of Amazon that provides on-demand cloud computing platforms on a metered pay-as-you-go basis. Access the AWS web console at [console.aws.amazon.com](https://console.aws.amazon.com/).
