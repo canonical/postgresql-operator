@@ -1,8 +1,3 @@
-(tutorial-6-integrate-with-other-applications)=
-
-
->[Charmed PostgreSQL VM Tutorial](https://discourse.charmhub.io/t/9707) > 5. Integrate with other applications
-
 # Integrate with other applications
 
 [Integrations](https://juju.is/docs/sdk/integration), known as "relations" in Juju 2.9, are the easiest way to create a user for PostgreSQL in Charmed PostgreSQL VM. 
@@ -159,6 +154,4 @@ juju run data-integrator/leader get-credentials
 ```
 You can then connect to the database with these new credentials.
 From here you will see all of your data is still present in the database.
-
-**Next step:** [6. Enable TLS](/tutorial/7-enable-tls-encryption)
 

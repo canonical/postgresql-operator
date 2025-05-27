@@ -42,5 +42,13 @@ This section contains pages with more detailed explanations that provide additio
 :glob:
 :hidden:
 
-*
-*/index
+Architecture <architecture>
+Interfaces and endpoints <interfaces-and-endpoints>
+Juju <juju>
+Legacy charm <legacy-charm>
+Units <units>
+Users <users>
+Roles <roles>
+Logs <logs>
+Connection pooling <connection-pooling>
+Security <security/index>

@@ -117,5 +117,18 @@ This section is for charm developers looking to support PostgreSQL integrations 
 :glob:
 :hidden:
 
-*
-*/index
+Deploy <deploy/index>
+Integrate <integrate-with-another-application>
+Manage passwords <manage-passwords>
+External network access <external-network-access>
+Scale <scale-replicas>
+Switchover/failover <switchover-failover>
+Enable TLS <enable-tls>
+Enable LDAP <enable-ldap>
+Enable plugins/extensions <enable-plugins-extensions/index>
+Back up and restore <back-up-and-restore/index>
+Monitoring (COS) <monitoring-cos/index>
+Upgrade <upgrade/index>
+Cross-regional async replication <cross-regional-async-replication/index>
+Development <development/index>
+

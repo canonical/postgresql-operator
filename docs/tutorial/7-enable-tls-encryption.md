@@ -1,8 +1,3 @@
-(tutorial-7-enable-tls-encryption)=
-
-
-> [Charmed PostgreSQL VM Tutorial](/tutorial/index) > 6. Enable encryption with TLS
-
 # Enable encryption with TLS
 
 [Transport Layer Security (TLS)](https://en.wikipedia.org/wiki/Transport_Layer_Security) is a protocol used to encrypt data exchanged between two applications. Essentially, it secures data transmitted over a network.
@@ -80,6 +75,4 @@ No client certificate CA names sent
 ...
 ```
 The Charmed PostgreSQL VM application is not using TLS anymore.
-
-**Next step:** [7. Clean up environment](/tutorial/8-clean-up-environment)
 

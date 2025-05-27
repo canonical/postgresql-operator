@@ -19,7 +19,7 @@ wget -qO- https://raw.githubusercontent.com/canonical/maas-multipass/main/maas.y
 ```
 > The wget command provides a [cloud-init](https://github.com/canonical/maas-multipass/blob/main/maas.yml) file that will set up the VM's LXD and MAAS environment.
 
- ## Configure MAAS
+## Configure MAAS
 
 **1.** Find your MAAS IP with
 ```shell
@@ -64,7 +64,7 @@ The LXD machine will be up and running after the images downloading and sync is 
 multipass exec maas -- sudo maas apikey --username admin
 ```
 
- ## Register MAAS with Juju
+## Register MAAS with Juju
 
 **1.** Enter the Multipass shell and install juju:
 ```shell
@@ -111,7 +111,7 @@ Add the flags `--credential` if you registered several MAAS credentials, and `--
 juju bootstrap --constraints tags=juju maas-cloud maas-controller
 ```
 
-# Deploy Charmed PostgreSQL on MAAS
+## Deploy Charmed PostgreSQL on MAAS
 ```shell
 juju add-model postgresql maas-cloud
 juju deploy postgresql --channel 14/stable
@@ -132,11 +132,11 @@ Machine  State    Address     Inst id        Base          AZ       Message
 0        started  10.10.10.5  wanted-dassie  ubuntu@22.04  default  Deployed
 ```
 
-# Test your Charmed PostgreSQL deployment
+## Test your Charmed PostgreSQL deployment
 
 Check the [Testing](/reference/software-testing) reference to test your deployment.
 
- ## Clean up the environment
+## Clean up the environment
 To stop your VM, run: 
 ```shell
 multipass stop maas

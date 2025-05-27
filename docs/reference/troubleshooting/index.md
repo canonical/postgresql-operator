@@ -1,6 +1,5 @@
 (reference-troubleshooting-index)=
 
-
 # Troubleshooting
 
 ```{caution}
@@ -196,4 +195,5 @@ ubuntu@juju-fd7874-0:~$
 :glob:
 :hidden:
 
-*
+SOS report <sos-report>
+CLI helpers <cli-helpers>

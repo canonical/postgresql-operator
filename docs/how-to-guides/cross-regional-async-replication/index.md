@@ -38,4 +38,6 @@ The following table shows the source and target controller/model combinations th
 :glob:
 :hidden:
 
-*
+Set up clusters <set-up-clusters>
+Integrate with a client app <integrate-with-a-client-app>
+Remove or recover a cluster <remove-or-recover-a-cluster>

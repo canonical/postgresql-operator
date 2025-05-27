@@ -1,8 +1,3 @@
-(tutorial-1-set-up-environment)=
-
-
-> [Charmed PostgreSQL VM Tutorial](/tutorial/index) >  1. Set up the environment
-
 # Set up the environment
 
 In this step, we will set up a development environment with the required components for deploying Charmed PostgreSQL.

@@ -33,4 +33,11 @@ This Charmed PostgreSQL tutorial has the following parts:
 :glob:
 :hidden:
 
-*
+1. Set up the environment <1-set-up-environment>
+2. Deploy PostgreSQL <2-deploy-postgresql>
+3. Access PostgreSQL <3-access-postgresql>
+4. Scale replicas <4-scale-replicas>
+5. Manage passwords <5-manage-passwords>
+6. Integrate with other applications <6-integrate-with-other-applications>
+7. Enable TLS encryption <7-enable-tls-encryption>
+8. Clean up the environment <8-clean-up-environment>

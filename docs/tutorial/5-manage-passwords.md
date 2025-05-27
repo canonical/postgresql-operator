@@ -1,8 +1,3 @@
-(tutorial-5-manage-passwords)=
-
-
-> [Charmed PostgreSQL VM Tutorial](/tutorial/index) > 4. Manage passwords
-
 # Manage passwords
 
 When we accessed PostgreSQL earlier in this tutorial, we needed to use a password manually. Passwords help to secure our database and are essential for security. Over time, it is a good practice to change the password frequently. 
@@ -87,6 +82,4 @@ To set a manual password for another user, run the following command:
 juju run postgresql/leader set-password username=my-user password=my-password
 ```
 Read more about internal operator users [here](/explanation/users).
-
-**Next step:** [5. Integrate with other applications](/tutorial/6-integrate-with-other-applications)
 

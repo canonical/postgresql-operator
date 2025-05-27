@@ -49,4 +49,4 @@ If the application charm uses the new `postgresql_client` interface, it can use 
 :glob:
 :hidden:
 
-*
+Enable TimescaleDB <enable-timescaledb>

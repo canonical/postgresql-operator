@@ -101,4 +101,4 @@ For details on the cryptography used by Charmed PostgreSQL, see the [Cryptograph
 :glob:
 :hidden:
 
-*
+Cryptography <cryptography>

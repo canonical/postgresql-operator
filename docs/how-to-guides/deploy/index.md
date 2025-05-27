@@ -98,4 +98,14 @@ See: [How to deploy on juju storage]
 :glob:
 :hidden:
 
-*
+Sunbeam <sunbeam>
+MAAS <maas>
+AWS EC2 <aws-ec2>
+GCE <gce>
+Azure <azure>
+Multi-AZ <multi-az>
+TLS VIP access <tls-vip-access>
+Terraform <terraform>
+Air-gapped <air-gapped>
+Juju spaces <juju-spaces>
+Juju storage <juju-storage>

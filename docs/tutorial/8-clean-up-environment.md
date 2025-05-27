@@ -1,8 +1,3 @@
-(tutorial-8-clean-up-environment)=
-
-
-> [Charmed PostgreSQL VM Tutorial](/tutorial/index) > 7. Clean up environment
-
 # Clean up your environment
 
 In this tutorial we've successfully deployed PostgreSQL on LXD, added and removed cluster members, added and removed database users, and enabled a layer of security with TLS.

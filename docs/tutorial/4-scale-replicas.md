@@ -1,9 +1,5 @@
-(tutorial-4-scale-replicas)=
-
-
-> [Charmed PostgreSQL VM Tutorial](/tutorial/index) > 3. Scale replicas
-
 # Scale your replicas
+
 In this section, you will learn to scale your Charmed PostgreSQL by adding or removing juju units. 
 
 The Charmed PostgreSQL VM operator uses a [PostgreSQL Patroni-based cluster](https://patroni.readthedocs.io/en/latest/) for scaling. It provides features such as automatic membership management, fault tolerance, and automatic failover. The charm uses PostgreSQL’s [synchronous replication](https://patroni.readthedocs.io/en/latest/replication_modes.html#postgresql-k8s-synchronous-replication) with Patroni.
@@ -73,6 +69,4 @@ Machine  State    Address       Inst id        Series  AZ  Message
 0        started  10.89.49.129  juju-a8a31d-0  jammy       Running
 1        started  10.89.49.197  juju-a8a31d-1  jammy       Running
 ```
-
-**Next step:** [4. Manage passwords](/tutorial/5-manage-passwords)
 

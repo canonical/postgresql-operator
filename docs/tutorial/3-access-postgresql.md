@@ -1,8 +1,3 @@
-(tutorial-3-access-postgresql)=
-
-
-> [Charmed PostgreSQL Tutorial](/tutorial/index) > 3. Access PostgreSQL
-
 # Access PostgreSQL
 
 In this section, you will learn how to get the credentials of your deployment, connect to the PostgreSQL instance, view its default databases, and finally, create your own new database. 
@@ -94,3 +89,62 @@ Now you are successfully logged in the interactive terminal. Here it is possible
 ```shell
 postgres=# SELECT version();
                                                              version
+---------------------------------------------------------------------------------------------------------------------------------
+ PostgreSQL 14.10 (Ubuntu 14.10-0ubuntu0.22.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, 64-bit
+(1 row)
+```
+
+We can see that PostgreSQL version 14.10 is installed. From this prompt, to print the list of available databases, we can simply run this command:
+
+```shell
+postgres=# \l
+```
+
+The output should be the same as the one obtained before with `psql`, but this time we did not need to specify any parameters since we are already connected to the PostgreSQL application.
+
+### Create a new database
+For creating and connecting to a new sample database, we can run the following commands:
+```shell
+postgres=# CREATE DATABASE mynewdatabase;
+postgres=# \c mynewdatabase
+
+You are now connected to database "mynewdatabase" as user "operator".
+```
+
+We can now create a new table inside this database:
+
+```shell
+postgres=# CREATE TABLE mytable (
+	id SERIAL PRIMARY KEY,
+	name VARCHAR(50),
+	age INT
+);
+```
+
+And insert an element into it:
+
+```shell
+postgres=# INSERT INTO mytable (name, age) VALUES ('John', 30);
+```
+
+We can see our new table element by submitting a query:
+
+```shell
+postgres=# SELECT * FROM mytable;
+
+ id | name | age
+----+------+-----
+  1 | John |  30
+(1 row)
+```
+
+You can try multiple SQL commands inside this environment. Once you're ready, reconnect to the default postgres database and drop the sample database we created:
+
+```shell
+postgres=# \c postgres
+
+You are now connected to database "postgres" as user "operator".
+postgres=# DROP DATABASE mynewdatabase;
+```
+
+When you’re ready to leave the PostgreSQL shell, you can just type `exit`. This will take you back to the host of Charmed PostgreSQL (`postgresql/0`). Exit this host by once again typing exit. Now you will be in your original shell where you first started the tutorial. Here you can interact with Juju and LXD.

@@ -46,5 +46,13 @@ Technical specifications, APIs, release notes, and other reference material for 
 :glob:
 :hidden:
 
-*
-*/index
+Releases <releases>
+Versions <versions>
+System requirements <system-requirements>
+Software testing <software-testing>
+Performance and resources <performance-and-resources>
+Troubleshooting <troubleshooting/index>
+Plugins/extensions <plugins-extensions>
+Alert rules <alert-rules>
+Statuses <statuses>
+Contacts <contacts>

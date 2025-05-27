@@ -1,8 +1,3 @@
-(tutorial-2-deploy-postgresql)=
-
-
-> [Charmed PostgreSQL VM Tutorial](/tutorial/index) > 2. Deploy PostgreSQL
-
 # Deploy Charmed PostgreSQL VM
 
 In this section, you will deploy Charmed PostgreSQL VM, access a unit, and interact with the PostgreSQL databases that exist inside the application.

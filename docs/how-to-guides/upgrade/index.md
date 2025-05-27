@@ -21,4 +21,5 @@ For instructions on carrying out **minor version upgrades**, see the following g
 :glob:
 :hidden:
 
-*
+Perform a minor upgrade <perform-a-minor-upgrade>
+Perform a minor rollback <perform-a-minor-rollback>
