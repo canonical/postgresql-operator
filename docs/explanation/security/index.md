@@ -88,9 +88,9 @@ For more implementation details, see the [PostgreSQL documentation](https://www.
 
 Charmed PostgreSQL provides native integration with the [Canonical Observability Stack (COS)](https://charmhub.io/topics/canonical-observability-stack). To reduce the blast radius of infrastructure disruptions, the general recommendation is to deploy COS and the observed application into separate environments, isolated from one another. Refer to the [COS production deployments best practices](https://charmhub.io/topics/canonical-observability-stack/reference/best-practices) for more information or see the How to guides for PostgreSQL [monitoring](https://canonical.com/data/docs/postgresql/iaas/h-enable-monitoring), [alert rules](https://canonical.com/data/docs/postgresql/iaas/h-enable-alert-rules), and [tracing](https://canonical.com/data/docs/postgresql/iaas/h-enable-tracing) for practical instructions.
 
-PostgreSQL logs are stored in `/var/snap/charmed-postgresql/common/var/log/postgresql` within the postgresql container of each unit. It’s recommended to integrate the charm with [COS](/how-to-guides/monitoring-cos/enable-monitoring), from where the logs can be easily persisted and queried using [Loki](https://charmhub.io/loki-k8s)/[Grafana](https://charmhub.io/grafana).
+PostgreSQL logs are stored in `/var/snap/charmed-postgresql/common/var/log/postgresql` within the PostgreSQL container of each unit. It’s recommended to integrate the charm with [COS](/how-to-guides/monitoring-cos/enable-monitoring), from where the logs can be easily persisted and queried using [Loki](https://charmhub.io/loki-k8s)/[Grafana](https://charmhub.io/grafana).
 
-## Additional Resources
+## Additional resources
 
 For details on the cryptography used by Charmed PostgreSQL, see the [Cryptography](/explanation/security/cryptography) explanation page.
 

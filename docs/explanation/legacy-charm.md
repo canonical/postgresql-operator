@@ -34,7 +34,7 @@ The "modern" charm provides temporary support for the legacy interfaces:
 
 **Note**: the `trust` option must be enabled if [ Role Based Access Control (RBAC)](https://kubernetes.io/docs/concepts/security/rbac-good-practices/) is in use on your Kubernetes.
 
-## How to deploy old "legacy" postgresql charm
+## How to deploy old "legacy" PostgreSQL charm
 
 Deploy the charm using the channel `latest/stable`:
 

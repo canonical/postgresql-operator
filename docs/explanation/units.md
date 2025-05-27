@@ -46,7 +46,7 @@ primary: postgresql/0
 
 Also it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers).
 
-## Standby / Replica
+## Standby / replica
 
 At the moment it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers) only (check the linked documentation for the access details). Example:
 ```shell

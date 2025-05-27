@@ -1,6 +1,5 @@
 (explanation-roles)=
 
-
 # Roles 
 
 > **Note**: check the separate [Users](/explanation/users) explanations first.
@@ -11,7 +10,7 @@ There are several definitions of Roles in Charmed PostgreSQL:
   *  LDAP-specific roles 
 * Extra user roles relation flag
 
-## Predefined PostgreSQL 16 Roles
+## Predefined PostgreSQL 16 roles
 
 ```shell
 test123=> SELECT * FROM pg_roles;
@@ -34,7 +33,7 @@ test123=> SELECT * FROM pg_roles;
 ...
 ```
 
-## Charmed PostgreSQL 16 Roles
+## Charmed PostgreSQL 16 roles
 
 Charmed PostgreSQL 16 introduced the following instance level predefined roles:
 
@@ -57,7 +56,7 @@ test123=> SELECT * FROM pg_roles;
 ...
 ```
 
-## Charmed PostgreSQL 14 Roles
+## Charmed PostgreSQL 14 roles
 
 Charmed PostgreSQL 14 ships the minimal necessary roles logic: each application relation got a user with dedicated role matching the resources owner. It can be fine-tuned using extra-users-roles relation flag.  In general the following roles available for track `14`:
 
@@ -85,7 +84,7 @@ postgres=# SELECT * FROM pg_roles;
 ...
 ```
 
-### Predefined Charmed PostgreSQL 14 Roles
+### Predefined Charmed PostgreSQL 14 roles
 
 ```shell
 postgres=# SELECT * FROM pg_roles;
@@ -102,7 +101,7 @@ postgres=# SELECT * FROM pg_roles;
 ...
 ```
 
-### Relation specific Roles
+### Relation specific roles
 
 For each application/relation the dedicated user is been created (with matching role and all all resources ownership). The resources ownership is being updated on each re-relation for new users/roles regeneration. Example of simple application relation to PostgreSQL and creating table:
 
@@ -162,7 +161,7 @@ In this case there several records created to:
  * `relation-14` - for relation between PgBouncer and PostgreSQL
  * `pgbouncer_auth_relation_14` - to authenticate end-users which connects PgBouncer
 
-### Charmed PostgreSQL LDAP Roles
+### Charmed PostgreSQL LDAP roles
 
 To map LDAP users to PostgreSQL users, the dedicated LDAP groups have to be created before hand using [Data Integrator](https://charmhub.io/data-integrator) charm.
 The result of such mapping will be a new PostgreSQL Roles:

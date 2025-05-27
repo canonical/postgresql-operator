@@ -1,6 +1,5 @@
 (explanation-architecture)=
 
-
 # Architecture
 
 [PostgreSQL](https://www.postgresql.org/) is one of the most popular open source database. The “[Charmed PostgreSQL](https://charmhub.io/postgresql)” is a Juju-based operator to deploy and support PostgreSQL from [day 0 to day 2](https://codilime.com/blog/day-0-day-1-day-2-the-software-lifecycle-in-the-cloud-age/), it is based on the [PostgreSQL Community Edition](https://www.postgresql.org/community/) using the [Patroni](https://github.com/zalando/patroni) to manage PostgreSQL cluster based on [PostgreSQL synchronous replication](https://patroni.readthedocs.io/en/latest/replication_modes.html#postgresql-synchronous-replication).
@@ -62,19 +61,19 @@ The snap "charmed-postgresql" also ships list of tools used by charm:
 
 [PgBouncer](http://www.pgbouncer.org/) is a lightweight connection pooler for PostgreSQL that provides transparent routing between your application and back-end PostgreSQL Servers. The "[PgBouncer](https://charmhub.io/pgbouncer)" is an independent charm "Charmed PostgreSQL" can be related with.
 
-### TLS Certificates Operator
+### TLS certificates operator
 
-[TLS Certificates](https://charmhub.io/tls-certificates-operator) charm responsible for distributing certificates through relationship. Certificates are provided by the operator through Juju configs. For the playground deployments, the [self-signed operator](https://charmhub.io/self-signed-certificates) is available as well.
+The [TLS Certificates](https://charmhub.io/tls-certificates-operator) charm is responsible for distributing certificates through relationship. Certificates are provided by the operator through Juju configs. For the playground deployments, the [self-signed operator](https://charmhub.io/self-signed-certificates) is available as well.
 
-### S3 Integrator
+### S3 integrator
 
 [S3 Integrator](https://charmhub.io/s3-integrator) is an integrator charm for providing S3 credentials to Charmed PostgreSQL which seek to access shared S3 data. Store the credentials centrally in the integrator charm and relate consumer charms as needed.
 
-### Data Integrator
+### Data integrator
 
 [Data Integrator](https://charmhub.io/data-integrator) charm is a solution to request DB credentials for non-native Juju applications. Not all applications implement a data_interfaces relation but allow setting credentials via config. Also, some of the applications are run outside of juju. This integrator charm allows receiving credentials which can be passed into application config directly without implementing juju-native relation.
 
-### PostgreSQL Test App
+### PostgreSQL test app
 
 The charm "[PostgreSQL Test App](https://charmhub.io/postgresql-test-app)" is a Canonical test application to validate the charm installation / functionality and perform the basic performance tests.
 
@@ -94,14 +93,13 @@ Loki is an open-source fully-featured logging system. This charms is shipped wit
 
 Prometheus is an open-source systems monitoring and alerting toolkit with a dimensional data model, flexible query language, efficient time series database and modern alerting approach. This charm is shipped with a Prometheus exporters, alerts and support for integrating with the [Prometheus Operator](https://charmhub.io/prometheus-k8s) to automatically scrape the targets. Please follow [COS Monitoring](/how-to-guides/monitoring-cos/enable-monitoring) setup.
 
-<a name="lld"></a>
 ## LLD (Low Level Design)
 
 Please check the charm state machines displayed in the [workflow diagrams](https://discourse.charmhub.io/t/charmed-postgresql-k8s-explanations-charm-flowcharts/9305). The low-level logic is mostly common for both VM and K8s charms.
 
 <!--- TODO: Describe all possible installations? Cross-model/controller? --->
 
-### Juju Events
+### Juju events
 
 Accordingly to the [Juju SDK](https://juju.is/docs/sdk/event): “an event is a data structure that encapsulates part of the execution context of a charm”.
 
@@ -117,7 +115,7 @@ For this charm, the following events are observed:
 8. TODO: any other events?
 --->
 
-### Charm Code Overview
+### Charm code overview
 
 The "[src/charm.py](https://github.com/canonical/postgresql-operator/blob/main/src/charm.py)" is the default entry point for a charm and has the `PostgresqlOperatorCharm` Python class which inherits from CharmBase.
 
