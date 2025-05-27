@@ -74,7 +74,7 @@ The similar way as above, COS alerts can be send to the long [list of supported 
 Do you have questions? [Contact us]!
 
 <!-- Links -->
-[Contact us]: /
+[Contact us]: /reference/contacts
 [Charmed PostgreSQL VM operator]: /tutorial/2-deploy-postgresql
 [COS Monitoring]: /how-to-guides/monitoring-cos/enable-monitoring
 [list of Awesome Alert Rules]: /reference/alert-rules

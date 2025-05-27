@@ -26,7 +26,7 @@ This page goes over some recommended tools and approaches to troubleshooting the
 Before anything, always run `juju status` to check the [list of charm statuses](/reference/statuses) and the recommended fixes. This alone may already solve your issue. 
 
 Otherwise, this reference goes over how to troubleshoot this charm via:
-- [`juju` logs](#logs)
+- [`juju` logs](#juju-logs)
 - [`snap-based charm`](#snap-based-charm)
 - [Installing extra software](#install-extra-software)
 
@@ -169,7 +169,7 @@ Continue troubleshooting your database/SQL related issues from here.<br/>
 
 It is NOT recommended to restart services directly as it might create a split brain situation with operator internal state. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to-guides/scale-replicas) to recover the cluster state.
 
-As a last resort, [contact us](/) if you cannot determine the source of your issue.
+As a last resort, [contact us](/reference/contacts) if you cannot determine the source of your issue.
 
 Also, feel free to improve this document!
 

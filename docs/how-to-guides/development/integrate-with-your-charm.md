@@ -5,14 +5,6 @@
 
 Charmed PostgreSQL can be integrated with any charmed application that supports its interfaces. This page provides some guidance and resources for charm developers to develop, integrate, and troubleshoot their charm so that it may connect with PostgreSQL.
 
-## Summary
-* Check supported interfaces 
-* Integrate your charm with PostgreSQL
-* Troubleshooting & testing
-* FAQ
-
----
-
 ## Check supported interfaces
 First, we recommend that you check [the supported interfaces](/explanation/interfaces-and-endpoints) of the current charm. You have the option to use modern (preferred) or legacy interfaces. 
 
@@ -28,7 +20,7 @@ Legacy charm details are described [here](/explanation/legacy-charm).
 **For some practical examples**, take a look at the following:
 * [postgresql-test-app](https://github.com/canonical/postgresql-test-app) GitHub repository
 *  [juju-sdk-tutorial-k8s](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_integrate_with_psql) - the branch `04_integrate_with_psql` describes integration with Charmed PostgreSQL K8s 
-* [How to migrate Nextcloud to new PostgreSQL (vm-charms)](/) guide
+* [How to migrate Nextcloud to new PostgreSQL (vm-charms)](https://discourse.charmhub.io/t/nextcloud-postgresql-how-to-migrate-nextcloud-to-new-postgresql-vm-charms/10969) guide
 
 ## Troubleshooting & testing
 * To learn the basics of charm debugging, start with [Juju | How to debug a charm](https://juju.is/docs/sdk/debug-a-charm)
@@ -65,7 +57,7 @@ Legacy charm details are described [here](/explanation/legacy-charm).
 
 ## Success stories
 
-* [How to migrate Nextcloud to new PostgreSQL (vm-charms)](/).
+* [How to migrate Nextcloud to new PostgreSQL (vm-charms)](https://discourse.charmhub.io/t/nextcloud-postgresql-how-to-migrate-nextcloud-to-new-postgresql-vm-charms/10969).
 
 [Contact us](/reference/contacts) if you have any questions, issues, or ideas!
 

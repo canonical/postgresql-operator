@@ -1,6 +1,5 @@
 (how-to-guides-deploy-sunbeam)=
 
-
 # How to deploy on Sunbeam
 
 > **Duration** : Up to 60 minutes depending on internet download speed.
@@ -13,14 +12,6 @@ This guide goes through the steps for setting up Sunbeam and deploying Charmed P
 * Hardware requirements depend on planned deployment size.
   * Recommended: 8 CPU cores, 32GB RAM, 100GB of storage
   * Minimum: See the requirements listed in the [Sunbeam documentation][Single-node guided]
-
-## Steps
-* [Install and bootstrap Sunbeam](#install-and-bootstrap-sunbeam)
-* [Enable OpenStack Images Auto-sync](#enable-openstack-images-auto-sync)
-* [Set up Juju inside an OpenStack bastion](set-up-juju-inside-an-openstack-bastion)
-* [Deploy Charmed PostgreSQL](#deploy-charmed-postgresql)
-* [(Optional) Access the OpenStack dashboard](#optional-access-the-openstack-dashboard)
----
 
 ## Install and bootstrap Sunbeam
 Follow the official OpenStack guide: [Single-node deployment][Single-node guided]. 

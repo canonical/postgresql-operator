@@ -1,6 +1,5 @@
 (how-to-guides-cross-regional-async-replication-set-up-clusters)=
 
-
 # Set up clusters for cross-regional async replication
 
 Cross-regional (or multi-server) asynchronous replication focuses on disaster recovery by distributing data across different servers. 
@@ -11,15 +10,6 @@ This guide will show you the basics of initiating a cross-regional async setup u
 * Juju `v.3.4.2+`
 * Make sure your machine(s) fulfill the [system requirements](/reference/system-requirements)
 * See [supported target/source model relationships](/how-to-guides/cross-regional-async-replication/index).
-
-## Summary
-* [Deploy](#deploy)
-* [Offer](#offer)
-* [Consume](#consume)
-* [Promote or switchover a cluster](#promote-or-switchover-a-cluster)
-* [Scale a cluster](#scale-a-cluster)
-
----
 
 ## Deploy
 

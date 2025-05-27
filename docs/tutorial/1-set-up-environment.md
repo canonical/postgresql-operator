@@ -11,12 +11,6 @@ In this step, we will set up a development environment with the required compone
 Before you start, make sure your machine meets the [minimum system requirements](/reference/system-requirements).
 ```
 
-## Summary
-
-- [Set up Multipass](#multipass)
-- [Set up Juju](#juju)
----
-
 ## Set up Multipass
 
 [Multipass](https://multipass.run/) is a quick and easy way to launch virtual machines running Ubuntu. It uses the [cloud-init](https://cloud-init.io/) standard to install and configure all the necessary parts automatically.

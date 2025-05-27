@@ -3,7 +3,7 @@
 
 # Migrate database data using ‘backup/restore’
 
-This is a guide for migrating data from modern charms. To migrate [legacy charms](/) data, refer to the guide [Migrate data via pg_dump](/explanation/legacy-charm).
+This is a guide for migrating data from modern charms. To migrate [legacy charms](/explanation/legacy-charm) data, refer to the guide [Migrate data via pg_dump](/how-to-guides/development/migrate-data-via-pg-dump).
 
 This Charmed PostgreSQL operator is able to restore its own[backups](/how-to-guides/back-up-and-restore/restore-a-backup) stored on [S3-compatible storage](/how-to-guides/back-up-and-restore/configure-s3-aws). The same restore approach is applicable to restore [foreign backups](/how-to-guides/back-up-and-restore/migrate-a-cluster) made by different Charmed PostgreSQL installation or even another PostgreSQL charm. The backup have to be created manually using [pgBackRest](https://pgbackrest.org/)!
 

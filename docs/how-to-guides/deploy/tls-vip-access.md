@@ -1,6 +1,5 @@
 (how-to-guides-deploy-tls-vip-access)=
 
-
 # Deploy for external TLS VIP access
 
 This guide goes over an example deployment of PostgreSQL, PgBouncer and HAcluster that require external TLS/SSL access via [Virtual IP (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address).   
@@ -10,15 +9,6 @@ It combines the following guides, where you can find more detailed information:
 * [PostgreSQL | How to connect from outside the local network](/how-to-guides/external-network-access)
 * [PgBouncer | How to connect from outside the local network](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
 
-## Summary
-* [Requirements](#requirements)
-* [Design](#design)
-* [Deploy components](#deploy-components)
-* [Check connectivity](#check-connectivity)
-* [(Optional) Add monitoring](#optional-add-monitoring)
-* [High availability](#high-availability)
-
----
 
 ## Requirements
 
@@ -29,7 +19,7 @@ The basic requirements to follow along with this example setup are the following
 * A fully deployed and running Juju machine environment
   * See the [PostgreSQL Tutorial](/tutorial/1-set-up-environment) for a quick setup with Multipass
   * See the official [Juju deployment guide](https://juju.is/docs/juju/tutorial#deploy) for more details
-* A spare virtual IP address for [hacluster](/)
+* A spare virtual IP address for [hacluster](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741#using-a-virtual-ip-to-connect-to-pgbouncer)
   * See the PgBouncer guide: [How to use a VIP to connect to PgBouncer](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
 * DNS record pointing to VIP above (`my-tls-example-db.local` is used as an example here)
 

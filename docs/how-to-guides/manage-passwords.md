@@ -1,6 +1,5 @@
 (how-to-guides-manage-passwords)=
 
-
 # How to manage passwords
 
 If you are using **PostgreSQL 16** (channel `16/<any>`), passwords are managed with Juju secrets.

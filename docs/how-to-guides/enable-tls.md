@@ -1,6 +1,5 @@
 (how-to-guides-enable-tls)=
 
-
 ```{note}
 **Note**: All commands are written for `juju >= v.3.1`
 
@@ -15,19 +14,12 @@ This guide assumes everything is deployed within the same network and Juju model
 
 > See also: [How to deploy for external TLS access](/how-to-guides/deploy/tls-vip-access)
 
-## Summary
-* Enable TLS
-* Disable TLS
-* Check certificates in use
-* Update keys
----
-
 ## Enable TLS
 
 ```{caution}
 **[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
 
-Check [this guide about X.509 certificates](/) for an overview of all the TLS certificate charms available. 
+Check [this guide about X.509 certificates](https://discourse.charmhub.io/t/security-with-x-509-certificates/11664) for an overview of all the TLS certificate charms available. 
 ```
 
 First, deploy the TLS charm:

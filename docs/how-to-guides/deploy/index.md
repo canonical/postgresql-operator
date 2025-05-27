@@ -1,14 +1,11 @@
 (how-to-guides-deploy-index)=
 
-
 # How to deploy
 
 This page aims to provide an introduction to the PostgreSQL deployment process and lists all the related guides. It contains the following sections:
 * [General deployment instructions](#general-deployment-instructions)
 * [Clouds](#clouds)
-* [Special deployments](#special-deployments)
-
----
+* [Special deployments](#special-deployment-scenarios)
 
 ## General deployment instructions
 
@@ -71,7 +68,6 @@ Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju
 
 See: [How to deploy on juju storage]
 
----
 
 <!--Links-->
 

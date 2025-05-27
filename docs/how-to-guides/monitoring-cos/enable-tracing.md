@@ -12,10 +12,10 @@ If you're using `juju 2.9`, check the [`juju 3.0` Release Notes](https://juju.is
 This guide contains the steps to enable tracing with [Grafana Tempo](https://grafana.com/docs/tempo/latest/) for your PostgreSQL application. 
 
 To summarize:
-* [Deploy the Tempo charm in a COS K8s environment](#deploy)
-* [Offer interfaces for cross-model integrations](#offer)
-* [Consume and integratre cross-model integrations](#consume)
-* [View PostgreSQL traces on Grafana](#view)
+* [Deploy the Tempo charm in a COS K8s environment](#deploy-tempo)
+* [Offer interfaces for cross-model integrations](#offer-interfaces)
+* [Consume and integratre cross-model integrations](#consume-interfaces)
+* [View PostgreSQL traces on Grafana](#view-traces)
 
 ```{caution}
 **Warning:** This is feature is in development. It is **not recommended** for production environments. 
@@ -30,7 +30,6 @@ Enabling tracing with Tempo requires that you:
 - Have deployed a 'cos-lite' bundle from the `latest/edge` track in a Kubernetes environment
   - See [Getting started on MicroK8s](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
 
----
 
 ## Deploy Tempo
 

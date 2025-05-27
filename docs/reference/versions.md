@@ -123,7 +123,6 @@ Learn more in the [legacy charm explanation page].
 [Backup and restore]: /how-to-guides/back-up-and-restore/create-a-backup
 [COS integration]: /how-to-guides/monitoring-cos/enable-monitoring
 [TLS integration]: /how-to-guides/enable-tls
-[LDAP integration]: /how-to-guides/enable-ldap
 [`arm64` architecture]: /reference/system-requirements
 
 [legacy charm explanation page]: /explanation/legacy-charm

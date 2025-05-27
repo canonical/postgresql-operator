@@ -1,6 +1,5 @@
 (how-to-guides-cross-regional-async-replication-remove-or-recover-a-cluster)=
 
-
 # Remove or recover a cluster
 
 This guide will cover how to manage clusters using an example PostgreSQL deployment with two servers: one in Rome and one in Lisbon.
@@ -11,16 +10,6 @@ This guide will cover how to manage clusters using an example PostgreSQL deploym
 * See [supported target/source model relationships](/how-to-guides/cross-regional-async-replication/index).
 * A cross-regional async replication setup
   * See [How to set up clusters](/how-to-guides/cross-regional-async-replication/set-up-clusters)
-
-## Summary
-* [Switchover](#switchover)
-* [Detach a cluster](#detach-a-cluster)
-  * [Reuse a detached cluster](#reuse-a-detached-cluster)
-  * [Remove a detached cluster](#remove-a-detached-cluster)
-* [Recover a cluster](#recover-a-cluster)
-
-<!-- TODO: Rethink sections, especially "recover" -->
----
 
 ## Switchover
 

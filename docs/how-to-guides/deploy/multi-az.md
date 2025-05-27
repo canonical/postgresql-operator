@@ -1,6 +1,5 @@
 (how-to-guides-deploy-multi-az)=
 
-
 # Deploy on multiple availability zones (AZ) 
 
 During the deployment to hardware/VMs, it is important to spread all the
@@ -11,20 +10,11 @@ This guide will take you through deploying a PostgreSQL cluster on GCE using 3 a
 
 ```{note}
 This documentation assumes that your cloud supports and provides availability zones concepts. This is enabled by default on EC2/GCE and supported by LXD/MicroCloud.
-
-See the [Additional resources](#additional-resources) section for more details about AZ on specific clouds.
 ```
-
-## Summary
-* [Set up GCE on Google Cloud](#set-up-gce-on-google-cloud)
-* [Deploy PostgreSQL with Juju zones constraints](#deploy-postgresql-with-juju-zones-constraints)
-  * [Simulation: A node gets drained](#simulation-a-node-gets-drained)
-* [Additional resources](#additional-resources)
----
 
 ## Set up GCE on Google Cloud
 
-Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](/) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
+Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://discourse.charmhub.io/t/charmed-postgresql-k8s-how-to-deploy-on-gke/11237) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
 
 ```{caution}
 **Warning**: Creating the following GKE resources may cost you money - be sure to monitor your GCloud costs.

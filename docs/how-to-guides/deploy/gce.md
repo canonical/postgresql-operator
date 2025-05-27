@@ -1,19 +1,9 @@
 (how-to-guides-deploy-gce)=
 
-
 # How to deploy on GCE
 
 [Google Compute Engine](https://cloud.google.com/products/compute) is a popular subsidiary of Google that provides on-demand cloud computing platforms on a metered pay-as-you-go basis. Access the GCloud web console at [console.cloud.google.com](https://console.cloud.google.com/compute/instances).
 
-## Summary
-* [Install GCloud and Juju tooling](#install-gcloud-and-juju-tooling)
-  * [Authenticate](#authenticate)
-* [Bootstrap Juju controller on GCE](#bootstrap-juju-controller-on-gce)
-* [Deploy charms](#deploy-charms)
-* [Expose database (optional)](#expose-database-optional)
-* [Clean up](#clean-up)
-
----
 
 ## Install GCloud and Juju tooling
 

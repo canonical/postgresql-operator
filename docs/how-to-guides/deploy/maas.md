@@ -1,26 +1,14 @@
 (how-to-guides-deploy-maas)=
 
-
 # How to deploy on MAAS
 
 This guide aims to provide a quick start to deploying Charmed PostgreSQL on MAAS. It summarizes the instructions from the [Build a MAAS and LXD environment with Multipass Tutorial](https://discourse.maas.io/t/5360) to set up and tear down a **playground environment**.
 
 If you want to deploy PostgreSQL on MAAS in a **production environment**, refer to the official [Bootstrap MAAS Tutorial](https://maas.io/docs/tutorial-bootstrapping-maas) followed by the [Charmed PostgreSQL Tutorial](/tutorial/index).
 
-
-
-## Summary
- * [Bootstrap a Multipass VM](#bootstrap-multipass-vm)
- * [Configure MAAS](#configure-maas)
- * [Register MAAS with Juju](#register-maas-juju)
- * [Deploy Charmed PostgreSQL on MAAS](#deploy-postgresql-maas)
- * [Test Charmed PostgreSQL deployment](#test-postgresql)
- * [Clean up the environment](#clean-up)
-
 For further details and explanation about each step, remember you can refer to the [original tutorial](https://discourse.maas.io/t/5360). 
 
----
- ## Bootstrap a Multipass VM
+## Bootstrap a Multipass VM
 
 Install Multipass and launch a VM:
 ```shell

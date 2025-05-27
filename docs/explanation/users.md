@@ -14,12 +14,12 @@ There are three types of users in PostgreSQL:
 
 The operator uses the following internal DB users:
 
-* `postgres` - the [initial/default](https://charmhub.io/postgresql/docs/t-manage-passwords) PostgreSQL user. Used for very initial bootstrap only.
-* `operator` - the user that charm.py uses to manage database/cluster.
+* `postgres` - the [initial/default](/how-to-guides/manage-passwords) PostgreSQL user. Used for very initial bootstrap only.
+* `operator` - the user that `charm.py` uses to manage database/cluster.
 * `replication` - the user performs replication between database PostgreSQL cluster members.
 * `rewind` - the internal user for synchronizing a PostgreSQL cluster with another copy of the same cluster.
-* `monitoring` - the user for [COS integration](https://charmhub.io/postgresql/docs/h-enable-monitoring).
-* `backups` - the user to [perform/list/restore backups](https://charmhub.io/postgresql/docs/h-create-and-list-backups).
+* `monitoring` - the user for [COS integration](/how-to-guides/monitoring-cos/enable-monitoring).
+* `backups` - the user to [perform/list/restore backups](/how-to-guides/back-up-and-restore/create-backup).
 
 The full list of internal users is available in charm [source code](https://github.com/canonical/postgresql-operator/blob/main/src/constants.py). The full dump of internal users (on the newly installed charm):
 
@@ -35,10 +35,11 @@ postgres=# \du
  replication | Replication                                                | {}
  rewind      |                                                            | {}
 ```
-**Note**: it is forbidden to use/manage described above users! They are dedicated to the operators logic! Please use [data-integrator](https://charmhub.io/postgresql/docs/t-integrations) charm to generate/manage/remove an external credentials.
+**Note**: it is forbidden to use/manage described above users! They are dedicated to the operators logic! Please use [data-integrator](https://charmhub.io/data-integrator) charm to generate/manage/remove an external credentials.
 
 It is allowed to rotate passwords for *internal* users using action 'set-password':
-```shell
+
+```
 > juju show-action postgresql set-password
 Change the system user's password, which is used by charm. It is for internal charm users and SHOULD NOT be used by applications.
 
@@ -52,7 +53,7 @@ username:
 ```
 For example, to generate a new random password for *internal* user:
 
-```shell
+```
 > juju run-action --wait postgresql/leader set-password username=operator
 
 unit-postgresql-1:

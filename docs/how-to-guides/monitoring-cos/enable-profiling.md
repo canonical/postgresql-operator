@@ -11,15 +11,6 @@ If you're using `juju 2.9`, check the [`juju 3.0` Release Notes](https://juju.is
 
 This guide contains the steps to enable profiling with [Parca](https://www.parca.dev/docs/overview/) for your PostgreSQL application. 
 
-## Summary
-* [Prerequisites](#prerequisites)
-* [Set up the Parca backend](#set-up-the-parca-backend)
-  * [Charmed Parca K8s](#charmed-parca-k8s)
-  * [Polar Signals Cloud](#polar-signals-cloud)
-* [View profiles](#view-profiles)
-
----
-
 ## Prerequisites
 
 ```{caution}
@@ -87,12 +78,14 @@ There are two potential backends:
 
 This section goes through the steps for enabling profiling with Charmed Parca K8s as the backend.
 
+(deploy-cos-lite-and-parca-k8s)=
 #### 1. Deploy `cos-lite` and `parca-k8s`
 
 Refer to [Getting started on MicroK8s](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s) and deploy the `cos-lite` bundle from the `latest/edge` track in a Kubernetes environment.
 
 Then, refer to [Deploy Charmed Parca on top of COS-lite](https://discourse.charmhub.io/t/how-to-deploy-charmed-parca-on-top-of-cos-lite/16579) to deploy Charmed Parca K8s in the same model as the `cos-lite` bundle.
 
+(parca-offer-interfaces)=
 #### 2. Offer interfaces
 
 Offer interfaces for cross-model integrations:
@@ -114,7 +107,7 @@ juju integrate postgresql parca-agent
 
 #### 4. Integrate `parca-agent` with `parca-k8s`
 
-Consume the parca offer from [Step 2](#2-offer-interfaces) and integrate with them:
+Consume the parca offer from [Step 2](#parca-offer-interfaces) and integrate with them:
 
 ```
 juju find-offers <k8s_controller_name>:
@@ -147,7 +140,7 @@ This section goes through the steps for enabling profiling with Polar Signals Cl
 ```{note}
 With PSC, `cos-lite` and `parca-k8s` are not required. This section goes through the recommended setup, where `polar-signals-cloud-integrator` is deployed in the same model as `postgresql`, and `parca-agent` is used to relay traffic to PSC.
 
-If you would like to use `parca-k8s` to relay traffic to PSC instead, refer to [Steps 1 and 2](#1-deploy-cos-lite-and-parca-k8s) in the Charmed Parca K8s section.
+If you would like to use `parca-k8s` to relay traffic to PSC instead, refer to [Steps 1 and 2](#deploy-cos-lite-and-parca-k8s) in the Charmed Parca K8s section.
 ```
 
 #### 1. Deploy and integrate `parca-agent` with `postgresql`

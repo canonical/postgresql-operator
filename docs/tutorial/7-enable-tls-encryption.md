@@ -16,16 +16,8 @@ In this section, you will learn how to enable security in your PostgreSQL deploy
 ```{caution}
 **[Self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) are not recommended for a production environment.**
 
-Check [this guide](/) for an overview of the TLS certificates charms available. 
+Check [this guide](https://discourse.charmhub.io/t/security-with-x-509-certificates/11664) for an overview of the TLS certificates charms available. 
 ```
-
-## Summary
-- [Deploy TLS charm](#deploy-tls-charm)
-- [Integrate with PostgreSQL](#integrate-with-postgresql)
-  - Check the TLS certificates in use
-- [Remove TLS certificate](#remove-tls)
-
----
 
 ## Deploy TLS charm
 

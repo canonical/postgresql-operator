@@ -16,13 +16,6 @@ This tutorial hosts all replicas on the same machine.
 To enable high availability in a production environment, replicas should be hosted on different servers to [maintain isolation](https://canonical.com/blog/database-high-availability).
 ```
 
-## Summary
-
-- [Add units](#add-units)
-- [Remove units](#remove-units)
-
----
-
 ## Add units
 
 Currently, your deployment has only one juju **unit**, known in juju as the **leader unit**. You can think of this as the database **primary instance**. For each **replica**, a new unit is created. All units are members of the same database cluster.

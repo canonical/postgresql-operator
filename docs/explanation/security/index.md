@@ -34,8 +34,8 @@ When configuring cloud credentials to be used with Juju, ensure that users have 
 |Cloud|Cloud user policies|
 | --- | --- |
 |OpenStack|N/A|
-|AWS|[Juju AWS Permission](/), [AWS Instance Profiles](/), [Juju on AWS](https://juju.is/docs/juju/amazon-ec2)|
-|Azure|[Juju Azure Permission](https://juju.is/docs/juju/microsoft-azure), [How to use Juju with Microsoft Azure](/)|
+|AWS|[Juju AWS Permission](https://discourse.charmhub.io/t/juju-aws-permissions/5307), [AWS Instance Profiles](https://discourse.charmhub.io/t/using-aws-instance-profiles-with-juju-2-9/5185), [Juju on AWS](https://juju.is/docs/juju/amazon-ec2)|
+|Azure|[Juju Azure Permission](https://juju.is/docs/juju/microsoft-azure), [How to use Juju with Microsoft Azure](https://discourse.charmhub.io/t/how-to-use-juju-with-microsoft-azure/15219)|
 |GCP|[Google Cloud's Identity and Access Management](https://cloud.google.com/iam/docs/overview), [GCE role recommendations](https://cloud.google.com/policy-intelligence/docs/role-recommendations-overview), [Google GCE cloud and Juju](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/cloud/list-of-supported-clouds/the-google-gce-cloud-and-juju/)|
 
 #### Juju users

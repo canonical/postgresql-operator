@@ -11,17 +11,9 @@ This part of the tutorial accesses PostgreSQL via the `operator` user.
 
 **Do not directly interface with the `operator` user in a production environment.**
 
-In a later section about [Integrations,](https://charmhub.io/postgresql-k8s/docs/t-integrations) we will cover how to safely access PostgreSQL by creating a separate user via the [Data Integrator charm](https://charmhub.io/data-integrator)
+In a later section about [integrations,](/tutorial/6-integrate-with-other-applications) we will cover how to safely access PostgreSQL by creating a separate user via the [Data Integrator charm](https://charmhub.io/data-integrator)
 ```
 
-
-## Summary
-
-- [Retrieve credentials](#retrieve-credentials)
-- [Access PostgreSQL via `psql`](#access-postgresql-via-psql)
-  - [ Create a new database](#new-database)
-
----
 ## Retrieve credentials
 
 Connecting to the database requires that you know three pieces of information: The internal postgreSQL database's username and password, and the host machine's IP address. 

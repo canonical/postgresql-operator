@@ -16,13 +16,6 @@ This guide contains recommended steps and useful commands for creating and manag
 * Access to S3 storage
 * [Configured settings for S3 storage](/how-to-guides/back-up-and-restore/configure-s3-aws)
 
-## Summary
-- [Save your current cluster credentials](#save-credentials), as you'll need them for restoring
-- [Create a backup](#create-backup) 
-- [List backups](#list-backups) to check the availability and status of your backups
-
----
-
 ## Save your current cluster credentials
 For security reasons, charm credentials are not stored inside backups. So, if you plan to restore to a backup at any point in the future, **you will need the `operator`, `replication`, and `rewind` user passwords for your existing cluster**.
 

@@ -1,19 +1,8 @@
 (how-to-guides-deploy-aws-ec2)=
 
-
 # How to deploy on AWS EC2
 
 [Amazon Web Services](https://aws.amazon.com/) is a popular subsidiary of Amazon that provides on-demand cloud computing platforms on a metered pay-as-you-go basis. Access the AWS web console at [console.aws.amazon.com](https://console.aws.amazon.com/).
-
-## Summary
-* [Install AWS and Juju tooling](#install-aws-and-juju-tooling)
-  * [Authenticate](#authenticate)
-* [Bootstrap Juju controller on AWS EC2](#bootstrap-juju-controller-on-aws-ec2)
-* [Deploy charms](#deploy-charms)
-* [Expose database (optional)](#expose-database-optional)
-* [Clean up](#clean-up)
-
----
 
 ## Install AWS and Juju tooling
 

@@ -13,14 +13,6 @@ For an in-depth introduction to the Juju Terraform Provider, read [this Discours
 **Note**: Storage support was added in [Juju Terraform Provider version 0.13+](https://github.com/juju/terraform-provider-juju/releases/tag/v0.13.0).
 ```
 
-## Summary
-* [Install Terraform tooling](#install-terraform-tooling)
-* [Verify the deployment](#verify-the-deployment)
-* [Apply the deployment](#apply-the-deployment)
-* [Check deployment status](#check-deployment-status)
-* [Clean up](#clean-up)
----
-
 ## Install Terraform tooling
 
 This guide assumes Juju is installed and you have an LXD controller already bootstrapped. For more information, check the [Set up the environment](/tutorial/1-set-up-environment) tutorial page.

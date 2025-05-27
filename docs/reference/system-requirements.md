@@ -55,9 +55,9 @@ The charm is based on the [charmed-postgresql snap](https://snapcraft.io/charmed
 [3.6 LTS]: https://img.shields.io/badge/3.6_LTS-%23E95420?label=Juju
 
 <!-- LINKS -->
-[552]: /
-[288]: /
-[336]: /
-[363]: /
-[430]: /
+[552]: https://github.com/canonical/postgresql-operator/releases/tag/rev552
+[288]: https://github.com/canonical/postgresql-operator/releases/tag/rev288
+[336]: https://github.com/canonical/postgresql-operator/releases/tag/rev336
+[363]: https://github.com/canonical/postgresql-operator/releases/tag/rev363
+[430]: https://github.com/canonical/postgresql-operator/releases/tag/rev429
 

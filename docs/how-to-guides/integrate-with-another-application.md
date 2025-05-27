@@ -15,15 +15,6 @@ This guide shows how to integrate Charmed PostgreSQL with both charmed and non-c
 
 > For developer information about how to integrate your own charmed application with PostgreSQL, see [Development > How to integrate with your charm](/how-to-guides/development/integrate-with-your-charm).
 
-## Summary
-* [Integrate with a charmed application](#integrate-with-a-charmed-application)
-  * [Modern interface](#modern-interface)
-  * [Legacy interface](#legacy-interface)
-* [Integrate with a non-charmed application](#integrate-with-a-non-charmed-application)
-* [Rotate application passwords](#rotate-application-passwords)
-
----
-
 ## Integrate with a charmed application
 
 Integrations with charmed applications are supported via the modern [`postgresql_client`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/postgresql_client/v0/README.md) interface, and the legacy `psql` interface from the [original version](https://launchpad.net/postgresql-charm) of the charm.

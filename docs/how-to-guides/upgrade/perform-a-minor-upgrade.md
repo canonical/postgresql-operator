@@ -21,9 +21,7 @@ This guide is part of [Charmed PostgreSQL Upgrades](/how-to-guides/upgrade/index
 - [**3. Upgrade**](#step-3-upgrade). Once started, all units in a cluster will be executed sequentially. The upgrade will be aborted (paused) if the unit upgrade has failed.
 - [**4. (Optional) Consider a rollback**](#step-4-rollback-optional) in case of disaster. 
     - Please [inform us](/reference/contacts) about your case scenario troubleshooting to trace the source of the issue and prevent it in the future.
-- [**Post-upgrade check**](#step-5-post-upgrade-check). Make sure all units are in the proper state and the cluster is healthy.
-
----
+- [**Post-upgrade check**](#post-upgrade-check). Make sure all units are in the proper state and the cluster is healthy.
 
 ## Pre-upgrade checks
 Before performing a minor PostgreSQL upgrade, there are some important considerations to take into account:

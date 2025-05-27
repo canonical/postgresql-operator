@@ -1,6 +1,5 @@
 (how-to-guides-switchover-failover)=
 
-
 # PostgreSQL Switchover / Failover
 
 Charmed PostgreSQL constantly monitors the cluster status and performs **automated failover** in case of Primary unit gone. Sometimes **manual switchover** is necessary for hardware maintenance reasons. Check the difference between them [here](https://dbvisit.com/blog/difference-between-failover-vs-switchover).

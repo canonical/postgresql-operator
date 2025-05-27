@@ -11,13 +11,6 @@ Integrations automatically create a username, password, and database for the des
 
 In this section, you will integrate your Charmed PostgreSQL to another charmed application.
 
-## Summary
-- [Deploy `data-integrator`](#deploy-data-integrator)
-- [Integrate with PostgreSQL](#integrate-with-postgresq)
-- [Access the related database](#access-related-database)
-- [Remove the user](#remove-user)
----
-
 ## Deploy data-integrator
 
 In this tutorial, we will relate to the [Data Integrator charm](https://charmhub.io/data-integrator). This is a bare-bones charm that allows for central management of database users. It automatically provides credentials and endpoints that are needed to connect with a charmed database application.

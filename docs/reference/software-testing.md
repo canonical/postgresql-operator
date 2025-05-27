@@ -11,20 +11,14 @@ If you're using `juju 2.9`, check the [`juju 3.0` Release Notes](https://juju.is
 
 Most types of standard [software tests](https://en.wikipedia.org/wiki/Software_testing) are applicable to Charmed PostgreSQL.
 
-This reference addresses the following types:
-
-* [Smoke test](#smoke)
-* [Unit tests](#unit)
-* [Integration tests](#integration)
-* [System test](#system)
-
----
 ## Smoke test
+
 This type of test ensures that basic functionality works over a short amount of time.
+
 ### Steps
-1. [Set up a `juju v.3.x` environment](/)
-2. Deploy database with test application
-3. Start "continuous write" test
+
+1. Deploy database with test application
+2. Start "continuous write" test
 
 <details><summary>Example</summary>
 

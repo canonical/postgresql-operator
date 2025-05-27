@@ -15,15 +15,6 @@ This tutorial is written for **Charmed PostgreSQL 14**, which has a different wa
 To learn more about managing passwords on **Charmed PostgreSQL 16**, see [How to > Manage passwords](/how-to-guides/manage-passwords).
 ```
 
-## Summary
-- [Retrieve the operator password](#retrieve-password)
-- [Rotate the operator password](#rotate-password)
-- [Set a new password](#set-new-password)
-  - ...for the operator
-  - ...for another user
-
----
-
 ## Retrieve the operator password
 
 The operator's password can be retrieved by running the `get-password` action on the Charmed PostgreSQL VM application:

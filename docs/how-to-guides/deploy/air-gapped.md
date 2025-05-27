@@ -1,6 +1,5 @@
 (how-to-guides-deploy-air-gapped)=
 
-
 # Deploy in an offline or air-gapped environment
 
 An air-gapped environment refers to a system that does not have access to the public internet.
@@ -21,8 +20,8 @@ Canonical does not prescribe how you should set up your specific air-gapped envi
 ## Air-gapped setup summary
 
 [1\. Export snaps and charms](#1-export-snaps-and-charms) <br>
-[2\. Transfer binary blobs](#2-transfer-binary-blobs) <br>
-[3\. Import snaps and charms](3-import-snaps-and-charms) <br>
+[2\. Transfer binary blobs](#2-transfer-the-binary-blobs) <br>
+[3\. Import snaps and charms](#3-import-snaps-and-charms) <br>
 [4\. Deploy PostgreSQL](#4-deploy-postgresql)
 
 ## Air-gapped day-to-day example
@@ -139,7 +138,7 @@ Use [the official release notes](/reference/releases) as a reference.
 * https://documentation.ubuntu.com/snap-store-proxy/
 * https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/
 * https://ubuntu.com/kubernetes/docs/install-offline
-* [Charmed Kubeflow > Install in an airgapped environment](https://charmed-kubeflow.io/docs/install-in-airgapped-environment)
+* [Charmed Kubeflow > Install in an airgapped environment](https://charmed-kubeflow.io/docs/install-in-an-airgapped-environment)
 *  [Wikipedia > Air gap (networking)](https://en.wikipedia.org/wiki/Air_gap_(networking))
 
 ```{note}
