@@ -142,7 +142,7 @@ to create a new model to deploy workloads.
 
 You can check the [Azure instances availability](https://portal.azure.com/#browse/Microsoft.Compute%2FVirtualMachines):
 
-![image|689x313](upload://bB5lCMIHtL1KToftKQVv7z86aoi.png)
+![image|689x313](azure-availability.png)
 
 
 ## Deploy charms

@@ -66,7 +66,7 @@ where `10.76.203.210` is the IP of the Multipass VM and  `10.10.10.0` is the net
 
 The image below is an example of the OpenStack dashboard view (bastion + juju controller + 3 `postgresql` nodes):
 
-![image|690x225](upload://fsYFnvPbgxhsAeFtfva4b5qbKii.png)
+![Sunbeam OpenStack dashboard|690x225](sunbeam-dashboard.png)
 
 > To learn more about deploying and operating PostgreSQL, see the [Charmed PostgreSQL tutorial][Tutorial].
 

@@ -160,9 +160,9 @@ After the backend setup is complete, the profiles for the machines where the Pos
 
 If you are running Charmed Parca K8s, you can also access the link for Parca's web interface from COS catalogue (`juju run traefik/0 show-proxied-endpoints` in the K8s model where `cos-lite` is deployed).
 
-![Example profile with Parca Web UI690x753](upload://zFOOKY8nokrg2Q4xUVTbD8UGjD3.png)
+![Example profile with Parca Web UI690x753](profile-parca-web-ui.png)
 
 Furthermore, if you have `cos-lite` deployed, you can use Grafana to explore profiles under the `Explore` section with `parca-k8s` as the data source.
 
-![Example profile with Grafana's Parca plugin|690x383](upload://w3G5STYOxMZHCpIA48gEJHUniLi.jpeg)
+![Example profile with Grafana's Parca plugin|690x383](profile-grafana-parca-plugin.png)
 

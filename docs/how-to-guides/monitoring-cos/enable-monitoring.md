@@ -126,5 +126,5 @@ juju run grafana/leader get-admin-password --model <k8s_cos_controller>:<cos_mod
 
 ### Example of Charmed PostgreSQL on Grafana
 
-![image|690x353](upload://c7LEKHwQJ25t7BkkR5S9hhs9d4Q.png)
+![Charmed PostgreSQL Grafana web UI|690x353](postgresql-grafana-ui.png)
 

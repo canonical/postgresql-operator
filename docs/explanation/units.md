@@ -10,7 +10,7 @@ Charmed PostgreSQL cluster size can be [easily scaled](/reference/contacts) from
 
 > **Note**: starting from revision 561 all Charmed PostgreSQL units are configured as Sync Standby members by default. It provides better guaranties for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count)'.
 
-![PostgreSQL Units types|690x253, 100%](upload://pY5kzxO9ELJGEqEe1F1RQjOG6SS.png)
+![PostgreSQL Units types|690x253, 100%](unit-types.png)
 
 ## Primary
 

@@ -32,7 +32,7 @@ multipass list
 <details>
 <summary><b>4.</b> Wait for image downloads to complete on <code>http://<MAAS_IP>:5240/MAAS/r/images</code> </summary>
 
-[![Screenshot from 2024-04-12 12-48-40](upload://kyNPhsHr7GHyFouEpp7sxPytb6g.png)](https://assets.ubuntu.com/v1/901aa34b-image_downloads.png)
+![MAAS image downloads](maas-image-downloads.png)
 </details>
 </br>
 
@@ -44,13 +44,13 @@ The LXD machine will be up and running after the images downloading and sync is 
 <details>
 <summary><b>5.</b> Navigate to  <code>http://<MASS_IP>:5240/MAAS/r/tags</code> and create a tag with <code>tag-name=juju</code>. Assign it to the LXD machine. </summary>
 
-[![Screenshot from 2024-04-12 12-51-30](upload://44dY32yFYSybmvypdEgDtj0lFid.png)](https://assets.ubuntu.com/v1/1c82f803-tags.png)
+![MAAS interface - create tag](maas-create-tag.png)
 </details>
 
 > **A note on DHCP**
 >
 > MAAS uses DHCP to boot and install new machines. You must enable DHCP manually if you see this banner on MAAS pages:
-![image|690x46](upload://g458TLPPqGIISCFHKdfUwXRepeZ.png)
+![DHCP banner|690x46](maas-dhcp-banner.png)
 >
 > **Make sure to enable DHCP service inside the MAAS VM only.**
 >

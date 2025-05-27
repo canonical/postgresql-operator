@@ -107,7 +107,7 @@ to create a new model to deploy workloads.
 
 You can check the [GCE instance availability](https://console.cloud.google.com/compute/instances) (ensure the right GCloud project chosen!):
 
-![image|690x172](upload://4t1wS2BwCYgBfrdR1MdOBbUALJ1.png)
+![image|690x172](gce-availability.png)
 
 Create a new Juju model:
 ```shell

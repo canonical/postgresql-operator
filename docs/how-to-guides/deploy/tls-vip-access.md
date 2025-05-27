@@ -27,7 +27,7 @@ The basic requirements to follow along with this example setup are the following
 This setup applicable for VM/machine charms only. **Do NOT use it for K8s deployments!**
 ```
 
-![PostgreSQL TLS VIP|631x562](upload://fIN24xhTTX1Hy1aszs7Os413Y0m.png)
+![PostgreSQL TLS VIP|631x562](tls-vip-setup.png)
 
 This setup deploys the following components:
 

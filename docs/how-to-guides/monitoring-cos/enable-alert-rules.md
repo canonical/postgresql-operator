@@ -6,7 +6,7 @@ Charmed PostgreSQL VM ships a pre-configured and pre-enabled [list of Awesome Al
 
 <details><summary>Screenshot of alert rules in the Grafana web interface</summary>
 
-![Screenshot from 2024-01-18 20-05-52|690x439](upload://j6WSPQ1BzoFzqIg2jm1mTq79SMo.png)
+![Alert rules Grafana web UI|690x439](alert-rules-grafana-ui.png)
 </details>
 
 For information about accessing and managing COS Alert Rules, refer to the [COS documentation](https://charmhub.io/cos-lite).
@@ -62,7 +62,7 @@ At this stage, the COS Alert Manager will start sending alert notifications to P
 
 The image below shows an example of the Pushover web client:
 
-![image|690x439](upload://vqUcKpZ5R4wQLmY2HYGV5fz5pNU.jpeg)
+![Pushover web client|690x439](pushover-client.jpeg)
 
 ## Alert receivers
 

@@ -90,7 +90,7 @@ to create a new model to deploy workloads.
 [/details]
 
 You can check the [AWS EC2 instance availability](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#Instances:instanceState=running) (ensure the right AWS region chosen!):
-![image|690x118](upload://putAO5NyHdaeWE6jXI8X1hZHTYv.png)
+![image|690x118](aws-ec2-availability.png)
 
 Create a new Juju model:
 ```shell
