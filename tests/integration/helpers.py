@@ -272,18 +272,22 @@ def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
     return len(switchover_history_info.json())
 
 
-def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
+def db_connect(
+    host: str, password: str, user: str = "operator", database: str = "postgres"
+) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
     Args:
         host: the IP of the postgres host
         password: operator user password
+        user: postgres user (default: operator)
+        database: postgres database (default: postgres)
 
     Returns:
         psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='{user}' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
@@ -423,7 +427,7 @@ async def deploy_and_relate_bundle_with_postgresql(
                 else:
                     await ops_test.juju("deploy", patched.name)
 
-    async with ops_test.fast_forward(fast_interval="30s"):
+    async with ops_test.fast_forward(fast_interval="60s"):
         # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
             main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"

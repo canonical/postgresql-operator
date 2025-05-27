@@ -66,6 +66,9 @@ class PostgreSQLProvider(Object):
         self.framework.observe(
             self.database_provides.on.database_requested, self._on_database_requested
         )
+        self.framework.observe(
+            charm.on[self.relation_name].relation_changed, self._on_relation_changed
+        )
 
     @staticmethod
     def _sanitize_extra_roles(extra_roles: str | None) -> list[str]:
@@ -128,6 +131,8 @@ class PostgreSQLProvider(Object):
             self.update_endpoints(event)
 
             self._update_unit_status(event.relation)
+
+            self.charm.update_config()
         except (
             PostgreSQLCreateDatabaseError,
             PostgreSQLCreateUserError,
@@ -139,6 +144,28 @@ class PostgreSQLProvider(Object):
                 if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
                 else f"Failed to initialize {self.relation_name} relation"
             )
+
+    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
+        # Check for some conditions before trying to access the PostgreSQL instance.
+        if not self.charm.is_cluster_initialised:
+            logger.debug(
+                "Deferring on_relation_changed: Cluster must be initialized before configuration can be updated with relation users"
+            )
+            event.defer()
+            return
+
+        user = f"relation-{event.relation.id}"
+        try:
+            if user not in self.charm.postgresql.list_users():
+                logger.debug("Deferring on_relation_changed: user was not created yet")
+                event.defer()
+                return
+        except PostgreSQLListUsersError:
+            logger.debug("Deferring on_relation_changed: failed to list users")
+            event.defer()
+            return
+
+        self.charm.update_config()
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Correctly update the status."""

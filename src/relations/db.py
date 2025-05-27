@@ -111,6 +111,16 @@ class DbProvides(Object):
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.unit.is_leader():
+            if (
+                not self.charm._patroni.member_started
+                or f"relation-{event.relation.id}"
+                not in self.charm.postgresql.list_users(current_host=True)
+            ):
+                logger.debug("Deferring on_relation_changed: user was not created yet")
+                event.defer()
+                return
+
+            self.charm.update_config()
             return
 
         if self._check_multiple_endpoints():
@@ -219,6 +229,8 @@ class DbProvides(Object):
 
         self._update_unit_status(relation)
 
+        self.charm.update_config()
+
         return True
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
@@ -322,7 +334,7 @@ class DbProvides(Object):
 
         postgresql_version = None
         try:
-            postgresql_version = self.charm.postgresql.get_postgresql_version()
+            postgresql_version = self.charm.postgresql.get_postgresql_version(current_host=False)
         except PostgreSQLGetPostgreSQLVersionError:
             logger.exception(
                 f"Failed to retrieve the PostgreSQL version to initialise/update {self.relation_name} relation"

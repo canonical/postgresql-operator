@@ -516,7 +516,12 @@ class Patroni:
         except RetryError:
             return True
 
-        return response["state"] not in [*RUNNING_STATES, "starting", "restarting"]
+        return response["state"] not in [
+            *RUNNING_STATES,
+            "creating replica",
+            "starting",
+            "restarting",
+        ]
 
     @property
     def member_replication_lag(self) -> str:
@@ -632,6 +637,7 @@ class Patroni:
         restore_to_latest: bool = False,
         parameters: dict[str, str] | None = None,
         no_peers: bool = False,
+        user_databases_map: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -649,6 +655,7 @@ class Patroni:
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
+            user_databases_map: map of databases to be accessible by each user.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
@@ -696,6 +703,7 @@ class Patroni:
             raft_password=self.raft_password,
             ldap_parameters=self._dict_to_hba_string(ldap_params),
             patroni_password=self.patroni_password,
+            user_databases_map=user_databases_map,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
