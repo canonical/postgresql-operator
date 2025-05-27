@@ -1727,20 +1727,11 @@ def test_get_available_memory(harness):
         assert harness.charm.get_available_memory() == 0
 
 
-def test_juju_run_exec_divergence(harness):
+def test_juju_run_exec(harness):
     with (
         patch("charm.ClusterTopologyObserver") as _topology_observer,
-        patch("charm.JujuVersion") as _juju_version,
     ):
-        # Juju 2
-        _juju_version.from_environ.return_value.major = 2
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-run")
-        _topology_observer.reset_mock()
-
         # Juju 3
-        _juju_version.from_environ.return_value.major = 3
         harness = Harness(PostgresqlOperatorCharm)
         harness.begin()
         _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
