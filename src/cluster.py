@@ -12,7 +12,7 @@ import re
 import shutil
 import ssl
 import subprocess
-from asyncio import as_completed, run
+from asyncio import as_completed, create_task, run, wait
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
@@ -322,11 +322,14 @@ class Patroni:
                 return None
 
     async def _async_get_request(self, uri, endpoints):
-        tasks = [self._aiohttp_get_request(f"http://{ip}:8008{uri}") for ip in endpoints] + [
-            self._aiohttp_get_request(f"https://{ip}:8008{uri}") for ip in endpoints
-        ]
-        for routine in as_completed(tasks):
-            if result := await routine:
+        tasks = [
+            create_task(self._aiohttp_get_request(f"http://{ip}:8008{uri}")) for ip in endpoints
+        ] + [create_task(self._aiohttp_get_request(f"https://{ip}:8008{uri}")) for ip in endpoints]
+        for task in as_completed(tasks):
+            if result := await task:
+                for task in tasks:
+                    task.cancel()
+                await wait(tasks)
                 return result
 
     def parallel_patroni_get_request(self, uri: str, endpoints: list[str] | None = None) -> dict:
