@@ -14,10 +14,10 @@ Technical specifications, APIs, release notes, and other reference material for 
 * [Contacts]
 
 
-**In the tabs at the top of this charm's Charmhub page**, you can find the following automatically generated API references:
+The following generated API references can be found on [Charmhub](https://charmhub.io/postgresql):
 
-| Page                                                                       | Description                                             |
-|----------------------------------------------------------------------------|---------------------------------------------------------|
+| Page | Description |
+|------|-------------|
 | [Integrations](https://charmhub.io/postgresql/integrations)                   | Integration/relation interfaces supported by this charm |
 | [Libraries](https://charmhub.io/postgresql/libraries) | VM charm library is empty as charm uses [K8s library](https://charmhub.io/postgresql-k8s/libraries/) (more info [here](/explanation/architecture)) |
 | [Configuration](https://charmhub.io/postgresql/configuration)                 | Application configuration parameters                   |

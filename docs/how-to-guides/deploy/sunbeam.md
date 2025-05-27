@@ -29,13 +29,13 @@ To summarize, the relevant sections are:
 
 ## Deploy Charmed PostgreSQL
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
-```terminal
+```text
 juju add-model postgresql
 juju deploy postgresql --base ubuntu@22.04 -n 3
 ```
 
 Sample output of `juju status --watch 1s`:
-```terminal
+```text
 Model       Controller     Cloud/Region       Version  SLA          Timestamp
 postgresql  my-controller  sunbeam/RegionOne  3.5.4    unsupported  19:42:44Z
 
@@ -58,7 +58,7 @@ Follow the official guide: [Accessing the OpenStack dashboard].
 
 ````{note}
 When using a Multipass VM, you may need to manually route OpenStack IPs. For example:
-```terminal
+```text
 sudo ip route add 10.10.10.0/24 via 10.76.203.210 
 ```
 where `10.76.203.210` is the IP of the Multipass VM and  `10.10.10.0` is the network returned by `sunbeam dashboard-url`. 

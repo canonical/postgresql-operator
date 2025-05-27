@@ -6,22 +6,20 @@ This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL
 
 Charmed PostgreSQL is an open-source software operator designed to deploy and operate object-relational databases on IAAS/VM. It packages the powerful database management system [PostgreSQL](https://www.postgresql.org/) into a charmed operator for deployment with [Juju](https://juju.is/docs/juju).
 
-This charm offers automated operations management from day 0 to day 2. It is equipped with several features to securely store and scale complicated data workloads, including TLS encryption, backups, monitoring, password rotation, and easy integration with client applications.
-
-Charmed PostgreSQL meets the need of deploying PostgreSQL in a structured and consistent manner while providing flexibility in configuration. It simplifies deployment, scaling, configuration and management of relational databases in large-scale production environments reliably.
+This charmed operator meets the need of simplifying deployment, scaling, configuration and management of relational databases in large-scale production environments reliably. It is equipped with several features to securely store and scale complicated data workloads, including easy integration with client applications.
  
-This charmed operator is made for anyone looking for a comprehensive database management interface, whether for operating a complex production environment or simply as a playground to learn more about databases and charms.
+Charmed PostgreSQL is made for anyone looking for a comprehensive database management interface, whether for operating a complex production environment or simply as a playground to learn more about databases and charms.
 
-<!-- 
-This "Charmed PostgreSQL" operator (in the channel `14/stable`) is a new "[Charmed SDK](https://juju.is/docs/sdk)"-based charm to replace legacy "[Reactive](https://juju.is/docs/sdk/charm-taxonomy#reactive)"-based charm (in the channel `latest/stable`). <br/>Read more about [legacy charm here](/explanation/legacy-charm).
--->
 
 ## In this documentation
 
 | | |
 |--|--|
-|  [**Tutorials**](/tutorial/index)</br>  [Get started](/tutorial/index) - a hands-on introduction to using Charmed PostgreSQL operator for new users </br> |  [**How-to guides**](/how-to-guides/scale-replicas) </br> Step-by-step guides covering key operations such as [scaling](/how-to-guides/scale-replicas), [encryption](/how-to-guides/enable-tls), and [restoring backups](/how-to-guides/back-up-and-restore/restore-a-backup) |
-| [**Reference**](/reference/index) </br> Technical information such as [requirements](/reference/system-requirements), [release notes](/reference/releases), and [plugins](/reference/plugins-extensions) | [**Explanation**](/explanation/interfaces-and-endpoints) </br> Concepts - discussion and clarification of key topics such as [architecture](/explanation/architecture), [users](/explanation/users), and [legacy charms](/explanation/legacy-charm)|
+|  [**Get started**](/tutorial/index) - [Deploy on a cloud](/how-to-guides/deploy/index) \| [Scale](/how-to-guides/scale) \| [Manage passwords](/how-to-guides/manage-passwords) \| [Enable encryption](/how-to-guides/enable-encryption) \| [Back up](/how-to-guides/back-up-and-restore/index) \| [Monitoring](/how-to-guides/monitoring-cos/index) </br> |  [**How-to guides**](/how-to-guides/index) for key tasks, use-cases, and problems. These guides assume basic familiarity with Juju and PostgreSQL. </br>  |
+| [**Reference**](/reference/index) - Technical information for quick lookup, such as [requirements](/reference/system-requirements), [plugins](/reference/plugins-extensions), and [statuses](/reference/statuses). | [**Explanation**](/explanation/interfaces-and-endpoints) - Discussion and clarification of key topics such as [architecture](/explanation/architecture), [users](/explanation/users), and [legacy charms](/explanation/legacy-charm)|
+
+
+
 ## Project and community
 
 Charmed PostgreSQL is an official distribution of PostgreSQL. It’s an open-source project that welcomes community contributions, suggestions, fixes and constructive feedback.
