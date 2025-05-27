@@ -160,7 +160,7 @@ def test_patroni_scrape_config_no_tls(harness):
 
 def test_patroni_scrape_config_tls(harness):
     with patch(
-        "charm.PostgresqlOperatorCharm.is_tls_enabled",
+        "charm.PostgresqlOperatorCharm.is_peer_tls_enabled",
         return_value=True,
         new_callable=PropertyMock,
     ):
@@ -1150,8 +1150,11 @@ def test_update_config(harness):
         ) as _is_workload_running,
         patch("charm.Patroni.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
-            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
-        ) as _is_tls_enabled,
+            "charm.PostgresqlOperatorCharm.is_client_tls_enabled", new_callable=PropertyMock
+        ) as _is_client_tls_enabled,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_peer_tls_enabled", new_callable=PropertyMock
+        ) as _is_peer_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
     ):
@@ -1165,13 +1168,15 @@ def test_update_config(harness):
         # Test without TLS files available.
         with harness.hooks_disabled():
             harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
-        _is_tls_enabled.return_value = False
+        _is_client_tls_enabled.return_value = False
+        _is_peer_tls_enabled.return_value = False
         harness.charm.update_config()
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
             enable_ldap=False,
-            enable_tls=False,
+            enable_client_tls=False,
+            enable_peer_tls=False,
             backup_id=None,
             stanza=None,
             restore_stanza=None,
@@ -1181,7 +1186,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
         )
-        _handle_postgresql_restart_need.assert_called_once_with(False)
+        _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
         _restart_metrics_service.assert_called_once()
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
@@ -1193,14 +1198,16 @@ def test_update_config(harness):
         harness.update_relation_data(
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it change.
-        _is_tls_enabled.return_value = True
+        _is_client_tls_enabled.return_value = True
+        _is_peer_tls_enabled.return_value = True
         _render_patroni_yml_file.reset_mock()
         harness.charm.update_config()
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
             enable_ldap=False,
-            enable_tls=True,
+            enable_client_tls=True,
+            enable_peer_tls=True,
             backup_id=None,
             stanza=None,
             restore_stanza=None,
@@ -1232,7 +1239,7 @@ def test_update_config(harness):
         harness.update_relation_data(
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it doesn't change.
-        _is_tls_enabled.return_value = False
+        _is_client_tls_enabled.return_value = False
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
         _restart_ldap_sync_service.assert_not_called()
@@ -2085,13 +2092,13 @@ def test_handle_postgresql_restart_need(harness):
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch(
-            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
-        ) as _is_tls_enabled,
+            "charm.PostgresqlOperatorCharm.is_client_tls_enabled", new_callable=PropertyMock
+        ) as _is_client_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
     ):
         rel_id = harness.model.get_relation(PEER).id
         for values in itertools.product(
-            [True, False], [True, False], [True, False], [True, False], [True, False]
+            [True, False], [True, False], [True, False], [True, False]
         ):
             _reload_patroni_configuration.reset_mock()
             _restart.reset_mock()
@@ -2100,27 +2107,27 @@ def test_handle_postgresql_restart_need(harness):
                 harness.update_relation_data(
                     rel_id,
                     harness.charm.unit.name,
-                    {"postgresql_restarted": ("True" if values[4] else "")},
+                    {"postgresql_restarted": ("True" if values[3] else "")},
                 )
 
-            _is_tls_enabled.return_value = values[1]
-            postgresql_mock.is_tls_enabled = PropertyMock(return_value=values[2])
-            postgresql_mock.is_restart_pending = PropertyMock(return_value=values[3])
+            _is_client_tls_enabled.return_value = values[0]
+            postgresql_mock.is_tls_enabled.return_value = values[1]
+            postgresql_mock.is_restart_pending = PropertyMock(return_value=values[2])
 
-            harness.charm._handle_postgresql_restart_need(values[0])
+            harness.charm._handle_postgresql_restart_need()
             _reload_patroni_configuration.assert_called_once()
             if values[0]:
                 assert "tls" in harness.get_relation_data(rel_id, harness.charm.unit)
             else:
                 assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit)
 
-            if (values[1] != values[2]) or values[3]:
+            if (values[0] != values[1]) or values[2]:
                 assert "postgresql_restarted" not in harness.get_relation_data(
                     rel_id, harness.charm.unit
                 )
                 _restart.assert_called_once()
             else:
-                if values[4]:
+                if values[3]:
                     assert "postgresql_restarted" in harness.get_relation_data(
                         rel_id, harness.charm.unit
                     )

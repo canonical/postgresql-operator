@@ -431,7 +431,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "metrics_path": "/metrics",
                 "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
-                "scheme": "https" if self.is_tls_enabled else "http",
+                "scheme": "https" if self.is_peer_tls_enabled else "http",
             }
         ]
 
@@ -1151,9 +1151,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return self.unit.name == self._patroni.get_standby_leader(unit_name_pattern=True)
 
     @property
-    def is_tls_enabled(self) -> bool:
+    def is_client_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all((*self.tls.get_client_tls_files(), *self.tls.get_peer_tls_files()))
+        return all(self.tls.get_client_tls_files())
+
+    @property
+    def is_peer_tls_enabled(self) -> bool:
+        """Return whether TLS is enabled."""
+        return all(self.tls.get_peer_tls_files())
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -2268,7 +2273,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if refresh is None:
             refresh = self.refresh
 
-        enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:
             limit_memory = self.config.profile_limit_memory * 10**6
@@ -2283,7 +2287,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             connectivity=self.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
             enable_ldap=self.is_ldap_enabled,
-            enable_tls=enable_tls,
+            enable_client_tls=self.is_client_tls_enabled,
+            enable_peer_tls=self.is_peer_tls_enabled,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
             restore_timeline=self.app_peer_data.get("restore-timeline"),
@@ -2301,17 +2306,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
-            self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            self.unit_peer_data.update({"tls": "enabled" if self.is_client_tls_enabled else ""})
             self.postgresql_client_relation.update_endpoints()
             logger.debug("Early exit update_config: Workload not started yet")
             return True
 
         if not self._patroni.member_started:
-            if enable_tls:
+            if self.is_client_tls_enabled:
                 logger.debug(
                     "Early exit update_config: patroni not responding but TLS is enabled."
                 )
-                self._handle_postgresql_restart_need(True)
+                self._handle_postgresql_restart_need()
                 return True
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
@@ -2334,7 +2339,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "wal_keep_size": self.config.durability_wal_keep_size,
         })
 
-        self._handle_postgresql_restart_need(enable_tls)
+        self._handle_postgresql_restart_need()
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -2376,10 +2381,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
+    def _handle_postgresql_restart_need(self) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
-            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+            restart_postgresql = self.is_client_tls_enabled != self.postgresql.is_tls_enabled()
         else:
             restart_postgresql = False
         try:
@@ -2398,7 +2403,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+        self.unit_peer_data.update({"tls": "enabled" if self.is_client_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed

@@ -650,7 +650,8 @@ class Patroni:
         connectivity: bool = False,
         is_creating_backup: bool = False,
         enable_ldap: bool = False,
-        enable_tls: bool = False,
+        enable_client_tls: bool = False,
+        enable_peer_tls: bool = False,
         stanza: str | None = None,
         restore_stanza: str | None = None,
         disable_pgbackrest_archiving: bool = False,
@@ -667,7 +668,8 @@ class Patroni:
             connectivity: whether to allow external connections to the database.
             is_creating_backup: whether this unit is creating a backup.
             enable_ldap: whether to enable LDAP authentication.
-            enable_tls: whether to enable TLS.
+            enable_client_tls: whether to enable client TLS.
+            enable_peer_tls: whether to enable peer TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
             disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
@@ -693,7 +695,8 @@ class Patroni:
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             enable_ldap=enable_ldap,
-            enable_tls=enable_tls,
+            enable_client_tls=enable_client_tls,
+            enable_peer_tls=enable_peer_tls,
             member_name=self.member_name,
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers

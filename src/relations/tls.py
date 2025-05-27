@@ -13,10 +13,8 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
     TLSCertificatesRequiresV4,
 )
 from ops import (
-    BlockedStatus,
     EventSource,
     RelationBrokenEvent,
-    RelationCreatedEvent,
 )
 from ops.framework import EventBase, Object
 from ops.pebble import ConnectionError as PebbleConnectionError
@@ -31,7 +29,6 @@ SCOPE = "unit"
 TLS_CLIENT_RELATION = "client-certificates"
 TLS_PEER_RELATION = "peer-certificates"
 TLS_RELS = (TLS_CLIENT_RELATION, TLS_PEER_RELATION)
-MISSING_TLS_RELATION_MESSAGE = "Charm is not integrated to both certificate relations"
 
 
 class RefreshTLSCertificatesEvent(EventBase):
@@ -110,18 +107,9 @@ class TLS(Object):
         )
 
         for rel in TLS_RELS:
-            self.framework.observe(self.charm.on[rel].relation_created, self._on_relation_created)
             self.framework.observe(
                 self.charm.on[rel].relation_broken, self._on_certificates_broken
             )
-
-    def _on_relation_created(self, event: RelationCreatedEvent) -> None:
-        if not self.model.get_relation(TLS_CLIENT_RELATION) or not self.model.get_relation(
-            TLS_PEER_RELATION
-        ):
-            self.charm.set_unit_status(BlockedStatus(MISSING_TLS_RELATION_MESSAGE))
-        else:
-            self.charm._set_primary_status_message()
 
     def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
         try:
@@ -135,14 +123,6 @@ class TLS(Object):
             return
 
     def _on_certificates_broken(self, event: RelationBrokenEvent) -> None:
-        if self.model.get_relation(TLS_CLIENT_RELATION) or self.model.get_relation(
-            TLS_PEER_RELATION
-        ):
-            self.charm.set_unit_status(BlockedStatus(MISSING_TLS_RELATION_MESSAGE))
-            # Don't trigger update_config if TLS rels are in partial state
-            return
-        else:
-            self.charm._set_primary_status_message()
         if not self.charm.update_config():
             logger.debug("Cannot update config at this moment")
             event.defer()

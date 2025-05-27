@@ -239,7 +239,7 @@ class PostgreSQLProvider(Object):
                 ro_endpoints = rw_endpoint
                 ro_hosts = primary_unit_ip
 
-        tls = "True" if self.charm.is_tls_enabled else "False"
+        tls = "True" if self.charm.is_client_tls_enabled else "False"
         if tls == "True":
             _, ca, _ = self.charm.tls.get_client_tls_files()
         else:

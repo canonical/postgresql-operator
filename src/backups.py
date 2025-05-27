@@ -1259,7 +1259,7 @@ Stderr:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            enable_tls=self.charm.is_tls_enabled and len(self.charm._peer_members_ips) > 0,
+            enable_tls=self.charm.is_peer_tls_enabled and len(self.charm._peer_members_ips) > 0,
             peer_endpoints=self.charm._peer_members_ips,
             path=s3_parameters["path"],
             data_path=f"{POSTGRESQL_DATA_PATH}",
@@ -1356,7 +1356,7 @@ Stderr:
 
         # Stop the service if TLS is not enabled or there are no replicas.
         if (
-            not self.charm.is_tls_enabled
+            not self.charm.is_peer_tls_enabled
             or len(self.charm._peer_members_ips) == 0
             or self.charm._patroni.get_standby_leader()
         ):
