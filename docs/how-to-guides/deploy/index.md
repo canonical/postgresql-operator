@@ -51,8 +51,6 @@ See also:
 * [How to enable TLS]
 * [How to connect from outside the local network]
 
-[How to deploy on juju spaces] goes over how to configure your deployment of PostgreSQL and client application to use juju spaces to separate network traffic.
-
 ### Airgapped
 [How to deploy in an offline or air-gapped environment] goes over the special configuration steps for installing PostgreSQL in an airgapped environment via CharmHub and the Snap Store Proxy.
 
@@ -105,5 +103,4 @@ Multi-AZ <multi-az>
 TLS VIP access <tls-vip-access>
 Terraform <terraform>
 Air-gapped <air-gapped>
-Juju spaces <juju-spaces>
 Juju storage <juju-storage>

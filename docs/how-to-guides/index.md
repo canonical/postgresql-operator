@@ -16,7 +16,6 @@ Other deployment scenarios and configurations:
 * [Terraform]
 * [TLS VIP access]
 * [Air-gapped]
-* [Juju spaces]
 * [Juju storage]
 
 ## Usage and maintenance

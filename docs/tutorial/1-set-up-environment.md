@@ -20,7 +20,7 @@ Launch a new VM using the [charm-dev](https://github.com/canonical/multipass-blu
 multipass launch --cpus 4 --memory 8G --disk 50G --name my-vm charm-dev
 ```
 
-```{note}
+```
 **Note**: All 'multipass launch' parameters are [described here](https://multipass.run/docs/launch-command).
 ```
 

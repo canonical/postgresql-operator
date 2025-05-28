@@ -89,3 +89,4 @@ To randomly generate a password for the `operator` user, run
 juju run postgresql/leader set-password
 ```
 
+See also: [](/how-to-guides/manage-passwords)

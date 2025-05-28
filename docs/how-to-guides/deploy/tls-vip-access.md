@@ -182,4 +182,4 @@ At this point, Juju is responsible for the health of the clusters/applications:
 
 ## Troubleshooting
 
-[Contact us](reference/contacts) if you have any issues with this setup or would like help with a different use-case.
+[Contact us](/reference/contacts) if you have any issues with this setup or would like help with a different use-case.
