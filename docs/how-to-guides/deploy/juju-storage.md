@@ -11,7 +11,7 @@ Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju
 Check the [`metadata.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/metadata.yaml) for find Juju storage name and tech details:
 
 [details="Charmed PostgreSQL 16 storage list"]
-```shell
+```text
 storage:
   archive:
     type: filesystem
@@ -34,7 +34,7 @@ Charmed PostgreSQL 16 supports multiple storage `archive` , `data` , `logs` and 
 
 Check the [metadata.yaml](https://github.com/canonical/postgresql-operator/blob/main/metadata.yaml) for find Juju storage name and tech details:
 [details="Charmed PostgreSQL 14 storage list"]
-```shell
+```text
 storage:
   pgdata:
     type: filesystem
@@ -45,7 +45,7 @@ storage:
 Charmed PostgreSQL 14 supports single storage `pgdata` attaching it on `juju deploy` and mounted inside the Snap common folder `/var/snap/charmed-postgresql/common`.
 
 [details="Example of 'Juju storage'"]
-```shell
+```text
 > juju deploy postgresql
 
 > juju storage
@@ -80,7 +80,7 @@ pgdata/0:
 
 ### Define the storage size
 
-```shell
+```text
 > juju deploy postgresql --storage pgdata=10G
 
 > juju storage
@@ -92,7 +92,7 @@ postgresql/1  pgdata/1    filesystem  lxd   10 GiB  attached
 
 Juju supports wide list of different [storage pools](https://bobcares.com/blog/lxd-create-storage-pool/):
 
-```shell
+```text
 > juju create-storage-pool mystoragepool lxd
 
 > juju storage-pools | grep mystoragepool
@@ -110,7 +110,7 @@ postgresql/2  pgdata/2    filesystem  mystoragepool  5 GiB   attached
 To re-deploy the application with the old Juju storage, it is necessary to provide all charm/database  credentials to the new charm or app. 
 
 **Charmed PostgreSQL 14 uses the Juju action `set-password` to handle credentials:**
-```shell
+```text
 # Note old passwords
 > juju show-secret --reveal database-peers.postgresql.app
 
@@ -143,7 +143,7 @@ juju run postgresql/leader set-password username=monitoring password=AgOxXzcRD5i
 To re-deploy the application with the old Juju storage, it is necessary to provide all charm/database credentials as Juju user secrets. 
 
 **Charmed PostgreSQL 16 uses Juju user secrets to handle credentials:**
-```shell
+```text
 # Note old passwords
 > juju show-secret --reveal database-peers.postgresql.app
 
@@ -171,7 +171,7 @@ To re-deploy the application with the old Juju storage, it is necessary to provi
 
 [details="Example: Complete old storage re-deployment (track 16)"] 
 Prepare the test data to restore later:
-```shell
+```text
 # Add a new model
 > juju add-model teststorage
 
@@ -241,7 +241,7 @@ Unit  Storage ID  Type        Pool  Size     Status    Message
 ```
 
 Re-deploy the postgresql application reusing storage `pgdata/0 `:
-```shell
+```text
 # Create a new Juju User secret
 > juju add-secret mypgpass \
     monitoring-password=6inFApK8IyJuJ6LG \

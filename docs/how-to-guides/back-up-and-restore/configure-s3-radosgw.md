@@ -17,17 +17,17 @@ The Charmed PostgreSQL backup tool ([pgBackRest](https://pgbackrest.org/)) can c
 
 ## Configure s3-integrator
 First, install the MinIO client and create a bucket:
-```shell
+```text
 mc config host add dest https://radosgw.mycompany.fqdn <access-key> <secret-key> --api S3v4 --lookup path
 mc mb dest/backups-bucket
 ```
 Then, deploy and run the charm:
-```shell
+```text
 juju deploy s3-integrator
 juju run s3-integrator/leader sync-s3-credentials access-key=<access-key> secret-key=<secret-key> 
 ```
 Lastly, use `juju config` to add your configuration parameters. For example:
-```shell
+```text
 juju config s3-integrator \
     endpoint="https://radosgw.mycompany.fqdn" \
     bucket="backups-bucket" \
@@ -39,11 +39,11 @@ juju config s3-integrator \
 ```
 ## Integrate with Charmed PostgreSQL
 To pass these configurations to Charmed PostgreSQL, integrate the two applications:
-```shell
+```text
 juju integrate s3-integrator postgresql
 ```
 You can create, list, and restore backups now:
-```shell
+```text
 juju run postgresql/leader list-backups 
 juju run postgresql/leader create-backup 
 juju run postgresql/leader list-backups 
@@ -51,7 +51,7 @@ juju run postgresql/leader restore backup-id=<backup-id-here>
 ```
 
 You can also update your S3 configuration options after integrating using
-```shell
+```text
 juju config s3-integrator <option>=<value>
 ```
 The s3-integrator charm [accepts many configurations](https://charmhub.io/s3-integrator/configure) - enter whatever configurations are necessary for your S3 storage.

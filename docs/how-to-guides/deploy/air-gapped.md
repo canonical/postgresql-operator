@@ -75,7 +75,7 @@ Usually charms require SNAPs (and some manually pin them). For the manual SNAP e
 <details>
 <summary><code>store-admin export snaps --from-yaml snaps.yaml</code></summary>
 
-```shell
+```text
 Downloading grafana-agent revision 51 (latest/stable amd64)
   [####################################]  100%          
 Downloading grafana-agent revision 82 (latest/stable amd64)
@@ -98,7 +98,7 @@ canonical-livepatch: /home/ubuntu/snap/store-admin/common/export/canonical-livep
 
 Transfer the binary blobs using the way of your choice into the air-gapped environment.
 
-```shell
+```text
 cp /home/ubuntu/snap/store-admin/common/export/*.tar.gz /media/usb/
 
 ...
@@ -111,7 +111,7 @@ cp /media/usb/*.tar.gz /var/snap/snap-store-proxy/common/charms-to-push/
  Import the [snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap/#importing-pushing-snaps) and [charm](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) blobs into local air-gapped CharmHub:
 
 > **Note**: when importing machine charms that depend on a snap for functionality, you must first manually import the required snap.
-```shell
+```text
 sudo snap-store-proxy push-snap /var/snap/snap-store-proxy/common/snaps-to-push/charmed-postgresql-20241008T082122.tar.gz
 
 sudo snap-store-proxy push-charm-bundle /var/snap/snap-store-proxy/common/charms-to-push/postgresql-bundle-20241003T104903.tar.gz
@@ -121,7 +121,7 @@ sudo snap-store-proxy push-charm-bundle /var/snap/snap-store-proxy/common/charms
 ### 4. Deploy PostgreSQL
 
  Deploy and operate Juju charms normally:
-```shell
+```text
 juju deploy postgresql
 ```
 ```{note}

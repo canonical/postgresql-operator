@@ -61,7 +61,7 @@ If a [local charm](https://juju.is/docs/sdk/deploy-a-charm) is deployed (revisio
 
 The first step is to record the revision of the running application as a safety measure for a rollback action. To accomplish this, run the `juju status` command and look for the deployed Charmed PostgreSQL revision in the command output, e.g.:
 
-```shell
+```text
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
 welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  11:35:36+02:00
 
@@ -85,7 +85,7 @@ In this example, the current revision is `330`. Store it safely to use in case o
 
 Before running the [`juju refresh`](https://juju.is/docs/juju/juju-refresh) command, it’s necessary to run the `pre-upgrade-check` action against the leader unit:
 
-```shell
+```text
 juju run postgresql/leader pre-upgrade-check
 ```
 Make sure there are no errors in the result output.
@@ -97,15 +97,15 @@ This action will configure the charm to minimize the amount of primary switchove
 Use the  `juju refresh` command to trigger the charm upgrade process.
 
 Example with channel selection:
-```shell
+```text
 juju refresh postgresql --channel 14/edge
 ```
 Example with specific revision selection:
-```shell
+```text
 juju refresh postgresql --revision=342
 ```
 Example with a local charm file:
-```shell
+```text
 juju refresh postgresql --path ./postgresql_ubuntu-22.04-amd64.charm
 ```
 
@@ -119,7 +119,7 @@ First the `replica` units, then the `sync-standby` units, and lastly, the `leade
 
  `juju status` will look like similar to the output below:
 
-```shell
+```text
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
 welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  11:36:18+02:00
 
@@ -139,7 +139,7 @@ Machine  State    Address       Inst id        Base          AZ  Message
 
 After each unit completes the upgrade, the message will go blank, and a next unit will follow:
 
-```shell
+```text
 Model        Controller  Cloud/Region         Version  SLA          Timestamp
 welcome-lxd  lxd         localhost/localhost  3.1.6    unsupported  11:36:31+02:00
 

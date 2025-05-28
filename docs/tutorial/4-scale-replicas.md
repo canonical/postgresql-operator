@@ -17,7 +17,7 @@ To enable high availability in a production environment, replicas should be host
 Currently, your deployment has only one juju **unit**, known in juju as the **leader unit**. You can think of this as the database **primary instance**. For each **replica**, a new unit is created. All units are members of the same database cluster.
 
 To add two replicas to your deployed PostgreSQL application, run
-```shell
+```text
 juju add-unit postgresql -n 2
 ```
 
@@ -49,7 +49,7 @@ Removing a unit from the application scales down the replicas.
 Before we scale them down, list all the units with `juju status`. You will see three units: `postgresql/0`, `postgresql/1`, and `postgresql/2`. Each of these units hosts a PostgreSQL replica. 
 
 To remove the replica hosted on the unit `postgresql/2` enter:
-```shell
+```text
 juju remove-unit postgresql/2
 ```
 

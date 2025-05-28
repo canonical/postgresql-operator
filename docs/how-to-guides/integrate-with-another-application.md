@@ -22,12 +22,12 @@ You can see which existing charms are compatible with PostgreSQL in the [Integra
 
 ### Modern `postgresql_client` interface
 To integrate with a charmed application that supports the `postgresql_client` interface, run
-```shell
+```text
 juju integrate postgresql:database <charm>
 ```
 
 To remove the integration, run
-```shell
+```text
 juju remove-relation postgresql <charm>
 ```
 
@@ -38,12 +38,12 @@ See the [legacy charm explanation page](/explanation/legacy-charm).
 ```
 
 To integrate via the legacy interface, run
- ```shell
+ ```text
 juju integrate postgresql:db <charm>
 ```
 
 Extended permissions can be requested using the `db-admin` endpoint:
-```shell
+```text
 juju integrate postgresql:db-admin <charm>
 ```
 
@@ -52,24 +52,24 @@ juju integrate postgresql:db-admin <charm>
 To integrate with an application outside of Juju, you must use the [`data-integrator` charm](https://charmhub.io/data-integrator) to create the required credentials and endpoints.
 
 Deploy `data-integrator`:
-```shell
+```text
 juju deploy data-integrator --config database-name=<name>
 ```
 
 Integrate with PostgreSQL:
-```shell
+```text
 juju integrate data-integrator postgresql
 ```
 
 Use the `get-credentials` action to retrieve credentials from `data-integrator`:
-```shell
+```text
 juju run data-integrator/leader get-credentials
 ```
 
 ## Rotate application passwords
 To rotate the passwords of users created for integrated applications, the integration should be removed and integrated again. This process will generate a new user and password for the application.
 
-```shell
+```text
 juju remove-relation <charm> postgresql
 juju integrate <charm> postgresql
 ```
@@ -79,12 +79,12 @@ juju integrate <charm> postgresql
 The operator user is used internally by the Charmed PostgreSQL application. The `set-password` action can be used to rotate its password.
 
 To set a specific password for the operator user, run
-```shell
+```text
 juju run postgresql/leader set-password password=<password>
 ```
 
 To randomly generate a password for the `operator` user, run
-```shell
+```text
 juju run postgresql/leader set-password
 ```
 

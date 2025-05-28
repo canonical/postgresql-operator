@@ -19,7 +19,7 @@ Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://discourse.charmh
 ```
 
 Log into Google Cloud and [bootstrap GCE on Google Cloud](/how-to-guides/deploy/gce):
-```shell
+```text
 gcloud auth login
 gcloud iam service-accounts keys create sa-private-key.json  --iam-account=juju-gce-account@[your-gcloud-project-12345].iam.gserviceaccount.com
 sudo mv sa-private-key.json /var/snap/juju/common/sa-private-key.json
@@ -36,13 +36,13 @@ Juju provides the support for availability zones using **constraints**. Read mor
 
 The command below demonstrates how Juju automatically deploys Charmed PostgreSQL VM using [Juju constraints](https://juju.is/docs/juju/constraint#zones):
 
-```shell
+```text
 juju deploy postgresql -n 3 \
   --constraints zones=us-east1-b,us-east1-c,us-east1-d
 ```
 
 After a successful deployment, `juju status` will show an active application:
-```shell
+```text
 Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:16:52+02:00
 
@@ -61,7 +61,7 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ```
 
 and each unit/vm will sit in the separate AZ out of the box:
-```shell
+```text
 > gcloud compute instances list
 NAME           ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
 juju-a82dd9-0  us-east1-b  n1-highcpu-4               10.142.0.30  34.23.252.144  RUNNING  # Juju Controller
@@ -72,7 +72,7 @@ juju-e7c0db-0  us-east1-d  n2-highcpu-2               10.142.0.31  34.148.44.51 
 
 ### Simulation: A node gets lost
 Let's destroy a GCE node and recreate it using the same AZ:
-```shell
+```text
 > gcloud compute instances delete juju-e7c0db-1 
 No zone specified. Using zone [us-east1-c] for instance: [juju-e7c0db-1].
 The following instances will be deleted. Any attached disks configured to be auto-deleted will be deleted unless they are attached to any other instances or the `--keep-disks` flag is given and specifies them for keeping. Deleting a disk is 
@@ -84,7 +84,7 @@ Do you want to continue (Y/n)?  Y
 Deleted [https://www.googleapis.com/compute/v1/projects/data-platform-testing-354909/zones/us-east1-c/instances/juju-e7c0db-1].
 ```
 
-```shell
+```text
 Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:25:14+02:00
 
@@ -103,7 +103,7 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ```
 
 Here we should remove the no-longer available `server/vm/GCE` node and add a new one. Juju will create it in the same AZ `us-east4-c`:
-```shell
+```text
 > juju remove-unit postgresql/1 --force --no-wait
 WARNING This command will perform the following actions:
 will remove unit postgresql/1
@@ -112,7 +112,7 @@ Continue [y/N]? y
 ```
 
 The command `juju status` shows the machines in a healthy state, but PostgreSQL HA recovery is necessary:
-```shell
+```text
 Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:30:09+02:00
 
@@ -129,12 +129,12 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ```
 
 Request Juju to add a new unit in the proper AZ:
-```shell
+```text
 juju add-unit postgresql -n 1
 ```
 
 Juju uses the right AZ where the node is missing. Run `juju status`:
-```shell
+```text
 Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:30:42+02:00
 
@@ -159,7 +159,7 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ```
 
 Check the list of currently running GCE instances:
-```shell
+```text
 > gcloud compute instances list
 NAME           ZONE        MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
 juju-a82dd9-0  us-east1-b  n1-highcpu-4                10.142.0.30  34.23.252.144  RUNNING
@@ -169,12 +169,12 @@ juju-e7c0db-0  us-east1-d  n2-highcpu-2                10.142.0.31  34.148.44.51
 ```
 
 Request Juju to clean all GCE resources:
-```shell
+```text
 juju destroy-controller gce --no-prompt --force --destroy-all-models
 ```
 
 Re-check that there are no running GCE instances left (it should be empty):
-```shell
+```text
 gcloud compute instances list
 ```
 

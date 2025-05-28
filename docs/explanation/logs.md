@@ -6,7 +6,7 @@ It is a dedicated section to highlight logs for each component to simplify troub
 ## Core logs
 
 PostgreSQL and Patroni logs can be found in `/var/snap/charmed-postgresql/common/var/log/postgresql` and `/var/snap/charmed-postgresql/common/var/log/patroni` respectively:
-```shell
+```text
 > ls -alh /var/snap/charmed-postgresql/common/var/log/postgresql
 total 20K
 drwxr-xr-x 2 snap_daemon root        4.0K Oct 11 15:09 .
@@ -17,7 +17,7 @@ drwxr-xr-x 6 snap_daemon root        4.0K Oct 11 15:04 ..
 -rw------- 1 snap_daemon snap_daemon  817 Oct 11 15:08 postgresql-3_1508.log
 -rw------- 1 snap_daemon snap_daemon    0 Oct 11 15:09 postgresql-3_1509.log
 ```
-```shell
+```text
 >  ls -alh /var/snap/charmed-postgresql/common/var/log/patroni/
 total 28K
 drwxr-xr-x 2 snap_daemon root        4.0K Oct 11 15:29 .
@@ -29,7 +29,7 @@ drwxr-xr-x 6 snap_daemon root        4.0K Oct 11 15:25 ..
 -rw-r--r-- 1 snap_daemon snap_daemon  464 Oct 11 15:27 patroni.log.4
 ```
 The PostgreSQL log naming convention  is `postgresql-<weekday>_<hour><minute>.log`. The log message format is `<date> <time> UTC [<pid>]: <connection details> <level>: <message>`. E.g:
-```shell
+```text
 > cat /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql-3_1508.log
 2023-10-11 15:08:17 GMT [4338]: user=,db=,app=,client=,line=8 LOG:  received SIGHUP, reloading configuration files
 2023-10-11 15:08:17 GMT [4338]: user=,db=,app=,client=,line=9 LOG:  parameter "archive_command" changed to "pgbackrest --config=/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf --stanza=pg.pg archive-push %p"
@@ -39,7 +39,7 @@ The PostgreSQL log naming convention  is `postgresql-<weekday>_<hour><minute>.lo
 ```
 
 The Patroni log message format is `<date> <time> UTC [<pid>]: <level>: <message>`. E.g:
-```shell
+```text
 > cat /var/snap/charmed-postgresql/common/var/log/patroni/patroni.log.4
 2023-10-11 15:27:01 UTC [4247]: WARNING: Could not activate Linux watchdog device: "Can't open watchdog device: [Errno 2] No such file or directory: '/dev/watchdog'" 
 2023-10-11 15:27:01 UTC [4247]: INFO: initialized a new cluster 
@@ -54,7 +54,7 @@ All timestamps are in UTC.
 ## Optional logs
 
 If S3 backups are enabled, Pgbackrest logs would be located in `/var/snap/charmed-postgresql/common/var/log/pgbackrest`:
-```shell
+```text
 > ls -alh  /var/snap/charmed-postgresql/common/var/log/pgbackrest/
 total 20K
 drwxr-xr-x 2 snap_daemon root        4.0K Oct 11 15:14 .
@@ -65,7 +65,7 @@ drwxr-xr-x 6 snap_daemon root        4.0K Oct 11 15:04 ..
 ```
 
 The naming convention of the Pgbackrest logs is `<model name>.patroni-<postgresql app name>-<action>.log`. Log output should look similar to:
-```shell
+```text
 > cat /var/snap/charmed-postgresql/common/var/log/pgbackrest/pg.pg-expire.log 
 -------------------PROCESS START-------------------
 2023-10-11 15:14:44.555 P00   INFO: expire command begin 2.47: --config=/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf --exec-id=11725-9ad622c8 --lock-path=/tmp --log-level-console=debug --log-path=/var/snap/charmed-postgresql/common/var/log/pgbackrest --repo1-path=/postgresql-test2 --repo1-retention-full=9999999 --repo1-s3-bucket=dragop-test-bucket --repo1-s3-endpoint=https://s3.eu-central-1.amazonaws.com --repo1-s3-key=<redacted> --repo1-s3-key-secret=<redacted> --repo1-s3-region=eu-central-1 --repo1-s3-uri-style=host --repo1-type=s3 --stanza=pg.pg

@@ -14,17 +14,17 @@ In a later section about [integrations,](/tutorial/6-integrate-with-other-applic
 Connecting to the database requires that you know three pieces of information: The internal postgreSQL database's username and password, and the host machine's IP address. 
 
 The IP addresses associated with each application unit can be found using the `juju status` command. Since we will use the leader unit to connect to PostgreSQL, we are interested in the IP address for the unit marked with `*`, like shown in the output below:
-```shell
+```text
 Unit           	  Workload  Agent  Address   Ports  Message
 postgresql/0*     active	idle   10.1.110.80     	Primary
 ```
 
 The user we will connect to in this tutorial will be 'operator'. To retrieve its associated password, run the Charmed PostgreSQL action get-password:
-```shell
+```text
 juju run postgresql/leader get-password
 ```
 The command above should output something like this:
-```shell
+```text
 Running operation 1 with 1 task
   - task 2 on unit-postgresql-0
 
@@ -32,18 +32,18 @@ Waiting for task 2...
 password: 66hDfCMm3ofT0yrG
 ```
 In order to retrieve the password of a user other than 'operator', use the option username:
-```shell
+```text
 juju run postgresql/leader get-password username=replication
 ```
 
 At this point, we have all the information required to access PostgreSQL. Run the command below to enter the leader unit's shell as root:
 
-```shell
+```text
 juju ssh --container postgresql postgresql/leader bash
 ```
 which should bring you to a prompt like this: 
 
-```shell
+```text
  root@postgresql-0:/#
 ```
 The following commands should be executed from this remote shell you just logged into. 
@@ -55,12 +55,12 @@ The following commands should be executed from this remote shell you just logged
 The easiest way to interact with PostgreSQL is via [PostgreSQL interactive terminal `psql`](https://www.postgresql.org/docs/14/app-psql.html), which is already installed on the host you're connected to.
 
 For example, to list all databases currently available, run the command below. When requested, enter the password that you obtained earlier.
-```shell
+```text
 psql --host=10.1.110.80 --username=operator --password --list
 ```
 
 You can see below the output for the list of databases. `postgres` is the default database we are connected to and is used for administrative tasks and for creating other databases.  
-```shell
+```text
    Name    |  Owner   | Encoding |   Collate   |    Ctype    |   Access privileges
 -----------+----------+----------+-------------+-------------+-----------------------
  postgres  | operator | UTF8     | en_US.UTF-8 | en_US.UTF-8 |
@@ -72,13 +72,13 @@ You can see below the output for the list of databases. `postgres` is the defaul
 ```
 
 In order to execute queries, we should enter psql's interactive terminal by running the following command, again typing password when requested:
-```shell
+```text
  psql --host=10.1.110.80 --username=operator --password postgres
 ```
 
 The output should be something like this:
 
-```shell
+```text
 psql (14.10 (Ubuntu 14.10-0ubuntu0.22.04.1))
 Type "help" for help.
 
@@ -86,7 +86,7 @@ postgres=#
 ```
 Now you are successfully logged in the interactive terminal. Here it is possible to execute commands to PostgreSQL directly using PostgreSQL SQL Queries. For example, to show which version of PostgreSQL is installed, run the following command:
 
-```shell
+```text
 postgres=# SELECT version();
                                                              version
 ---------------------------------------------------------------------------------------------------------------------------------
@@ -96,7 +96,7 @@ postgres=# SELECT version();
 
 We can see that PostgreSQL version 14.10 is installed. From this prompt, to print the list of available databases, we can simply run this command:
 
-```shell
+```text
 postgres=# \l
 ```
 
@@ -104,7 +104,7 @@ The output should be the same as the one obtained before with `psql`, but this t
 
 ### Create a new database
 For creating and connecting to a new sample database, we can run the following commands:
-```shell
+```text
 postgres=# CREATE DATABASE mynewdatabase;
 postgres=# \c mynewdatabase
 
@@ -113,7 +113,7 @@ You are now connected to database "mynewdatabase" as user "operator".
 
 We can now create a new table inside this database:
 
-```shell
+```text
 postgres=# CREATE TABLE mytable (
 	id SERIAL PRIMARY KEY,
 	name VARCHAR(50),
@@ -123,13 +123,13 @@ postgres=# CREATE TABLE mytable (
 
 And insert an element into it:
 
-```shell
+```text
 postgres=# INSERT INTO mytable (name, age) VALUES ('John', 30);
 ```
 
 We can see our new table element by submitting a query:
 
-```shell
+```text
 postgres=# SELECT * FROM mytable;
 
  id | name | age
@@ -140,7 +140,7 @@ postgres=# SELECT * FROM mytable;
 
 You can try multiple SQL commands inside this environment. Once you're ready, reconnect to the default postgres database and drop the sample database we created:
 
-```shell
+```text
 postgres=# \c postgres
 
 You are now connected to database "postgres" as user "operator".

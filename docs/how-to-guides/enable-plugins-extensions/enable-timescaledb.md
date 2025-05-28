@@ -8,11 +8,11 @@ Charmed PostgreSQL separates TimescaleDB editions for different [CharmHub tracks
 ## Enable TimescaleDB
 
 To enable TimescaleDB plugin/extension simply run:
-```shell
+```text
 juju config postgresql plugin_timescaledb_enable=true
 ```
 The plugin has been enabled on all units once the config-change event finished and all units reports idle:
-```shell
+```text
 > juju status
 ...
 Unit           Workload  Agent      Machine  Public address  Ports     Message
@@ -30,13 +30,13 @@ postgresql/6   active    idle   6        10.189.210.150  5432/tcp
 ## Disable TimescaleDB
 
 To disable it explicitly, simply run:
-```shell
+```text
 juju config postgresql plugin_timescaledb_enable=false
 ```
 The plugin has been disabled on all units once the config-change event finished and all units reports idle (same example as above).
 
 > **Note**: the extension will NOT be disable when database objects uses/depends on plugin is being disabled (clean the database to disable the plugin):
-```shell
+```text
 > juju status
 ...
 Unit           Workload  Agent  Machine  Public address  Ports     Message
@@ -45,14 +45,14 @@ postgresql/3*  blocked   idle   3        10.189.210.124  5432/tcp  Cannot disabl
 ```
 
 Another option is to reset the manually enabled config option (as it is disabled by default):
-```shell
+```text
 juju config postgresql --reset plugin_timescaledb_enable
 ```
 
 ## Test TimescaleDB status:
 
 Prepare the `user_defined_action` procedure:
-```shell
+```text
 postgres=# CREATE OR REPLACE PROCEDURE user_defined_action(job_id int, config jsonb) LANGUAGE PLPGSQL AS
 $$
 BEGIN
@@ -62,7 +62,7 @@ $$;
 ```
 
 Run the following commands to test your TimescaleDB on Charmed PostgreSQL 14:
-```shell
+```text
 postgres=# SELECT add_job('user_defined_action','1h');
 ERROR:  function "add_job" is not supported under the current "apache" license
 HINT:  Upgrade your license to 'timescale' to use this free community feature.

@@ -12,7 +12,7 @@ In this tutorial, we will relate to the [Data Integrator charm](https://charmhub
 
 To deploy `data-integrator`, run
 
-```shell
+```text
 juju deploy data-integrator --config database-name=test-database
 ```
 Example output:
@@ -46,7 +46,7 @@ Machine  State    Address       Inst id        Series  AZ  Message
 Now that the `data-integrator` charm has been set up, we can relate it to PostgreSQL. This will automatically create a username, password, and database for `data-integrator`.
 
 Relate the two applications with:
-```shell
+```text
 juju integrate data-integrator postgresql
 ```
 Wait for `juju status --watch 1s` to show all applications/units as `active`:
@@ -70,7 +70,7 @@ Machine  State    Address       Inst id        Series  AZ  Message
 ```
 
 To retrieve the username, password and database name, run the command
-```shell
+```text
 juju run data-integrator/leader get-credentials
 ```
 
@@ -99,7 +99,7 @@ Note that your hostnames, usernames, and passwords will likely be different.
 ## Access the related database
 
 Use `endpoints`, `username`, `password` from above to connect newly created database `test-database` on the PostgreSQL server:
-```shell
+```text
 > psql --host=10.89.49.129 --username=relation-3 --password test-database
 ...
 test-database=> \l
@@ -111,7 +111,7 @@ test-database=> \l
 ```
 
 The newly created database `test-database` is also available on all other PostgreSQL cluster members:
-```shell
+```text
 > psql --host=10.89.49.197 --username=relation-3 --password --list
 ...
  test-database | operator | UTF8     | C.UTF-8 | C.UTF-8 | =Tc/operator             +
@@ -126,13 +126,13 @@ Note the database name we specified when we first deployed the `data-integrator`
 ## Remove the user
 
 Removing the integration automatically removes the user that was created when the integration was created. Enter the following to remove the integration:
-```shell
+```text
 juju remove-relation postgresql data-integrator
 ```
 
 Now try again to connect to the same PostgreSQL you just used in the previous section:
 
-```shell
+```text
 > psql --host=10.89.49.129 --username=relation-3 --password --list
 ```
 
@@ -145,11 +145,11 @@ This is expected, since this user no longer exists after removing the integratio
 Data remains on the server at this stage.
 
 To create a user again, integrate the applications again:
-```shell
+```text
 juju integrate data-integrator postgresql
 ```
 Re-integrating generates a new user and password:
-```shell
+```text
 juju run data-integrator/leader get-credentials
 ```
 You can then connect to the database with these new credentials.

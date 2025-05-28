@@ -9,7 +9,7 @@
 ```
 ### Install Juju and Azure CLI
 Install Juju via snap:
-```shell
+```text
 sudo snap install juju --channel 3.6/edge
 ```
 
@@ -57,7 +57,7 @@ This will start a script that will help you set up the credentials, where you wi
 
 After prompting this information, you will be asked to authenticate the requests via web browser, as shown in the following example outputs:
 
-```shell
+```text
 To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code <YOUR_CODE> to authenticate.
 ```
 
@@ -67,12 +67,12 @@ You will be asked to authenticate twice, for allowing the creation of two differ
 
 If successful, you will see a confirmation that the credentials have been correctly added locally:
 
-```shell
+```text
 Credential <CREDENTIAL_NAME> added locally for cloud "azure".
 ```
 
 [details=Full sample output of `juju add-credential azure`]
-```shell
+```text
 > juju add-credential azure
 
 This operation can be applied to both a copy on this client and to the one on a controller.
@@ -115,7 +115,7 @@ Credential "azure-test-credentials1" added locally for cloud "azure".
 ### Bootstrap Juju controller
 
 Once successfully completed, bootstrap the new Juju controller on Azure:
-```shell
+```text
 > juju bootstrap azure azure
 
 Creating Juju controller "azure" on azure/centralus
@@ -148,23 +148,23 @@ You can check the [Azure instances availability](https://portal.azure.com/#brows
 ## Deploy charms
 
 Create a new Juju model if you don't have one already
-```shell
+```text
 juju add-model welcome
 ```
 > (Optional) Increase the debug level if you are troubleshooting charms:
-> ```shell
+> ```text
 > juju model-config logging-config='<root>=INFO;unit=DEBUG'
 > ```
 
 The following command deploys PostgreSQL and [Data Integrator](https://charmhub.io/data-integrator), a charm that can be used to requests a test database:
 
-```shell
+```text
 juju deploy postgresql
 juju deploy data-integrator --config database-name=test123
 juju integrate postgresql data-integrator
 ```
 Check the status:
-```shell
+```text
 > juju status --relations
 
 Model    Controller  Cloud/Region     Version    SLA          Timestamp
@@ -191,12 +191,12 @@ postgresql:upgrade                     postgresql:upgrade                     up
 ```
 
 Once deployed, request the credentials for your newly bootstrapped PostgreSQL database:
-```shell
+```text
 juju run data-integrator/leader get-credentials
 ```
 
 Example output:
-```shell
+```text
 postgresql:
   data: '{"database": "test123", "external-node-connectivity": "true", "requested-secrets":
     "[\"username\", \"password\", \"tls\", \"tls-ca\", \"uris\"]"}'
@@ -209,7 +209,7 @@ postgresql:
 ```
 
 At this point, you can access your DB inside Azure VM using the internal IP address. All further Juju applications will use the database through the internal network:
-```shell
+```text
 > psql postgresql://relation-4:Jqi0QckCAADOFagl@192.168.0.5:5432/test123
 
 psql (14.12 (Ubuntu 14.12-0ubuntu0.22.04.1))
@@ -223,13 +223,13 @@ From here you can begin to use your newly deployed PostgreSQL. Learn more about 
 ## Expose database (optional)
 
 If it is necessary to access the database from outside of Azure, open the Azure firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
-```shell
+```text
 juju expose postgresql
 ```
 > Be wary that [opening ports to the public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications).
 
 Once exposed, you can connect your database using the same credentials as above. This time use the Azure VM public IP assigned to the PostgreSQL instance. You can see this with `juju status`:
-```shell
+```text
 > juju status postgresql
 
 ...
@@ -266,7 +266,7 @@ Type "help" for help.
 test123=> 
 ```
 To close public access, run:
-```shell
+```text
 juju unexpose postgresql
 ```
 
@@ -285,18 +285,18 @@ azure*      welcome  admin  superuser  azure/centralus       2      1  none  3.6
 ```
 
 To destroy the `azure` Juju controller and remove the Azure instance, run the command below. **All your data will be permanently removed.**
-```shell
+```text
 juju destroy-controller azure --destroy-all-models --destroy-storage --force
 ```
 
 Next, check and manually delete all unnecessary Azure VM instances and resources. To show the list of all your Azure VMs, run the following command (make sure no running resources are left): 
-```shell
+```text
 az vm list
 az resource list
 ```
 
 List your Juju credentials:
-```shell
+```text
 > juju credentials
 
 ...
@@ -306,33 +306,33 @@ azure        azure-test-name1
 ...
 ```
 Remove Azure CLI credentials from Juju:
-```shell
+```text
 juju remove-credential azure azure-test-name1
 ```
 
 After deleting the credentials, the `interactive` process may still leave the role resource and its assignment hanging around. 
 We recommend you to check if these are still present with:
 
-```shell
+```text
 az role definition list --name azure-test-role1
 ```
 > Use it without specifying the `--name` argument to get the full list. 
 
 You can also check whether you still have a role assignment bound to `azure-test-role1` registered using:
 
-```shell
+```text
 az role assignment list --role azure-test-role1
 ```
 
 If this is the case, you can remove the role assignment first and then the role itself with the following commands:
 
-```shell
+```text
 az role assignment delete --role azure-test-role1
 az role definition delete --name azure-test-role1
 ```
 
 Finally, log out of the Azure CLI user credentials to prevent any credential leakage:
-```shell
+```text
 az logout 
 ```
 

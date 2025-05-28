@@ -21,18 +21,18 @@ Check [this guide about X.509 certificates](https://discourse.charmhub.io/t/secu
 ```
 
 First, deploy the TLS charm:
-```shell
+```text
 juju deploy self-signed-certificates
 ```
 
 To enable TLS integrate (formerly known as “relate”) the two applications:
-```shell
+```text
 juju integrate postgresql:certificates self-signed-certificates:certificates
 ```
 
 ## Check certificates in use
 To check the certificates in use by PostgreSQL, run
-```shell
+```text
 openssl s_client -starttls postgres -connect <leader_unit_IP>:<port> | grep issuer
 ```
 
@@ -42,11 +42,11 @@ Updates to private keys for certificate signing requests (CSR) can be made via t
 With three replicas, this schema should be followed:
 
 Generate a shared internal key:
-```shell
+```text
 openssl genrsa -out internal-key.pem 3072
 ```
 Generate external keys for each unit:
-```shell
+```text
 openssl genrsa -out external-key-0.pem 3072
 openssl genrsa -out external-key-1.pem 3072
 openssl genrsa -out external-key-2.pem 3072
@@ -70,7 +70,7 @@ juju run postgresql/2 set-tls-private-key
 
 ## Disable TLS
 Disable TLS by removing the integration.
-```shell
+```text
 juju remove-relation postgresql:certificates self-signed-certificates:certificates
 ```
 

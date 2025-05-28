@@ -10,7 +10,7 @@ There are several definitions of Roles in Charmed PostgreSQL:
 
 ## Predefined PostgreSQL 16 roles
 
-```shell
+```text
 test123=> SELECT * FROM pg_roles;
            rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 -----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
@@ -42,7 +42,7 @@ Charmed PostgreSQL 16 introduced the following instance level predefined roles:
 * charmed_dba (WIP)
 * charmed_instance_admin (WIP)
 
-```shell
+```text
 test123=> SELECT * FROM pg_roles;
            rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 -----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
@@ -64,7 +64,7 @@ Charmed PostgreSQL 14 ships the minimal necessary roles logic: each application 
 
 ### Predefined PostgreSQL 14 Roles
 
-```shell
+```text
 postgres=# SELECT * FROM pg_roles;
           rolname          | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 ---------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
@@ -84,7 +84,7 @@ postgres=# SELECT * FROM pg_roles;
 
 ### Predefined Charmed PostgreSQL 14 roles
 
-```shell
+```text
 postgres=# SELECT * FROM pg_roles;
           rolname          | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 ---------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
@@ -103,7 +103,7 @@ postgres=# SELECT * FROM pg_roles;
 
 For each application/relation the dedicated user is been created (with matching role and all all resources ownership). The resources ownership is being updated on each re-relation for new users/roles regeneration. Example of simple application relation to PostgreSQL and creating table:
 
-```shell
+```text
 postgres=# SELECT * FROM pg_roles;
           rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 ----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
@@ -128,7 +128,7 @@ mydb=# \d+
 
 When the same application is being related through PgBouncer, the extra users/roles created following the same logic as above:
 
-```shell
+```text
 postgres=# SELECT * FROM pg_roles;
           rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 ----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
@@ -164,7 +164,7 @@ In this case there several records created to:
 To map LDAP users to PostgreSQL users, the dedicated LDAP groups have to be created before hand using [Data Integrator](https://charmhub.io/data-integrator) charm.
 The result of such mapping will be a new PostgreSQL Roles:
 
-```shell
+```text
 postgres=# SELECT * FROM pg_roles;
     rolname    | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 ----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------

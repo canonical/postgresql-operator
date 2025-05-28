@@ -9,7 +9,7 @@ The [manual switchover](https://en.wikipedia.org/wiki/Switchover) is possible us
 ## Switchover 
 
 To switchover the PostgreSQL Primary (write-endpoint) to new Juju unit, use Juju action `promote-to-primary` (on the unit `x`, which will be promoted as a new Primary):
-```shell
+```text
 juju run postgresql/x promote-to-primary scope=unit
 ```
 > **Note**: The manual switchover is possible on the healthy '[Sync Standby](/explanation/units)' unit only. Otherwise it will be rejected by Patroni with the reason explanation.
@@ -32,13 +32,13 @@ The command to re-init Raft cluster should be executed when charm is ready:
 * the last unit was has detected Raft majority lost, status: `Raft majority loss, run: promote-to-primary`
 
 To re-initialize Raft and fix the Partition/PostgreSQL cluster (when requested):
-```shell
+```text
 juju run postgresql/x promote-to-primary scope=unit force=true
 ```
 
 [details="Example of Raft re-initialization"]
 Deploy PostgreSQL 3 units:
-```shell
+```text
 > juju deploy postgresql --config synchronous_node_count=1
 
 > juju status 
@@ -59,7 +59,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 2        started  10.189.210.188  juju-422c1a-2  ubuntu@22.04      Running
 ```
 Find the current Primary/Standby/Replica:
-```shell
+```text
 > juju ssh postgresql/0
 ubuntu@juju-422c1a-0:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml list
 + Cluster: postgresql (7499430436963402504) ---+-----------+----+-----------+
@@ -72,7 +72,7 @@ ubuntu@juju-422c1a-0:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 ```
 
 Kill the Leader and Sync Standby machines:
-```shell
+```text
 > lxc stop --force juju-422c1a-0  && lxc stop --force juju-422c1a-2
 
 > juju status 
@@ -95,7 +95,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 At this stage it is recommended to restore the lost nodes, they will rejoin the cluster automatically once Juju detects their availability.
 
 To start Raft re-initialization, remove DEAD machines as a signal to charm that they cannot be restored/started and no risks for split-brain:
-```shell
+```text
 > juju remove-machine --force 0 
 WARNING This command will perform the following actions:
 will remove machine 0
@@ -111,7 +111,7 @@ will remove machine 2
 Continue [y/N]? y
 ```
 Check the status to ensure `Raft majority loss`:
-```shell
+```text
 > juju status
 ...
 Unit           Workload  Agent      Machine  Public address  Ports     Message
@@ -120,7 +120,7 @@ postgresql/1*  blocked   executing  1        10.189.210.166  5432/tcp  Raft majo
 ```
 
 Start Raft re-initialization:
-```shell
+```text
 > juju run postgresql/1 promote-to-primary scope=unit force=true
 ```
 
@@ -134,7 +134,7 @@ postgresql/1*  maintenance  executing  3        10.189.210.166  5432/tcp  (promo
 ```
 
 At the end, the Primary until is back:
-```shell
+```text
 > juju status
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
 postgresql  lxd         localhost/localhost  3.6.5    unsupported  15:03:12+02:00
@@ -150,12 +150,12 @@ Machine  State    Address         Inst id        Base          AZ  Message
 ```
 
 Scale application to 3+ units to complete HA recovery:
-```shell
+```text
 > juju add-unit postgresql -n 2
 ```
 
 The healthy status:
-```shell
+```text
 > juju status
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
 postgresql  lxd         localhost/localhost  3.6.5    unsupported  15:09:56+02:00

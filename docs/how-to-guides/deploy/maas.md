@@ -9,7 +9,7 @@ For further details and explanation about each step, remember you can refer to t
 ## Bootstrap a Multipass VM
 
 Install Multipass and launch a VM:
-```shell
+```text
 sudo snap install multipass
 
 wget -qO- https://raw.githubusercontent.com/canonical/maas-multipass/main/maas.yml \
@@ -20,7 +20,7 @@ wget -qO- https://raw.githubusercontent.com/canonical/maas-multipass/main/maas.y
 ## Configure MAAS
 
 **1.** Find your MAAS IP with
-```shell
+```text
 multipass list
 ```
 
@@ -58,21 +58,21 @@ The LXD machine will be up and running after the images downloading and sync is 
 
 
 **6.** Finally, dump MAAS admin user API key to add as Juju credentials later:
-```shell
+```text
 multipass exec maas -- sudo maas apikey --username admin
 ```
 
 ## Register MAAS with Juju
 
 **1.** Enter the Multipass shell and install juju:
-```shell
+```text
 multipass shell maas
 sudo snap install juju
 ```
 **2.** Add MAAS cloud and credentials into juju. 
 
 These commands are interactive, so the following code block shows the commands followed by a sample output. **Make sure to enter your own information when prompted by juju.**
-```shell
+```text
 juju add-cloud
 
 > Since Juju 2 is being run for the first time, downloading latest cloud information. Fetching latest public cloud list... Your list of public clouds is up to date, see `juju clouds`. Cloud Types
@@ -87,7 +87,7 @@ juju add-cloud
 > Enter the API endpoint url: http://<MAAS_IP>:5240/MAAS
 > Cloud "maas-cloud" 
 ```
-```shell
+```text
 juju add-credential maas-cloud 
 
 > ...
@@ -105,18 +105,18 @@ juju add-credential maas-cloud
 **3.** Bootstrap Juju. 
 
 Add the flags `--credential` if you registered several MAAS credentials, and `--debug` if you want to see bootstrap details:
-```shell
+```text
 juju bootstrap --constraints tags=juju maas-cloud maas-controller
 ```
 
 ## Deploy Charmed PostgreSQL on MAAS
-```shell
+```text
 juju add-model postgresql maas-cloud
 juju deploy postgresql --channel 14/stable
 ```
 
 Sample `juju status` output:
-```shell
+```text
 Model       Controller       Cloud/Region        Version  SLA          Timestamp
 postgresql  maas-controller  maas-cloud/default  3.1.8    unsupported  12:50:26+02:00
 
@@ -136,7 +136,7 @@ Check the [Testing](/reference/software-testing) reference to test your deployme
 
 ## Clean up the environment
 To stop your VM, run: 
-```shell
+```text
 multipass stop maas
 ```
 If you're done with testing and would like to free up resources on your machine, you can remove the VM entirely.
@@ -148,7 +148,7 @@ For more information, see the docs for [`multipass delete`](https://multipass.ru
 ```
 
 To completely delete your VM and all its data, run:
-```shell
+```text
 multipass delete --purge maas
 ```
 

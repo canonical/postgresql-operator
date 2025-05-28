@@ -28,7 +28,7 @@ The main Patroni tool is `patronictl`.
 `patronictl` checks the low-level Patroni status of the cluster.
 
 [details="Example: cluster status"]
-```shell
+```text
 > juju deploy postgresql -n 3 # and wait for deployment
 > juju ssh postgresql/2
 ...
@@ -49,7 +49,7 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 Use `--help` to find all the available Patroni actions.
 
 [details="Example: Patroni actions"]
-```shell
+```text
 >  sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml --help
 ...
   failover     Failover to a replica
@@ -72,7 +72,7 @@ Use `--help` to find all the available Patroni actions.
 Patroni can perform a low-level [switchover/failover](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-switchover) inside one cluster.
 
 [details="Example: switchover (healthy cluster only)"]
-```shell
+```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml switchover postgresql --candidate postgresql-2 --force
 Current cluster topology
 + Cluster: postgresql (7496847632512033809) ----+-----------+----+-----------+
@@ -103,7 +103,7 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 [/details]
 
 [details="Example: failover"]
-```shell
+```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml failover postgresql --candidate postgresql-3              
 Current cluster list
 + Cluster: postgresql (7496847632512033809) ----+-----------+----+-----------+
@@ -145,7 +145,7 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 
 Sometimes the cluster member might stuck in the middle of nowhere, the easiest way to try is [reinit the Patroni cluster member](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-reinit).
 [details="Example: cluster member re-initialization"]
-```shell
+```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml reinit postgresql postgresql-1
 + Cluster: postgresql (7496847632512033809) ----+-----------+----+-----------+
 | Member        | Host           | Role         | State     | TL | Lag in MB |
@@ -165,7 +165,7 @@ Success: reinitialize for member postgresql-1
 Patroni provides most `patronictl` actions as a [REST API](https://patroni.readthedocs.io/en/latest/rest_api.html). Use port `8008` to access Patroni REST API on any member/unit of Charmed PostgreSQL.
 
 [details="Example: read-only access via Patroni REST API"]
-```shell
+```text
 ubuntu@juju360:~$ curl 10.189.210.55:8008/cluster | jq # where 10.189.210.55 is IP of Charmed PostgreSQL Juju unit
 ...
 {
@@ -208,7 +208,7 @@ ubuntu@juju360:~$ curl 10.189.210.55:8008/cluster | jq # where 10.189.210.55 is 
 > **Note**: Patroni REST API can be accessed anonymously in read-only mode only. The Juju secret `patroni-password` is mandatory to apply any chances via Patroni REST API.
 Example of authenticated changes via Patroni REST API:
 [details="Example: write access via Patroni REST API"]
-```shell
+```text
 > juju deploy postgresql -n 3 # and wait for deployment
 > juju secrets | grep postgresql # find ID with 'patroni-password'
 > juju show-secret --reveal ccccaaabbbbbbcgoi12345 | grep patroni-password # reveal password to access Patroni REST API
@@ -223,7 +223,7 @@ Successfully switched over to "postgresql-1"
 
 Pay attention to TLS relation with PostgreSQL and access Patroni REST API accordingly:
 [details="Example: access Patroni REST API with(out) TLS"]
-```shell
+```text
 > curl    http://x.x.x.x:8008/cluster  # to access without TLS
 > curl    https://x.x.x.x:8008/cluster # to access with trusted certificate
 > curl -k https://x.x.x.x:8008/cluster # to access with self-signed certificate
@@ -238,7 +238,7 @@ Patroni relies on the Raft library for the consensus handling and Primary electi
 While **you should not interact with Raft library manually**,  you can check its internal status:
 
 [details="Example: check Raft status"]
-```shell
+```text
 > juju deploy postgresql -n 3 # and wait for deployment
 > juju secrets | grep postgresql # find ID with 'raft-password'
 > juju show-secret --reveal cvia1ibjihbbbcgoi12300 | grep raft-password # reveal password to access Raft

@@ -7,7 +7,7 @@ You may now keep your Charmed PostgreSQL VM deployment running and write to the 
 
 ## Stop your virtual machine
 If you'd like to keep your environment for later, simply stop your VM with
-```shell
+```text
 multipass stop my-vm
 ```
 
@@ -21,7 +21,7 @@ For more information, see the docs for [`multipass delete`](https://multipass.ru
 ```
 
 **Delete your VM and its data** by running
-```shell
+```text
 multipass delete --purge my-vm
 ```
 

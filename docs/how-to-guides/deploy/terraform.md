@@ -15,22 +15,22 @@ For an in-depth introduction to the Juju Terraform Provider, read [this Discours
 This guide assumes Juju is installed and you have an LXD controller already bootstrapped. For more information, check the [Set up the environment](/tutorial/1-set-up-environment) tutorial page.
 
 First, install Terraform Provider and example modules:
-```shell
+```text
 sudo snap install terraform --classic
 ```
 Switch to the LXD provider and create a new model:
-```shell
+```text
 juju switch lxd
 juju add-model my-model
 ```
 Clone examples and navigate to the PostgreSQL machine module:
-```shell
+```text
 git clone https://github.com/canonical/terraform-modules.git
 cd terraform-modules/modules/machine/postgresql
 ```
 
 Initialise the Juju Terraform Provider:
-```shell
+```text
 terraform init
 ```
 
@@ -59,7 +59,7 @@ resource "juju_application" "machine_postgresql" {
 
 Run `terraform plan` to get a preview of the changes that will be made:
 
-```shell
+```text
 terraform plan -var "juju_model_name=my-model"
 ```
 
@@ -67,7 +67,7 @@ terraform plan -var "juju_model_name=my-model"
 
 If everything looks correct, deploy the resources (skip the approval):
 
-```shell
+```text
 terraform apply -auto-approve -var "juju_model_name=my-model"
 ```
 
@@ -75,13 +75,13 @@ terraform apply -auto-approve -var "juju_model_name=my-model"
 
 Check the deployment status with 
 
-```shell
+```text
 juju status --model lxd:my-model --watch 1s
 ```
 
 Sample output:
 
-```shell
+```text
 Model         Controller  Cloud/Region         Version  SLA          Timestamp
 my-model  lxd         localhost/localhost  3.5.2    unsupported  14:04:26+02:00
 
@@ -100,12 +100,12 @@ Continue to operate the charm as usual from here or apply further Terraform chan
 ## Clean up
 
 To keep the house clean, remove the newly deployed Charmed PostgreSQL by running
-```shell
+```text
 terraform destroy -var "juju_model_name=my-model"
 ```
 
 Sample output:
-```shell
+```text
 juju_application.machine_postgresql: Refreshing state... [id=my-model:postgresql]
 
 Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:

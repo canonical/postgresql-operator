@@ -14,11 +14,11 @@ If you are using an earlier version, check the [Juju 3.0 Release Notes](https://
 First, switch to the COS K8s environment and offer COS interfaces to be cross-model integrated with the Charmed PostgreSQL VM model.
 
 To switch to the Kubernetes controller for the COS model, run
-```shell
+```text
 juju switch <k8s_controller>:<cos_model_name>
 ```
 To offer the COS interfaces, run
-```shell
+```text
 juju offer grafana:grafana-dashboard grafana
 juju offer loki:logging loki
 juju offer prometheus:receive-remote-write prometheus
@@ -27,15 +27,15 @@ juju offer prometheus:receive-remote-write prometheus
 Next, we will switch to the Charmed PostgreSQL VM model, find offers, and consume them.
 
 We are currently on the Kubernetes controller for the COS model. To switch to the PostgreSQL model, run
-```shell
+```text
 juju switch <machine_controller_name>:<postgresql_model_name>
 ```
 To find offers, run
-```shell
+```text
 juju find-offers <k8s_controller>:admin/<cos_model_name>
 ```
 The output should be similar to the sample below, where `k8s` is the k8s controller name and `cos` is the model where `cos-lite` has been deployed:
-```shell
+```text
 Store  URL                   Access Interfaces
 k8s    admin/cos.grafana     admin  grafana_dashboard:grafana-dashboard
 k8s    admin/cos.loki        admin  loki_push_api:logging
@@ -44,22 +44,22 @@ k8s    admin/cos.prometheus  admin  prometheus-receive-remote-write:receive-remo
 ```
 
 To consume offers to be reachable in the current model, run
-```shell
+```text
 juju consume <k8s_controller>:admin/cos.prometheus
 juju consume <k8s_controller>:admin/cos.loki
 juju consume <k8s_controller>:admin/cos.grafana
 ```
 ## Deploy and integrate Grafana
 First, deploy the [`grafana-agent`](https://charmhub.io/grafana-agent) subordinate charm.
-```shell
+```text
 juju deploy grafana-agent
 ```
 Then, integrate (previously known as "relate") it with PostgreSQL 
-```shell
+```text
 juju integrate postgresql:cos-agent grafana-agent
 ```
  Finally, integrate `grafana-agent` with consumed COS offers:
-```shell
+```text
 juju integrate grafana-agent grafana
 juju integrate grafana-agent loki
 juju integrate grafana-agent prometheus
@@ -120,7 +120,7 @@ prometheus    prometheus   prometheus-k8s  103  1/1        receive-remote-write 
 
 ### Connect Grafana web interface
 To connect to the Grafana web interface, follow the [Browse dashboards](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s?_ga=2.201254254.1948444620.1704703837-757109492.1701777558#browse-dashboards) section of the MicroK8s "Getting started" guide.
-```shell
+```text
 juju run grafana/leader get-admin-password --model <k8s_cos_controller>:<cos_model_name>
 ```
 

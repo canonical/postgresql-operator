@@ -11,23 +11,23 @@ Before you start, make sure your machine meets the [minimum system requirements]
 [Multipass](https://multipass.run/) is a quick and easy way to launch virtual machines running Ubuntu. It uses the [cloud-init](https://cloud-init.io/) standard to install and configure all the necessary parts automatically.
 
 Install Multipass from the [snap store](https://snapcraft.io/multipass):
-```shell
+```text
 sudo snap install multipass
 ```
 
 Launch a new VM using the [charm-dev](https://github.com/canonical/multipass-blueprints/blob/main/v1/charm-dev.yaml) cloud-init config:
-```shell
+```text
 multipass launch --cpus 4 --memory 8G --disk 50G --name my-vm charm-dev
 ```
 
-[note type=""]
+```{note}
 **Note**: All 'multipass launch' parameters are [described here](https://multipass.run/docs/launch-command).
 ```
 
 The Multipass [list of commands](https://multipass.run/docs/multipass-cli-commands) is short and self-explanatory. For example, to show all running VMs, just run the command `multipass list`.
 
 As soon as a new VM has started, access it using
-```shell
+```text
 multipass shell my-vm
 ```
 
@@ -40,12 +40,12 @@ All necessary components have been pre-installed inside VM already, like LXD and
 ## Set up Juju
 
 Let's bootstrap Juju to use the local LXD controller. We will call it “overlord”, but you can give it any name you’d like:
-```shell
+```text
 juju bootstrap localhost overlord
 ```
 
 A controller can work with different [models](https://juju.is/docs/juju/model). Set up a specific model for Charmed PostgreSQL VM named ‘tutorial’:
-```shell
+```text
 juju add-model tutorial
 ```
 
@@ -56,6 +56,4 @@ tutorial  overlord    localhost/localhost  3.1.7    unsupported  09:38:32+01:00
 
 Model "admin/tutorial" is empty.
 ```
-
-**Next step:** [2. Deploy PostgreSQL](/tutorial/2-deploy-postgresql)
 

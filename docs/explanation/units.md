@@ -15,7 +15,7 @@ Charmed PostgreSQL cluster size can be [easily scaled](/reference/contacts) from
 ## Primary
 
 The simplest way to find the Primary unit is to run `juju status`. Please be aware that the information here can be outdated as it is being updated only on [Juju event 'update-status'](https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status): 
-```shell
+```text
 ubuntu@juju360:~$ juju status postgresql
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
 postgresql  lxd         localhost/localhost  3.6.5    unsupported  13:04:15+02:00
@@ -35,7 +35,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 ```
 
 The up-to-date Primary unit number can be received using Juju action `get-primary`:
-```shell
+```text
 > juju run postgresql/leader get-primary
 ...
 primary: postgresql/0
@@ -46,7 +46,7 @@ Also it is possible to retrieve this information using [patronictl](/reference/t
 ## Standby / replica
 
 At the moment it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers) only (check the linked documentation for the access details). Example:
-```shell
+```text
 > ... patronictl ... list
 + Cluster: postgresql (7499430436963402504) ---+-----------+----+-----------+
 | Member       | Host           | Role         | State     | TL | Lag in MB |
@@ -64,7 +64,7 @@ On the example above:
 ## Replica lag distance
 
 At the moment it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers) only (check the linked documentation for the access details). Example:
-```shell
+```text
 > ... patronictl ... list
 + Cluster: postgresql (7499430436963402504) ---+-----------+----+-----------+
 | Member       | Host           | Role         | State     | TL | Lag in MB |

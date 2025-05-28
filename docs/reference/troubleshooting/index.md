@@ -32,22 +32,22 @@ Otherwise, this reference goes over how to troubleshoot this charm via:
 Please be familiar with [Juju logs concepts](https://juju.is/docs/juju/log) and learn [how to manage Juju logs](https://juju.is/docs/juju/manage-logs).
 
 Always check the Juju logs before troubleshooting further:
-```shell
+```text
 juju debug-log --replay --tail
 ```
 
 Focus on `ERRORS` (normally there should be none):
-```shell
+```text
 juju debug-log --replay | grep -c ERROR
 ```
 
 Consider enabling the `DEBUG` log level if you are troubleshooting unusual charm behaviour:
-```shell
+```text
 juju model-config 'logging-config=<root>=INFO;unit=DEBUG'
 ```
 
 The Patroni/PostgreSQL logs are located inside SNAP:
-```shell
+```text
 > ls -la /var/snap/charmed-postgresql/common/var/log/*
 
 /var/snap/charmed-postgresql/common/var/log/patroni:
@@ -66,19 +66,19 @@ The Patroni/PostgreSQL logs are located inside SNAP:
 First, check the [operator architecture](/explanation/architecture) to become familiar with snap content, operator building blocks, and running Juju units.
 
 To enter the unit, use:
-```shell
+```text
 juju ssh postgresql/0 bash
 ```
 
 Make sure the `charmed-postgresql` snap is installed and functional:
-```shell
+```text
 ubuntu@juju-fd7874-0:~$ sudo snap list charmed-postgresql
 Name                Version  Rev  Tracking       Publisher        Notes
 charmed-postgresql  14.9     70   latest/stable  dataplatformbot  held
 ```
 
 From here you can make sure all snap (systemd) services are running: 
-```shell
+```text
 ubuntu@juju-fd7874-0# sudo snap services
 Service                                          Startup   Current   Notes
 charmed-postgresql.patroni                       enabled   active    -
@@ -141,7 +141,7 @@ ubuntu@juju-fd7874-0:~$
 The list of running snap/systemd services will depend on configured (enabled) [COS integration](/how-to-guides/monitoring-cos/enable-monitoring) and/or [backup](/how-to-guides/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
 
 To access PostgreSQL, check the [charm users concept](/explanation/users) and request `operator` credentials to use `psql`:
-```shell
+```text
 > juju show-unit postgresql/0 | awk '/private-address:/{print $2;exit}' 
 10.47.228.200
 
@@ -177,7 +177,7 @@ We recommend you do **not** install any additional software. This may affect sta
 Sometimes, however, it is necessary to install some extra troubleshooting software. 
 
 Use the common approach:
-```shell
+```text
 ubuntu@juju-fd7874-0:~$ sudo apt update && sudo apt install gdb
 ...
 Setting up gdb (12.1-0ubuntu1~22.04) ...

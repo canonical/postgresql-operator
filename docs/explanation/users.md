@@ -20,7 +20,7 @@ The operator uses the following internal DB users:
 
 The full list of internal users is available in charm [source code](https://github.com/canonical/postgresql-operator/blob/main/src/constants.py). The full dump of internal users (on the newly installed charm):
 
-```shell
+```text
 postgres=# \du
                                       List of roles
   Role name  |                         Attributes                         |  Member of   
@@ -61,7 +61,7 @@ unit-postgresql-1:
   status: completed
 ```
 To set a predefined password for the specific user, run:
-```shell
+```text
 > juju run-action --wait postgresql/leader set-password username=operator password=newpassword
 
 unit-postgresql-1:
@@ -78,7 +78,7 @@ unit-postgresql-1:
 
 The operator created a dedicated user for every application related/integrated with database. Those users are removed on the juju relation/integration removal request. However, DB data stays in place and can be reused on re-created relations (using new user credentials):
 
-```shell
+```text
 postgres=# \du
                                       List of roles
   Role name  |                         Attributes                         |  Member of   
@@ -90,7 +90,7 @@ postgres=# \du
 ```
 
 **Note**: If password rotation is needed for users used in relations, it is needed to remove the relation and create it again:
-```shell
+```text
 > juju remove-relation postgresql myclientapp
 > juju wait-for application postgresql
 > juju relate postgresql myclientapp

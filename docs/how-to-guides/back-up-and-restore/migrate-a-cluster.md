@@ -22,17 +22,17 @@ Restoring a backup from a previous cluster to a current cluster requires:
 
 ## Manage cluster passwords
 When you restore a backup from an old cluster, it will restore the password from the previous cluster to your current cluster. Set the password of your current cluster to the previous cluster’s password:
-```shell
+```text
 juju run postgresql/leader set-password username=operator password=<previous cluster password> 
 juju run postgresql/leader set-password username=replication password=<previous cluster password> 
 juju run postgresql/leader set-password username=rewind password=<previous cluster password> 
 ```
 ## List backups
 To view the available backups to restore, use the command `list-backups`:
-```shell
+```text
 juju run postgresql/leader list-backups 
 ```
 This shows a list of the available backups (it is up to you to identify which `backup-id` corresponds to the previous-cluster):
-```shell
+```text
     backups: |-
       backup-id             | backup-type  | backup-status

@@ -17,12 +17,12 @@ Charmed PostgreSQL shipped with built-in [SoS](https://github.com/sosreport/sos)
 ### Collect logs on one unit
 
 To generate the troubleshooting report archiving all logs simply call `sos report` inside the relevant Juju unit:
-```shell
+```text
 juju ssh postgresql/0
 > sudo sos report -o system,systemd,snap,charmed_postgresql --low-priority
 ```
 As a result, the archive will all logs will be generated and can be shared with your support representative:
-```shell
+```text
 ...
 Your sos report has been generated and saved in:
 	/tmp/sosreport-juju-d4c067-1-2025-04-07-chdmwlz.tar.xz
@@ -34,12 +34,12 @@ Your sos report has been generated and saved in:
 ```
 
 Use `juju scp` to copy logs from Juju unit to localhost:
-```shell
+```text
 juju scp postgresql/0:/tmp/sosreport-juju-d4c067-1-2025-04-07-chdmwlz.tar.xz .
 ```
 
 [details="Example output"]
-```shell
+```text
 juju ssh postgresql/0
 
 ubuntu@juju-d4c067-1:~$ sudo sos report -o system,systemd,snap,charmed_postgresql --low-priority
@@ -94,21 +94,21 @@ juju scp postgresql/0:/tmp/sosreport-juju-d4c067-1-2025-04-07-qntyqpz.tar.xz .
 The sos tool allows you to collect logs from several Juju units (replace <UNIT_A/B/...> labels with proper Juju unit like `postgresql/0`).
 
 Run the following command from outside the Juju units:
-```shell
+```text
 sos collect --cluster-type juju --no-local -c "juju.units=<UNIT_A>,<UNIT_B>,<...>" --batch -o system,systemd,snap,charmed_postgresql --low-priority
 ```
 
 ## Use the latest sos plugins from Git
 
 The latest version of [sos plugins](https://github.com/sosreport/sos/tree/main/sos/report/plugins) can be retrieved from Git easily:
-```shell
+```text
 git clone https://github.com/sosreport/sos.git
 cd sos
 sudo ./bin/sos report -­a
 ```
 
 The output will be the same to the example above providing archive with all logs as above:
-```shell
+```text
 Your sos report has been generated and saved in:
 	/tmp/sosreport-juju-d4c067-1-2025-04-07-egosqmi.tar.xz
 ```

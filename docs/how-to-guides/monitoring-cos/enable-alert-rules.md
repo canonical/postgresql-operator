@@ -22,7 +22,7 @@ The following section is an example of the [Pushover](https://pushover.net/) ale
 The first step is to create a new account on Pushover (or use an existing one). The goal is to have the 'user key' and 'token' to authorize alerts for the Pushover application. Follow this straightforward [Pushover guide](https://support.pushover.net/i175-how-to-get-a-pushover-api-or-pushover-application-token).
 
 Next, create a new [COS Alert Manager](https://charmhub.io/alertmanager-k8s) config (replace `user_key` and `token` with yours):
-```shell
+```text
 cat > myalert.yaml << EOF
 ```
 ```yaml

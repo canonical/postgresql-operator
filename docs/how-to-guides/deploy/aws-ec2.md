@@ -5,7 +5,7 @@
 ## Install AWS and Juju tooling
 
 Install Juju via snap:
-```shell
+```text
 sudo snap install juju
 ```
 
@@ -23,7 +23,7 @@ aws-cli/2.13.25 Python/3.11.5 Linux/6.2.0-33-generic exe/x86_64.ubuntu.23 prompt
 ```
 ### Authenticate
 [Create an IAM account](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-console.html) (or use legacy access keys) to operate AWS EC2:
-```shell
+```text
 mkdir -p ~/.aws && cat <<- EOF >  ~/.aws/credentials.yaml
 credentials:
   aws:
@@ -35,7 +35,7 @@ EOF
 ```
 
 <!--- TODO, teach Juju to use `aws configure` format:
-```shell
+```text
 ~$ aws configure
 AWS Access Key ID [None]: SECRET_ACCESS_KEY_ID
 AWS Secret Access Key [None]: SECRET_ACCESS_KEY_VALUE
@@ -43,7 +43,7 @@ Default region name [None]: eu-west-3
 Default output format [None]:
 ```
 Check AWS credentials:
-```shell
+```text
 ~$ aws sts get-caller-identity
 {
     "UserId": "1234567890",
@@ -56,15 +56,15 @@ Check AWS credentials:
 ## Bootstrap Juju controller on AWS EC2
 
 Add AWS credentials to Juju:
-```shell
+```text
 juju add-credential aws -f ~/.aws/credentials.yaml
 ```
 Bootstrap Juju controller ([check all supported configuration options](https://juju.is/docs/juju/amazon-ec2)):
-```shell
+```text
 juju bootstrap aws
 ```
 [details="Output example"]
-```shell
+```text
 > juju bootstrap aws
 Creating Juju controller "aws-us-east-1" on aws/us-east-1
 Looking for packaged Juju agent version 3.5.4 for amd64
@@ -93,11 +93,11 @@ You can check the [AWS EC2 instance availability](https://us-east-1.console.aws.
 ![image|690x118](aws-ec2-availability.png)
 
 Create a new Juju model:
-```shell
+```text
 juju add-model welcome
 ```
 > (Optional) Increase the debug level if you are troubleshooting charms:
-> ```shell
+> ```text
 > juju model-config logging-config='<root>=INFO;unit=DEBUG'
 > ```
 
@@ -105,13 +105,13 @@ juju add-model welcome
 
 The following command deploys PostgreSQL and [Data-Integrator](https://charmhub.io/data-integrator) (the charm to request a test DB):
 
-```shell
+```text
 juju deploy postgresql
 juju deploy data-integrator --config database-name=test123
 juju relate postgresql data-integrator
 ```
 Check the status:
-```shell
+```text
 > juju status --relations
 Model    Controller     Cloud/Region   Version  SLA          Timestamp
 welcome  aws-us-east-1  aws/us-east-1  3.5.4    unsupported  13:33:05+02:00
@@ -139,16 +139,16 @@ postgresql:upgrade                     postgresql:upgrade                     up
 Once deployed, request the credentials for your newly bootstrapped PostgreSQL database.
 
 For Juju 2.9 use:
-```shell
+```text
 juju run-action --wait data-integrator/leader get-credentials
 ```
 and for newer Juju 3+ use:
-```shell
+```text
 juju run data-integrator/leader get-credentials
 ```
 
 The output example:
-```shell
+```text
 postgresql:
   data: '{"database": "test123", "external-node-connectivity": "true", "requested-secrets":
     "[\"username\", \"password\", \"tls\", \"tls-ca\", \"uris\"]"}'
@@ -161,7 +161,7 @@ postgresql:
 ```
 
 At this point, you can access your DB inside AWS using the internal IP address. All further Juju applications will use the database through the internal network:
-```shell
+```text
 > psql postgresql://relation-4:rmnk0AO4jICAixCL@172.31.40.178:5432/test123
 psql (15.6 (Ubuntu 15.6-0ubuntu0.23.10.1), server 14.12 (Ubuntu 14.12-0ubuntu0.22.04.1))
 Type "help" for help.
@@ -174,12 +174,12 @@ From here you can [use/scale/backup/restore/refresh](/tutorial/index) your newly
 ## Expose database (optional)
 
 If necessary to access DB from outside of AWS (warning: [opening ports to public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications)) open the AWS firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
-```shell
+```text
 juju expose postgresql
 ```
 
 Once exposed, you can connect your database using the same credentials as above (Important: this time use the EC2 Public IP assigned to the PostgreSQL instance):
-```shell
+```text
 > juju status postgresql
 ...
 Unit           Workload  Agent  Machine  Public address  Ports     Message
@@ -193,7 +193,7 @@ Type "help" for help.
 test123=> 
 ```
 To close the public access run:
-```shell
+```text
 juju unexpose postgresql
 ```
 ## Clean up
@@ -203,7 +203,7 @@ Always clean AWS resources that are no longer necessary -  they could be costly!
 ```
 
 To destroy the Juju controller and remove AWS instance (warning: all your data will be permanently removed):
-```shell
+```text
 > juju controllers
 Controller      Model  User   Access     Cloud/Region   Models  Nodes    HA  Version
 aws-us-east-1*  -      admin  superuser  aws/us-east-1       1      1  none  3.5.4  
@@ -212,8 +212,8 @@ aws-us-east-1*  -      admin  superuser  aws/us-east-1       1      1  none  3.5
 ```
 
 Next, check and manually delete all unnecessary AWS EC2 instances, to show the list of all your EC2 instances run the following command (make sure the correct region used!): 
-```shell
+```text
 aws ec2 describe-instances --region us-east-1 --query "Reservations[].Instances[*].{InstanceType: InstanceType, InstanceId: InstanceId, State: State.Name}" --output table
 ```
 [details="Output example"]
-```shell
+```text

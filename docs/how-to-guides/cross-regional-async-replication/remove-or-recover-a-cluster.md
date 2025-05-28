@@ -15,7 +15,7 @@ If the primary cluster fails or is removed, it is necessary to appoint a new clu
 
 To switchover and promote `lisbon` to primary, one would run the command:
 
-```shell
+```text
 juju run -m lisbon db2/leader promote-to-primary
 ```
 
@@ -25,7 +25,7 @@ Clusters in an async replica set can be detached. The detached cluster can then 
 
 Assuming `lisbon` is the current primary, one would run the following command to detach `rome`:
 
-```shell
+```text
 juju remove-relation -m lisbon replication-offer db2:replication
 ```
 
@@ -35,14 +35,14 @@ The command above will move the `rome` cluster into a detached state (`blocked`)
 
 The following command creates a new cluster in the replica set from the detached `rome` cluster, keeping its existing data in use:
 
-```shell
+```text
 juju run -m rome db1/leader promote-to-primary scope=cluster
 ```
 ### Remove a detached cluster
 
 The following command removes the detached `rome` cluster and **destroys its stored data** with the optional `--destroy-storage` flag:
 
-```shell
+```text
 juju remove-application -m rome db1 --destroy-storage
 ```
 

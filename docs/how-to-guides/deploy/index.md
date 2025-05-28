@@ -10,7 +10,7 @@ This page aims to provide an introduction to the PostgreSQL deployment process a
 The basic requirements for deploying a charm are the [**Juju client**](https://juju.is/docs/juju) and a machine [**cloud**](https://juju.is/docs/juju/cloud).
 
 First, [bootstrap](https://juju.is/docs/juju/juju-bootstrap) the cloud controller and create a [model](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/model/): 
-```shell
+```text
 juju bootstrap <cloud name> <controller name>
 juju add-model <model name>
 ```
@@ -18,7 +18,7 @@ juju add-model <model name>
 Then, either continue with the `juju` client **or** use the `terraform juju` client to deploy the PostgreSQL charm.
 
 **To deploy with the `juju` client:**
-```shell
+```text
 juju deploy postgresql -n <number_of_replicas>
 ```
 > See also: [`juju deploy` command](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/deploy/)

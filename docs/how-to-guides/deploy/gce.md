@@ -6,7 +6,7 @@
 ## Install GCloud and Juju tooling
 
 Install Juju via snap:
-```shell
+```text
 sudo snap install juju
 sudo snap install google-cloud-cli --classic
 ```
@@ -25,12 +25,12 @@ Google Cloud SDK 474.0.0
 ```
 ### Authenticate
 Login to GCloud:
-```shell
+```text
 gcloud auth login
 ```
 
 [Create an service IAM account](https://cloud.google.com/iam/docs/service-accounts-create) for Juju to operate GCE:
-```shell
+```text
 > gcloud iam service-accounts create juju-gce-account --display-name="Juju GCE service account"
 Created service account [juju-gce-account].
 
@@ -50,14 +50,14 @@ created key [aaaaaaa....aaaaaaa] of type [json] as [sa-private-key.json] for [ju
 ## Bootstrap Juju controller on GCE
 
 > **Note**: move newly exported GCloud jsonfile into SNAP accessible folder due to the known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
-```shell
+```text
 sudo mv sa-private-key.json /var/snap/juju/common/sa-private-key.json
 sudo chmod a+r /var/snap/juju/common/sa-private-key.json
 ```
 
 Add GCE credentials to Juju:
 
-```shell
+```text
 > juju add-credential google
 ...
 Enter credential name: juju-gce-account
@@ -76,11 +76,11 @@ Credential "juju-gce-account" added locally for cloud "google".
 ```
 
 Bootstrap Juju controller ([check all supported configuration options](https://juju.is/docs/juju/google-gce)):
-```shell
+```text
 juju bootstrap google gce
 ```
 [details="Output example"]
-```shell
+```text
 > juju bootstrap google gce
 Creating Juju controller "gce" on google/us-east1
 Looking for packaged Juju agent version 3.5.4 for amd64
@@ -110,11 +110,11 @@ You can check the [GCE instance availability](https://console.cloud.google.com/c
 ![image|690x172](gce-availability.png)
 
 Create a new Juju model:
-```shell
+```text
 juju add-model welcome
 ```
 > (Optional) Increase the debug level if you are troubleshooting charms:
-> ```shell
+> ```text
 > juju model-config logging-config='<root>=INFO;unit=DEBUG'
 > ```
 
@@ -122,13 +122,13 @@ juju add-model welcome
 
 The following command deploys PostgreSQL and [Data-Integrator](https://charmhub.io/data-integrator) (the charm to request a test DB):
 
-```shell
+```text
 juju deploy postgresql
 juju deploy data-integrator --config database-name=test123
 juju relate postgresql data-integrator
 ```
 Check the status:
-```shell
+```text
 > juju status --relations
 Model    Controller  Cloud/Region     Version  SLA          Timestamp
 welcome  gce         google/us-east1  3.5.4    unsupported  23:24:05+02:00
@@ -156,16 +156,16 @@ postgresql:upgrade                     postgresql:upgrade                     up
 Once deployed, request the credentials for your newly bootstrapped PostgreSQL database.
 
 For Juju 2.9 use:
-```shell
+```text
 juju run-action --wait data-integrator/leader get-credentials
 ```
 and for newer Juju 3+ use:
-```shell
+```text
 juju run data-integrator/leader get-credentials
 ```
 
 The output example:
-```shell
+```text
 postgresql:
   data: '{"database": "test123", "external-node-connectivity": "true", "requested-secrets":
     "[\"username\", \"password\", \"tls\", \"tls-ca\", \"uris\"]"}'
@@ -178,7 +178,7 @@ postgresql:
 ```
 
 At this point, you can access your DB inside GCloud using the internal IP address. All further Juju applications will use the database through the internal network:
-```shell
+```text
 > psql postgresql://relation-4:SkQ7KpYsyC6PmVVK@10.142.0.18:5432/test123
 psql (14.12 (Ubuntu 14.12-0ubuntu0.22.04.1))
 Type "help" for help.
@@ -191,12 +191,12 @@ From here you can [use/scale/backup/restore/refresh](/tutorial/index) your newly
 ## Expose database (optional)
 
 If necessary to access DB from outside of GCloud (warning: [opening ports to public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications)) open the GCloud firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
-```shell
+```text
 juju expose postgresql
 ```
 
 Once exposed, you can connect your database using the same credentials as above (Important: this time use the GCE Public IP assigned to the PostgreSQL instance):
-```shell
+```text
 > juju status postgresql
 ...
 Unit           Workload  Agent  Machine  Public address  Ports     Message
@@ -210,7 +210,7 @@ Type "help" for help.
 test123=>
 ```
 To close the public access run:
-```shell
+```text
 juju unexpose postgresql
 ```
 ## Clean up
@@ -220,7 +220,7 @@ Always clean GCE resources that are no longer necessary -  they could be costly!
 ```
 
 To destroy the Juju controller and remove GCE instance (warning: all your data will be permanently removed):
-```shell
+```text
 > juju controllers
 Controller  Model    User   Access     Cloud/Region     Models  Nodes    HA  Version
 gce*        welcome  admin  superuser  google/us-east1       2      1  none  3.5.4  
@@ -229,11 +229,11 @@ gce*        welcome  admin  superuser  google/us-east1       2      1  none  3.5
 ```
 
 Next, check and manually delete all unnecessary GCloud resources, to show the list of all your GCE instances run the following command (make sure the correct region used!): 
-```shell
+```text
 gcloud compute instances list
 ```
 [details="Output example"]
-```shell
+```text
 NAME           ZONE        MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 juju-33f662-0  us-east1-b  n1-highcpu-4                10.142.0.17  35.231.246.157  RUNNING
 juju-e2b96f-0  us-east1-b  n2d-highcpu-2               10.142.0.18  35.237.64.81    STOPPING
@@ -242,7 +242,7 @@ juju-e2b96f-1  us-east1-d  n2d-highcpu-2               10.142.0.19  34.73.238.17
 [/details]
 
 List your Juju credentials:
-```shell
+```text
 > juju credentials
 ...
 Client Credentials:
@@ -251,12 +251,12 @@ google       juju-gce-account
 ...
 ```
 Remove GCloud credentials from Juju:
-```shell
+```text
 > juju remove-credential google juju-gce-account
 ```
 
 Finally, remove GCloud jsonfile user credentials (to avoid forgetting and leaking):
-```shell
+```text
 rm -f /var/snap/juju/common/sa-private-key.json
 ```
 
