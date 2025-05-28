@@ -13,7 +13,7 @@ For a given release, this table shows:
 * The minimum Juju 3 version required to reliably operate **all** features of the release
 * Support for specific features
 
-| Release | PostgreSQL version | Minimum Juju version | [TLS encryption](/how-to-guides/enable-tls) | [COS monitoring](/how-to-guides/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to-guides/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to-guides/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to-guides/back-up-and-restore/restore-a-backup) |
+| Release | PostgreSQL version | Minimum Juju version | [TLS encryption](/how-to-guides/enable-tls) | [COS monitoring](/how-to-guides/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to-guides/upgrade/index) | [Cross-regional async replication](/how-to-guides/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to-guides/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 |   |   |   | ![check] | ![check] | ![check] | ![check] | ![check] |
 
