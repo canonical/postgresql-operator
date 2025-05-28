@@ -39,7 +39,7 @@ The bundle export example:
 <details> 
 <summary><code>store-admin export bundle postgresql-bundle --channel=14/edge --series=jammy --arch=amd64</code></summary>
 
-```
+```text
 Downloading postgresql-bundle revision 140 (14/edge)
   [####################################]  100%
 Downloading data-integrator revision 71 (edge)

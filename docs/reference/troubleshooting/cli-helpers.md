@@ -27,7 +27,8 @@ The main Patroni tool is `patronictl`.
 
 `patronictl` checks the low-level Patroni status of the cluster.
 
-[details="Example: cluster status"]
+<details><summary>Example: cluster status</summary>
+
 ```text
 > juju deploy postgresql -n 3 # and wait for deployment
 > juju ssh postgresql/2
@@ -42,13 +43,14 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 | + postgresql-3  | 10.189.210.26  | Sync Standby | streaming |  1 |         0 |
 +-----------------+----------------+--------------+-----------+----+-----------+
 ```
-[/details]
+</details>
 
 #### Useful Patroni actions
 
 Use `--help` to find all the available Patroni actions.
 
-[details="Example: Patroni actions"]
+<details><summary>Example: Patroni actions</summary>
+
 ```text
 >  sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml --help
 ...
@@ -65,13 +67,14 @@ Use `--help` to find all the available Patroni actions.
   switchover   Switchover to a replica
   topology     Prints ASCII topology for given cluster
 ```
-[/details]
+</details>
 
 #### Switchover/failover 
 
 Patroni can perform a low-level [switchover/failover](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-switchover) inside one cluster.
 
-[details="Example: switchover (healthy cluster only)"]
+<details><summary>Example: switchover (healthy cluster only)</summary>
+
 ```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml switchover postgresql --candidate postgresql-2 --force
 Current cluster topology
@@ -100,9 +103,10 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 | postgresql-3  | 10.189.210.26  | Sync Standby | streaming |  3 |         0 |
 +---------------+----------------+--------------+-----------+----+-----------+
 ```
-[/details]
+</details>
 
-[details="Example: failover"]
+<details><summary>Example: failover</summary>
+
 ```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml failover postgresql --candidate postgresql-3              
 Current cluster list
@@ -139,12 +143,13 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 | postgresql-3  | 10.189.210.26  | Leader       | running   |  2 |           |
 +---------------+----------------+--------------+-----------+----+-----------+
 ```
-[/details]
+</details>
 
 #### Re-initialisation
 
 Sometimes the cluster member might stuck in the middle of nowhere, the easiest way to try is [reinit the Patroni cluster member](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-reinit).
-[details="Example: cluster member re-initialization"]
+<details><summary>Example: cluster member re-initialization</summary>
+
 ```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml reinit postgresql postgresql-1
 + Cluster: postgresql (7496847632512033809) ----+-----------+----+-----------+
@@ -158,13 +163,14 @@ Are you sure you want to reinitialize members postgresql-1? [y/N]: y
 Success: reinitialize for member postgresql-1
 ```
 
-[/details]
+</details>
 
 ### Patroni REST API
 
 Patroni provides most `patronictl` actions as a [REST API](https://patroni.readthedocs.io/en/latest/rest_api.html). Use port `8008` to access Patroni REST API on any member/unit of Charmed PostgreSQL.
 
-[details="Example: read-only access via Patroni REST API"]
+<details><summary>Example: read-only access via Patroni REST API</summary>
+
 ```text
 ubuntu@juju360:~$ curl 10.189.210.55:8008/cluster | jq # where 10.189.210.55 is IP of Charmed PostgreSQL Juju unit
 ...
@@ -203,11 +209,12 @@ ubuntu@juju360:~$ curl 10.189.210.55:8008/cluster | jq # where 10.189.210.55 is 
   "scope": "postgresql"
 }                                                                                                                                  
 ```
-[/details]
+</details>
 
 > **Note**: Patroni REST API can be accessed anonymously in read-only mode only. The Juju secret `patroni-password` is mandatory to apply any chances via Patroni REST API.
 Example of authenticated changes via Patroni REST API:
-[details="Example: write access via Patroni REST API"]
+<details><summary>Example: write access via Patroni REST API</summary>
+
 ```text
 > juju deploy postgresql -n 3 # and wait for deployment
 > juju secrets | grep postgresql # find ID with 'patroni-password'
@@ -219,16 +226,17 @@ Successfully switched over to "postgresql-1"
 ``` 
 > **Hint**: use dedicated [promote-to-primary](/how-to-guides/switchover-failover) action to switchover Primary.
 
-[/details]
+</details>
 
 Pay attention to TLS relation with PostgreSQL and access Patroni REST API accordingly:
-[details="Example: access Patroni REST API with(out) TLS"]
+<details><summary>Example: access Patroni REST API with(out) TLS</summary>
+
 ```text
 > curl    http://x.x.x.x:8008/cluster  # to access without TLS
 > curl    https://x.x.x.x:8008/cluster # to access with trusted certificate
 > curl -k https://x.x.x.x:8008/cluster # to access with self-signed certificate
 ``` 
-[/details]
+</details>
 
 
 ### Raft library
@@ -237,7 +245,8 @@ Patroni relies on the Raft library for the consensus handling and Primary electi
 
 While **you should not interact with Raft library manually**,  you can check its internal status:
 
-[details="Example: check Raft status"]
+<details><summary>Example: check Raft status</summary>
+
 ```text
 > juju deploy postgresql -n 3 # and wait for deployment
 > juju secrets | grep postgresql # find ID with 'raft-password'
@@ -275,5 +284,5 @@ version: 0.3.12
 > **Note**: password is mandatory to access Raft. 
 
 > **Note**: pay attention to the CLI syntax (simple `-` used, avoid misstype with common `--` prefix for parametes)
-[/details]
+</details>
 

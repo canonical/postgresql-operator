@@ -86,7 +86,7 @@ Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneous
 |:--------:|:-----:|:-----:|:-----:|
 |[288] |![check]| | ![check]   |
 
-[/details]
+</details>
 
 ## Plugins/extensions
 

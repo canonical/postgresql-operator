@@ -71,7 +71,8 @@ If successful, you will see a confirmation that the credentials have been correc
 Credential <CREDENTIAL_NAME> added locally for cloud "azure".
 ```
 
-[details=Full sample output of `juju add-credential azure`]
+<details><summary>Full sample output of <code>juju add-credential azure</code></summary>
+
 ```text
 > juju add-credential azure
 
@@ -110,7 +111,7 @@ To sign in, use a web browser to open the page https://microsoft.com/devicelogin
 To sign in, use a web browser to open the page https://microsoft.com/devicelogin and enter the code HIDDEN to authenticate.
 Credential "azure-test-credentials1" added locally for cloud "azure".
 ```
-[/details]
+</details>
 
 ### Bootstrap Juju controller
 

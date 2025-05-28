@@ -63,7 +63,8 @@ Bootstrap Juju controller ([check all supported configuration options](https://j
 ```text
 juju bootstrap aws
 ```
-[details="Output example"]
+<details><summary>Output example</summary>
+
 ```text
 > juju bootstrap aws
 Creating Juju controller "aws-us-east-1" on aws/us-east-1
@@ -87,7 +88,7 @@ Now you can run
 	juju add-model <model-name>
 to create a new model to deploy workloads.
 ```
-[/details]
+</details>
 
 You can check the [AWS EC2 instance availability](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#Instances:instanceState=running) (ensure the right AWS region chosen!):
 ![image|690x118](aws-ec2-availability.png)
@@ -215,5 +216,41 @@ Next, check and manually delete all unnecessary AWS EC2 instances, to show the l
 ```text
 aws ec2 describe-instances --region us-east-1 --query "Reservations[].Instances[*].{InstanceType: InstanceType, InstanceId: InstanceId, State: State.Name}" --output table
 ```
-[details="Output example"]
+<details><summary>Output example</summary>
+
 ```text
+-------------------------------------------------------
+|                  DescribeInstances                  |
++---------------------+----------------+--------------+
+|     InstanceId      | InstanceType   |    State     |
++---------------------+----------------+--------------+
+|  i-0f374435695ffc54c|  m7i.large     |  terminated  |
+|  i-0e1e8279f6b2a08e0|  m7i.large     |  terminated  |
+|  i-061e0d10d36c8cffe|  m7i.large     |  terminated  |
+|  i-0f4615983d113166d|  m7i.large     |  terminated  |
++---------------------+----------------+--------------+
+```
+</details>
+
+List your Juju credentials:
+```text
+> juju credentials
+...
+Client Credentials:
+Cloud        Credentials
+aws          NAME_OF_YOUR_CREDENTIAL
+...
+```
+Remove AWS EC2 CLI credentials from Juju:
+```text
+> juju remove-credential aws NAME_OF_YOUR_CREDENTIAL
+```
+
+Finally, remove AWS CLI user credentials (to avoid forgetting and leaking):
+```text
+rm -f ~/.aws/credentials.yaml
+```
+
+```{note}
+If you expect having several concurrent connections frequently, it is highly recommended to deploy [PgBouncer](https://charmhub.io/pgbouncer?channel=1/stable) alongside PostgreSQL. For more information, read our explanation about [Connection pooling](/explanation/connection-pooling).
+```

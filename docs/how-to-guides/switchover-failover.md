@@ -32,12 +32,15 @@ The command to re-init Raft cluster should be executed when charm is ready:
 * the last unit was has detected Raft majority lost, status: `Raft majority loss, run: promote-to-primary`
 
 To re-initialize Raft and fix the Partition/PostgreSQL cluster (when requested):
+
 ```text
 juju run postgresql/x promote-to-primary scope=unit force=true
 ```
 
-[details="Example of Raft re-initialization"]
+<details><summary>Example of Raft re-initialization</summary>
+
 Deploy PostgreSQL 3 units:
+
 ```text
 > juju deploy postgresql --config synchronous_node_count=1
 
@@ -173,5 +176,5 @@ Machine  State    Address         Inst id        Base          AZ  Message
 3        started  10.189.210.124  juju-422c1a-3  ubuntu@22.04      Running
 4        started  10.189.210.178  juju-422c1a-4  ubuntu@22.04      Running
 ```
-[/details]
+</details>
 

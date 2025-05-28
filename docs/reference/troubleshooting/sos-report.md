@@ -38,7 +38,8 @@ Use `juju scp` to copy logs from Juju unit to localhost:
 juju scp postgresql/0:/tmp/sosreport-juju-d4c067-1-2025-04-07-chdmwlz.tar.xz .
 ```
 
-[details="Example output"]
+<details><summary>Example output</summary>
+
 ```text
 juju ssh postgresql/0
 
@@ -87,7 +88,7 @@ ubuntu@juju-d4c067-1:~$ exit
 
 juju scp postgresql/0:/tmp/sosreport-juju-d4c067-1-2025-04-07-qntyqpz.tar.xz .
 ```
-[/details]
+</details>
 
 ### Collect logs from several units
 

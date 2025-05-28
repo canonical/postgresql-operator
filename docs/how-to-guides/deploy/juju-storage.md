@@ -10,7 +10,8 @@ Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju
 
 Check the [`metadata.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/metadata.yaml) for find Juju storage name and tech details:
 
-[details="Charmed PostgreSQL 16 storage list"]
+<details><summary>Charmed PostgreSQL 16 storage list</summary>
+
 ```text
 storage:
   archive:
@@ -26,25 +27,27 @@ storage:
     type: filesystem
     location: /var/snap/charmed-postgresql/common/data/temp
 ```
-[/details]
+</details>
 
 Charmed PostgreSQL 16 supports multiple storage `archive` , `data` , `logs` and `temp` . See the deployment examples below.
 
 ## Charmed PostgreSQL 14
 
 Check the [metadata.yaml](https://github.com/canonical/postgresql-operator/blob/main/metadata.yaml) for find Juju storage name and tech details:
-[details="Charmed PostgreSQL 14 storage list"]
+<details><summary>Charmed PostgreSQL 14 storage list</summary>
+
 ```text
 storage:
   pgdata:
     type: filesystem
     location: /var/snap/charmed-postgresql/common
 ```
-[/details]
+</details>
 
 Charmed PostgreSQL 14 supports single storage `pgdata` attaching it on `juju deploy` and mounted inside the Snap common folder `/var/snap/charmed-postgresql/common`.
 
-[details="Example of 'Juju storage'"]
+<details><summary>Example of 'Juju storage'</summary>
+
 ```text
 > juju deploy postgresql
 
@@ -74,7 +77,7 @@ pgdata/0:
 > juju ssh postgresql/0 mount | grep /var/snap/charmed-postgresql/common
 /dev/sda1 on /var/snap/charmed-postgresql/common type ext4 (rw,relatime,discard,errors=remount-ro)
 ```
-[/details]
+</details>
 
 ## Deployment examples
 
@@ -169,7 +172,8 @@ To re-deploy the application with the old Juju storage, it is necessary to provi
 > juju grant-secret mypgpass postgresql
 ```
 
-[details="Example: Complete old storage re-deployment (track 16)"] 
+<details><summary>Example: Complete old storage re-deployment (track 16)</summary>
+
 Prepare the test data to restore later:
 ```text
 # Add a new model
@@ -279,5 +283,5 @@ postgresql/1*  active    idle   1        10.189.210.179  5432/tcp  Primary# Chec
 Unit          Storage ID  Type        Pool  Size     Status    Message
 postgresql/1  pgdata/0    filesystem  lxd   5.0 GiB  attached  
 ```
-[/details]
+</details>
 

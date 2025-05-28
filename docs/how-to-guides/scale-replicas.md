@@ -25,15 +25,15 @@ juju run postgresql/leader get-primary
 
 Similarly, the primary replica is displayed as a status message in `juju status`. However, one should note that this hook gets called on regular time intervals and the primary may be outdated if the status hook has not been called recently. 
 
-```{note}
+````{note}
 **We highly suggest configuring the `update-status` hook to run frequently.** In addition to reporting the primary, secondaries, and other statuses, the [status hook](https://juju.is/docs/sdk/update-status-event) performs self-healing in the case of a network cut. 
 
 To change the frequency of the `update-status` hook, run
 ```text
 juju model-config update-status-hook-interval=<time(s/m/h)>
 ```
-<!--Note that this hook executes a read query to PostgreSQL. On a production level server, this should be configured to occur at a frequency that doesn't overload the server with read requests. Similarly, the hook should not be configured at too quick of a frequency, as this can delay other hooks from running. -->
-```
+Note that this hook executes a read query to PostgreSQL. On a production level server, this should be configured to occur at a frequency that doesn't overload the server with read requests. Similarly, the hook should not be configured at too quick of a frequency, as this can delay other hooks from running.
+````
 
 ## Scale replicas on an existing application
 
@@ -47,6 +47,6 @@ To scale down the cluster, use `juju remove-unit`:
 juju remove-unit postgresql/<unit_id_to_remove>
 ```
 ```{warning}
-**Warning**: Do not remove the last unit, it will destroy your data!
+Do not remove the last unit, it will destroy your data!
 ```
 

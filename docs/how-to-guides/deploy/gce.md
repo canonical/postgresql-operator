@@ -79,7 +79,8 @@ Bootstrap Juju controller ([check all supported configuration options](https://j
 ```text
 juju bootstrap google gce
 ```
-[details="Output example"]
+<details><summary>Output example</summary>
+
 ```text
 > juju bootstrap google gce
 Creating Juju controller "gce" on google/us-east1
@@ -103,7 +104,7 @@ Now you can run
 	juju add-model <model-name>
 to create a new model to deploy workloads.
 ```
-[/details]
+</details>
 
 You can check the [GCE instance availability](https://console.cloud.google.com/compute/instances) (ensure the right GCloud project chosen!):
 
@@ -232,14 +233,15 @@ Next, check and manually delete all unnecessary GCloud resources, to show the li
 ```text
 gcloud compute instances list
 ```
-[details="Output example"]
+<details><summary>Output example</summary>
+
 ```text
 NAME           ZONE        MACHINE_TYPE   PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP     STATUS
 juju-33f662-0  us-east1-b  n1-highcpu-4                10.142.0.17  35.231.246.157  RUNNING
 juju-e2b96f-0  us-east1-b  n2d-highcpu-2               10.142.0.18  35.237.64.81    STOPPING
 juju-e2b96f-1  us-east1-d  n2d-highcpu-2               10.142.0.19  34.73.238.173   STOPPING
 ```
-[/details]
+</details>
 
 List your Juju credentials:
 ```text
