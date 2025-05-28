@@ -93,6 +93,7 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
                 == "Raft majority loss, run: promote-to-primary",
                 timeout=600,
             )
+            await ops_test.model.wait_for_idle(timeout=600, idle_period=45)
 
             run_action = (
                 await ops_test.model.applications[DATABASE_APP_NAME]

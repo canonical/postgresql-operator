@@ -50,3 +50,9 @@ variable "config" {
   type        = map(string)
   default     = {}
 }
+
+variable "enable_expose" {
+  type        = bool
+  default     = true
+  description = "Whether to expose the application"
+}

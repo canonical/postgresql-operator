@@ -10,6 +10,7 @@ This section contains pages with more detailed explanations that provide additio
 
 ## Operational concepts
 * [Connection pooling]
+* [Units]
 * [Users]
 * [Logs]
 
@@ -22,6 +23,7 @@ This section contains pages with more detailed explanations that provide additio
 
 [Architecture]: /t/11857
 [Interfaces and endpoints]: /t/10251
+[Units]: /t/17525
 [Users]: /t/10798
 [Logs]: /t/12099
 [Juju]: /t/11985
