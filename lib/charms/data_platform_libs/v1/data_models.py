@@ -1,4 +1,4 @@
-# Copyright 2023 Canonical Ltd.
+# Copyright 2024 Canonical Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -39,7 +39,7 @@ also parsing and validation on standard dataclass implementation:
 
 ```python
 
-from charms.data_platform_libs.v0.data_models import BaseConfigModel
+from charms.data_platform_libs.v1.data_models import BaseConfigModel
 
 class MyConfig(BaseConfigModel):
 
@@ -164,20 +164,27 @@ from pydantic import BaseModel, ValidationError
 LIBID = "cb2094c5b07d47e1bf346aaee0fcfcfe"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 0
 
-PYDEPS = ["ops>=2.0.0", "pydantic>=1.10,<2"]
+PYDEPS = ["ops>=2.0.0", "pydantic>=2,<3"]
 
 G = TypeVar("G")
 T = TypeVar("T", bound=BaseModel)
 AppModel = TypeVar("AppModel", bound=BaseModel)
 UnitModel = TypeVar("UnitModel", bound=BaseModel)
 
-DataBagNativeTypes = (int, str, float)
+DataBagNativeTypes = (
+    int,
+    str,
+    float,
+    Optional[int],
+    Optional[str],
+    Optional[float],
+)
 
 
 class BaseConfigModel(BaseModel):
@@ -233,7 +240,7 @@ def write(relation_data: RelationDataContent, model: BaseModel):
         relation_data: pointer to the relation databag
         model: instance of pydantic model to be written
     """
-    for key, value in model.dict(exclude_none=False).items():
+    for key, value in model.model_dump(exclude_none=False).items():
         if value:
             relation_data[key.replace("_", "-")] = (
                 str(value)
@@ -255,10 +262,10 @@ def read(relation_data: MutableMapping[str, str], obj: Type[T]) -> T:
         **{
             field_name: (
                 relation_data[parsed_key]
-                if field.outer_type_ in DataBagNativeTypes
+                if field_info.annotation in DataBagNativeTypes
                 else json.loads(relation_data[parsed_key])
             )
-            for field_name, field in obj.__fields__.items()
+            for field_name, field_info in obj.model_fields.items()
             # pyright: ignore[reportGeneralTypeIssues]
             if (parsed_key := field_name.replace("_", "-")) in relation_data
             if relation_data[parsed_key]
