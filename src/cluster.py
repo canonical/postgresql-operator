@@ -168,7 +168,7 @@ class Patroni:
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
-        self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
+        self.verify = f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}" if tls_enabled else True
 
     @property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:

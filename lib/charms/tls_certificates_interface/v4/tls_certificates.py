@@ -9,7 +9,7 @@ interface.
 Pre-requisites:
   - Juju >= 3.0
   - cryptography >= 43.0.0
-  - pydantic >= 2.0
+  - pydantic >= 1.0
 
 Learn more on how-to use the TLS Certificates interface library by reading the documentation:
 - https://charmhub.io/tls-certificates-interface/
@@ -27,7 +27,9 @@ from datetime import datetime, timedelta, timezone
 from enum import Enum
 from typing import FrozenSet, List, MutableMapping, Optional, Tuple, Union
 
+import pydantic
 from cryptography import x509
+from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
@@ -41,7 +43,6 @@ from ops.model import (
     SecretNotFoundError,
     Unit,
 )
-from pydantic import BaseModel, ConfigDict, ValidationError
 
 # The unique Charmhub library identifier, never change it
 LIBID = "afd8c2bccf834997afce12c2706d2ede"
@@ -51,11 +52,11 @@ LIBAPI = 4
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 15
+LIBPATCH = 17
 
 PYDEPS = [
     "cryptography>=43.0.0",
-    "pydantic>=2.0",
+    "pydantic",
 ]
 
 logger = logging.getLogger(__name__)
@@ -69,76 +70,142 @@ class DataValidationError(TLSCertificatesError):
     """Raised when data validation fails."""
 
 
-class _DatabagModel(BaseModel):
-    """Base databag model."""
+if int(pydantic.version.VERSION.split(".")[0]) < 2:
 
-    model_config = ConfigDict(
-        # tolerate additional keys in databag
-        extra="ignore",
-        # Allow instantiating this class by field name (instead of forcing alias).
-        populate_by_name=True,
-        # Custom config key: whether to nest the whole datastructure (as json)
-        # under a field or spread it out at the toplevel.
-        _NEST_UNDER=None,
-    )  # type: ignore
-    """Pydantic config."""
+    class _DatabagModel(pydantic.BaseModel):  # type: ignore
+        """Base databag model."""
 
-    @classmethod
-    def load(cls, databag: MutableMapping):
-        """Load this model from a Juju databag."""
-        nest_under = cls.model_config.get("_NEST_UNDER")
-        if nest_under:
-            return cls.model_validate(json.loads(databag[nest_under]))
+        class Config:
+            """Pydantic config."""
 
-        try:
-            data = {
-                k: json.loads(v)
-                for k, v in databag.items()
-                # Don't attempt to parse model-external values
-                if k in {(f.alias or n) for n, f in cls.model_fields.items()}
-            }
-        except json.JSONDecodeError as e:
-            msg = f"invalid databag contents: expecting json. {databag}"
-            logger.error(msg)
-            raise DataValidationError(msg) from e
+            # ignore any extra fields in the databag
+            extra = "ignore"
+            """Ignore any extra fields in the databag."""
+            allow_population_by_field_name = True
+            """Allow instantiating this class by field name (instead of forcing alias)."""
 
-        try:
-            return cls.model_validate_json(json.dumps(data))
-        except ValidationError as e:
-            msg = f"failed to validate databag: {databag}"
-            logger.debug(msg, exc_info=True)
-            raise DataValidationError(msg) from e
+        _NEST_UNDER = None
 
-    def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
-        """Write the contents of this model to Juju databag.
+        @classmethod
+        def load(cls, databag: MutableMapping):
+            """Load this model from a Juju databag."""
+            if cls._NEST_UNDER:
+                return cls.parse_obj(json.loads(databag[cls._NEST_UNDER]))
 
-        Args:
-            databag: The databag to write to.
-            clear: Whether to clear the databag before writing.
+            try:
+                data = {
+                    k: json.loads(v)
+                    for k, v in databag.items()
+                    # Don't attempt to parse model-external values
+                    if k in {f.alias for f in cls.__fields__.values()}
+                }
+            except json.JSONDecodeError as e:
+                msg = f"invalid databag contents: expecting json. {databag}"
+                logger.error(msg)
+                raise DataValidationError(msg) from e
 
-        Returns:
-            MutableMapping: The databag.
-        """
-        if clear and databag:
-            databag.clear()
+            try:
+                return cls.parse_raw(json.dumps(data))  # type: ignore
+            except pydantic.ValidationError as e:
+                msg = f"failed to validate databag: {databag}"
+                logger.debug(msg, exc_info=True)
+                raise DataValidationError(msg) from e
 
-        if databag is None:
-            databag = {}
-        nest_under = self.model_config.get("_NEST_UNDER")
-        if nest_under:
-            databag[nest_under] = self.model_dump_json(
-                by_alias=True,
-                # skip keys whose values are default
-                exclude_defaults=True,
-            )
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+            """Write the contents of this model to Juju databag.
+
+            :param databag: the databag to write the data to.
+            :param clear: ensure the databag is cleared before writing it.
+            """
+            if clear and databag:
+                databag.clear()
+
+            if databag is None:
+                databag = {}
+
+            if self._NEST_UNDER:
+                databag[self._NEST_UNDER] = self.json(by_alias=True, exclude_defaults=True)
+                return databag
+
+            dct = self.dict(by_alias=True, exclude_defaults=True)
+            databag.update({k: json.dumps(v) for k, v in dct.items()})
+
             return databag
 
-        dct = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)
-        databag.update({k: json.dumps(v) for k, v in dct.items()})
-        return databag
+else:
+    from pydantic import ConfigDict
+
+    class _DatabagModel(pydantic.BaseModel):
+        """Base databag model."""
+
+        model_config = ConfigDict(
+            # tolerate additional keys in databag
+            extra="ignore",
+            # Allow instantiating this class by field name (instead of forcing alias).
+            populate_by_name=True,
+            # Custom config key: whether to nest the whole datastructure (as json)
+            # under a field or spread it out at the toplevel.
+            _NEST_UNDER=None,  # type: ignore
+        )
+        """Pydantic config."""
+
+        @classmethod
+        def load(cls, databag: MutableMapping):
+            """Load this model from a Juju databag."""
+            nest_under = cls.model_config.get("_NEST_UNDER")
+            if nest_under:
+                return cls.model_validate(json.loads(databag[nest_under]))
+
+            try:
+                data = {
+                    k: json.loads(v)
+                    for k, v in databag.items()
+                    # Don't attempt to parse model-external values
+                    if k in {(f.alias or n) for n, f in cls.model_fields.items()}
+                }
+            except json.JSONDecodeError as e:
+                msg = f"invalid databag contents: expecting json. {databag}"
+                logger.error(msg)
+                raise DataValidationError(msg) from e
+
+            try:
+                return cls.model_validate_json(json.dumps(data))
+            except pydantic.ValidationError as e:
+                msg = f"failed to validate databag: {databag}"
+                logger.debug(msg, exc_info=True)
+                raise DataValidationError(msg) from e
+
+        def dump(self, databag: Optional[MutableMapping] = None, clear: bool = True):
+            """Write the contents of this model to Juju databag.
+
+            Args:
+                databag: The databag to write to.
+                clear: Whether to clear the databag before writing.
+
+            Returns:
+                MutableMapping: The databag.
+            """
+            if clear and databag:
+                databag.clear()
+
+            if databag is None:
+                databag = {}
+            nest_under = self.model_config.get("_NEST_UNDER")
+            if nest_under:
+                databag[nest_under] = self.model_dump_json(
+                    by_alias=True,
+                    # skip keys whose values are default
+                    exclude_defaults=True,
+                )
+                return databag
+
+            dct = self.model_dump(mode="json", by_alias=True, exclude_defaults=True)
+            databag.update({k: json.dumps(v) for k, v in dct.items()})
+
+            return databag
 
 
-class _Certificate(BaseModel):
+class _Certificate(pydantic.BaseModel):
     """Certificate model."""
 
     ca: str
@@ -163,7 +230,7 @@ class _Certificate(BaseModel):
         )
 
 
-class _CertificateSigningRequest(BaseModel):
+class _CertificateSigningRequest(pydantic.BaseModel):
     """Certificate signing request model."""
 
     certificate_signing_request: str
@@ -669,6 +736,32 @@ def generate_private_key(
         encryption_algorithm=serialization.NoEncryption(),
     )
     return PrivateKey.from_string(key_bytes.decode())
+
+
+def chain_has_valid_order(chain: List[str]) -> bool:
+    """Check if the chain has a valid order.
+
+    Validates that each certificate in the chain is properly signed by the next certificate.
+    The chain should be ordered from leaf to root, where each certificate is signed by
+    the next one in the chain.
+
+    Args:
+        chain (List[str]): List of certificates in PEM format, ordered from leaf to root
+
+    Returns:
+        bool: True if the chain has a valid order, False otherwise.
+    """
+    if len(chain) < 2:
+        return True
+
+    try:
+        for i in range(len(chain) - 1):
+            cert = x509.load_pem_x509_certificate(chain[i].encode())
+            issuer = x509.load_pem_x509_certificate(chain[i + 1].encode())
+            cert.verify_directly_issued_by(issuer)
+        return True
+    except (ValueError, TypeError, InvalidSignature):
+        return False
 
 
 def generate_csr(  # noqa: C901
@@ -1688,11 +1781,21 @@ class TLSCertificatesProvidesV4(Object):
         relation: Relation,
         provider_certificate: ProviderCertificate,
     ) -> None:
+        chain = [str(certificate) for certificate in provider_certificate.chain]
+        if chain[0] != str(provider_certificate.certificate):
+            logger.warning(
+                "The order of the chain from the TLS Certificates Provider is incorrect. "
+                "The leaf certificate should be the first element of the chain."
+            )
+        elif not chain_has_valid_order(chain):
+            logger.warning(
+                "The order of the chain from the TLS Certificates Provider is partially incorrect."
+            )
         new_certificate = _Certificate(
             certificate=str(provider_certificate.certificate),
             certificate_signing_request=str(provider_certificate.certificate_signing_request),
             ca=str(provider_certificate.ca),
-            chain=[str(certificate) for certificate in provider_certificate.chain],
+            chain=chain,
         )
         provider_certificates = self._load_provider_certificates(relation)
         if new_certificate in provider_certificates:

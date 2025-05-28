@@ -1120,7 +1120,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
-            bool(self.unit_peer_data.get("tls")),
+            bool(self.unit_peer_data.get("peer_tls")),
             self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
             self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
@@ -2306,7 +2306,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
-            self.unit_peer_data.update({"tls": "enabled" if self.is_client_tls_enabled else ""})
+            self.unit_peer_data.update({
+                "tls": "enabled" if self.is_client_tls_enabled else "",
+                "peer_tls": "enabled" if self.is_peer_tls_enabled else "",
+            })
             self.postgresql_client_relation.update_endpoints()
             logger.debug("Early exit update_config: Workload not started yet")
             return True
@@ -2387,6 +2390,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restart_postgresql = self.is_client_tls_enabled != self.postgresql.is_tls_enabled()
         else:
             restart_postgresql = False
+        # TODO remove when we have self service peer cert
+        if not restart_postgresql:
+            restart_postgresql = self.is_peer_tls_enabled != (
+                self.unit_peer_data.get("peer_tls") == "enabled"
+            )
         try:
             self._patroni.reload_patroni_configuration()
         except Exception as e:
@@ -2403,7 +2411,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
-        self.unit_peer_data.update({"tls": "enabled" if self.is_client_tls_enabled else ""})
+        self.unit_peer_data.update({
+            "tls": "enabled" if self.is_client_tls_enabled else "",
+            # TODO remove when we have self service peer cert
+            "peer_tls": "enabled" if self.is_peer_tls_enabled else "",
+        })
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed
