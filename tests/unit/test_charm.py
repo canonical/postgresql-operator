@@ -1376,11 +1376,7 @@ def test_validate_config_options(harness):
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
-        message = (
-            "1 validation error for CharmConfig\n"
-            "response_lc_monetary\n"
-            "  unexpected value; permitted:"
-        )
+        message = "1 validation error for CharmConfig\nresponse_lc_monetary\n  Input should be "
         assert str(e.value).startswith(message)
 
 
@@ -1739,6 +1735,16 @@ def test_get_available_memory(harness):
 
     with patch("builtins.open", mock_open(read_data="")):
         assert harness.charm.get_available_memory() == 0
+
+
+def test_juju_run_exec(harness):
+    with (
+        patch("charm.ClusterTopologyObserver") as _topology_observer,
+    ):
+        # Juju 3
+        harness = Harness(PostgresqlOperatorCharm)
+        harness.begin()
+        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
 
 
 def test_client_relations(harness):
