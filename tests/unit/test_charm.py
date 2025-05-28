@@ -1156,6 +1156,7 @@ def test_update_config(harness):
         patch(
             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
         ) as _handle_postgresql_restart_need,
+        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
         patch(
             "charm.PostgresqlOperatorCharm._restart_metrics_service"
         ) as _restart_metrics_service,
@@ -1199,6 +1200,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            slots=None,
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1228,6 +1230,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            slots=None,
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
