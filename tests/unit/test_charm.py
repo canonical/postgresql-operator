@@ -145,35 +145,17 @@ def test_on_install_snap_failure(harness):
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
-def test_patroni_scrape_config_no_tls(harness):
+def test_patroni_scrape_config(harness):
     result = harness.charm.patroni_scrape_config()
 
     assert result == [
         {
             "metrics_path": "/metrics",
-            "scheme": "http",
+            "scheme": "https",
             "static_configs": [{"targets": ["192.0.2.0:8008"]}],
             "tls_config": {"insecure_skip_verify": True},
         },
     ]
-
-
-def test_patroni_scrape_config_tls(harness):
-    with patch(
-        "charm.PostgresqlOperatorCharm.is_peer_tls_enabled",
-        return_value=True,
-        new_callable=PropertyMock,
-    ):
-        result = harness.charm.patroni_scrape_config()
-
-        assert result == [
-            {
-                "metrics_path": "/metrics",
-                "scheme": "https",
-                "static_configs": [{"targets": ["192.0.2.0:8008"]}],
-                "tls_config": {"insecure_skip_verify": True},
-            },
-        ]
 
 
 def test_primary_endpoint(harness):
@@ -598,6 +580,7 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
+        patch("charm.TLS.generate_internal_peer_cert") as _generate_internal_peer_cert,
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -679,6 +662,7 @@ def test_on_start_replica(harness):
         patch.object(EventBase, "defer") as _defer,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
+        patch("charm.TLS.generate_internal_peer_cert") as _generate_internal_peer_cert,
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             return_value=True,
@@ -1150,11 +1134,8 @@ def test_update_config(harness):
         ) as _is_workload_running,
         patch("charm.Patroni.render_patroni_yml_file") as _render_patroni_yml_file,
         patch(
-            "charm.PostgresqlOperatorCharm.is_client_tls_enabled", new_callable=PropertyMock
-        ) as _is_client_tls_enabled,
-        patch(
-            "charm.PostgresqlOperatorCharm.is_peer_tls_enabled", new_callable=PropertyMock
-        ) as _is_peer_tls_enabled,
+            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
+        ) as _is_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
     ):
@@ -1168,15 +1149,13 @@ def test_update_config(harness):
         # Test without TLS files available.
         with harness.hooks_disabled():
             harness.update_relation_data(rel_id, harness.charm.unit.name, {"tls": ""})
-        _is_client_tls_enabled.return_value = False
-        _is_peer_tls_enabled.return_value = False
+        _is_tls_enabled.return_value = False
         harness.charm.update_config()
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
             enable_ldap=False,
-            enable_client_tls=False,
-            enable_peer_tls=False,
+            enable_tls=False,
             backup_id=None,
             stanza=None,
             restore_stanza=None,
@@ -1198,16 +1177,14 @@ def test_update_config(harness):
         harness.update_relation_data(
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it change.
-        _is_client_tls_enabled.return_value = True
-        _is_peer_tls_enabled.return_value = True
+        _is_tls_enabled.return_value = True
         _render_patroni_yml_file.reset_mock()
         harness.charm.update_config()
         _render_patroni_yml_file.assert_called_once_with(
             connectivity=True,
             is_creating_backup=False,
             enable_ldap=False,
-            enable_client_tls=True,
-            enable_peer_tls=True,
+            enable_tls=True,
             backup_id=None,
             stanza=None,
             restore_stanza=None,
@@ -1239,7 +1216,7 @@ def test_update_config(harness):
         harness.update_relation_data(
             rel_id, harness.charm.unit.name, {"tls": ""}
         )  # Mock some data in the relation to test that it doesn't change.
-        _is_client_tls_enabled.return_value = False
+        _is_tls_enabled.return_value = False
         harness.charm.update_config()
         _handle_postgresql_restart_need.assert_not_called()
         _restart_ldap_sync_service.assert_not_called()
@@ -1579,18 +1556,22 @@ def test_update_certificate(harness):
     with (
         patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.refresh_tls_certificates_event") as _refresh_tls_certificates_event,
+        patch("charm.TLS.generate_internal_peer_cert") as _generate_internal_peer_cert,
     ):
         # If there is no current TLS files, _request_certificate should be called
         # only when the certificates relation is established.
         _get_client_tls_files.return_value = (None, None, None)
         harness.charm._update_certificate()
         _refresh_tls_certificates_event.emit.assert_not_called()
+        _generate_internal_peer_cert.assert_called_once_with()
+        _generate_internal_peer_cert.reset_mock()
 
         # Test with already present TLS files (when they will be replaced by new ones).
         _get_client_tls_files.return_value = (sentinel.key, sentinel.ca, sentinel.cert)
 
         harness.charm._update_certificate()
         _refresh_tls_certificates_event.emit.assert_called_once_with()
+        _generate_internal_peer_cert.assert_called_once_with()
 
 
 def test_update_member_ip(harness):
@@ -2092,8 +2073,8 @@ def test_handle_postgresql_restart_need(harness):
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch(
-            "charm.PostgresqlOperatorCharm.is_client_tls_enabled", new_callable=PropertyMock
-        ) as _is_client_tls_enabled,
+            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
+        ) as _is_tls_enabled,
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
     ):
         rel_id = harness.model.get_relation(PEER).id
@@ -2110,7 +2091,7 @@ def test_handle_postgresql_restart_need(harness):
                     {"postgresql_restarted": ("True" if values[3] else "")},
                 )
 
-            _is_client_tls_enabled.return_value = values[0]
+            _is_tls_enabled.return_value = values[0]
             postgresql_mock.is_tls_enabled.return_value = values[1]
             postgresql_mock.is_restart_pending = PropertyMock(return_value=values[2])
 

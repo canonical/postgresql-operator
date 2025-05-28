@@ -168,7 +168,7 @@ class Patroni:
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
-        self.verify = f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}" if tls_enabled else True
+        self.verify = f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}"
 
     @property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
@@ -177,7 +177,7 @@ class Patroni:
     @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
-        return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
+        return f"https://{self.unit_ip}:8008"
 
     @staticmethod
     def _dict_to_hba_string(_dict: dict[str, Any]) -> str:
@@ -256,6 +256,8 @@ class Patroni:
     ) -> Optional[list[ClusterMember]]:
         """Query the cluster status."""
         # Request info from cluster endpoint (which returns all members of the cluster).
+        # TODO we don't know the other cluster's ca
+        verify = self.verify if not alternative_endpoints else False
         for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
             with attempt:
                 if alternative_endpoints:
@@ -265,7 +267,7 @@ class Patroni:
 
                 cluster_status = requests.get(
                     f"{request_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
+                    verify=verify,
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
                 )
@@ -394,12 +396,9 @@ class Patroni:
         attempt_number = attempt.retry_state.attempt_number
         if attempt_number > 1:
             url = self._patroni_url
-            # Build the URL using http and later using https for each peer.
             if (attempt_number - 1) <= len(self.peers_ips):
-                url = url.replace("https://", "http://")
                 unit_number = attempt_number - 2
             else:
-                url = url.replace("http://", "https://")
                 unit_number = attempt_number - 2 - len(self.peers_ips)
             other_unit_ip = list(self.peers_ips)[unit_number]
             url = url.replace(self.unit_ip, other_unit_ip)
@@ -650,8 +649,7 @@ class Patroni:
         connectivity: bool = False,
         is_creating_backup: bool = False,
         enable_ldap: bool = False,
-        enable_client_tls: bool = False,
-        enable_peer_tls: bool = False,
+        enable_tls: bool = False,
         stanza: str | None = None,
         restore_stanza: str | None = None,
         disable_pgbackrest_archiving: bool = False,
@@ -668,8 +666,7 @@ class Patroni:
             connectivity: whether to allow external connections to the database.
             is_creating_backup: whether this unit is creating a backup.
             enable_ldap: whether to enable LDAP authentication.
-            enable_client_tls: whether to enable client TLS.
-            enable_peer_tls: whether to enable peer TLS.
+            enable_tls: whether to enable client TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
             disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
@@ -695,8 +692,7 @@ class Patroni:
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             data_path=POSTGRESQL_DATA_PATH,
             enable_ldap=enable_ldap,
-            enable_client_tls=enable_client_tls,
-            enable_peer_tls=enable_peer_tls,
+            enable_tls=enable_tls,
             member_name=self.member_name,
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers

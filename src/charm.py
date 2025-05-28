@@ -431,7 +431,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "metrics_path": "/metrics",
                 "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
-                "scheme": "https" if self.is_peer_tls_enabled else "http",
+                "scheme": "https",
             }
         ]
 
@@ -1151,14 +1151,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return self.unit.name == self._patroni.get_standby_leader(unit_name_pattern=True)
 
     @property
-    def is_client_tls_enabled(self) -> bool:
+    def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
         return all(self.tls.get_client_tls_files())
-
-    @property
-    def is_peer_tls_enabled(self) -> bool:
-        """Return whether TLS is enabled."""
-        return all(self.tls.get_peer_tls_files())
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -1395,6 +1390,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
 
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
+            self.tls.generate_internal_peer_ca()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1577,7 +1574,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if not postgres_password or not self._replication_password:
+            logger.info("leader not elected and/or internal CA not yet generated")
+            self.set_unit_status(WaitingStatus("awaiting passwords generation"))
+            event.defer()
+            return
+
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        self.tls.generate_internal_peer_cert()
 
         # Open port
         try:
@@ -2067,6 +2071,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # relating to the TLS Certificates Operator.
         if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
             self.tls.refresh_tls_certificates_event.emit()
+        self.tls.generate_internal_peer_cert()
 
     @property
     def is_blocked(self) -> bool:
@@ -2287,8 +2292,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             connectivity=self.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
             enable_ldap=self.is_ldap_enabled,
-            enable_client_tls=self.is_client_tls_enabled,
-            enable_peer_tls=self.is_peer_tls_enabled,
+            enable_tls=self.is_tls_enabled,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
             restore_timeline=self.app_peer_data.get("restore-timeline"),
@@ -2307,15 +2311,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
             self.unit_peer_data.update({
-                "tls": "enabled" if self.is_client_tls_enabled else "",
-                "peer_tls": "enabled" if self.is_peer_tls_enabled else "",
+                "tls": "enabled" if self.is_tls_enabled else "",
             })
             self.postgresql_client_relation.update_endpoints()
             logger.debug("Early exit update_config: Workload not started yet")
             return True
 
         if not self._patroni.member_started:
-            if self.is_client_tls_enabled:
+            if self.is_tls_enabled:
                 logger.debug(
                     "Early exit update_config: patroni not responding but TLS is enabled."
                 )
@@ -2387,14 +2390,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _handle_postgresql_restart_need(self) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
-            restart_postgresql = self.is_client_tls_enabled != self.postgresql.is_tls_enabled()
+            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
         else:
             restart_postgresql = False
-        # TODO remove when we have self service peer cert
-        if not restart_postgresql:
-            restart_postgresql = self.is_peer_tls_enabled != (
-                self.unit_peer_data.get("peer_tls") == "enabled"
-            )
         try:
             self._patroni.reload_patroni_configuration()
         except Exception as e:
@@ -2411,11 +2409,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
-        self.unit_peer_data.update({
-            "tls": "enabled" if self.is_client_tls_enabled else "",
-            # TODO remove when we have self service peer cert
-            "peer_tls": "enabled" if self.is_peer_tls_enabled else "",
-        })
+        self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed

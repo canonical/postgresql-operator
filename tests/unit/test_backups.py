@@ -1746,8 +1746,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         with open("templates/pgbackrest.conf.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
-            enable_tls=harness.charm.is_peer_tls_enabled
-            and len(harness.charm.peer_members_endpoints) > 0,
+            enable_tls=len(harness.charm._peer_members_ips) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
             data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql",
@@ -1890,9 +1889,6 @@ def test_start_stop_pgbackrest_service(harness):
             "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
         ) as _peer_members_ips,
         patch(
-            "charm.PostgresqlOperatorCharm.is_peer_tls_enabled", new_callable=PropertyMock
-        ) as _is_peer_tls_enabled,
-        patch(
             "charm.PostgreSQLBackups._render_pgbackrest_conf_file"
         ) as _render_pgbackrest_conf_file,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
@@ -1913,16 +1909,9 @@ def test_start_stop_pgbackrest_service(harness):
         stop.assert_not_called()
         restart.assert_not_called()
 
-        # Test when TLS is not enabled (should stop the service).
-        _render_pgbackrest_conf_file.return_value = True
-        _is_peer_tls_enabled.return_value = False
-        assert harness.charm.backup.start_stop_pgbackrest_service()
-        stop.assert_called_once()
-        restart.assert_not_called()
-
         # Test when there are no replicas.
         stop.reset_mock()
-        _is_peer_tls_enabled.return_value = True
+        _render_pgbackrest_conf_file.return_value = True
         _peer_members_ips.return_value = []
         assert harness.charm.backup.start_stop_pgbackrest_service()
         stop.assert_called_once()

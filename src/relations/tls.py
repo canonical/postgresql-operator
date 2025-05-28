@@ -5,12 +5,19 @@
 
 import logging
 import socket
+from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
+    Certificate,
     CertificateAvailableEvent,
     CertificateRequestAttributes,
+    PrivateKey,
     TLSCertificatesRequiresV4,
+    generate_ca,
+    generate_certificate,
+    generate_csr,
+    generate_private_key,
 )
 from ops import (
     EventSource,
@@ -45,34 +52,34 @@ class TLS(Object):
         self.charm = charm
         self.peer_relation = peer_relation
         unit_id = self.charm.unit.name.split("/")[1]
-        host = f"{self.charm.app.name}-{unit_id}"
+        self.host = f"{self.charm.app.name}-{unit_id}"
         if self.charm.unit_peer_data:
-            common_name = self.charm.unit_peer_data.get("database-address") or host
+            self.common_name = self.charm.unit_peer_data.get("database-address") or self.host
             client_addresses = {
                 self.charm.unit_peer_data.get("database-address"),
             }
-            peer_addresses = {
+            self.peer_addresses = {
                 self.charm.unit_peer_data.get("database-peers-address"),
                 self.charm.unit_peer_data.get("replication-address"),
                 self.charm.unit_peer_data.get("replication-offer-address"),
                 self.charm.unit_peer_data.get("private-address"),
             }
             client_addresses -= {None}
-            peer_addresses -= {None}
+            self.peer_addresses -= {None}
         else:
-            common_name = host
+            self.common_name = self.host
             client_addresses = set()
-            peer_addresses = set()
+            self.peer_addresses = set()
 
         self.client_certificate = TLSCertificatesRequiresV4(
             self.charm,
             TLS_CLIENT_RELATION,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=common_name,
+                    common_name=self.common_name,
                     sans_ip=frozenset(client_addresses),
                     sans_dns=frozenset({
-                        host,
+                        self.host,
                         socket.getfqdn(),
                         *client_addresses,
                     }),
@@ -85,12 +92,12 @@ class TLS(Object):
             TLS_PEER_RELATION,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=common_name,
-                    sans_ip=frozenset(peer_addresses),
+                    common_name=self.common_name,
+                    sans_ip=frozenset(self.peer_addresses),
                     sans_dns=frozenset({
-                        host,
+                        self.host,
                         socket.getfqdn(),
-                        *peer_addresses,
+                        *self.peer_addresses,
                     }),
                 ),
             ],
@@ -146,7 +153,7 @@ class TLS(Object):
             ca_file = str(certs[0].ca)
         return key, ca_file, cert
 
-    def get_peer_tls_files(self) -> (str | None, str | None, str | None):
+    def get_peer_tls_files(self) -> (str, str, str):
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
@@ -163,4 +170,40 @@ class TLS(Object):
         if certs:
             cert = str(certs[0].certificate)
             ca_file = str(certs[0].ca)
+        if not all((key, ca_file, cert)):
+            key = self.charm.get_secret("unit", "internal-key")
+            cert = self.charm.get_secret("unit", "internal-cert")
+            ca_file = self.charm.get_secret("app", "internal-ca")
         return key, ca_file, cert
+
+    def generate_internal_peer_ca(self):
+        """Generate internal peer CA using the tls lib."""
+        private_key = generate_private_key()
+        ca = generate_ca(
+            private_key,
+            common_name=f"{self.charm.app.name}-{self.charm.model.uuid}",
+            validity=timedelta(days=7300),
+        )
+        logger.warning("Internal peer CA generated")
+        self.charm.set_secret("app", "internal-ca-key", str(private_key))
+        self.charm.set_secret("app", "internal-ca", str(ca))
+
+    def generate_internal_peer_cert(self):
+        """Generate internal peer certificate using the tls lib."""
+        ca_key = PrivateKey.from_string(self.charm.get_secret("app", "internal-ca-key"))
+        ca = Certificate.from_string(self.charm.get_secret("app", "internal-ca"))
+        private_key = generate_private_key()
+        csr = generate_csr(
+            private_key,
+            common_name=self.common_name,
+            sans_ip=frozenset(self.peer_addresses),
+            sans_dns=frozenset({
+                self.host,
+                socket.getfqdn(),
+                *self.peer_addresses,
+            }),
+        )
+        cert = generate_certificate(csr, ca, ca_key, validity=timedelta(days=7300))
+        self.charm.set_secret("unit", "internal-key", str(private_key))
+        self.charm.set_secret("unit", "internal-cert", str(cert))
+        self.charm.push_tls_files_to_workload()
