@@ -13,6 +13,7 @@ import shutil
 import ssl
 import subprocess
 from asyncio import as_completed, create_task, run, wait
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
@@ -302,10 +303,8 @@ class Patroni:
 
     async def _aiohttp_get_request(self, url):
         ssl_ctx = ssl.create_default_context()
-        try:
+        with suppress(FileNotFoundError):
             ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
-        except FileNotFoundError:
-            logger.debug("No CA file in expected location.")
         async with ClientSession(
             auth=self._patroni_async_auth,
             timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),

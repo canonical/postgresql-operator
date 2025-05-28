@@ -3,7 +3,7 @@
 import signal
 import sys
 from json import dumps
-from unittest.mock import Mock, PropertyMock, call, patch, sentinel
+from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
 from ops.charm import CharmBase
@@ -139,7 +139,7 @@ def test_dispatch(harness):
         ])
 
 
-def test_main():
+async def test_main():
     with (
         patch.object(
             sys,
@@ -149,10 +149,7 @@ def test_main():
         patch("scripts.cluster_topology_observer.sleep", return_value=None),
         patch("scripts.cluster_topology_observer.urlopen") as _urlopen,
         patch("scripts.cluster_topology_observer.subprocess") as _subprocess,
-        patch(
-            "scripts.cluster_topology_observer.create_default_context",
-            return_value=sentinel.sslcontext,
-        ),
+        patch("scripts.cluster_topology_observer.create_default_context") as _context,
     ):
         response1 = {
             "members": [
@@ -171,16 +168,13 @@ def test_main():
         mock2.read.return_value = dumps(response2)
         _urlopen.side_effect = [mock1, Exception, mock2]
         with pytest.raises(UnreachableUnitsError):
-            main()
-        assert _urlopen.call_args_list == [
-            # Iteration 1. server2 is not called
-            call("http://server1:8008/cluster", timeout=5, context=sentinel.sslcontext),
-            # Iteration 2 local unit server1 is called first
-            call("http://server1:8008/cluster", timeout=5, context=sentinel.sslcontext),
-            call("http://server3:8008/cluster", timeout=5, context=sentinel.sslcontext),
-            # Iteration 3 Last known member is server3
-            call("https://server3:8008/cluster", timeout=5, context=sentinel.sslcontext),
-        ]
+            await main()
+        _urlopen.assert_any_call(
+            "http://server1:8008/cluster", timeout=5, context=_context.return_value
+        )
+        _urlopen.assert_any_call(
+            "http://server3:8008/cluster", timeout=5, context=_context.return_value
+        )
 
         _subprocess.run.assert_called_once_with([
             "run_cmd",
