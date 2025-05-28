@@ -97,6 +97,15 @@ bootstrap:
         logging_collector: 'on'
         wal_level: logical
         shared_preload_libraries: 'timescaledb,pgaudit'
+    {%- if slots %}
+    slots:
+    {%- for slot, database in slots.items() %}
+      {{slot}}:
+        database: {{database}}
+        plugin: pgoutput
+        type: logical
+    {%- endfor -%}
+    {% endif %}
 
   {%- if restoring_backup %}
   method: pgbackrest
