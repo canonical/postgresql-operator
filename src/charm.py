@@ -1120,7 +1120,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
-            bool(self.unit_peer_data.get("peer_tls")),
             self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
             self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
@@ -1392,6 +1391,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
+            self.tls.generate_internal_peer_cert()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1574,9 +1574,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        if not postgres_password or not self._replication_password:
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
             logger.info("leader not elected and/or internal CA not yet generated")
-            self.set_unit_status(WaitingStatus("awaiting passwords generation"))
             event.defer()
             return
 
@@ -2071,7 +2070,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # relating to the TLS Certificates Operator.
         if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
             self.tls.refresh_tls_certificates_event.emit()
-        self.tls.generate_internal_peer_cert()
+        if self.get_secret(UNIT_SCOPE, "internal-cert"):
+            self.tls.generate_internal_peer_cert()
 
     @property
     def is_blocked(self) -> bool:

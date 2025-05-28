@@ -28,6 +28,11 @@ from ops.pebble import ConnectionError as PebbleConnectionError
 from ops.pebble import PathError, ProtocolError
 from tenacity import RetryError
 
+from constants import (
+    APP_SCOPE,
+    UNIT_SCOPE,
+)
+
 if TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
 
@@ -185,8 +190,8 @@ class TLS(Object):
             validity=timedelta(days=7300),
         )
         logger.warning("Internal peer CA generated")
-        self.charm.set_secret("app", "internal-ca-key", str(private_key))
-        self.charm.set_secret("app", "internal-ca", str(ca))
+        self.charm.set_secret(APP_SCOPE, "internal-ca-key", str(private_key))
+        self.charm.set_secret(APP_SCOPE, "internal-ca", str(ca))
 
     def generate_internal_peer_cert(self):
         """Generate internal peer certificate using the tls lib."""
@@ -204,6 +209,6 @@ class TLS(Object):
             }),
         )
         cert = generate_certificate(csr, ca, ca_key, validity=timedelta(days=7300))
-        self.charm.set_secret("unit", "internal-key", str(private_key))
-        self.charm.set_secret("unit", "internal-cert", str(cert))
+        self.charm.set_secret(UNIT_SCOPE, "internal-key", str(private_key))
+        self.charm.set_secret(UNIT_SCOPE, "internal-cert", str(cert))
         self.charm.push_tls_files_to_workload()

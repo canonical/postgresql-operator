@@ -138,24 +138,13 @@ class PostgreSQLBackups(Object):
         # yet and either hasn't joined the peer relation yet or hasn't configured TLS
         # yet while other unit already has TLS enabled.
         return not (
-            not self.charm._patroni.member_started
-            and (
-                (len(self.charm._peers.data.keys()) == 2)
-                or (
-                    "peer_tls" not in self.charm.unit_peer_data
-                    and any(
-                        "peer_tls" in unit_data for _, unit_data in self.charm._peers.data.items()
-                    )
-                )
-            )
+            not self.charm._patroni.member_started and (len(self.charm._peers.data.keys()) == 2)
         )
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
-
-        tls_enabled = "peer_tls" in self.charm.unit_peer_data
 
         # Check if this unit is the primary (if it was not possible to retrieve that information,
         # then show that the unit cannot perform a backup, because possibly the database is offline).
@@ -165,14 +154,8 @@ class PostgreSQLBackups(Object):
             return False, "Unit cannot perform backups as the database seems to be offline"
 
         # Only enable backups on primary if there are replicas but TLS is not enabled.
-        if is_primary and self.charm.app.planned_units() > 1 and tls_enabled:
+        if is_primary and self.charm.app.planned_units() > 1:
             return False, "Unit cannot perform backups as it is the cluster primary"
-
-        # Can create backups on replicas only if TLS is enabled (it's needed to enable
-        # pgBackRest to communicate with the primary to request that missing WAL files
-        # are pushed to the S3 repo before the backup action is triggered).
-        if not is_primary and not tls_enabled:
-            return False, "Unit cannot perform backups as TLS is not enabled"
 
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"

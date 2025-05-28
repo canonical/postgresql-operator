@@ -133,7 +133,6 @@ class Patroni:
         superuser_password: str,
         replication_password: str,
         rewind_password: str,
-        tls_enabled: bool,
         raft_password: str,
         patroni_password: str,
     ):
@@ -149,7 +148,6 @@ class Patroni:
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
-            tls_enabled: whether TLS is enabled
             raft_password: password for raft
             patroni_password: password for the user used on patroni
         """
@@ -164,7 +162,6 @@ class Patroni:
         self.rewind_password = rewind_password
         self.raft_password = raft_password
         self.patroni_password = patroni_password
-        self.tls_enabled = tls_enabled
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.

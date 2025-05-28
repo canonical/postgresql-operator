@@ -203,6 +203,7 @@ def test_on_leader_elected(harness):
             new_callable=PropertyMock,
         ) as _primary_endpoint,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch("charm.TLS.generate_internal_peer_cert"),
     ):
         # Assert that there is no password in the peer relation.
         assert harness.charm._peers.data[harness.charm.app].get("operator-password", None) is None
@@ -580,7 +581,8 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
-        patch("charm.TLS.generate_internal_peer_cert") as _generate_internal_peer_cert,
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -662,11 +664,12 @@ def test_on_start_replica(harness):
         patch.object(EventBase, "defer") as _defer,
         patch("charm.PostgresqlOperatorCharm._replication_password") as _replication_password,
         patch("charm.PostgresqlOperatorCharm._get_password") as _get_password,
-        patch("charm.TLS.generate_internal_peer_cert") as _generate_internal_peer_cert,
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             return_value=True,
         ) as _is_storage_attached,
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -719,6 +722,8 @@ def test_on_start_no_patroni_member(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
         ) as _is_storage_attached,
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
+        patch("charm.TLS.generate_internal_peer_cert"),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -1556,22 +1561,18 @@ def test_update_certificate(harness):
     with (
         patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.refresh_tls_certificates_event") as _refresh_tls_certificates_event,
-        patch("charm.TLS.generate_internal_peer_cert") as _generate_internal_peer_cert,
     ):
         # If there is no current TLS files, _request_certificate should be called
         # only when the certificates relation is established.
         _get_client_tls_files.return_value = (None, None, None)
         harness.charm._update_certificate()
         _refresh_tls_certificates_event.emit.assert_not_called()
-        _generate_internal_peer_cert.assert_called_once_with()
-        _generate_internal_peer_cert.reset_mock()
 
         # Test with already present TLS files (when they will be replaced by new ones).
         _get_client_tls_files.return_value = (sentinel.key, sentinel.ca, sentinel.cert)
 
         harness.charm._update_certificate()
         _refresh_tls_certificates_event.emit.assert_called_once_with()
-        _generate_internal_peer_cert.assert_called_once_with()
 
 
 def test_update_member_ip(harness):
