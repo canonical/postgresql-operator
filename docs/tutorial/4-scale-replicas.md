@@ -25,21 +25,7 @@ You can now watch the scaling process in live using: `juju status --watch 1s`. I
 
 You’ll know that all three nodes are in sync when `juju status` reports `Workload=active` and `Agent=idle`:
 ```text
-Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:16:44+01:00
-
-App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql           active      3  postgresql  14/stable  281  no       
-
-Unit           Workload  Agent  Machine  Public address  Ports  Message
-postgresql/0*  active    idle   0        10.89.49.129           Primary
-postgresql/1   active    idle   1        10.89.49.197           
-postgresql/2   active    idle   2        10.89.49.175           
-
-Machine  State    Address       Inst id        Series  AZ  Message
-0        started  10.89.49.129  juju-a8a31d-0  jammy       Running
-1        started  10.89.49.197  juju-a8a31d-1  jammy       Running
-2        started  10.89.49.175  juju-a8a31d-2  jammy       Running
+TODO
 ```
 
 ## Remove units
@@ -56,18 +42,6 @@ juju remove-unit postgresql/2
 You’ll know that the replica was successfully removed when `juju status --watch 1s` reports:
 
 ```text
-Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:17:14+01:00
-
-App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql           active      2  postgresql  14/stable  281  no       
-
-Unit           Workload  Agent  Machine  Public address  Ports  Message
-postgresql/0*  active    idle   0        10.89.49.129           
-postgresql/1   active    idle   1        10.89.49.197           
-
-Machine  State    Address       Inst id        Series  AZ  Message
-0        started  10.89.49.129  juju-a8a31d-0  jammy       Running
-1        started  10.89.49.197  juju-a8a31d-1  jammy       Running
+TODO
 ```
 

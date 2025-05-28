@@ -21,7 +21,7 @@ multipass launch --cpus 4 --memory 8G --disk 50G --name my-vm charm-dev
 ```
 
 ```{note}
-**Note**: All 'multipass launch' parameters are [described here](https://multipass.run/docs/launch-command).
+All 'multipass launch' parameters are [described here](https://multipass.run/docs/launch-command).
 ```
 
 The Multipass [list of commands](https://multipass.run/docs/multipass-cli-commands) is short and self-explanatory. For example, to show all running VMs, just run the command `multipass list`.
@@ -32,7 +32,7 @@ multipass shell my-vm
 ```
 
 ```{note}
-**Note**:  If at any point you'd like to leave a Multipass VM, enter `Ctrl+D` or type `exit`.
+If at any point you'd like to leave a Multipass VM, enter `Ctrl+D` or type `exit`.
 ```
 
 All necessary components have been pre-installed inside VM already, like LXD and Juju. The files `/var/log/cloud-init.log` and `/var/log/cloud-init-output.log` contain all low-level installation details. 

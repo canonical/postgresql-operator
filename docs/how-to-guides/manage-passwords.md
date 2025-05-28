@@ -1,16 +1,8 @@
 # How to manage passwords
 
-If you are using **PostgreSQL 16** (channel `16/<any>`), passwords are managed with Juju secrets.
-> See the section [Passwords with PostgreSQL 16](#passwords-with-postgresql-16).
+Charmed PostgreSQL 16 uses [Juju secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/#secret) to manage passwords.
 
-If you are using **PostgreSQL 14** (channel `14/<any>`), passwords are managed with Juju's `get-password` and `set-password` actions.
-> See the section [Passwords with PostgreSQL 14](#passwords-with-postgresql-14).
-
-## Passwords with PostgreSQL 16
-
-On PostgreSQL 16, the charm uses [Juju secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/#secret) to manage passwords.
-
-See also: [Juju | How to manage secrets](https://documentation.ubuntu.com/juju/latest/howto/manage-secrets/#manage-secrets)
+> See also: [Juju | How to manage secrets](https://documentation.ubuntu.com/juju/latest/howto/manage-secrets/#manage-secrets)
 
 ### Create a secret
 
@@ -60,33 +52,3 @@ In this example,
 * `user_b`'s password remains as it was when the secret was added, but **`user_b` is no longer part of the secret**.
 
 See also: [Explanation > Users](/explanation/users)
-
-## Passwords with PostgreSQL 14
-
-### Get password
-
-To retrieve the operator's password:
-
-```text
-juju run postgresql/leader get-password
-```
-### Set password
-
-To change the operator's password to a new, randomized password:
-
-```text
-juju run postgresql/leader set-password
-```
-
-To set a manual password for the operator/admin user:
-
-```text
-juju run postgresql/leader set-password password=<password>
-```
-
-To set a manual password for another user:
-
-```text
-juju run postgresql/leader set-password username=<username> password=<password>
-```
-

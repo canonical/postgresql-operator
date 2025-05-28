@@ -8,7 +8,7 @@ The Charmed PostgreSQL operator supports [Juju spaces](https://documentation.ubu
 
 ## Prerequisites
 
-* **Charmed PostgreSQL 16**
+* Charmed PostgreSQL 16
 * Configured network spaces
   * See [Juju | How to manage network spaces](https://documentation.ubuntu.com/juju/latest/reference/juju-cli/list-of-juju-cli-commands/add-space/)
 

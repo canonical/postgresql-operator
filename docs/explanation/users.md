@@ -37,7 +37,7 @@ It is forbidden to use/manage described above users, as they are dedicated to th
 
 Use the [data-integrator](https://charmhub.io/data-integrator) charm to generate, manage, and remove external credentials.
 ```
-
+<!-- TODO: check if this can be replaced with secrets 
 Passwords for *internal* users can be rotated using the action 'set-password':
 
 ```text
@@ -102,6 +102,7 @@ If password rotation is required for users used in relations, the relation must 
 > juju wait-for application postgresql
 > juju relate postgresql myclientapp
 ```
+-->
 
 ### Extra user roles
 

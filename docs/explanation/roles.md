@@ -9,7 +9,7 @@ There are several definitions of roles in Charmed PostgreSQL:
 
 > See also: [](/explanation/users)
 
-## Predefined PostgreSQL 16 roles
+## PostgreSQL 16 roles
 
 ```text
 test123=> SELECT * FROM pg_roles;
@@ -34,7 +34,7 @@ test123=> SELECT * FROM pg_roles;
 
 ## Charmed PostgreSQL 16 roles
 
-Charmed PostgreSQL 16 introduced the following instance level predefined roles:
+Charmed PostgreSQL 16 introduces the following instance level predefined roles:
 
 * charmed_stats (inherit from pg_monitor)
 * charmed_read (inherit from pg_read_all_data)
@@ -55,51 +55,7 @@ test123=> SELECT * FROM pg_roles;
 ...
 ```
 
-## Charmed PostgreSQL 14 roles
-
-Charmed PostgreSQL 14 ships the minimal necessary roles logic: each application relation got a user with dedicated role matching the resources owner. It can be fine-tuned using extra-users-roles relation flag.  In general the following roles available for track `14`:
-
-* Predefined PostgreSQL Roles
-* Predefined Charmed PostgreSQL Roles
-  * Charmed PostgreSQL LDAP Roles (rev 600+)
-
-### Predefined PostgreSQL 14 Roles
-
-```text
-postgres=# SELECT * FROM pg_roles;
-          rolname          | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
- pg_database_owner         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6171
- pg_read_all_data          | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6181
- pg_write_all_data         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  6182
- pg_monitor                | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3373
- pg_read_all_settings      | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3374
- pg_read_all_stats         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3375
- pg_stat_scan_tables       | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  3377
- pg_read_server_files      | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4569
- pg_write_server_files     | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4570
- pg_execute_server_program | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4571
- pg_signal_backend         | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           |  4200
-...
-```
-
-### Predefined Charmed PostgreSQL 14 roles
-
-```text
-postgres=# SELECT * FROM pg_roles;
-          rolname          | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
- ...
- operator                  | t        | t          | t             | t           | t           | t              |           -1 | ********    |               | t            |           |    10
- replication               | f        | t          | f             | f           | t           | t              |           -1 | ********    |               | f            |           | 16384
- rewind                    | f        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16385
- postgres                  | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16386
- backup                    | t        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16387
- monitoring                | f        | t          | f             | f           | t           | f              |           -1 | ********    |               | f            |           | 16388
- admin                     | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16389
-...
-```
-
+<!--TODO: are the next two sections also relevant for 16?-->
 ### Relation specific roles
 
 For each application/relation the dedicated user is been created (with matching role and all all resources ownership). The resources ownership is being updated on each re-relation for new users/roles regeneration. Example of simple application relation to PostgreSQL and creating table:

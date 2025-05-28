@@ -25,22 +25,7 @@ juju deploy self-signed-certificates --config ca-common-name="Tutorial CA"
 Wait until the `self-signed-certificates` is up and active, use `juju status --watch 1s` to monitor the progress:
 
 ```text
-Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:31:40+01:00
-
-App                        Version  Status  Scale  Charm                      Channel    Rev  Exposed  Message
-postgresql                          active      2  postgresql                 14/stable  281  no       
-self-signed-certificates            active      1  self-signed-certificates   stable     72   no       
-
-Unit                          Workload  Agent  Machine  Public address  Ports  Message
-postgresql/0*                 active    idle   0        10.89.49.129           Primary
-postgresql/1                  active    idle   1        10.89.49.197           
-self-signed-certificates/0*   active    idle   3        10.89.49.185           
-
-Machine  State    Address       Inst id        Series  AZ  Message
-0        started  10.89.49.129  juju-a8a31d-0  jammy       Running
-1        started  10.89.49.197  juju-a8a31d-1  jammy       Running
-4        started  10.89.49.185  juju-a8a31d-3  jammy       Running
+TODO
 ```
 
 ## Integrate with PostgreSQL

@@ -3,7 +3,7 @@
 There are [two types of charms](https://juju.is/docs/sdk/charm-taxonomy#charm-types-by-generation) stored under the same charm name `postgresql`:
 
 1. [Reactive](https://juju.is/docs/sdk/charm-taxonomy#reactive)  charm in the channel `latest/stable` (called `legacy`)
-2. [Ops-based](https://juju.is/docs/sdk/ops) charm in the channel `14/stable` (called `modern`)
+2. [Ops-based](https://juju.is/docs/sdk/ops) charm in the channels `14/stable` and `16/stable` (called `modern`)
 
 The legacy charm provided endpoints `db` and `db-admin` (for the interface `pgsql`). The modern charm provides old endpoints as well + new endpoint `database` (for the interface `postgresql_client`). Read more details about the available [endpoints/interfaces](/explanation/interfaces-and-endpoints).
 
@@ -11,7 +11,9 @@ The legacy charm provided endpoints `db` and `db-admin` (for the interface `pgsq
 Choose one endpoint to use, rather than relating both simultaneously.
 ```
 
-## The default track "latest" vs "14"
+<!--TODO: how relevant is this for 16? would someone migrate from latest to 16?-->
+
+## The default track `latest` vs `14`
 
 The [default track](https://docs.openstack.org/charm-guide/yoga/project/charm-delivery.html) has been switched from the `latest` to `14`. It is [to ensure](https://discourse.charmhub.io/t/request-switch-default-track-from-latest-to-14-for-postgresql-k8s-charms/10314) all new deployments use a modern codebase. We strongly advise against using the latest track due to its implicit nature. In doing so, a future charm upgrade may result in a PostgreSQL version incompatible with an integrated application. Track 14 guarantees PostgreSQL 14 deployment only. The track `latest` will be closed after all applications migrated from Reactive to Ops-based charm.
 

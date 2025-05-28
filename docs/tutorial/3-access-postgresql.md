@@ -15,44 +15,14 @@ Connecting to the database requires that you know three pieces of information: T
 
 The IP addresses associated with each application unit can be found using the `juju status` command. Since we will use the leader unit to connect to PostgreSQL, we are interested in the IP address for the unit marked with `*`, like shown in the output below:
 ```text
-Unit           	  Workload  Agent  Address   Ports  Message
-postgresql/0*     active	idle   10.1.110.80     	Primary
+TODO
 ```
 
-The user we will connect to in this tutorial will be 'operator'. To retrieve its associated password, run the Charmed PostgreSQL action get-password:
-```text
-juju run postgresql/leader get-password
-```
-The command above should output something like this:
-```text
-Running operation 1 with 1 task
-  - task 2 on unit-postgresql-0
-
-Waiting for task 2...
-password: 66hDfCMm3ofT0yrG
-```
-In order to retrieve the password of a user other than 'operator', use the option username:
-```text
-juju run postgresql/leader get-password username=replication
-```
-
-At this point, we have all the information required to access PostgreSQL. Run the command below to enter the leader unit's shell as root:
-
-```text
-juju ssh --container postgresql postgresql/leader bash
-```
-which should bring you to a prompt like this: 
-
-```text
- root@postgresql-0:/#
-```
-The following commands should be executed from this remote shell you just logged into. 
-
->If you’d like to leave the unit's shell and return to your local terminal, enter `Ctrl+D` or type `exit`.
+(TODO)
 
 ## Access PostgreSQL via `psql`
 
-The easiest way to interact with PostgreSQL is via [PostgreSQL interactive terminal `psql`](https://www.postgresql.org/docs/14/app-psql.html), which is already installed on the host you're connected to.
+The easiest way to interact with PostgreSQL is via [PostgreSQL interactive terminal `psql`](https://www.postgresql.org/docs/16/app-psql.html), which is already installed on the host you're connected to.
 
 For example, to list all databases currently available, run the command below. When requested, enter the password that you obtained earlier.
 ```text
@@ -88,10 +58,8 @@ Now you are successfully logged in the interactive terminal. Here it is possible
 
 ```text
 postgres=# SELECT version();
-                                                             version
----------------------------------------------------------------------------------------------------------------------------------
- PostgreSQL 14.10 (Ubuntu 14.10-0ubuntu0.22.04.1) on x86_64-pc-linux-gnu, compiled by gcc (Ubuntu 11.4.0-1ubuntu1~22.04) 11.4.0, 64-bit
-(1 row)
+
+TODO
 ```
 
 We can see that PostgreSQL version 14.10 is installed. From this prompt, to print the list of available databases, we can simply run this command:
