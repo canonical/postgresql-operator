@@ -1,9 +1,3 @@
-```{note}
-**Note**: All commands are written for `juju >= v3.1`
-
-If you're using `juju 2.9`, check the [`juju 3.0` Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # Enable profiling with Parca
 
 This guide contains the steps to enable profiling with [Parca](https://www.parca.dev/docs/overview/) for your PostgreSQL application. 

@@ -1,12 +1,3 @@
-
-
-
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # Perform a minor upgrade
 
 **Example**: PostgreSQL 14.8 -> PostgreSQL 14.9<br/>

@@ -1,9 +1,3 @@
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # How to restore a local backup
 
 This is a guide on how to restore a locally made backup.

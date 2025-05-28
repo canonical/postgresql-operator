@@ -14,6 +14,7 @@ For more information, check the [Juju 3.0 Release Notes](https://juju.is/docs/ju
 ```
 
 ## Do you need to migrate?
+
 A database migration is only required if the output of the following command is `latest/stable`:
 
 ```text

@@ -1,9 +1,3 @@
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # How to scale units
 
 Replication in PostgreSQL is the process of creating copies of the stored data. This provides redundancy, which means the application can provide self-healing capabilities in case one replica fails. In this context, each replica is equivalent to one juju unit.

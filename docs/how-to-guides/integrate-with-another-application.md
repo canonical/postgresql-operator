@@ -1,9 +1,3 @@
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # How to integrate with another application
 
 [Integrations](https://juju.is/docs/juju/relation) (formerly “relations”) are connections between two applications with compatible endpoints. These connections simplify the creation and management of users, passwords, and other shared data.

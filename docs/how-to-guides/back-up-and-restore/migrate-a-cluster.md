@@ -1,9 +1,3 @@
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # How to migrate a cluster
 
 This is a guide on how to restore a backup that was made from a different cluster, (i.e. cluster migration via restore). 
@@ -17,8 +11,6 @@ Restoring a backup from a previous cluster to a current cluster requires:
 - [Configured settings for S3 storage](/how-to-guides/back-up-and-restore/configure-s3-aws)
 - Backups from the previous cluster in your S3 storage
 - Passwords from your previous cluster
-
----
 
 ## Manage cluster passwords
 When you restore a backup from an old cluster, it will restore the password from the previous cluster to your current cluster. Set the password of your current cluster to the previous cluster’s password:

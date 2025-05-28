@@ -1,15 +1,8 @@
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # How to enable monitoring (COS)
 
 ## Prerequisites
 * Charmed PostgreSQL [Revision 336 or greater](/reference/releases)
 * [`cos-lite` bundle](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s) deployed in a Kubernetes environment
-
 
 First, switch to the COS K8s environment and offer COS interfaces to be cross-model integrated with the Charmed PostgreSQL VM model.
 

@@ -1,9 +1,3 @@
-```{note}
-**Note**: All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
-
 # How to create and list backups
 
 This guide contains recommended steps and useful commands for creating and managing backups to ensure smooth restores.
