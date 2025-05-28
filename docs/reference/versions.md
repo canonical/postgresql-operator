@@ -20,7 +20,7 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
 
 ### Supported features
 
-* [Juju Spaces support]
+* Juju spaces support
 * [Multiple Juju storage support]
 * [LDAP integration] (also supported by PostgreSQL `14`)
 * [SoS report integration] (also supported by PostgreSQL `14`)
@@ -110,7 +110,6 @@ Learn more in the [legacy charm explanation page].
 [Tracing via Tempo]: /how-to-guides/monitoring-cos/enable-tracing
 [security hardening]: /explanation/security/index
 [Multiple Juju storage support]: /how-to-guides/deploy/juju-storage
-[Juju Spaces support]: /how-to-guides/deploy/juju-spaces
 
 [release notes]: /reference/releases
 
