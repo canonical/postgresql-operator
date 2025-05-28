@@ -102,7 +102,7 @@ def test_can_initialise_stanza(harness):
             harness.update_relation_data(
                 harness.model.get_relation(PEER).id,
                 f"{harness.charm.app.name}/1",
-                {"tls": "enabled"},
+                {"peer_tls": "enabled"},
             )
         assert not harness.charm.backup._can_initialise_stanza
 
@@ -144,7 +144,7 @@ def test_can_unit_perform_backup(harness):
             harness.update_relation_data(
                 peer_rel_id,
                 harness.charm.unit.name,
-                {"tls": "True"},
+                {"peer_tls": "True"},
             )
         assert harness.charm.backup._can_unit_perform_backup() == (
             False,
@@ -157,7 +157,7 @@ def test_can_unit_perform_backup(harness):
             harness.update_relation_data(
                 peer_rel_id,
                 harness.charm.unit.name,
-                {"tls": ""},
+                {"peer_tls": ""},
             )
         assert harness.charm.backup._can_unit_perform_backup() == (
             False,

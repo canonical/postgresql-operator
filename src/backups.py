@@ -142,8 +142,10 @@ class PostgreSQLBackups(Object):
             and (
                 (len(self.charm._peers.data.keys()) == 2)
                 or (
-                    "tls" not in self.charm.unit_peer_data
-                    and any("tls" in unit_data for _, unit_data in self.charm._peers.data.items())
+                    "peer_tls" not in self.charm.unit_peer_data
+                    and any(
+                        "peer_tls" in unit_data for _, unit_data in self.charm._peers.data.items()
+                    )
                 )
             )
         )
@@ -153,7 +155,7 @@ class PostgreSQLBackups(Object):
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
 
-        tls_enabled = "tls" in self.charm.unit_peer_data
+        tls_enabled = "peer_tls" in self.charm.unit_peer_data
 
         # Check if this unit is the primary (if it was not possible to retrieve that information,
         # then show that the unit cannot perform a backup, because possibly the database is offline).
