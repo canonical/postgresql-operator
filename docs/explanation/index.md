@@ -5,7 +5,6 @@ This section contains pages with more detailed explanations that provide additio
 ## Core concepts and design
 * [Architecture]
 * [Interfaces and endpoints]
-* [Juju]
 * [Legacy charm]
 
 ## Operational concepts
@@ -26,7 +25,6 @@ This section contains pages with more detailed explanations that provide additio
 [Units]: /explanation/units
 [Users]: /explanation/users
 [Logs]: /explanation/logs
-[Juju]: /explanation/juju
 [Legacy charm]: /explanation/legacy-charm
 [Connection pooling]: /explanation/connection-pooling
 [Security]: /explanation/security/index
@@ -41,7 +39,6 @@ This section contains pages with more detailed explanations that provide additio
 
 Architecture <architecture>
 Interfaces and endpoints <interfaces-and-endpoints>
-Juju <juju>
 Legacy charm <legacy-charm>
 Units <units>
 Users <users>
