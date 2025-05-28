@@ -1,34 +1,41 @@
-# PostgreSQL Switchover / Failover
+# Switchover / failover
 
 Charmed PostgreSQL constantly monitors the cluster status and performs **automated failover** in case of Primary unit gone. Sometimes **manual switchover** is necessary for hardware maintenance reasons. Check the difference between them [here](https://dbvisit.com/blog/difference-between-failover-vs-switchover).
 
-The [manual switchover](https://en.wikipedia.org/wiki/Switchover) is possible using Juju action [promote-to-primary](https://charmhub.io/postgresql/actions#promote-to-primary). 
+[Manual switchover](https://en.wikipedia.org/wiki/Switchover) is possible using Juju action [promote-to-primary](https://charmhub.io/postgresql/actions#promote-to-primary). 
 
-> **Important**: Charmed PostgreSQL has been designed to provide maximum guaranties for the data survival in all corner cases, therefor allowed actions depends on the configured [Juju unit state](/explanation/units).
+Charmed PostgreSQL has been designed for maximum guarantee of data survival in all corner cases. As such, allowed actions depend on the configured [Juju unit state](/explanation/units).
 
 ## Switchover 
 
-To switchover the PostgreSQL Primary (write-endpoint) to new Juju unit, use Juju action `promote-to-primary` (on the unit `x`, which will be promoted as a new Primary):
+To switchover the PostgreSQL Primary (write-endpoint) to new Juju unit, use Juju action `promote-to-primary` (on the unit `x`, which will be promoted as a new primary):
+
 ```text
 juju run postgresql/x promote-to-primary scope=unit
 ```
-> **Note**: The manual switchover is possible on the healthy '[Sync Standby](/explanation/units)' unit only. Otherwise it will be rejected by Patroni with the reason explanation.
 
-> **Note**: It is a normal situation when [Juju leader](https://documentation.ubuntu.com/juju/3.6/reference/unit/#leader-unit) unit and PostgreSQL Primary unit are pointing to different [Juju units](https://documentation.ubuntu.com/juju/3.6/reference/unit/). Juju Leader failover is fully automated and can be [enforced](https://github.com/canonical/jhack?tab=readme-ov-file#elect) for educational purpose only! Do NOT trigger Juju leader election for Primary moves.
+Note that:
+* a manual switchover is possible on the healthy '[Sync Standby](/explanation/units)' unit only. Otherwise it will be rejected by Patroni with the reason explanation.
+* the [Juju leader](https://documentation.ubuntu.com/juju/3.6/reference/unit/#leader-unit) unit and PostgreSQL primary unit are normally pointing to different [Juju units](https://documentation.ubuntu.com/juju/3.6/reference/unit/). Juju leader failover is fully automated and can be [enforced](https://github.com/canonical/jhack?tab=readme-ov-file#elect) for educational purpose only! Do **not** trigger Juju leader election to move the primary.
 
 ## Failover
 
-Charmed PostgreSQL doesn't provide manual failover due to lack of data safety guaranties.
+Charmed PostgreSQL doesn't provide manual failover due to lack of data safety guarantees.
+
 Advanced users can still execute it using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers). The same time Charmed PostgreSQL allows the cluster recovery using the full PostgreSQL/Patroni/Raft cluster re-initialization.
 
 ## Raft re-initialization
 
-> **Warning**: this is the worst possible recovery case scenario when Primary and ALL Sync Standby units lost simultaneously and their data cannot be recovered from the disc. In this case Patroni cannot perform automatic failover for the only available Replica(s) units. Still Patroni provides the read-only access to the data.
->
-> The manual failover procedure cannot guaranty the latest SQL transactions availability on the Replica unit(s) (due to the [lag distance](/explanation/units) to Primary)! Also Raft cluster consensus is not possible when one unit left in three units cluster. 
+```{caution}
+This is the worst possible recovery case scenario when Primary and ALL Sync Standby units lost simultaneously and their data cannot be recovered from the disc. 
 
-The command to re-init Raft cluster should be executed when charm is ready:
-* the one/last Juju unit is available in Juju application
+In this case, Patroni cannot perform automatic failover for the only available Replica(s) units. Still Patroni provides the read-only access to the data.
+
+A manual failover procedure cannot guarantee the latest SQL transactions' availability on the replica unit(s) due to the [lag distance](/explanation/units) to the primary. Additionally, Raft cluster consensus is not possible when one unit is left in a three-unit cluster. 
+```
+
+The command to re-initialize the Raft cluster should be executed when charm is ready:
+* the last Juju unit is available in Juju application
 * the last unit was has detected Raft majority lost, status: `Raft majority loss, run: promote-to-primary`
 
 To re-initialize Raft and fix the Partition/PostgreSQL cluster (when requested):
@@ -61,7 +68,9 @@ Machine  State    Address         Inst id        Base          AZ  Message
 1        started  10.189.210.166  juju-422c1a-1  ubuntu@22.04      Running
 2        started  10.189.210.188  juju-422c1a-2  ubuntu@22.04      Running
 ```
-Find the current Primary/Standby/Replica:
+
+Find the current primary/standby/replica:
+
 ```text
 > juju ssh postgresql/0
 ubuntu@juju-422c1a-0:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml list
@@ -74,7 +83,8 @@ ubuntu@juju-422c1a-0:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 +--------------+----------------+--------------+-----------+----+-----------+
 ```
 
-Kill the Leader and Sync Standby machines:
+Kill the leader and sync standby machines:
+
 ```text
 > lxc stop --force juju-422c1a-0  && lxc stop --force juju-422c1a-2
 
@@ -95,9 +105,11 @@ Machine  State    Address         Inst id        Base          AZ  Message
 1        started  10.189.210.166  juju-422c1a-1  ubuntu@22.04      Running
 2        down     10.189.210.188  juju-422c1a-2  ubuntu@22.04      Running
 ```
+
 At this stage it is recommended to restore the lost nodes, they will rejoin the cluster automatically once Juju detects their availability.
 
 To start Raft re-initialization, remove DEAD machines as a signal to charm that they cannot be restored/started and no risks for split-brain:
+
 ```text
 > juju remove-machine --force 0 
 WARNING This command will perform the following actions:
@@ -113,7 +125,9 @@ will remove machine 2
 - will remove storage pgdata/2
 Continue [y/N]? y
 ```
+
 Check the status to ensure `Raft majority loss`:
+
 ```text
 > juju status
 ...
@@ -123,11 +137,13 @@ postgresql/1*  blocked   executing  1        10.189.210.166  5432/tcp  Raft majo
 ```
 
 Start Raft re-initialization:
+
 ```text
 > juju run postgresql/1 promote-to-primary scope=unit force=true
 ```
 
 Wait for re-initiation to be completed:
+
 ```
 > juju status
 ...
@@ -136,7 +152,8 @@ postgresql/1*  maintenance  executing  3        10.189.210.166  5432/tcp  (promo
 ...
 ```
 
-At the end, the Primary until is back:
+At the end, the primary until is back:
+
 ```text
 > juju status
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
@@ -153,6 +170,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 ```
 
 Scale application to 3+ units to complete HA recovery:
+
 ```text
 > juju add-unit postgresql -n 2
 ```

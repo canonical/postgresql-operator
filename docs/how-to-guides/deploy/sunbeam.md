@@ -16,7 +16,7 @@ Follow the official OpenStack guide: [Single-node deployment][Single-node guided
 
 Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual fqdn fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
 
-## Enable OpenStack Images Auto-sync
+## Enable OpenStack images auto-sync
 Follow the official [Images Sync] guide to enable auto-sync and wait for the image `22.04` to be downloaded.
 
 ## Set up Juju inside an OpenStack bastion
@@ -28,6 +28,7 @@ To summarize, the relevant sections are:
 * Create a Juju controller 
 
 ## Deploy Charmed PostgreSQL
+
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
 ```text
 juju add-model postgresql

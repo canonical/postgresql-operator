@@ -4,13 +4,16 @@
 
 
 ## Set up Juju and Azure tooling
+
 ```{caution}
-**Warning**: The described `Azure interactive` method (with web browser authentication `service-principal-secret-via-browser`) described here is only supported starting Juju 3.6-rc1+!
+The `Azure interactive` method (with web browser authentication `service-principal-secret-via-browser`) described here is only supported starting Juju 3.6-rc1+!
 ```
+
 ### Install Juju and Azure CLI
+
 Install Juju via snap:
 ```text
-sudo snap install juju --channel 3.6/edge
+sudo snap install juju 
 ```
 
 Follow the installation guides for:
@@ -18,7 +21,7 @@ Follow the installation guides for:
 
 To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
 
-```console
+```text
 > juju version
 3.6-rc1-genericlinux-amd64
 
@@ -44,9 +47,11 @@ We are describing here the currently recommended `interactive` method with web b
 The first mandatory step is to [create an Azure subscription](https://learn.microsoft.com/en-us/azure/cost-management-billing/manage/create-subscription) - you will need the Azure subscription ID for Juju. 
 
 Once you have it, add Azure credentials to Juju:
-```none
+
+```text
 juju add-credential azure
 ```
+
 This will start a script that will help you set up the credentials, where you will be asked to fill in a set of parameters:  
 * `credential-name`: Fill this with a sensible name that will help you identify the credential set, say `<CREDENTIAL_NAME>`
 * `region`: Select any default region that is more convenient for you to deploy your controller and applications. Note that credentials are not region-specific.
@@ -149,13 +154,15 @@ You can check the [Azure instances availability](https://portal.azure.com/#brows
 ## Deploy charms
 
 Create a new Juju model if you don't have one already
+
 ```text
 juju add-model welcome
 ```
-> (Optional) Increase the debug level if you are troubleshooting charms:
-> ```text
-> juju model-config logging-config='<root>=INFO;unit=DEBUG'
-> ```
+Optionally increase the debug level if you are troubleshooting charms:
+
+```text
+juju model-config logging-config='<root>=INFO;unit=DEBUG'
+```
 
 The following command deploys PostgreSQL and [Data Integrator](https://charmhub.io/data-integrator), a charm that can be used to requests a test database:
 
@@ -164,7 +171,9 @@ juju deploy postgresql
 juju deploy data-integrator --config database-name=test123
 juju integrate postgresql data-integrator
 ```
+
 Check the status:
+
 ```text
 > juju status --relations
 
@@ -192,12 +201,14 @@ postgresql:upgrade                     postgresql:upgrade                     up
 ```
 
 Once deployed, request the credentials for your newly bootstrapped PostgreSQL database:
+
 ```text
 juju run data-integrator/leader get-credentials
 ```
 
 Example output:
-```text
+
+```yaml
 postgresql:
   data: '{"database": "test123", "external-node-connectivity": "true", "requested-secrets":
     "[\"username\", \"password\", \"tls\", \"tls-ca\", \"uris\"]"}'
@@ -210,6 +221,7 @@ postgresql:
 ```
 
 At this point, you can access your DB inside Azure VM using the internal IP address. All further Juju applications will use the database through the internal network:
+
 ```text
 > psql postgresql://relation-4:Jqi0QckCAADOFagl@192.168.0.5:5432/test123
 
@@ -223,13 +235,18 @@ From here you can begin to use your newly deployed PostgreSQL. Learn more about 
 
 ## Expose database (optional)
 
-If it is necessary to access the database from outside of Azure, open the Azure firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
+If it is necessary to access the database from outside of Azure, open the Azure firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality:
+
 ```text
 juju expose postgresql
 ```
-> Be wary that [opening ports to the public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications).
+
+```{caution}
+Be wary that [opening ports to the public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications).
+```
 
 Once exposed, you can connect your database using the same credentials as above. This time use the Azure VM public IP assigned to the PostgreSQL instance. You can see this with `juju status`:
+
 ```text
 > juju status postgresql
 
@@ -257,8 +274,10 @@ postgresql:restart                     postgresql:restart                     ro
 postgresql:upgrade                     postgresql:upgrade                     upgrade                peer     
 ...
 ```
+
 Note the IP and port (`172.170.35.199:5432`) and connect via `psql`:
-```
+
+```text
 > psql postgresql://relation-4:Jqi0QckCAADOFagl@172.170.35.199:5432/test123
 
 psql (14.12 (Ubuntu 14.12-0ubuntu0.22.04.1))
@@ -266,7 +285,9 @@ Type "help" for help.
 
 test123=> 
 ```
+
 To close public access, run:
+
 ```text
 juju unexpose postgresql
 ```
@@ -278,7 +299,8 @@ Always clean Azure resources that are no longer necessary -  they could be costl
 ```
 
 See all controllers in your machine with the following command:
-```
+
+```text
 > juju controllers
 ...
 Controller  Model    User   Access     Cloud/Region     Models  Nodes    HA  Version
@@ -286,17 +308,20 @@ azure*      welcome  admin  superuser  azure/centralus       2      1  none  3.6
 ```
 
 To destroy the `azure` Juju controller and remove the Azure instance, run the command below. **All your data will be permanently removed.**
+
 ```text
 juju destroy-controller azure --destroy-all-models --destroy-storage --force
 ```
 
-Next, check and manually delete all unnecessary Azure VM instances and resources. To show the list of all your Azure VMs, run the following command (make sure no running resources are left): 
+Next, check and manually delete all unnecessary Azure VM instances and resources. To show the list of all your Azure VMs, run the following command (make sure no running resources are left):
+
 ```text
 az vm list
 az resource list
 ```
 
 List your Juju credentials:
+
 ```text
 > juju credentials
 
@@ -317,7 +342,6 @@ We recommend you to check if these are still present with:
 ```text
 az role definition list --name azure-test-role1
 ```
-> Use it without specifying the `--name` argument to get the full list. 
 
 You can also check whether you still have a role assignment bound to `azure-test-role1` registered using:
 
@@ -333,6 +357,7 @@ az role definition delete --name azure-test-role1
 ```
 
 Finally, log out of the Azure CLI user credentials to prevent any credential leakage:
+
 ```text
 az logout 
 ```

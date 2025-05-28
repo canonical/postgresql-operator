@@ -4,7 +4,7 @@ This guide will show how to enable TLS/SSL on a PostgreSQL cluster using the [`s
 
 This guide assumes everything is deployed within the same network and Juju model.
 
-> See also: [How to deploy for external TLS access](/how-to-guides/deploy/tls-vip-access)
+> See also: [](/how-to-guides/deploy/tls-vip-access)
 
 ## Enable TLS
 
@@ -15,31 +15,39 @@ Check [this guide about X.509 certificates](https://discourse.charmhub.io/t/secu
 ```
 
 First, deploy the TLS charm:
+
 ```text
 juju deploy self-signed-certificates
 ```
 
 To enable TLS integrate (formerly known as “relate”) the two applications:
+
 ```text
 juju integrate postgresql:certificates self-signed-certificates:certificates
 ```
 
 ## Check certificates in use
+
 To check the certificates in use by PostgreSQL, run
+
 ```text
 openssl s_client -starttls postgres -connect <leader_unit_IP>:<port> | grep issuer
 ```
 
 ## Update keys
+
 Updates to private keys for certificate signing requests (CSR) can be made via the `set-tls-private-key` action. Note that passing keys to external/internal keys should *only be done with* `base64 -w0`, *not* `cat`. 
 
 With three replicas, this schema should be followed:
 
 Generate a shared internal key:
+
 ```text
 openssl genrsa -out internal-key.pem 3072
 ```
+
 Generate external keys for each unit:
+
 ```text
 openssl genrsa -out external-key-0.pem 3072
 openssl genrsa -out external-key-1.pem 3072
@@ -48,7 +56,7 @@ openssl genrsa -out external-key-2.pem 3072
 
 Apply both private keys to each unit. The shared internal key will be applied only to the juju leader.
 
-```
+```text
 juju run postgresql/0 set-tls-private-key "external-key=$(base64 -w0 external-key-0.pem)"  "internal-key=$(base64 -w0 internal-key.pem)"  --wait
 juju run postgresql/1 set-tls-private-key "external-key=$(base64 -w0 external-key-1.pem)"  "internal-key=$(base64 -w0 internal-key.pem)"  --wait
 juju run postgresql/2 set-tls-private-key "external-key=$(base64 -w0 external-key-2.pem)"  "internal-key=$(base64 -w0 internal-key.pem)"  --wait
@@ -56,14 +64,16 @@ juju run postgresql/2 set-tls-private-key "external-key=$(base64 -w0 external-ke
 
 Updates can also be done with auto-generated keys:
 
-```
+```text
 juju run postgresql/0 set-tls-private-key
 juju run postgresql/1 set-tls-private-key
 juju run postgresql/2 set-tls-private-key
 ```
 
 ## Disable TLS
+
 Disable TLS by removing the integration.
+
 ```text
 juju remove-relation postgresql:certificates self-signed-certificates:certificates
 ```

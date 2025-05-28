@@ -24,7 +24,7 @@ juju add-unit postgresql -n 2
 You can now watch the scaling process in live using: `juju status --watch 1s`. It usually takes several minutes for new cluster members to be added. 
 
 You’ll know that all three nodes are in sync when `juju status` reports `Workload=active` and `Agent=idle`:
-```
+```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:16:44+01:00
 
@@ -54,7 +54,8 @@ juju remove-unit postgresql/2
 ```
 
 You’ll know that the replica was successfully removed when `juju status --watch 1s` reports:
-```
+
+```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:17:14+01:00
 

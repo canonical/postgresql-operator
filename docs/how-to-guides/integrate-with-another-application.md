@@ -1,10 +1,10 @@
 # How to integrate with another application
 
-[Integrations](https://juju.is/docs/juju/relation) (formerly “relations”) are connections between two applications with compatible endpoints. These connections simplify the creation and management of users, passwords, and other shared data.
+[Integrations](https://juju.is/docs/juju/relation), also known as “relations” are connections between two applications with compatible endpoints. These connections simplify the creation and management of users, passwords, and other shared data.
 
 This guide shows how to integrate Charmed PostgreSQL with both charmed and non-charmed applications.
 
-> For developer information about how to integrate your own charmed application with PostgreSQL, see [Development > How to integrate with your charm](/how-to-guides/development/integrate-with-your-charm).
+For developer information about how to integrate your own charmed application with PostgreSQL, see [Development > How to integrate with your charm](/how-to-guides/development/integrate-with-your-charm).
 
 ## Integrate with a charmed application
 
@@ -15,28 +15,34 @@ You can see which existing charms are compatible with PostgreSQL in the [Integra
 ```
 
 ### Modern `postgresql_client` interface
+
 To integrate with a charmed application that supports the `postgresql_client` interface, run
+
 ```text
 juju integrate postgresql:database <charm>
 ```
 
 To remove the integration, run
+
 ```text
 juju remove-relation postgresql <charm>
 ```
 
 ### Legacy `pgsql` interface
+
 ```{caution}
 Note that this interface is **deprecated**.
 See the [legacy charm explanation page](/explanation/legacy-charm).
 ```
 
 To integrate via the legacy interface, run
+
  ```text
 juju integrate postgresql:db <charm>
 ```
 
 Extended permissions can be requested using the `db-admin` endpoint:
+
 ```text
 juju integrate postgresql:db-admin <charm>
 ```
@@ -67,7 +73,8 @@ To rotate the passwords of users created for integrated applications, the integr
 juju remove-relation <charm> postgresql
 juju integrate <charm> postgresql
 ```
->`<charm>` can be `data-integrator` in the case of connecting with a non-charmed application.
+
+`<charm>` can be `data-integrator` in the case of connecting with a non-charmed application.
 
 ### Internal operator user
 The operator user is used internally by the Charmed PostgreSQL application. The `set-password` action can be used to rotate its password.

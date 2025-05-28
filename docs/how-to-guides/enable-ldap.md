@@ -1,30 +1,32 @@
 # How to enable LDAP authentication
 
-LDAP (*Lightweight Directory Access Protocol*) enables centralized authentication for PostgreSQL clusters, reducing the overhead of managing local credentials and access policies.
+The Lightweight Directory Access Protocol (LDAP) enables centralized authentication for PostgreSQL clusters, reducing the overhead of managing local credentials and access policies.
 
 This guide goes over the steps to integrate LDAP as an authentication method with the PostgreSQL charm, all within the Juju ecosystem.
 
 ## Prerequisites
+
 * Charmed PostgreSQL channel `14/edge` or `16/edge` (revision `600` or higher)
 * Juju `v3.6` or higher
 
 ## Deploy an LDAP server in a K8s environment
 
 ```{caution}
-**Disclaimer:** In this guide, we use [self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) provided by the [`self-signed-certificates` operator](https://github.com/canonical/self-signed-certificates-operator). 
+In this guide, we use [self-signed certificates](https://en.wikipedia.org/wiki/Self-signed_certificate) provided by the [`self-signed-certificates` operator](https://github.com/canonical/self-signed-certificates-operator). 
 
 **This is not recommended for a production environment.**
 
 For production environments, check the collection of [Charmhub operators](https://charmhub.io/?q=tls-certificates) that implement the `tls-certificate` interface, and choose the most suitable for your use-case.
 ```
 
-Switch to the Kubernetes controller:
+Switch to a Kubernetes controller:
 
 ```text
 juju switch <k8s_controller>
 ```
 
 Deploy the [GLAuth charm](https://charmhub.io/glauth-k8s):
+
 ```text
 juju add-model glauth
 juju deploy self-signed-certificates
@@ -33,6 +35,7 @@ juju deploy glauth-k8s --channel edge --trust
 ```
 
 Integrate (formerly known as "relate") the three applications:
+
 ```text
 juju integrate glauth-k8s:certificates self-signed-certificates
 juju integrate glauth-k8s:pg-database postgresql-k8s
@@ -104,7 +107,7 @@ juju integrate postgresql:receive-ca-cert send-ca-cert
 
 ## Map LDAP users to PostgreSQL
 
-To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorization groups. To create those groups before hand, refer to the Data Integrator charm [page](https://charmhub.io/data-integrator).
+To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorization groups. To create those groups before hand, refer to the [Data Integrator charm](https://charmhub.io/data-integrator).
 
 ```text
 juju config postgresql ldap_map="<ldap_group>=<psql_group>"

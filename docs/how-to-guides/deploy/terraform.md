@@ -7,7 +7,7 @@ The easiest way is to start from [these examples of terraform modules](https://g
 For an in-depth introduction to the Juju Terraform Provider, read [this Discourse post](https://discourse.charmhub.io/t/6939).
 
 ```{note}
-**Note**: Storage support was added in [Juju Terraform Provider version 0.13+](https://github.com/juju/terraform-provider-juju/releases/tag/v0.13.0).
+Storage support was added in [Juju Terraform Provider version 0.13+](https://github.com/juju/terraform-provider-juju/releases/tag/v0.13.0).
 ```
 
 ## Install Terraform tooling
@@ -15,15 +15,20 @@ For an in-depth introduction to the Juju Terraform Provider, read [this Discours
 This guide assumes Juju is installed and you have an LXD controller already bootstrapped. For more information, check the [Set up the environment](/tutorial/1-set-up-environment) tutorial page.
 
 First, install Terraform Provider and example modules:
+
 ```text
 sudo snap install terraform --classic
 ```
+
 Switch to the LXD provider and create a new model:
+
 ```text
 juju switch lxd
 juju add-model my-model
 ```
+
 Clone examples and navigate to the PostgreSQL machine module:
+
 ```text
 git clone https://github.com/canonical/terraform-modules.git
 cd terraform-modules/modules/machine/postgresql

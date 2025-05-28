@@ -47,15 +47,15 @@ The LXD machine will be up and running after the images downloading and sync is 
 ![MAAS interface - create tag](maas-create-tag.png)
 </details>
 
-> **A note on DHCP**
->
-> MAAS uses DHCP to boot and install new machines. You must enable DHCP manually if you see this banner on MAAS pages:
+```{note}
+**A note on DHCP**
+MAAS uses DHCP to boot and install new machines. You must enable DHCP manually if you see this banner on MAAS pages:
 ![DHCP banner|690x46](maas-dhcp-banner.png)
->
-> **Make sure to enable DHCP service inside the MAAS VM only.**
->
- >Use the internal VM network `fabric-1` on `10.10.10.0/24` and choose a range (e.g. `10.10.10.100-10.10.10.120`). Check the [official MAAS manual](https://maas.io/docs/enabling-dhcp) for more information about enabling DHCP.
 
+**Make sure to enable DHCP service inside the MAAS VM only.**
+
+Use the internal VM network `fabric-1` on `10.10.10.0/24` and choose a range (e.g. `10.10.10.100-10.10.10.120`). Check the [official MAAS manual](https://maas.io/docs/enabling-dhcp) for more information about enabling DHCP.
+```
 
 **6.** Finally, dump MAAS admin user API key to add as Juju credentials later:
 ```text
@@ -135,24 +135,25 @@ Machine  State    Address     Inst id        Base          AZ       Message
 Check the [Testing](/reference/software-testing) reference to test your deployment.
 
 ## Clean up the environment
+
 To stop your VM, run: 
 ```text
 multipass stop maas
 ```
 If you're done with testing and would like to free up resources on your machine, you can remove the VM entirely.
 
-```{caution}
-**Warning**: When you remove the VM as shown below, **you will lose all the data** in PostgreSQL and any other applications inside it! 
+```{warning}
+When you remove the VM as shown below, **you will lose all the data** in PostgreSQL and any other applications inside it! 
 
 For more information, see the docs for [`multipass delete`](https://multipass.run/docs/delete-command).
 ```
 
 To completely delete your VM and all its data, run:
+
 ```text
 multipass delete --purge maas
 ```
 
-```{note}
 If you expect having several concurrent connections frequently, it is highly recommended to deploy [PgBouncer](https://charmhub.io/pgbouncer?channel=1/stable) alongside PostgreSQL. For more information, read our explanation about [Connection pooling](/explanation/connection-pooling).
-```
+
 

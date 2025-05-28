@@ -4,11 +4,8 @@ This guide outlines the steps for enabling an extension in a Charmed PostgreSQL 
 
 For a list of available extensions, see the page [Supported plugins/extensions](/reference/plugins-extensions). The words "plugin" and "extension" will be used interchangeably.
 
-## Prerequisites
-* A deployed [Charmed PostgreSQL operator](/tutorial/2-deploy-postgresql) from [a revision that supports the desired plugin](/reference/plugins-extensions)
-
-
 ## Enable extension
+
 Enable the extension by setting `True` as the value of its respective config option, like in the following example:
 
 ```text
@@ -36,7 +33,7 @@ After enabling the needed extensions through the config options, the charm will 
 If the application charm uses the new `postgresql_client` interface, it can use the [is_postgresql_plugin_enabled](https://charmhub.io/data-platform-libs/libraries/data_interfaces) helper method from the data interfaces library to check whether the plugin/extension is already enabled in the database.
 
 ```{note}
-**Note:** Not all PostgreSQL extensions are available. The list of supported extensions is available at [Supported plugins/extensions](/reference/plugins-extensions).
+Not all PostgreSQL extensions are available. The list of supported extensions is available at [Supported plugins/extensions](/reference/plugins-extensions).
 ```
 
 

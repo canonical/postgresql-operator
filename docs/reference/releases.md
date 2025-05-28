@@ -32,9 +32,13 @@ For more details about each feature/interface, refer to the documentation linked
 ## Architecture and base
 Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneously for different [bases/series](https://juju.is/docs/juju/base) using the same charm code. In other words, one release contains multiple revisions.
 
-> If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.
+If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.
 
-> If you deploy a specific revision, **you must make sure it matches your base and architecture** via the tables below or with [`juju info`](https://juju.is/docs/juju/juju-info)
+```{caution}
+If you deploy with the `--revision` flag, **you must make sure the revision matches your base and architecture**. 
+
+Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
+```
 
 ### Release 552-553
 
@@ -43,56 +47,25 @@ Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneous
 |[553]  | ![check] |        |  ![check]  |
 |[552] |          | ![check] |  ![check]  |
 
-[details=Older releases]
-
-### Release 467-468
-
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[468]  |![check] | | ![check]  |
-|[467] |  | ![check]| ![check] |
-
-### Release 429-430
+<details>
+<summary>Older releases</summary>
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
-|[430] |![check]| | ![check]   |
-|[429] |  | ![check]| ![check] |
-
-### Release 363
-
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[363] | ![check]| | ![check]  |
-
-
-### Release 351
-
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[351] |![check]| | ![check]   |
-
-
-### Release 336
-
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[336] |![check]| | ![check]   |
-
-
-### Release 288
-
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[288] |![check]| | ![check]   |
+|[468] |![check]  |          | ![check] |
+|[467] |          | ![check] | ![check] |
+|[430] |![check]  |          | ![check] |
+|[429] |          | ![check] | ![check] |
+|[363] |![check]  |          | ![check] |          
+|[351] |![check]  |          | ![check] |         
+|[336] |![check]  |          | ![check] |       
+|[288] |![check]  |          | ![check] |       
 
 </details>
 
 ## Plugins/extensions
 
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
-
-> **Note**: Our release notes are an ongoing work in progress. If there is any additional information about releases that you would like to see or suggestions for other improvements, don't hesitate to contact us on [Matrix ](https://matrix.to/#/#charmhub-data-platform:ubuntu.com) or [leave a comment](https://discourse.charmhub.io/t/charmed-postgresql-reference-release-notes/11875).
 
 <!-- LINKS-->
 [553]: https://github.com/canonical/postgresql-operator/releases/tag/rev552

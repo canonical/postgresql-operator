@@ -6,6 +6,7 @@
 ## Install GCloud and Juju tooling
 
 Install Juju via snap:
+
 ```text
 sudo snap install juju
 sudo snap install google-cloud-cli --classic
@@ -15,7 +16,7 @@ Check the official the [Google Cloud (GCloud) CLI](https://cloud.google.com/sdk/
 
 To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
 
-```console
+```text
 ~$ juju version
 3.5.4-genericlinux-amd64
 
@@ -24,12 +25,15 @@ Google Cloud SDK 474.0.0
 ...
 ```
 ### Authenticate
+
 Login to GCloud:
+
 ```text
 gcloud auth login
 ```
 
 [Create an service IAM account](https://cloud.google.com/iam/docs/service-accounts-create) for Juju to operate GCE:
+
 ```text
 > gcloud iam service-accounts create juju-gce-account --display-name="Juju GCE service account"
 Created service account [juju-gce-account].
@@ -49,7 +53,9 @@ created key [aaaaaaa....aaaaaaa] of type [json] as [sa-private-key.json] for [ju
 
 ## Bootstrap Juju controller on GCE
 
-> **Note**: move newly exported GCloud jsonfile into SNAP accessible folder due to the known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
+Move the newly exported GCloud json file into a snap-accessible folder due to a known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
+
+
 ```text
 sudo mv sa-private-key.json /var/snap/juju/common/sa-private-key.json
 sudo chmod a+r /var/snap/juju/common/sa-private-key.json

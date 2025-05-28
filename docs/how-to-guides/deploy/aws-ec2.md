@@ -14,13 +14,14 @@ Follow the installation guides for:
 
 To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
 
-```console
+```text
 ~$ juju version
 3.5.4-genericlinux-amd64
 
 ~$ aws --version
 aws-cli/2.13.25 Python/3.11.5 Linux/6.2.0-33-generic exe/x86_64.ubuntu.23 prompt/off
 ```
+
 ### Authenticate
 [Create an IAM account](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-console.html) (or use legacy access keys) to operate AWS EC2:
 ```text
@@ -56,10 +57,13 @@ Check AWS credentials:
 ## Bootstrap Juju controller on AWS EC2
 
 Add AWS credentials to Juju:
+
 ```text
 juju add-credential aws -f ~/.aws/credentials.yaml
 ```
+
 Bootstrap Juju controller ([check all supported configuration options](https://juju.is/docs/juju/amazon-ec2)):
+
 ```text
 juju bootstrap aws
 ```
@@ -94,13 +98,16 @@ You can check the [AWS EC2 instance availability](https://us-east-1.console.aws.
 ![image|690x118](aws-ec2-availability.png)
 
 Create a new Juju model:
+
 ```text
 juju add-model welcome
 ```
-> (Optional) Increase the debug level if you are troubleshooting charms:
-> ```text
-> juju model-config logging-config='<root>=INFO;unit=DEBUG'
-> ```
+
+Optionally increase the debug level if you are troubleshooting charms:
+
+```text
+juju model-config logging-config='<root>=INFO;unit=DEBUG'
+```
 
 ## Deploy charms
 
@@ -111,7 +118,9 @@ juju deploy postgresql
 juju deploy data-integrator --config database-name=test123
 juju relate postgresql data-integrator
 ```
+
 Check the status:
+
 ```text
 > juju status --relations
 Model    Controller     Cloud/Region   Version  SLA          Timestamp
@@ -149,7 +158,7 @@ juju run data-integrator/leader get-credentials
 ```
 
 The output example:
-```text
+```yaml
 postgresql:
   data: '{"database": "test123", "external-node-connectivity": "true", "requested-secrets":
     "[\"username\", \"password\", \"tls\", \"tls-ca\", \"uris\"]"}'
@@ -254,3 +263,4 @@ rm -f ~/.aws/credentials.yaml
 ```{note}
 If you expect having several concurrent connections frequently, it is highly recommended to deploy [PgBouncer](https://charmhub.io/pgbouncer?channel=1/stable) alongside PostgreSQL. For more information, read our explanation about [Connection pooling](/explanation/connection-pooling).
 ```
+

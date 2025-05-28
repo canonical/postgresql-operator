@@ -4,7 +4,6 @@
 :titlesonly:
 :maxdepth: 2
 :glob:
-:hidden:
 
 Configure S3 AWS <configure-s3-aws>
 Configure S3 RadosGW <configure-s3-radosgw>

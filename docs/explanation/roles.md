@@ -1,12 +1,13 @@
 # Roles 
+<!--TODO: fix structure-->
 
-> **Note**: check the separate [Users](/explanation/users) explanations first.
-
-There are several definitions of Roles in Charmed PostgreSQL:
+There are several definitions of roles in Charmed PostgreSQL:
 * Predefined PostgreSQL roles
 * Instance level DB/relation-specific roles
   *  LDAP-specific roles 
 * Extra user roles relation flag
+
+> See also: [](/explanation/users)
 
 ## Predefined PostgreSQL 16 roles
 

@@ -3,8 +3,6 @@
 **Example**: PostgreSQL 14.8 -> PostgreSQL 14.9<br/>
 (including charm revision bump: e.g. Revision 193 -> Revision 196)
 
-This guide is part of [Charmed PostgreSQL Upgrades](/how-to-guides/upgrade/index). Refer to this page for more information and an overview of the content.
-
 ## Summary
 - [**Pre-upgrade checks**](#pre-upgrade-checks): Important information to consider before starting an upgrade.
 - [**1. Collect**](#step-1-collect) all necessary pre-upgrade information. It will be necessary for a rollback, if needed. **Do not skip this step**; better to be safe than sorry!
@@ -15,10 +13,8 @@ This guide is part of [Charmed PostgreSQL Upgrades](/how-to-guides/upgrade/index
 - [**Post-upgrade check**](#post-upgrade-check). Make sure all units are in the proper state and the cluster is healthy.
 
 ## Pre-upgrade checks
-Before performing a minor PostgreSQL upgrade, there are some important considerations to take into account:
-* Concurrency with other operations during the upgrade
-* Backing up your data
-* Service disruption
+
+Key topics to take into consideration before upgrading.
 
 ### Concurrency with other operations
 **We strongly recommend to NOT perform any other extraordinary operations on Charmed PostgreSQL cluster while upgrading.** 
@@ -85,6 +81,19 @@ This action will configure the charm to minimize the amount of primary switchove
 
 ## Step 3: Upgrade
 
+```{important}
+**Do NOT trigger `rollback` procedure during the running `upgrade` procedure.**
+It is expected to have some status changes during the process: `waiting`, `maintenance`, `active`. 
+
+Make sure the upgrade has failed/stopped and cannot be fixed/continued before triggering `rollback`!
+
+**Please be patient during huge installations.**
+Each unit should recover shortly after the upgrade, but time can vary depending on the amount of data written to the cluster while the unit was not part of it. 
+
+**Incompatible charm revisions or dependencies will halt the process.**
+After a `juju refresh`, if there are any version incompatibilities in charm revisions, its dependencies, or any other unexpected failure in the upgrade process, the upgrade process will be halted and enter a failure state.
+```
+
 Use the  `juju refresh` command to trigger the charm upgrade process.
 
 Example with channel selection:
@@ -103,7 +112,7 @@ juju refresh postgresql --path ./postgresql_ubuntu-22.04-amd64.charm
 All units will be refreshed (i.e. receive new charm content), and the upgrade will execute one unit at a time. 
 
 ```{note}
-**Note:** To reduce connection disruptions, the order in which the units are upgraded is based on roles: 
+To reduce connection disruptions, the order in which the units are upgraded is based on roles: 
 
 First the `replica` units, then the `sync-standby` units, and lastly, the `leader`(or `primary`) unit. 
 ```
@@ -147,17 +156,6 @@ Machine  State    Address       Inst id        Base          AZ  Message
 4        started  10.3.217.95   juju-d483b7-4  ubuntu@22.04      Running
 5        started  10.3.217.108  juju-d483b7-5  ubuntu@22.04      Running
 ```
-### Important Notes
-**Do NOT trigger `rollback` procedure during the running `upgrade` procedure.**
-It is expected to have some status changes during the process: `waiting`, `maintenance`, `active`. 
-
-Make sure `upgrade` has failed/stopped and cannot be fixed/continued before triggering `rollback`!
-
-**Please be patient during huge installations.**
-Each unit should recover shortly after the upgrade, but time can vary depending on the amount of data written to the cluster while the unit was not part of it. 
-
-**Incompatible charm revisions or dependencies will halt the process.**
-After a `juju refresh`, if there are any version incompatibilities in charm revisions, its dependencies, or any other unexpected failure in the upgrade process, the upgrade process will be halted and enter a failure state.
 
 ## Step 4: Rollback (optional)
 
@@ -165,7 +163,7 @@ The step must be skipped if the upgrade went well!
 
 Although the underlying PostgreSQL Cluster continues to work, it’s important to roll back the charm to a previous revision so that an update can be attempted after further inspection of the failure. 
 
-> See: [How to perform a minor rollback](/how-to-guides/upgrade/perform-a-minor-rollback)
+> See: [](/how-to-guides/upgrade/perform-a-minor-rollback)
 
 ## Post-upgrade check
 

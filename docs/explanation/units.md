@@ -1,20 +1,24 @@
 # PostgreSQL units
 
-Each [HA](https://en.wikipedia.org/wiki/High_availability)/[DR](https://en.wikipedia.org/wiki/IT_disaster_recovery) implementation has a primary and secondary (standby) site(s).
-Charmed PostgreSQL cluster size can be [easily scaled](/reference/contacts) from 0 to 10 units ([contact us](/reference/contacts) for 10+ units cluster). It is recommended to use 3+ units cluster size in production (due to [Raft consensus](https://en.wikipedia.org/wiki/Raft_(algorithm)) requirements). Those units type can be:
-  * **Primary**: unit which accepts all writes and [guaranties no split brain](https://en.wikipedia.org/wiki/Split-brain_(computing)).
+Each [high-availability](https://en.wikipedia.org/wiki/High_availability)/[disaster-recovery](https://en.wikipedia.org/wiki/IT_disaster_recovery) implementation has primary and secondary (standby) sites.
+
+A Charmed PostgreSQL cluster size can be [easily scaled](/how-to-guides/scale-replicas) from 0 to 10 units. [Contact us](/reference/contacts) if you have a cluster with 10+ units.
+
+It is recommended to use 3+ units cluster size in production (due to [Raft consensus](https://en.wikipedia.org/wiki/Raft_(algorithm)) requirements). Those units type can be:
+  * **Primary**: unit which accepts all writes and guarantees no [split-brain scenario](https://en.wikipedia.org/wiki/Split-brain_(computing)).
   * **Sync Standby** (synchronous copy) : designed for the fast automatic failover. Used for read-only queries and guaranties the latest transaction availability.
   * **Replica** (asynchronous copy): designed for long-running and resource consuming queries without affecting Primary performance. Used for read-only queries without guaranties of the latest transaction availability.
 
-> **Warning**: all SQL transactions have to be confirmed by all Sync Standby unit(s) before Primary unit commit transaction to the client. Therefor the high-performance and high-availability is a trade-of balance between "Sync Standby" and "Replica" units count in the cluster.
-
-> **Note**: starting from revision 561 all Charmed PostgreSQL units are configured as Sync Standby members by default. It provides better guaranties for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count)'.
-
 ![PostgreSQL Units types|690x253, 100%](unit-types.png)
+
+All SQL transactions have to be confirmed by all Sync Standby unit(s) before Primary unit commit transaction to the client. Therefore, high-performance and high-availability is a trade-off between "sync standby" and "replica" unit count in the cluster.
+
+Starting from revision 561, all Charmed PostgreSQL units are configured as Sync Standby members by default. It provides better guarantees for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=14/stable#synchronous_node_count)'.
 
 ## Primary
 
-The simplest way to find the Primary unit is to run `juju status`. Please be aware that the information here can be outdated as it is being updated only on [Juju event 'update-status'](https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status): 
+The simplest way to find the Primary unit is to run `juju status`. Please be aware that the information here can be outdated as it is being updated only on [Juju event 'update-status'](https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status):
+
 ```text
 ubuntu@juju360:~$ juju status postgresql
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
@@ -35,6 +39,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 ```
 
 The up-to-date Primary unit number can be received using Juju action `get-primary`:
+
 ```text
 > juju run postgresql/leader get-primary
 ...
@@ -43,9 +48,12 @@ primary: postgresql/0
 
 Also it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers).
 
-## Standby / replica
+## Standby / Replica
 
-At the moment it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers) only (check the linked documentation for the access details). Example:
+At the moment it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers) only (check the linked documentation for access details).
+
+Example:
+
 ```text
 > ... patronictl ... list
 + Cluster: postgresql (7499430436963402504) ---+-----------+----+-----------+
@@ -56,14 +64,17 @@ At the moment it is possible to retrieve this information using [patronictl](/re
 | postgresql-2 | 10.189.210.188 | Replica      | streaming |  1 |         0 |
 +--------------+----------------+--------------+-----------+----+-----------+
 ```
-On the example above:
+
 * `postgresql-0` is a PostgreSQL Primary unit (Patroni Leader) which accepts all writes
 * `postgresql-1` is a PostgreSQL/Patroni Sync Standby unit which can be promoted as new primary using manual switchover (safe).
 * `postgresql-2` is a PostgreSQL/Patroni Replica unit which can NOT be directly promoted as a new Primary using manual switchover. The automatic promotion Replica=>Sync Standby is necessary to guaranties the latest SQL transactions availability on this unit to allow further promotion as a new Primary. Otherwise the manual failover can be performed to Replica unit accepting the risks of loosing the last transactions(s) which lagged behind Primary. 
 
 ## Replica lag distance
 
-At the moment it is possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers) only (check the linked documentation for the access details). Example:
+At the moment, it is only possible to retrieve this information using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers). Check the linked documentation for access details. 
+
+Example:
+
 ```text
 > ... patronictl ... list
 + Cluster: postgresql (7499430436963402504) ---+-----------+----+-----------+
@@ -91,4 +102,3 @@ At the moment it is possible to retrieve this information using [patronictl](/re
       "lag": 42 <<<<<<<<<<<< Lag in MB
     }
 ```
-

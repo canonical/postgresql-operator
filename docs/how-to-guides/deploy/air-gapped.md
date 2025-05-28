@@ -104,28 +104,35 @@ cp /home/ubuntu/snap/store-admin/common/export/*.tar.gz /media/usb/
 ...
 cp /media/usb/*.tar.gz /var/snap/snap-store-proxy/common/charms-to-push/
 ```
-> **Note**: always check [checksum](https://en.wikipedia.org/wiki/Checksum) for the transferred blobs!
+
+```{tip}
+Always check [checksum](https://en.wikipedia.org/wiki/Checksum) for the transferred blobs!
+```
 
 ### 3. Import snaps and charms
 
  Import the [snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap/#importing-pushing-snaps) and [charm](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) blobs into local air-gapped CharmHub:
 
-> **Note**: when importing machine charms that depend on a snap for functionality, you must first manually import the required snap.
+When importing machine charms that depend on a snap for functionality, you must first manually import the required snap.
+
 ```text
 sudo snap-store-proxy push-snap /var/snap/snap-store-proxy/common/snaps-to-push/charmed-postgresql-20241008T082122.tar.gz
 
 sudo snap-store-proxy push-charm-bundle /var/snap/snap-store-proxy/common/charms-to-push/postgresql-bundle-20241003T104903.tar.gz
 ```
-> **Note**: when [re-importing](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) charms or importing other revisions, make sure to provide the `--push-channel-map`.
+
+When [re-importing](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) charms or importing other revisions, make sure to provide the `--push-channel-map`.
 
 ### 4. Deploy PostgreSQL
 
  Deploy and operate Juju charms normally:
+
 ```text
 juju deploy postgresql
 ```
+
 ```{note}
-**Note**: All the charms revisions and snap revisions deployed in the air-gapped environment must match the official CharmHub and SnapStore revisions.
+All the charms revisions and snap revisions deployed in the air-gapped environment must match the official Charmhub and snap store revisions.
 
 Use [the official release notes](/reference/releases) as a reference.
 ```

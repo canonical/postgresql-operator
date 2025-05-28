@@ -13,10 +13,12 @@ To learn more about managing passwords on **Charmed PostgreSQL 16**, see [How to
 ## Retrieve the operator password
 
 The operator's password can be retrieved by running the `get-password` action on the Charmed PostgreSQL VM application:
+
 ```text
 juju run postgresql/leader get-password
 ```
 Running the command should output:
+
 ```yaml
 unit-postgresql-0:
   UnitId: postgresql/0
@@ -33,10 +35,13 @@ unit-postgresql-0:
 ## Rotate the operator password
 
 You can change the operator's password to a new random password by entering:
+
 ```text
 juju run postgresql/leader set-password
 ```
+
 Running the command should output:
+
 ```yaml
 unit-postgresql-0:
   UnitId: postgresql/0
@@ -49,6 +54,7 @@ unit-postgresql-0:
     enqueued: 2023-03-20 09:18:08 +0000 UTC
     started: 2023-03-20 09:18:10 +0000 UTC
 ```
+
 The `status: completed` element in the output above indicates that the password has been successfully updated. The new password should be different from the previous password.
 
 ## Set a new password
@@ -63,6 +69,7 @@ juju run postgresql/leader set-password password=<password>
 where `<password>` is your password of choice.
 
 Example output:
+
 ```yaml
 unit-postgresql-0:
   UnitId: postgresql/0
@@ -77,7 +84,9 @@ unit-postgresql-0:
 ```
 
 ### ...for another user
+
 To set a manual password for another user, run the following command:
+
 ```text
 juju run postgresql/leader set-password username=my-user password=my-password
 ```

@@ -16,7 +16,7 @@ The following table shows the source and target controller/model combinations th
 | GCP |  | ![ check ] | ![ check ] |
 | Azure |  | ![ check ] | ![ check ] |
 
-## How-to guides
+## Guides
 
 * [How to set up clusters for cross-regional async replication](/how-to-guides/cross-regional-async-replication/set-up-clusters)
 * [How to integrate with a client application](/how-to-guides/cross-regional-async-replication/integrate-with-a-client-app)

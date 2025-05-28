@@ -7,20 +7,21 @@ There are [two types of charms](https://juju.is/docs/sdk/charm-taxonomy#charm-ty
 
 The legacy charm provided endpoints `db` and `db-admin` (for the interface `pgsql`). The modern charm provides old endpoints as well + new endpoint `database` (for the interface `postgresql_client`). Read more details about the available [endpoints/interfaces](/explanation/interfaces-and-endpoints).
 
-**Note**: Please choose one endpoint to use. No need to relate all of them simultaneously!
+```{note}
+Choose one endpoint to use, rather than relating both simultaneously.
+```
 
 ## The default track "latest" vs "14"
 
 The [default track](https://docs.openstack.org/charm-guide/yoga/project/charm-delivery.html) has been switched from the `latest` to `14`. It is [to ensure](https://discourse.charmhub.io/t/request-switch-default-track-from-latest-to-14-for-postgresql-k8s-charms/10314) all new deployments use a modern codebase. We strongly advise against using the latest track due to its implicit nature. In doing so, a future charm upgrade may result in a PostgreSQL version incompatible with an integrated application. Track 14 guarantees PostgreSQL 14 deployment only. The track `latest` will be closed after all applications migrated from Reactive to Ops-based charm.
 
-<a name="howtomigrate"></a>
 ## How to migrate from "legacy" to "modern" charm
 
 The "modern" charm provides temporary support for the legacy interfaces:
 
 * **quick try**: relate the current application with new charm using endpoint `db` (set the channel to `14/stable`). No extra changes necessary:
 
-```
+```text
   postgresql:
     charm: postgresql
     channel: 14/stable
@@ -28,21 +29,33 @@ The "modern" charm provides temporary support for the legacy interfaces:
 
 * **proper migration**: migrate the application to the new interface "[postgresql_client](https://github.com/canonical/charm-relation-interfaces)". The application will connect PostgreSQL using "[data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces)" library from "[data-platform-libs](https://github.com/canonical/data-platform-libs/)" via endpoint `database`.
 
-**Warning**: NO in-place upgrades possible! Reactive charm cannot be upgraded to Operator-framework-based one. To move DB data, the second/modern DB application must be launched nearby and data should be copied from "legacy" application to the "modern" one. Canonical Data Platform team is preparing copy&paste guide right now. Please [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) if you need migration instructions.
+Note that the `trust` option must be enabled if [Role Based Access Control (RBAC)](https://kubernetes.io/docs/concepts/security/rbac-good-practices/) is in use on your Kubernetes. <!--TODO: is this relevant here?-->
 
-**Note**: the `trust` option must be enabled if [ Role Based Access Control (RBAC)](https://kubernetes.io/docs/concepts/security/rbac-good-practices/) is in use on your Kubernetes.
+```{warning}
+**In-place upgrades are not supported for this case.**
+
+Reactive charms cannot be upgraded to an operator-framework-based version. To move database data, the new DB application must be launched nearby, and data should be copied from "legacy" application to the "modern" one. 
+
+Please [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) if you need migration instructions.
+```
 
 ## How to deploy old "legacy" PostgreSQL charm
 
 Deploy the charm using the channel `latest/stable`:
 
-```
+```text
   postgresql:
     charm: postgresql
     channel: latest/stable
 ```
 
-**Note**: remove Charm store prefix `cs:` from the bundle. Otherwise the modern charm will be chosen by Juju (due to the default track pointing to `14/stable` and not `latest/stable`). The common error message is: `cannot deploy application "postgresql": unknown option "..."`.
+```{note}
+Remove the charm store prefix `cs:` from the bundle. 
+
+Otherwise, the modern charm will be chosen by Juju (due to the default track pointing to `14/stable` and not `latest/stable`).
+
+A common error message is: `cannot deploy application "postgresql": unknown option "..."`.
+```
 
 ## Config options supported by modern charm
 

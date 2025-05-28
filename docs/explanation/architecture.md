@@ -8,7 +8,7 @@
 ## HLD (High Level Design)
 
 The charm design leverages on the SNAP “[charmed-postgresql](https://snapcraft.io/charmed-postgresql)” which is deployed by Juju on the specified VM/MAAS/bare-metal machine based on Ubuntu Jammy/22.04. SNAP allows to run PostgreSQL service(s) in a secure and isolated environment ([strict confinement](https://ubuntu.com/blog/demystifying-snap-confinement)). The installed SNAP:
-```
+```text
 > juju ssh postgresql/0 snap list charmed-postgresql
 Name                Version  Rev  Tracking       Publisher        Notes
 charmed-postgresql  14.9     70   latest/stable  dataplatformbot  held
@@ -28,7 +28,7 @@ Versions of all the components above are carefully chosen to fit functionality o
 
 The Charmed PostgreSQL unit consisting of a several services which are enabled/activated accordingly to the setup: 
 
-```
+```text
 > juju ssh postgresql/0 snap services charmed-postgresql
 Service                                          Startup   Current  Notes
 charmed-postgresql.patroni                       enabled   active   -
@@ -43,14 +43,18 @@ The `pgbackrest` snap service is a backup framework for PostgreSQL. It is disabl
 
 The `prometheus-postgres-exporter` service is activated after the relation with [COS Monitoring](/how-to-guides/monitoring-cos/enable-monitoring) only.
 
-> **:information_source: Note:** it is possible to star/stop/restart snap services manually but it is NOT recommended to avoid a split brain with a charm state machine! Do it with a caution!!!
-
-> **:warning: Important:** all snap resources must be executed under the special user `snapd_daemon` only!
+```{caution}
+It is possible to start/stop/restart snap services manually, but it is **not** recommended in order to avoid a split brain with a charm state machine.
+```
 
 The snap "charmed-postgresql" also ships list of tools used by charm:
 * `charmed-postgresql.psql` (alias `psq`) - is PostgreSQL interactive terminal.
 * `charmed-postgresql.patronictl` - a tool to monitor and manage Patroni.
 * `charmed-postgresql.pgbackrest` - a tool to backup/restore PostgreSQL DB.
+
+```{warning}
+All snap resources must be executed under the special user `snapd_daemon` only!
+```
 
 <a name="integrations"></a>
 ## Integrations
@@ -103,26 +107,26 @@ Accordingly to the [Juju SDK](https://juju.is/docs/sdk/event): “an event is a 
 
 For this charm, the following events are observed:
 
-1. [on_install](https://juju.is/docs/sdk/install-event): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
-2. [leader-elected](https://juju.is/docs/sdk/leader-elected-event): generate all the secrets to bootstrap the cluster.
-3. [leader-settings-changed](https://juju.is/docs/sdk/leader-settings-changed-event): Handle the leader settings changed event.
-4. [start](https://juju.is/docs/sdk/start-event): Init/setting up the cluster node.
-5. [config_changed](https://juju.is/docs/sdk/config-changed-event): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
-6. [update-status](https://juju.is/docs/sdk/update-status-event): Takes care of workload health checks.
+1. [`on_install`](https://juju.is/docs/sdk/install-event): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
+2. [`leader-elected`](https://juju.is/docs/sdk/leader-elected-event): generate all the secrets to bootstrap the cluster.
+3. [`leader-settings-changed`](https://juju.is/docs/sdk/leader-settings-changed-event): Handle the leader settings changed event.
+4. [`start`](https://juju.is/docs/sdk/start-event): Init/setting up the cluster node.
+5. [`config_changed`](https://juju.is/docs/sdk/config-changed-event): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
+6. [`update-status`](https://juju.is/docs/sdk/update-status-event): Takes care of workload health checks.
 <!--- 7. database_storage_detaching: TODO: ops? event?
 8. TODO: any other events?
 --->
 
 ### Charm code overview
 
-The "[src/charm.py](https://github.com/canonical/postgresql-operator/blob/main/src/charm.py)" is the default entry point for a charm and has the `PostgresqlOperatorCharm` Python class which inherits from CharmBase.
+[`src/charm.py`](https://github.com/canonical/postgresql-operator/blob/main/src/charm.py) is the default entry point for a charm and has the `PostgresqlOperatorCharm` Python class which inherits from CharmBase.
 
 CharmBase is the base class from which all Charms are formed, defined by [Ops](https://juju.is/docs/sdk/ops) (Python framework for developing charms). See more information in [Charm](https://juju.is/docs/sdk/constructs#charm).
 
 The `__init__` method guarantees that the charm observes all events relevant to its operation and handles them.
 
 The VM and K8s charm flavors shares the codebase via [charm libraries](https://juju.is/docs/sdk/libraries) in [lib/charms/postgresql_k8s/v0/](https://github.com/canonical/postgresql-k8s-operator/blob/main/lib/charms/postgresql_k8s/v0/postgresql.py) (of K8s flavor of the charm!):
-```
+```text
 > charmcraft list-lib postgresql-k8s                                                                                                                                                                                                               
 Library name    API    Patch                                                                                                                                                                                                                          
 postgresql      0      12                                                                                                                                                                                                                             

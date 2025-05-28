@@ -10,7 +10,7 @@ There are many possible ways to connect the Charmed PostgreSQL database from out
 
 One of the possible options is to use [virtual IP addresses (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address) which the charm PgBouncer provides with assistance from the charm/interface `hacluster`. Please follow the [PgBouncer documentation](https://charmhub.io/pgbouncer/docs/h-external-access) for such configuration.
 
-> See also: [How to deploy for external TLS VIP access](/how-to-guides/deploy/tls-vip-access).
+> See also: [](/how-to-guides/deploy/tls-vip-access).
 
 ## External relation (Juju)
 

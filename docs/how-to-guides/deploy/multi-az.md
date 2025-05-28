@@ -15,7 +15,7 @@ This documentation assumes that your cloud supports and provides availability zo
 Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://discourse.charmhub.io/t/charmed-postgresql-k8s-how-to-deploy-on-gke/11237) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
 
 ```{caution}
-**Warning**: Creating the following GKE resources may cost you money - be sure to monitor your GCloud costs.
+Creating the following GKE resources may cost you money - be sure to monitor your GCloud costs.
 ```
 
 Log into Google Cloud and [bootstrap GCE on Google Cloud](/how-to-guides/deploy/gce):
@@ -32,9 +32,9 @@ juju add-model mymodel
 
 ## Deploy PostgreSQL with Juju zones constraints
 
-Juju provides the support for availability zones using **constraints**. Read more about zones in [Juju documentation](https://juju.is/docs/juju/constraint#zones).
+Juju provides support for availability zones using [**constraints**](https://juju.is/docs/juju/constraint#zones).
 
-The command below demonstrates how Juju automatically deploys Charmed PostgreSQL VM using [Juju constraints](https://juju.is/docs/juju/constraint#zones):
+The command below demonstrates how Juju automatically deploys Charmed PostgreSQL VM using Juju constraints:
 
 ```text
 juju deploy postgresql -n 3 \
@@ -42,6 +42,7 @@ juju deploy postgresql -n 3 \
 ```
 
 After a successful deployment, `juju status` will show an active application:
+
 ```text
 Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:16:52+02:00
@@ -61,6 +62,7 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ```
 
 and each unit/vm will sit in the separate AZ out of the box:
+
 ```text
 > gcloud compute instances list
 NAME           ZONE        MACHINE_TYPE  PREEMPTIBLE  INTERNAL_IP  EXTERNAL_IP    STATUS
@@ -71,7 +73,9 @@ juju-e7c0db-0  us-east1-d  n2-highcpu-2               10.142.0.31  34.148.44.51 
 ```
 
 ### Simulation: A node gets lost
+
 Let's destroy a GCE node and recreate it using the same AZ:
+
 ```text
 > gcloud compute instances delete juju-e7c0db-1 
 No zone specified. Using zone [us-east1-c] for instance: [juju-e7c0db-1].
@@ -103,6 +107,7 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ```
 
 Here we should remove the no-longer available `server/vm/GCE` node and add a new one. Juju will create it in the same AZ `us-east4-c`:
+
 ```text
 > juju remove-unit postgresql/1 --force --no-wait
 WARNING This command will perform the following actions:
@@ -155,7 +160,7 @@ Machine  State    Address        Inst id        Base          AZ          Messag
 ## Remove GCE setup
 
 ```{caution}
-**Warning**: Do not forget to remove your test setup - it can be costly!
+Do not forget to remove your test setup - it can be costly!
 ```
 
 Check the list of currently running GCE instances:

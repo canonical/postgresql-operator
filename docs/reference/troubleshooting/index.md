@@ -1,11 +1,5 @@
 # Troubleshooting
 
-```{caution}
-**Warning:** At the moment, there is **no** ability to [pause an operator](https://warthogs.atlassian.net/browse/DPE-2545).
-
-Make sure your activity will not interfere with the operator itself!
-```
-
 ## Summary
 
 This page goes over some recommended tools and approaches to troubleshooting the charm.
@@ -17,26 +11,39 @@ Otherwise, this reference goes over how to troubleshoot this charm via:
 - [`snap-based charm`](#snap-based-charm)
 - [Installing extra software](#install-extra-software)
 
-## `juju` logs
 
-Please be familiar with [Juju logs concepts](https://juju.is/docs/juju/log) and learn [how to manage Juju logs](https://juju.is/docs/juju/manage-logs).
+```{caution}
+At the moment, there is no support for [pausing an operator](https://warthogs.atlassian.net/browse/DPE-2545).
+
+Make sure your activity will not interfere with the operator itself!
+```
+
+## Juju logs
+
+See:
+* [Juju | logs](https://juju.is/docs/juju/log)
+* [Juju | How to manage logs](https://juju.is/docs/juju/manage-logs).
 
 Always check the Juju logs before troubleshooting further:
+
 ```text
 juju debug-log --replay --tail
 ```
 
 Focus on `ERRORS` (normally there should be none):
+
 ```text
 juju debug-log --replay | grep -c ERROR
 ```
 
 Consider enabling the `DEBUG` log level if you are troubleshooting unusual charm behaviour:
+
 ```text
 juju model-config 'logging-config=<root>=INFO;unit=DEBUG'
 ```
 
-The Patroni/PostgreSQL logs are located inside SNAP:
+The Patroni/PostgreSQL logs are located inside the snap:
+
 ```text
 > ls -la /var/snap/charmed-postgresql/common/var/log/*
 
@@ -51,23 +58,26 @@ The Patroni/PostgreSQL logs are located inside SNAP:
 # The pgBouncer should be stopped on Charmed PostgreSQL deployments and produce no logs.
 ```
 
-## `snap`-based charm
+## Snap-based charm
 
 First, check the [operator architecture](/explanation/architecture) to become familiar with snap content, operator building blocks, and running Juju units.
 
 To enter the unit, use:
+
 ```text
 juju ssh postgresql/0 bash
 ```
 
 Make sure the `charmed-postgresql` snap is installed and functional:
+
 ```text
 ubuntu@juju-fd7874-0:~$ sudo snap list charmed-postgresql
 Name                Version  Rev  Tracking       Publisher        Notes
 charmed-postgresql  14.9     70   latest/stable  dataplatformbot  held
 ```
 
-From here you can make sure all snap (systemd) services are running: 
+From here you can make sure all snap (systemd) services are running:
+
 ```text
 ubuntu@juju-fd7874-0# sudo snap services
 Service                                          Startup   Current   Notes
@@ -131,6 +141,7 @@ ubuntu@juju-fd7874-0:~$
 The list of running snap/systemd services will depend on configured (enabled) [COS integration](/how-to-guides/monitoring-cos/enable-monitoring) and/or [backup](/how-to-guides/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
 
 To access PostgreSQL, check the [charm users concept](/explanation/users) and request `operator` credentials to use `psql`:
+
 ```text
 > juju show-unit postgresql/0 | awk '/private-address:/{print $2;exit}' 
 10.47.228.200
@@ -151,10 +162,12 @@ password: rV0Xn4l65KtQsHSq
 Continue troubleshooting your database/SQL related issues from here.<br/>
 
 ```{caution}
-**Warning**: Do **NOT** manage users, credentials, databases, schema directly. This avoids a split brain situation with the operator and integrated applications.
-```
+To avoid split-brain scenarios:
 
-It is NOT recommended to restart services directly as it might create a split brain situation with operator internal state. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to-guides/scale-replicas) to recover the cluster state.
+* Do not manage users, credentials, databases, and schema directly. 
+* Avoid restarting services directly. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to-guides/scale-replicas) to recover the cluster state.
+
+```
 
 As a last resort, [contact us](/reference/contacts) if you cannot determine the source of your issue.
 
@@ -174,8 +187,9 @@ Setting up gdb (12.1-0ubuntu1~22.04) ...
 ubuntu@juju-fd7874-0:~$
 ```
 
-**Always remove manually installed components at the end of troubleshooting.** Keep the house clean!
-
+```{tip}
+Always remove manually installed components at the end of troubleshooting. Keep the house clean!
+```
 
 ```{toctree}
 :titlesonly:

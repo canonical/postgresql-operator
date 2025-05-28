@@ -66,7 +66,8 @@ For example:
 juju add-unit db1 -n 2 -m rome
 juju add-unit db2 -n 2 -m lisbon
 ```
+
 ```{note}
-**Note:** Scaling is possible before and after the asynchronous replication is established/created.
+Scaling is possible before and after the asynchronous replication is established/created.
 ```
 

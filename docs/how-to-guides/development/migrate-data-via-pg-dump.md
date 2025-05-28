@@ -3,7 +3,7 @@
 This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to-guides/development/integrate-with-your-charm). 
 
 ```{note}
-**Note**: All commands are written for `juju >= v.3.0`
+All commands are written for `juju >= v.3.0`
 
 If you are using an earlier version, be aware that:
 
@@ -25,6 +25,7 @@ Migration is **not** necessary if the output above is `14/stable`!
 This guide can be used to copy data between different installations of the same (modern) charm `postgresql`, but the [backup/restore](/how-to-guides/development/migrate-data-via-backup-restore) is more recommended for migrations between modern charms.
 
 ## Summary
+
 The legacy VM charm archived in the `latest/stable` channel, read more [here](/explanation/legacy-charm).
 A minor difference in commands might be necessary for different revisions and/or Juju versions, but the general logic remains:
 
@@ -36,11 +37,12 @@ A minor difference in commands might be necessary for different revisions and/or
 * Add relation to modern charm
 * Validate results and remove legacy charm
 
-```{note}
-**Note**: Always test migration in a safe environment before performing it in production!
+```{caution}
+Always test migration in a safe environment before performing it in production!
 ```
 
 ## Prerequisites
+
 - **[Your application is compatible](/explanation/legacy-charm) with Charmed PostgreSQL VM**
 - A client machine with access to the deployed legacy charm
 - `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022) for more information about key differences)

@@ -2,9 +2,10 @@
 
 This is a guide on how to restore a locally made backup.
 
-To restore a backup that was made from a *different* cluster, (i.e. cluster migration via restore), see [How to migrate cluster using backups](/how-to-guides/back-up-and-restore/migrate-a-cluster):
+To restore a backup that was made from a *different* cluster, (i.e. cluster migration via restore), see [](/how-to-guides/back-up-and-restore/migrate-a-cluster).
 
 ## Prerequisites
+
 - Deployments have been [scaled-down](/how-to-guides/scale-replicas) to a single PostgreSQL unit (scale it up after the backup is restored)
 - Access to S3 storage
 - [Configured settings for S3 storage](/how-to-guides/back-up-and-restore/configure-s3-aws)
@@ -14,7 +15,9 @@ To restore a backup that was made from a *different* cluster, (i.e. cluster migr
   -  468+ for `amd64`
 
 ## List backups
+
 To view the available backups to restore, use the command `list-backups`:
+
 ```text
 juju run postgresql/leader list-backups
 ```

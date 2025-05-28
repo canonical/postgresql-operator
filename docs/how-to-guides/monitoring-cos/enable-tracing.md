@@ -2,23 +2,15 @@
 
 This guide contains the steps to enable tracing with [Grafana Tempo](https://grafana.com/docs/tempo/latest/) for your PostgreSQL application. 
 
-To summarize:
-* [Deploy the Tempo charm in a COS K8s environment](#deploy-tempo)
-* [Offer interfaces for cross-model integrations](#offer-interfaces)
-* [Consume and integratre cross-model integrations](#consume-interfaces)
-* [View PostgreSQL traces on Grafana](#view-traces)
-
 ```{caution}
-**Warning:** This is feature is in development. It is **not recommended** for production environments. 
-
-This feature is available for Charmed PostgreSQL revision 421+ only.
+This is feature is in development. It is **not recommended** for production environments. 
 ```
 
 ## Prerequisites
 Enabling tracing with Tempo requires that you:
-- Have deployed a Charmed PostgreSQL application
+- Have deployed Charmed PostgreSQL revision 421+ 
   - See [How to scale units](https://discourse.charmhub.io/t/charmed-postgresql-how-to-scale-units/9689)
-- Have deployed a 'cos-lite' bundle from the `latest/edge` track in a Kubernetes environment
+- Have deployed a `cos-lite` bundle from the `latest/edge` track in a Kubernetes environment
   - See [Getting started on MicroK8s](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
 
 
@@ -29,6 +21,7 @@ First, switch to the Kubernetes controller where the COS model is deployed:
 ```text
 juju switch <k8s_controller_name>:<cos_model_name>
 ```
+
 Then, deploy the dependencies of Tempo following [this tutorial](https://discourse.charmhub.io/t/tutorial-deploy-tempo-ha-on-top-of-cos-lite/15489). In particular, we would want to:
 - Deploy the minio charm
 - Deploy the s3 integrator charm
@@ -54,7 +47,9 @@ juju switch <machine_controller_name>:<postgresql_model_name>
 
 juju find-offers <k8s_controller_name>:
 ```
-> :exclamation: Do not miss the "`:`" in the command above.
+```{tip}
+Do not miss the "`:`" in the command above.
+```
 
 Below is a sample output where `k8s` is the K8s controller name and `cos` is the model where `cos-lite` and `tempo-k8s` are deployed:
 
@@ -116,7 +111,7 @@ tempo:tracing              grafana-agent:tracing      tracing                reg
 ```
 
 ```{note}
-**Note:** All traces are exported to Tempo using HTTP. Support for sending traces via HTTPS is an upcoming feature.
+All traces are exported to Tempo using HTTP. Support for sending traces via HTTPS is an upcoming feature.
 ```
 
 ## View traces

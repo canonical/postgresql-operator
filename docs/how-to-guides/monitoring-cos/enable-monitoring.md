@@ -1,33 +1,44 @@
-# How to enable monitoring (COS)
+# How to enable monitoring
 
 ## Prerequisites
+
 * Charmed PostgreSQL [Revision 336 or greater](/reference/releases)
 * [`cos-lite` bundle](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s) deployed in a Kubernetes environment
 
 First, switch to the COS K8s environment and offer COS interfaces to be cross-model integrated with the Charmed PostgreSQL VM model.
 
 To switch to the Kubernetes controller for the COS model, run
+
 ```text
 juju switch <k8s_controller>:<cos_model_name>
 ```
+
 To offer the COS interfaces, run
+
 ```text
 juju offer grafana:grafana-dashboard grafana
 juju offer loki:logging loki
 juju offer prometheus:receive-remote-write prometheus
 ```
+
 ## Consume offers via the PostgreSQL model
+
 Next, we will switch to the Charmed PostgreSQL VM model, find offers, and consume them.
 
 We are currently on the Kubernetes controller for the COS model. To switch to the PostgreSQL model, run
+
 ```text
 juju switch <machine_controller_name>:<postgresql_model_name>
 ```
+
 To find offers, run
+
 ```text
 juju find-offers <k8s_controller>:admin/<cos_model_name>
 ```
+
 The output should be similar to the sample below, where `k8s` is the k8s controller name and `cos` is the model where `cos-lite` has been deployed:
+
 ```text
 Store  URL                   Access Interfaces
 k8s    admin/cos.grafana     admin  grafana_dashboard:grafana-dashboard
@@ -37,31 +48,40 @@ k8s    admin/cos.prometheus  admin  prometheus-receive-remote-write:receive-remo
 ```
 
 To consume offers to be reachable in the current model, run
+
 ```text
 juju consume <k8s_controller>:admin/cos.prometheus
 juju consume <k8s_controller>:admin/cos.loki
 juju consume <k8s_controller>:admin/cos.grafana
 ```
+
 ## Deploy and integrate Grafana
+
 First, deploy the [`grafana-agent`](https://charmhub.io/grafana-agent) subordinate charm.
+
 ```text
 juju deploy grafana-agent
 ```
+
 Then, integrate (previously known as "relate") it with PostgreSQL 
+
 ```text
 juju integrate postgresql:cos-agent grafana-agent
 ```
- Finally, integrate `grafana-agent` with consumed COS offers:
+
+Finally, integrate `grafana-agent` with consumed COS offers:
+
 ```text
 juju integrate grafana-agent grafana
 juju integrate grafana-agent loki
 juju integrate grafana-agent prometheus
 ```
+
 After this is complete, Grafana will show the new dashboard `PostgreSQL Exporter` and will allow access to Charmed PostgreSQL logs on Loki.
 
-### Sample outputs
 Below is a sample output of `juju status` on the Charmed PostgreSQL VM model:
-```console
+
+```text
 ubuntu@localhost:~$ juju status
 Model      Controller  Cloud/Region         Version  SLA          Timestamp
 vmmodel    local       localhost/localhost  2.9.42   unsupported  00:12:18+02:00
@@ -84,7 +104,8 @@ Machine  State    Address        Inst id        Series  AZ  Message
 ```
 
 Example of `juju status` on a COS K8s model:
-```console
+
+```text
 ubuntu@localhost:~$ juju status
 Model  Controller   Cloud/Region        Version  SLA          Timestamp
 cos    k8s          microk8s/localhost  2.9.42   unsupported  00:15:31+02:00
@@ -111,13 +132,14 @@ loki          loki         loki-k8s        60   1/1        logging              
 prometheus    prometheus   prometheus-k8s  103  1/1        receive-remote-write  prometheus_remote_write  provider
 ```
 
-### Connect Grafana web interface
+## Connect Grafana web interface
+
 To connect to the Grafana web interface, follow the [Browse dashboards](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s?_ga=2.201254254.1948444620.1704703837-757109492.1701777558#browse-dashboards) section of the MicroK8s "Getting started" guide.
+
 ```text
 juju run grafana/leader get-admin-password --model <k8s_cos_controller>:<cos_model_name>
 ```
 
-### Example of Charmed PostgreSQL on Grafana
-
+Below is a sample screenshot of Charmed PostgreSQL on the Grafana web UI:
 ![Charmed PostgreSQL Grafana web UI|690x353](postgresql-grafana-ui.png)
 

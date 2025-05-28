@@ -16,13 +16,15 @@ To deploy `data-integrator`, run
 juju deploy data-integrator --config database-name=test-database
 ```
 Example output:
-```
+
+```text
 Located charm "data-integrator" in charm-hub, revision 11
 Deploying "data-integrator" from charm-hub charm "data-integrator", revision 11 in channel stable on jammy
 ```
 
 Running `juju status` will show you `data-integrator` in a `blocked` state. This state is expected due to not-yet established relation (integration) between applications.
-```
+
+```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  3.1.7   unsupported  10:22:13+01:00
 
@@ -46,10 +48,13 @@ Machine  State    Address       Inst id        Series  AZ  Message
 Now that the `data-integrator` charm has been set up, we can relate it to PostgreSQL. This will automatically create a username, password, and database for `data-integrator`.
 
 Relate the two applications with:
+
 ```text
 juju integrate data-integrator postgresql
 ```
+
 Wait for `juju status --watch 1s` to show all applications/units as `active`:
+
 ```
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:22:31+01:00
@@ -70,6 +75,7 @@ Machine  State    Address       Inst id        Series  AZ  Message
 ```
 
 To retrieve the username, password and database name, run the command
+
 ```text
 juju run data-integrator/leader get-credentials
 ```
@@ -99,6 +105,7 @@ Note that your hostnames, usernames, and passwords will likely be different.
 ## Access the related database
 
 Use `endpoints`, `username`, `password` from above to connect newly created database `test-database` on the PostgreSQL server:
+
 ```text
 > psql --host=10.89.49.129 --username=relation-3 --password test-database
 ...
@@ -126,6 +133,7 @@ Note the database name we specified when we first deployed the `data-integrator`
 ## Remove the user
 
 Removing the integration automatically removes the user that was created when the integration was created. Enter the following to remove the integration:
+
 ```text
 juju remove-relation postgresql data-integrator
 ```
@@ -137,21 +145,28 @@ Now try again to connect to the same PostgreSQL you just used in the previous se
 ```
 
 This will output an error message like the one shown below:
-```
+
+```text
 psql: error: connection to server at "10.89.49.129", port 5432 failed: FATAL:  password authentication failed for user "relation-3"
 ```
+
 This is expected, since this user no longer exists after removing the integration.
 
 Data remains on the server at this stage.
 
 To create a user again, integrate the applications again:
+
 ```text
 juju integrate data-integrator postgresql
 ```
+
 Re-integrating generates a new user and password:
+
 ```text
 juju run data-integrator/leader get-credentials
 ```
+
 You can then connect to the database with these new credentials.
+
 From here you will see all of your data is still present in the database.
 

@@ -44,6 +44,7 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 +-----------------+----------------+--------------+-----------+----+-----------+
 ```
 </details>
+</br>
 
 #### Useful Patroni actions
 
@@ -68,6 +69,7 @@ Use `--help` to find all the available Patroni actions.
   topology     Prints ASCII topology for given cluster
 ```
 </details>
+</br>
 
 #### Switchover/failover 
 
@@ -144,6 +146,7 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 +---------------+----------------+--------------+-----------+----+-----------+
 ```
 </details>
+</br>
 
 #### Re-initialisation
 
@@ -164,6 +167,7 @@ Success: reinitialize for member postgresql-1
 ```
 
 </details>
+</br>
 
 ### Patroni REST API
 
@@ -211,7 +215,10 @@ ubuntu@juju360:~$ curl 10.189.210.55:8008/cluster | jq # where 10.189.210.55 is 
 ```
 </details>
 
-> **Note**: Patroni REST API can be accessed anonymously in read-only mode only. The Juju secret `patroni-password` is mandatory to apply any chances via Patroni REST API.
+```{note}
+The Patroni REST API can be accessed anonymously in read-only mode only. The Juju secret `patroni-password` is mandatory to apply any chances via Patroni REST API.
+```
+
 Example of authenticated changes via Patroni REST API:
 <details><summary>Example: write access via Patroni REST API</summary>
 
@@ -237,13 +244,13 @@ Pay attention to TLS relation with PostgreSQL and access Patroni REST API accord
 > curl -k https://x.x.x.x:8008/cluster # to access with self-signed certificate
 ``` 
 </details>
-
+</br>
 
 ### Raft library
 
 Patroni relies on the Raft library for the consensus handling and Primary election. It is implemented using [pySyncObj](https://github.com/bakwc/PySyncObj) and available as a CLI tool. 
 
-While **you should not interact with Raft library manually**,  you can check its internal status:
+While **you should not interact with Raft library manually**,  you can check its internal status. Note that a password is mandatory to access Raft.
 
 <details><summary>Example: check Raft status</summary>
 
@@ -281,8 +288,9 @@ uptime: 2482881
 version: 0.3.12
 ```
 
-> **Note**: password is mandatory to access Raft. 
+```{tip}
+Pay attention to the CLI syntax. Use the standard hyphen `-`, avoid typos with the common `--` prefix for parameters.
+```
 
-> **Note**: pay attention to the CLI syntax (simple `-` used, avoid misstype with common `--` prefix for parametes)
 </details>
 
