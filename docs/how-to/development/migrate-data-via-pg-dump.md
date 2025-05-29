@@ -1,17 +1,6 @@
 # Migrate database data using `pg_dump` / `pg_restore`
 
-This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/development/integrate-with-your-charm). 
-
-```{note}
-All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, be aware that:
-
- - `juju run` replaces `juju run-action --wait` in `juju v.2.9` 
- - `juju integrate` replaces `juju relate` and `juju add-relation` in `juju v.2.9`
-
-For more information, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
-```
+This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/development/integrate-with-your-charm).
 
 ## Do you need to migrate?
 
@@ -20,6 +9,7 @@ A database migration is only required if the output of the following command is 
 ```text
 juju show-application postgresql | yq '.[] | .channel'
 ```
+
 Migration is **not** necessary if the output above is `14/stable`! 
 
 This guide can be used to copy data between different installations of the same (modern) charm `postgresql`, but the [backup/restore](/how-to/development/migrate-data-via-backup-restore) is more recommended for migrations between modern charms.
@@ -53,6 +43,7 @@ Always test migration in a safe environment before performing it in production!
 To obtain credentials for existing databases, execute the following commands for **each** database that will be migrated. Take note of these credentials for future steps.
 
 First, define and tune your application and db (database) names. For example:
+
 ```text
 CLIENT_APP=< my-application/0 >
 OLD_DB_APP=< legacy-postgresql/leader | postgresql/0 >

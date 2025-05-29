@@ -4,6 +4,7 @@
 (including charm revision bump: e.g. Revision 193 -> Revision 196)
 
 ## Summary
+
 - [**Pre-upgrade checks**](#pre-upgrade-checks): Important information to consider before starting an upgrade.
 - [**1. Collect**](#step-1-collect) all necessary pre-upgrade information. It will be necessary for a rollback, if needed. **Do not skip this step**; better to be safe than sorry!
 - [**2. Prepare**](#step-2-prepare) your Charmed PostgreSQL Juju application for the in-place upgrade. See the step details for all technical details executed by charm here.

@@ -172,6 +172,5 @@ If you expect having several concurrent connections frequently, it is highly rec
 For more examples of Terraform modules for VM, including PostgreSQL HA and PostgreSQL + PgBouncer, see the other directories in the [`terraform-modules` repository](https://github.com/canonical/terraform-modules/tree/main/modules/machine).
 ```
 
-
 Feel free to [contact us](/reference/contacts) if you have any question and [collaborate with us on GitHub](https://github.com/canonical/terraform-modules)!
 

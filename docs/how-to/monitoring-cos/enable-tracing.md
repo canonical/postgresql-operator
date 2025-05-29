@@ -7,9 +7,11 @@ This is feature is in development. It is **not recommended** for production envi
 ```
 
 ## Prerequisites
+
 Enabling tracing with Tempo requires that you:
+
 - Have deployed Charmed PostgreSQL revision 421+ 
-  - See [How to scale units](https://discourse.charmhub.io/t/charmed-postgresql-how-to-scale-units/9689)
+  - See [](/how-to/deploy)
 - Have deployed a `cos-lite` bundle from the `latest/edge` track in a Kubernetes environment
   - See [Getting started on MicroK8s](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
 
@@ -48,7 +50,7 @@ juju switch <machine_controller_name>:<postgresql_model_name>
 juju find-offers <k8s_controller_name>:
 ```
 ```{tip}
-Do not miss the "`:`" in the command above.
+Don't miss the "`:`" in the command above.
 ```
 
 Below is a sample output where `k8s` is the K8s controller name and `cos` is the model where `cos-lite` and `tempo-k8s` are deployed:
@@ -67,6 +69,7 @@ juju consume k8s:admin/cos.tempo
 ## Consume interfaces
 
 First, deploy [Grafana Agent](https://charmhub.io/grafana-agent) from the `latest/edge` channel.
+
 ```text
 juju deploy grafana-agent --channel latest/edge
 ```

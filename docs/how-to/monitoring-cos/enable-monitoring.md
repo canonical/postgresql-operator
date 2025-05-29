@@ -2,8 +2,9 @@
 
 ## Prerequisites
 
-* Charmed PostgreSQL [Revision 336 or greater](/reference/releases)
 * [`cos-lite` bundle](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s) deployed in a Kubernetes environment
+
+## Offer interfaces via the COS controller
 
 First, switch to the COS K8s environment and offer COS interfaces to be cross-model integrated with the Charmed PostgreSQL VM model.
 
@@ -141,5 +142,6 @@ juju run grafana/leader get-admin-password --model <k8s_cos_controller>:<cos_mod
 ```
 
 Below is a sample screenshot of Charmed PostgreSQL on the Grafana web UI:
+
 ![Charmed PostgreSQL Grafana web UI|690x353](postgresql-grafana-ui.png)
 

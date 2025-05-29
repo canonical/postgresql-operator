@@ -4,14 +4,14 @@
 
 This guide shows how to integrate Charmed PostgreSQL with both charmed and non-charmed applications.
 
-For developer information about how to integrate your own charmed application with PostgreSQL, see [Development > How to integrate with your charm](/how-to/development/integrate-with-your-charm).
+For developer information about how to integrate your own charmed application with PostgreSQL, see [](/how-to/development/integrate-with-your-charm).
 
 ## Integrate with a charmed application
 
 Integrations with charmed applications are supported via the modern [`postgresql_client`](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/postgresql_client/v0/README.md) interface, and the legacy `psql` interface from the [original version](https://launchpad.net/postgresql-charm) of the charm.
 
 ```{note}
-You can see which existing charms are compatible with PostgreSQL in the [Integrations](https://charmhub.io/postgresql/integrations) tab.
+You can see which existing charms are compatible with PostgreSQL in the [Integrations](https://charmhub.io/postgresql/integrations) tab on Charmhub.
 ```
 
 ### Modern `postgresql_client` interface
@@ -77,6 +77,7 @@ juju integrate <charm> postgresql
 `<charm>` can be `data-integrator` in the case of connecting with a non-charmed application.
 
 ### Internal operator user
+
 The operator user is used internally by the Charmed PostgreSQL application. The `set-password` action can be used to rotate its password.
 
 To set a specific password for the operator user, run

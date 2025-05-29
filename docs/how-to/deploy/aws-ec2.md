@@ -4,6 +4,8 @@
 
 ## Prerequisites
 
+This guide assumes you have:
+
 * A physical or virtual machine running Ubuntu 22.04+
 * Juju 3 (`3.6+` is recommended)
   * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)

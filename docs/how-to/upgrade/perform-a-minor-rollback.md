@@ -12,6 +12,7 @@ Do NOT trigger `rollback` during the running `upgrade` action! It may cause an u
 ```
 
 ## Summary of the rollback steps
+
 1. **Prepare** the Charmed PostgreSQL VM application for the in-place rollback. 
 2. **Rollback**. Once started, all units in a cluster will be executed sequentially. The rollback will be aborted (paused) if the unit rollback has failed.
 3. **Check**. Make sure the charm and cluster are in a healthy state again.

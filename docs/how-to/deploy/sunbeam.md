@@ -5,6 +5,9 @@
 This guide goes through the steps for setting up Sunbeam and deploying Charmed PostgreSQL. 
 
 ## Prerequisites
+
+This guide assumes you have:
+
 * A physical or virtual machine running Ubuntu 22.04+
   * If you'd like to follow this guide in an isolated test environment, you can [launch a Multipass](/tutorial/1-set-up-environment) instance.
 * Hardware requirements depend on planned deployment size.
@@ -14,14 +17,17 @@ This guide goes through the steps for setting up Sunbeam and deploying Charmed P
   * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
 
 ## Install and bootstrap Sunbeam
+
 Follow the official OpenStack guide: [Single-node deployment][Single-node guided]. 
 
 Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual fqdn fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
 
 ## Enable OpenStack images auto-sync
+
 Follow the official [Images Sync] guide to enable auto-sync and wait for the image `22.04` to be downloaded.
 
 ## Set up Juju inside an OpenStack bastion
+
 Follow the MicroStack guide [Manage workloads with Juju] from the beginning, and stop after the section "Create a Juju controller". 
 
 To summarize, the relevant sections are:
@@ -56,7 +62,8 @@ Machine  State    Address          Inst id                               Base   
 2        started  192.168.122.14   6f9ad7cd-2a9d-435e-a6d8-3e39bf2218cd  ubuntu@22.04  nova  ACTIVE
 ```
 
-## (Optional) Access the OpenStack dashboard 
+## (Optional) Access the OpenStack dashboard
+
 Follow the official guide: [Accessing the OpenStack dashboard].
 
 ````{note}

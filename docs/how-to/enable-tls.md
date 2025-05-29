@@ -34,7 +34,7 @@ To check the certificates in use by PostgreSQL, run
 openssl s_client -starttls postgres -connect <leader_unit_IP>:<port> | grep issuer
 ```
 
-## Update keys
+## Manage keys
 
 Updates to private keys for certificate signing requests (CSR) can be made via the `set-tls-private-key` action. Note that passing keys to external/internal keys should *only be done with* `base64 -w0`, *not* `cat`. 
 

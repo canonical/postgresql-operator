@@ -14,7 +14,7 @@ This guide will take you through deploying a PostgreSQL cluster on GCE using 3 a
 * A cloud service that supports and provides availability zones.
 
 ```{note}
-Multi-availability zones are enabled by default on EC2/GCE and supported by LXD/MicroCloud.
+Multi-availability zones are enabled by default on EC2/GCE and supported by LXD and MicroCloud.
 ```
 
 ## Set up GCE on Google Cloud

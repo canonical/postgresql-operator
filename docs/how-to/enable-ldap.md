@@ -7,7 +7,7 @@ This guide goes over the steps to integrate LDAP as an authentication method wit
 ## Prerequisites
 
 * Charmed PostgreSQL channel `14/edge` or `16/edge` (revision `600` or higher)
-* Juju `v3.6` or higher
+* Juju `3.6+`
 
 ## Deploy an LDAP server in a K8s environment
 
@@ -107,7 +107,7 @@ juju integrate postgresql:receive-ca-cert send-ca-cert
 
 ## Map LDAP users to PostgreSQL
 
-To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorization groups. To create those groups before hand, refer to the [Data Integrator charm](https://charmhub.io/data-integrator).
+To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorization groups. To create those groups before hand, refer to the [data integrator charm](https://charmhub.io/data-integrator).
 
 ```text
 juju config postgresql ldap_map="<ldap_group>=<psql_group>"
