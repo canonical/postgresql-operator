@@ -341,8 +341,8 @@ class PostgreSQL:
             raise PostgreSQLCreateUserError() from e
 
 
-    def create_predefined_roles(self) -> None:
-        """Create predefined roles."""
+    def create_predefined_instance_roles(self) -> None:
+        """Create predefined instance roles."""
         role_to_queries = {
             ROLE_STATS: [
                 f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
@@ -377,7 +377,7 @@ class PostgreSQL:
                     for query in queries:
                         cursor.execute(SQL(query))
         except psycopg2.Error as e:
-            logger.error(f"Failed to create predefined roles: {e}")
+            logger.error(f"Failed to create predefined instance roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
 
     def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
@@ -801,6 +801,65 @@ END; $$;"""
                 cursor.close()
             if connection is not None:
                 connection.close()
+
+
+    def set_up_predefined_catalog_roles_function(self) -> None:
+        """Create predefined catalog roles function."""
+        function_creation_statement = """CREATE OR REPLACE FUNCTION set_up_catalog_roles() RETURNS VOID AS $$
+DECLARE
+    database TEXT;
+    current_session_user TEXT;
+    owner_user TEXT;
+    admin_user TEXT;
+    statements TEXT[];
+    statement TEXT;
+BEGIN
+	database := (SELECT current_database());
+	current_session_user := (SELECT session_user);
+    owner_user := database || '_owner';
+    admin_user := database || '_admin';
+
+    statements := ARRAY[
+        'REVOKE CREATE ON DATABASE ' || database || ' FROM charmed_databases_owner;',
+        'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
+        'ALTER SCHEMA public OWNER TO ' || owner_user || ';',
+        'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';',
+	    'GRANT CONNECT ON DATABASE database TO ' || admin_user || ';'
+    ];
+    FOREACH statement IN ARRAY statements
+    LOOP
+        EXECUTE statement;
+    END LOOP;
+
+	IF current_session_user LIKE 'relation-%' OR current_session_user LIKE 'relation_id_%' THEN
+		statement := 'GRANT ' || admin_user || ' TO ' || current_session_user || ';';
+        EXECUTE statement;
+	END IF;
+
+    statements := ARRAY[
+        'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON TABLES TO ' || admin_user || ';',
+        'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT EXECUTE ON FUNCTIONS TO ' || admin_user || ';',
+        'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON SEQUENCES TO ' || admin_user || ';',
+        'REVOKE EXECUTE ON FUNCTION set_user_u(text) FROM ' || owner_user || ';',
+        'REVOKE EXECUTE ON FUNCTION set_user_u(text) FROM ' || admin_user || ';',
+        'REVOKE EXECUTE ON FUNCTION set_user(text) FROM ' || owner_user || ';',
+        'REVOKE EXECUTE ON FUNCTION set_user(text) FROM ' || admin_user || ';',
+        'REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM ' || owner_user || ';',
+        'REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM ' || admin_user || ';'
+    ];
+    FOREACH statement IN ARRAY statements
+    LOOP
+        EXECUTE statement;
+    END LOOP;
+END;
+$$ LANGUAGE plpgsql security definer;"""
+        try:
+            for database in ["postgres", "template1"]:
+                with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL(function_creation_statement))
+        except psycopg2.Error as e:
+            logger.error(f"Failed to set up predefined catalog roles function: {e}")
+            raise PostgreSQLCreatePredefinedRolesError() from e
 
     def update_user_password(
         self, username: str, password: str, database_host: Optional[str] = None
