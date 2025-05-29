@@ -15,7 +15,7 @@ While this tutorial intends to guide you as you deploy Charmed PostgreSQL for th
 
 First, we will set up a cloud environment using [Multipass](https://multipass.run/) with [LXD](https://documentation.ubuntu.com/lxd/latest/) and [Juju](https://documentation.ubuntu.com/juju/3.6/). This is the quickest and easiest way to get your machine ready for using Charmed PostgreSQL. 
 
-To learn about other types of deployment environments and methods (e.g. bootstrapping other clouds, using Terraform), see [](/how-to-guides/deploy/index).
+To learn about other types of deployment environments and methods (e.g. bootstrapping other clouds, using Terraform), see [](/how-to/deploy/index).
 
 ### Multipass
 
