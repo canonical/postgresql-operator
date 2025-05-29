@@ -75,7 +75,7 @@ Feel free to [contact us](/reference/contacts) with a list of required extension
 
 In the legacy charm, the user could request roles by setting the `roles` field to a comma separated list of desired roles. It is NOT supported by the modern charm implementation of the legacy `pgsql` interface. The same functionality is provided via the modern `postgresql_client` using "[extra-user-roles](/explanation/users)". 
 
-For more information about migrating the new interface, see [this guide](/how-to-guides/development/integrate-with-your-charm).
+For more information about migrating the new interface, see [this guide](/how-to/development/integrate-with-your-charm).
 
 ## Supported PostgreSQL versions by modern charm
 

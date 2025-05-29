@@ -2,7 +2,7 @@
 
 A Charmed PostgreSQL backup can be stored on any S3-compatible storage. S3 access and configurations are managed with the [s3-integrator charm](https://charmhub.io/s3-integrator).
 
-This guide will teach you how to deploy and configure the s3-integrator charm for [AWS S3](https://aws.amazon.com/s3/), send the configurations to the Charmed PostgreSQL application, and update it. (To configure S3 for RadosGW, see [this guide](/how-to-guides/back-up-and-restore/configure-s3-radosgw))
+This guide will teach you how to deploy and configure the s3-integrator charm for [AWS S3](https://aws.amazon.com/s3/), send the configurations to the Charmed PostgreSQL application, and update it. (To configure S3 for RadosGW, see [this guide](/how-to/back-up-and-restore/configure-s3-radosgw))
 
 ## Configure s3-integrator
 First, deploy and run the charm:
@@ -19,7 +19,7 @@ juju config s3-integrator \
     region="us-west-2"
 ```
 ```{note} 
-There is now an experimental configuration option that sets up a retention time (in days) for backups stored in S3:  [`experimental-delete-older-than-days`](https://charmhub.io/s3-integrator/configuration?channel=latest/edge#experimental-delete-older-than-days). More info on [this guide](/how-to-guides/back-up-and-restore/manage-backup-retention)
+There is now an experimental configuration option that sets up a retention time (in days) for backups stored in S3:  [`experimental-delete-older-than-days`](https://charmhub.io/s3-integrator/configuration?channel=latest/edge#experimental-delete-older-than-days). More info on [this guide](/how-to/back-up-and-restore/manage-backup-retention)
 ```
 
 ```{note} 

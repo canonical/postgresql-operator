@@ -2,7 +2,7 @@
 
 Each [high-availability](https://en.wikipedia.org/wiki/High_availability)/[disaster-recovery](https://en.wikipedia.org/wiki/IT_disaster_recovery) implementation has primary and secondary (standby) sites.
 
-A Charmed PostgreSQL cluster size can be [easily scaled](/how-to-guides/scale-replicas) from 0 to 10 units. [Contact us](/reference/contacts) if you have a cluster with 10+ units.
+A Charmed PostgreSQL cluster size can be [easily scaled](/how-to/scale-replicas) from 0 to 10 units. [Contact us](/reference/contacts) if you have a cluster with 10+ units.
 
 It is recommended to use 3+ units cluster size in production (due to [Raft consensus](https://en.wikipedia.org/wiki/Raft_(algorithm)) requirements). Those units type can be:
   * **Primary**: unit which accepts all writes and guarantees no [split-brain scenario](https://en.wikipedia.org/wiki/Split-brain_(computing)).

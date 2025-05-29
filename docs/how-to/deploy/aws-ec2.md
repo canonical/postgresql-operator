@@ -2,28 +2,27 @@
 
 [Amazon Web Services](https://aws.amazon.com/) is a popular subsidiary of Amazon that provides on-demand cloud computing platforms on a metered pay-as-you-go basis. Access the AWS web console at [console.aws.amazon.com](https://console.aws.amazon.com/).
 
-## Install AWS and Juju tooling
+## Prerequisites
 
-Install Juju via snap:
+* A physical or virtual machine running Ubuntu 22.04+
+* Juju 3 (`3.6+` is recommended)
+  * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
+
+## Install AWS tooling
+
+Follow the installation guide for the [Amazon Web Services CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html).
+
+To check it is correctly installed, you can run the commands demonstrated below with sample outputs:
+
 ```text
-sudo snap install juju
-```
-
-Follow the installation guides for:
-* [AWs CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) - the Amazon Web Services CLI
-
-To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
-
-```text
-~$ juju version
-3.5.4-genericlinux-amd64
-
 ~$ aws --version
 aws-cli/2.13.25 Python/3.11.5 Linux/6.2.0-33-generic exe/x86_64.ubuntu.23 prompt/off
 ```
 
 ### Authenticate
+
 [Create an IAM account](https://docs.aws.amazon.com/eks/latest/userguide/getting-started-console.html) (or use legacy access keys) to operate AWS EC2:
+
 ```text
 mkdir -p ~/.aws && cat <<- EOF >  ~/.aws/credentials.yaml
 credentials:

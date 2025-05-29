@@ -10,6 +10,8 @@ This guide goes through the steps for setting up Sunbeam and deploying Charmed P
 * Hardware requirements depend on planned deployment size.
   * Recommended: 8 CPU cores, 32GB RAM, 100GB of storage
   * Minimum: See the requirements listed in the [Sunbeam documentation][Single-node guided]
+* Juju 3 (`3.6+` is recommended)
+  * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
 
 ## Install and bootstrap Sunbeam
 Follow the official OpenStack guide: [Single-node deployment][Single-node guided]. 

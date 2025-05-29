@@ -8,7 +8,7 @@ Read the [](#prerequisites) section carefully if you are deploying PostgreSQL in
 
 ## Prerequisites
 
-* A juju model with [Charmed PostgreSQL deployed](/how-to-guides/deploy/index).
+* A juju model with [Charmed PostgreSQL deployed](/how-to/deploy/index).
 * **If you are using an LXD model**, LXD's virtualization type must be set to `virtual-machine`.
   * See [](#lxd-virtualization-type) for more details.
 * **If your base is `ubuntu@22.4`**, you must use the `generic` flavor of Linux. 

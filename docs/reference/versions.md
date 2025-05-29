@@ -28,7 +28,7 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
   * All replicas are now [synchronous units]
   * Switchover the primary unit via `promote-to-primary scope=unit`
   * Raft re-init helper: `promote-to-primary scope=unit force=yes`
-* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords](/how-to-guides/manage-passwords)
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords](/how-to/manage-passwords)
 * [Timescale Community Edition]
 * [Extended COS integration]
   * [Profiling via Parca]
@@ -98,27 +98,27 @@ Learn more in the [legacy charm explanation page].
 
 [PgBouncer]: https://charmhub.io/pgbouncer
 
-[LDAP integration]: /how-to-guides/enable-ldap
+[LDAP integration]: /how-to/enable-ldap
 [SoS report integration]: /reference/troubleshooting/sos-report
-[Recovery improvements]: /how-to-guides/switchover-failover
+[Recovery improvements]: /how-to/switchover-failover
 [synchronous units]: https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count
 [internal charm passwords]: /explanation/users
 [rotation]: /tutorial/5-manage-passwords
-[Timescale Community Edition]: /how-to-guides/enable-plugins-extensions/enable-timescaledb
-[Extended COS integration]: /how-to-guides/monitoring-cos/enable-monitoring
-[Profiling via Parca]: /how-to-guides/monitoring-cos/enable-profiling
-[Tracing via Tempo]: /how-to-guides/monitoring-cos/enable-tracing
+[Timescale Community Edition]: /how-to/enable-plugins-extensions/enable-timescaledb
+[Extended COS integration]: /how-to/monitoring-cos/enable-monitoring
+[Profiling via Parca]: /how-to/monitoring-cos/enable-profiling
+[Tracing via Tempo]: /how-to/monitoring-cos/enable-tracing
 [security hardening]: /explanation/security/index
-[Multiple Juju storage support]: /how-to-guides/deploy/juju-storage
+[Multiple Juju storage support]: /how-to/deploy/juju-storage
 
 [release notes]: /reference/releases
 
 [Interfaces and endpoints]: /explanation/interfaces-and-endpoints
 
-[Deployment]: /how-to-guides/deploy/index
-[Backup and restore]: /how-to-guides/back-up-and-restore/create-a-backup
-[COS integration]: /how-to-guides/monitoring-cos/enable-monitoring
-[TLS integration]: /how-to-guides/enable-tls
+[Deployment]: /how-to/deploy/index
+[Backup and restore]: /how-to/back-up-and-restore/create-a-backup
+[COS integration]: /how-to/monitoring-cos/enable-monitoring
+[TLS integration]: /how-to/enable-tls
 [`arm64` architecture]: /reference/system-requirements
 
 [legacy charm explanation page]: /explanation/legacy-charm

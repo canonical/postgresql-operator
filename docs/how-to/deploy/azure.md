@@ -2,29 +2,23 @@
 
 [Azure](https://azure.com/) is a cloud computing platform developed by Microsoft. It has management, access and development of applications and services to individuals, companies, and governments through its global infrastructure. Access the Azure web console at [portal.azure.com](https://portal.azure.com/).
 
+## Prerequisites
 
-## Set up Juju and Azure tooling
+* A physical or virtual machine running Ubuntu 22.04+
+* Juju `3.6+`
+  * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
 
 ```{caution}
-The `Azure interactive` method (with web browser authentication `service-principal-secret-via-browser`) described here is only supported starting Juju 3.6-rc1+!
+The `Azure interactive` method (with web browser authentication `service-principal-secret-via-browser`) described here is only supported starting Juju 3.6+!
 ```
 
-### Install Juju and Azure CLI
+## Install Azure tooling
 
-Install Juju via snap:
-```text
-sudo snap install juju 
-```
+Follow the installation guide for the [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt).
 
-Follow the installation guides for:
-* [Azure CLI](https://learn.microsoft.com/en-us/cli/azure/install-azure-cli-linux?pivots=apt) - the Azure CLI for Linux
-
-To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
+To check it is correctly installed, you can run the commands demonstrated below with sample outputs:
 
 ```text
-> juju version
-3.6-rc1-genericlinux-amd64
-
 > az --version
 azure-cli                         2.65.0
 core                              2.65.0
@@ -118,7 +112,7 @@ Credential "azure-test-credentials1" added locally for cloud "azure".
 ```
 </details>
 
-### Bootstrap Juju controller
+## Bootstrap Juju controller
 
 Once successfully completed, bootstrap the new Juju controller on Azure:
 ```text

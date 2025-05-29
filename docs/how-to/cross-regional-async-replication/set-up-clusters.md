@@ -7,7 +7,7 @@ This guide will show you the basics of initiating a cross-regional async setup u
 ## Prerequisites
 * Juju `v.3.4.2+`
 * Make sure your machine(s) fulfill the [system requirements](/reference/system-requirements)
-* See [supported target/source model relationships](/how-to-guides/cross-regional-async-replication/index).
+* See [supported target/source model relationships](/how-to/cross-regional-async-replication/index).
 
 ## Deploy
 

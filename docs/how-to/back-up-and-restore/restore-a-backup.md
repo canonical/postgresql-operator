@@ -2,14 +2,14 @@
 
 This is a guide on how to restore a locally made backup.
 
-To restore a backup that was made from a *different* cluster, (i.e. cluster migration via restore), see [](/how-to-guides/back-up-and-restore/migrate-a-cluster).
+To restore a backup that was made from a *different* cluster, (i.e. cluster migration via restore), see [](/how-to/back-up-and-restore/migrate-a-cluster).
 
 ## Prerequisites
 
-- Deployments have been [scaled-down](/how-to-guides/scale-replicas) to a single PostgreSQL unit (scale it up after the backup is restored)
+- Deployments have been [scaled-down](/how-to/scale-replicas) to a single PostgreSQL unit (scale it up after the backup is restored)
 - Access to S3 storage
-- [Configured settings for S3 storage](/how-to-guides/back-up-and-restore/configure-s3-aws)
-- [Existing backups in your S3 storage](/how-to-guides/back-up-and-restore/create-a-backup)
+- [Configured settings for S3 storage](/how-to/back-up-and-restore/configure-s3-aws)
+- [Existing backups in your S3 storage](/how-to/back-up-and-restore/create-a-backup)
 - [Point-in-time recovery](#point-in-time-recovery) requires the following PostgreSQL charm revisions:
    - 467+ for `arm64`
   -  468+ for `amd64`

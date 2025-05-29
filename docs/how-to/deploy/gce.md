@@ -2,24 +2,25 @@
 
 [Google Compute Engine](https://cloud.google.com/products/compute) is a popular subsidiary of Google that provides on-demand cloud computing platforms on a metered pay-as-you-go basis. Access the GCloud web console at [console.cloud.google.com](https://console.cloud.google.com/compute/instances).
 
+## Prerequisites
 
-## Install GCloud and Juju tooling
+* A physical or virtual machine running Ubuntu 22.04+
+* Juju 3 (`3.6+` is recommended)
+  * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
 
-Install Juju via snap:
+## Install GCloud
+
+The Google Cloud CLI tool is available via snap: 
 
 ```text
-sudo snap install juju
 sudo snap install google-cloud-cli --classic
 ```
 
-Check the official the [Google Cloud (GCloud) CLI](https://cloud.google.com/sdk/docs/install)  documentation about other installation options.
+Check the official the [Google Cloud CLI documentation](https://cloud.google.com/sdk/docs/install) for other installation options.
 
-To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
+To check it is all correctly installed, run the commands demonstrated below with sample outputs:
 
 ```text
-~$ juju version
-3.5.4-genericlinux-amd64
-
 ~$ gcloud --version
 Google Cloud SDK 474.0.0
 ...

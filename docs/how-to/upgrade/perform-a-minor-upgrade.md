@@ -31,7 +31,7 @@ Concurrency with other operations is not supported, and it can lead the cluster 
 ### Backups
 **Make sure to have a backup of your data when running any type of upgrade.**
 
-Guides on how to configure backups with S3-compatible storage can be found [here](/how-to-guides/back-up-and-restore/create-a-backup).
+Guides on how to configure backups with S3-compatible storage can be found [here](/how-to/back-up-and-restore/create-a-backup).
 
 ### Service disruption
 **It is recommended to deploy your application in conjunction with the [Charmed PgBouncer](https://charmhub.io/pgbouncer) operator.** 
@@ -163,7 +163,7 @@ The step must be skipped if the upgrade went well!
 
 Although the underlying PostgreSQL Cluster continues to work, it’s important to roll back the charm to a previous revision so that an update can be attempted after further inspection of the failure. 
 
-> See: [](/how-to-guides/upgrade/perform-a-minor-rollback)
+> See: [](/how-to/upgrade/perform-a-minor-rollback)
 
 ## Post-upgrade check
 

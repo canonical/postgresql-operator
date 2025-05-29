@@ -3,9 +3,9 @@
 This guide contains recommended steps and useful commands for creating and managing backups to ensure smooth restores.
 
 ## Prerequisites
-* A cluster with at [least three nodes](/how-to-guides/scale-replicas) deployed
+* A cluster with at [least three nodes](/how-to/scale-replicas) deployed
 * Access to S3 storage
-* [Configured settings for S3 storage](/how-to-guides/back-up-and-restore/configure-s3-aws)
+* [Configured settings for S3 storage](/how-to/back-up-and-restore/configure-s3-aws)
 
 ## Save your current cluster credentials
 
@@ -19,7 +19,7 @@ juju run postgresql/leader get-password username=replication
 juju run postgresql/leader get-password username=rewind
 ``` 
 
-For more context about passwords during a restore, check [How to migrate a cluster > Manage cluster passwords](/how-to-guides/back-up-and-restore/migrate-a-cluster).
+For more context about passwords during a restore, check [How to migrate a cluster > Manage cluster passwords](/how-to/back-up-and-restore/migrate-a-cluster).
 
 ## Create a backup
 

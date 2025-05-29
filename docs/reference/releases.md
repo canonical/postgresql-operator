@@ -14,7 +14,7 @@ For a given release, this table shows:
    > This charm still supports older versions of Juju down to 2.9. See the [Juju section of the system requirements](/reference/system-requirements) for more details.
 * Support for specific features
 
-| Release | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to-guides/enable-tls)* | [COS monitoring](/how-to-guides/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to-guides/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to-guides/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to-guides/back-up-and-restore/restore-a-backup) |
+| Release | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
 | [552], [553] | 14.15 | `3.6.1+` | ![check] | ![check] | ![check] | ![check] | ![check] |
 | [467], [468] | 14.12 | `3.4.3+` | ![check] | ![check] | ![check] | ![check] | ![check] |

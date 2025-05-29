@@ -6,19 +6,26 @@ or even better, to the different [availability zones](https://en.wikipedia.org/w
 
 This guide will take you through deploying a PostgreSQL cluster on GCE using 3 available zones. All Juju units will be set up to sit in their dedicated zones only, which effectively guarantees database copy survival across all available AZs.
 
+## Prerequisites
+
+* A physical or virtual machine running Ubuntu 22.04+
+* Juju 3 (`3.6+` is recommended)
+  * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
+* A cloud service that supports and provides availability zones.
+
 ```{note}
-This documentation assumes that your cloud supports and provides availability zones concepts. This is enabled by default on EC2/GCE and supported by LXD/MicroCloud.
+Multi-availability zones are enabled by default on EC2/GCE and supported by LXD/MicroCloud.
 ```
 
 ## Set up GCE on Google Cloud
 
-Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://discourse.charmhub.io/t/charmed-postgresql-k8s-how-to-deploy-on-gke/11237) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
+Let's deploy a [PostgreSQL cluster on GKE (us-east4)](https://discourse.charmhub.io/t/charmed-postgresql-k8s-how-to-deploy-on-gke/11237) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
 
 ```{caution}
 Creating the following GKE resources may cost you money - be sure to monitor your GCloud costs.
 ```
 
-Log into Google Cloud and [bootstrap GCE on Google Cloud](/how-to-guides/deploy/gce):
+Log into Google Cloud and [bootstrap GCE on Google Cloud](/how-to/deploy/gce):
 ```text
 gcloud auth login
 gcloud iam service-accounts keys create sa-private-key.json  --iam-account=juju-gce-account@[your-gcloud-project-12345].iam.gserviceaccount.com

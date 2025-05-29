@@ -1,6 +1,6 @@
 # Migrate database data using `pg_dump` / `pg_restore`
 
-This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to-guides/development/integrate-with-your-charm). 
+This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/development/integrate-with-your-charm). 
 
 ```{note}
 All commands are written for `juju >= v.3.0`
@@ -22,7 +22,7 @@ juju show-application postgresql | yq '.[] | .channel'
 ```
 Migration is **not** necessary if the output above is `14/stable`! 
 
-This guide can be used to copy data between different installations of the same (modern) charm `postgresql`, but the [backup/restore](/how-to-guides/development/migrate-data-via-backup-restore) is more recommended for migrations between modern charms.
+This guide can be used to copy data between different installations of the same (modern) charm `postgresql`, but the [backup/restore](/how-to/development/migrate-data-via-backup-restore) is more recommended for migrations between modern charms.
 
 ## Summary
 

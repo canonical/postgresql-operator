@@ -64,48 +64,48 @@ This section is for charm developers looking to support PostgreSQL integrations 
 
 <!--Links-->
 
-[Sunbeam]: /how-to-guides/deploy/sunbeam
-[MAAS]: /how-to-guides/deploy/maas
-[AWS EC2]: /how-to-guides/deploy/aws-ec2
-[GCE]: /how-to-guides/deploy/gce
-[Azure]: /how-to-guides/deploy/azure
-[Multi-AZ]: /how-to-guides/deploy/multi-az
-[TLS VIP access]: /how-to-guides/deploy/tls-vip-access
-[Juju spaces]: /how-to-guides/deploy/juju-spaces
-[Terraform]: /how-to-guides/deploy/terraform
-[Air-gapped]: /how-to-guides/deploy/air-gapped
-[Juju storage]: /how-to-guides/deploy/juju-storage
+[Sunbeam]: /how-to/deploy/sunbeam
+[MAAS]: /how-to/deploy/maas
+[AWS EC2]: /how-to/deploy/aws-ec2
+[GCE]: /how-to/deploy/gce
+[Azure]: /how-to/deploy/azure
+[Multi-AZ]: /how-to/deploy/multi-az
+[TLS VIP access]: /how-to/deploy/tls-vip-access
+[Juju spaces]: /how-to/deploy/juju-spaces
+[Terraform]: /how-to/deploy/terraform
+[Air-gapped]: /how-to/deploy/air-gapped
+[Juju storage]: /how-to/deploy/juju-storage
 
-[Integrate with another application]: /how-to-guides/integrate-with-another-application
-[External access]: /how-to-guides/external-network-access
-[Scale replicas]: /how-to-guides/scale-replicas
-[Enable TLS]: /how-to-guides/enable-tls
-[Switchover/failover]: /how-to-guides/switchover-failover
+[Integrate with another application]: /how-to/integrate-with-another-application
+[External access]: /how-to/external-network-access
+[Scale replicas]: /how-to/scale-replicas
+[Enable TLS]: /how-to/enable-tls
+[Switchover/failover]: /how-to/switchover-failover
 
-[Configure S3 AWS]: /how-to-guides/back-up-and-restore/configure-s3-aws
-[Configure S3 RadosGW]: /how-to-guides/back-up-and-restore/configure-s3-radosgw
-[Create a backup]: /how-to-guides/back-up-and-restore/create-a-backup
-[Restore a backup]: /how-to-guides/back-up-and-restore/restore-a-backup
-[Manage backup retention]: /how-to-guides/back-up-and-restore/manage-backup-retention
-[Migrate a cluster]: /how-to-guides/back-up-and-restore/migrate-a-cluster
+[Configure S3 AWS]: /how-to/back-up-and-restore/configure-s3-aws
+[Configure S3 RadosGW]: /how-to/back-up-and-restore/configure-s3-radosgw
+[Create a backup]: /how-to/back-up-and-restore/create-a-backup
+[Restore a backup]: /how-to/back-up-and-restore/restore-a-backup
+[Manage backup retention]: /how-to/back-up-and-restore/manage-backup-retention
+[Migrate a cluster]: /how-to/back-up-and-restore/migrate-a-cluster
 
-[Enable monitoring]: /how-to-guides/monitoring-cos/enable-monitoring
-[Enable alert rules]: /how-to-guides/monitoring-cos/enable-alert-rules
-[Enable tracing]: /how-to-guides/monitoring-cos/enable-tracing
-[Enable profiling]: /how-to-guides/monitoring-cos/enable-profiling
+[Enable monitoring]: /how-to/monitoring-cos/enable-monitoring
+[Enable alert rules]: /how-to/monitoring-cos/enable-alert-rules
+[Enable tracing]: /how-to/monitoring-cos/enable-tracing
+[Enable profiling]: /how-to/monitoring-cos/enable-profiling
 
-[Perform a minor upgrade]: /how-to-guides/upgrade/perform-a-minor-upgrade
-[Perform a minor rollback]: /how-to-guides/upgrade/perform-a-minor-rollback
+[Perform a minor upgrade]: /how-to/upgrade/perform-a-minor-upgrade
+[Perform a minor rollback]: /how-to/upgrade/perform-a-minor-rollback
 
-[Cross-regional async replication]: /how-to-guides/cross-regional-async-replication/index
-[Set up clusters]: /how-to-guides/cross-regional-async-replication/set-up-clusters
-[Integrate with a client app]: /how-to-guides/cross-regional-async-replication/integrate-with-a-client-app
-[Remove or recover a cluster]: /how-to-guides/cross-regional-async-replication/remove-or-recover-a-cluster
-[Enable plugins/extensions]: /how-to-guides/enable-plugins-extensions/index
+[Cross-regional async replication]: /how-to/cross-regional-async-replication/index
+[Set up clusters]: /how-to/cross-regional-async-replication/set-up-clusters
+[Integrate with a client app]: /how-to/cross-regional-async-replication/integrate-with-a-client-app
+[Remove or recover a cluster]: /how-to/cross-regional-async-replication/remove-or-recover-a-cluster
+[Enable plugins/extensions]: /how-to/enable-plugins-extensions/index
 
-[Integrate with your charm]: /how-to-guides/development/integrate-with-your-charm
-[Migrate data via pg_dump]: /how-to-guides/development/migrate-data-via-pg-dump
-[Migrate data via backup/restore]: /how-to-guides/development/migrate-data-via-backup-restore
+[Integrate with your charm]: /how-to/development/integrate-with-your-charm
+[Migrate data via pg_dump]: /how-to/development/migrate-data-via-pg-dump
+[Migrate data via backup/restore]: /how-to/development/migrate-data-via-backup-restore
 
 
 ```{toctree}
