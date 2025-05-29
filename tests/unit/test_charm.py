@@ -1618,6 +1618,9 @@ def test_push_tls_files_to_workload(harness):
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.TLS.get_client_tls_files") as _get_client_tls_files,
         patch("charm.TLS.get_peer_tls_files") as _get_peer_tls_files,
+        patch(
+            "charm.PostgresqlOperatorCharm.get_secret", return_value="internal_ca"
+        ) as _get_secret,
     ):
         _get_client_tls_files.side_effect = [
             ("key", "ca", "cert"),
@@ -1635,13 +1638,13 @@ def test_push_tls_files_to_workload(harness):
 
         # Test when all TLS files are available.
         assert harness.charm.push_tls_files_to_workload()
-        assert _render_file.call_count == 6
+        assert _render_file.call_count == 7
 
         # Test when not all TLS files are available.
         for _ in range(3):
             _render_file.reset_mock()
             assert not (harness.charm.push_tls_files_to_workload())
-            assert _render_file.call_count == 4
+            assert _render_file.call_count == 5
 
 
 def test_push_ca_file_into_workload(harness):

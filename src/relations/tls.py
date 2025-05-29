@@ -86,6 +86,8 @@ class TLS(Object):
                     sans_dns=frozenset({
                         self.host,
                         socket.getfqdn(),
+                        # IP address need to be part of the DNS SANs list due to
+                        # https://github.com/pgbackrest/pgbackrest/issues/1977.
                         *client_addresses,
                     }),
                 ),
@@ -102,6 +104,8 @@ class TLS(Object):
                     sans_dns=frozenset({
                         self.host,
                         socket.getfqdn(),
+                        # IP address need to be part of the DNS SANs list due to
+                        # https://github.com/pgbackrest/pgbackrest/issues/1977.
                         *self.peer_addresses,
                     }),
                 ),
@@ -133,6 +137,9 @@ class TLS(Object):
             logger.error("Cannot push TLS certificates: %r", e)
             event.defer()
             return
+        if not self.charm.update_config():
+            logger.debug("Cannot update config at this moment")
+            event.defer()
 
     def _on_certificates_broken(self, event: RelationBrokenEvent) -> None:
         if not self.charm.update_config():
@@ -180,6 +187,15 @@ class TLS(Object):
             cert = self.charm.get_secret("unit", "internal-cert")
             ca_file = self.charm.get_secret("app", "internal-ca")
         return key, ca_file, cert
+
+    def get_peer_ca_bundle(self):
+        """Get bundled CA certs."""
+        ca_file = ""
+        certs, _ = self.peer_certificate.get_assigned_certificates()
+        if certs:
+            ca_file += str(certs[0].ca) + "\n"
+        ca_file += self.charm.get_secret("app", "internal-ca")
+        return ca_file
 
     def generate_internal_peer_ca(self):
         """Generate internal peer CA using the tls lib."""
