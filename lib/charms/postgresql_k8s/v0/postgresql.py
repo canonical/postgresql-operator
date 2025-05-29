@@ -24,8 +24,7 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Tuple
 
 import psycopg2
-from ops.model import Relation
-from psycopg2.sql import SQL, Composed, Identifier, Literal
+from psycopg2.sql import SQL, Identifier, Literal
 
 # The unique Charmhub library identifier, never change it
 LIBID = "24ee217a54e840a598ff21a079c3e678"
@@ -218,20 +217,15 @@ class PostgreSQL:
     def create_database(
         self,
         database: str,
-        user: str,
         plugins: Optional[List[str]] = None,
-        client_relations: Optional[List[Relation]] = None,
     ) -> None:
         """Creates a new database and grant privileges to a user on it.
 
         Args:
             database: database to be created.
-            user: user that will have access to the database.
             plugins: extensions to enable in the new database.
-            client_relations: current established client relations.
         """
         plugins = plugins if plugins else []
-        client_relations = client_relations if client_relations else []
         try:
             connection = self._connect_to_database()
             cursor = connection.cursor()
@@ -239,34 +233,15 @@ class PostgreSQL:
                 SQL("SELECT datname FROM pg_database WHERE datname={};").format(Literal(database))
             )
             if cursor.fetchone() is None:
+                cursor.execute(SQL("SET ROLE charmed_databases_owner;"))
                 cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
             cursor.execute(
                 SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
                     Identifier(database)
                 )
             )
-            for user_to_grant_access in [user, PERMISSIONS_GROUP_ADMIN, *self.system_users]:
-                cursor.execute(
-                    SQL("GRANT ALL PRIVILEGES ON DATABASE {} TO {};").format(
-                        Identifier(database), Identifier(user_to_grant_access)
-                    )
-                )
-            relations_accessing_this_database = 0
-            for relation in client_relations:
-                for data in relation.data.values():
-                    if data.get("database") == database:
-                        relations_accessing_this_database += 1
             with self._connect_to_database(database=database) as conn, conn.cursor() as curs:
                 curs.execute(SQL("SELECT set_up_predefined_catalog_roles();"))
-                curs.execute(
-                    "SELECT schema_name FROM information_schema.schemata WHERE schema_name NOT LIKE 'pg_%' and schema_name <> 'information_schema';"
-                )
-                schemas = [row[0] for row in curs.fetchall()]
-                statements = self._generate_database_privileges_statements(
-                    relations_accessing_this_database, schemas, user
-                )
-                for statement in statements:
-                    curs.execute(statement)
         except psycopg2.Error as e:
             logger.error(f"Failed to create database: {e}")
             raise PostgreSQLCreateDatabaseError() from e
@@ -280,6 +255,7 @@ class PostgreSQL:
         password: Optional[str] = None,
         admin: bool = False,
         extra_user_roles: Optional[List[str]] = None,
+        in_role: Optional[str] = None,
     ) -> None:
         """Creates a database user.
 
@@ -288,6 +264,7 @@ class PostgreSQL:
             password: password to be assigned to the user.
             admin: whether the user should have additional admin privileges.
             extra_user_roles: additional privileges and/or roles to be assigned to the user.
+            in_role: role to be assigned to the user.
         """
         try:
             # Separate roles and privileges from the provided extra user roles.
@@ -319,10 +296,12 @@ class PostgreSQL:
                     SQL("SELECT TRUE FROM pg_roles WHERE rolname={};").format(Literal(user))
                 )
                 if cursor.fetchone() is not None:
-                    user_definition = "ALTER ROLE {}"
+                    user_definition = "ALTER ROLE {} "
                 else:
-                    user_definition = "CREATE ROLE {}"
+                    user_definition = "CREATE ROLE {} "
                 user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
+                if in_role:
+                    user_definition += f" IN ROLE {in_role} "
                 if privileges:
                     user_definition += f" {' '.join(privileges)}"
                 cursor.execute(SQL("BEGIN;"))
@@ -526,72 +505,6 @@ class PostgreSQL:
         finally:
             if connection is not None:
                 connection.close()
-
-    def _generate_database_privileges_statements(
-        self, relations_accessing_this_database: int, schemas: List[str], user: str
-    ) -> List[Composed]:
-        """Generates a list of databases privileges statements."""
-        statements = []
-        if relations_accessing_this_database == 1:
-            statements.append(
-                SQL(
-                    """DO $$
-DECLARE r RECORD;
-BEGIN
-  FOR r IN (SELECT statement FROM (SELECT 1 AS index,'ALTER TABLE '|| schemaname || '."' || tablename ||'" OWNER TO {};' AS statement
-FROM pg_tables WHERE NOT schemaname IN ('pg_catalog', 'information_schema')
-UNION SELECT 2 AS index,'ALTER SEQUENCE '|| sequence_schema || '."' || sequence_name ||'" OWNER TO {};' AS statement
-FROM information_schema.sequences WHERE NOT sequence_schema IN ('pg_catalog', 'information_schema')
-UNION SELECT 3 AS index,'ALTER FUNCTION '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'f'
-UNION SELECT 4 AS index,'ALTER PROCEDURE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'p'
-UNION SELECT 5 AS index,'ALTER AGGREGATE '|| nsp.nspname || '."' || p.proname ||'"('||pg_get_function_identity_arguments(p.oid)||') OWNER TO {};' AS statement
-FROM pg_proc p JOIN pg_namespace nsp ON p.pronamespace = nsp.oid WHERE NOT nsp.nspname IN ('pg_catalog', 'information_schema') AND p.prokind = 'a'
-UNION SELECT 6 AS index,'ALTER VIEW '|| schemaname || '."' || viewname ||'" OWNER TO {};' AS statement
-FROM pg_catalog.pg_views WHERE NOT schemaname IN ('pg_catalog', 'information_schema')) AS statements ORDER BY index) LOOP
-      EXECUTE format(r.statement);
-  END LOOP;
-END; $$;"""
-                ).format(
-                    Identifier(user),
-                    Identifier(user),
-                    Identifier(user),
-                    Identifier(user),
-                    Identifier(user),
-                    Identifier(user),
-                )
-            )
-            statements.append(
-                SQL(
-                    "UPDATE pg_catalog.pg_largeobject_metadata\n"
-                    "SET lomowner = (SELECT oid FROM pg_roles WHERE rolname = {})\n"
-                    "WHERE lomowner = (SELECT oid FROM pg_roles WHERE rolname = {});"
-                ).format(Literal(user), Literal(self.user))
-            )
-            for schema in schemas:
-                statements.append(
-                    SQL("ALTER SCHEMA {} OWNER TO {};").format(
-                        Identifier(schema), Identifier(user)
-                    )
-                )
-        else:
-            for schema in schemas:
-                schema = Identifier(schema)
-                statements.extend([
-                    SQL("GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA {} TO {};").format(
-                        schema, Identifier(user)
-                    ),
-                    SQL("GRANT USAGE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
-                    SQL("GRANT CREATE ON SCHEMA {} TO {};").format(schema, Identifier(user)),
-                ])
-        return statements
 
     def get_last_archived_wal(self) -> str:
         """Get the name of the last archived wal for the current PostgreSQL cluster."""
@@ -801,7 +714,9 @@ END; $$;"""
 
             cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';")
             if cursor.fetchone() is None:
-                self.create_user("charmed_databases_owner")
+                self.create_user(
+                    "charmed_databases_owner", extra_user_roles=[PERMISSIONS_GROUP_ADMIN]
+                )
 
             self.set_up_login_hook_function()
             self.set_up_predefined_catalog_roles_function()
@@ -868,6 +783,7 @@ $$ LANGUAGE plpgsql;"""
                     cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
                     cursor.execute(SQL("CREATE SCHEMA IF NOT EXISTS login_hook;"))
                     cursor.execute(SQL(function_creation_statement))
+                    cursor.execute(SQL("GRANT EXECUTE ON FUNCTION login_hook.login() TO PUBLIC;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to create login hook function: {e}")
             raise e
