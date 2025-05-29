@@ -855,8 +855,8 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
                 # TLS is enabled, otherwise True is set because it's the default value
                 # for the verify parameter.
                 health_info = requests.get(
-                    f"{'https' if enabled else 'http'}://{unit_address}:8008/health",
-                    verify=temp_ca_file.name if enabled else True,
+                    f"https://{unit_address}:8008/health",
+                    verify=temp_ca_file.name if enabled else False,
                 )
                 return health_info.status_code == 200
     except RetryError:
