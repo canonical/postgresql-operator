@@ -1393,7 +1393,6 @@ def test_on_peer_relation_changed(harness):
                 rel_id, harness.charm.app.name, {"cluster_initialised": ""}
             )
         harness.charm._on_peer_relation_changed(mock_event)
-        mock_event.defer.assert_called_once()
         _reconfigure_cluster.assert_not_called()
 
         # Test an initialized cluster and this is the leader unit

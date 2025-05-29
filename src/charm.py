@@ -840,7 +840,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if not self.is_cluster_initialised:
             logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
-            event.defer()
             return False
 
         # Check whether raft is stuck.
@@ -1578,9 +1577,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("leader not elected and/or internal CA not yet generated")
             event.defer()
             return
+        if not self.get_secret(UNIT_SCOPE, "internal-cert"):
+            self.tls.generate_internal_peer_cert()
 
         self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
-        self.tls.generate_internal_peer_cert()
 
         # Open port
         try:
