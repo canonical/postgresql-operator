@@ -11,7 +11,7 @@ This is feature is in development. It is **not recommended** for production envi
 Enabling tracing with Tempo requires that you:
 
 - Have deployed Charmed PostgreSQL revision 421+ 
-  - See [](/how-to/deploy)
+  - See [](/how-to/deploy/index)
 - Have deployed a `cos-lite` bundle from the `latest/edge` track in a Kubernetes environment
   - See [Getting started on MicroK8s](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s)
 

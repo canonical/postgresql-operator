@@ -12,7 +12,7 @@ Storage support was added in [Juju Terraform Provider version 0.13+](https://git
 
 ## Install Terraform tooling
 
-This guide assumes Juju is installed and you have an LXD controller already bootstrapped. For more information, check the [Set up the environment](/tutorial/1-set-up-environment) tutorial page.
+This guide assumes Juju is installed and you have an LXD controller already bootstrapped. For more information, check the [](/tutorial/index).
 
 First, install Terraform Provider and example modules:
 
