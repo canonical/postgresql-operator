@@ -49,7 +49,7 @@ Deploy the charm using the channel `latest/stable`:
     channel: latest/stable
 ```
 
-```{note}
+```{caution}
 Remove the charm store prefix `cs:` from the bundle. 
 
 Otherwise, the modern charm will be chosen by Juju (due to the default track pointing to `14/stable` and not `latest/stable`).

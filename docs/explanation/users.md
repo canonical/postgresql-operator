@@ -1,6 +1,7 @@
 # Users
 
 There are three types of users in PostgreSQL:
+
 * Internal users (used by the charmed operator)
 * Relation users (used by related applications)
   * Extra user roles (if default permissions are not enough)
@@ -38,7 +39,7 @@ It is forbidden to use/manage described above users, as they are dedicated to th
 Use the [data-integrator](https://charmhub.io/data-integrator) charm to generate, manage, and remove external credentials.
 ```
 
-Passwords for *internal* users can be rotated using the action 'set-password':
+Passwords for *internal* users can be rotated using the action `set-password`:
 
 ```text
 > juju show-action postgresql set-password
@@ -54,7 +55,6 @@ username:
 ```
 
 For example, to generate a new random password for *internal* user:
-
 
 ```text
 > juju run-action --wait postgresql/leader set-password username=operator
@@ -98,9 +98,9 @@ postgres=# \du
 If password rotation is required for users used in relations, the relation must be removed and created again:
 
 ```text
-> juju remove-relation postgresql myclientapp
-> juju wait-for application postgresql
-> juju relate postgresql myclientapp
+juju remove-relation postgresql myclientapp
+juju wait-for application postgresql
+juju relate postgresql myclientapp
 ```
 
 ### Extra user roles

@@ -9,7 +9,7 @@ To perform a basic restore (from a *local* backup), see [](/how-to/back-up-and-r
 Restoring a backup from a previous cluster to a current cluster requires:
 - A single unit Charmed PostgreSQL deployed and running
 - Access to S3 storage
-- [](/how-to/back-up-and-restore/configure-s3-aws)
+  - [](/how-to/back-up-and-restore/configure-s3-aws)
 - Backups from the previous cluster in your S3 storage
 - Passwords from your previous cluster
 

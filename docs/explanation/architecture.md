@@ -4,7 +4,6 @@
 
 ![image|690x423, 100%](architecture-diagram.png)
 
-<a name="hld"></a>
 ## HLD (High Level Design)
 
 The charm design leverages on the SNAP “[charmed-postgresql](https://snapcraft.io/charmed-postgresql)” which is deployed by Juju on the specified VM/MAAS/bare-metal machine based on Ubuntu Jammy/22.04. SNAP allows to run PostgreSQL service(s) in a secure and isolated environment ([strict confinement](https://ubuntu.com/blog/demystifying-snap-confinement)). The installed SNAP:
@@ -56,7 +55,6 @@ The snap "charmed-postgresql" also ships list of tools used by charm:
 All snap resources must be executed under the special user `snapd_daemon` only!
 ```
 
-<a name="integrations"></a>
 ## Integrations
 
 ### PgBouncer

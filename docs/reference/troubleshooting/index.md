@@ -1,7 +1,5 @@
 # Troubleshooting
 
-## Summary
-
 This page goes over some recommended tools and approaches to troubleshooting the charm.
 
 Before anything, always run `juju status` to check the [list of charm statuses](/reference/statuses) and the recommended fixes. This alone may already solve your issue. 
@@ -166,12 +164,9 @@ To avoid split-brain scenarios:
 
 * Do not manage users, credentials, databases, and schema directly. 
 * Avoid restarting services directly. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to/scale-replicas) to recover the cluster state.
-
 ```
 
 As a last resort, [contact us](/reference/contacts) if you cannot determine the source of your issue.
-
-Also, feel free to improve this document!
 
 ## Install extra software
 
@@ -180,6 +175,7 @@ We recommend you do **not** install any additional software. This may affect sta
 Sometimes, however, it is necessary to install some extra troubleshooting software. 
 
 Use the common approach:
+
 ```text
 ubuntu@juju-fd7874-0:~$ sudo apt update && sudo apt install gdb
 ...

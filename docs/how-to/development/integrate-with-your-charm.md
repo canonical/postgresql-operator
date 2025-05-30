@@ -18,7 +18,7 @@ Legacy charm details are described [here](/explanation/legacy-charm).
 
 **For some practical examples**, take a look at the following:
 * [postgresql-test-app](https://github.com/canonical/postgresql-test-app) GitHub repository
-*  [juju-sdk-tutorial-k8s](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_integrate_with_psql) - the branch `04_integrate_with_psql` describes integration with Charmed PostgreSQL K8s 
+* [juju-sdk-tutorial-k8s](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_integrate_with_psql) - the branch `04_integrate_with_psql` describes integration with Charmed PostgreSQL K8s 
 * [How to migrate Nextcloud to new PostgreSQL (vm-charms)](https://discourse.charmhub.io/t/nextcloud-postgresql-how-to-migrate-nextcloud-to-new-postgresql-vm-charms/10969) guide
 
 ## Troubleshooting & testing

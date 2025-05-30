@@ -11,13 +11,10 @@ This charmed operator meets the need of simplifying deployment, scaling, configu
 Charmed PostgreSQL is made for anyone looking for a comprehensive database management interface, whether for operating a complex production environment or simply as a playground to learn more about databases and charms.
 
 
-## In this documentation
-
 | | |
 |--|--|
 |  [**Get started**](/tutorial/index) - [Deploy on a cloud](/how-to/deploy/index) \| [Scale](/how-to/scale-replicas) \| [Manage passwords](/how-to/manage-passwords) \| [Enable encryption](/how-to/enable-tls) \| [Back up](/how-to/back-up-and-restore/index) \| [Monitoring](/how-to/monitoring-cos/index) </br> |  [**How-to guides**](/how-to/index) for key tasks, use-cases, and problems. These guides assume basic familiarity with Juju and PostgreSQL. </br>  |
 | [**Reference**](/reference/index) - Technical information for quick lookup, such as [requirements](/reference/system-requirements), [plugins](/reference/plugins-extensions), and [statuses](/reference/statuses). | [**Explanation**](/explanation/interfaces-and-endpoints) - Discussion and clarification of key topics such as [architecture](/explanation/architecture), [users](/explanation/users), and [legacy charms](/explanation/legacy-charm)|
-
 
 
 ## Project and community
@@ -26,10 +23,11 @@ Charmed PostgreSQL is an official distribution of PostgreSQL. It’s an open-sou
 - [Read our Code of Conduct](https://ubuntu.com/community/code-of-conduct)
 - [Join the Discourse forum](https://discourse.charmhub.io/tag/postgresql)
 - [Contribute](https://github.com/canonical/postgresql-operator/blob/main/CONTRIBUTING.md) to the code or report an [issue](https://github.com/canonical/postgresql-operator/issues/new/choose)
-- Explore [Canonical Data Fabric solutions](https://canonical.com/data)
+- Explore [Canonical Data solutions](https://canonical.com/data)
 - [Contacts us](/reference/contacts) for all further questions
 
 ## Licencing & Trademark
+
 The Charmed PostgreSQL Operator is distributed under the [Apache Software Licence version 2.0](https://github.com/canonical/postgresql-operator/blob/main/LICENSE). It depends on [PostgreSQL](https://www.postgresql.org/ftp/source/), which is licensed under the [PostgreSQL License](https://www.postgresql.org/about/licence/) - a liberal open-source licence similar to the BSD or MIT licences.
 
 PostgreSQL is a trademark or registered trademark of PostgreSQL Global Development Group. Other trademarks are the property of their respective owners.
@@ -42,8 +40,8 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 :hidden:
 
 Home <self>
-tutorial*/index
-how*/index
-reference*/index
-explanation*/index
-*
+Tutorial <tutorial/index>
+How-to guides <how-to/index>
+Reference <reference/index>
+Explanation <explanation/index>
+

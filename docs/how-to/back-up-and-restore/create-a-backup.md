@@ -3,6 +3,7 @@
 This guide contains recommended steps and useful commands for creating and managing backups to ensure smooth restores.
 
 ## Prerequisites
+
 * A cluster with at [least three nodes](/how-to/scale-replicas) deployed
 * Access to S3 storage
 * [Configured settings for S3 storage](/how-to/back-up-and-restore/configure-s3-aws)

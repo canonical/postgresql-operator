@@ -10,7 +10,6 @@ Charmed PostgreSQL is an open source project that warmly welcomes community cont
 Our legacy [Mattermost](https://chat.charmhub.io/charmhub/channels/data-platform) channel is read-only until January 31, 2025.
 ```
 
-
 Useful links:
 
 * [Canonical Data Fabric](https://ubuntu.com/data/)

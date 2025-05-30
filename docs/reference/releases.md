@@ -9,7 +9,7 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 ## Dependencies and supported features
 
 For a given release, this table shows:
-* The PostgreSQL version packaged inside.
+* The PostgreSQL 14 version packaged inside.
 * The minimum Juju 3 version required to reliably operate **all** features of the release
    > This charm still supports older versions of Juju down to 2.9. See the [Juju section of the system requirements](/reference/system-requirements) for more details.
 * Support for specific features
@@ -26,10 +26,8 @@ For a given release, this table shows:
 
 \* **TLS encryption**: Support for **`v2` or higher** of the [`tls-certificates` interface](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates). This means that you can integrate with [modern TLS charms](https://charmhub.io/topics/security-with-x-509-certificates).
 
-For more details about a particular revision, refer to its dedicated Release Notes page.
-For more details about each feature/interface, refer to the documentation linked in the column header.
-
 ## Architecture and base
+
 Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneously for different [bases/series](https://juju.is/docs/juju/base) using the same charm code. In other words, one release contains multiple revisions.
 
 If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.

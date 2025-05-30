@@ -35,6 +35,7 @@ The charm is based on the [charmed-postgresql snap](https://snapcraft.io/charmed
 [Contact us](/reference/contacts) if you are interested in a new architecture!
 
 ## Networking
+
 * Access to the internet is required for downloading required snaps and charms
 * Only IPv4 is supported at the moment
   * See more information about this limitation in [this Jira issue](https://warthogs.atlassian.net/browse/DPE-4695)

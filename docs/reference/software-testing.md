@@ -45,10 +45,12 @@ watch -n1 -x juju ssh postgresql/leader "psql postgresql://${user}:${pass}@${ip}
 </details>
 
 ### Expected results
+
 * `postgresql-test-app` continuously inserts records into the database received through the integration (the table `continuous_writes`).
 * The counters (amount of records in table) are growing on all cluster members
 
 ### Tips
+
 To stop the "continuous write" test, run
 ```text
 juju run postgresql-test-app/leader stop-continuous-writes

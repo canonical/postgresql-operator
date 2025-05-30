@@ -17,7 +17,7 @@ As this charm documentation is written for Juju 3.x, users of 2.9.x will encount
 
 Breaking changes have been introduced in the Juju client between versions 2.9.x and 3.x. These are caused by the renaming and re-purposing of several commands - functionality and command options remain unchanged.
 
-In the context of this guide, the pertinent changes are as follows:
+In the context of this documentation, the pertinent changes are as follows:
 
 | v2.9.x | v3.x |
 | --- | --- |
@@ -31,16 +31,18 @@ See the [Juju 3.0 release notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---
 Example substitutions:
 
 ### Juju 3.x:
+
 ```text
 juju integrate postgresql:database postgresql-test-app
 
 juju run postgresql/leader get-password 
 ```
 ### Juju 2.9.x:
+
 ```text
 juju relate postgresql:database postgresql-test-app
 
 juju run-action --wait postgresql/leader get-password
 ```
-> :tipping_hand_man: [The document based on OpenStack guide.](https://docs.openstack.org/charm-guide/latest/project/support-notes.html#breaking-changes-between-juju-2-9-x-and-3-x)
+> This document is based on [this OpenStack guide](https://docs.openstack.org/charm-guide/latest/project/support-notes.html#breaking-changes-between-juju-2-9-x-and-3-x)
 
