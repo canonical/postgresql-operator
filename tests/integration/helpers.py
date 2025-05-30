@@ -276,18 +276,22 @@ def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
     return len(switchover_history_info.json())
 
 
-def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
+def db_connect(
+    host: str, password: str, username: str = "operator", database: str = "postgres"
+) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
     Args:
         host: the IP of the postgres host
-        password: operator user password
+        password: user password
+        username: username to connect with
+        database: database to connect to
 
     Returns:
         psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='{username}' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
