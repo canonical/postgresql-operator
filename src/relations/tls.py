@@ -197,7 +197,6 @@ class TLS(Object):
         operator_ca = str(certs[0].ca) if certs else ""
         if not (old_operator_ca := self.charm.get_secret(UNIT_SCOPE, "old-ca")):
             old_operator_ca = ""
-        logger.error(f"@@@@@@@@@@@{old_operator_ca}")
         internal_ca = self.charm.get_secret(APP_SCOPE, "internal-ca")
         return "\n".join((operator_ca, old_operator_ca, internal_ca))
 
