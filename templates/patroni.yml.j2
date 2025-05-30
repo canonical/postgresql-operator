@@ -183,15 +183,22 @@ postgresql:
       {%- if enable_tls %}
       sslrootcert: {{ conf_path }}/ca.pem
       {%- endif %}
+      sslcert: {{ conf_path }}/patroni_cert.pem
+      sslkey: {{ conf_path }}/patroni_key.pem
     rewind:
       username: {{ rewind_user }}
       password: {{ rewind_password }}
       {%- if enable_tls %}
       sslrootcert: {{ conf_path }}/ca.pem
       {%- endif %}
+      sslcert: {{ conf_path }}/patroni_cert.pem
+      sslkey: {{ conf_path }}/patroni_key.pem
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      {%- endif %}
       sslcert: {{ conf_path }}/patroni_cert.pem
       sslkey: {{ conf_path }}/patroni_key.pem
 use_unix_socket: true
