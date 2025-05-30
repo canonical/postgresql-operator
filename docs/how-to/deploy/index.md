@@ -16,7 +16,7 @@ Then, either continue with the `juju` client **or** use the `terraform juju` cli
 
 **To deploy with the `juju` client:**
 ```text
-juju deploy postgresql -n <number_of_replicas>
+juju deploy postgresql --channel 14/stable -n <number_of_replicas>
 ```
 > See also: [`juju deploy` command](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/deploy/)
 
@@ -43,16 +43,16 @@ See also:
 * [How to enable TLS]
 * [How to connect from outside the local network]
 
-### Airgapped
+## Airgapped
 [How to deploy in an offline or air-gapped environment] goes over the special configuration steps for installing PostgreSQL in an airgapped environment via CharmHub and the Snap Store Proxy.
 
-### Cluster-cluster replication
+## Cluster-cluster replication
 
 Cluster-cluster, cross-regional, or multi-server asynchronous replication focuses on disaster recovery by distributing data across different servers. 
 
 The [Cross-regional async replication] guide goes through the steps to set up clusters for cluster-cluster replication, integrate with a client, and remove or recover a failed cluster.
 
-### Juju storage
+## Juju storage
 Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilize data volume provided by different clouds while keeping the same UI/UX for end users.
 
 See: [How to deploy on juju storage]

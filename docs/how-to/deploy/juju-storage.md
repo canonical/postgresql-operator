@@ -24,7 +24,7 @@ Charmed PostgreSQL 14 supports single storage `pgdata` attaching it on `juju dep
 <details><summary>Example of 'Juju storage'</summary>
 
 ```text
-> juju deploy postgresql
+> juju deploy postgresql --channel 14/stable
 
 > juju storage
 Unit          Storage ID  Type        Size  Status   Message
@@ -59,7 +59,7 @@ pgdata/0:
 ### Define the storage size
 
 ```text
-> juju deploy postgresql --storage pgdata=10G
+> juju deploy postgresql --channel 14/stable --storage pgdata=10G
 
 > juju storage
 Unit          Storage ID  Type        Pool  Size    Status    Message
@@ -76,7 +76,7 @@ Juju supports wide list of different [storage pools](https://bobcares.com/blog/l
 > juju storage-pools | grep mystoragepool
 mystoragepool  lxd       
 
-> juju deploy postgresql --storage pgdata=5G,mystoragepool
+> juju deploy postgresql --channel 14/stable --storage pgdata=5G,mystoragepool
 
 > juju storage
 Unit          Storage ID  Type        Pool           Size    Status    Message

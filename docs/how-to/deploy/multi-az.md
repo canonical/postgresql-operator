@@ -44,7 +44,7 @@ Juju provides support for availability zones using [**constraints**](https://juj
 The command below demonstrates how Juju automatically deploys Charmed PostgreSQL VM using Juju constraints:
 
 ```text
-juju deploy postgresql -n 3 \
+juju deploy postgresql --channel 14/stable -n 3 \
   --constraints zones=us-east1-b,us-east1-c,us-east1-d
 ```
 

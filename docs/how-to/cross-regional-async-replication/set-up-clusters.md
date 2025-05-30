@@ -18,10 +18,10 @@ juju add-model rome
 juju add-model lisbon
 
 juju switch rome # active model must correspond to cluster
-juju deploy postgresql db1
+juju deploy postgresql --channel 14/stable db1
 
 juju switch lisbon 
-juju deploy postgresql db2
+juju deploy postgresql --channel 14/stable db2
 ```
 
 ## Offer

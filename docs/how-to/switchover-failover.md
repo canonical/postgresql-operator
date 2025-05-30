@@ -49,7 +49,7 @@ juju run postgresql/x promote-to-primary scope=unit force=true
 Deploy PostgreSQL 3 units:
 
 ```text
-> juju deploy postgresql --config synchronous_node_count=1
+> juju deploy postgresql --channel 14/stable --config synchronous_node_count=1
 
 > juju status 
 Model       Controller  Cloud/Region         Version  SLA          Timestamp

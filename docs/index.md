@@ -1,4 +1,4 @@
-# Charmed PostgreSQL 14
+# Charmed PostgreSQL documentation
 
 ```{note}
 This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL K8s](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/).

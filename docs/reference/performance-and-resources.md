@@ -22,7 +22,7 @@ Pre-deployed application profile change is planned but currently is NOT supporte
 You can set the profile during deployment using the `--config` flag. For example:
 
 ```text
-juju deploy postgresql --config profile=testing
+juju deploy postgresql --channel 14/stable --config profile=testing
 ```
 
 You can change the profile using the `juju config` action. For example:
@@ -38,12 +38,12 @@ For a list of all of this charm's config options, see the [Configuration tab](ht
 The Juju [`--constraints`](https://juju.is/docs/juju/constraint) flag sets RAM and CPU limits for [Juju units](https://juju.is/docs/juju/unit):
 
 ```text
-juju deploy postgresql --constraints cores=8 mem=16G
+juju deploy postgresql --channel 14/stable --constraints cores=8 mem=16G
 ```
 
 Juju constraints can be set together with the charm's profile:
 
 ```text
-juju deploy postgresql --constraints cores=8 mem=16G --config profile=testing
+juju deploy postgresql --channel 14/stable --constraints cores=8 mem=16G --config profile=testing
 ```
 
