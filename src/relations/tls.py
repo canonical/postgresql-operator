@@ -38,7 +38,6 @@ logger = logging.getLogger(__name__)
 SCOPE = "unit"
 TLS_CLIENT_RELATION = "client-certificates"
 TLS_PEER_RELATION = "peer-certificates"
-TLS_RELS = (TLS_CLIENT_RELATION, TLS_PEER_RELATION)
 
 
 class RefreshTLSCertificatesEvent(EventBase):
@@ -112,18 +111,28 @@ class TLS(Object):
         )
 
         self.framework.observe(
-            self.client_certificate.on.certificate_available,
-            self._on_certificate_available,
+            self.client_certificate.on.certificate_available, self._on_certificate_available
         )
         self.framework.observe(
-            self.peer_certificate.on.certificate_available,
-            self._on_certificate_available,
+            self.peer_certificate.on.certificate_available, self._on_peer_certificate_available
         )
 
-        for rel in TLS_RELS:
-            self.framework.observe(
-                self.charm.on[rel].relation_broken, self._on_certificate_available
-            )
+        self.framework.observe(
+            self.charm.on[TLS_CLIENT_RELATION].relation_broken, self._on_certificate_available
+        )
+        self.framework.observe(
+            self.charm.on[TLS_PEER_RELATION].relation_broken, self._on_peer_certificate_available
+        )
+
+    def _on_peer_certificate_available(self, event: EventBase) -> None:
+        certs, _ = self.peer_certificate.get_assigned_certificates()
+        new_ca = str(certs[0].ca) if certs else None
+        current_ca = self.charm.get_secret(UNIT_SCOPE, "current-ca")
+        # Stash the CAs in case of rotation
+        if new_ca != current_ca:
+            self.charm.set_secret(UNIT_SCOPE, "current-ca", new_ca)
+            self.charm.set_secret(UNIT_SCOPE, "old-ca", current_ca)
+        self._on_certificate_available(event)
 
     def _on_certificate_available(self, event: EventBase) -> None:
         if not self.charm.get_secret(APP_SCOPE, "internal-ca"):
@@ -188,8 +197,7 @@ class TLS(Object):
         operator_ca = str(certs[0].ca) if certs else ""
         if not (old_operator_ca := self.charm.get_secret(UNIT_SCOPE, "old-ca")):
             old_operator_ca = ""
-        if operator_ca == old_operator_ca:
-            old_operator_ca = ""
+        logger.error(f"@@@@@@@@@@@{old_operator_ca}")
         internal_ca = self.charm.get_secret(APP_SCOPE, "internal-ca")
         return "\n".join((operator_ca, old_operator_ca, internal_ca))
 
