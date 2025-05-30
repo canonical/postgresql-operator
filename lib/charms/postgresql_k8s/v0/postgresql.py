@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 54
+LIBPATCH = 55
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -848,13 +848,13 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                     """)
                     cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_create_schema
-    ON ddl_command_end
+    ON ddl_command_start
     WHEN TAG IN ('CREATE SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
                     """)
                     cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
-    ON ddl_command_end
+    ON ddl_command_start
     WHEN TAG IN ('DROP SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
                     """)
