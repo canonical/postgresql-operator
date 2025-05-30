@@ -84,7 +84,24 @@ async def test_predefined_catalog_roles(ops_test: OpsTest, charm) -> None:
                 logger.info("Reading data from the test table")
                 cursor.execute("SELECT * FROM test_table;")
                 result = cursor.fetchall()
-                assert len(result) == 1, "The owner user should be able to read the data"
+                assert len(result) == 1, "The database owner user should be able to read the data"
+
+                logger.info("Checking that the relation user can't create a table")
+                cursor.execute("DROP TABLE IF EXISTS test_table_2;")
+                cursor.execute("RESET ROLE;")
+                cursor.execute("SELECT session_user,current_user;")
+                result = cursor.fetchone()
+                if result is not None:
+                    assert result[0] == username, (
+                        "The session user should be the relation user in the primary"
+                    )
+                    assert result[1] == username, (
+                        "The current user should be the relation user in the primary"
+                    )
+                else:
+                    assert False, "No result returned from the query"
+                with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                    cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
         finally:
             if connection is not None:
                 connection.close()
