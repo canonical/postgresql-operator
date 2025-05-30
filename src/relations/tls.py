@@ -10,7 +10,6 @@ from typing import TYPE_CHECKING
 
 from charms.tls_certificates_interface.v4.tls_certificates import (
     Certificate,
-    CertificateAvailableEvent,
     CertificateRequestAttributes,
     PrivateKey,
     TLSCertificatesRequiresV4,
@@ -21,7 +20,6 @@ from charms.tls_certificates_interface.v4.tls_certificates import (
 )
 from ops import (
     EventSource,
-    RelationBrokenEvent,
 )
 from ops.framework import EventBase, Object
 from ops.pebble import ConnectionError as PebbleConnectionError
@@ -124,10 +122,14 @@ class TLS(Object):
 
         for rel in TLS_RELS:
             self.framework.observe(
-                self.charm.on[rel].relation_broken, self._on_certificates_broken
+                self.charm.on[rel].relation_broken, self._on_certificate_available
             )
 
-    def _on_certificate_available(self, event: CertificateAvailableEvent) -> None:
+    def _on_certificate_available(self, event: EventBase) -> None:
+        if not self.charm.get_secret("app", "internal-ca"):
+            logger.debug("Charm not ready yet")
+            event.defer()
+            return
         try:
             if not self.charm.push_tls_files_to_workload():
                 logger.debug("Cannot push TLS certificates at this moment")
@@ -137,14 +139,6 @@ class TLS(Object):
             logger.error("Cannot push TLS certificates: %r", e)
             event.defer()
             return
-        if not self.charm.update_config():
-            logger.debug("Cannot update config at this moment")
-            event.defer()
-
-    def _on_certificates_broken(self, event: RelationBrokenEvent) -> None:
-        if not self.charm.update_config():
-            logger.debug("Cannot update config at this moment")
-            event.defer()
 
     def get_client_tls_files(self) -> (str | None, str | None, str | None):
         """Prepare TLS files in special PostgreSQL way.
@@ -205,7 +199,7 @@ class TLS(Object):
             common_name=f"{self.charm.app.name}-{self.charm.model.uuid}",
             validity=timedelta(days=7300),
         )
-        logger.warning("Internal peer CA generated")
+        logger.warning("Internal peer CA generated. Please use a proper TLS operator if possible.")
         self.charm.set_secret(APP_SCOPE, "internal-ca-key", str(private_key))
         self.charm.set_secret(APP_SCOPE, "internal-ca", str(ca))
 
@@ -221,6 +215,8 @@ class TLS(Object):
             sans_dns=frozenset({
                 self.host,
                 socket.getfqdn(),
+                # IP address need to be part of the DNS SANs list due to
+                # https://github.com/pgbackrest/pgbackrest/issues/1977.
                 *self.peer_addresses,
             }),
         )
