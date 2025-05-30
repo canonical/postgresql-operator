@@ -241,9 +241,7 @@ async def is_cluster_updated(
 
     # Verify that no writes to the database were missed after stopping the writes.
     logger.info("checking that no writes to the database were missed after stopping the writes")
-    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
-        with attempt:
-            total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
+    total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
 
     # Verify that old primary is up-to-date.
     logger.info("checking that the former primary is up to date with the cluster after restarting")
@@ -259,17 +257,19 @@ async def check_writes(
 ) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes, max_number_written = await count_writes(
-        ops_test, use_ip_from_inside=use_ip_from_inside, extra_model=extra_model
-    )
-    for member, count in actual_writes.items():
-        print(
-            f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}"
-        )
-        assert count == max_number_written[member], (
-            f"{member}: writes to the db were missed: count of actual writes different from the max number written."
-        )
-        assert total_expected_writes == count, f"{member}: writes to the db were missed."
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            actual_writes, max_number_written = await count_writes(
+                ops_test, use_ip_from_inside=use_ip_from_inside, extra_model=extra_model
+            )
+            for member, count in actual_writes.items():
+                logger.info(
+                    f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}"
+                )
+                assert count == max_number_written[member], (
+                    f"{member}: writes to the db were missed: count of actual writes different from the max number written."
+                )
+                assert total_expected_writes == count, f"{member}: writes to the db were missed."
     return total_expected_writes
 
 
