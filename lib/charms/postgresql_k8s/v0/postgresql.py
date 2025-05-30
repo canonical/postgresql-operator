@@ -803,6 +803,11 @@ BEGIN
 	current_session_user := (SELECT session_user);
     owner_user := database || '_owner';
     admin_user := database || '_admin';
+    
+    IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) > 0 THEN
+        RAISE NOTICE 'Predefined catalog roles already exist for database %', database;
+		RETURN;
+	END IF;
 
     statements := ARRAY[
         'REVOKE CREATE ON DATABASE ' || database || ' FROM charmed_databases_owner;',
