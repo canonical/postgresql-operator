@@ -126,7 +126,7 @@ class TLS(Object):
             )
 
     def _on_certificate_available(self, event: EventBase) -> None:
-        if not self.charm.get_secret("app", "internal-ca"):
+        if not self.charm.get_secret(APP_SCOPE, "internal-ca"):
             logger.debug("Charm not ready yet")
             event.defer()
             return
@@ -177,21 +177,23 @@ class TLS(Object):
             cert = str(certs[0].certificate)
             ca_file = str(certs[0].ca)
         if not all((key, ca_file, cert)):
-            key = self.charm.get_secret("unit", "internal-key")
-            cert = self.charm.get_secret("unit", "internal-cert")
-            ca_file = self.charm.get_secret("app", "internal-ca")
+            key = self.charm.get_secret(UNIT_SCOPE, "internal-key")
+            cert = self.charm.get_secret(UNIT_SCOPE, "internal-cert")
+            ca_file = self.charm.get_secret(APP_SCOPE, "internal-ca")
         return key, ca_file, cert
 
-    def get_peer_ca_bundle(self):
+    def get_peer_ca_bundle(self) -> str:
         """Get bundled CA certs."""
-        ca_file = ""
         certs, _ = self.peer_certificate.get_assigned_certificates()
-        if certs:
-            ca_file += str(certs[0].ca) + "\n"
-        ca_file += self.charm.get_secret("app", "internal-ca")
-        return ca_file
+        operator_ca = str(certs[0].ca) if certs else ""
+        if not (old_operator_ca := self.charm.get_secret(UNIT_SCOPE, "old-ca")):
+            old_operator_ca = ""
+        if operator_ca == old_operator_ca:
+            old_operator_ca = ""
+        internal_ca = self.charm.get_secret(APP_SCOPE, "internal-ca")
+        return "\n".join((operator_ca, old_operator_ca, internal_ca))
 
-    def generate_internal_peer_ca(self):
+    def generate_internal_peer_ca(self) -> None:
         """Generate internal peer CA using the tls lib."""
         private_key = generate_private_key()
         ca = generate_ca(
@@ -203,10 +205,10 @@ class TLS(Object):
         self.charm.set_secret(APP_SCOPE, "internal-ca-key", str(private_key))
         self.charm.set_secret(APP_SCOPE, "internal-ca", str(ca))
 
-    def generate_internal_peer_cert(self):
+    def generate_internal_peer_cert(self) -> None:
         """Generate internal peer certificate using the tls lib."""
-        ca_key = PrivateKey.from_string(self.charm.get_secret("app", "internal-ca-key"))
-        ca = Certificate.from_string(self.charm.get_secret("app", "internal-ca"))
+        ca_key = PrivateKey.from_string(self.charm.get_secret(APP_SCOPE, "internal-ca-key"))
+        ca = Certificate.from_string(self.charm.get_secret(APP_SCOPE, "internal-ca"))
         private_key = generate_private_key()
         csr = generate_csr(
             private_key,
