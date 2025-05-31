@@ -753,38 +753,48 @@ class PostgreSQLBackups(Object):
             )
         return return_code == 0
 
-    def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
-        """Call the stanza initialization when the credentials or the connection info change."""
+    def _credential_changed_checks(self, event: CredentialsChangedEvent) -> bool:
         if not self.charm.is_cluster_initialised or not self.charm.get_secret(
             UNIT_SCOPE, "internal-cert"
         ):
             logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
             event.defer()
-            return
+            return False
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
         if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
             logger.info("Cannot change S3 configuration in bad PITR restore status")
             event.defer()
-            return
+            return False
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
         if self.charm.is_cluster_restoring_backup or self.charm.is_cluster_restoring_to_time:
             logger.info("Cannot change S3 configuration during restore")
             event.defer()
-            return
+            return False
 
         if not self._render_pgbackrest_conf_file():
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
-            return
+            return False
 
         if not self._can_initialise_stanza:
             logger.debug("Cannot initialise stanza yet.")
             event.defer()
+            return False
+        return True
+
+    def _on_s3_credential_changed(self, event: CredentialsChangedEvent) -> None:
+        """Call the stanza initialization when the credentials or the connection info change."""
+        if not self._credential_changed_checks(event):
             return
 
         # Start the pgBackRest service for the check_stanza to be successful. It's required to run on all the units if the tls is enabled.
-        self.start_stop_pgbackrest_service()
+        try:
+            self.start_stop_pgbackrest_service()
+        except RetryError:
+            logger.debug("Cannot initialise service yet.")
+            event.defer()
+            return
 
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
