@@ -944,6 +944,7 @@ def test_on_s3_credential_changed(harness):
         ) as _is_standby_leader,
         patch("time.gmtime"),
         patch("time.asctime", return_value="Thu Feb 24 05:00:00 2022"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
         # Test when the cluster was not initialised yet.

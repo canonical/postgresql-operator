@@ -43,6 +43,7 @@ from constants import (
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
+    UNIT_SCOPE,
 )
 
 logger = logging.getLogger(__name__)
@@ -754,7 +755,9 @@ class PostgreSQLBackups(Object):
 
     def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
         """Call the stanza initialization when the credentials or the connection info change."""
-        if not self.charm.is_cluster_initialised:
+        if not self.charm.is_cluster_initialised or not self.charm.get_secret(
+            UNIT_SCOPE, "internal-cert"
+        ):
             logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
             event.defer()
             return
