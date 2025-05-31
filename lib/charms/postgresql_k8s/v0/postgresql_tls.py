@@ -23,7 +23,7 @@ import ipaddress
 import logging
 import re
 import socket
-from typing import List, Optional
+from typing import Iterator, List, Optional
 
 from charms.certificate_transfer_interface.v0.certificate_transfer import (
     CertificateAvailableEvent as CertificateAddedEvent,
@@ -55,7 +55,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version.
-LIBPATCH = 14
+LIBPATCH = 15
 
 logger = logging.getLogger(__name__)
 SCOPE = "unit"
@@ -268,6 +268,17 @@ class PostgreSQLTLS(Object):
             "sans_ip": sans_ip,
             "sans_dns": sans_dns,
         }
+
+    def get_ca_secret_names(self) -> Iterator[str]:
+        """Get a secret-name for each relation fulfilling the CA transfer interface.
+
+        Returns:
+            Secret name for a CA transfer fulfilled interface.
+        """
+        relations = self.charm.model.relations.get(TLS_TRANSFER_RELATION, [])
+
+        for relation in relations:
+            yield f"ca-{relation.app.name}"
 
     def get_tls_files(self) -> (Optional[str], Optional[str], Optional[str]):
         """Prepare TLS files in special PostgreSQL way.
