@@ -75,6 +75,11 @@ Currently, the charm supports architecture `amd64` (all revisions) and `arm64` (
 
 See the technical details in [Supported architectures](/t/11743).
 
+## Workload artifacts
+
+The legacy charm used to deploy PostgreSQL from APT/Debian packages,
+while the modern charm installs and operates PostgreSQL snap "[charmed-postgresql](https://snapcraft.io/charmed-postgresql)". Check more details in [the modern charm architecture](/t/11857).
+
 ## How to report issues and contact authors
 
 The "legacy charm" (from `latest/stable`) is stored on [Launchpad](https://git.launchpad.net/postgresql-charm/), here is the link to report all [legacy charm issues](https://bugs.launchpad.net/postgresql-charm).

@@ -58,18 +58,20 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | h-deploy-gce | [GCE](/t/15722) |
 | 3 | h-deploy-azure | [Azure](/t/15733) |
 | 3 | h-deploy-multi-az | [Multi-AZ](/t/15749) |
-| 3 | h-deploy-terraform | [Terraform](/t/14916) |
 | 3 | h-deploy-tls-vip-access | [TLS VIP access](/t/16576) |
-| 3 | h-deploy-juju-spaces | [Juju spaces](/t/17416) |
+| 3 | h-deploy-terraform | [Terraform](/t/14916) |
 | 3 | h-deploy-airgapped | [Air-gapped](/t/15746) |
+| 3 | h-deploy-juju-spaces | [Juju spaces](/t/17416) |
 | 3 | h-deploy-juju-storage | [Juju storage](/t/17529) |
 | 2 | h-integrate | [Integrate with another application](/t/9687) |
+| 2 | h-manage-passwords | [Manage passwords](/t/17692) |
 | 2 | h-external-access | [External network access](/t/15802) |
 | 2 | h-scale | [Scale replicas](/t/9689) |
 | 2 | h-switchover-failover | [Switchover/failover](/t/17523) |
 | 2 | h-enable-tls | [Enable TLS](/t/9685) |
 | 2 | h-enable-ldap | [Enable LDAP](/t/17361) |
 | 2 | h-enable-plugins-extensions | [Enable plugins/extensions](/t/10906) |
+| 3 | r-plugins-timescaledb | [Enable TimescaleDB](/t/17528) |
 | 2 | h-backup | [Back up and restore]() |
 | 3 | h-configure-s3-aws | [Configure S3 AWS](/t/9681) |
 | 3 | h-configure-s3-radosgw | [Configure S3 RadosGW](/t/10313) |
@@ -103,7 +105,6 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | r-sos-report | [SOS report](/t/17228) |
 | 3 | r-cli-helpers | [CLI helpers](/t/17406) |
 | 2 | r-plugins-extensions | [Plugins/extensions](/t/10946) |
-| 3 | r-plugins-timescaledb | [TimescaleDB](/t/17528) |
 | 2 | r-alert-rules | [Alert rules](/t/15841) |
 | 2 | r-statuses | [Statuses](/t/10844) |
 | 2 | r-contacts | [Contacts](/t/11863) |
@@ -114,6 +115,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 2 | e-legacy-charm | [Legacy charm](/t/10690) |
 | 2 | e-units | [Units](/t/17525) |
 | 2 | e-users | [Users](/t/10798) |
+| 2 | e-roles | [Roles](/t/17725) |
 | 2 | e-logs | [Logs](/t/12099) |
 | 2 | e-connection-pooling| [Connection pooling](/t/15777) |
 | 2 | e-security | [Security](/t/16852) |
@@ -136,3 +138,13 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 | 3 | r-revision-336 | [Revision 336](/t/11877) |
 | 3 | r-revision-288 | [Revision 288](/t/11876) |
 -->
+
+# Redirects
+
+[details=Mapping table]
+
+| Original path | New location |
+| -------------------- | -------------------- |
+| /postgresql/docs/r-channels | /postgresql/docs/r-versions |
+
+[/details]
