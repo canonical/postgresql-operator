@@ -10,19 +10,22 @@ import os
 import pwd
 import re
 import shutil
+import ssl
 import subprocess
+from asyncio import as_completed, create_task, run, wait
+from contextlib import suppress
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Optional, TypedDict
 
 import charm_refresh
 import psutil
 import requests
+from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
-    AttemptManager,
     RetryError,
     Retrying,
     retry,
@@ -175,6 +178,10 @@ class Patroni:
         return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
     @property
+    def _patroni_async_auth(self) -> BasicAuth:
+        return BasicAuth("patroni", password=self.patroni_password)
+
+    @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
@@ -251,25 +258,13 @@ class Patroni:
             if snp["name"] == charm_refresh.snap_name():
                 return snp["version"]
 
-    def cluster_status(
-        self, alternative_endpoints: Optional[list] = None
-    ) -> Optional[list[ClusterMember]]:
+    def cluster_status(self, alternative_endpoints: Optional[list] = None) -> list[ClusterMember]:
         """Query the cluster status."""
-        # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                if alternative_endpoints:
-                    request_url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
-                else:
-                    request_url = self._patroni_url
-
-                cluster_status = requests.get(
-                    f"{request_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                return cluster_status.json()["members"]
+        if response := self.parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
+        ):
+            return response["members"]
+        return []
 
     def get_member_ip(self, member_name: str) -> Optional[str]:
         """Get cluster member IP address.
@@ -306,6 +301,42 @@ class Patroni:
                     return member["state"]
         return ""
 
+    async def _aiohttp_get_request(self, url):
+        ssl_ctx = ssl.create_default_context()
+        with suppress(FileNotFoundError):
+            ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
+        async with ClientSession(
+            auth=self._patroni_async_auth,
+            timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),
+        ) as session:
+            try:
+                async with session.get(url, ssl=ssl_ctx) as response:
+                    if response.status > 299:
+                        logger.debug(
+                            "Call failed with status code {response.status}: {response.text()}"
+                        )
+                        return
+                    return await response.json()
+            except (ClientError, ValueError):
+                return None
+
+    async def _async_get_request(self, uri, endpoints):
+        tasks = [
+            create_task(self._aiohttp_get_request(f"http://{ip}:8008{uri}")) for ip in endpoints
+        ] + [create_task(self._aiohttp_get_request(f"https://{ip}:8008{uri}")) for ip in endpoints]
+        for task in as_completed(tasks):
+            if result := await task:
+                for task in tasks:
+                    task.cancel()
+                await wait(tasks)
+                return result
+
+    def parallel_patroni_get_request(self, uri: str, endpoints: list[str] | None = None) -> dict:
+        """Call all possible patroni endpoints in parallel."""
+        if not endpoints:
+            endpoints = (self.unit_ip, *self.peers_ips)
+        return run(self._async_get_request(uri, endpoints))
+
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
     ) -> Optional[str]:
@@ -341,71 +372,25 @@ class Patroni:
             standby leader pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                for member in cluster_status.json()["members"]:
-                    if member["role"] == "standby_leader":
-                        if check_whether_is_running and member["state"] not in RUNNING_STATES:
-                            logger.warning(f"standby leader {member['name']} is not running")
-                            continue
-                        standby_leader = member["name"]
-                        if unit_name_pattern:
-                            # Change the last dash to / in order to match unit name pattern.
-                            standby_leader = label2name(standby_leader)
-                        return standby_leader
+        for member in self.cluster_status():
+            if member["role"] == "standby_leader":
+                if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                    logger.warning(f"standby leader {member['name']} is not running")
+                    continue
+                standby_leader = member["name"]
+                if unit_name_pattern:
+                    # Change the last dash to / in order to match unit name pattern.
+                    standby_leader = label2name(standby_leader)
+                return standby_leader
 
     def get_sync_standby_names(self) -> list[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt)
-                r = requests.get(
-                    f"{url}/cluster",
-                    verify=self.verify,
-                    auth=self._patroni_auth,
-                    timeout=PATRONI_TIMEOUT,
-                )
-                for member in r.json()["members"]:
-                    if member["role"] == "sync_standby":
-                        sync_standbys.append(label2name(member["name"]))
+        for member in self.cluster_status():
+            if member["role"] == "sync_standby":
+                sync_standbys.append(label2name(member["name"]))
         return sync_standbys
-
-    def _get_alternative_patroni_url(
-        self, attempt: AttemptManager, alternative_endpoints: list[str] | None = None
-    ) -> str:
-        """Get an alternative REST API URL from another member each time.
-
-        When the Patroni process is not running in the current unit it's needed
-        to use a URL from another cluster member REST API to do some operations.
-        """
-        if alternative_endpoints is not None:
-            return self._patroni_url.replace(
-                self.unit_ip, alternative_endpoints[attempt.retry_state.attempt_number - 1]
-            )
-        attempt_number = attempt.retry_state.attempt_number
-        if attempt_number > 1:
-            url = self._patroni_url
-            # Build the URL using http and later using https for each peer.
-            if (attempt_number - 1) <= len(self.peers_ips):
-                url = url.replace("https://", "http://")
-                unit_number = attempt_number - 2
-            else:
-                url = url.replace("http://", "https://")
-                unit_number = attempt_number - 2 - len(self.peers_ips)
-            other_unit_ip = list(self.peers_ips)[unit_number]
-            url = url.replace(self.unit_ip, other_unit_ip)
-        else:
-            url = self._patroni_url
-        return url
 
     def are_all_members_ready(self) -> bool:
         """Check if all members are correctly running Patroni and PostgreSQL.
