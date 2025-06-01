@@ -255,12 +255,13 @@ class Patroni:
         # Request info from cluster endpoint (which returns all members of the cluster).
         # TODO we don't know the other cluster's ca
         verify = self.verify if not alternative_endpoints else False
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
+        for attempt in Retrying(
+            stop=stop_after_attempt(
+                len(alternative_endpoints) if alternative_endpoints else len(self.peers_ips)
+            )
+        ):
             with attempt:
-                if alternative_endpoints:
-                    request_url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
-                else:
-                    request_url = self._patroni_url
+                request_url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
 
                 cluster_status = requests.get(
                     f"{request_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
@@ -340,42 +341,28 @@ class Patroni:
             standby leader pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt)
-                cluster_status = requests.get(
-                    f"{url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=self.verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                for member in cluster_status.json()["members"]:
-                    if member["role"] == "standby_leader":
-                        if check_whether_is_running and member["state"] not in RUNNING_STATES:
-                            logger.warning(f"standby leader {member['name']} is not running")
-                            continue
-                        standby_leader = member["name"]
-                        if unit_name_pattern:
-                            # Change the last dash to / in order to match unit name pattern.
-                            standby_leader = label2name(standby_leader)
-                        return standby_leader
+        cluster_status = self.cluster_status()
+        if cluster_status:
+            for member in cluster_status:
+                if member["role"] == "standby_leader":
+                    if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                        logger.warning(f"standby leader {member['name']} is not running")
+                        continue
+                    standby_leader = member["name"]
+                    if unit_name_pattern:
+                        # Change the last dash to / in order to match unit name pattern.
+                        standby_leader = label2name(standby_leader)
+                    return standby_leader
 
     def get_sync_standby_names(self) -> list[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for attempt in Retrying(stop=stop_after_attempt(2 * len(self.peers_ips) + 1)):
-            with attempt:
-                url = self._get_alternative_patroni_url(attempt)
-                r = requests.get(
-                    f"{url}/cluster",
-                    verify=self.verify,
-                    auth=self._patroni_auth,
-                    timeout=PATRONI_TIMEOUT,
-                )
-                for member in r.json()["members"]:
-                    if member["role"] == "sync_standby":
-                        sync_standbys.append(label2name(member["name"]))
+        cluster_status = self.cluster_status()
+        if cluster_status:
+            for member in cluster_status:
+                if member["role"] == "sync_standby":
+                    sync_standbys.append(label2name(member["name"]))
         return sync_standbys
 
     def _get_alternative_patroni_url(
