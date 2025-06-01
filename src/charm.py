@@ -26,7 +26,7 @@ import ops.log
 import psycopg2
 import tomli
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
-from charms.data_platform_libs.v0.data_models import TypedCharmBase
+from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
 from charms.postgresql_k8s.v0.postgresql import (
@@ -43,7 +43,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from ops import JujuVersion, main
+from ops import main
 from ops.charm import (
     ActionEvent,
     HookEvent,
@@ -261,8 +261,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             deleted_label=SECRET_DELETED_LABEL,
         )
 
-        juju_version = JujuVersion.from_environ()
-        run_cmd = "/usr/bin/juju-exec" if juju_version.major > 2 else "/usr/bin/juju-run"
+        run_cmd = "/usr/bin/juju-exec"
         self._observer = ClusterTopologyObserver(self, run_cmd)
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
@@ -850,9 +849,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # If the unit is the leader, it can reconfigure the cluster.
         if self.unit.is_leader() and not self._reconfigure_cluster(event):
             event.defer()
-            return False
-
-        if self._update_member_ip():
             return False
 
         # Don't update this member before it's part of the members list.
@@ -1446,6 +1442,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
+
+        if self._update_member_ip():
+            # Update the sync-standby endpoint in the async replication data.
+            self.async_replication.update_async_replication_data()
+            return
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
