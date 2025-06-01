@@ -85,7 +85,6 @@ def patroni(harness, peers_ips):
         "fake-superuser-password",
         "fake-replication-password",
         "fake-rewind-password",
-        False,
         "fake-raft-password",
         "fake-patroni-password",
     )
@@ -438,8 +437,8 @@ def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
-            f"http://{patroni.unit_ip}:8008/reinitialize",
-            verify=True,
+            f"https://{patroni.unit_ip}:8008/reinitialize",
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -456,9 +455,9 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover()
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover",
+            "https://1.1.1.1:8008/switchover",
             json={"leader": "primary"},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -468,9 +467,9 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover("candidate")
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover",
+            "https://1.1.1.1:8008/switchover",
             json={"leader": "primary", "candidate": "candidate"},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -504,9 +503,9 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         patroni.update_synchronous_node_count()
 
         _patch.assert_called_once_with(
-            "http://1.1.1.1:8008/config",
+            "https://1.1.1.1:8008/config",
             json={"synchronous_node_count": 0},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -555,7 +554,10 @@ def test_member_started_true(peers_ips, patroni):
         assert patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -570,7 +572,10 @@ def test_member_started_false(peers_ips, patroni):
         assert not patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -585,7 +590,10 @@ def test_member_started_error(peers_ips, patroni):
         assert not patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -600,7 +608,10 @@ def test_member_inactive_true(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -615,7 +626,10 @@ def test_member_inactive_false(peers_ips, patroni):
         assert not patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -630,7 +644,10 @@ def test_member_inactive_error(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 

@@ -241,7 +241,7 @@ class PostgreSQLProvider(Object):
 
         tls = "True" if self.charm.is_tls_enabled else "False"
         if tls == "True":
-            _, ca, _ = self.charm.tls.get_tls_files()
+            _, ca, _ = self.charm.tls.get_client_tls_files()
         else:
             ca = ""
 

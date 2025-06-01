@@ -15,7 +15,7 @@ from urllib.request import urlopen
 
 API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
-TLS_CA_FILE = "ca.pem"
+TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
 SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
 SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/etc"
 PATRONI_CONF_PATH = f"{SNAP_CONF_PATH}/patroni"
@@ -63,7 +63,7 @@ async def main():
         # Disable TLS chain verification
         context = create_default_context()
         with suppress(FileNotFoundError):
-            context.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
+            context.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
         context.check_hostname = False
         context.verify_mode = CERT_NONE
 

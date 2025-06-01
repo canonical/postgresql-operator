@@ -15,7 +15,7 @@ import subprocess
 from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Optional, TypedDict
+from typing import TYPE_CHECKING, Any, TypedDict
 
 import charm_refresh
 import psutil
@@ -48,7 +48,7 @@ from constants import (
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
     REWIND_USER,
-    TLS_CA_FILE,
+    TLS_CA_BUNDLE_FILE,
     USER,
 )
 from utils import label2name
@@ -136,7 +136,6 @@ class Patroni:
         superuser_password: str,
         replication_password: str,
         rewind_password: str,
-        tls_enabled: bool,
         raft_password: str,
         patroni_password: str,
     ):
@@ -152,7 +151,6 @@ class Patroni:
             superuser_password: password for the operator user
             replication_password: password for the user used in the replication
             rewind_password: password for the user used on rewinds
-            tls_enabled: whether TLS is enabled
             raft_password: password for raft
             patroni_password: password for the user used on patroni
         """
@@ -167,11 +165,10 @@ class Patroni:
         self.rewind_password = rewind_password
         self.raft_password = raft_password
         self.patroni_password = patroni_password
-        self.tls_enabled = tls_enabled
         # Variable mapping to requests library verify parameter.
         # The CA bundle file is used to validate the server certificate when
         # TLS is enabled, otherwise True is set because it's the default value.
-        self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
+        self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}"
 
     @property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
@@ -184,7 +181,7 @@ class Patroni:
     @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
-        return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
+        return f"https://{self.unit_ip}:8008"
 
     @staticmethod
     def _dict_to_hba_string(_dict: dict[str, Any]) -> str:
@@ -258,15 +255,16 @@ class Patroni:
             if snp["name"] == charm_refresh.snap_name():
                 return snp["version"]
 
-    def cluster_status(self, alternative_endpoints: Optional[list] = None) -> list[ClusterMember]:
+    def cluster_status(self, alternative_endpoints: list | None = None) -> list[ClusterMember]:
         """Query the cluster status."""
+        # Request info from cluster endpoint (which returns all members of the cluster).
         if response := self.parallel_patroni_get_request(
             f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
         ):
             return response["members"]
         return []
 
-    def get_member_ip(self, member_name: str) -> Optional[str]:
+    def get_member_ip(self, member_name: str) -> str | None:
         """Get cluster member IP address.
 
         Args:
@@ -304,7 +302,7 @@ class Patroni:
     async def _aiohttp_get_request(self, url):
         ssl_ctx = ssl.create_default_context()
         with suppress(FileNotFoundError):
-            ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}")
+            ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
         async with ClientSession(
             auth=self._patroni_async_auth,
             timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),
@@ -339,7 +337,7 @@ class Patroni:
 
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
-    ) -> Optional[str]:
+    ) -> str | None:
         """Get primary instance.
 
         Args:
@@ -372,24 +370,28 @@ class Patroni:
             standby leader pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for member in self.cluster_status():
-            if member["role"] == "standby_leader":
-                if check_whether_is_running and member["state"] not in RUNNING_STATES:
-                    logger.warning(f"standby leader {member['name']} is not running")
-                    continue
-                standby_leader = member["name"]
-                if unit_name_pattern:
-                    # Change the last dash to / in order to match unit name pattern.
-                    standby_leader = label2name(standby_leader)
-                return standby_leader
+        cluster_status = self.cluster_status()
+        if cluster_status:
+            for member in cluster_status:
+                if member["role"] == "standby_leader":
+                    if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                        logger.warning(f"standby leader {member['name']} is not running")
+                        continue
+                    standby_leader = member["name"]
+                    if unit_name_pattern:
+                        # Change the last dash to / in order to match unit name pattern.
+                        standby_leader = label2name(standby_leader)
+                    return standby_leader
 
     def get_sync_standby_names(self) -> list[str]:
         """Get the list of sync standby unit names."""
         sync_standbys = []
         # Request info from cluster endpoint (which returns all members of the cluster).
-        for member in self.cluster_status():
-            if member["role"] == "sync_standby":
-                sync_standbys.append(label2name(member["name"]))
+        cluster_status = self.cluster_status()
+        if cluster_status:
+            for member in cluster_status:
+                if member["role"] == "sync_standby":
+                    sync_standbys.append(label2name(member["name"]))
         return sync_standbys
 
     def are_all_members_ready(self) -> bool:
@@ -657,7 +659,7 @@ class Patroni:
             connectivity: whether to allow external connections to the database.
             is_creating_backup: whether this unit is creating a backup.
             enable_ldap: whether to enable LDAP authentication.
-            enable_tls: whether to enable TLS.
+            enable_tls: whether to enable client TLS.
             stanza: name of the stanza created by pgBackRest.
             restore_stanza: name of the stanza used when restoring a backup.
             disable_pgbackrest_archiving: whether to force disable pgBackRest WAL archiving.
