@@ -28,11 +28,6 @@ from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
-from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
-from relations.logical_replication import (
-    LOGICAL_REPLICATION_OFFER_RELATION,
-    LOGICAL_REPLICATION_RELATION,
-)
 
 from constants import (
     BACKUP_ID_FORMAT,
@@ -47,6 +42,11 @@ from constants import (
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
     UNIT_SCOPE,
+)
+from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
+from relations.logical_replication import (
+    LOGICAL_REPLICATION_OFFER_RELATION,
+    LOGICAL_REPLICATION_RELATION,
 )
 
 logger = logging.getLogger(__name__)

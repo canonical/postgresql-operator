@@ -130,6 +130,9 @@ from relations.logical_replication import (
     LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS,
     PostgreSQLLogicalReplication,
 )
+from relations.postgresql_provider import PostgreSQLProvider
+from rotate_logs import RotateLogs
+from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
