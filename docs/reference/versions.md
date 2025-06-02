@@ -103,7 +103,6 @@ Learn more in the [legacy charm explanation page].
 [Recovery improvements]: /how-to-guides/switchover-failover
 [synchronous units]: https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count
 [internal charm passwords]: /explanation/users
-[rotation]: /tutorial/5-manage-passwords
 [Timescale Community Edition]: /how-to-guides/enable-plugins-extensions/enable-timescaledb
 [Extended COS integration]: /how-to-guides/monitoring-cos/enable-monitoring
 [Profiling via Parca]: /how-to-guides/monitoring-cos/enable-profiling
