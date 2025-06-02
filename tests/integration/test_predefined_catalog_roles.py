@@ -7,42 +7,69 @@ import psycopg2 as psycopg2
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
 
-from .helpers import DATABASE_APP_NAME
+from .helpers import (
+    DATABASE_APP_NAME,
+    db_connect,
+    get_password,
+    get_unit_address,
+)
 
 logger = logging.getLogger(__name__)
 
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
+DATABASE_NAME = "test"
 RELATION_ENDPOINT = "postgresql"
 
 
 @pytest.mark.abort_on_fail
 async def test_deploy(ops_test: OpsTest, charm) -> None:
     """Deploy and relate the charms."""
-    logger.info("Deploying charms")
-    if DATABASE_APP_NAME not in ops_test.model.applications:
-        await ops_test.model.deploy(charm, config={"profile": "testing"}, num_units=2)
     reset_relation = False
-    if DATA_INTEGRATOR_APP_NAME not in ops_test.model.applications:
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, config={"database-name": "test"})
+    if DATABASE_APP_NAME not in ops_test.model.applications:
+        logger.info("Deploying database charm")
+        await ops_test.model.deploy(charm, config={"profile": "testing"}, num_units=2)
     else:
+        logger.info("Dropping test databases from already deployed database charm")
+        connection = None
+        try:
+            host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/0")
+            password = await get_password(ops_test, database_app_name=DATABASE_APP_NAME)
+            connection = db_connect(host, password)
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                cursor.execute(f"DROP DATABASE IF EXISTS {DATABASE_NAME};")
+                cursor.execute(f"DROP DATABASE IF EXISTS {DATABASE_NAME}_2;")
+        finally:
+            if connection is not None:
+                connection.close()
+        reset_relation = True
+    if DATA_INTEGRATOR_APP_NAME not in ops_test.model.applications:
+        logger.info("Deploying data integrator charm")
+        await ops_test.model.deploy(
+            DATA_INTEGRATOR_APP_NAME, config={"database-name": DATABASE_NAME}
+        )
+    else:
+        logger.info("Resetting extra user roles in already deployed data integrator charm")
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "extra-user-roles": ""
         })
         reset_relation = True
-    logger.info("Adding relation between charms")
     relations = [
         relation
         for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
         if not relation.is_peer and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
     ]
     if reset_relation and relations:
+        logger.info("Removing existing relation between charms")
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].remove_relation(
             f"{DATA_INTEGRATOR_APP_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME
         )
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
+        logger.info("Adding relation between charms")
         await ops_test.model.relate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
     if not relations:
+        logger.info("Adding relation between charms")
         await ops_test.model.relate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
@@ -80,7 +107,6 @@ async def test_permissions(ops_test: OpsTest) -> None:
             else:
                 assert False, "No result returned from the query"
             logger.info("Creating a test table and inserting data")
-            cursor.execute("DROP TABLE IF EXISTS test_table;")
             cursor.execute("CREATE TABLE test_table (id INTEGER);")
             logger.info("Inserting data into the test table")
             cursor.execute("INSERT INTO test_table(id) VALUES(1);")
@@ -91,10 +117,9 @@ async def test_permissions(ops_test: OpsTest) -> None:
 
             logger.info("Checking that the database owner user can't create a database")
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                cursor.execute("CREATE DATABASE test_2;")
+                cursor.execute(f"CREATE DATABASE {DATABASE_NAME}_2;")
 
             logger.info("Checking that the relation user can't create a table")
-            cursor.execute("DROP TABLE IF EXISTS test_table_2;")
             cursor.execute("RESET ROLE;")
             cursor.execute("SELECT session_user,current_user;")
             result = cursor.fetchone()
@@ -142,7 +167,7 @@ async def test_permissions(ops_test: OpsTest) -> None:
 @pytest.mark.abort_on_fail
 async def test_database_creation_permissions(ops_test: OpsTest) -> None:
     """Test that the database creation permissions are correctly set for the extra user role."""
-    logger.info("Removing relation")
+    logger.info("Removing existing relation between charms")
     await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].remove_relation(
         f"{DATA_INTEGRATOR_APP_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME
     )
@@ -185,7 +210,7 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
                 )
             else:
                 assert False, "No result returned from the query"
-            cursor.execute("CREATE DATABASE test_2;")
+            cursor.execute(f"CREATE DATABASE {DATABASE_NAME}_2;")
     finally:
         if connection is not None:
             connection.close()
