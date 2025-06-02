@@ -11,6 +11,7 @@ Additional context about key concepts behind the PostgreSQL charm, including des
 ## Operational concepts
 * [Units]
 * [Users]
+* [Roles]
 * [Logs]
 * [Connection pooling]
 
@@ -25,6 +26,7 @@ Additional context about key concepts behind the PostgreSQL charm, including des
 [Interfaces and endpoints]: /explanation/interfaces-and-endpoints
 [Units]: /explanation/units
 [Users]: /explanation/users
+[roles]: /explanation/roles
 [Logs]: /explanation/logs
 [Juju]: /explanation/juju
 [Legacy charm]: /explanation/legacy-charm
