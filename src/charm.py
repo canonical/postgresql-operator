@@ -1412,6 +1412,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_config_changed: no peer relation")
             event.defer()
             return
+        self.update_endpoint_addresses()
 
         if not self.is_cluster_initialised:
             logger.debug("Defer on_config_changed: cluster not initialised yet")
@@ -1444,8 +1445,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_config_changed: unable to set synchronous node count")
             event.defer()
             return
-
-        self.update_endpoint_addresses()
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
