@@ -231,6 +231,8 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
             else:
                 assert False, "No result returned from the query"
             cursor.execute(f"CREATE DATABASE {DATABASE_NAME}_2;")
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
     finally:
         if connection is not None:
             connection.close()
