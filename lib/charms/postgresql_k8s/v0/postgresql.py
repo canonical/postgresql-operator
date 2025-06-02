@@ -804,16 +804,20 @@ BEGIN
     owner_user := database || '_owner';
     admin_user := database || '_admin';
     
-    IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) > 0 THEN
-        RAISE NOTICE 'Predefined catalog roles already exist for database %', database;
-		RETURN;
-	END IF;
+    IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
+        statements := ARRAY[
+            'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
+            'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';'
+        ];
+        FOREACH statement IN ARRAY statements
+        LOOP
+            EXECUTE statement;
+        END LOOP;
+    END IF;
 
     statements := ARRAY[
         'REVOKE CREATE ON DATABASE ' || database || ' FROM charmed_databases_owner;',
-        'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
         'ALTER SCHEMA public OWNER TO ' || owner_user || ';',
-        'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';',
         'GRANT CONNECT ON DATABASE ' || database || ' TO ' || admin_user || ';'
     ];
     FOREACH statement IN ARRAY statements
@@ -821,10 +825,11 @@ BEGIN
         EXECUTE statement;
     END LOOP;
 
-	IF current_session_user LIKE 'relation-%' OR current_session_user LIKE 'relation_id_%' THEN
-		statement := 'GRANT ' || admin_user || ' TO ' || current_session_user || ';';
+    IF current_session_user LIKE 'relation-%' OR current_session_user LIKE 'relation_id_%' THEN
+        RAISE NOTICE 'Granting % to %', admin_user, current_session_user;
+        statement := 'GRANT ' || admin_user || ' TO ' || current_session_user || ';';
         EXECUTE statement;
-	END IF;
+    END IF;
 
     statements := ARRAY[
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON TABLES TO ' || admin_user || ';',
