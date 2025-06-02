@@ -852,8 +852,7 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
                 temp_ca_file.seek(0)
 
                 # The CA bundle file is used to validate the server certificate when
-                # TLS is enabled, otherwise True is set because it's the default value
-                # for the verify parameter.
+                # peer TLS is enabled, otherwise don't validate the internal cert.
                 health_info = requests.get(
                     f"https://{unit_address}:8008/health",
                     verify=temp_ca_file.name if enabled else False,
