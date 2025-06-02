@@ -138,7 +138,7 @@ ubuntu     10234  0.0  0.0  17208  7944 ?        R    21:47   0:00 sshd: ubuntu@
 ubuntu@juju-fd7874-0:~$
 ```
 
-The list of running snap/systemd services will depend on configured (enabled) [COS integration](/how-to-guides/monitoring-cos/enable-monitoring) and/or [backup](/how-to-guides/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
+The list of running snap/systemd services will depend on configured (enabled) [COS integration](/how-to/monitoring-cos/enable-monitoring) and/or [backup](/how-to/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
 
 To access PostgreSQL, check the [charm users concept](/explanation/users) and request `operator` credentials to use `psql`:
 
@@ -165,7 +165,7 @@ Continue troubleshooting your database/SQL related issues from here.<br/>
 To avoid split-brain scenarios:
 
 * Do not manage users, credentials, databases, and schema directly. 
-* Avoid restarting services directly. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to-guides/scale-replicas) to recover the cluster state.
+* Avoid restarting services directly. If you see the problem with a unit, consider [removing the failing unit and adding a new unit](/how-to/scale-replicas) to recover the cluster state.
 
 ```
 

@@ -73,6 +73,6 @@ Do you have questions? [Contact us]!
 <!-- Links -->
 [Contact us]: /reference/contacts
 [Charmed PostgreSQL VM operator]: /tutorial/index
-[COS Monitoring]: /how-to-guides/monitoring-cos/enable-monitoring
+[COS Monitoring]: /how-to/monitoring-cos/enable-monitoring
 [list of Awesome Alert Rules]: /reference/alert-rules
 

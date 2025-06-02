@@ -4,7 +4,7 @@ This guide will show how to enable TLS/SSL on a PostgreSQL cluster using the [`s
 
 This guide assumes everything is deployed within the same network and Juju model.
 
-> See also: [](/how-to-guides/deploy/tls-vip-access)
+> See also: [](/how-to/deploy/tls-vip-access)
 
 ## Enable TLS
 

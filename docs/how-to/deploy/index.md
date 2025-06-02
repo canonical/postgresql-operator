@@ -71,23 +71,23 @@ See: [How to deploy on juju storage]
 
 [Tutorial]: /tutorial/index
 
-[How to deploy using Terraform]: /how-to-guides/deploy/terraform
+[How to deploy using Terraform]: /how-to/deploy/terraform
 
-[Sunbeam]: /how-to-guides/deploy/sunbeam
-[Canonical MAAS]: /how-to-guides/deploy/maas
-[Amazon Web Services EC2]: /how-to-guides/deploy/aws-ec2
-[Google Cloud Engine]: /how-to-guides/deploy/gce
-[Azure]: /how-to-guides/deploy/azure
-[How to deploy on multiple availability zones (AZ)]: /how-to-guides/deploy/multi-az
+[Sunbeam]: /how-to/deploy/sunbeam
+[Canonical MAAS]: /how-to/deploy/maas
+[Amazon Web Services EC2]: /how-to/deploy/aws-ec2
+[Google Cloud Engine]: /how-to/deploy/gce
+[Azure]: /how-to/deploy/azure
+[How to deploy on multiple availability zones (AZ)]: /how-to/deploy/multi-az
 
-[How to deploy for external TLS VIP access]: /how-to-guides/deploy/tls-vip-access
-[How to enable TLS]: /how-to-guides/enable-tls
-[How to connect from outside the local network]: /how-to-guides/external-network-access
-[How to deploy on juju spaces]: /how-to-guides/deploy/juju-spaces
+[How to deploy for external TLS VIP access]: /how-to/deploy/tls-vip-access
+[How to enable TLS]: /how-to/enable-tls
+[How to connect from outside the local network]: /how-to/external-network-access
+[How to deploy on juju spaces]: /how-to/deploy/juju-spaces
 
-[How to deploy in an offline or air-gapped environment]: /how-to-guides/deploy/air-gapped
-[Cross-regional async replication]: /how-to-guides/cross-regional-async-replication/index
-[How to deploy on juju storage]: /how-to-guides/deploy/juju-storage
+[How to deploy in an offline or air-gapped environment]: /how-to/deploy/air-gapped
+[Cross-regional async replication]: /how-to/cross-regional-async-replication/index
+[How to deploy on juju storage]: /how-to/deploy/juju-storage
 
 
 ```{toctree}

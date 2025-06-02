@@ -231,7 +231,7 @@ Example of authenticated changes via Patroni REST API:
 > curl -k -u patroni:patr0n1sup3rs3cretpassw0rd -X POST https://10.151.27.242:8008/switchover -d '{"leader": "postgresql-0", "candidate": "postgresql-1"}'
 Successfully switched over to "postgresql-1"
 ``` 
-> **Hint**: use dedicated [promote-to-primary](/how-to-guides/switchover-failover) action to switchover Primary.
+> **Hint**: use dedicated [promote-to-primary](/how-to/switchover-failover) action to switchover Primary.
 
 </details>
 

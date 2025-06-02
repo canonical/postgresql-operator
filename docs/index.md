@@ -15,7 +15,7 @@ Charmed PostgreSQL is made for anyone looking for a comprehensive database manag
 
 | | |
 |--|--|
-|  [**Get started**](/tutorial/index) - [Deploy on a cloud](/how-to-guides/deploy/index) \| [Scale](/how-to-guides/scale-replicas) \| [Manage passwords](/how-to-guides/manage-passwords) \| [Enable encryption](/how-to-guides/enable-tls) \| [Back up](/how-to-guides/back-up-and-restore/index) \| [Monitoring](/how-to-guides/monitoring-cos/index) </br> |  [**How-to guides**](/how-to-guides/index) for key tasks, use-cases, and problems. These guides assume basic familiarity with Juju and PostgreSQL. </br>  |
+|  [**Get started**](/tutorial/index) - [Deploy on a cloud](/how-to/deploy/index) \| [Scale](/how-to/scale-replicas) \| [Manage passwords](/how-to/manage-passwords) \| [Enable encryption](/how-to/enable-tls) \| [Back up](/how-to/back-up-and-restore/index) \| [Monitoring](/how-to/monitoring-cos/index) </br> |  [**How-to guides**](/how-to/index) for key tasks, use-cases, and problems. These guides assume basic familiarity with Juju and PostgreSQL. </br>  |
 | [**Reference**](/reference/index) - Technical information for quick lookup, such as [requirements](/reference/system-requirements), [plugins](/reference/plugins-extensions), and [statuses](/reference/statuses). | [**Explanation**](/explanation/interfaces-and-endpoints) - Discussion and clarification of key topics such as [architecture](/explanation/architecture), [users](/explanation/users), and [legacy charms](/explanation/legacy-charm)|
 
 

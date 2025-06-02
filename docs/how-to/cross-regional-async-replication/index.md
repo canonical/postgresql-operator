@@ -18,12 +18,12 @@ The following table shows the source and target controller/model combinations th
 
 ## Guides
 
-* [How to set up clusters for cross-regional async replication](/how-to-guides/cross-regional-async-replication/set-up-clusters)
-* [How to integrate with a client application](/how-to-guides/cross-regional-async-replication/integrate-with-a-client-app)
-* [How to remove or recover a cluster](/how-to-guides/cross-regional-async-replication/remove-or-recover-a-cluster)
-  * [Switchover](/how-to-guides/cross-regional-async-replication/remove-or-recover-a-cluster)
-  * [Detach](/how-to-guides/cross-regional-async-replication/remove-or-recover-a-cluster)
-  * [Recover](/how-to-guides/cross-regional-async-replication/remove-or-recover-a-cluster)
+* [How to set up clusters for cross-regional async replication](/how-to/cross-regional-async-replication/set-up-clusters)
+* [How to integrate with a client application](/how-to/cross-regional-async-replication/integrate-with-a-client-app)
+* [How to remove or recover a cluster](/how-to/cross-regional-async-replication/remove-or-recover-a-cluster)
+  * [Switchover](/how-to/cross-regional-async-replication/remove-or-recover-a-cluster)
+  * [Detach](/how-to/cross-regional-async-replication/remove-or-recover-a-cluster)
+  * [Recover](/how-to/cross-regional-async-replication/remove-or-recover-a-cluster)
 
 <!-- BADGES -->
 [check]: https://img.shields.io/badge/%E2%9C%93-brightgreen

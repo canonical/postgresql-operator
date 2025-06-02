@@ -4,7 +4,7 @@ A PostgreSQL backup can be stored on any S3-compatible storage. S3 access and co
 
 This guide will teach you how to deploy and configure the s3-integrator charm on Ceph via [RadosGW](https://docs.ceph.com/en/quincy/man/8/radosgw/), send the configuration to a Charmed PostgreSQL application, and update it. 
 
-> See also: [](/how-to-guides/back-up-and-restore/configure-s3-aws)
+> See also: [](/how-to/back-up-and-restore/configure-s3-aws)
 
 ```{note}
 The Charmed PostgreSQL backup tool ([pgBackRest](https://pgbackrest.org/)) can currently only interact with S3-compatible storages if they work with [SSL/TLS](https://github.com/pgbackrest/pgbackrest/issues/2340).

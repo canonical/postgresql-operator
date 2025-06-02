@@ -3,7 +3,7 @@
 This guide goes over an example deployment of PostgreSQL, PgBouncer and HAcluster that require external TLS/SSL access via [Virtual IP (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address).   
 
 It combines the following guides, where you can find more detailed information:
-* [PostgreSQL | How to connect from outside the local network](/how-to-guides/external-network-access)
+* [PostgreSQL | How to connect from outside the local network](/how-to/external-network-access)
 * [PgBouncer | How to connect from outside the local network](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
 
 
@@ -161,14 +161,14 @@ psql postgresql://relation_id_9:V7kHqHyapIphkUS0cHoOtP3j@my-tls-example-db.local
 
 Consider adding the [Canonical Observability Stack (COS)](https://charmhub.io/topics/canonical-observability-stack) to your setup for monitoring, alert rules, logs, and tracing.
 
->See: [](/how-to-guides/monitoring-cos/enable-monitoring), [PgBouncer | How to enable monitoring](https://discourse.charmhub.io/t/pgbouncer-how-to-enable-monitoring/12308).
+>See: [](/how-to/monitoring-cos/enable-monitoring), [PgBouncer | How to enable monitoring](https://discourse.charmhub.io/t/pgbouncer-how-to-enable-monitoring/12308).
 
 ## High availability
 
 ```{caution}
 In production environments, deploy different units into separate availability zones (AZ).
 
-See: [](/how-to-guides/deploy/multi-az)
+See: [](/how-to/deploy/multi-az)
 ```
 
 At this point, Juju is responsible for the health of the clusters/applications:

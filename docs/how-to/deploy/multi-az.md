@@ -18,7 +18,7 @@ Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://discourse.charmh
 Creating the following GKE resources may cost you money - be sure to monitor your GCloud costs.
 ```
 
-Log into Google Cloud and [bootstrap GCE on Google Cloud](/how-to-guides/deploy/gce):
+Log into Google Cloud and [bootstrap GCE on Google Cloud](/how-to/deploy/gce):
 ```text
 gcloud auth login
 gcloud iam service-accounts keys create sa-private-key.json  --iam-account=juju-gce-account@[your-gcloud-project-12345].iam.gserviceaccount.com
