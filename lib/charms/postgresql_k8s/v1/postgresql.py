@@ -129,38 +129,50 @@ class PostgreSQLListUsersError(Exception):
 class PostgreSQLUpdateUserPasswordError(Exception):
     """Exception raised when updating a user password fails."""
 
+
 class PostgreSQLDatabaseExistsError(Exception):
     """Exception raised during database existence check."""
+
 
 class PostgreSQLTableExistsError(Exception):
     """Exception raised during table existence check."""
 
+
 class PostgreSQLIsTableEmptyError(Exception):
     """Exception raised during table emptiness check."""
+
 
 class PostgreSQLCreatePublicationError(Exception):
     """Exception raised when creating PostgreSQL publication."""
 
+
 class PostgreSQLPublicationExistsError(Exception):
     """Exception raised during PostgreSQL publication existence check."""
+
 
 class PostgreSQLAlterPublicationError(Exception):
     """Exception raised when altering PostgreSQL publication."""
 
+
 class PostgreSQLDropPublicationError(Exception):
     """Exception raised when dropping PostgreSQL publication."""
+
 
 class PostgreSQLCreateSubscriptionError(Exception):
     """Exception raised when creating PostgreSQL subscription."""
 
+
 class PostgreSQLSubscriptionExistsError(Exception):
     """Exception raised during PostgreSQL subscription existence check."""
+
 
 class PostgreSQLUpdateSubscriptionError(Exception):
     """Exception raised when updating PostgreSQL subscription."""
 
+
 class PostgreSQLRefreshSubscriptionError(Exception):
     """Exception raised when refreshing PostgreSQL subscription."""
+
 
 class PostgreSQLDropSubscriptionError(Exception):
     """Exception raised when dropping PostgreSQL subscription."""
@@ -512,7 +524,13 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
-    def grant_replication_privileges(self, user: str, database: str, schematables: list[str], old_schematables: list[str] | None = None) -> None:
+    def grant_replication_privileges(
+        self,
+        user: str,
+        database: str,
+        schematables: list[str],
+        old_schematables: list[str] | None = None,
+    ) -> None:
         """Grant CONNECT privilege on database and SELECT privelege on tables.
 
         Args:
@@ -530,18 +548,26 @@ class PostgreSQL:
             if old_schematables:
                 cursor.execute(
                     SQL("REVOKE ALL PRIVILEGES ON TABLE {} FROM {};").format(
-                        SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in old_schematables),
+                        SQL(",").join(
+                            Identifier(schematable.split(".")[0], schematable.split(".")[1])
+                            for schematable in old_schematables
+                        ),
                         Identifier(user),
                     )
                 )
             cursor.execute(
                 SQL("GRANT SELECT ON TABLE {} TO {};").format(
-                    SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables),
+                    SQL(",").join(
+                        Identifier(schematable.split(".")[0], schematable.split(".")[1])
+                        for schematable in schematables
+                    ),
                     Identifier(user),
                 )
             )
 
-    def revoke_replication_privileges(self, user: str, database: str, schematables: list[str]) -> None:
+    def revoke_replication_privileges(
+        self, user: str, database: str, schematables: list[str]
+    ) -> None:
         """Revoke all privileges from tables and database.
 
         Args:
@@ -552,7 +578,10 @@ class PostgreSQL:
         with self._connect_to_database(database=database) as connection, connection.cursor() as cursor:
             cursor.execute(
                 SQL("REVOKE ALL PRIVILEGES ON TABLE {} FROM {};").format(
-                    SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables),
+                    SQL(",").join(
+                        Identifier(schematable.split(".")[0], schematable.split(".")[1])
+                        for schematable in schematables
+                    ),
                     Identifier(user),
                 )
             )
@@ -962,7 +991,9 @@ END; $$;"""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    SQL("SELECT tablename FROM pg_tables WHERE schemaname={} AND tablename={};").format(Literal(schema), Literal(table))
+                    SQL(
+                        "SELECT tablename FROM pg_tables WHERE schemaname={} AND tablename={};"
+                    ).format(Literal(schema), Literal(table))
                 )
                 return cursor.fetchone() is not None
         except psycopg2.Error as e:
@@ -972,10 +1003,11 @@ END; $$;"""
     def is_table_empty(self, db: str, schema: str, table: str) -> bool:
         """Check whether table is empty."""
         try:
-            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
-                cursor.execute(
-                    SQL("SELECT COUNT(1) FROM {};").format(Identifier(schema, table))
-                )
+            with (
+                self._connect_to_database(database=db) as connection,
+                connection.cursor() as cursor,
+            ):
+                cursor.execute(SQL("SELECT COUNT(1) FROM {};").format(Identifier(schema, table)))
                 return cursor.fetchone()[0] == 0
         except psycopg2.Error as e:
             logger.error(f"Failed to check whether table is empty: {e}")
@@ -988,7 +1020,10 @@ END; $$;"""
                 cursor.execute(
                     SQL("CREATE PUBLICATION {} FOR TABLE {};").format(
                         Identifier(name),
-                        SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables)
+                        SQL(",").join(
+                            Identifier(schematable.split(".")[0], schematable.split(".")[1])
+                            for schematable in schematables
+                        ),
                     )
                 )
         except psycopg2.Error as e:
@@ -1000,7 +1035,9 @@ END; $$;"""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    SQL("SELECT pubname FROM pg_publication WHERE pubname={};").format(Literal(publication))
+                    SQL("SELECT pubname FROM pg_publication WHERE pubname={};").format(
+                        Literal(publication)
+                    )
                 )
                 return cursor.fetchone() is not None
         except psycopg2.Error as e:
@@ -1014,7 +1051,10 @@ END; $$;"""
                 cursor.execute(
                     SQL("ALTER PUBLICATION {} SET TABLE {};").format(
                         Identifier(name),
-                        SQL(",").join(Identifier(schematable.split(".")[0], schematable.split(".")[1]) for schematable in schematables)
+                        SQL(",").join(
+                            Identifier(schematable.split(".")[0], schematable.split(".")[1])
+                            for schematable in schematables
+                        ),
                     )
                 )
         except psycopg2.Error as e:
@@ -1034,16 +1074,30 @@ END; $$;"""
             logger.error(f"Failed to drop Postgresql publication: {e}")
             raise PostgreSQLDropPublicationError() from e
 
-    def create_subscription(self, subscription: str, host: str, db: str, user: str, password: str, publication: str, replication_slot: str) -> None:
+    def create_subscription(
+        self,
+        subscription: str,
+        host: str,
+        db: str,
+        user: str,
+        password: str,
+        publication: str,
+        replication_slot: str,
+    ) -> None:
         """Create PostgreSQL subscription."""
         try:
-            with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database=db) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
-                    SQL("CREATE SUBSCRIPTION {} CONNECTION {} PUBLICATION {} WITH (copy_data=true,create_slot=false,enabled=true,slot_name={});").format(
+                    SQL(
+                        "CREATE SUBSCRIPTION {} CONNECTION {} PUBLICATION {} WITH (copy_data=true,create_slot=false,enabled=true,slot_name={});"
+                    ).format(
                         Identifier(subscription),
                         Literal(f"host={host} dbname={db} user={user} password={password}"),
                         Identifier(publication),
-                        Identifier(replication_slot)
+                        Identifier(replication_slot),
                     )
                 )
         except psycopg2.Error as e:
@@ -1055,7 +1109,9 @@ END; $$;"""
         try:
             with self._connect_to_database(database=db) as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    SQL("SELECT subname FROM pg_subscription WHERE subname={};").format(Literal(subscription))
+                    SQL("SELECT subname FROM pg_subscription WHERE subname={};").format(
+                        Literal(subscription)
+                    )
                 )
                 return cursor.fetchone() is not None
         except psycopg2.Error as e:
@@ -1083,7 +1139,9 @@ END; $$;"""
             connection = self._connect_to_database(database=db)
             with connection.cursor() as cursor:
                 cursor.execute(
-                    SQL("ALTER SUBSCRIPTION {} REFRESH PUBLICATION").format(Identifier(subscription))
+                    SQL("ALTER SUBSCRIPTION {} REFRESH PUBLICATION").format(
+                        Identifier(subscription)
+                    )
                 )
         except psycopg2.Error as e:
             logger.error(f"Failed to refresh Postgresql subscription: {e}")
