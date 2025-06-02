@@ -596,10 +596,10 @@ class PostgreSQL:
         schematables: list[str],
         old_schematables: list[str] | None = None,
     ) -> None:
-        """Grant CONNECT privilege on database and SELECT privelege on tables.
+        """Grant CONNECT privilege on database and SELECT privilege on tables.
 
         Args:
-            user: target user for priveleges grant.
+            user: target user for privileges grant.
             database: database to grant CONNECT privilege on.
             schematables: list of tables with schema notation to grant SELECT privileges on.
             old_schematables: list of tables with schema notation to revoke all privileges from.
@@ -636,7 +636,7 @@ class PostgreSQL:
         """Revoke all privileges from tables and database.
 
         Args:
-            user: target user for priveleges revocation.
+            user: target user for privileges revocation.
             database: database to remove all privileges from.
             schematables: list of tables with schema notation to revoke all privileges from.
         """
