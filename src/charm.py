@@ -1432,10 +1432,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._validate_config_options()
             # update config on every run
             self.update_config()
-        # except psycopg2.OperationalError:
-        #     logger.debug("Defer on_config_changed: Cannot connect to database")
-        #     event.defer()
-        #     return
+        except psycopg2.OperationalError:
+            logger.exception("Postgresql error")
+            logger.debug("Defer on_config_changed: Cannot connect to database")
+            event.defer()
+            return
         except ValueError as e:
             self.set_unit_status(BlockedStatus("Configuration Error. Please check the logs"))
             logger.error("Invalid configuration: %s", str(e))
