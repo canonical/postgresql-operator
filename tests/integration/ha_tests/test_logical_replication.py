@@ -7,7 +7,7 @@ from pytest_operator.plugin import OpsTest
 
 from integration import markers
 from integration.ha_tests.helpers import get_cluster_roles
-from integration.helpers import CHARM_BASE, get_leader_unit, wait_for_idle_on_blocked
+from integration.helpers import CHARM_BASE, get_leader_unit
 from integration.new_relations.helpers import build_connection_string
 
 DATABASE_APP_NAME = "postgresql"
@@ -284,7 +284,7 @@ async def test_pg2_resolve_dynamic_error(ops_test: OpsTest):
         psycopg2.connect(connection_string) as connection,
         connection.cursor() as cursor,
     ):
-        cursor.execute(f"DELETE FROM test_table;")
+        cursor.execute("DELETE FROM test_table;")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(status="active", timeout=500)
     await _check_test_data(ops_test, SECOND_DATA_INTEGRATOR_APP_NAME, "fourth")

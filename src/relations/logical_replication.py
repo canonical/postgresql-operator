@@ -496,7 +496,7 @@ class PostgreSQLLogicalReplication(Object):
 
     def _process_offer(self, relation: Relation) -> None:
         logger.debug(
-            f"Started proccessing offer for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation.id}"
+            f"Started processing offer for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation.id}"
         )
 
         subscriptions_request = json.loads(
