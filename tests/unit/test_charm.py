@@ -286,6 +286,10 @@ def test_on_config_changed(harness):
         patch(
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
+        patch(
+            "charm.Patroni.member_started",
+            new_callable=PropertyMock,
+        ) as _member_started,
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -293,8 +297,15 @@ def test_on_config_changed(harness):
         _enable_disable_extensions.assert_not_called()
         _set_up_relation.assert_not_called()
 
+        # Test when patroni is not yet started on the unit.
+        _is_cluster_initialised.return_value = True
+        _member_started.return_value = False
+        _enable_disable_extensions.assert_not_called()
+        _set_up_relation.assert_not_called()
+
         # Test when the unit is not the leader.
         _is_cluster_initialised.return_value = True
+        _member_started.return_value = True
         harness.charm.on.config_changed.emit()
         _validate_config_options.assert_called_once()
         _enable_disable_extensions.assert_not_called()
