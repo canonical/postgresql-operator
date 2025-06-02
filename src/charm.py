@@ -1428,6 +1428,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if self._update_member_ip():
+            # Update the sync-standby endpoint in the async replication data.
+            self.async_replication.update_async_replication_data()
+            self.update_config(no_peers=True)
+            return
+
         try:
             self._validate_config_options()
             # update config on every run
@@ -1449,11 +1455,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
-
-        if self._update_member_ip():
-            # Update the sync-standby endpoint in the async replication data.
-            self.async_replication.update_async_replication_data()
-            return
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
