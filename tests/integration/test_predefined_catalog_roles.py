@@ -131,6 +131,47 @@ async def test_remove_and_reestablish_relation(ops_test: OpsTest) -> None:
 
     await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_APP_NAME)
 
+    logger.info("Removing existing relation between charms")
+    await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].remove_relation(
+        f"{DATA_INTEGRATOR_APP_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME
+    )
+    async with ops_test.fast_forward():
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked"),
+            ops_test.model.block_until(
+                lambda: len([
+                    relation
+                    for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
+                    if not relation.is_peer
+                    and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
+                ])
+                == 0
+            ),
+        )
+
+    logger.info("Dropping test database to recreate it")
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    connection = None
+    try:
+        host = get_unit_address(ops_test, primary)
+        password = await get_password(ops_test, database_app_name=DATABASE_APP_NAME)
+        connection = db_connect(host, password)
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute(f"DROP DATABASE {DATABASE_NAME};")
+    finally:
+        if connection is not None:
+            connection.close()
+
+    logger.info("Adding relation between charms")
+    await ops_test.model.relate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
+    async with ops_test.fast_forward():
+        await ops_test.model.wait_for_idle(
+            apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
+        )
+
+    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_APP_NAME)
+
 
 @pytest.mark.abort_on_fail
 async def test_database_creation_permissions(ops_test: OpsTest) -> None:
