@@ -745,9 +745,6 @@ def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> 
 async def check_roles_and_their_permissions(
     ops_test: OpsTest, relation_endpoint: str, database_name: str
 ) -> None:
-    logger.info(
-        "Checking that the relation user is automatically escalated to the database owner user"
-    )
     action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
         action_name="get-credentials"
     )
@@ -760,13 +757,16 @@ async def check_roles_and_their_permissions(
         connection = psycopg2.connect(uris)
         connection.autocommit = True
         with connection.cursor() as cursor:
+            logger.info(
+                "Checking that the relation user is automatically escalated to the database owner user"
+            )
             cursor.execute("SELECT session_user,current_user;")
             result = cursor.fetchone()
             if result is not None:
                 assert result[0] == username, (
                     "The session user should be the relation user in the primary"
                 )
-                assert result[1] == "test_owner", (
+                assert result[1] == f"{database_name}_owner", (
                     "The current user should be the database owner user in the primary"
                 )
             else:
@@ -803,12 +803,12 @@ async def check_roles_and_their_permissions(
         if connection is not None:
             connection.close()
 
-    logger.info("Checking that the relation user can read data from the database")
     connection_string = f"host={data_integrator_credentials[relation_endpoint]['read-only-endpoints'].split(':')[0]} dbname={data_integrator_credentials[relation_endpoint]['database']} user={username} password={data_integrator_credentials[relation_endpoint]['password']}"
     connection = None
     try:
         connection = psycopg2.connect(connection_string)
         with connection.cursor() as cursor:
+            logger.info("Checking that the relation user can read data from the database")
             cursor.execute("SELECT session_user,current_user;")
             result = cursor.fetchone()
             if result is not None:

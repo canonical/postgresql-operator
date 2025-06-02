@@ -81,7 +81,7 @@ async def test_deploy(ops_test: OpsTest, charm) -> None:
 @pytest.mark.abort_on_fail
 async def test_permissions(ops_test: OpsTest) -> None:
     """Test that the relation user is automatically escalated to the database owner user."""
-    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_APP_NAME)
+    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_NAME)
 
 
 @pytest.mark.abort_on_fail
@@ -120,7 +120,7 @@ async def test_remove_and_reestablish_relation(ops_test: OpsTest) -> None:
             apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
         )
 
-    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_APP_NAME)
+    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_NAME)
 
     logger.info("Removing existing relation between charms")
     await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].remove_relation(
@@ -155,7 +155,7 @@ async def test_remove_and_reestablish_relation(ops_test: OpsTest) -> None:
             apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
         )
 
-    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_APP_NAME)
+    await check_roles_and_their_permissions(ops_test, RELATION_ENDPOINT, DATABASE_NAME)
 
 
 @pytest.mark.abort_on_fail
@@ -185,7 +185,6 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
             apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
         )
 
-    logger.info("Checking that the database owner user can create a database")
     action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
         action_name="get-credentials"
     )
@@ -198,6 +197,7 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
         connection = psycopg2.connect(uris)
         connection.autocommit = True
         with connection.cursor() as cursor:
+            logger.info("Checking that the charmed_databases_owner user can create a database")
             cursor.execute("SELECT session_user,current_user;")
             result = cursor.fetchone()
             if result is not None:
@@ -210,8 +210,26 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
             else:
                 assert False, "No result returned from the query"
             cursor.execute(f"CREATE DATABASE {DATABASE_NAME}_2;")
+            logger.info("Checking that the charmed_databases_owner user can't create a table")
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                 cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+            logger.info(
+                "Checking that the relation user can escalate to the database owner user and create a table"
+            )
+            cursor.execute("RESET ROLE;")
+            cursor.execute(f"SET ROLE {DATABASE_NAME}_owner;")
+            cursor.execute("SELECT session_user,current_user;")
+            result = cursor.fetchone()
+            if result is not None:
+                assert result[0] == username, (
+                    "The session user should be the relation user in the primary"
+                )
+                assert result[1] == f"{DATABASE_NAME}_owner", (
+                    "The current user should be the database owner user in the primary"
+                )
+            else:
+                assert False, "No result returned from the query"
+            cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
     finally:
         if connection is not None:
             connection.close()
