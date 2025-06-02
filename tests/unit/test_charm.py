@@ -355,6 +355,9 @@ def test_enable_disable_extensions(harness, caplog):
   synchronous_node_count:
     type: string
     default: "all"
+  logical_replication_subscription_request:
+    type: string
+    default: "{}"
   plugin_citext_enable:
     default: false
     type: boolean
