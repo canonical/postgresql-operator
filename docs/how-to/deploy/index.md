@@ -1,6 +1,10 @@
 # How to deploy
 
-This page introduces the PostgreSQL deployment process and lists all related guides.
+This page introduces the Charmed PostgreSQL deployment process and all related guides.
+
+```{seealso}
+[How to deploy on Charmed PostgreSQL 16](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to-guides/deploy/). 
+```
 
 ## General deployment instructions
 
