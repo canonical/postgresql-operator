@@ -33,7 +33,7 @@ postgres=# \du
  rewind      |                                                            | {}
 ```
 
-```{note}
+```{caution}
 It is forbidden to use/manage described above users, as they are dedicated to the operator's logic.
 
 Use the [data-integrator](https://charmhub.io/data-integrator) charm to generate, manage, and remove external credentials.

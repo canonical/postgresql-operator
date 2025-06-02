@@ -9,7 +9,6 @@ The [legacy PostgreSQL charm](/explanation/legacy-charm) in track [`latest/`](ht
 ## Check storage details
 
 Check the [metadata.yaml](https://github.com/canonical/postgresql-operator/blob/main/metadata.yaml) for find Juju storage name and tech details:
-<details><summary>Charmed PostgreSQL 14 storage list</summary>
 
 ```text
 storage:
@@ -17,7 +16,6 @@ storage:
     type: filesystem
     location: /var/snap/charmed-postgresql/common
 ```
-</details>
 
 Charmed PostgreSQL 14 supports single storage `pgdata` attaching it on `juju deploy` and mounted inside the Snap common folder `/var/snap/charmed-postgresql/common`.
 

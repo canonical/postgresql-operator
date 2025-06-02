@@ -5,7 +5,7 @@ Charmed PostgreSQL 14 ships the minimal necessary roles logic: each application 
 
 > See also: [](/explanation/users)
 
-## PostgreSQL 14 roles
+## Native PostgreSQL roles
 
 ```text
 postgres=# SELECT * FROM pg_roles;
@@ -25,7 +25,7 @@ postgres=# SELECT * FROM pg_roles;
 ...
 ```
 
-## Charmed PostgreSQL 14 roles
+## Charmed PostgreSQL roles
 
 ```text
 postgres=# SELECT * FROM pg_roles;

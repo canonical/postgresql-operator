@@ -33,7 +33,7 @@ author = "Canonical Ltd."
 #
 # TODO: To disable the title, set to an empty string.
 
-html_title = project + " documentation"
+html_title = project + " 14 documentation"
 
 
 # Copyright string; shown at the bottom of the page
