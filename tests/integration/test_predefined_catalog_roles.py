@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 import logging
 
 import psycopg2 as psycopg2
@@ -11,6 +12,7 @@ from .helpers import (
     DATABASE_APP_NAME,
     db_connect,
     get_password,
+    get_primary,
     get_unit_address,
 )
 
@@ -30,9 +32,10 @@ async def test_deploy(ops_test: OpsTest, charm) -> None:
         await ops_test.model.deploy(charm, config={"profile": "testing"}, num_units=2)
     else:
         logger.info("Dropping test databases from already deployed database charm")
+        primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
         connection = None
         try:
-            host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/0")
+            host = get_unit_address(ops_test, primary)
             password = await get_password(ops_test, database_app_name=DATABASE_APP_NAME)
             connection = db_connect(host, password)
             connection.autocommit = True
@@ -172,7 +175,18 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
         f"{DATA_INTEGRATOR_APP_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME
     )
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked"),
+            ops_test.model.block_until(
+                lambda: len([
+                    relation
+                    for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
+                    if not relation.is_peer
+                    and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
+                ])
+                == 0
+            ),
+        )
 
     logger.info("Configuring data integrator charm for database creation extra user role")
     await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
