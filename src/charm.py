@@ -840,7 +840,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if not self.is_cluster_initialised:
-            logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
+            logger.debug("Early exit on_peer_relation_changed: cluster not initialized")
             return False
 
         # Check whether raft is stuck.
