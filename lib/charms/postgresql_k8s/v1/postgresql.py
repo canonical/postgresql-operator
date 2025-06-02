@@ -335,6 +335,7 @@ class PostgreSQL:
             user: user to be created.
             password: password to be assigned to the user.
             admin: whether the user should have additional admin privileges.
+            replication: whether the user should have replication privileges.
             extra_user_roles: additional privileges and/or roles to be assigned to the user.
             database: optional database to allow the user to connect to.
             can_create_database: whether the user should be able to create databases.
