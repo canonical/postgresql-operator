@@ -1431,7 +1431,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._update_member_ip():
             # Update the sync-standby endpoint in the async replication data.
             self.async_replication.update_async_replication_data()
-            self.update_config(no_peers=True)
             return
 
         try:
@@ -1439,7 +1438,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # update config on every run
             self.update_config()
         except psycopg2.OperationalError:
-            logger.exception("Postgresql error")
             logger.debug("Defer on_config_changed: Cannot connect to database")
             event.defer()
             return
