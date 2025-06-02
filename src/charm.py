@@ -1149,6 +1149,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if not self._patroni.member_started:
+            logger.debug("Defer on_config_changed: awaiting for patroni to start")
+            event.defer()
+            return
+
         if not self.upgrade.idle:
             logger.debug("Defer on_config_changed: upgrade in progress")
             event.defer()
