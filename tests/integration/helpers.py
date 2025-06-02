@@ -993,6 +993,14 @@ async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
     return primary != old_primary
 
 
+def relations(ops_test: OpsTest, provider_app: str, requirer_app: str) -> list:
+    return [
+        relation
+        for relation in ops_test.model.applications[provider_app].relations
+        if not relation.is_peer and relation.requires.application_name == requirer_app
+    ]
+
+
 async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
     """Restart the machine where a unit run on.
 

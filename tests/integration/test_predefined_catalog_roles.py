@@ -16,6 +16,7 @@ from .helpers import (
     get_password,
     get_primary,
     get_unit_address,
+    relations,
 )
 
 logger = logging.getLogger(__name__)
@@ -58,12 +59,8 @@ async def test_deploy(ops_test: OpsTest, charm) -> None:
             "extra-user-roles": ""
         })
         reset_relation = True
-    relations = [
-        relation
-        for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
-        if not relation.is_peer and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
-    ]
-    if reset_relation and relations:
+    existing_relations = relations(ops_test, DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME)
+    if reset_relation and existing_relations:
         logger.info("Removing existing relation between charms")
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].remove_relation(
             f"{DATA_INTEGRATOR_APP_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME
@@ -72,7 +69,7 @@ async def test_deploy(ops_test: OpsTest, charm) -> None:
             await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         logger.info("Adding relation between charms")
         await ops_test.model.relate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-    if not relations:
+    if not existing_relations:
         logger.info("Adding relation between charms")
         await ops_test.model.relate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
     async with ops_test.fast_forward():
@@ -98,13 +95,7 @@ async def test_remove_and_reestablish_relation(ops_test: OpsTest) -> None:
         await asyncio.gather(
             ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked"),
             ops_test.model.block_until(
-                lambda: len([
-                    relation
-                    for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
-                    if not relation.is_peer
-                    and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
-                ])
-                == 0
+                lambda: len(relations(ops_test, DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME)) == 0
             ),
         )
 
@@ -139,13 +130,7 @@ async def test_remove_and_reestablish_relation(ops_test: OpsTest) -> None:
         await asyncio.gather(
             ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked"),
             ops_test.model.block_until(
-                lambda: len([
-                    relation
-                    for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
-                    if not relation.is_peer
-                    and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
-                ])
-                == 0
+                lambda: len(relations(ops_test, DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME)) == 0
             ),
         )
 
@@ -184,13 +169,7 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
         await asyncio.gather(
             ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked"),
             ops_test.model.block_until(
-                lambda: len([
-                    relation
-                    for relation in ops_test.model.applications[DATABASE_APP_NAME].relations
-                    if not relation.is_peer
-                    and relation.requires.application_name == DATA_INTEGRATOR_APP_NAME
-                ])
-                == 0
+                lambda: len(relations(ops_test, DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME)) == 0
             ),
         )
 
