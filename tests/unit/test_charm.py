@@ -229,6 +229,10 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
+        patch(
+            "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
+            return_value=True,
+        ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
