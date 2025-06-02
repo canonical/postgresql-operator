@@ -118,7 +118,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
     async with ops_test.fast_forward():
         # Verify that a new primary gets elected (ie old primary is secondary).
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
                 new_primary_name = await get_primary(ops_test, app)
                 assert new_primary_name is not None
@@ -212,7 +212,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
                 new_primary_name = await get_primary(ops_test, app, down_unit=primary_name)
                 assert new_primary_name != primary_name
@@ -276,7 +276,7 @@ async def test_network_cut_without_ip_change(
 
     # Verify machine is not reachable from peer units.
     all_units_names = [unit.name for unit in ops_test.model.applications[app].units]
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
         with attempt:
             for unit_name in set(all_units_names) - {primary_name}:
                 logger.info(f"checking for no connectivity between {primary_name} and {unit_name}")
@@ -304,7 +304,7 @@ async def test_network_cut_without_ip_change(
 
         logger.info("checking whether a new primary was elected")
         # Verify that a new primary gets elected (ie old primary is secondary).
-        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
             with attempt:
                 new_primary_name = await get_primary(ops_test, app, down_unit=primary_name)
                 assert new_primary_name != primary_name
