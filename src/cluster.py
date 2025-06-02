@@ -1038,7 +1038,7 @@ class Patroni:
         current_config = requests.get(
             f"{self._patroni_url}/config",
             verify=self.verify,
-            timeout=API_REQUEST_TIMEOUT,
+            timeout=PATRONI_TIMEOUT,
             auth=self._patroni_auth,
         )
         slots_patch: dict[str, dict[str, str] | None] = dict.fromkeys(
