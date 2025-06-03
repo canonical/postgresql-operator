@@ -268,6 +268,9 @@ def test_is_cluster_initialised(harness):
 def test_on_config_changed(harness):
     with (
         patch(
+            "charm.PostgresqlOperatorCharm._update_member_ip", return_value=False
+        ) as _update_member_ip,
+        patch(
             "charm.PostgresqlOperatorCharm._validate_config_options"
         ) as _validate_config_options,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
@@ -315,6 +318,23 @@ def test_on_config_changed(harness):
         )
         harness.charm.on.config_changed.emit()
         _enable_disable_extensions.assert_called_once()
+
+        # Test when there is an error related to the config options.
+        _update_member_ip.reset_mock()
+        _enable_disable_extensions.reset_mock()
+        harness.charm.unit.status = BlockedStatus("Configuration Error")
+        harness.charm.on.config_changed.emit()
+        assert isinstance(harness.model.unit.status, ActiveStatus)
+        _update_member_ip.assert_called_once()
+        _enable_disable_extensions.assert_called_once()
+
+        # Test when the unit has updated its member IP.
+        _update_member_ip.reset_mock()
+        _enable_disable_extensions.reset_mock()
+        _update_member_ip.return_value = True
+        harness.charm.on.config_changed.emit()
+        _update_member_ip.assert_called_once()
+        _enable_disable_extensions.assert_not_called()
 
 
 def test_check_extension_dependencies(harness):
@@ -1366,11 +1386,7 @@ def test_validate_config_options(harness):
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
-        message = (
-            "1 validation error for CharmConfig\n"
-            "response_lc_monetary\n"
-            "  unexpected value; permitted:"
-        )
+        message = "1 validation error for CharmConfig\nresponse_lc_monetary\n  Input should be "
         assert str(e.value).startswith(message)
 
 
@@ -1430,32 +1446,20 @@ def test_on_peer_relation_changed(harness):
         mock_event.defer.reset_mock()
         _reconfigure_cluster.reset_mock()
         _reconfigure_cluster.return_value = True
-        _update_member_ip.return_value = False
         _member_started.return_value = True
         _primary_endpoint.return_value = "192.0.2.0"
         harness.model.unit.status = WaitingStatus("awaiting for cluster to start")
         harness.charm._on_peer_relation_changed(mock_event)
         mock_event.defer.assert_not_called()
         _reconfigure_cluster.assert_called_once_with(mock_event)
-        _update_member_ip.assert_called_once()
         _update_config.assert_called_once()
         _start_patroni.assert_called_once()
         _update_new_unit_status.assert_called_once()
 
-        # Test when the cluster member updates its IP.
-        _update_member_ip.reset_mock()
+        # Test when the unit fails to update the Patroni configuration.
         _update_config.reset_mock()
         _start_patroni.reset_mock()
-        _update_member_ip.return_value = True
         _update_new_unit_status.reset_mock()
-        harness.charm._on_peer_relation_changed(mock_event)
-        _update_member_ip.assert_called_once()
-        _update_config.assert_not_called()
-        _start_patroni.assert_not_called()
-        _update_new_unit_status.assert_not_called()
-
-        # Test when the unit fails to update the Patroni configuration.
-        _update_member_ip.return_value = False
         _update_config.side_effect = RetryError(last_attempt=1)
         harness.charm._on_peer_relation_changed(mock_event)
         _update_config.assert_called_once()
@@ -1731,20 +1735,11 @@ def test_get_available_memory(harness):
         assert harness.charm.get_available_memory() == 0
 
 
-def test_juju_run_exec_divergence(harness):
+def test_juju_run_exec(harness):
     with (
         patch("charm.ClusterTopologyObserver") as _topology_observer,
-        patch("charm.JujuVersion") as _juju_version,
     ):
-        # Juju 2
-        _juju_version.from_environ.return_value.major = 2
-        harness = Harness(PostgresqlOperatorCharm)
-        harness.begin()
-        _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-run")
-        _topology_observer.reset_mock()
-
         # Juju 3
-        _juju_version.from_environ.return_value.major = 3
         harness = Harness(PostgresqlOperatorCharm)
         harness.begin()
         _topology_observer.assert_called_once_with(harness.charm, "/usr/bin/juju-exec")
