@@ -776,17 +776,7 @@ async def check_roles_and_their_permissions(
             logger.info(
                 "Checking that the relation user is automatically escalated to the database owner user"
             )
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == f"{database_name}_owner", (
-                    "The current user should be the database owner user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, f"{database_name}_owner")
             logger.info("Creating a test table and inserting data")
             cursor.execute("CREATE TABLE test_table (id INTEGER);")
             logger.info("Inserting data into the test table")
@@ -802,17 +792,7 @@ async def check_roles_and_their_permissions(
 
             logger.info("Checking that the relation user can't create a table")
             cursor.execute("RESET ROLE;")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == username, (
-                    "The current user should be the relation user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, username)
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                 cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
     finally:
@@ -825,17 +805,7 @@ async def check_roles_and_their_permissions(
         connection = psycopg2.connect(connection_string)
         with connection.cursor() as cursor:
             logger.info("Checking that the relation user can read data from the database")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the replica"
-                )
-                assert result[1] == username, (
-                    "The current user should be the relation user in the replica"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, username, primary=False)
             logger.info("Reading data from the test table")
             cursor.execute("SELECT * FROM test_table;")
             result = cursor.fetchall()
