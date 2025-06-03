@@ -2,10 +2,6 @@
 
 This page introduces the Charmed PostgreSQL deployment process and all related guides.
 
-```{seealso}
-[How to deploy on Charmed PostgreSQL 16](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to-guides/deploy/). 
-```
-
 ## General deployment instructions
 
 The basic requirements for deploying a charm are the [**Juju client**](https://juju.is/docs/juju) and a machine [**cloud**](https://juju.is/docs/juju/cloud).

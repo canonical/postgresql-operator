@@ -5,10 +5,8 @@ Charmed PostgreSQL backups can be managed via a retention policy. This retention
 This guide will teach you how to set this configuration and how it works in managing existing backups.
 
 ```{caution}
-This is an experimental parameter; use it with caution.
+This is an experimental parameter - use it with caution.
 ```
-
-## Configure S3-integrator charm
 
 Deploy and run the `s3-integrator` charm:
 
@@ -37,10 +35,10 @@ juju config s3-integrator --reset experimental-delete-older-than-days
 
 This configuration will be enforced in **every** Charmed PostgreSQL application related to the configured S3-integrator charm
 
-```{note} 
-The retention is **not** enforced automatically once a backup is older than the set amount of days: Backups older than the set retention time will only get expired only once a newer backup is created.
+```{caution} 
+The retention is **not** enforced automatically once a backup is older than the set amount of days. Backups older than the set retention time will only get expired only once a newer backup is created.
 
-This behavior avoids complete backup deletion if there has been no newer backups created in the charm.
+This behavior avoids complete backup deletion if no newer backups have been created in the charm.
 ```
 
 The s3-integrator charm accepts many [configurations](https://charmhub.io/s3-integrator/configure) - enter whichever are necessary for your S3 storage.

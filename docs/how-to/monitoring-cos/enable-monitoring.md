@@ -80,7 +80,10 @@ juju integrate grafana-agent prometheus
 
 After this is complete, Grafana will show the new dashboard `PostgreSQL Exporter` and will allow access to Charmed PostgreSQL logs on Loki.
 
+### Sample outputs
+
 Below is a sample output of `juju status` on the Charmed PostgreSQL VM model:
+
 
 ```text
 ubuntu@localhost:~$ juju status
@@ -133,7 +136,7 @@ loki          loki         loki-k8s        60   1/1        logging              
 prometheus    prometheus   prometheus-k8s  103  1/1        receive-remote-write  prometheus_remote_write  provider
 ```
 
-## Connect Grafana web interface
+### Connect Grafana web interface
 
 To connect to the Grafana web interface, follow the [Browse dashboards](https://charmhub.io/topics/canonical-observability-stack/tutorials/install-microk8s?_ga=2.201254254.1948444620.1704703837-757109492.1701777558#browse-dashboards) section of the MicroK8s "Getting started" guide.
 

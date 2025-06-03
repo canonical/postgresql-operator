@@ -440,7 +440,7 @@ juju integrate data-integrator postgresql
 
 Wait for `juju status --watch 1s` to show all applications/units as `active`:
 
-```
+```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord    localhost/localhost  3.1.7    unsupported  10:22:31+01:00
 
@@ -660,7 +660,7 @@ For more information, see the docs for [`multipass delete`](https://multipass.ru
 multipass delete --purge my-vm
 ```
 
-### Next steps
+## Next steps
 
 - Run [Charmed PostgreSQL on Kubernetes](https://github.com/canonical/postgresql-k8s-operator)
 - Check out our other other charm offerings, like [MySQL](https://charmhub.io/mysql) and [Kafka](https://charmhub.io/kafka?channel=edge)

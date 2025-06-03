@@ -24,7 +24,7 @@ juju run postgresql/leader list-backups
 
 This should show your available backups like in the sample output below:
 <!--TODO: Update output with any missing parameters (id, repository, etc...) -->
-```text
+```yaml
 list-backups: |-
   Storage bucket name: canonical-postgres
   Backups base path: /test/backup/
@@ -50,12 +50,16 @@ Below is a complete list of parameters shown for each backup/restore operation:
 * `backup-path`: path of the backup related files in the S3 repository.
 * `timeline`: number which identifies different branches in the database transactions history; every time a restore or PITR is made, this number is incremented by 1.
 
+
 ## Point-in-time recovery
+
 Point-in-time recovery (PITR) is a PostgreSQL feature that enables restorations to the database state at specific points in time.
 
 After performing a PITR in a PostgreSQL cluster, a new timeline is created to track from the point to where the database was restored. They can be tracked via the `timeline` parameter in the `list-backups` output.
 
+
 ## Restore backup
+
 To restore a backup from that list, run the `restore` command and pass the parameter corresponding to the backup type.
 
 When the user needs to restore a specific backup that was made, they can use the `backup-id` that is listed in the `list-backups` output. 

@@ -15,13 +15,6 @@ Canonical does not prescribe how you should set up your specific air-gapped envi
 * [Air-gapped Snap Store Proxy](https://documentation.ubuntu.com/snap-store-proxy/) is installed and running.
 * Local APT and LXD Images caches are reachable.
 
-## Air-gapped setup summary
-
-[1\. Export snaps and charms](#1-export-snaps-and-charms) <br>
-[2\. Transfer binary blobs](#2-transfer-the-binary-blobs) <br>
-[3\. Import snaps and charms](#3-import-snaps-and-charms) <br>
-[4\. Deploy PostgreSQL](#4-deploy-postgresql)
-
 ## Air-gapped day-to-day example
 
 ### 1. Export snaps and charms

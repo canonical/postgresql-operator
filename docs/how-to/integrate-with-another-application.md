@@ -1,3 +1,8 @@
+---
+relatedlinks: https://documentation.ubuntu.com/juju/3.6/reference/relation/, [postgresql_client&#32-&#32GitHub](https://github.com/canonical/charm-relation-interfaces/tree/main/interfaces/postgresql_client/v0)
+
+---
+
 # How to integrate with another application
 
 [Integrations](https://juju.is/docs/juju/relation), also known as “relations” are connections between two applications with compatible endpoints. These connections simplify the creation and management of users, passwords, and other shared data.
@@ -31,8 +36,7 @@ juju remove-relation postgresql <charm>
 ### Legacy `pgsql` interface
 
 ```{caution}
-Note that this interface is **deprecated**.
-See the [legacy charm explanation page](/explanation/legacy-charm).
+Note that this interface is **deprecated**. See [](/explanation/legacy-charm).
 ```
 
 To integrate via the legacy interface, run
@@ -74,20 +78,6 @@ juju remove-relation <charm> postgresql
 juju integrate <charm> postgresql
 ```
 
-`<charm>` can be `data-integrator` in the case of connecting with a non-charmed application.
-
-### Internal operator user
-
-The operator user is used internally by the Charmed PostgreSQL application. The `set-password` action can be used to rotate its password.
-
-To set a specific password for the operator user, run
-```text
-juju run postgresql/leader set-password password=<password>
-```
-
-To randomly generate a password for the `operator` user, run
-```text
-juju run postgresql/leader set-password
-```
+In the case of connecting with a non-charmed application, `<charm>` would be `data-integrator`.
 
 See also: [](/how-to/manage-passwords)

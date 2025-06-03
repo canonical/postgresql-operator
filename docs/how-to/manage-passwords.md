@@ -2,10 +2,6 @@
 
 In Charmed PostgreSQL 14, user credentials are managed with Juju's `get-password` and `set-password` actions.
 
-```{seealso}
-[How to manage passwords on Charmed PostgreSQL 16](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/manage-passwords/). 
-```
-
 ## Get password
 
 To retrieve the operator's password:
