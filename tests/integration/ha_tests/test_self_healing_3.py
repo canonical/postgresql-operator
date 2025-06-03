@@ -235,6 +235,13 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
     # Wait the LXD unit has its IP updated.
     logger.info("waiting for IP address to be updated on Juju unit")
     await wait_network_restore(ops_test, primary_name, primary_ip)
+    await ops_test.model.wait_for_idle(
+        apps=[app],
+        status="active",
+        raise_on_blocked=True,
+        timeout=1000,
+        idle_period=30,
+    )
 
     # Verify that the database service got restarted and is ready in the old primary.
     logger.info(f"waiting for the database service to be ready on {primary_name}")
