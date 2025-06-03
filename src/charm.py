@@ -1980,6 +1980,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("on_update_status early exit: Unit is in Blocked status")
             return False
 
+        # Don't update this member before it's part of the members list.
+        if self._unit_ip not in self.members_ips:
+            logger.debug("on_update_status early exit: Unit not in the members list")
+            return False
         return True
 
     def _handle_processes_failures(self) -> bool:
