@@ -827,7 +827,7 @@ BEGIN
 
     IF current_session_user LIKE 'relation-%' OR current_session_user LIKE 'relation_id_%' THEN
         RAISE NOTICE 'Granting % to %', admin_user, current_session_user;
-        statement := 'GRANT ' || admin_user || ' TO ' || current_session_user || ';';
+        statement := 'GRANT ' || admin_user || ' TO "' || current_session_user || '";';
         EXECUTE statement;
     END IF;
 

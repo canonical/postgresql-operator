@@ -249,3 +249,45 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
     finally:
         if connection is not None:
             connection.close()
+
+
+@pytest.mark.abort_on_fail
+async def test_newly_created_database_permissions(ops_test: OpsTest) -> None:
+    """Test that the newly created database has the correct permissions."""
+    action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
+        action_name="get-credentials"
+    )
+    result = await action.wait()
+    data_integrator_credentials = result.results
+    username = data_integrator_credentials[RELATION_ENDPOINT]["username"]
+    password = data_integrator_credentials[RELATION_ENDPOINT]["password"]
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    connection = None
+    try:
+        host = get_unit_address(ops_test, primary)
+        connection = db_connect(host, password, username=username, database=f"{DATABASE_NAME}_2")
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            logger.info("Checking that the charmed_databases_owner user can create a table")
+            cursor.execute("SELECT session_user,current_user;")
+            result = cursor.fetchone()
+            if result is not None:
+                assert result[0] == username, (
+                    "The session user should be the relation user in the primary"
+                )
+                assert result[1] == "charmed_databases_owner", (
+                    "The current user should be the charmed_databases_owner user in the primary"
+                )
+            else:
+                assert False, "No result returned from the query"
+            cursor.execute("DROP TABLE IF EXISTS test_table;")
+            cursor.execute("CREATE TABLE test_table (id INTEGER);")
+            logger.info(
+                "Checking that the charmed_databases_owner user can't create a table anymore after executing the set_up_predefined_catalog_roles() function"
+            )
+            cursor.execute("SELECT set_up_predefined_catalog_roles();")
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+    finally:
+        if connection is not None:
+            connection.close()
