@@ -652,11 +652,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             member_ip = self._patroni.get_member_ip(departing_member)
             self._patroni.remove_raft_member(member_ip)
         except RemoveRaftMemberFailedError:
-            logger.debug(
-                "Deferring on_peer_relation_departed: Failed to remove member from raft cluster"
-            )
-            event.defer()
-            return
+            logger.debug("on_peer_relation_departed: Failed to remove member from raft cluster")
         except RetryError:
             logger.warning(
                 f"Early exit on_peer_relation_departed: Cannot get {event.departing_unit.name} member IP"
