@@ -2176,7 +2176,7 @@ def test_on_peer_relation_departed(harness):
         _get_member_ip.return_value = mock_ip_address
         harness.charm._on_peer_relation_departed(event)
         _remove_raft_member.assert_called_once_with(mock_ip_address)
-        # event.defer.assert_called_once()
+        event.defer.assert_called_once()
         _updated_synchronous_node_count.assert_not_called()
         _get_ips_to_remove.assert_not_called()
         _remove_from_members_ips.assert_not_called()
