@@ -288,6 +288,23 @@ async def test_newly_created_database_permissions(ops_test: OpsTest) -> None:
             cursor.execute("SELECT set_up_predefined_catalog_roles();")
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                 cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+            logger.info(
+                "Checking that the relation user can escalate to the database owner user and create a table"
+            )
+            cursor.execute("RESET ROLE;")
+            cursor.execute(f"SET ROLE {DATABASE_NAME}_2_owner;")
+            cursor.execute("SELECT session_user,current_user;")
+            result = cursor.fetchone()
+            if result is not None:
+                assert result[0] == username, (
+                    "The session user should be the relation user in the primary"
+                )
+                assert result[1] == f"{DATABASE_NAME}_2_owner", (
+                    "The current user should be the database owner user in the primary"
+                )
+            else:
+                assert False, "No result returned from the query"
+            cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
     finally:
         if connection is not None:
             connection.close()
