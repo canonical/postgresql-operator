@@ -105,6 +105,7 @@ async def test_charmed_read_role(ops_test: OpsTest):
         connection.autocommit = True
 
         with connection.cursor() as cursor:
+            cursor.execute("RESET ROLE;")
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%' AND table_type <> 'VIEW';"
             )
