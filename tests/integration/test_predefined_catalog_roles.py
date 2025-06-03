@@ -11,6 +11,7 @@ from pytest_operator.plugin import OpsTest
 from .helpers import (
     DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
+    check_connected_user,
     check_roles_and_their_permissions,
     db_connect,
     get_password,
@@ -198,17 +199,7 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
         connection.autocommit = True
         with connection.cursor() as cursor:
             logger.info("Checking that the charmed_databases_owner user can create a database")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == "charmed_databases_owner", (
-                    "The current user should be the charmed_databases_owner user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, "charmed_databases_owner")
             cursor.execute(f"CREATE DATABASE {DATABASE_NAME}_2;")
             logger.info("Checking that the charmed_databases_owner user can't create a table")
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
@@ -218,34 +209,14 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
             )
             cursor.execute("RESET ROLE;")
             cursor.execute(f"SET ROLE {DATABASE_NAME}_owner;")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == f"{DATABASE_NAME}_owner", (
-                    "The current user should be the database owner user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, f"{DATABASE_NAME}_owner")
             cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
             logger.info(
                 "Checking that the relation user can escalate to the charmed_databases_owner user again"
             )
             cursor.execute("RESET ROLE;")
             cursor.execute("SET ROLE charmed_databases_owner;")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == "charmed_databases_owner", (
-                    "The current user should be the charmed_databases_owner user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, "charmed_databases_owner")
     finally:
         if connection is not None:
             connection.close()
@@ -269,17 +240,7 @@ async def test_newly_created_database_permissions(ops_test: OpsTest) -> None:
         connection.autocommit = True
         with connection.cursor() as cursor:
             logger.info("Checking that the charmed_databases_owner user can create a table")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == "charmed_databases_owner", (
-                    "The current user should be the charmed_databases_owner user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, "charmed_databases_owner")
             cursor.execute("DROP TABLE IF EXISTS test_table;")
             cursor.execute("CREATE TABLE test_table (id INTEGER);")
             logger.info(
@@ -293,17 +254,7 @@ async def test_newly_created_database_permissions(ops_test: OpsTest) -> None:
             )
             cursor.execute("RESET ROLE;")
             cursor.execute(f"SET ROLE {DATABASE_NAME}_2_owner;")
-            cursor.execute("SELECT session_user,current_user;")
-            result = cursor.fetchone()
-            if result is not None:
-                assert result[0] == username, (
-                    "The session user should be the relation user in the primary"
-                )
-                assert result[1] == f"{DATABASE_NAME}_2_owner", (
-                    "The current user should be the database owner user in the primary"
-                )
-            else:
-                assert False, "No result returned from the query"
+            check_connected_user(cursor, username, f"{DATABASE_NAME}_2_owner")
             cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
     finally:
         if connection is not None:

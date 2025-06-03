@@ -742,6 +742,22 @@ def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> 
     return model.units.get(unit_name).public_address
 
 
+def check_connected_user(
+    cursor, session_user: str, current_user: str, primary: bool = True
+) -> None:
+    cursor.execute("SELECT session_user,current_user;")
+    result = cursor.fetchone()
+    if result is not None:
+        assert result[0] == session_user, (
+            f"The session user should be the {session_user} user in the {'primary' if primary else 'replica'}"
+        )
+        assert result[1] == current_user, (
+            f"The current user should be the {current_user} user in the {'primary' if primary else 'replica'}"
+        )
+    else:
+        assert False, "No result returned from the query"
+
+
 async def check_roles_and_their_permissions(
     ops_test: OpsTest, relation_endpoint: str, database_name: str
 ) -> None:
