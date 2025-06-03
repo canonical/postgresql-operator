@@ -230,6 +230,22 @@ async def test_database_creation_permissions(ops_test: OpsTest) -> None:
             else:
                 assert False, "No result returned from the query"
             cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+            logger.info(
+                "Checking that the relation user can escalate to the charmed_databases_owner user again"
+            )
+            cursor.execute("RESET ROLE;")
+            cursor.execute("SET ROLE charmed_databases_owner;")
+            cursor.execute("SELECT session_user,current_user;")
+            result = cursor.fetchone()
+            if result is not None:
+                assert result[0] == username, (
+                    "The session user should be the relation user in the primary"
+                )
+                assert result[1] == "charmed_databases_owner", (
+                    "The current user should be the charmed_databases_owner user in the primary"
+                )
+            else:
+                assert False, "No result returned from the query"
     finally:
         if connection is not None:
             connection.close()
