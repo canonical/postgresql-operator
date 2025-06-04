@@ -7,7 +7,7 @@
 
 This repository contains a charmed operator for deploying [PostgreSQL](https://www.postgresql.org/about/) on Kubernetes via the [Juju orchestration engine](https://juju.is/).
 
-To learn more about how to deploy and operate Charmed PostgreSQL K8s, see the [official documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/).
+To learn more about how to deploy and operate Charmed PostgreSQL, see the [official documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/).
 
 ## Overview
 
