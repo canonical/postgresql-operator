@@ -53,6 +53,7 @@ ROLE_STATS = "charmed_stats"
 ROLE_READ = "charmed_read"
 ROLE_DML = "charmed_dml"
 ROLE_BACKUP = "charmed_backup"
+ROLE_DBA = "charmed_dba"
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -361,12 +362,19 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
+            ROLE_DBA: [
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;",
+                f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA};",
+                f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA};",
+                f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA};"
+            ]
         }
 
         _, existing_roles = self.list_valid_privileges_and_roles()
 
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
                 for role, queries in role_to_queries.items():
                     if role in existing_roles:
                         logger.debug(f"Role {role} already exists")
