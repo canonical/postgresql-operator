@@ -254,6 +254,7 @@ class PostgreSQL:
         admin: bool = False,
         extra_user_roles: Optional[List[str]] = None,
         in_role: Optional[str] = None,
+        can_create_database: bool = False,
     ) -> None:
         """Creates a database user.
 
@@ -263,6 +264,7 @@ class PostgreSQL:
             admin: whether the user should have additional admin privileges.
             extra_user_roles: additional privileges and/or roles to be assigned to the user.
             in_role: role to be assigned to the user.
+            can_create_database: whether the user should be able to create databases.
         """
         try:
             # Separate roles and privileges from the provided extra user roles.
@@ -297,7 +299,9 @@ class PostgreSQL:
                     user_definition = "CREATE ROLE {} "
                 user_definition += f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 if in_role:
-                    user_definition += f" IN ROLE {in_role} "
+                    user_definition += f" IN ROLE {in_role}"
+                if can_create_database:
+                    user_definition += " CREATEDB"
                 if privileges:
                     user_definition += f" {' '.join(privileges)}"
                 cursor.execute(SQL("BEGIN;"))
@@ -726,7 +730,7 @@ class PostgreSQL:
             cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';")
             if cursor.fetchone() is None:
                 self.create_user(
-                    "charmed_databases_owner", extra_user_roles=[PERMISSIONS_GROUP_ADMIN]
+                    "charmed_databases_owner", can_create_database=True,
                 )
 
             self.set_up_login_hook_function()
@@ -864,7 +868,6 @@ $$ LANGUAGE plpgsql security definer;"""
                 with self._connect_to_database(
                     database=database
                 ) as connection, connection.cursor() as cursor:
-                    cursor.execute(SQL("CREATE EXTENSION set_user;"))
                     cursor.execute(SQL(function_creation_statement))
                     cursor.execute(
                         SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
