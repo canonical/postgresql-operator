@@ -351,12 +351,7 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
             ROLE_DBA: [
-                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;",
-                f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA};",
-                f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA};",
-                f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA};"
-                f"GRANT execute ON FUNCTION reset_user() TO {ROLE_DBA};"
-                f"GRANT execute ON FUNCTION reset_user(text) TO {ROLE_DBA};"
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;"
             ]
         }
 
@@ -850,12 +845,21 @@ BEGIN
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON TABLES TO ' || admin_user || ';',
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT EXECUTE ON FUNCTIONS TO ' || admin_user || ';',
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON SEQUENCES TO ' || admin_user || ';',
+        'GRANT EXECUTE ON FUNCTION set_user_u(text) TO charmed_dba;',
         'REVOKE EXECUTE ON FUNCTION set_user_u(text) FROM ' || owner_user || ';',
         'REVOKE EXECUTE ON FUNCTION set_user_u(text) FROM ' || admin_user || ';',
+        'GRANT EXECUTE ON FUNCTION set_user(text) TO charmed_dba;',
         'REVOKE EXECUTE ON FUNCTION set_user(text) FROM ' || owner_user || ';',
         'REVOKE EXECUTE ON FUNCTION set_user(text) FROM ' || admin_user || ';',
+        'GRANT EXECUTE ON FUNCTION set_user(text, text) TO charmed_dba;',
         'REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM ' || owner_user || ';',
-        'REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM ' || admin_user || ';'
+        'REVOKE EXECUTE ON FUNCTION set_user(text, text) FROM ' || admin_user || ';',
+        'GRANT EXECUTE ON FUNCTION reset_user() TO charmed_dba;',
+        'REVOKE EXECUTE ON FUNCTION reset_user() FROM ' || owner_user || ';',
+        'REVOKE EXECUTE ON FUNCTION reset_user() FROM ' || admin_user || ';',
+        'GRANT EXECUTE ON FUNCTION reset_user(text) TO charmed_dba;',
+        'REVOKE EXECUTE ON FUNCTION reset_user(text) FROM ' || owner_user || ';',
+        'REVOKE EXECUTE ON FUNCTION reset_user(text) FROM ' || admin_user || ';'
     ];
     FOREACH statement IN ARRAY statements
     LOOP
