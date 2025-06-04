@@ -967,7 +967,7 @@ class Patroni:
             raise RemoveRaftMemberFailedError() from None
 
         if not result.startswith("SUCCESS"):
-            logger.debug("Remove raft member: Remove call not successful")
+            logger.debug(f"Remove raft member: Remove call not successful with {result}")
             raise RemoveRaftMemberFailedError()
 
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
