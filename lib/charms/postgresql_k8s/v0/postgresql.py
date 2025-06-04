@@ -31,11 +31,11 @@ from psycopg2.sql import SQL, Composed, Identifier, Literal
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 53
+LIBPATCH = 0
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
