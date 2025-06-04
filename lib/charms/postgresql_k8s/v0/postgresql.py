@@ -52,9 +52,7 @@ ROLE_STATS = "charmed_stats"
 ROLE_READ = "charmed_read"
 ROLE_DML = "charmed_dml"
 ROLE_BACKUP = "charmed_backup"
-
-# Groups to distinguish database permissions
-PERMISSIONS_GROUP_ADMIN = "admin"
+ROLE_DBA = "charmed_dba"
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -268,20 +266,18 @@ class PostgreSQL:
         """
         try:
             # Separate roles and privileges from the provided extra user roles.
-            admin_role = False
             roles = privileges = None
             if extra_user_roles:
-                admin_role = PERMISSIONS_GROUP_ADMIN in extra_user_roles
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [
                     role
                     for role in extra_user_roles
-                    if role in valid_roles and role != PERMISSIONS_GROUP_ADMIN
+                    if role in valid_roles
                 ]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
-                    if extra_user_role not in roles and extra_user_role != PERMISSIONS_GROUP_ADMIN
+                    if extra_user_role not in roles
                 }
                 invalid_privileges = [
                     privilege for privilege in privileges if privilege not in valid_privileges
@@ -299,7 +295,7 @@ class PostgreSQL:
                     user_definition = "ALTER ROLE {} "
                 else:
                     user_definition = "CREATE ROLE {} "
-                user_definition += f"WITH {'NOLOGIN' if user == 'admin' else 'LOGIN'}{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'{'IN ROLE admin CREATEDB' if admin_role else ''}"
+                user_definition += f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 if in_role:
                     user_definition += f" IN ROLE {in_role} "
                 if privileges:
@@ -321,6 +317,17 @@ class PostgreSQL:
 
     def create_predefined_instance_roles(self) -> None:
         """Create predefined instance roles."""
+        connection = None
+        try:
+            for database in ["postgres", "template1"]:
+                with self._connect_to_database(
+                    database=database,
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
+        finally:
+            if connection is not None:
+                connection.close()
+
         role_to_queries = {
             ROLE_STATS: [
                 f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
@@ -339,6 +346,14 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
+            ROLE_DBA: [
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;",
+                f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA};",
+                f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA};",
+                f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA};"
+                f"GRANT execute ON FUNCTION reset_user() TO {ROLE_DBA};"
+                f"GRANT execute ON FUNCTION reset_user(text) TO {ROLE_DBA};"
+            ]
         }
 
         _, existing_roles = self.list_valid_privileges_and_roles()
@@ -357,6 +372,9 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined instance roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection is not None:
+                connection.close()
 
     def grant_database_privileges_to_user(
         self, user: str, database: str, privileges: list[str]
@@ -695,22 +713,15 @@ class PostgreSQL:
                     cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
                     cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
 
-            cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='admin';")
-            if cursor.fetchone() is None:
-                # Allow access to the postgres database only to the system users.
-                cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
-                cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
-                for user in self.system_users:
-                    cursor.execute(
-                        SQL("GRANT ALL PRIVILEGES ON DATABASE postgres TO {};").format(
-                            Identifier(user)
-                        )
+            # Allow access to the postgres database only to the system users.
+            cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
+            cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
+            for user in self.system_users:
+                cursor.execute(
+                    SQL("GRANT ALL PRIVILEGES ON DATABASE postgres TO {};").format(
+                        Identifier(user)
                     )
-                self.create_user(
-                    PERMISSIONS_GROUP_ADMIN,
-                    extra_user_roles=[ROLE_READ, ROLE_DML],
                 )
-                cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
 
             cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';")
             if cursor.fetchone() is None:
@@ -945,7 +956,7 @@ $$ LANGUAGE plpgsql security definer;"""
             ldap_group = mapping_parts[0]
             psql_group = mapping_parts[1]
 
-            if psql_group in [*ACCESS_GROUPS, PERMISSIONS_GROUP_ADMIN]:
+            if psql_group in ACCESS_GROUPS:
                 logger.warning(f"Tried to assign LDAP users to forbidden group: {psql_group}")
                 continue
 
