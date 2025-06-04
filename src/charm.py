@@ -618,16 +618,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         else:
             return primary_endpoint
 
-    def get_hostname_by_unit(self, _) -> str:
-        """Create a DNS name for a PostgreSQL unit.
-
-        Returns:
-            A string representing the hostname of the PostgreSQL unit.
-        """
-        # For now, as there is no DNS hostnames on VMs, and it would also depend on
-        # the underlying provider (LXD, MAAS, etc.), the unit IP is returned.
-        return self._unit_ip
-
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
         try:
@@ -1011,7 +1001,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # hook, the configuration is updated and the service is started - or only
         # reloaded in the other units).
         stored_ip = self.unit_peer_data.get("ip")
-        current_ip = self.get_hostname_by_unit(None)
+        current_ip = self._unit_ip
         if stored_ip is None:
             self.unit_peer_data.update({"ip": current_ip})
             return False
@@ -1428,6 +1418,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if self._update_member_ip():
+            # Update the sync-standby endpoint in the async replication data.
+            self.async_replication.update_async_replication_data()
+            return
+
         try:
             self._validate_config_options()
             # update config on every run
@@ -1448,11 +1443,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
-
-        if self._update_member_ip():
-            # Update the sync-standby endpoint in the async replication data.
-            self.async_replication.update_async_replication_data()
-            return
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
@@ -1584,7 +1574,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.get_secret(UNIT_SCOPE, "internal-cert"):
             self.tls.generate_internal_peer_cert()
 
-        self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        self.unit_peer_data.update({"ip": self._unit_ip})
 
         # Open port
         try:
