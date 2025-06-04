@@ -12,6 +12,7 @@ from pytest_operator.plugin import OpsTest
 
 from .helpers import (
     CHARM_BASE,
+    DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
     db_connect,
     get_password,
@@ -27,7 +28,6 @@ from .new_relations.helpers import (
 logger = logging.getLogger(__name__)
 
 TIMEOUT = 15 * 60
-DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 # NOTE: We are unable to test set_user_u('operator') as dba user because psycopg2
 # runs every query in a transaction and running set_user() is not supported in transactions.

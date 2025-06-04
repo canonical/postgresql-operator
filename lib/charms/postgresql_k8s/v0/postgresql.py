@@ -344,6 +344,16 @@ class PostgreSQL:
 
     def create_predefined_roles(self) -> None:
         """Create predefined roles."""
+        connection = None
+        try:
+            for database in ["postgres", "template1"]:
+                with self._connect_to_database(
+                    database=database,
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
+        finally:
+            if connection is not None:
+                connection.close()
         role_to_queries = {
             ROLE_STATS: [
                 f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
@@ -374,7 +384,6 @@ class PostgreSQL:
 
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
                 for role, queries in role_to_queries.items():
                     if role in existing_roles:
                         logger.debug(f"Role {role} already exists")
@@ -387,6 +396,9 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection is not None:
+                connection.close()
 
     def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
         """Grant the specified priviliges on the provided database for the user."""
