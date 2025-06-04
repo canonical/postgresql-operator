@@ -748,11 +748,12 @@ def check_connected_user(
     cursor.execute("SELECT session_user,current_user;")
     result = cursor.fetchone()
     if result is not None:
+        instance = "primary" if primary else "replica"
         assert result[0] == session_user, (
-            f"The session user should be the {session_user} user in the {'primary' if primary else 'replica'}"
+            f"The session user should be the {session_user} user in the {instance}"
         )
         assert result[1] == current_user, (
-            f"The current user should be the {current_user} user in the {'primary' if primary else 'replica'}"
+            f"The current user should be the {current_user} user in the {instance}"
         )
     else:
         assert False, "No result returned from the query"
