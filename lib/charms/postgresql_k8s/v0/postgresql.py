@@ -31,11 +31,11 @@ from psycopg2.sql import SQL, Composed, Identifier, Literal
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 53
+LIBPATCH = 0
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -53,6 +53,7 @@ ROLE_STATS = "charmed_stats"
 ROLE_READ = "charmed_read"
 ROLE_DML = "charmed_dml"
 ROLE_BACKUP = "charmed_backup"
+ROLE_DBA = "charmed_dba"
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -338,6 +339,16 @@ class PostgreSQL:
 
     def create_predefined_roles(self) -> None:
         """Create predefined roles."""
+        connection = None
+        try:
+            for database in ["postgres", "template1"]:
+                with self._connect_to_database(
+                    database=database,
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
+        finally:
+            if connection is not None:
+                connection.close()
         role_to_queries = {
             ROLE_STATS: [
                 f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
@@ -356,6 +367,14 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
+            ROLE_DBA: [
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;",
+                f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA};",
+                f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA};",
+                f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA};"
+                f"GRANT execute ON FUNCTION reset_user() TO {ROLE_DBA};"
+                f"GRANT execute ON FUNCTION reset_user(text) TO {ROLE_DBA};"
+            ]
         }
 
         _, existing_roles = self.list_valid_privileges_and_roles()
@@ -374,6 +393,9 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection is not None:
+                connection.close()
 
     def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
         """Grant the specified priviliges on the provided database for the user."""
