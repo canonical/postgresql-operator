@@ -377,6 +377,8 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION set_user(text) TO {ROLE_DBA};",
                 f"GRANT execute ON FUNCTION set_user(text, text) TO {ROLE_DBA};",
                 f"GRANT execute ON FUNCTION set_user_u(text) TO {ROLE_DBA};"
+                f"GRANT execute ON FUNCTION reset_user() TO {ROLE_DBA};"
+                f"GRANT execute ON FUNCTION reset_user(text) TO {ROLE_DBA};"
             ]
         }
 

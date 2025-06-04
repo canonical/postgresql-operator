@@ -64,9 +64,6 @@ async def test_charmed_dba_role(ops_test: OpsTest):
     username = data_integrator_credentials["postgresql"]["username"]
 
     for read_only_endpoint in [False, True]:
-        logger.info(
-            f"Testing escalation from charmed_dba to operator role in the {'replica' if read_only_endpoint else 'primary'} database"
-        )
         connection_string = await build_connection_string(
             ops_test,
             DATA_INTEGRATOR_APP_NAME,
@@ -78,8 +75,16 @@ async def test_charmed_dba_role(ops_test: OpsTest):
         connection.autocommit = True
         try:
             with connection.cursor() as cursor:
+                logger.info(
+                    f"Testing escalation from charmed_dba to operator user in the {'replica' if read_only_endpoint else 'primary'}"
+                )
                 cursor.execute("SELECT set_user_u('operator'::TEXT);")
                 check_connected_user(cursor, username, "operator")
+                logger.info(
+                    f"Resetting the user to charmed_dba in the {'replica' if read_only_endpoint else 'primary'}"
+                )
+                cursor.execute("SELECT reset_user();")
+                check_connected_user(cursor, username, username)
         finally:
             if connection is not None:
                 connection.close()
