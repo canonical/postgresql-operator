@@ -63,28 +63,31 @@ async def test_charmed_dba_role(ops_test: OpsTest):
     data_integrator_credentials = result.results
     username = data_integrator_credentials["postgresql"]["username"]
 
-    for read_only_endpoint in [False, True]:
+    for read_write_endpoint in [True, False]:
         connection_string = await build_connection_string(
             ops_test,
             DATA_INTEGRATOR_APP_NAME,
             "postgresql",
             database="charmed_dba_database",
-            read_only_endpoint=read_only_endpoint,
+            read_only_endpoint=(not read_write_endpoint),
         )
         connection = psycopg2.connect(connection_string)
         connection.autocommit = True
         try:
             with connection.cursor() as cursor:
-                logger.info(
-                    f"Testing escalation from charmed_dba to operator user in the {'replica' if read_only_endpoint else 'primary'}"
-                )
-                cursor.execute("SELECT set_user_u('operator'::TEXT);")
-                check_connected_user(cursor, username, "operator")
-                logger.info(
-                    f"Resetting the user to charmed_dba in the {'replica' if read_only_endpoint else 'primary'}"
-                )
+                instance = "primary" if read_write_endpoint else "replica"
+                logger.info(f"Testing escalation to the rewind user in the {instance}")
+                cursor.execute("SELECT set_user('rewind'::TEXT);")
+                check_connected_user(cursor, username, "rewind", primary=read_write_endpoint)
+                logger.info(f"Resetting the user to the {username} user in the {instance}")
                 cursor.execute("SELECT reset_user();")
-                check_connected_user(cursor, username, username)
+                check_connected_user(cursor, username, username, primary=read_write_endpoint)
+                logger.info(f"Testing escalation to the operator user in the {instance}")
+                cursor.execute("SELECT set_user_u('operator'::TEXT);")
+                check_connected_user(cursor, username, "operator", primary=read_write_endpoint)
+                logger.info(f"Resetting the user to the {username} user in the {instance}")
+                cursor.execute("SELECT reset_user();")
+                check_connected_user(cursor, username, username, primary=read_write_endpoint)
         finally:
             if connection is not None:
                 connection.close()
