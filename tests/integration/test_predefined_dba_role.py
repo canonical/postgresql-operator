@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 
 import asyncio
+import logging
 
 import psycopg2
 import psycopg2.sql
@@ -16,6 +17,8 @@ from .helpers import (
     check_connected_user,
 )
 from .new_relations.helpers import build_connection_string
+
+logger = logging.getLogger(__name__)
 
 
 @pytest.mark.abort_on_fail
@@ -53,13 +56,6 @@ async def test_charmed_dba_role(ops_test: OpsTest):
         apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
     )
 
-    connection_string = await build_connection_string(
-        ops_test,
-        DATA_INTEGRATOR_APP_NAME,
-        "postgresql",
-        database="charmed_dba_database",
-    )
-
     action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
         action_name="get-credentials"
     )
@@ -67,12 +63,23 @@ async def test_charmed_dba_role(ops_test: OpsTest):
     data_integrator_credentials = result.results
     username = data_integrator_credentials["postgresql"]["username"]
 
-    connection = psycopg2.connect(connection_string)
-    connection.autocommit = True
-    try:
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT set_user_u('operator'::TEXT);")
-            check_connected_user(cursor, username, "operator")
-    finally:
-        if connection is not None:
-            connection.close()
+    for read_only_endpoint in [False, True]:
+        logger.info(
+            f"Testing escalation from charmed_dba to operator role in the {'replica' if read_only_endpoint else 'primary'} database"
+        )
+        connection_string = await build_connection_string(
+            ops_test,
+            DATA_INTEGRATOR_APP_NAME,
+            "postgresql",
+            database="charmed_dba_database",
+            read_only_endpoint=read_only_endpoint,
+        )
+        connection = psycopg2.connect(connection_string)
+        connection.autocommit = True
+        try:
+            with connection.cursor() as cursor:
+                cursor.execute("SELECT set_user_u('operator'::TEXT);")
+                check_connected_user(cursor, username, "operator")
+        finally:
+            if connection is not None:
+                connection.close()
