@@ -115,7 +115,7 @@ def change_primary_start_timeout(
 
 
 def get_patroni_cluster(unit_ip: str) -> dict[str, str]:
-    resp = requests.get(f"http://{unit_ip}:8008/cluster")
+    resp = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
     return resp.json()
 
 
@@ -210,7 +210,7 @@ def check_patroni(ops_test: OpsTest, unit_name: str, restart_time: float) -> boo
         whether Patroni is running correctly.
     """
     unit_ip = get_unit_address(ops_test, unit_name)
-    health_info = requests.get(f"http://{unit_ip}:8008/health").json()
+    health_info = requests.get(f"https://{unit_ip}:8008/health", verify=False).json()
     postmaster_start_time = datetime.strptime(
         health_info["postmaster_start_time"], "%Y-%m-%d %H:%M:%S.%f%z"
     ).timestamp()
@@ -235,7 +235,7 @@ async def check_cluster_members(ops_test: OpsTest, application_name: str) -> Non
             expected_members = get_application_units(ops_test, application_name)
             expected_members_ips = get_application_units_ips(ops_test, application_name)
 
-            r = requests.get(f"http://{address}:8008/cluster")
+            r = requests.get(f"https://{address}:8008/cluster", verify=False)
             assert [member["name"] for member in r.json()["members"]] == expected_members
             assert [member["host"] for member in r.json()["members"]] == expected_members_ips
 
@@ -272,7 +272,7 @@ def convert_records_to_dict(records: list[tuple]) -> dict:
 def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
     """Return the number of performed switchovers."""
     unit_address = get_unit_address(ops_test, unit_name)
-    switchover_history_info = requests.get(f"http://{unit_address}:8008/history")
+    switchover_history_info = requests.get(f"https://{unit_address}:8008/history", verify=False)
     return len(switchover_history_info.json())
 
 
@@ -693,27 +693,24 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     return action.results["primary"]
 
 
-async def get_tls_ca(
-    ops_test: OpsTest,
-    unit_name: str,
-) -> str:
+async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client") -> str:
     """Returns the TLS CA used by the unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        relation: TLS relation to get the CA from
 
     Returns:
         TLS CA or an empty string if there is no CA.
     """
     raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    endpoint = f"{relation}-certificates"
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
-    relation_data = [
-        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
-    ]
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == endpoint]
     if len(relation_data) == 0:
         return ""
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
@@ -842,7 +839,7 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled on Patroni REST API.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    tls_ca = await get_tls_ca(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name, "peer")
 
     # If there is no TLS CA in the relation, something is wrong in
     # the relation between the TLS Certificates Operator and PostgreSQL.
@@ -859,11 +856,10 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
                 temp_ca_file.seek(0)
 
                 # The CA bundle file is used to validate the server certificate when
-                # TLS is enabled, otherwise True is set because it's the default value
-                # for the verify parameter.
+                # peer TLS is enabled, otherwise don't validate the internal cert.
                 health_info = requests.get(
-                    f"{'https' if enabled else 'http'}://{unit_address}:8008/health",
-                    verify=temp_ca_file.name if enabled else True,
+                    f"https://{unit_address}:8008/health",
+                    verify=temp_ca_file.name if enabled else False,
                 )
                 return health_info.status_code == 200
     except RetryError:
@@ -975,7 +971,9 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     """
     unit_ip = get_unit_address(ops_test, unit_name)
     requests.post(
-        f"http://{unit_ip}:8008/restart", auth=requests.auth.HTTPBasicAuth("patroni", password)
+        f"https://{unit_ip}:8008/restart",
+        auth=requests.auth.HTTPBasicAuth("patroni", password),
+        verify=False,
     )
 
 
@@ -1050,18 +1048,19 @@ def switchover(
     """
     primary_ip = get_unit_address(ops_test, current_primary)
     response = requests.post(
-        f"http://{primary_ip}:8008/switchover",
+        f"https://{primary_ip}:8008/switchover",
         json={
             "leader": current_primary.replace("/", "-"),
             "candidate": candidate.replace("/", "-") if candidate else None,
         },
         auth=requests.auth.HTTPBasicAuth("patroni", password),
+        verify=False,
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
     for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
-            response = requests.get(f"http://{primary_ip}:8008/cluster")
+            response = requests.get(f"https://{primary_ip}:8008/cluster", verify=False)
             assert response.status_code == 200
             standbys = len([
                 member for member in response.json()["members"] if member["role"] == "sync_standby"
@@ -1136,7 +1135,10 @@ async def backup_operations(
     )
 
     await ops_test.model.relate(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.relate(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)

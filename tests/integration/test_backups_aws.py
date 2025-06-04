@@ -52,7 +52,10 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
 
     # Remove the relation to the TLS certificates operator.
     await ops_test.model.applications[database_app_name].remove_relation(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.applications[database_app_name].remove_relation(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
 
     new_unit_name = f"{database_app_name}/2"

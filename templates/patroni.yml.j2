@@ -26,18 +26,12 @@ restapi:
     username: patroni
     password: {{ patroni_password }}
   {%- endif %}
-  {%- if enable_tls %}
-  cafile: {{ conf_path }}/ca.pem
-  certfile: {{ conf_path }}/cert.pem
-  keyfile: {{ conf_path }}/key.pem
-  {%- endif %}
+  cafile: {{ conf_path }}/peer_ca.pem
+  certfile: {{ conf_path }}/peer_cert.pem
+  keyfile: {{ conf_path }}/peer_key.pem
 
-{%- if enable_tls %}
 ctl:
-  cacert: {{ conf_path }}/ca.pem
-  certfile: {{ conf_path }}/cert.pem
-  keyfile: {{ conf_path }}/key.pem
-{%- endif %}
+  cacert: {{ conf_path }}/peer_ca.pem
 
 raft:
   data_dir: {{ conf_path }}/raft
@@ -193,25 +187,25 @@ postgresql:
       password: {{ replication_password }}
       {%- if enable_tls %}
       sslrootcert: {{ conf_path }}/ca.pem
-      sslcert: {{ conf_path }}/cert.pem
-      sslkey: {{ conf_path }}/key.pem
       {%- endif %}
+      sslcert: {{ conf_path }}/nonexistent_cert.pem
+      sslkey: {{ conf_path }}/nonexistent_key.pem
     rewind:
       username: {{ rewind_user }}
       password: {{ rewind_password }}
       {%- if enable_tls %}
       sslrootcert: {{ conf_path }}/ca.pem
-      sslcert: {{ conf_path }}/cert.pem
-      sslkey: {{ conf_path }}/key.pem
       {%- endif %}
+      sslcert: {{ conf_path }}/nonexistent_cert.pem
+      sslkey: {{ conf_path }}/nonexistent_key.pem
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
       {%- if enable_tls %}
       sslrootcert: {{ conf_path }}/ca.pem
-      sslcert: {{ conf_path }}/cert.pem
-      sslkey: {{ conf_path }}/key.pem
       {%- endif %}
+      sslcert: {{ conf_path }}/nonexistent_cert.pem
+      sslkey: {{ conf_path }}/nonexistent_key.pem
 use_unix_socket: true
 {%- if is_creating_backup %}
 tags:

@@ -355,9 +355,10 @@ class PostgreSQL:
             # Existing objects need to be reassigned in each database
             # before the user can be deleted.
             for database in databases:
-                with self._connect_to_database(
-                    database
-                ) as connection, connection.cursor() as cursor:
+                with (
+                    self._connect_to_database(database) as connection,
+                    connection.cursor() as cursor,
+                ):
                     cursor.execute(
                         SQL("REASSIGN OWNED BY {} TO {};").format(
                             Identifier(user), Identifier(self.user)
@@ -448,9 +449,10 @@ class PostgreSQL:
 
             # Enable/disabled the extension in each database.
             for database in databases:
-                with self._connect_to_database(
-                    database=database
-                ) as connection, connection.cursor() as cursor:
+                with (
+                    self._connect_to_database(database=database) as connection,
+                    connection.cursor() as cursor,
+                ):
                     for extension, enable in ordered_extensions.items():
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
@@ -560,9 +562,10 @@ END; $$;"""
         Returns:
             Set of PostgreSQL text search configs.
         """
-        with self._connect_to_database(
-            database_host=self.current_host
-        ) as connection, connection.cursor() as cursor:
+        with (
+            self._connect_to_database(database_host=self.current_host) as connection,
+            connection.cursor() as cursor,
+        ):
             cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
             text_search_configs = cursor.fetchall()
             return {text_search_config[0] for text_search_config in text_search_configs}
@@ -573,9 +576,10 @@ END; $$;"""
         Returns:
             Set of PostgreSQL timezones.
         """
-        with self._connect_to_database(
-            database_host=self.current_host
-        ) as connection, connection.cursor() as cursor:
+        with (
+            self._connect_to_database(database_host=self.current_host) as connection,
+            connection.cursor() as cursor,
+        ):
             cursor.execute("SELECT name FROM pg_timezone_names;")
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
@@ -586,9 +590,10 @@ END; $$;"""
         Returns:
             Set of PostgreSQL table access methods.
         """
-        with self._connect_to_database(
-            database_host=self.current_host
-        ) as connection, connection.cursor() as cursor:
+        with (
+            self._connect_to_database(database_host=self.current_host) as connection,
+            connection.cursor() as cursor,
+        ):
             cursor.execute("SELECT amname FROM pg_am WHERE amtype = 't';")
             access_methods = cursor.fetchall()
             return {access_method[0] for access_method in access_methods}
@@ -601,9 +606,10 @@ END; $$;"""
         """
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database(
-                database_host=host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute("SELECT version();")
                 # Split to get only the version number.
                 return cursor.fetchone()[0].split(" ")[1]
@@ -622,9 +628,12 @@ END; $$;"""
             whether TLS is enabled.
         """
         try:
-            with self._connect_to_database(
-                database_host=self.current_host if check_current_host else None
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(
+                    database_host=self.current_host if check_current_host else None
+                ) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute("SHOW ssl;")
                 return "on" in cursor.fetchone()[0]
         except psycopg2.Error:
@@ -644,9 +653,10 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database(
-                database_host=host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
                     "SELECT groname FROM pg_catalog.pg_group WHERE groname LIKE '%_access';"
                 )
@@ -674,9 +684,10 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database(
-                database_host=host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
                     SQL(
                         "SELECT TRUE FROM pg_catalog.pg_user WHERE usename = {} AND usesuper;"
@@ -712,9 +723,10 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database(
-                database_host=host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=host) as connection,
+                connection.cursor() as cursor,
+            ):
                 if group:
                     query = SQL(
                         "SELECT usename FROM (SELECT UNNEST(grolist) AS user_id FROM pg_catalog.pg_group WHERE groname = {}) AS g JOIN pg_catalog.pg_user AS u ON g.user_id = u.usesysid;"
@@ -744,9 +756,10 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database(
-                database_host=host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
                     "SELECT usename "
                     "FROM pg_catalog.pg_user "
@@ -782,9 +795,10 @@ END; $$;"""
         connection = None
         cursor = None
         try:
-            with self._connect_to_database(
-                database="template1"
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database="template1") as connection,
+                connection.cursor() as cursor,
+            ):
                 # Create database function and event trigger to identify users created by PgBouncer.
                 cursor.execute(
                     "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
@@ -900,9 +914,10 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
         """
         connection = None
         try:
-            with self._connect_to_database(
-                database_host=database_host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=database_host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
@@ -1039,9 +1054,10 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
             Whether the date style is valid.
         """
         try:
-            with self._connect_to_database(
-                database_host=self.current_host
-            ) as connection, connection.cursor() as cursor:
+            with (
+                self._connect_to_database(database_host=self.current_host) as connection,
+                connection.cursor() as cursor,
+            ):
                 cursor.execute(
                     SQL(
                         "SET DateStyle to {};",
