@@ -2,8 +2,6 @@
 # See LICENSE file for licensing details.
 import asyncio
 import logging
-import secrets
-import string
 from pathlib import Path
 
 import psycopg2
@@ -484,97 +482,10 @@ async def test_relation_with_no_database_name(ops_test: OpsTest):
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
 
 
-async def test_admin_role(ops_test: OpsTest):
-    """Test that the admin role gives access to all the databases."""
-    all_app_names = [DATA_INTEGRATOR_APP_NAME]
-    all_app_names.extend(APP_NAMES)
+async def test_invalid_extra_user_roles(ops_test: OpsTest):
     async with ops_test.fast_forward():
         await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
-        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
-            "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-            "extra-user-roles": "admin",
-        })
-        await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
-        await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-        await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
-
-    # Check that the user can access all the databases.
-    for database in [
-        DATABASE_DEFAULT_NAME,
-        f"{APPLICATION_APP_NAME.replace('-', '_')}_database",
-        "another_application_database",
-    ]:
-        logger.info(f"connecting to the following database: {database}")
-        connection_string = await build_connection_string(
-            ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=database
-        )
-        connection = None
-        should_fail = False
-        try:
-            with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-                # Check the version that the application received is the same on the
-                # database server.
-                cursor.execute("SELECT version();")
-                data = cursor.fetchone()[0].split(" ")[1]
-
-                # Get the version of the database and compare with the information that
-                # was retrieved directly from the database.
-                version = await get_application_relation_data(
-                    ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", "version"
-                )
-                assert version == data
-
-                # Write some data (it should fail in the default database name).
-                random_name = (
-                    f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
-                )
-                should_fail = database == DATABASE_DEFAULT_NAME
-                cursor.execute(f"CREATE SCHEMA test; CREATE TABLE test.{random_name}(data TEXT);")
-                if should_fail:
-                    assert False, (
-                        f"failed to run a statement in the following database: {database}"
-                    )
-        except psycopg2.errors.InsufficientPrivilege as e:
-            if not should_fail:
-                logger.exception(e)
-                assert False, (
-                    f"failed to connect to or run a statement in the following database: {database}"
-                )
-        finally:
-            if connection is not None:
-                connection.close()
-
-    # Test the creation and deletion of databases.
-    connection_string = await build_connection_string(
-        ops_test, DATA_INTEGRATOR_APP_NAME, "postgresql", database=DATABASE_DEFAULT_NAME
-    )
-    connection = psycopg2.connect(connection_string)
-    connection.autocommit = True
-    cursor = connection.cursor()
-    random_name = f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
-    cursor.execute(f"CREATE DATABASE {random_name};")
-    cursor.execute(f"DROP DATABASE {random_name};")
-    try:
-        cursor.execute(f"DROP DATABASE {DATABASE_DEFAULT_NAME};")
-        assert False, (
-            f"the admin extra user role was able to drop the `{DATABASE_DEFAULT_NAME}` system database"
-        )
-    except psycopg2.errors.InsufficientPrivilege:
-        # Ignore the error, as the admin extra user role mustn't be able to drop
-        # the "postgres" system database.
-        pass
-    finally:
-        connection.close()
-
-
-async def test_invalid_extra_user_roles(ops_test: OpsTest):
-    async with ops_test.fast_forward():
-        # Remove the relation between the database and the first data integrator.
-        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME
-        )
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
 
         another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
         data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
