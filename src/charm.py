@@ -44,7 +44,6 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
-from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import main
@@ -108,6 +107,7 @@ from constants import (
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
     SYSTEM_USERS,
+    TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
@@ -120,6 +120,8 @@ from constants import (
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
+from relations.tls import TLS
+from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
@@ -234,7 +236,8 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         PostgreSQLBackups,
         PostgreSQLLDAP,
         PostgreSQLProvider,
-        PostgreSQLTLS,
+        TLS,
+        TLSTransfer,
         RollingOpsManager,
     ),
 )
@@ -289,7 +292,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        self.tls = PostgreSQLTLS(self, PEER)
+        self.tls = TLS(self, PEER)
+        self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -431,7 +435,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "metrics_path": "/metrics",
                 "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
-                "scheme": "https" if self.is_tls_enabled else "http",
+                "scheme": "https",
             }
         ]
 
@@ -616,16 +620,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         else:
             return primary_endpoint
-
-    def get_hostname_by_unit(self, _) -> str:
-        """Create a DNS name for a PostgreSQL unit.
-
-        Returns:
-            A string representing the hostname of the PostgreSQL unit.
-        """
-        # For now, as there is no DNS hostnames on VMs, and it would also depend on
-        # the underlying provider (LXD, MAAS, etc.), the unit IP is returned.
-        return self._unit_ip
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -839,8 +833,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if not self.is_cluster_initialised:
-            logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
-            event.defer()
+            logger.debug("Early exit on_peer_relation_changed: cluster not initialized")
             return False
 
         # Check whether raft is stuck.
@@ -1011,7 +1004,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # hook, the configuration is updated and the service is started - or only
         # reloaded in the other units).
         stored_ip = self.unit_peer_data.get("ip")
-        current_ip = self.get_hostname_by_unit(None)
+        current_ip = self._unit_ip
         if stored_ip is None:
             self.unit_peer_data.update({"ip": current_ip})
             return False
@@ -1117,7 +1110,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
-            bool(self.unit_peer_data.get("tls")),
             self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
             self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
@@ -1150,7 +1142,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_tls_files())
+        return all(self.tls.get_client_tls_files())
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -1387,6 +1379,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
 
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
+            self.tls.generate_internal_peer_ca()
+            self.tls.generate_internal_peer_cert()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1425,6 +1420,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_config_changed: Refresh in progress")
             event.defer()
             return
+
+        if self._update_member_ip():
+            # Update the sync-standby endpoint in the async replication data.
+            self.async_replication.update_async_replication_data()
+            return
+
         try:
             self._validate_config_options()
             # update config on every run
@@ -1445,11 +1446,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
-
-        if self._update_member_ip():
-            # Update the sync-standby endpoint in the async replication data.
-            self.async_replication.update_async_replication_data()
-            return
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
@@ -1574,7 +1570,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
+            logger.info("leader not elected and/or internal CA not yet generated")
+            event.defer()
+            return
+        if not self.get_secret(UNIT_SCOPE, "internal-cert"):
+            self.tls.generate_internal_peer_cert()
+
+        self.unit_peer_data.update({"ip": self._unit_ip})
 
         # Open port
         try:
@@ -2089,8 +2092,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Request the certificate only if there is already one. If there isn't,
         # the certificate will be generated in the relation joined event when
         # relating to the TLS Certificates Operator.
-        if all(self.tls.get_tls_files()):
-            self.tls._request_certificate(self.get_secret("unit", "private-key"))
+        if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
+            self.tls.refresh_tls_certificates_event.emit()
+        if self.get_secret(UNIT_SCOPE, "internal-cert"):
+            self.tls.generate_internal_peer_cert()
 
     @property
     def is_blocked(self) -> bool:
@@ -2174,13 +2179,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
-        key, ca, cert = self.tls.get_tls_files()
+        key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+
+        key, ca, cert = self.tls.get_peer_tls_files()
+        if key is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+        if ca is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+        if cert is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
+
+        self._patroni.render_file(
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}", self.tls.get_peer_ca_bundle(), 0o600
+        )
 
         try:
             return self.update_config()
@@ -2289,7 +2306,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if refresh is None:
             refresh = self.refresh
 
-        enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:
             limit_memory = self.config.profile_limit_memory * 10**6
@@ -2304,7 +2320,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             connectivity=self.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
             enable_ldap=self.is_ldap_enabled,
-            enable_tls=enable_tls,
+            enable_tls=self.is_tls_enabled,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
             restore_timeline=self.app_peer_data.get("restore-timeline"),
@@ -2322,17 +2338,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
-            self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            self.unit_peer_data.update({
+                "tls": "enabled" if self.is_tls_enabled else "",
+            })
             self.postgresql_client_relation.update_endpoints()
             logger.debug("Early exit update_config: Workload not started yet")
             return True
 
         if not self._patroni.member_started:
-            if enable_tls:
+            if self.is_tls_enabled:
                 logger.debug(
                     "Early exit update_config: patroni not responding but TLS is enabled."
                 )
-                self._handle_postgresql_restart_need(True)
+                self._handle_postgresql_restart_need()
                 return True
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
@@ -2355,7 +2373,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "wal_keep_size": self.config.durability_wal_keep_size,
         })
 
-        self._handle_postgresql_restart_need(enable_tls)
+        self._handle_postgresql_restart_need()
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -2397,7 +2415,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
+    def _handle_postgresql_restart_need(self) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
             restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
@@ -2419,7 +2437,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+        self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed

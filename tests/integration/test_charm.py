@@ -66,7 +66,7 @@ async def test_database_is_up(ops_test: OpsTest, unit_id: int):
     # Query Patroni REST API and check the status that indicates
     # both Patroni and PostgreSQL are up and running.
     host = get_unit_address(ops_test, f"{DATABASE_APP_NAME}/{unit_id}")
-    result = requests.get(f"http://{host}:8008/health")
+    result = requests.get(f"https://{host}:8008/health", verify=False)
     assert result.status_code == 200
 
 
@@ -148,7 +148,7 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
     assert settings["wal_level"] == "logical"
 
     # Retrieve settings from Patroni REST API.
-    result = requests.get(f"http://{host}:8008/config")
+    result = requests.get(f"https://{host}:8008/config", verify=False)
     settings = result.json()
 
     # Validate each configuration related to Patroni
