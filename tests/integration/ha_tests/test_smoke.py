@@ -2,7 +2,6 @@
 # Copyright 2021 Canonical Ltd.
 # See LICENSE file for licensing details.
 
-import asyncio
 import logging
 
 import pytest
@@ -174,7 +173,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             await ops_test.model.wait_for_idle(
                 apps=[DUP_DATABASE_APP_NAME], timeout=60, idle_period=30, status="waiting"
             )
-        except asyncio.TimeoutError:
+        except TimeoutError:
             logger.info("Application is not in waiting state. Checking logs...")
 
         for attempt in Retrying(stop=stop_after_delay(60 * 10), wait=wait_fixed(3), reraise=True):
