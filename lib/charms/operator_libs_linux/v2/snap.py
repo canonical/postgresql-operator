@@ -102,7 +102,7 @@ LIBAPI = 2
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 
 # Regex to locate 7-bit C1 ANSI sequences
@@ -576,6 +576,9 @@ class Snap:
 
         if revision:
             args.append(f'--revision="{revision}"')
+
+        if self.confinement == 'classic':
+            args.append('--classic')
 
         if devmode:
             args.append("--devmode")
