@@ -29,7 +29,6 @@ The "modern" charm provides temporary support for the legacy interfaces:
 
 * **proper migration**: migrate the application to the new interface "[postgresql_client](https://github.com/canonical/charm-relation-interfaces)". The application will connect PostgreSQL using "[data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces)" library from "[data-platform-libs](https://github.com/canonical/data-platform-libs/)" via endpoint `database`.
 
-Note that the `trust` option must be enabled if [Role Based Access Control (RBAC)](https://kubernetes.io/docs/concepts/security/rbac-good-practices/) is in use on your Kubernetes. <!--TODO: is this relevant here?-->
 
 ```{warning}
 **In-place upgrades are not supported for this case.**
