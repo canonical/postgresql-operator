@@ -167,7 +167,7 @@ juju model-config logging-config='<root>=INFO;unit=DEBUG'
 The following command deploys PostgreSQL and [Data Integrator](https://charmhub.io/data-integrator), a charm that can be used to requests a test database:
 
 ```text
-juju deploy postgresql
+juju deploy postgresql --channel 16/stable
 juju deploy data-integrator --config database-name=test123
 juju integrate postgresql data-integrator
 ```

@@ -69,7 +69,7 @@ OLD_DB_USER=$(juju show-unit ${CLIENT_APP} | yq '.[] | .relation-info | select(.
 Deploy new PostgreSQL database charm:
 
 ```text
-juju deploy postgresql ${NEW_DB_APP} --channel 14/stable
+juju deploy postgresql ${NEW_DB_APP} --channel 16/stable
 ```
 Obtain `operator` user password of new PostgreSQL database from PostgreSQL charm:
 ```text

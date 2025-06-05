@@ -128,7 +128,7 @@ When [re-importing](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-
  Deploy and operate Juju charms normally:
 
 ```text
-juju deploy postgresql
+juju deploy postgresql --channel 16/stable
 ```
 
 ```{note}

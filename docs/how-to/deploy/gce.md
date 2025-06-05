@@ -130,7 +130,7 @@ juju add-model welcome
 The following command deploys PostgreSQL and [Data-Integrator](https://charmhub.io/data-integrator) (the charm to request a test DB):
 
 ```text
-juju deploy postgresql
+juju deploy postgresql --channel 16/stable
 juju deploy data-integrator --config database-name=test123
 juju relate postgresql data-integrator
 ```

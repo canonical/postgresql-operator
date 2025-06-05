@@ -49,7 +49,7 @@ juju add-model my-external-tls-db
 Deploy `postgresql` and `self-signed-certificates`:
 
 ```text
-juju deploy postgresql -n 3
+juju deploy postgresql --channel 16/stable -n 3
 juju deploy self-signed-certificates
 juju integrate postgresql self-signed-certificates
 ```

@@ -112,7 +112,7 @@ juju bootstrap --constraints tags=juju maas-cloud maas-controller
 ## Deploy Charmed PostgreSQL on MAAS
 ```text
 juju add-model postgresql maas-cloud
-juju deploy postgresql --channel 14/stable
+juju deploy postgresql --channel 16/stable
 ```
 
 Sample `juju status` output:

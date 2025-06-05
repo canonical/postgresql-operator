@@ -1,9 +1,14 @@
 # How to deploy
 
 This page aims to provide an introduction to the PostgreSQL deployment process and lists all the related guides. It contains the following sections:
-* [General deployment instructions](#general-deployment-instructions)
-* [Clouds](#clouds)
-* [Special deployments](#special-deployment-scenarios)
+- [How to deploy](#how-to-deploy)
+  - [General deployment instructions](#general-deployment-instructions)
+  - [Clouds](#clouds)
+  - [Special deployment scenarios](#special-deployment-scenarios)
+    - [Networking](#networking)
+    - [Airgapped](#airgapped)
+    - [Cluster-cluster replication](#cluster-cluster-replication)
+    - [Juju storage](#juju-storage)
 
 ## General deployment instructions
 
@@ -19,7 +24,7 @@ Then, either continue with the `juju` client **or** use the `terraform juju` cli
 
 **To deploy with the `juju` client:**
 ```text
-juju deploy postgresql -n <number_of_replicas>
+juju deploy postgresql --channel 16/stable -n <number_of_replicas>
 ```
 > See also: [`juju deploy` command](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/deploy/)
 

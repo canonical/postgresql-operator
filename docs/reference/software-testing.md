@@ -16,7 +16,7 @@ This type of test ensures that basic functionality works over a short amount of 
 ```text
 juju add-model smoke-test
 
-juju deploy postgresql --channel 14/edge
+juju deploy postgresql --channel 16/stable
 juju add-unit postgresql -n 2 # (optional)
 
 juju deploy postgresql-test-app

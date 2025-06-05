@@ -32,7 +32,7 @@ To summarize, the relevant sections are:
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
 ```text
 juju add-model postgresql
-juju deploy postgresql --base ubuntu@22.04 -n 3
+juju deploy postgresql --channel 16/stable --base ubuntu@22.04 -n 3
 ```
 
 Sample output of `juju status --watch 1s`:

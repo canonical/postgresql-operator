@@ -30,7 +30,7 @@ The main Patroni tool is `patronictl`.
 <details><summary>Example: cluster status</summary>
 
 ```text
-> juju deploy postgresql -n 3 # and wait for deployment
+> juju deploy postgresql --channel 16/stable -n 3 # and wait for deployment
 > juju ssh postgresql/2
 ...
 
@@ -223,7 +223,7 @@ Example of authenticated changes via Patroni REST API:
 <details><summary>Example: write access via Patroni REST API</summary>
 
 ```text
-> juju deploy postgresql -n 3 # and wait for deployment
+> juju deploy postgresql --channel 16/stable -n 3 # and wait for deployment
 > juju secrets | grep postgresql # find ID with 'patroni-password'
 > juju show-secret --reveal ccccaaabbbbbbcgoi12345 | grep patroni-password # reveal password to access Patroni REST API
     patroni-password: patr0n1sup3rs3cretpassw0rd
@@ -255,7 +255,7 @@ While **you should not interact with Raft library manually**,  you can check its
 <details><summary>Example: check Raft status</summary>
 
 ```text
-> juju deploy postgresql -n 3 # and wait for deployment
+> juju deploy postgresql --channel 16/stable -n 3 # and wait for deployment
 > juju secrets | grep postgresql # find ID with 'raft-password'
 > juju show-secret --reveal cvia1ibjihbbbcgoi12300 | grep raft-password # reveal password to access Raft
     raft-password: r@ftsup3rs3cretp@ssw0rd

@@ -34,7 +34,7 @@ Charmed PostgreSQL 16 supports multiple storage `archive` , `data` , `logs` and 
 ## Define storage size
 
 ```text
-> juju deploy postgresql --storage pgdata=10G
+> juju deploy postgresql --channel 16/stable --storage pgdata=10G
 
 > juju storage
 Unit          Storage ID  Type        Pool  Size    Status    Message
@@ -51,7 +51,7 @@ Juju supports wide list of different [storage pools](https://bobcares.com/blog/l
 > juju storage-pools | grep mystoragepool
 mystoragepool  lxd       
 
-> juju deploy postgresql --storage pgdata=5G,mystoragepool
+> juju deploy postgresql --channel 16/stable --storage pgdata=5G,mystoragepool
 
 > juju storage
 Unit          Storage ID  Type        Pool           Size    Status    Message
