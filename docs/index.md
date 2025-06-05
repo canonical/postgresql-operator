@@ -1,7 +1,9 @@
 # Charmed PostgreSQL documentation
 
-```{note}
-This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL K8s](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/).
+```{caution}
+**Charmed PostgreSQL 16 is under development.** Please wait for the upcoming stable release before deploying it in production, or see the documentation for [version 14](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/).
+
+Meanwhile, you’re welcome to explore the [`16/candidate` track](https://charmhub.io/postgresql?channel=16/candidate) and share your feedback as we continue to improve.
 ```
 
 Charmed PostgreSQL is an open-source software operator designed to deploy and operate object-relational databases on IAAS/VM. It packages the powerful database management system [PostgreSQL](https://www.postgresql.org/) into a charmed operator for deployment with [Juju](https://juju.is/docs/juju).
@@ -10,6 +12,9 @@ This charmed operator meets the need of simplifying deployment, scaling, configu
  
 Charmed PostgreSQL is made for anyone looking for a comprehensive database management interface, whether for operating a complex production environment or simply as a playground to learn more about databases and charms.
 
+```{note}
+This is a **IAAS/VM** operator. To deploy on Kubernetes, see [Charmed PostgreSQL K8s](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/).
+```
 
 ## In this documentation
 
