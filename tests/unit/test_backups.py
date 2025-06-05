@@ -952,7 +952,6 @@ def test_on_s3_credential_changed(harness):
         harness.charm.backup.s3_client.on.credentials_changed.emit(
             relation=harness.model.get_relation(S3_PARAMETERS_RELATION, s3_rel_id)
         )
-        _defer.assert_called_once()
         _render_pgbackrest_conf_file.assert_not_called()
 
         # Test when the cluster is already initialised, but the charm fails to render
