@@ -756,9 +756,8 @@ class PostgreSQLBackups(Object):
         if not self.charm.is_cluster_initialised or not self.charm.get_secret(
             UNIT_SCOPE, "internal-cert"
         ):
-            logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
-            event.defer()
-            return False
+            logger.debug("Skipping pgBackRest configuration, PostgreSQL has not yet started.")
+            return
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
         if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
