@@ -22,8 +22,8 @@ peers:
     interface: postgresql_peers
   restart:
     interface: rolling_op
-  upgrade:
-    interface: upgrade
+  refresh-v-three:
+    interface: refresh
 
 provides:
   replication-offer:
@@ -32,10 +32,6 @@ provides:
     optional: true
   database:
     interface: postgresql_client
-  db:
-    interface: pgsql
-  db-admin:
-    interface: pgsql
   cos-agent:
     interface: cos_agent
     limit: 1
@@ -45,7 +41,11 @@ requires:
     interface: postgresql_async
     limit: 1
     optional: true
-  certificates:
+  peer-certificates:
+    interface: tls-certificates
+    limit: 1
+    optional: true
+  client-certificates:
     interface: tls-certificates
     limit: 1
     optional: true
@@ -66,16 +66,26 @@ requires:
     optional: true
 
 storage:
-  pgdata:
+  archive:
     type: filesystem
-    location: /var/snap/charmed-postgresql/common
+    description: Storage mount used for holding local backups (before typically sending them to remote object storage) when relevant/needed.
+    location: /var/snap/charmed-postgresql/common/data/archive
+  data:
+    type: filesystem
+    description: Storage mount used for storing all tables, indexes, and so on (except those from temporary tablespaces).
+    location: /var/snap/charmed-postgresql/common/var/lib/postgresql
+  logs:
+    type: filesystem
+    description: Storage mount used for storing all the logs that are part of the transactional commit path (WAL files).
+    location: /var/snap/charmed-postgresql/common/data/logs
+  temp:
+    type: filesystem
+    description: Storage mount used for storing temporary tablespaces (where typically sort operations happen).
+    location: /var/snap/charmed-postgresql/common/data/temp
 
 assumes:
   - juju
   - any-of:
-      - all-of:
-          - juju >= 2.9.49
-          - juju < 3
       - all-of:
           - juju >= 3.4.3
           - juju < 3.5

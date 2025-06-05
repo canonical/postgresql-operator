@@ -4,6 +4,7 @@
 """Postgres client relation hooks & helpers."""
 
 import logging
+import typing
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -19,7 +20,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
+from ops.charm import RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
 
@@ -29,9 +30,13 @@ from constants import (
     DATABASE_PORT,
     ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
 )
-from utils import new_password
+from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
+
+
+if typing.TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 
 class PostgreSQLProvider(Object):
@@ -42,7 +47,7 @@ class PostgreSQLProvider(Object):
         - relation-broken
     """
 
-    def __init__(self, charm: CharmBase, relation_name: str = "database") -> None:
+    def __init__(self, charm: "PostgresqlOperatorCharm", relation_name: str = "database") -> None:
         """Constructor for PostgreSQLClientProvides object.
 
         Args:
@@ -96,7 +101,7 @@ class PostgreSQLProvider(Object):
             return
 
         # Retrieve the database name and extra user roles using the charm library.
-        database = event.database
+        database = event.database or ""
 
         # Make sure the relation access-group is added to the list
         extra_user_roles = self._sanitize_extra_roles(event.extra_user_roles)
@@ -134,10 +139,12 @@ class PostgreSQLProvider(Object):
             PostgreSQLGetPostgreSQLVersionError,
         ) as e:
             logger.exception(e)
-            self.charm.unit.status = BlockedStatus(
-                e.message
-                if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
-                else f"Failed to initialize {self.relation_name} relation"
+            self.charm.set_unit_status(
+                BlockedStatus(
+                    e.message
+                    if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
+                    else f"Failed to initialize relation {self.relation_name}"
+                )
             )
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
@@ -184,7 +191,7 @@ class PostgreSQLProvider(Object):
             else:
                 logger.info("Stale relation user detected: %s", user)
 
-    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:
+    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:  # noqa: C901
         """Set the read/write and read-only endpoints."""
         if not self.charm.unit.is_leader():
             return
@@ -195,30 +202,46 @@ class PostgreSQLProvider(Object):
         rel_data = self.database_provides.fetch_relation_data(
             relations_ids, ["external-node-connectivity", "database"]
         )
+
+        # skip if no relation data
+        if not rel_data:
+            return
+
         secret_data = self.database_provides.fetch_my_relation_data(relations_ids, ["password"])
 
-        # If there are no replicas, remove the read-only endpoint.
-        replicas_endpoint = list(self.charm.members_ips - {self.charm.primary_endpoint})
-        replicas_endpoint.sort()
-        cluster_state = self.charm._patroni.are_replicas_up()
-        if cluster_state:
-            replicas_endpoint = [
-                replica for replica in replicas_endpoint if cluster_state.get(replica, False)
-            ]
-        read_only_endpoints = (
-            ",".join(f"{x}:{DATABASE_PORT}" for x in replicas_endpoint)
-            if len(replicas_endpoint) > 0
-            else f"{self.charm.primary_endpoint}:{DATABASE_PORT}"
-        )
-        read_only_hosts = (
-            ",".join(replicas_endpoint)
-            if len(replicas_endpoint) > 0
-            else f"{self.charm.primary_endpoint}"
-        )
+        # Get cluster status
+        online_members = self.charm._patroni.online_cluster_members()
+        # Filter out-of-sync members
+        online_members = [
+            member for member in online_members if not member.get("tags", {}).get("nosync", False)
+        ]
+
+        # populate rw/ro endpoints
+        primary_unit_ip, rw_endpoint, ro_hosts, ro_endpoints = "", "", "", ""
+        for member in online_members:
+            unit = self.model.get_unit(label2name(member["name"]))
+            if member["role"] == "leader":
+                primary_unit_ip = self.charm._get_unit_ip(unit, self.relation_name)
+                rw_endpoint = f"{primary_unit_ip}:{DATABASE_PORT}"
+            else:
+                replica_ip = self.charm._get_unit_ip(unit, self.relation_name)
+                if not replica_ip:
+                    continue
+                if ro_hosts:
+                    ro_hosts = f"{ro_hosts},{replica_ip}"
+                    ro_endpoints = f"{ro_endpoints},{replica_ip}:{DATABASE_PORT}"
+                else:
+                    ro_hosts = replica_ip
+                    ro_endpoints = f"{replica_ip}:{DATABASE_PORT}"
+        else:
+            if not ro_hosts and primary_unit_ip:
+                # If there are no replicas, fallback to primary
+                ro_endpoints = rw_endpoint
+                ro_hosts = primary_unit_ip
 
         tls = "True" if self.charm.is_tls_enabled else "False"
         if tls == "True":
-            _, ca, _ = self.charm.tls.get_tls_files()
+            _, ca, _ = self.charm.tls.get_client_tls_files()
         else:
             ca = ""
 
@@ -232,19 +255,19 @@ class PostgreSQLProvider(Object):
             # Set the read/write endpoint.
             self.database_provides.set_endpoints(
                 relation_id,
-                f"{self.charm.primary_endpoint}:{DATABASE_PORT}",
+                rw_endpoint,
             )
 
             # Set the read-only endpoint.
             self.database_provides.set_read_only_endpoints(
                 relation_id,
-                read_only_endpoints,
+                ro_endpoints,
             )
 
             # Set connection string URI.
             self.database_provides.set_uris(
                 relation_id,
-                f"postgresql://{user}:{password}@{self.charm.primary_endpoint}:{DATABASE_PORT}/{database}",
+                f"postgresql://{user}:{password}@{rw_endpoint}/{database}",
             )
             # Make sure that the URI will be a secret
             if (
@@ -254,7 +277,7 @@ class PostgreSQLProvider(Object):
             ) and "read-only-uris" in secret_fields:
                 self.database_provides.set_read_only_uris(
                     relation_id,
-                    f"postgresql://{user}:{password}@{read_only_hosts}:{DATABASE_PORT}/{database}",
+                    f"postgresql://{user}:{password}@{ro_hosts}:{DATABASE_PORT}/{database}",
                 )
 
             self.database_provides.set_tls(relation_id, tls)
@@ -271,7 +294,12 @@ class PostgreSQLProvider(Object):
             self.charm.is_blocked
             and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ) and not self.check_for_invalid_extra_user_roles(relation.id):
-            self.charm.unit.status = ActiveStatus()
+            self.charm.set_unit_status(ActiveStatus())
+        if (
+            self.charm.is_blocked
+            and "Failed to initialize relation" in self.charm.unit.status.message
+        ):
+            self.charm.set_unit_status(ActiveStatus())
 
         self._update_unit_status_on_blocking_endpoint_simultaneously()
 
@@ -282,7 +310,7 @@ class PostgreSQLProvider(Object):
             return
 
         if self._check_multiple_endpoints():
-            self.charm.unit.status = BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE)
+            self.charm.set_unit_status(BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE))
             return
 
     def _update_unit_status_on_blocking_endpoint_simultaneously(self):
@@ -292,7 +320,7 @@ class PostgreSQLProvider(Object):
             and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
             and not self._check_multiple_endpoints()
         ):
-            self.charm.unit.status = ActiveStatus()
+            self.charm.set_unit_status(ActiveStatus())
 
     def check_for_invalid_extra_user_roles(self, relation_id: int) -> bool:
         """Checks if there are relations with invalid extra user roles.

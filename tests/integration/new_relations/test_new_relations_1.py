@@ -24,7 +24,6 @@ from ..helpers import (
     start_machine,
     stop_machine,
 )
-from ..juju_ import juju_major_version
 from .helpers import (
     build_connection_string,
     get_application_relation_data,
@@ -95,24 +94,23 @@ async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTes
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
 
         # Check that on juju 3 we have secrets and no username and password in the rel databag
-        if juju_major_version > 2:
-            logger.info("checking for secrets")
-            secret_uri, password = await asyncio.gather(
-                get_application_relation_data(
-                    ops_test,
-                    APPLICATION_APP_NAME,
-                    FIRST_DATABASE_RELATION_NAME,
-                    "secret-user",
-                ),
-                get_application_relation_data(
-                    ops_test,
-                    APPLICATION_APP_NAME,
-                    FIRST_DATABASE_RELATION_NAME,
-                    "password",
-                ),
-            )
-            assert secret_uri is not None
-            assert password is None
+        logger.info("checking for secrets")
+        secret_uri, password = await asyncio.gather(
+            get_application_relation_data(
+                ops_test,
+                APPLICATION_APP_NAME,
+                FIRST_DATABASE_RELATION_NAME,
+                "secret-user",
+            ),
+            get_application_relation_data(
+                ops_test,
+                APPLICATION_APP_NAME,
+                FIRST_DATABASE_RELATION_NAME,
+                "password",
+            ),
+        )
+        assert secret_uri is not None
+        assert password is None
 
         # Try to get the connection string of the database using the read-only endpoint.
         # It should be the primary.
@@ -211,10 +209,9 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
     machine = await get_machine_from_unit(ops_test, replica)
     await stop_machine(ops_test, machine)
 
-    # Topology observer runs every half a minute
-    await asyncio.sleep(60)
-
     for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(3), reraise=True):
+        # Topology observer runs every half a minute
+        await asyncio.sleep(60)
         with attempt:
             data = await get_application_relation_data(
                 ops_test,
@@ -464,7 +461,9 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             f"{DATABASE_APP_NAME}:database",
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1000, idle_period=30
+        )
         with pytest.raises(psycopg2.OperationalError):
             psycopg2.connect(primary_connection_string)
 
@@ -531,7 +530,7 @@ async def test_admin_role(ops_test: OpsTest):
                     f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
                 )
                 should_fail = database == DATABASE_DEFAULT_NAME
-                cursor.execute(f"CREATE TABLE {random_name}(data TEXT);")
+                cursor.execute(f"CREATE SCHEMA test; CREATE TABLE test.{random_name}(data TEXT);")
                 if should_fail:
                     assert False, (
                         f"failed to run a statement in the following database: {database}"

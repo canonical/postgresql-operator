@@ -62,8 +62,10 @@ HLL_EXTENSION_STATEMENT = "CREATE TABLE hll_test (users hll);"
 HYPOPG_EXTENSION_STATEMENT = "CREATE TABLE hypopg_test (id integer, val text); SELECT hypopg_create_index('CREATE INDEX ON hypopg_test (id)');"
 IP4R_EXTENSION_STATEMENT = "CREATE TABLE ip4r_test (ip ip4);"
 JSONB_PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION jsonb_plperl_test(val jsonb) RETURNS jsonb TRANSFORM FOR TYPE jsonb LANGUAGE plperl as $$ return $_[0]; $$;"
-ORAFCE_EXTENSION_STATEMENT = "SELECT add_months(date '2005-05-31',1);"
-PG_SIMILARITY_EXTENSION_STATEMENT = "SHOW pg_similarity.levenshtein_threshold;"
+ORAFCE_EXTENSION_STATEMENT = "SELECT oracle.add_months(date '2005-05-31',1);"
+PG_SIMILARITY_EXTENSION_STATEMENT = (
+    "SET pg_similarity.levenshtein_threshold = 0.7; SELECT 'aaa', 'aab', lev('aaa','aab');"
+)
 PLPERL_EXTENSION_STATEMENT = "CREATE OR REPLACE FUNCTION plperl_test(name text) RETURNS text AS $$ return $_SHARED{$_[0]}; $$ LANGUAGE plperl;"
 PREFIX_EXTENSION_STATEMENT = "SELECT '123'::prefix_range @> '123456';"
 RDKIT_EXTENSION_STATEMENT = "SELECT is_valid_smiles('CCC');"
@@ -168,7 +170,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
 
     # Check that the available plugins are disabled.
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     address = get_unit_address(ops_test, primary)
 
     config = enable_disable_config(False)
@@ -211,7 +213,7 @@ async def test_plugins(ops_test: OpsTest, charm) -> None:
 async def test_plugin_objects(ops_test: OpsTest) -> None:
     """Checks if charm gets blocked when trying to disable a plugin in use."""
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     address = get_unit_address(ops_test, primary)
 
     logger.info("Creating an index object which depends on the pg_trgm config")

@@ -12,7 +12,7 @@ variable "app_name" {
 variable "channel" {
   description = "Charm channel to use when deploying"
   type        = string
-  default     = "14/stable"
+  default     = "16/stable"
 }
 
 variable "revision" {
@@ -24,7 +24,7 @@ variable "revision" {
 variable "base" {
   description = "Application base"
   type        = string
-  default     = "ubuntu@22.04"
+  default     = "ubuntu@24.04"
 }
 
 variable "units" {
@@ -49,10 +49,4 @@ variable "config" {
   description = "Application configuration. Details at https://charmhub.io/postgresql/configurations"
   type        = map(string)
   default     = {}
-}
-
-variable "enable_expose" {
-  type        = bool
-  default     = true
-  description = "Whether to expose the application"
 }

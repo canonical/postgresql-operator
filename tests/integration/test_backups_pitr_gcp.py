@@ -16,18 +16,12 @@ from .helpers import (
     get_primary,
     get_unit_address,
 )
-from .juju_ import juju_major_version
 
 CANNOT_RESTORE_PITR = "cannot restore PITR, juju debug-log for details"
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
-if juju_major_version < 3:
-    TLS_CERTIFICATES_APP_NAME = "tls-certificates-operator"
-    TLS_CHANNEL = "legacy/stable"
-    TLS_CONFIG = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-else:
-    TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
-    TLS_CHANNEL = "latest/stable"
-    TLS_CONFIG = {"ca-common-name": "Test CA"}
+TLS_CERTIFICATES_APP_NAME = "self-signed-certificates"
+TLS_CHANNEL = "latest/stable"
+TLS_CONFIG = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +63,10 @@ async def pitr_backup_operations(
         "integrating self-signed-certificates with postgresql and waiting them to stabilize"
     )
     await ops_test.model.relate(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.relate(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(
@@ -94,7 +91,7 @@ async def pitr_backup_operations(
         if unit.name != primary:
             replica = unit.name
             break
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test, database_app_name=database_app_name)
     address = get_unit_address(ops_test, primary)
 
     logger.info("1: creating table")

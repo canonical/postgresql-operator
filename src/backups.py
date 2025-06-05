@@ -27,7 +27,6 @@ from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
-from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
@@ -43,6 +42,7 @@ from constants import (
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
+    UNIT_SCOPE,
 )
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ class PostgreSQLBackups(Object):
         """Returns the path to the TLS CA chain file."""
         s3_parameters, _ = self._retrieve_s3_parameters()
         if s3_parameters.get("tls-ca-chain") is not None:
-            return f"{self.charm._storage_path}/pgbackrest-tls-ca-chain.crt"
+            return f"{PGBACKREST_CONF_PATH}/pgbackrest-tls-ca-chain.crt"
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
@@ -138,22 +138,13 @@ class PostgreSQLBackups(Object):
         # yet and either hasn't joined the peer relation yet or hasn't configured TLS
         # yet while other unit already has TLS enabled.
         return not (
-            not self.charm._patroni.member_started
-            and (
-                (len(self.charm._peers.data.keys()) == 2)
-                or (
-                    "tls" not in self.charm.unit_peer_data
-                    and any("tls" in unit_data for _, unit_data in self.charm._peers.data.items())
-                )
-            )
+            not self.charm._patroni.member_started and (len(self.charm._peers.data.keys()) == 2)
         )
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
-
-        tls_enabled = "tls" in self.charm.unit_peer_data
 
         # Check if this unit is the primary (if it was not possible to retrieve that information,
         # then show that the unit cannot perform a backup, because possibly the database is offline).
@@ -163,14 +154,8 @@ class PostgreSQLBackups(Object):
             return False, "Unit cannot perform backups as the database seems to be offline"
 
         # Only enable backups on primary if there are replicas but TLS is not enabled.
-        if is_primary and self.charm.app.planned_units() > 1 and tls_enabled:
+        if is_primary and self.charm.app.planned_units() > 1:
             return False, "Unit cannot perform backups as it is the cluster primary"
-
-        # Can create backups on replicas only if TLS is enabled (it's needed to enable
-        # pgBackRest to communicate with the primary to request that missing WAL files
-        # are pushed to the S3 repo before the backup action is triggered).
-        if not is_primary and not tls_enabled:
-            return False, "Unit cannot perform backups as TLS is not enabled"
 
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
@@ -327,12 +312,25 @@ class PostgreSQLBackups(Object):
 
     def _empty_data_files(self) -> bool:
         """Empty the PostgreSQL data directory in preparation of backup restore."""
+        paths = [
+            "/var/snap/charmed-postgresql/common/data/archive",
+            POSTGRESQL_DATA_PATH,
+            "/var/snap/charmed-postgresql/common/data/logs",
+            "/var/snap/charmed-postgresql/common/data/temp",
+        ]
+        path = None
         try:
-            path = Path(POSTGRESQL_DATA_PATH)
-            if path.exists() and path.is_dir():
-                shutil.rmtree(path)
+            for path in paths:
+                path_object = Path(path)
+                if path_object.exists() and path_object.is_dir():
+                    for item in os.listdir(path):
+                        item_path = os.path.join(path, item)
+                        if os.path.isfile(item_path) or os.path.islink(item_path):
+                            os.remove(item_path)
+                        elif os.path.isdir(item_path):
+                            shutil.rmtree(item_path)
         except OSError as e:
-            logger.warning(f"Failed to remove contents of the data directory with error: {e!s}")
+            logger.warning(f"Failed to remove contents from {path} with error: {e!s}")
             return False
 
         return True
@@ -619,7 +617,7 @@ class PostgreSQLBackups(Object):
             event.defer()
             return False
 
-        self.charm.unit.status = MaintenanceStatus("initialising stanza")
+        self.charm.set_unit_status(MaintenanceStatus("initialising stanza"))
 
         # Create the stanza.
         try:
@@ -678,7 +676,7 @@ class PostgreSQLBackups(Object):
         # Update the configuration to use pgBackRest as the archiving mechanism.
         self.charm.update_config()
 
-        self.charm.unit.status = MaintenanceStatus("checking stanza")
+        self.charm.set_unit_status(MaintenanceStatus("checking stanza"))
 
         try:
             # If the tls is enabled, it requires all the units in the cluster to run the pgBackRest service to
@@ -754,36 +752,48 @@ class PostgreSQLBackups(Object):
             )
         return return_code == 0
 
-    def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
-        """Call the stanza initialization when the credentials or the connection info change."""
-        if not self.charm.is_cluster_initialised:
+    def _credential_changed_checks(self, event: CredentialsChangedEvent) -> bool:
+        if not self.charm.is_cluster_initialised or not self.charm.get_secret(
+            UNIT_SCOPE, "internal-cert"
+        ):
             logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
             event.defer()
-            return
+            return False
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
         if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
             logger.info("Cannot change S3 configuration in bad PITR restore status")
             event.defer()
-            return
+            return False
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
         if self.charm.is_cluster_restoring_backup or self.charm.is_cluster_restoring_to_time:
             logger.info("Cannot change S3 configuration during restore")
             event.defer()
-            return
+            return False
 
         if not self._render_pgbackrest_conf_file():
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
-            return
+            return False
 
         if not self._can_initialise_stanza:
             logger.debug("Cannot initialise stanza yet.")
             event.defer()
+            return False
+        return True
+
+    def _on_s3_credential_changed(self, event: CredentialsChangedEvent) -> None:
+        """Call the stanza initialization when the credentials or the connection info change."""
+        if not self._credential_changed_checks(event):
             return
 
         # Start the pgBackRest service for the check_stanza to be successful. It's required to run on all the units if the tls is enabled.
-        self.start_stop_pgbackrest_service()
+        try:
+            self.start_stop_pgbackrest_service()
+        except RetryError:
+            logger.debug("Cannot initialise service yet.")
+            event.defer()
+            return
 
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
@@ -882,12 +892,11 @@ class PostgreSQLBackups(Object):
 
         # Test uploading metadata to S3 to test credentials before backup.
         datetime_backup_requested = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        juju_version = JujuVersion.from_environ()
         metadata = f"""Date Backup Requested: {datetime_backup_requested}
 Model Name: {self.model.name}
 Application Name: {self.model.app.name}
 Unit Name: {self.charm.unit.name}
-Juju Version: {juju_version!s}
+Juju Version: {self.charm.model.juju_version!s}
 """
         if not self._upload_content_to_s3(
             metadata,
@@ -904,7 +913,7 @@ Juju Version: {juju_version!s}
             # the Patroni configuration.
             self._change_connectivity_to_database(connectivity=False)
 
-        self.charm.unit.status = MaintenanceStatus("creating backup")
+        self.charm.set_unit_status(MaintenanceStatus("creating backup"))
         # Set flag due to missing in progress backups on JSON output
         # (reference: https://github.com/pgbackrest/pgbackrest/issues/2007)
         self.charm.update_config(is_creating_backup=True)
@@ -917,7 +926,7 @@ Juju Version: {juju_version!s}
             self._change_connectivity_to_database(connectivity=True)
 
         self.charm.update_config(is_creating_backup=False)
-        self.charm.unit.status = ActiveStatus()
+        self.charm.set_unit_status(ActiveStatus())
 
     def _run_backup(
         self,
@@ -1074,7 +1083,7 @@ Stderr:
             event.fail(error_message)
             return
 
-        self.charm.unit.status = MaintenanceStatus("restoring backup")
+        self.charm.set_unit_status(MaintenanceStatus("restoring backup"))
 
         # Stop the database service before performing the restore.
         logger.info("Stopping database service")
@@ -1246,7 +1255,7 @@ Stderr:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            enable_tls=self.charm.is_tls_enabled and len(self.charm._peer_members_ips) > 0,
+            enable_tls=len(self.charm._peer_members_ips) > 0,
             peer_endpoints=self.charm._peer_members_ips,
             path=s3_parameters["path"],
             data_path=f"{POSTGRESQL_DATA_PATH}",
@@ -1342,11 +1351,7 @@ Stderr:
             return False
 
         # Stop the service if TLS is not enabled or there are no replicas.
-        if (
-            not self.charm.is_tls_enabled
-            or len(self.charm._peer_members_ips) == 0
-            or self.charm._patroni.get_standby_leader()
-        ):
+        if len(self.charm._peer_members_ips) == 0 or self.charm._patroni.get_standby_leader():
             charmed_postgresql_snap.stop(services=["pgbackrest-service"])
             return True
 

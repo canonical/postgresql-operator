@@ -30,13 +30,18 @@ from tenacity import (
     wait_fixed,
 )
 
-from constants import DATABASE_DEFAULT_NAME
+from constants import DATABASE_DEFAULT_NAME, PEER, SYSTEM_USERS_PASSWORD_CONFIG
 
 CHARM_BASE = "ubuntu@22.04"
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
-STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
+STORAGE_PATH = METADATA["storage"]["data"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+
+
+class SecretNotFoundError(Exception):
+    """Raised when a secret is not found."""
+
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +115,7 @@ def change_primary_start_timeout(
 
 
 def get_patroni_cluster(unit_ip: str) -> dict[str, str]:
-    resp = requests.get(f"http://{unit_ip}:8008/cluster")
+    resp = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
     return resp.json()
 
 
@@ -139,7 +144,7 @@ async def check_database_users_existence(
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
 
     # Retrieve all users in the database.
     users_in_db = await execute_query_on_unit(
@@ -164,8 +169,7 @@ async def check_databases_creation(ops_test: OpsTest, databases: list[str]) -> N
         ops_test: The ops test framework
         databases: List of database names that should have been created
     """
-    unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
 
     for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
         unit_address = await unit.get_public_address()
@@ -206,7 +210,7 @@ def check_patroni(ops_test: OpsTest, unit_name: str, restart_time: float) -> boo
         whether Patroni is running correctly.
     """
     unit_ip = get_unit_address(ops_test, unit_name)
-    health_info = requests.get(f"http://{unit_ip}:8008/health").json()
+    health_info = requests.get(f"https://{unit_ip}:8008/health", verify=False).json()
     postmaster_start_time = datetime.strptime(
         health_info["postmaster_start_time"], "%Y-%m-%d %H:%M:%S.%f%z"
     ).timestamp()
@@ -231,7 +235,7 @@ async def check_cluster_members(ops_test: OpsTest, application_name: str) -> Non
             expected_members = get_application_units(ops_test, application_name)
             expected_members_ips = get_application_units_ips(ops_test, application_name)
 
-            r = requests.get(f"http://{address}:8008/cluster")
+            r = requests.get(f"https://{address}:8008/cluster", verify=False)
             assert [member["name"] for member in r.json()["members"]] == expected_members
             assert [member["host"] for member in r.json()["members"]] == expected_members_ips
 
@@ -268,22 +272,26 @@ def convert_records_to_dict(records: list[tuple]) -> dict:
 def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
     """Return the number of performed switchovers."""
     unit_address = get_unit_address(ops_test, unit_name)
-    switchover_history_info = requests.get(f"http://{unit_address}:8008/history")
+    switchover_history_info = requests.get(f"https://{unit_address}:8008/history", verify=False)
     return len(switchover_history_info.json())
 
 
-def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
+def db_connect(
+    host: str, password: str, username: str = "operator", database: str = "postgres"
+) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
     Args:
         host: the IP of the postgres host
-        password: operator user password
+        password: user password
+        username: username to connect with
+        database: database to connect to
 
     Returns:
         psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='{username}' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
@@ -581,7 +589,7 @@ async def get_landscape_api_credentials(ops_test: OpsTest) -> list[str]:
         ops_test: The ops test framework
     """
     unit = ops_test.model.applications[DATABASE_APP_NAME].units[0]
-    password = await get_password(ops_test, unit.name)
+    password = await get_password(ops_test)
     unit_address = await unit.get_public_address()
 
     output = await execute_query_on_unit(
@@ -621,21 +629,43 @@ async def get_machine_from_unit(ops_test: OpsTest, unit_name: str) -> str:
     return raw_hostname.strip()
 
 
-async def get_password(ops_test: OpsTest, unit_name: str, username: str = "operator") -> str:
-    """Retrieve a user password using the action.
+async def get_password(
+    ops_test: OpsTest,
+    username: str = "operator",
+    database_app_name: str = DATABASE_APP_NAME,
+) -> str:
+    """Retrieve a user password from the secret.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: the name of the unit.
         username: the user to get the password.
+        database_app_name: the app for getting the secret
 
     Returns:
         the user password.
     """
-    unit = ops_test.model.units.get(unit_name)
-    action = await unit.run_action("get-password", **{"username": username})
-    result = await action.wait()
-    return result.results["password"]
+    secret = await get_secret_by_label(ops_test, label=f"{PEER}.{database_app_name}.app")
+    password = secret.get(f"{username}-password")
+
+    return password
+
+
+async def get_secret_by_label(ops_test: OpsTest, label: str) -> dict[str, str]:
+    secrets_raw = await ops_test.juju("list-secrets")
+    secret_ids = [
+        secret_line.split()[0] for secret_line in secrets_raw[1].split("\n")[1:] if secret_line
+    ]
+
+    for secret_id in secret_ids:
+        secret_data_raw = await ops_test.juju(
+            "show-secret", "--format", "json", "--reveal", secret_id
+        )
+        secret_data = json.loads(secret_data_raw[1])
+
+        if label == secret_data[secret_id].get("label"):
+            return secret_data[secret_id]["content"]["Data"]
+
+    raise SecretNotFoundError(f"Secret with label {label} not found")
 
 
 @retry(
@@ -663,27 +693,24 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     return action.results["primary"]
 
 
-async def get_tls_ca(
-    ops_test: OpsTest,
-    unit_name: str,
-) -> str:
+async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client") -> str:
     """Returns the TLS CA used by the unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        relation: TLS relation to get the CA from
 
     Returns:
         TLS CA or an empty string if there is no CA.
     """
     raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    endpoint = f"{relation}-certificates"
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
-    relation_data = [
-        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
-    ]
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == endpoint]
     if len(relation_data) == 0:
         return ""
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
@@ -722,7 +749,7 @@ async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test)
     # Get the IP addresses of the other units to check that they
     # are connecting to the primary unit (if unit_name is the
     # primary unit name) using encrypted connections.
@@ -787,7 +814,7 @@ async def check_tls_replication(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test)
 
     # Check for the all replicas using encrypted connection
     output = await execute_query_on_unit(
@@ -812,7 +839,7 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled on Patroni REST API.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    tls_ca = await get_tls_ca(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name, "peer")
 
     # If there is no TLS CA in the relation, something is wrong in
     # the relation between the TLS Certificates Operator and PostgreSQL.
@@ -829,11 +856,10 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
                 temp_ca_file.seek(0)
 
                 # The CA bundle file is used to validate the server certificate when
-                # TLS is enabled, otherwise True is set because it's the default value
-                # for the verify parameter.
+                # peer TLS is enabled, otherwise don't validate the internal cert.
                 health_info = requests.get(
-                    f"{'https' if enabled else 'http'}://{unit_address}:8008/health",
-                    verify=temp_ca_file.name if enabled else True,
+                    f"https://{unit_address}:8008/health",
+                    verify=temp_ca_file.name if enabled else False,
                 )
                 return health_info.status_code == 200
     except RetryError:
@@ -851,44 +877,6 @@ def has_relation_exited(
         if endpoint_one in endpoints and endpoint_two in endpoints:
             return False
     return True
-
-
-def remove_chown_workaround(original_charm_filename: str, patched_charm_filename: str) -> None:
-    """Remove the chown workaround from the charm."""
-    with (
-        zipfile.ZipFile(original_charm_filename, "r") as charm_file,
-        zipfile.ZipFile(patched_charm_filename, "w") as modified_charm_file,
-    ):
-        # Iterate the input files
-        unix_attributes = {}
-        for charm_info in charm_file.infolist():
-            # Read input file
-            with charm_file.open(charm_info) as file:
-                if charm_info.filename == "src/charm.py":
-                    content = file.read()
-                    # Modify the content of the file by replacing a string
-                    content = (
-                        content.decode()
-                        .replace(
-                            """        try:
-            self._patch_snap_seccomp_profile()
-        except subprocess.CalledProcessError as e:
-            logger.exception(e)
-            self.unit.status = BlockedStatus("failed to patch snap seccomp profile")
-            return""",
-                            "",
-                        )
-                        .encode()
-                    )
-                    # Write content.
-                    modified_charm_file.writestr(charm_info.filename, content)
-                else:  # Other file, don't want to modify => just copy it.
-                    content = file.read()
-                    modified_charm_file.writestr(charm_info.filename, content)
-                unix_attributes[charm_info.filename] = charm_info.external_attr >> 16
-
-        for modified_charm_info in modified_charm_file.infolist():
-            modified_charm_info.external_attr = unix_attributes[modified_charm_info.filename] << 16
 
 
 @retry(
@@ -983,32 +971,46 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     """
     unit_ip = get_unit_address(ops_test, unit_name)
     requests.post(
-        f"http://{unit_ip}:8008/restart", auth=requests.auth.HTTPBasicAuth("patroni", password)
+        f"https://{unit_ip}:8008/restart",
+        auth=requests.auth.HTTPBasicAuth("patroni", password),
+        verify=False,
     )
 
 
 async def set_password(
-    ops_test: OpsTest, unit_name: str, username: str = "operator", password: str | None = None
+    ops_test: OpsTest,
+    username: str = "operator",
+    password: str | None = None,
+    database_app_name: str = DATABASE_APP_NAME,
 ):
-    """Set a user password using the action.
+    """Set a user password via secret.
 
     Args:
         ops_test: ops_test instance.
-        unit_name: the name of the unit.
         username: the user to set the password.
         password: optional password to use
             instead of auto-generating
+        database_app_name: name of the app for the secret
 
     Returns:
         the results from the action.
     """
-    unit = ops_test.model.units.get(unit_name)
-    parameters = {"username": username}
-    if password is not None:
-        parameters["password"] = password
-    action = await unit.run_action("set-password", **parameters)
-    result = await action.wait()
-    return result.results
+    secret_name = "system_users_secret"
+
+    try:
+        secret_id = await ops_test.model.add_secret(
+            name=secret_name, data_args=[f"{username}={password}"]
+        )
+        await ops_test.model.grant_secret(secret_name=secret_name, application=database_app_name)
+
+        # update the application config to include the secret
+        await ops_test.model.applications[database_app_name].set_config({
+            SYSTEM_USERS_PASSWORD_CONFIG: secret_id
+        })
+    except Exception:
+        await ops_test.model.update_secret(
+            name=secret_name, data_args=[f"{username}={password}"], new_name=secret_name
+        )
 
 
 async def start_machine(ops_test: OpsTest, machine_name: str) -> None:
@@ -1046,18 +1048,19 @@ def switchover(
     """
     primary_ip = get_unit_address(ops_test, current_primary)
     response = requests.post(
-        f"http://{primary_ip}:8008/switchover",
+        f"https://{primary_ip}:8008/switchover",
         json={
             "leader": current_primary.replace("/", "-"),
             "candidate": candidate.replace("/", "-") if candidate else None,
         },
         auth=requests.auth.HTTPBasicAuth("patroni", password),
+        verify=False,
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
     for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
-            response = requests.get(f"http://{primary_ip}:8008/cluster")
+            response = requests.get(f"https://{primary_ip}:8008/cluster", verify=False)
             assert response.status_code == 200
             standbys = len([
                 member for member in response.json()["members"] if member["role"] == "sync_standby"
@@ -1132,7 +1135,10 @@ async def backup_operations(
     )
 
     await ops_test.model.relate(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.relate(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
@@ -1159,7 +1165,7 @@ async def backup_operations(
             break
 
     # Write some data.
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test, database_app_name=database_app_name)
     address = get_unit_address(ops_test, primary)
     logger.info("creating a table in the database")
     with db_connect(host=address, password=password) as connection:

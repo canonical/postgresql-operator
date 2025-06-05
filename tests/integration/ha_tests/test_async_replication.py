@@ -12,7 +12,7 @@ from juju.model import Model
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from .. import architecture, markers
+from .. import architecture
 from ..helpers import (
     APPLICATION_NAME,
     DATABASE_APP_NAME,
@@ -99,7 +99,6 @@ async def second_model_continuous_writes(second_model) -> None:
             assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_deploy_async_replication_setup(
     ops_test: OpsTest, first_model: Model, second_model: Model, charm
@@ -125,8 +124,12 @@ async def test_deploy_async_replication_setup(
             num_units=CLUSTER_SIZE,
             config={"profile": "testing"},
         )
-    await ops_test.model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
-    await second_model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
+    await ops_test.model.deploy(
+        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+    )
+    await second_model.deploy(
+        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+    )
 
     async with ops_test.fast_forward(), fast_forward(second_model):
         await gather(
@@ -143,7 +146,6 @@ async def test_deploy_async_replication_setup(
         )
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_async_replication(
     ops_test: OpsTest,
@@ -220,7 +222,6 @@ async def test_async_replication(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_get_data_integrator_credentials(
     ops_test: OpsTest,
@@ -232,7 +233,6 @@ async def test_get_data_integrator_credentials(
     data_integrator_credentials = result.results
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_switchover(
     ops_test: OpsTest,
@@ -286,7 +286,6 @@ async def test_switchover(
     await are_writes_increasing(ops_test, extra_model=second_model)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_data_integrator_creds_keep_on_working(
     ops_test: OpsTest,
@@ -308,7 +307,6 @@ async def test_data_integrator_creds_keep_on_working(
         connection.close()
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_promote_standby(
     ops_test: OpsTest,
@@ -362,7 +360,7 @@ async def test_promote_standby(
     any_unit = ops_test.model.applications[DATABASE_APP_NAME].units[0].name
     primary = await get_primary(ops_test, any_unit)
     address = get_unit_address(ops_test, primary)
-    password = await get_password(ops_test, primary)
+    password = await get_password(ops_test)
     database_name = f"{APPLICATION_NAME.replace('-', '_')}_database"
     connection = None
     try:
@@ -385,7 +383,6 @@ async def test_promote_standby(
     await are_writes_increasing(ops_test)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_reestablish_relation(
     ops_test: OpsTest, first_model: Model, second_model: Model, continuous_writes
@@ -442,7 +439,6 @@ async def test_reestablish_relation(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_async_replication_failover_in_main_cluster(
     ops_test: OpsTest, first_model: Model, second_model: Model, continuous_writes
@@ -487,7 +483,6 @@ async def test_async_replication_failover_in_main_cluster(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_async_replication_failover_in_secondary_cluster(
     ops_test: OpsTest, first_model: Model, second_model: Model, continuous_writes
@@ -523,7 +518,6 @@ async def test_async_replication_failover_in_secondary_cluster(
     await check_writes(ops_test, extra_model=second_model)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_scaling(
     ops_test: OpsTest, first_model: Model, second_model: Model, continuous_writes

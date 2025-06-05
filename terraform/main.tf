@@ -16,9 +16,4 @@ resource "juju_application" "machine_postgresql" {
   units       = var.units
   constraints = var.constraints
   config      = var.config
-
-  dynamic "expose" {
-    for_each = var.enable_expose ? [1] : []
-    content {}
-  }
 }

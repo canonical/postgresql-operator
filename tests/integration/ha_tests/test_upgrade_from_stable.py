@@ -1,6 +1,5 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-import json
 import logging
 
 import pytest
@@ -12,7 +11,6 @@ from ..helpers import (
     count_switchovers,
     get_leader_unit,
     get_primary,
-    remove_chown_workaround,
 )
 from .helpers import (
     are_writes_increasing,
@@ -22,46 +20,23 @@ from .helpers import (
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT = 900
+TIMEOUT = 25 * 60
 
 
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    return_code, charm_info, stderr = await ops_test.juju("info", "postgresql", "--format=json")
-    if return_code != 0:
-        raise Exception(f"failed to get charm info with error: {stderr}")
-    # Revisions lower than 315 have a currently broken workaround for chown.
-    parsed_charm_info = json.loads(charm_info)
-    revision = (
-        parsed_charm_info["channels"]["14"]["stable"][0]["revision"]
-        if "channels" in parsed_charm_info
-        else parsed_charm_info["channel-map"]["14/stable"]["revision"]
+    await ops_test.juju(
+        "deploy",
+        DATABASE_APP_NAME,
+        "-n",
+        3,
+        # TODO move to stable once we release refresh v3 to stable
+        "--channel",
+        "16/edge",
+        "--base",
+        "ubuntu@24.04",
     )
-    logger.info(f"14/stable revision: {revision}")
-    if int(revision) < 315:
-        original_charm_name = "./postgresql.charm"
-        return_code, _, stderr = await ops_test.juju(
-            "download",
-            "postgresql",
-            "--channel=14/stable",
-            f"--filepath={original_charm_name}",
-        )
-        if return_code != 0:
-            raise Exception(
-                f"failed to download charm from 14/stable channel with error: {stderr}"
-            )
-        patched_charm_name = "./modified_postgresql.charm"
-        remove_chown_workaround(original_charm_name, patched_charm_name)
-        return_code, _, stderr = await ops_test.juju("deploy", patched_charm_name, "-n", "3")
-        if return_code != 0:
-            raise Exception(f"failed to deploy charm from 14/stable channel with error: {stderr}")
-    else:
-        await ops_test.model.deploy(
-            DATABASE_APP_NAME,
-            num_units=3,
-            channel="14/stable",
-        )
     await ops_test.model.deploy(
         APPLICATION_NAME,
         num_units=1,
@@ -76,19 +51,14 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_pre_upgrade_check(ops_test: OpsTest) -> None:
-    """Test that the pre-upgrade-check action runs successfully."""
-    application = ops_test.model.applications[DATABASE_APP_NAME]
-    if "pre-upgrade-check" not in await application.get_actions():
-        logger.info("skipping the test because the charm from 14/stable doesn't support upgrade")
-        return
-
+async def test_pre_refresh_check(ops_test: OpsTest) -> None:
+    """Test that the pre-refresh-check action runs successfully."""
     logger.info("Get leader unit")
     leader_unit = await get_leader_unit(ops_test, DATABASE_APP_NAME)
     assert leader_unit is not None, "No leader unit found"
 
-    logger.info("Run pre-upgrade-check action")
-    action = await leader_unit.run_action("pre-upgrade-check")
+    logger.info("Run pre-refresh-check action")
+    action = await leader_unit.run_action("pre-refresh-check")
     await action.wait()
 
 
@@ -107,17 +77,49 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     initial_number_of_switchovers = count_switchovers(ops_test, primary_name)
 
     application = ops_test.model.applications[DATABASE_APP_NAME]
-    actions = await application.get_actions()
 
     logger.info("Refresh the charm")
     await application.refresh(path=charm)
 
     logger.info("Wait for upgrade to start")
-    await ops_test.model.block_until(
-        lambda: ("waiting" if "pre-upgrade-check" in actions else "maintenance")
-        in {unit.workload_status for unit in application.units},
-        timeout=TIMEOUT,
-    )
+    try:
+        # Blocked status is expected due to compatibility checks.
+        await ops_test.model.block_until(lambda: application.status == "blocked", timeout=60 * 3)
+
+        logger.info("Wait for refresh to block due to compatibility checks")
+        async with ops_test.fast_forward("60s"):
+            await ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+            )
+
+        assert "Refresh incompatible" in application.status_message, (
+            "Application refresh not blocked due to incompatibility"
+        )
+
+        # Highest to lowest unit number
+        refresh_order = sorted(
+            application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
+        )
+        action = await refresh_order[0].run_action(
+            "force-refresh-start", **{"check-compatibility": False}
+        )
+        await action.wait()
+
+        logger.info("Wait for first unit to upgrade")
+        async with ops_test.fast_forward("60s"):
+            await ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+            )
+
+        logger.info("Run resume-refresh action")
+        action = await refresh_order[1].run_action("resume-refresh")
+        await action.wait()
+    except TimeoutError:
+        # If the application didn't get into the blocked state, it should have upgraded only
+        # the charm code because the snap revision didn't change.
+        assert application.status == "active", (
+            "Application didn't reach blocked or active state after refresh attempt"
+        )
 
     logger.info("Wait for upgrade to complete")
     async with ops_test.fast_forward("60s"):
@@ -134,10 +136,8 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     logger.info("checking whether no writes were lost")
     await check_writes(ops_test)
 
-    # Check the number of switchovers.
-    if "pre-upgrade-check" in actions:
-        logger.info("checking the number of switchovers")
-        final_number_of_switchovers = count_switchovers(ops_test, primary_name)
-        assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
-            "Number of switchovers is greater than 2"
-        )
+    logger.info("checking the number of switchovers")
+    final_number_of_switchovers = count_switchovers(ops_test, primary_name)
+    assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
+        "Number of switchovers is greater than 2"
+    )

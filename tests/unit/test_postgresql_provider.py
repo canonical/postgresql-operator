@@ -23,6 +23,24 @@ EXTRA_USER_ROLES = "CREATEDB,CREATEROLE"
 RELATION_NAME = "database"
 POSTGRESQL_VERSION = "12"
 
+CLUSTER_STATUS = [
+    {
+        "name": "postgresql-0",
+        "role": "leader",
+        "state": "running",
+    },
+    {
+        "name": "postgresql-1",
+        "role": "replica",
+        "state": "running",
+    },
+    {
+        "name": "postgresql-2",
+        "role": "replica",
+        "state": "running",
+    },
+]
+
 
 @pytest.fixture(autouse=True)
 def harness():
@@ -36,7 +54,9 @@ def harness():
     rel_id = harness.add_relation(RELATION_NAME, "application")
     harness.add_relation_unit(rel_id, "application/0")
     peer_rel_id = harness.add_relation(PEER, harness.charm.app.name)
-    harness.add_relation_unit(peer_rel_id, harness.charm.unit.name)
+    harness.add_relation_unit(peer_rel_id, f"{harness.charm.app.name}/0")
+    harness.add_relation_unit(peer_rel_id, f"{harness.charm.app.name}/1")
+    harness.add_relation_unit(peer_rel_id, f"{harness.charm.app.name}/2")
     harness.update_relation_data(
         peer_rel_id,
         harness.charm.app.name,
@@ -215,21 +235,9 @@ def test_oversee_users(harness):
         postgresql_mock.delete_user.assert_called_once()  # Only the previous call.
 
 
-def test_update_endpoints_with_event(harness):
+def test_update_endpoints_with_event(harness: Harness):
     with (
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock(return_value="1.1.1.1"),
-        ) as _primary_endpoint,
-        patch(
-            "charm.PostgresqlOperatorCharm.members_ips",
-            new_callable=PropertyMock,
-            return_value={"1.1.1.1", "2.2.2.2"},
-        ) as _members_ips,
-        patch("charm.Patroni.get_primary", new_callable=PropertyMock) as _get_primary,
-        patch(
-            "charm.Patroni.are_replicas_up", return_value={"1.1.1.1": True, "2.2.2.2": True}
-        ) as _are_replicas_up,
+        patch("charm.Patroni.cluster_status") as cluster_status,
         patch(
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
@@ -243,11 +251,18 @@ def test_update_endpoints_with_event(harness):
         # Add two different relations.
         rel_id = harness.add_relation(RELATION_NAME, "application")
         another_rel_id = harness.add_relation(RELATION_NAME, "application")
+        peer_rel_id = harness.model.get_relation(PEER).id
         with harness.hooks_disabled():
             harness.update_relation_data(
                 rel_id,
                 "application",
                 {"database": "test_db", "extra-user-roles": ""},
+            )
+            harness.update_relation_data(
+                peer_rel_id, f"{harness.charm.app.name}/0", {f"{RELATION_NAME}-address": "1.1.1.1"}
+            )
+            harness.update_relation_data(
+                peer_rel_id, f"{harness.charm.app.name}/1", {f"{RELATION_NAME}-address": "2.2.2.2"}
             )
 
         # Define a mock relation changed event to be used in the subsequent update endpoints calls.
@@ -259,6 +274,7 @@ def test_update_endpoints_with_event(harness):
         # Test with both a primary and a replica.
         # Update the endpoints with the event and check that it updated
         # only the right relation databag (the one from the event).
+        cluster_status.return_value = CLUSTER_STATUS[:2]
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
@@ -270,7 +286,7 @@ def test_update_endpoints_with_event(harness):
         _fetch_my_relation_data.assert_called_once_with([2], ["password"])
 
         # Also test with only a primary instance.
-        _members_ips.return_value = {"1.1.1.1"}
+        cluster_status.return_value = CLUSTER_STATUS[:1]
         harness.charm.postgresql_client_relation.update_endpoints(mock_event)
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
@@ -283,19 +299,7 @@ def test_update_endpoints_with_event(harness):
 
 def test_update_endpoints_without_event(harness):
     with (
-        patch(
-            "charm.PostgresqlOperatorCharm.primary_endpoint",
-            new_callable=PropertyMock(return_value="1.1.1.1"),
-        ) as _primary_endpoint,
-        patch(
-            "charm.PostgresqlOperatorCharm.members_ips",
-            new_callable=PropertyMock,
-            return_value={"1.1.1.1", "2.2.2.2"},
-        ) as _members_ips,
-        patch("charm.Patroni.get_primary", new_callable=PropertyMock) as _get_primary,
-        patch(
-            "charm.Patroni.are_replicas_up", return_value={"1.1.1.1": True, "2.2.2.2": True}
-        ) as _are_replicas_up,
+        patch("charm.Patroni.cluster_status") as cluster_status,
         patch(
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
@@ -305,6 +309,7 @@ def test_update_endpoints_without_event(harness):
         rel_id = harness.model.get_relation(RELATION_NAME).id
 
         # Don't set data if no password
+        cluster_status.return_value = []
         _fetch_my_relation_data.return_value.get().get.return_value = None
 
         harness.charm.postgresql_client_relation.update_endpoints()
@@ -319,8 +324,18 @@ def test_update_endpoints_without_event(harness):
 
         relation_ids = [rel.id for rel in harness.charm.model.relations[RELATION_NAME]]
         other_rel_ids = set(relation_ids) - set({rel_id, another_rel_id})
+        peer_rel_id = harness.model.get_relation(PEER).id
 
         with harness.hooks_disabled():
+            harness.update_relation_data(
+                peer_rel_id, f"{harness.charm.app.name}/0", {f"{RELATION_NAME}-address": "1.1.1.1"}
+            )
+            harness.update_relation_data(
+                peer_rel_id, f"{harness.charm.app.name}/1", {f"{RELATION_NAME}-address": "2.2.2.2"}
+            )
+            harness.update_relation_data(
+                peer_rel_id, f"{harness.charm.app.name}/2", {f"{RELATION_NAME}-address": "3.3.3.3"}
+            )
             for relation_id in other_rel_ids:
                 harness.update_relation_data(
                     relation_id,
@@ -341,6 +356,7 @@ def test_update_endpoints_without_event(harness):
 
         # Test with both a primary and a replica.
         # Update the endpoints and check that all relations' databags are updated.
+        cluster_status.return_value = CLUSTER_STATUS[:2]
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
@@ -357,7 +373,6 @@ def test_update_endpoints_without_event(harness):
         _fetch_my_relation_data.assert_called_once_with(None, ["password"])
 
         # Filter out missing replica
-        _members_ips.return_value = {"1.1.1.1", "2.2.2.2", "3.3.3.3"}
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
@@ -373,7 +388,7 @@ def test_update_endpoints_without_event(harness):
         }
 
         # Don't filter if unable to get cluster status
-        _are_replicas_up.return_value = None
+        cluster_status.return_value = CLUSTER_STATUS
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",
@@ -389,8 +404,7 @@ def test_update_endpoints_without_event(harness):
         }
 
         # Also test with only a primary instance.
-        _members_ips.return_value = {"1.1.1.1"}
-        _are_replicas_up.return_value = {"1.1.1.1": True}
+        cluster_status.return_value = CLUSTER_STATUS[:1]
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {
             "endpoints": "1.1.1.1:5432",

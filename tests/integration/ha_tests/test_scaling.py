@@ -7,7 +7,6 @@ from asyncio import gather
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from .. import markers
 from ..helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -27,7 +26,6 @@ logger = logging.getLogger(__name__)
 charm = None
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
     """Build and deploy two PostgreSQL clusters."""
@@ -53,7 +51,6 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
@@ -102,7 +99,6 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
     await check_writes(ops_test)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.
@@ -136,14 +132,12 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
     await check_writes(ops_test)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_scale_to_five_units(ops_test: OpsTest) -> None:
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=3)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
-@markers.juju3
 @pytest.mark.abort_on_fail
 async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> None:
     # Start an application that continuously writes data to the database.

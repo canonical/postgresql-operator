@@ -18,21 +18,15 @@ from .helpers import (
     get_unit_address,
     wait_for_idle_on_blocked,
 )
-from .juju_ import juju_major_version
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
     "failed to access/create the bucket, check your S3 settings"
 )
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
-if juju_major_version < 3:
-    tls_certificates_app_name = "tls-certificates-operator"
-    tls_channel = "legacy/stable"
-    tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-else:
-    tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/stable"
-    tls_config = {"ca-common-name": "Test CA"}
+tls_certificates_app_name = "self-signed-certificates"
+tls_channel = "latest/stable"
+tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -149,7 +143,7 @@ async def test_restore_on_new_cluster(
 
     # Check that the backup was correctly restored by having only the first created table.
     logger.info("checking that the backup was correctly restored")
-    password = await get_password(ops_test, unit_name)
+    password = await get_password(ops_test, database_app_name=database_app_name)
     address = get_unit_address(ops_test, unit_name)
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(

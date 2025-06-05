@@ -26,18 +26,12 @@ restapi:
     username: patroni
     password: {{ patroni_password }}
   {%- endif %}
-  {%- if enable_tls %}
-  cafile: {{ conf_path }}/ca.pem
-  certfile: {{ conf_path }}/cert.pem
-  keyfile: {{ conf_path }}/key.pem
-  {%- endif %}
+  cafile: {{ conf_path }}/peer_ca.pem
+  certfile: {{ conf_path }}/peer_cert.pem
+  keyfile: {{ conf_path }}/peer_key.pem
 
-{%- if enable_tls %}
 ctl:
-  cacert: {{ conf_path }}/ca.pem
-  certfile: {{ conf_path }}/cert.pem
-  keyfile: {{ conf_path }}/key.pem
-{%- endif %}
+  cacert: {{ conf_path }}/peer_ca.pem
 
 raft:
   data_dir: {{ conf_path }}/raft
@@ -126,10 +120,13 @@ bootstrap:
   initdb:
   - encoding: UTF8
   - data-checksums
+  - waldir: /var/snap/charmed-postgresql/common/data/logs
   {%- endif %}
 
 postgresql:
-  listen: '{{ self_ip }}:5432'
+  listen: {% for ip in listen_ips %}{{ ip }}{%- if not loop.last %},{% endif %}{% endfor %}:5432
+  basebackup:
+    - waldir: /var/snap/charmed-postgresql/common/data/logs
   connect_address: '{{ self_ip }}:5432'
   # Path to PostgreSQL binaries used in the database bootstrap process.
   bin_dir: /snap/charmed-postgresql/current/usr/lib/postgresql/{{ version }}/bin
@@ -147,6 +144,7 @@ postgresql:
     ssl_cert_file: {{ conf_path }}/cert.pem
     ssl_key_file: {{ conf_path }}/key.pem
     {%- endif %}
+    temp_tablespaces: temp
     unix_socket_directories: /tmp
     {%- if pg_parameters %}
     {%- for key, value in pg_parameters.items() %}
@@ -182,12 +180,27 @@ postgresql:
     replication:
       username: replication
       password: {{ replication_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      {%- endif %}
+      sslcert: {{ conf_path }}/nonexistent_cert.pem
+      sslkey: {{ conf_path }}/nonexistent_key.pem
     rewind:
       username: {{ rewind_user }}
       password: {{ rewind_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      {%- endif %}
+      sslcert: {{ conf_path }}/nonexistent_cert.pem
+      sslkey: {{ conf_path }}/nonexistent_key.pem
     superuser:
       username: {{ superuser }}
       password: {{ superuser_password }}
+      {%- if enable_tls %}
+      sslrootcert: {{ conf_path }}/ca.pem
+      {%- endif %}
+      sslcert: {{ conf_path }}/nonexistent_cert.pem
+      sslkey: {{ conf_path }}/nonexistent_key.pem
 use_unix_socket: true
 {%- if is_creating_backup %}
 tags:

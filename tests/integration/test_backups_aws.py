@@ -18,21 +18,15 @@ from .helpers import (
     scale_application,
     switchover,
 )
-from .juju_ import juju_major_version
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
     "failed to access/create the bucket, check your S3 settings"
 )
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
-if juju_major_version < 3:
-    tls_certificates_app_name = "tls-certificates-operator"
-    tls_channel = "legacy/stable"
-    tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-else:
-    tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/stable"
-    tls_config = {"ca-common-name": "Test CA"}
+tls_certificates_app_name = "self-signed-certificates"
+tls_channel = "latest/stable"
+tls_config = {"ca-common-name": "Test CA"}
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +52,10 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
 
     # Remove the relation to the TLS certificates operator.
     await ops_test.model.applications[database_app_name].remove_relation(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.applications[database_app_name].remove_relation(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
 
     new_unit_name = f"{database_app_name}/2"
@@ -69,8 +66,10 @@ async def test_backup_aws(ops_test: OpsTest, aws_cloud_configs: tuple[dict, dict
 
     # Ensure replication is working correctly.
     address = get_unit_address(ops_test, new_unit_name)
-    password = await get_password(ops_test, new_unit_name)
-    patroni_password = await get_password(ops_test, new_unit_name, "patroni")
+    password = await get_password(ops_test, database_app_name=database_app_name)
+    patroni_password = await get_password(
+        ops_test, username="patroni", database_app_name=database_app_name
+    )
     with db_connect(host=address, password=password) as connection, connection.cursor() as cursor:
         cursor.execute(
             "SELECT EXISTS (SELECT FROM information_schema.tables"

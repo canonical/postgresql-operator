@@ -27,6 +27,7 @@ from ..helpers import (
     APPLICATION_NAME,
     db_connect,
     execute_query_on_unit,
+    get_password,
     get_patroni_cluster,
     get_unit_address,
     run_command_on_unit,
@@ -161,7 +162,6 @@ async def change_patroni_setting(
             so it uses the primary).
         tls: if Patroni is serving using tls.
     """
-    schema = "https" if tls else "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
@@ -172,9 +172,9 @@ async def change_patroni_setting(
                 primary_name = await get_primary(ops_test, app)
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
-                f"{schema}://{unit_ip}:8008/config",
+                f"https://{unit_ip}:8008/config",
                 json={setting: value},
-                verify=not tls,
+                verify=False,
                 auth=requests.auth.HTTPBasicAuth("patroni", password),
             )
 
@@ -201,7 +201,7 @@ async def change_wal_settings(
         with attempt:
             unit_ip = get_unit_address(ops_test, unit_name)
             requests.patch(
-                f"http://{unit_ip}:8008/config",
+                f"https://{unit_ip}:8008/config",
                 json={
                     "postgresql": {
                         "parameters": {
@@ -212,6 +212,7 @@ async def change_wal_settings(
                     }
                 },
                 auth=requests.auth.HTTPBasicAuth("patroni", password),
+                verify=False,
             )
 
 
@@ -240,9 +241,7 @@ async def is_cluster_updated(
 
     # Verify that no writes to the database were missed after stopping the writes.
     logger.info("checking that no writes to the database were missed after stopping the writes")
-    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
-        with attempt:
-            total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
+    total_expected_writes = await check_writes(ops_test, use_ip_from_inside)
 
     # Verify that old primary is up-to-date.
     logger.info("checking that the former primary is up to date with the cluster after restarting")
@@ -258,17 +257,19 @@ async def check_writes(
 ) -> int:
     """Gets the total writes from the test charm and compares to the writes from db."""
     total_expected_writes = await stop_continuous_writes(ops_test)
-    actual_writes, max_number_written = await count_writes(
-        ops_test, use_ip_from_inside=use_ip_from_inside, extra_model=extra_model
-    )
-    for member, count in actual_writes.items():
-        print(
-            f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}"
-        )
-        assert count == max_number_written[member], (
-            f"{member}: writes to the db were missed: count of actual writes different from the max number written."
-        )
-        assert total_expected_writes == count, f"{member}: writes to the db were missed."
+    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5), reraise=True):
+        with attempt:
+            actual_writes, max_number_written = await count_writes(
+                ops_test, use_ip_from_inside=use_ip_from_inside, extra_model=extra_model
+            )
+            for member, count in actual_writes.items():
+                logger.info(
+                    f"member: {member}, count: {count}, max_number_written: {max_number_written[member]}, total_expected_writes: {total_expected_writes}"
+                )
+                assert count == max_number_written[member], (
+                    f"{member}: writes to the db were missed: count of actual writes different from the max number written."
+                )
+                assert total_expected_writes == count, f"{member}: writes to the db were missed."
     return total_expected_writes
 
 
@@ -280,7 +281,7 @@ async def count_writes(
 ) -> tuple[dict[str, int], dict[str, int]]:
     """Count the number of writes in the database."""
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app, down_unit)
+    password = await get_password(ops_test, database_app_name=app)
     members = []
     for model in [ops_test.model, extra_model]:
         if model is None:
@@ -384,7 +385,7 @@ async def fetch_cluster_members(ops_test: OpsTest, use_ip_from_inside: bool = Fa
             if use_ip_from_inside
             else get_unit_ip(ops_test, unit.name)
         )
-        cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+        cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
         if len(member_ips) > 0:
             # If the list of members IPs was already fetched, also compare the
             # list provided by other members.
@@ -436,13 +437,12 @@ async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False
     Returns:
         the value of the configuration or None if it's using the default value.
     """
-    schema = "https" if tls else "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
-            configuration_info = requests.get(f"{schema}://{unit_ip}:8008/config", verify=not tls)
+            configuration_info = requests.get(f"https://{unit_ip}:8008/config", verify=False)
             value = configuration_info.json().get(setting)
             return int(value) if value is not None else None
 
@@ -462,7 +462,7 @@ async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> in
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
-            configuration_info = requests.get(f"http://{unit_ip}:8008/config")
+            configuration_info = requests.get(f"https://{unit_ip}:8008/config", verify=False)
             postgresql_dict = configuration_info.json().get("postgresql")
             if postgresql_dict is None:
                 return None
@@ -514,22 +514,6 @@ async def get_sync_standby(ops_test: OpsTest, model: Model, application_name: st
             return member["name"]
 
 
-async def get_password(ops_test: OpsTest, app: str, down_unit: str | None = None) -> str:
-    """Use the charm action to retrieve the password from provided application.
-
-    Returns:
-        string with the password stored on the peer relation databag.
-    """
-    # Can retrieve from any unit running unit, so we pick the first.
-    for unit in ops_test.model.applications[app].units:
-        if unit.name != down_unit:
-            unit_name = unit.name
-            break
-    action = await ops_test.model.units.get(unit_name).run_action("get-password")
-    action = await action.wait()
-    return action.results["password"]
-
-
 async def get_unit_ip(ops_test: OpsTest, unit_name: str, model: Model = None) -> str:
     """Wrapper for getting unit ip.
 
@@ -556,7 +540,7 @@ async def is_connection_possible(
 ) -> bool:
     """Test a connection to a PostgreSQL server."""
     app = unit_name.split("/")[0]
-    password = await get_password(ops_test, app, unit_name)
+    password = await get_password(ops_test, database_app_name=app)
     address = await (
         get_ip_from_inside_the_unit(ops_test, unit_name)
         if use_ip_from_inside
@@ -604,7 +588,7 @@ async def is_replica(ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
-                cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+                cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
 
                 # The unit may take some time to be listed on Patroni REST API cluster endpoint.
                 if member_name not in {
@@ -637,7 +621,7 @@ async def get_cluster_roles(
     )
 
     members = {"replicas": [], "primaries": [], "sync_standbys": []}
-    cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+    cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
     member_list = cluster_info.json()["members"]
     logger.info(f"Cluster members are: {member_list}")
     for member in member_list:
@@ -740,7 +724,7 @@ async def is_postgresql_ready(ops_test, unit_name: str, use_ip_from_inside: bool
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3)):
             with attempt:
-                instance_health_info = requests.get(f"http://{unit_ip}:8008/health")
+                instance_health_info = requests.get(f"https://{unit_ip}:8008/health", verify=False)
                 assert instance_health_info.status_code == 200
     except RetryError:
         return False
@@ -781,7 +765,7 @@ async def is_secondary_up_to_date(
     Retries over the period of one minute to give secondary adequate time to copy over data.
     """
     app = await app_name(ops_test)
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
     host = await next(
         (
             get_ip_from_inside_the_unit(ops_test, unit.name)
@@ -929,12 +913,13 @@ def storage_type(ops_test, app):
             return line.split()[3]
 
 
-def storage_id(ops_test, unit_name):
-    """Retrieves  storage id associated with provided unit.
+def get_storage_ids(ops_test, unit_name):
+    """Retrieves  storages ids associated with provided unit.
 
     Note: this function exists as a temporary solution until this issue is ported to libjuju 2:
     https://github.com/juju/python-libjuju/issues/694
     """
+    storage_ids = []
     model_name = ops_test.model.info.name
     proc = subprocess.check_output(f"juju storage --model={model_name}".split())
     proc = proc.decode("utf-8")
@@ -949,18 +934,22 @@ def storage_id(ops_test, unit_name):
             continue
 
         if line.split()[0] == unit_name:
-            return line.split()[1]
+            storage_ids.append(line.split()[1])
+    return storage_ids
 
 
-async def add_unit_with_storage(ops_test, app, storage):
-    """Adds unit with storage.
+async def add_unit_with_storage(ops_test, app, storages):
+    """Adds unit with storages.
 
     Note: this function exists as a temporary solution until this issue is resolved:
     https://github.com/juju/python-libjuju/issues/695
     """
     original_units = {unit.name for unit in ops_test.model.applications[app].units}
     model_name = ops_test.model.info.name
-    add_unit_cmd = f"add-unit {app} --model={model_name} --attach-storage={storage}".split()
+    add_unit_cmd = f"add-unit {app} --model={model_name}"
+    for storage in storages:
+        add_unit_cmd = add_unit_cmd + f" --attach-storage={storage}"
+    add_unit_cmd = add_unit_cmd.split()
     return_code, _, _ = await ops_test.juju(*add_unit_cmd)
     assert return_code == 0, "Failed to add unit with storage"
     async with ops_test.fast_forward():
@@ -973,7 +962,9 @@ async def add_unit_with_storage(ops_test, app, storage):
 
     # verify storage attached
     new_unit = (current_units - original_units).pop()
-    assert storage_id(ops_test, new_unit) == storage, "unit added with incorrect storage"
+    assert sorted(get_storage_ids(ops_test, new_unit)) == sorted(storages), (
+        "unit added with incorrect storage"
+    )
 
     # return a reference to newly added unit
     for unit in ops_test.model.applications[app].units:
@@ -1035,7 +1026,7 @@ async def create_db(ops_test: OpsTest, app: str, db: str) -> None:
     """Creates database with specified name."""
     unit = ops_test.model.applications[app].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
 
     conn = db_connect(unit_address, password)
     conn.autocommit = True
@@ -1049,7 +1040,7 @@ async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
     """Returns True if database with specified name already exists."""
     unit = ops_test.model.applications[app].units[0]
     unit_address = await unit.get_public_address()
-    password = await get_password(ops_test, app)
+    password = await get_password(ops_test, database_app_name=app)
 
     assert password is not None
 
@@ -1065,8 +1056,8 @@ async def check_db(ops_test: OpsTest, app: str, db: str) -> bool:
     return db in query
 
 
-async def get_any_deatached_storage(ops_test: OpsTest) -> str:
-    """Returns any of the current available deatached storage."""
+async def get_detached_storages(ops_test: OpsTest) -> list[str]:
+    """Returns the current available detached storage."""
     return_code, storages_list, stderr = await ops_test.juju(
         "storage", "-m", f"{ops_test.controller_name}:{ops_test.model.info.name}", "--format=json"
     )
@@ -1074,20 +1065,37 @@ async def get_any_deatached_storage(ops_test: OpsTest) -> str:
         raise Exception(f"failed to get storages info with error: {stderr}")
 
     parsed_storages_list = json.loads(storages_list)
+    detached_storages = []
     for storage_name, storage in parsed_storages_list["storage"].items():
         if (str(storage["status"]["current"]) == "detached") and (str(storage["life"] == "alive")):
-            return storage_name
+            detached_storages.append(storage_name)
+
+    if len(detached_storages) > 0:
+        return detached_storages
 
     raise Exception("failed to get deatached storage")
 
 
 async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
     """Checks if "operator" password is valid for current postgresql db."""
-    stdout = await run_command_on_unit(
-        ops_test,
+    complete_command = [
+        "exec",
+        "--unit",
         unit_name,
-        """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
-    )
+        "--",
+        "grep",
+        "-E",
+        "'password'",
+        "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*",
+    ]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed. Instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
     return 'password authentication failed for user "operator"' not in stdout
 
 

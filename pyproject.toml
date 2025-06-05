@@ -7,25 +7,23 @@ requires-poetry = ">=2.0.0"
 
 [tool.poetry.dependencies]
 python = "^3.10"
-ops = "^2.20.0"
-boto3 = "^1.38.4"
+ops = "^2.22.0"
+boto3 = "^1.38.28"
 pgconnstr = "^1.0.1"
 requests = "^2.32.3"
 tenacity = "^9.1.2"
 psycopg2 = "^2.9.10"
-pydantic = "^1.10.22"
+pydantic = "^2.11.4"
 jinja2 = "^3.1.6"
 pysyncobj = "^0.3.14"
 psutil = "^7.0.0"
+charm-refresh = "^3.0.0.1"
 
 [tool.poetry.group.charm-libs.dependencies]
 # data_platform_libs/v0/data_interfaces.py
 ops = ">=2.0.0"
-# data_platform_libs/v0/upgrade.py
-poetry-core = "*"
-# data_platform_libs/v0/upgrade.py requires pydantic ^1.10
-# data_platform_libs/v0/data_models.py requires pydantic ^1.10
-pydantic = "^1.10"
+# data_platform_libs/v0/data_models.py
+pydantic = "*"
 # grafana_agent/v0/cos_agent.py
 cosl = ">=0.0.50"
 # tls_certificates_interface/v2/tls_certificates.py
@@ -40,7 +38,7 @@ opentelemetry-exporter-otlp-proto-http = "1.21.0"
 optional = true
 
 [tool.poetry.group.format.dependencies]
-ruff = "^0.11.7"
+ruff = "^0.11.12"
 
 [tool.poetry.group.lint]
 optional = true
@@ -52,27 +50,37 @@ codespell = "^2.4.1"
 optional = true
 
 [tool.poetry.group.unit.dependencies]
-coverage = {extras = ["toml"], version = "^7.8.0"}
-pytest = "^8.3.5"
+coverage = { extras = ["toml"], version = "^7.8.2" }
+pytest = "^8.4.0"
 pytest-asyncio = "*"
 parameterized = "^0.9.0"
-jsonschema = "^4.23.0"
+jsonschema = "^4.24.0"
+tomli-w = "^1.2.0"
 
 [tool.poetry.group.integration]
 optional = true
 
 [tool.poetry.group.integration.dependencies]
-pytest = "^8.3.5"
+pytest = "^8.4.0"
 pytest-operator = "^0.42.0"
 # renovate caret doesn't work: https://github.com/renovatebot/renovate/issues/26940
-juju = "<=3.6.1.1"
+juju = "<=3.6.1.2"
+jubilant = "^1.1.0"
 boto3 = "*"
 tenacity = "*"
 landscape-api-py3 = "^0.9.0"
 mailmanclient = "^3.3.5"
 psycopg2-binary = "^2.9.10"
-allure-pytest = "^2.14.1"
-allure-pytest-default-results = "^0.1.2"
+allure-pytest = "^2.14.2"
+allure-pytest-default-results = "^0.1.3"
+tomli = "^2.2.1"
+tomli-w = "^1.2.0"
+
+[tool.poetry.group.build-refresh-version]
+optional = true
+
+[tool.poetry.group.build-refresh-version.dependencies]
+charm-refresh-build-version = "^0.2.0"
 
 # Testing tools configuration
 [tool.coverage.run]
@@ -80,15 +88,13 @@ branch = true
 
 [tool.coverage.report]
 show_missing = true
-exclude_lines = [
-    "logger\\.debug"
-]
+exclude_lines = ["logger\\.debug"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
 log_cli_level = "INFO"
 asyncio_mode = "auto"
-markers = ["juju2", "juju3", "juju_secrets"]
+markers = ["juju3", "juju_secrets"]
 
 # Formatting tools configuration
 [tool.black]
@@ -105,19 +111,36 @@ line-length = 99
 
 [tool.ruff.lint]
 explicit-preview-rules = true
-select = ["A", "E", "W", "F", "C", "N", "D", "I001", "B", "CPY", "RUF", "S", "SIM", "UP", "TC"]
+select = [
+  "A",
+  "E",
+  "W",
+  "F",
+  "C",
+  "N",
+  "D",
+  "I001",
+  "B",
+  "CPY",
+  "RUF",
+  "S",
+  "SIM",
+  "UP",
+  "TC",
+]
 extend-ignore = [
-    "D203",
-    "D204",
-    "D213",
-    "D215",
-    "D400",
-    "D404",
-    "D406",
-    "D407",
-    "D408",
-    "D409",
-    "D413",
+  "D203",
+  "D204",
+  "D213",
+  "D215",
+  "D400",
+  "D404",
+  "D406",
+  "D407",
+  "D408",
+  "D409",
+  "D413",
+  "B904",
 ]
 # Ignore E501 because using black creates errors with this
 # Ignore D107 Missing docstring in __init__
@@ -125,11 +148,15 @@ ignore = ["E501", "D107"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = [
-    "D100", "D101", "D102", "D103", "D104",
-    # Asserts
-    "B011",
-    # Disable security checks for tests
-    "S",
+  "D100",
+  "D101",
+  "D102",
+  "D103",
+  "D104",
+  # Asserts
+  "B011",
+  # Disable security checks for tests
+  "S",
 ]
 
 [tool.ruff.lint.flake8-copyright]

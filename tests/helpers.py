@@ -7,4 +7,4 @@ from pathlib import Path
 import yaml
 
 METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
-STORAGE_PATH = METADATA["storage"]["pgdata"]["location"]
+STORAGE_PATH = METADATA["storage"]["data"]["location"]

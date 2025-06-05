@@ -25,19 +25,13 @@ from .helpers import (
     primary_changed,
     run_command_on_unit,
 )
-from .juju_ import juju_major_version
 
 logger = logging.getLogger(__name__)
 
 APP_NAME = METADATA["name"]
-if juju_major_version < 3:
-    tls_certificates_app_name = "tls-certificates-operator"
-    tls_channel = "legacy/stable"
-    tls_config = {"generate-self-signed-certificates": "true", "ca-common-name": "Test CA"}
-else:
-    tls_certificates_app_name = "self-signed-certificates"
-    tls_channel = "latest/stable"
-    tls_config = {"ca-common-name": "Test CA"}
+tls_certificates_app_name = "self-signed-certificates"
+tls_channel = "latest/stable"
+tls_config = {"ca-common-name": "Test CA"}
 
 
 @pytest.mark.abort_on_fail
@@ -67,7 +61,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
         # Relate it to the PostgreSQL to enable TLS.
         await ops_test.model.relate(
-            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
+            f"{DATABASE_APP_NAME}:client-certificates", f"{tls_certificates_app_name}:certificates"
+        )
+        await ops_test.model.relate(
+            f"{DATABASE_APP_NAME}:peer-certificates", f"{tls_certificates_app_name}:certificates"
         )
         await ops_test.model.wait_for_idle(status="active", timeout=1500, raise_on_error=False)
 
@@ -90,7 +87,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Check if TLS enabled for replication
         assert await check_tls_replication(ops_test, primary, enabled=True)
 
-        patroni_password = await get_password(ops_test, primary, "patroni")
+        patroni_password = await get_password(ops_test, "patroni")
 
         # Enable additional logs on the PostgreSQL instance to check TLS
         # being used in a later step and make the fail-over to happens faster.
@@ -121,7 +118,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
 
                 # Check that the replica was promoted.
                 host = get_unit_address(ops_test, replica)
-                password = await get_password(ops_test, replica)
+                password = await get_password(ops_test)
                 with db_connect(host, password) as connection:
                     connection.autocommit = True
                     with connection.cursor() as cursor:
@@ -134,7 +131,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         # Write some data to the initial primary (this causes a divergence
         # in the instances' timelines).
         host = get_unit_address(ops_test, primary)
-        password = await get_password(ops_test, primary)
+        password = await get_password(ops_test)
         with db_connect(host, password) as connection:
             connection.autocommit = True
             with connection.cursor() as cursor:
@@ -146,7 +143,7 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
         await run_command_on_unit(
             ops_test,
             primary,
-            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/14/bin/postgres",
+            "pkill --signal SIGKILL -f /snap/charmed-postgresql/current/usr/lib/postgresql/16/bin/postgres",
         )
         await run_command_on_unit(
             ops_test,
@@ -176,7 +173,10 @@ async def test_tls_enabled(ops_test: OpsTest) -> None:
     async with ops_test.fast_forward():
         # Remove the relation.
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:certificates", f"{tls_certificates_app_name}:certificates"
+            f"{DATABASE_APP_NAME}:client-certificates", f"{tls_certificates_app_name}:certificates"
+        )
+        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
+            f"{DATABASE_APP_NAME}:peer-certificates", f"{tls_certificates_app_name}:certificates"
         )
         await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 

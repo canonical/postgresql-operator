@@ -87,7 +87,6 @@ def patroni(harness, peers_ips):
         "fake-superuser-password",
         "fake-replication-password",
         "fake-rewind-password",
-        False,
         "fake-raft-password",
         "fake-patroni-password",
     )
@@ -102,42 +101,37 @@ def test_get_alternative_patroni_url(peers_ips, patroni):
 
     # Test the first URL that is returned (it should have the current unit IP).
     url = patroni._get_alternative_patroni_url(attempt)
-    assert url == f"http://{patroni.unit_ip}:8008"
+    assert url == f"https://{patroni.unit_ip}:8008"
 
     # Test returning the other servers URLs.
     for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
         attempt.retry_state.attempt_number = attempt_number
         url = patroni._get_alternative_patroni_url(attempt)
-        assert url.split("http://")[1].split(":8008")[0] in peers_ips
+        assert url.split("https://")[1].split(":8008")[0] in peers_ips
 
 
 def test_get_member_ip(peers_ips, patroni):
     with (
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._get_alternative_patroni_url") as _get_alternative_patroni_url,
+        patch("requests.get", side_effect=mocked_requests_get),
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test error on trying to get the member IP.
-        _get_alternative_patroni_url.side_effect = "http://server2"
+        _patroni_url.return_value = "http://server2"
         with pytest.raises(RetryError):
             patroni.get_member_ip(patroni.member_name)
             assert False
 
         # Test using an alternative Patroni URL.
-        _get_alternative_patroni_url.side_effect = [
-            "http://server3",
-            "http://server2",
-            "http://server1",
-        ]
+        _patroni_url.return_value = "http://server1"
+
         ip = patroni.get_member_ip(patroni.member_name)
         assert ip == "1.1.1.1"
 
         # Test using the current Patroni URL.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip(patroni.member_name)
         assert ip == "1.1.1.1"
 
         # Test when not having that specific member in the cluster.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
         ip = patroni.get_member_ip("other-member-name")
         assert ip is None
 
@@ -172,11 +166,11 @@ def test_get_postgresql_version(peers_ips, patroni):
         _get_installed_snaps = _snap_client.return_value.get_installed_snaps
         _get_installed_snaps.return_value = [
             {"name": "something"},
-            {"name": "charmed-postgresql", "version": "14.0"},
+            {"name": "charmed-postgresql", "version": "16.6"},
         ]
         version = patroni.get_postgresql_version()
 
-        assert version == "14.0"
+        assert version == "16.6"
         _snap_client.assert_called_once_with()
         _get_installed_snaps.assert_called_once_with()
 
@@ -201,31 +195,22 @@ def test_dict_to_hba_string(harness, patroni):
 
 def test_get_primary(peers_ips, patroni):
     with (
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._get_alternative_patroni_url") as _get_alternative_patroni_url,
+        patch("requests.get", side_effect=mocked_requests_get),
+        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
     ):
         # Test error on trying to get the member IP.
-        _get_alternative_patroni_url.side_effect = "http://server2"
+        _patroni_url.return_value = "http://server2"
         with pytest.raises(RetryError):
             patroni.get_primary(patroni.member_name)
             assert False
 
-        # Test using an alternative Patroni URL.
-        _get_alternative_patroni_url.side_effect = [
-            "http://server3",
-            "http://server2",
-            "http://server1",
-        ]
-        primary = patroni.get_primary()
-        assert primary == "postgresql-0"
-
         # Test using the current Patroni URL.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        _patroni_url.return_value = "http://server1"
         primary = patroni.get_primary()
         assert primary == "postgresql-0"
 
         # Test requesting the primary in the unit name pattern.
-        _get_alternative_patroni_url.side_effect = ["http://server1"]
+        _patroni_url.return_value = "http://server1"
         primary = patroni.get_primary(unit_name_pattern=True)
         assert primary == "postgresql/0"
 
@@ -338,8 +323,13 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         patch("charm.Patroni.get_postgresql_version") as _get_postgresql_version,
         patch("charm.Patroni.render_file") as _render_file,
         patch("charm.Patroni._create_directory"),
+        patch(
+            "charm.PostgresqlOperatorCharm.listen_ips",
+            new_callable=PropertyMock,
+            return_value=["1.1.1.1", "192.168.0.1"],
+        ),
     ):
-        _get_postgresql_version.return_value = "14.7"
+        _get_postgresql_version.return_value = "16.6"
 
         # Define variables to render in the template.
         member_name = "postgresql-0"
@@ -349,7 +339,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         rewind_password = "fake-rewind-password"
         raft_password = "fake-raft-password"
         patroni_password = "fake-patroni-password"
-        postgresql_version = "14"
+        postgresql_version = "16"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
@@ -364,6 +354,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             peers_ips=peers_ips,
             scope=scope,
             self_ip=patroni.unit_ip,
+            listen_ips=["1.1.1.1", "192.168.0.1"],
             superuser="operator",
             superuser_password=superuser_password,
             replication_password=replication_password,
@@ -460,8 +451,8 @@ def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
-            f"http://{patroni.unit_ip}:8008/reinitialize",
-            verify=True,
+            f"https://{patroni.unit_ip}:8008/reinitialize",
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -478,9 +469,9 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover()
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover",
+            "https://1.1.1.1:8008/switchover",
             json={"leader": "primary"},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -490,9 +481,9 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover("candidate")
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover",
+            "https://1.1.1.1:8008/switchover",
             json={"leader": "primary", "candidate": "candidate"},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -526,9 +517,9 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         patroni.update_synchronous_node_count()
 
         _patch.assert_called_once_with(
-            "http://1.1.1.1:8008/config",
+            "https://1.1.1.1:8008/config",
             json={"synchronous_node_count": 0},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -577,7 +568,10 @@ def test_member_started_true(peers_ips, patroni):
         assert patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -592,7 +586,10 @@ def test_member_started_false(peers_ips, patroni):
         assert not patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -607,7 +604,10 @@ def test_member_started_error(peers_ips, patroni):
         assert not patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -622,7 +622,10 @@ def test_member_inactive_true(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -637,7 +640,10 @@ def test_member_inactive_false(peers_ips, patroni):
         assert not patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -652,7 +658,10 @@ def test_member_inactive_error(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 

@@ -1,6 +1,5 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-from pathlib import PosixPath
 from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
@@ -64,7 +63,7 @@ def test_tls_ca_chain_filename(harness):
         )
     assert (
         harness.charm.backup._tls_ca_chain_filename
-        == "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"
+        == "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"
     )
 
 
@@ -93,18 +92,6 @@ def test_can_initialise_stanza(harness):
         # Test when Patroni or PostgreSQL hasn't started yet
         # and the unit hasn't joined the peer relation yet.
         _member_started.return_value = False
-        assert not harness.charm.backup._can_initialise_stanza
-
-        # Test when the unit hasn't configured TLS yet while other unit already has TLS enabled.
-        harness.add_relation_unit(
-            harness.model.get_relation(PEER).id, f"{harness.charm.app.name}/1"
-        )
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
-                f"{harness.charm.app.name}/1",
-                {"tls": "enabled"},
-            )
         assert not harness.charm.backup._can_initialise_stanza
 
         # Test when everything is ok to initialise the stanza.
@@ -141,32 +128,13 @@ def test_can_unit_perform_backup(harness):
         # Test when running the check in the primary, there are replicas and TLS is enabled.
         harness.charm.unit.status = ActiveStatus()
         _planned_units.return_value = 2
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.unit.name,
-                {"tls": "True"},
-            )
         assert harness.charm.backup._can_unit_perform_backup() == (
             False,
             "Unit cannot perform backups as it is the cluster primary",
         )
 
-        # Test when running the check in a replica and TLS is disabled.
-        _is_primary.return_value = False
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.unit.name,
-                {"tls": ""},
-            )
-        assert harness.charm.backup._can_unit_perform_backup() == (
-            False,
-            "Unit cannot perform backups as TLS is not enabled",
-        )
-
         # Test when Patroni or PostgreSQL hasn't started yet.
-        _is_primary.return_value = True
+        _is_primary.return_value = False
         _member_started.return_value = False
         assert harness.charm.backup._can_unit_perform_backup() == (
             False,
@@ -202,7 +170,7 @@ def test_can_use_s3_repository(harness):
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch(
-            "charm.Patroni.get_postgresql_version", return_value="14.10"
+            "charm.Patroni.get_postgresql_version", return_value="16.6"
         ) as _get_postgresql_version,
         patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
         patch(
@@ -332,7 +300,7 @@ def test_construct_endpoint(harness):
 
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
-    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+    ["", "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"],
 )
 def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
     with (
@@ -453,6 +421,10 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
 def test_empty_data_files(harness):
     with (
         patch("shutil.rmtree") as _rmtree,
+        patch("os.path.isdir", return_value=True) as _isdir,
+        patch("os.path.islink", return_value=False) as _islink,
+        patch("os.path.isfile", return_value=False) as _isfile,
+        patch("os.listdir", return_value=["test_file.txt"]) as _listdir,
         patch("pathlib.Path.is_dir") as _is_dir,
         patch("pathlib.Path.exists") as _exists,
     ):
@@ -462,18 +434,24 @@ def test_empty_data_files(harness):
         _rmtree.assert_not_called()
 
         # Test when the removal of the data files fails.
-        path = PosixPath("/var/snap/charmed-postgresql/common/var/lib/postgresql")
         _exists.return_value = True
         _is_dir.return_value = True
         _rmtree.side_effect = OSError
         assert not harness.charm.backup._empty_data_files()
-        _rmtree.assert_called_once_with(path)
+        _rmtree.assert_called_once_with(
+            "/var/snap/charmed-postgresql/common/data/archive/test_file.txt"
+        )
 
         # Test when data files are successfully removed.
         _rmtree.reset_mock()
         _rmtree.side_effect = None
         assert harness.charm.backup._empty_data_files()
-        _rmtree.assert_called_once_with(path)
+        _rmtree.assert_has_calls([
+            call("/var/snap/charmed-postgresql/common/data/archive/test_file.txt"),
+            call("/var/snap/charmed-postgresql/common/var/lib/postgresql/test_file.txt"),
+            call("/var/snap/charmed-postgresql/common/data/logs/test_file.txt"),
+            call("/var/snap/charmed-postgresql/common/data/temp/test_file.txt"),
+        ])
 
 
 def test_change_connectivity_to_database(harness):
@@ -507,7 +485,7 @@ def test_execute_command(harness):
         patch("pwd.getpwnam") as _getpwnam,
     ):
         # Test when the command fails.
-        command = ["rm", "-r", "/var/lib/postgresql/data/pgdata"]
+        command = ["rm", "-r", "/var/snap/charmed-postgresql/common/data/db"]
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         assert harness.charm.backup._execute_command(command) == (1, "", "fake stderr")
         _run.assert_called_once_with(
@@ -966,6 +944,7 @@ def test_on_s3_credential_changed(harness):
         ) as _is_standby_leader,
         patch("time.gmtime"),
         patch("time.asctime", return_value="Thu Feb 24 05:00:00 2022"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
         # Test when the cluster was not initialised yet.
@@ -1164,7 +1143,6 @@ def test_on_create_backup_action(harness):
         ) as _is_primary,
         patch("charm.PostgreSQLBackups._upload_content_to_s3") as _upload_content_to_s3,
         patch("backups.datetime") as _datetime,
-        patch("ops.JujuVersion.from_environ") as _from_environ,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
         patch("charm.PostgreSQLBackups._can_unit_perform_backup") as _can_unit_perform_backup,
     ):
@@ -1199,13 +1177,12 @@ def test_on_create_backup_action(harness):
             [],
         )
         _datetime.now.return_value.strftime.return_value = "2023-01-01T09:00:00Z"
-        _from_environ.return_value = "test-juju-version"
         _upload_content_to_s3.return_value = False
         expected_metadata = f"""Date Backup Requested: 2023-01-01T09:00:00Z
 Model Name: {harness.charm.model.name}
 Application Name: {harness.charm.model.app.name}
 Unit Name: {harness.charm.unit.name}
-Juju Version: test-juju-version
+Juju Version: 0.0.0
 """
         harness.charm.backup._on_create_backup_action(mock_event)
         _upload_content_to_s3.assert_called_once_with(
@@ -1691,7 +1668,7 @@ def test_pre_restore_checks(harness):
 
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
-    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+    ["", "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"],
 )
 def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
     with (
@@ -1737,8 +1714,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         with open("templates/pgbackrest.conf.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
-            enable_tls=harness.charm.is_tls_enabled
-            and len(harness.charm.peer_members_endpoints) > 0,
+            enable_tls=len(harness.charm._peer_members_ips) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
             data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql",
@@ -1881,9 +1857,6 @@ def test_start_stop_pgbackrest_service(harness):
             "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
         ) as _peer_members_ips,
         patch(
-            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
-        ) as _is_tls_enabled,
-        patch(
             "charm.PostgreSQLBackups._render_pgbackrest_conf_file"
         ) as _render_pgbackrest_conf_file,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
@@ -1904,16 +1877,9 @@ def test_start_stop_pgbackrest_service(harness):
         stop.assert_not_called()
         restart.assert_not_called()
 
-        # Test when TLS is not enabled (should stop the service).
-        _render_pgbackrest_conf_file.return_value = True
-        _is_tls_enabled.return_value = False
-        assert harness.charm.backup.start_stop_pgbackrest_service()
-        stop.assert_called_once()
-        restart.assert_not_called()
-
         # Test when there are no replicas.
         stop.reset_mock()
-        _is_tls_enabled.return_value = True
+        _render_pgbackrest_conf_file.return_value = True
         _peer_members_ips.return_value = []
         assert harness.charm.backup.start_stop_pgbackrest_service()
         stop.assert_called_once()
@@ -1953,7 +1919,7 @@ def test_start_stop_pgbackrest_service(harness):
 
 @pytest.mark.parametrize(
     "tls_ca_chain_filename",
-    ["", "/var/snap/charmed-postgresql/common/pgbackrest-tls-ca-chain.crt"],
+    ["", "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest-tls-ca-chain.crt"],
 )
 def test_upload_content_to_s3(harness, tls_ca_chain_filename):
     with (
