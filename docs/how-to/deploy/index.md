@@ -1,14 +1,9 @@
 # How to deploy
 
 This page aims to provide an introduction to the PostgreSQL deployment process and lists all the related guides. It contains the following sections:
-- [How to deploy](#how-to-deploy)
-  - [General deployment instructions](#general-deployment-instructions)
-  - [Clouds](#clouds)
-  - [Special deployment scenarios](#special-deployment-scenarios)
-    - [Networking](#networking)
-    - [Airgapped](#airgapped)
-    - [Cluster-cluster replication](#cluster-cluster-replication)
-    - [Juju storage](#juju-storage)
+* [General deployment instructions](#general-deployment-instructions)
+* [Clouds](#clouds)
+* [Special deployments](#special-deployment-scenarios)
 
 ## General deployment instructions
 
