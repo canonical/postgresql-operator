@@ -63,7 +63,10 @@ async def pitr_backup_operations(
         "integrating self-signed-certificates with postgresql and waiting them to stabilize"
     )
     await ops_test.model.relate(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.relate(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(

@@ -42,6 +42,7 @@ from constants import (
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
+    UNIT_SCOPE,
 )
 
 logger = logging.getLogger(__name__)
@@ -137,22 +138,13 @@ class PostgreSQLBackups(Object):
         # yet and either hasn't joined the peer relation yet or hasn't configured TLS
         # yet while other unit already has TLS enabled.
         return not (
-            not self.charm._patroni.member_started
-            and (
-                (len(self.charm._peers.data.keys()) == 2)
-                or (
-                    "tls" not in self.charm.unit_peer_data
-                    and any("tls" in unit_data for _, unit_data in self.charm._peers.data.items())
-                )
-            )
+            not self.charm._patroni.member_started and (len(self.charm._peers.data.keys()) == 2)
         )
 
     def _can_unit_perform_backup(self) -> tuple[bool, str | None]:
         """Validates whether this unit can perform a backup."""
         if self.charm.is_blocked:
             return False, "Unit is in a blocking state"
-
-        tls_enabled = "tls" in self.charm.unit_peer_data
 
         # Check if this unit is the primary (if it was not possible to retrieve that information,
         # then show that the unit cannot perform a backup, because possibly the database is offline).
@@ -162,14 +154,8 @@ class PostgreSQLBackups(Object):
             return False, "Unit cannot perform backups as the database seems to be offline"
 
         # Only enable backups on primary if there are replicas but TLS is not enabled.
-        if is_primary and self.charm.app.planned_units() > 1 and tls_enabled:
+        if is_primary and self.charm.app.planned_units() > 1:
             return False, "Unit cannot perform backups as it is the cluster primary"
-
-        # Can create backups on replicas only if TLS is enabled (it's needed to enable
-        # pgBackRest to communicate with the primary to request that missing WAL files
-        # are pushed to the S3 repo before the backup action is triggered).
-        if not is_primary and not tls_enabled:
-            return False, "Unit cannot perform backups as TLS is not enabled"
 
         if not self.charm._patroni.member_started:
             return False, "Unit cannot perform backups as it's not in running state"
@@ -766,36 +752,48 @@ class PostgreSQLBackups(Object):
             )
         return return_code == 0
 
-    def _on_s3_credential_changed(self, event: CredentialsChangedEvent):
-        """Call the stanza initialization when the credentials or the connection info change."""
-        if not self.charm.is_cluster_initialised:
+    def _credential_changed_checks(self, event: CredentialsChangedEvent) -> bool:
+        if not self.charm.is_cluster_initialised or not self.charm.get_secret(
+            UNIT_SCOPE, "internal-cert"
+        ):
             logger.debug("Cannot set pgBackRest configurations, PostgreSQL has not yet started.")
             event.defer()
-            return
+            return False
 
         # Prevents config change in bad state, so DB peer relations change event will not cause patroni related errors.
         if self.charm.unit.status.message == CANNOT_RESTORE_PITR:
             logger.info("Cannot change S3 configuration in bad PITR restore status")
             event.defer()
-            return
+            return False
 
         # Prevents S3 change in the middle of restoring backup and patroni / pgbackrest errors caused by that.
         if self.charm.is_cluster_restoring_backup or self.charm.is_cluster_restoring_to_time:
             logger.info("Cannot change S3 configuration during restore")
             event.defer()
-            return
+            return False
 
         if not self._render_pgbackrest_conf_file():
             logger.debug("Cannot set pgBackRest configurations, missing configurations.")
-            return
+            return False
 
         if not self._can_initialise_stanza:
             logger.debug("Cannot initialise stanza yet.")
             event.defer()
+            return False
+        return True
+
+    def _on_s3_credential_changed(self, event: CredentialsChangedEvent) -> None:
+        """Call the stanza initialization when the credentials or the connection info change."""
+        if not self._credential_changed_checks(event):
             return
 
         # Start the pgBackRest service for the check_stanza to be successful. It's required to run on all the units if the tls is enabled.
-        self.start_stop_pgbackrest_service()
+        try:
+            self.start_stop_pgbackrest_service()
+        except RetryError:
+            logger.debug("Cannot initialise service yet.")
+            event.defer()
+            return
 
         if self.charm.unit.is_leader():
             self.charm.app_peer_data.update({
@@ -1257,7 +1255,7 @@ Stderr:
             template = Template(file.read())
         # Render the template file with the correct values.
         rendered = template.render(
-            enable_tls=self.charm.is_tls_enabled and len(self.charm._peer_members_ips) > 0,
+            enable_tls=len(self.charm._peer_members_ips) > 0,
             peer_endpoints=self.charm._peer_members_ips,
             path=s3_parameters["path"],
             data_path=f"{POSTGRESQL_DATA_PATH}",
@@ -1353,11 +1351,7 @@ Stderr:
             return False
 
         # Stop the service if TLS is not enabled or there are no replicas.
-        if (
-            not self.charm.is_tls_enabled
-            or len(self.charm._peer_members_ips) == 0
-            or self.charm._patroni.get_standby_leader()
-        ):
+        if len(self.charm._peer_members_ips) == 0 or self.charm._patroni.get_standby_leader():
             charmed_postgresql_snap.stop(services=["pgbackrest-service"])
             return True
 
