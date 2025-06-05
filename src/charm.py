@@ -29,7 +29,7 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,

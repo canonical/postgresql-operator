@@ -4,7 +4,7 @@
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
