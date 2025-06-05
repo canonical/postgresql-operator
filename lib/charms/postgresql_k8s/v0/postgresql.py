@@ -31,11 +31,11 @@ from psycopg2.sql import SQL, Composed, Identifier, Literal
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 52
+LIBPATCH = 0
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -48,6 +48,11 @@ ACCESS_GROUPS = [
     ACCESS_GROUP_INTERNAL,
     ACCESS_GROUP_RELATION,
 ]
+
+ROLE_STATS = "charmed_stats"
+ROLE_READ = "charmed_read"
+ROLE_DML = "charmed_dml"
+ROLE_BACKUP = "charmed_backup"
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -123,6 +128,15 @@ class PostgreSQLListUsersError(Exception):
 
 class PostgreSQLUpdateUserPasswordError(Exception):
     """Exception raised when updating a user password fails."""
+
+
+class PostgreSQLCreatePredefinedRolesError(Exception):
+    """Exception raised when creating predefined roles."""
+
+
+class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
+    """Exception raised when granting database privileges to user."""
+
 
 
 class PostgreSQL:
@@ -325,6 +339,55 @@ class PostgreSQL:
         except psycopg2.Error as e:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError() from e
+
+
+    def create_predefined_roles(self) -> None:
+        """Create predefined roles."""
+        role_to_queries = {
+            ROLE_STATS: [
+                f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
+            ],
+            ROLE_READ: [
+                f"CREATE ROLE {ROLE_READ} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_read_all_data",
+            ],
+            ROLE_DML: [
+                f"CREATE ROLE {ROLE_DML} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data",
+            ],
+            ROLE_BACKUP: [
+                f"CREATE ROLE {ROLE_BACKUP} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
+                f"GRANT {ROLE_STATS} TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_backup_start TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_backup_stop TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
+            ],
+        }
+
+        _, existing_roles = self.list_valid_privileges_and_roles()
+
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                for role, queries in role_to_queries.items():
+                    if role in existing_roles:
+                        logger.debug(f"Role {role} already exists")
+                        continue
+
+                    logger.info(f"Creating predefined role {role}")
+
+                    for query in queries:
+                        cursor.execute(SQL(query))
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create predefined roles: {e}")
+            raise PostgreSQLCreatePredefinedRolesError() from e
+
+    def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
+        """Grant the specified priviliges on the provided database for the user."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("GRANT {} ON DATABASE {} TO {};").format(Identifier(", ".join(privileges)), Identifier(database), Identifier(user)))
+        except psycopg2.Error as e:
+            logger.error(f"Faield to grant privileges to user: {e}")
+            raise PostgreSQLGrantDatabasePrivilegesToUserError() from e
 
     def delete_user(self, user: str) -> None:
         """Deletes a database user.
@@ -727,7 +790,7 @@ END; $$;"""
                     )
                 self.create_user(
                     PERMISSIONS_GROUP_ADMIN,
-                    extra_user_roles=["pg_read_all_data", "pg_write_all_data"],
+                    extra_user_roles=[ROLE_READ, ROLE_DML],
                 )
                 cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:

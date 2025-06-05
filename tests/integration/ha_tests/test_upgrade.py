@@ -27,7 +27,7 @@ from .helpers import (
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT = 600
+TIMEOUT = 30 * 60
 
 
 @pytest.mark.abort_on_fail

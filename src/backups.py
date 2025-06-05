@@ -27,7 +27,6 @@ from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object
-from ops.jujuversion import JujuVersion
 from ops.model import ActiveStatus, MaintenanceStatus
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
@@ -891,12 +890,11 @@ class PostgreSQLBackups(Object):
 
         # Test uploading metadata to S3 to test credentials before backup.
         datetime_backup_requested = datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")
-        juju_version = JujuVersion.from_environ()
         metadata = f"""Date Backup Requested: {datetime_backup_requested}
 Model Name: {self.model.name}
 Application Name: {self.model.app.name}
 Unit Name: {self.charm.unit.name}
-Juju Version: {juju_version!s}
+Juju Version: {self.charm.model.juju_version!s}
 """
         if not self._upload_content_to_s3(
             metadata,
