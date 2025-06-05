@@ -1143,7 +1143,6 @@ def test_on_create_backup_action(harness):
         ) as _is_primary,
         patch("charm.PostgreSQLBackups._upload_content_to_s3") as _upload_content_to_s3,
         patch("backups.datetime") as _datetime,
-        patch("ops.JujuVersion.from_environ") as _from_environ,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
         patch("charm.PostgreSQLBackups._can_unit_perform_backup") as _can_unit_perform_backup,
     ):
@@ -1178,13 +1177,12 @@ def test_on_create_backup_action(harness):
             [],
         )
         _datetime.now.return_value.strftime.return_value = "2023-01-01T09:00:00Z"
-        _from_environ.return_value = "test-juju-version"
         _upload_content_to_s3.return_value = False
         expected_metadata = f"""Date Backup Requested: 2023-01-01T09:00:00Z
 Model Name: {harness.charm.model.name}
 Application Name: {harness.charm.model.app.name}
 Unit Name: {harness.charm.unit.name}
-Juju Version: test-juju-version
+Juju Version: 0.0.0
 """
         harness.charm.backup._on_create_backup_action(mock_event)
         _upload_content_to_s3.assert_called_once_with(

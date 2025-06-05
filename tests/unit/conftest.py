@@ -13,7 +13,7 @@ from charms.tempo_coordinator_k8s.v0.charm_tracing import charm_tracing_disabled
 
 
 # This causes every test defined in this file to run 2 times, each with
-# charm.JujuVersion.has_secrets set as True or as False
+# ops.JujuVersion.has_secrets set as True or as False
 @pytest.fixture(autouse=True)
 def _has_secrets(request, monkeypatch):
     monkeypatch.setattr("ops.JujuVersion.has_secrets", PropertyMock(return_value=True))
