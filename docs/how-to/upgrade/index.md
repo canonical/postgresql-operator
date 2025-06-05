@@ -4,13 +4,6 @@ This charm does not support in-place upgrades for major version changes, and the
 
 For minor version upgrades on Charmed PostgreSQL 14, see the [version 14 upgrades documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/en/14/how-to/upgrade/).
 
-
 ```{note}
 We will soon publish a migration guide with instructions on how to change from PostgreSQL 14 to 16.
 ```
-
-```{toctree}
-:titlesonly:
-:maxdepth: 2
-:glob:
-:hidden:

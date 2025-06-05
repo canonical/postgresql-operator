@@ -30,8 +30,6 @@ If you deploy with the `--revision` flag, **you must make sure the revision matc
 Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
 ```
 
-
-
 ## Plugins/extensions
 
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).

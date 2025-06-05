@@ -1,6 +1,7 @@
 # Users
 
 There are three types of users in PostgreSQL:
+
 * Internal users (used by the charmed operator)
 * Relation users (used by related applications)
   * Extra user roles (if default permissions are not enough)
@@ -80,6 +81,8 @@ unit-postgresql-1:
 
 The action `set-password` must be executed on juju leader unit (to update peer relation data with new value).
 
+-->
+
 ## Relation users
 
 The operator created a dedicated user for every application related/integrated with database. Those users are removed on the juju relation/integration removal request. However, DB data stays in place and can be reused on re-created relations (using new user credentials):
@@ -102,7 +105,7 @@ If password rotation is required for users used in relations, the relation must 
 > juju wait-for application postgresql
 > juju relate postgresql myclientapp
 ```
--->
+
 
 ### Extra user roles
 

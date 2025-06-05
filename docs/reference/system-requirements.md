@@ -37,12 +37,6 @@ The charm is based on the [charmed-postgresql snap](https://snapcraft.io/charmed
 
 <!-- BADGES -->
 
-[2.9 LTS]: https://img.shields.io/badge/2.9_LTS-%23E95420?label=Juju
-[3.1]: https://img.shields.io/badge/3.1-%23E95420?label=Juju
-[3.2]: https://img.shields.io/badge/3.2-%23E95420?label=Juju
-[3.3]: https://img.shields.io/badge/3.3-%23E95420?label=Juju
-[3.4]: https://img.shields.io/badge/3.4-%23E95420?label=Juju
-[3.5]: https://img.shields.io/badge/3.5-%23E95420?label=Juju
 [3.6 LTS]: https://img.shields.io/badge/3.6_LTS-%23E95420?label=Juju
 
 <!-- LINKS -->
