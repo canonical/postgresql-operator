@@ -40,8 +40,6 @@ juju consume lisbon.db2database
 
 If the client application is another charm, deploy them and connect them with `juju integrate`.
 
-<!--TODO: Clarify code--->
-
 ```text
 juju switch app
 
@@ -55,8 +53,6 @@ juju integrate pgbouncer db1database
 ## External client
 
 If the client application is external, they must be integrated via the [`data-integrator` charm](https://charmhub.io/data-integrator).
-
-<!--TODO: Clarify code--->
 
 ```text
 juju switch app

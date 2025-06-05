@@ -11,7 +11,7 @@ The legacy charm provided endpoints `db` and `db-admin` (for the interface `pgsq
 Choose one endpoint to use, rather than relating both simultaneously.
 ```
 
-<!--TODO: how relevant is this for 16? would someone migrate from latest to 16?-->
+<!--TODO: Explain `latest` in the context of `16`-->
 
 ## The default track `latest` vs `14`
 
@@ -30,8 +30,6 @@ The "modern" charm provides temporary support for the legacy interfaces:
 ```
 
 * **proper migration**: migrate the application to the new interface "[postgresql_client](https://github.com/canonical/charm-relation-interfaces)". The application will connect PostgreSQL using "[data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces)" library from "[data-platform-libs](https://github.com/canonical/data-platform-libs/)" via endpoint `database`.
-
-Note that the `trust` option must be enabled if [Role Based Access Control (RBAC)](https://kubernetes.io/docs/concepts/security/rbac-good-practices/) is in use on your Kubernetes. <!--TODO: is this relevant here?-->
 
 ```{warning}
 **In-place upgrades are not supported for this case.**
