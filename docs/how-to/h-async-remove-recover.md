@@ -46,7 +46,7 @@ The command above will move the `rome` cluster into a detached state (`blocked`)
 The following command creates a new cluster in the replica set from the detached `rome` cluster, keeping its existing data in use:
 
 ```shell
-juju run -m rome db1/leader promote-to-primary
+juju run -m rome db1/leader promote-to-primary scope=cluster
 ```
 ### Remove a detached cluster
 
