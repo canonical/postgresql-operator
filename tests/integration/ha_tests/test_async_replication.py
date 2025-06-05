@@ -124,8 +124,12 @@ async def test_deploy_async_replication_setup(
             num_units=CLUSTER_SIZE,
             config={"profile": "testing"},
         )
-    await ops_test.model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
-    await second_model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
+    await ops_test.model.deploy(
+        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+    )
+    await second_model.deploy(
+        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+    )
 
     async with ops_test.fast_forward(), fast_forward(second_model):
         await gather(
