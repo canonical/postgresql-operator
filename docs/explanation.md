@@ -11,6 +11,7 @@ This section contains pages with more detailed explanations that provide additio
 ## Operational concepts
 * [Units]
 * [Users]
+* [Roles]
 * [Logs]
 * [Connection pooling]
 
@@ -25,6 +26,7 @@ This section contains pages with more detailed explanations that provide additio
 [Interfaces and endpoints]: /t/10251
 [Units]: /t/17525
 [Users]: /t/10798
+[Roles]: /t/17725
 [Logs]: /t/12099
 [Juju]: /t/11985
 [Legacy charm]: /t/10690
