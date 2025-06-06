@@ -2,13 +2,13 @@
 
 Each [HA](https://en.wikipedia.org/wiki/High_availability)/[DR](https://en.wikipedia.org/wiki/IT_disaster_recovery) implementation has a primary and secondary (standby) site(s).
 Charmed PostgreSQL cluster size can be [easily scaled](/t/11863) from 0 to 10 units ([contact us](/t/11863) for 10+ units cluster). It is recommended to use 3+ units cluster size in production (due to [Raft consensus](https://en.wikipedia.org/wiki/Raft_(algorithm)) requirements). Those units type can be:
-  * **Primary**: unit which accepts all writes and guaranties [no split brain](https://en.wikipedia.org/wiki/Split-brain_(computing)).
+  * **Primary**: unit which accepts all writes and [guaranties no split brain](https://en.wikipedia.org/wiki/Split-brain_(computing)).
   * **Sync Standby** (synchronous copy) : designed for the fast automatic failover. Used for read-only queries and guaranties the latest transaction availability.
   * **Replica** (asynchronous copy): designed for long-running and resource consuming queries without affecting Primary performance. Used for read-only queries without guaranties of the latest transaction availability.
 
 > **Warning**: all SQL transactions have to be confirmed by all Sync Standby unit(s) before Primary unit commit transaction to the client. Therefor the high-performance and high-availability is a trade-of balance between "Sync Standby" and "Replica" units count in the cluster.
 
-> **Note**: starting from revision 561 all Charmed PostgreSQL units are configured as Sync Standby members. It provides better guaranties for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count)'.
+> **Note**: starting from revision 561 all Charmed PostgreSQL units are configured as Sync Standby members by default. It provides better guaranties for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count)'.
 
 ![PostgreSQL Units types|690x253, 100%](upload://pY5kzxO9ELJGEqEe1F1RQjOG6SS.png)
 

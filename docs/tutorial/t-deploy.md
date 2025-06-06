@@ -8,7 +8,7 @@ In this section, you will deploy Charmed PostgreSQL VM, access a unit, and inter
 
 To deploy Charmed PostgreSQL, run 
 ```shell
-juju deploy postgresql
+juju deploy postgresql --channel=14/stable
 ```
 
 Juju will now fetch Charmed PostgreSQL VM from [Charmhub](https://charmhub.io/postgresql?channel=14/stable) and deploy it to the LXD cloud. This process can take several minutes depending on how provisioned (RAM, CPU, etc) your machine is. 

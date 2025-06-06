@@ -14,10 +14,10 @@ Installation of different cloud services with Juju:
 * [Multi-availability zones (AZ)][Multi-AZ]
 
 Other deployment scenarios and configurations:
-* [TLS VIP access]
-* [Juju spaces]
-* [Air-gapped]
 * [Terraform]
+* [TLS VIP access]
+* [Air-gapped]
+* [Juju spaces]
 * [Juju storage]
 
 ## Usage and maintenance

@@ -1,4 +1,4 @@
-# TimescaleDB plugin/extension
+# How to enable TimescaleDB
 
 Charmed PostgreSQL separates TimescaleDB editions for different [CharmHub tracks](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/howto/manage-channels/):
 

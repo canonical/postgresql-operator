@@ -276,3 +276,47 @@ version: 0.3.12
 
 > **Note**: pay attention to the CLI syntax (simple `-` used, avoid misstype with common `--` prefix for parametes)
 [/details]
+
+### PostgreSQL tools
+
+The Charmed PostgreSQL ships long list of standard `pg_*` tools, including `pg_dump`, `pg_dumpall` (and more). Due to the SNAP naming requirements they are available as `pg-dump` and `pg-dumpall` accordingly. 
+
+The entire list can bu found on systems with snap charmed-postgresql installed, e.g.:
+[details="Example: list of pg_* tools shipped by snap"]
+```shell
+> snap list charmed-postgresql
+Name                Version  Rev  Tracking       Publisher   Notes
+charmed-postgresql  14.15    143  latest/stable  canonical✓  held
+
+> charmed-postgresql.pg<TAB><TAB>
+charmed-postgresql.pg-archivecleanup  charmed-postgresql.pg-conftool        charmed-postgresql.pg-dump            charmed-postgresql.pg-recvlogical     charmed-postgresql.pg-upgradecluster  charmed-postgresql.pgbouncer-server
+charmed-postgresql.pg-backupcluster   charmed-postgresql.pg-createcluster   charmed-postgresql.pg-dumpall         charmed-postgresql.pg-renamecluster   charmed-postgresql.pg-virtualenv      
+charmed-postgresql.pg-basebackup      charmed-postgresql.pg-ctl             charmed-postgresql.pg-isready         charmed-postgresql.pg-restore         charmed-postgresql.pgbackrest         
+charmed-postgresql.pg-buildext        charmed-postgresql.pg-ctlcluster      charmed-postgresql.pg-lsclusters      charmed-postgresql.pg-restorecluster  charmed-postgresql.pgbench            
+charmed-postgresql.pg-config          charmed-postgresql.pg-dropcluster     charmed-postgresql.pg-receivewal      charmed-postgresql.pg-updatedicts     charmed-postgresql.pgbouncer      
+```
+[/details]
+
+#### pg_dump / pg_dumpall
+
+Those tools are designed to dump the PostgreSQL content. Due to the strictly confined SNAP, the context is limited to SNAP itself (and not the POSIX user triggered the tool). Also, due to security reasons the default `postgres` user cannot access DB, use user `operator` (you can find it's credential in Juju Secrets).
+
+[details="Example:  pg-dump/pg-dumpall usage"]
+```shell 
+charmed-postgresql.pg-dump -c -C -U operator -W -h /tmp -d mydb | tee mydb.sql >/dev/null
+```
+
+Also you can pass password using env variable PGPASSWORD, however it is NOT recommended for productions as DB password will be stored in shell history:
+
+```shell
+PGPASSWORD=my$ecretp@ss charmed-postgresql.pg-dumpall -c -U operator -h /tmp  | tee all_DBs.txt >/dev/null
+```
+
+Note, the local SNAP /tmp could be used as well:
+```shell
+PGPASSWORD=my$ecretp@ss charmed-postgresql.pg-dumpall -c -U operator -h /tmp  -f /tmp/test.sql
+
+> sudo ls -la /tmp/snap-private-tmp/snap.charmed-postgresql/tmp/test.sql 
+-rw-rw-r-- 1 ubuntu ubuntu 19416 Jun  4 08:24 /tmp/snap-private-tmp/snap.charmed-postgresql/tmp/test.sql
+```
+[/details]

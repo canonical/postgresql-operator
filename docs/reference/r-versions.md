@@ -20,22 +20,25 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
 
 ### Supported features
 
+* [Juju Spaces support]
+* [Multiple Juju storage support]
 * [LDAP integration] (also supported by PostgreSQL `14`)
 * [SoS report integration] (also supported by PostgreSQL `14`)
 * [Recovery improvements] (also supported by PostgreSQL `14`)
   * All replicas are now [synchronous units]
   * Switchover the primary unit via `promote-to-primary scope=unit`
   * Raft re-init helper: `promote-to-primary scope=unit force=yes`
-* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for internal charm password rotation
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords](/t/17692)
 * [Timescale Community Edition]
 * [Extended COS integration]
   * [Profiling via Parca]
   * [Tracing via Tempo]
 * Improved [security hardening]
-* (WIP) [Multiple Juju storage support]
-* (WIP) [Juju Spaces support]
-* (WIP) Refresh v3 lib support <!--VM only-->
-* (WIP) Improved built-in roles 
+* New "juju refresh" library (Refresh v3)
+* (WIP) [Improved built-in roles](/t/17725) 
+* (WIP) Migrated to TLS v4 library
+  * (WIP) New endpoints `client-certificates` and `peer-certificates`
+  * (WIP) Endpoint `peer-interfaces` uses TLS by default
 
 <!--
 Saving the following items for release notes:
@@ -53,7 +56,9 @@ Read more about Charmed PostgreSQL 16 features in the [release notes].
 * Juju actions `get-password` and `set-password`.
   * For security reasons, these actions are replaced by [Juju secrets](https://documentation.ubuntu.com/juju/3.6/reference/secret/index.html).
 * [Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/) has been replaced by [Timescale Community edition](https://docs.timescale.com/about/latest/timescaledb-editions/). 
-
+* The charm action `set-tls-private-key ` has been removed (will be re-introduced as Juju User Secrets)
+* The charm actions `pre-upgrade-check` and `resume-upgrade ` have been removed (replaced with `pre-refresh-check` and `resume-refresh` accordingly to be consistent with `juju refresh`)
+* The charm endpoint `certificates` has ben split into `client-certificates` and `peer-certificates`.
 
 ## PostgreSQL 14
 
