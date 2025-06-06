@@ -331,6 +331,7 @@ class PostgreSQL:
         finally:
             if connection is not None:
                 connection.close()
+            connection = None
 
         role_to_queries = {
             ROLE_STATS: [
