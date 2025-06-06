@@ -312,6 +312,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 )
             )
         except (charm_refresh.UnitTearingDown, charm_refresh.PeerRelationNotReady):
+            logger.exception("Cannot set charm_refresh")
             self.refresh = None
         self._reconcile_refresh_status()
 
