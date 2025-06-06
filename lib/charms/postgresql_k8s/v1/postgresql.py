@@ -387,7 +387,7 @@ class PostgreSQL:
                     )
                 )
         except psycopg2.Error as e:
-            logger.error(f"Field to grant privileges to user: {e}")
+            logger.error(f"Failed to grant privileges to user: {e}")
             raise PostgreSQLGrantDatabasePrivilegesToUserError() from e
 
     def delete_user(self, user: str) -> None:
