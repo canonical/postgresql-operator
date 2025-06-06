@@ -97,7 +97,7 @@ Prometheus is an open-source systems monitoring and alerting toolkit with a dime
 
 ## LLD (Low Level Design)
 
-Please check the charm state machines displayed in the [workflow diagrams](https://discourse.charmhub.io/t/charmed-postgresql-k8s-explanations-charm-flowcharts/9305). The low-level logic is mostly common for both VM and K8s charms.
+Please check the charm state machines displayed in the [workflow diagrams](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/explanation/flowcharts/). The low-level logic is mostly common for both VM and K8s charms.
 
 <!--- TODO: Describe all possible installations? Cross-model/controller? --->
 

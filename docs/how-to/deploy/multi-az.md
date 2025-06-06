@@ -12,7 +12,7 @@ This documentation assumes that your cloud supports and provides availability zo
 
 ## Set up GCE on Google Cloud
 
-Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://discourse.charmhub.io/t/charmed-postgresql-k8s-how-to-deploy-on-gke/11237) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
+Let's deploy the [PostgreSQL Cluster on GKE (us-east4)](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/16/how-to/deploy/gke/) using all 3 zones there (`us-east4-a`, `us-east4-b`, `us-east4-c`) and make sure all pods always sits in the dedicated zones only.
 
 ```{caution}
 Creating the following GKE resources may cost you money - be sure to monitor your GCloud costs.
