@@ -387,13 +387,19 @@ class PostgreSQL:
             logger.error(f"Failed to create predefined roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
 
-    def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
-        """Grant the specified priviliges on the provided database for the user."""
+    def grant_database_privileges_to_user(
+        self, user: str, database: str, privileges: list[str]
+    ) -> None:
+        """Grant the specified privileges on the provided database for the user."""
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute(SQL("GRANT {} ON DATABASE {} TO {};").format(Identifier(", ".join(privileges)), Identifier(database), Identifier(user)))
+                cursor.execute(
+                    SQL("GRANT {} ON DATABASE {} TO {};").format(
+                        Identifier(", ".join(privileges)), Identifier(database), Identifier(user)
+                    )
+                )
         except psycopg2.Error as e:
-            logger.error(f"Faield to grant privileges to user: {e}")
+            logger.error(f"Failed to grant privileges to user: {e}")
             raise PostgreSQLGrantDatabasePrivilegesToUserError() from e
 
     def delete_user(self, user: str) -> None:
