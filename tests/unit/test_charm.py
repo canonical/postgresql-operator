@@ -267,6 +267,10 @@ def test_on_config_changed(harness):
             "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
         ) as _is_cluster_initialised,
         patch("charm.PostgresqlOperatorCharm.update_endpoint_addresses"),
+        patch(
+            "relations.logical_replication.PostgreSQLLogicalReplication.apply_changed_config",
+            return_value=True,
+        ),
     ):
         # Test when the cluster was not initialised yet.
         _is_cluster_initialised.return_value = False
@@ -389,6 +393,9 @@ def test_enable_disable_extensions(harness, caplog):
   synchronous_node_count:
     type: string
     default: "all"
+  logical_replication_subscription_request:
+    type: string
+    default: "{}"
   plugin_citext_enable:
     default: false
     type: boolean
@@ -1156,6 +1163,7 @@ def test_update_config(harness):
         patch(
             "charm.PostgresqlOperatorCharm._handle_postgresql_restart_need"
         ) as _handle_postgresql_restart_need,
+        patch("charm.Patroni.ensure_slots_controller_by_patroni"),
         patch(
             "charm.PostgresqlOperatorCharm._restart_metrics_service"
         ) as _restart_metrics_service,
@@ -1199,6 +1207,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            slots=None,
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1228,6 +1237,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            slots=None,
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
