@@ -37,6 +37,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 
 class SecretNotFoundError(Exception):
@@ -735,6 +736,23 @@ def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> 
     if model is None:
         model = ops_test.model
     return model.units.get(unit_name).public_address
+
+
+def check_connected_user(
+    cursor, session_user: str, current_user: str, primary: bool = True
+) -> None:
+    cursor.execute("SELECT session_user,current_user;")
+    result = cursor.fetchone()
+    if result is not None:
+        instance = "primary" if primary else "replica"
+        assert result[0] == session_user, (
+            f"The session user should be the {session_user} user in the {instance}"
+        )
+        assert result[1] == current_user, (
+            f"The current user should be the {current_user} user in the {instance}"
+        )
+    else:
+        assert False, "No result returned from the query"
 
 
 async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
