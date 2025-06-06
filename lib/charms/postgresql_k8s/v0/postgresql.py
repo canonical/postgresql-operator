@@ -705,7 +705,9 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
+             with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT groname FROM pg_catalog.pg_group WHERE groname LIKE '%_access';"
                 )
