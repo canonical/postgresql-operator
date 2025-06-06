@@ -830,7 +830,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                   END IF;
                 END LOOP;
                 -- Remove users that don't exist anymore from the pg_hba file.
-                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
+                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
                 LOOP
                   DELETE FROM pg_hba WHERE lines = rec.lines;
                   changes := changes + 1;
