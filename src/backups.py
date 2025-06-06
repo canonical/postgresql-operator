@@ -11,7 +11,7 @@ import re
 import shutil
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
@@ -421,9 +421,7 @@ class PostgreSQLBackups(Object):
                 backup_reference, _ = self._parse_backup_id(backup["reference"][-1])
             lsn_start_stop = f"{backup['lsn']['start']} / {backup['lsn']['stop']}"
             time_start, time_stop = (
-                datetime.strftime(
-                    datetime.fromtimestamp(stamp, timezone.utc), "%Y-%m-%dT%H:%M:%SZ"
-                )
+                datetime.strftime(datetime.fromtimestamp(stamp, UTC), "%Y-%m-%dT%H:%M:%SZ")
                 for stamp in backup["timestamp"].values()
             )
             backup_timeline = (
@@ -526,7 +524,7 @@ class PostgreSQLBackups(Object):
 
         return dict[str, tuple[str, str]]({
             datetime.strftime(
-                datetime.fromtimestamp(timeline_object["time"], timezone.utc),
+                datetime.fromtimestamp(timeline_object["time"], UTC),
                 BACKUP_ID_FORMAT,
             ): (
                 timeline.split("/")[1],
@@ -574,8 +572,8 @@ class PostgreSQLBackups(Object):
         t = re.sub(r"\.(\d+)", lambda x: f".{x[1]:06}", t)
         dt = datetime.fromisoformat(t)
         # Convert to the timezone-naive
-        if dt.tzinfo is not None and dt.tzinfo is not timezone.utc:
-            dt = dt.astimezone(tz=timezone.utc)
+        if dt.tzinfo is not None and dt.tzinfo is not UTC:
+            dt = dt.astimezone(tz=UTC)
         return dt.replace(tzinfo=None)
 
     def _parse_backup_id(self, label) -> tuple[str, str]:
