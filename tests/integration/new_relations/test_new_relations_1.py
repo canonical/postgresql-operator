@@ -461,7 +461,9 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             f"{DATABASE_APP_NAME}:database",
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1000, idle_period=30
+        )
         with pytest.raises(psycopg2.OperationalError):
             psycopg2.connect(primary_connection_string)
 

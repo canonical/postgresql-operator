@@ -1078,11 +1078,24 @@ async def get_detached_storages(ops_test: OpsTest) -> list[str]:
 
 async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
     """Checks if "operator" password is valid for current postgresql db."""
-    stdout = await run_command_on_unit(
-        ops_test,
+    complete_command = [
+        "exec",
+        "--unit",
         unit_name,
-        """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
-    )
+        "--",
+        "grep",
+        "-E",
+        "'password'",
+        "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*",
+    ]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed. Instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
     return 'password authentication failed for user "operator"' not in stdout
 
 

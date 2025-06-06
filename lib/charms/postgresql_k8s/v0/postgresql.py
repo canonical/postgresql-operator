@@ -31,11 +31,11 @@ from psycopg2.sql import SQL, Composed, Identifier, Literal
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
 # Increment this major API version when introducing breaking changes
-LIBAPI = 0
+LIBAPI = 1
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 53
+LIBPATCH = 0
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -48,6 +48,11 @@ ACCESS_GROUPS = [
     ACCESS_GROUP_INTERNAL,
     ACCESS_GROUP_RELATION,
 ]
+
+ROLE_STATS = "charmed_stats"
+ROLE_READ = "charmed_read"
+ROLE_DML = "charmed_dml"
+ROLE_BACKUP = "charmed_backup"
 
 # Groups to distinguish database permissions
 PERMISSIONS_GROUP_ADMIN = "admin"
@@ -127,6 +132,14 @@ class PostgreSQLListUsersError(Exception):
 
 class PostgreSQLUpdateUserPasswordError(Exception):
     """Exception raised when updating a user password fails."""
+
+
+class PostgreSQLCreatePredefinedRolesError(Exception):
+    """Exception raised when creating predefined roles."""
+
+
+class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
+    """Exception raised when granting database privileges to user."""
 
 
 class PostgreSQL:
@@ -335,6 +348,54 @@ class PostgreSQL:
             logger.error(f"Failed to create user: {e}")
             raise PostgreSQLCreateUserError() from e
 
+    def create_predefined_roles(self) -> None:
+        """Create predefined roles."""
+        role_to_queries = {
+            ROLE_STATS: [
+                f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
+            ],
+            ROLE_READ: [
+                f"CREATE ROLE {ROLE_READ} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_read_all_data",
+            ],
+            ROLE_DML: [
+                f"CREATE ROLE {ROLE_DML} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data",
+            ],
+            ROLE_BACKUP: [
+                f"CREATE ROLE {ROLE_BACKUP} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
+                f"GRANT {ROLE_STATS} TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_backup_start TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_backup_stop TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_create_restore_point TO {ROLE_BACKUP}",
+                f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
+            ],
+        }
+
+        _, existing_roles = self.list_valid_privileges_and_roles()
+
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                for role, queries in role_to_queries.items():
+                    if role in existing_roles:
+                        logger.debug(f"Role {role} already exists")
+                        continue
+
+                    logger.info(f"Creating predefined role {role}")
+
+                    for query in queries:
+                        cursor.execute(SQL(query))
+        except psycopg2.Error as e:
+            logger.error(f"Failed to create predefined roles: {e}")
+            raise PostgreSQLCreatePredefinedRolesError() from e
+
+    def grant_database_privileges_to_user(self, user: str, database: str, privileges: list[str]) -> None:
+        """Grant the specified priviliges on the provided database for the user."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("GRANT {} ON DATABASE {} TO {};").format(Identifier(", ".join(privileges)), Identifier(database), Identifier(user)))
+        except psycopg2.Error as e:
+            logger.error(f"Faield to grant privileges to user: {e}")
+            raise PostgreSQLGrantDatabasePrivilegesToUserError() from e
+
     def delete_user(self, user: str) -> None:
         """Deletes a database user.
 
@@ -355,10 +416,9 @@ class PostgreSQL:
             # Existing objects need to be reassigned in each database
             # before the user can be deleted.
             for database in databases:
-                with (
-                    self._connect_to_database(database) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(
                         SQL("REASSIGN OWNED BY {} TO {};").format(
                             Identifier(user), Identifier(self.user)
@@ -449,10 +509,9 @@ class PostgreSQL:
 
             # Enable/disabled the extension in each database.
             for database in databases:
-                with (
-                    self._connect_to_database(database=database) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
                     for extension, enable in ordered_extensions.items():
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
@@ -562,10 +621,9 @@ END; $$;"""
         Returns:
             Set of PostgreSQL text search configs.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
             text_search_configs = cursor.fetchall()
             return {text_search_config[0] for text_search_config in text_search_configs}
@@ -576,10 +634,9 @@ END; $$;"""
         Returns:
             Set of PostgreSQL timezones.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT name FROM pg_timezone_names;")
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
@@ -590,10 +647,9 @@ END; $$;"""
         Returns:
             Set of PostgreSQL table access methods.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT amname FROM pg_am WHERE amtype = 't';")
             access_methods = cursor.fetchall()
             return {access_method[0] for access_method in access_methods}
@@ -606,10 +662,9 @@ END; $$;"""
         """
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT version();")
                 # Split to get only the version number.
                 return cursor.fetchone()[0].split(" ")[1]
@@ -628,12 +683,9 @@ END; $$;"""
             whether TLS is enabled.
         """
         try:
-            with (
-                self._connect_to_database(
-                    database_host=self.current_host if check_current_host else None
-                ) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=self.current_host if check_current_host else None
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SHOW ssl;")
                 return "on" in cursor.fetchone()[0]
         except psycopg2.Error:
@@ -653,10 +705,7 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT groname FROM pg_catalog.pg_group WHERE groname LIKE '%_access';"
                 )
@@ -684,10 +733,9 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     SQL(
                         "SELECT TRUE FROM pg_catalog.pg_user WHERE usename = {} AND usesuper;"
@@ -723,10 +771,9 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 if group:
                     query = SQL(
                         "SELECT usename FROM (SELECT UNNEST(grolist) AS user_id FROM pg_catalog.pg_group WHERE groname = {}) AS g JOIN pg_catalog.pg_user AS u ON g.user_id = u.usesysid;"
@@ -756,10 +803,7 @@ END; $$;"""
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT usename "
                     "FROM pg_catalog.pg_user "
@@ -795,10 +839,11 @@ END; $$;"""
         connection = None
         cursor = None
         try:
-            with (
-                self._connect_to_database(database="template1") as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database="template1"
+            ) as connection, connection.cursor() as cursor:
+                if temp_location is not None:
+                    cursor.execute("SELECT TRUE FROM pg_tablespace WHERE spcname='temp';")
                 # Create database function and event trigger to identify users created by PgBouncer.
                 cursor.execute(
                     "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
@@ -887,7 +932,7 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
                         )
                     self.create_user(
                         PERMISSIONS_GROUP_ADMIN,
-                        extra_user_roles=["pg_read_all_data", "pg_write_all_data"],
+                        extra_user_roles=[ROLE_READ, ROLE_DML],
                     )
                     cursor.execute("GRANT CONNECT ON DATABASE postgres TO admin;")
         except psycopg2.Error as e:
@@ -914,10 +959,9 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
         """
         connection = None
         try:
-            with (
-                self._connect_to_database(database_host=database_host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=database_host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
@@ -1054,10 +1098,9 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
             Whether the date style is valid.
         """
         try:
-            with (
-                self._connect_to_database(database_host=self.current_host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=self.current_host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     SQL(
                         "SET DateStyle to {};",

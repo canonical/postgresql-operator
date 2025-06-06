@@ -601,6 +601,16 @@ def test_on_start(harness):
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
         ) as _is_storage_attached,
+        patch(
+            "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
     ):

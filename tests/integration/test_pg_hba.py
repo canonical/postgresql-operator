@@ -70,7 +70,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
             connection = db_connect(
                 host=address,
                 password=credentials["postgresql"]["password"],
-                user=credentials["postgresql"]["username"],
+                username=credentials["postgresql"]["username"],
                 database=FIRST_DATABASE,
             )
             connection.autocommit = True
@@ -117,7 +117,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
                     db_connect(
                         host=address,
                         password=PASSWORD,
-                        user=FIRST_RELATION_USER,
+                        username=FIRST_RELATION_USER,
                         database=FIRST_DATABASE,
                     ) as connection,
                     connection.cursor() as cursor,
@@ -139,7 +139,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
                     db_connect(
                         host=address,
                         password=PASSWORD,
-                        user=SECOND_RELATION_USER,
+                        username=SECOND_RELATION_USER,
                         database=SECOND_DATABASE,
                     ) as connection,
                     connection.cursor() as cursor,
@@ -158,7 +158,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
                 with db_connect(
                     host=address,
                     password=PASSWORD,
-                    user=SECOND_RELATION_USER,
+                    username=SECOND_RELATION_USER,
                     database=FIRST_DATABASE,
                 ) as connection:
                     assert False, (

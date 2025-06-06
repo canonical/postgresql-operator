@@ -148,7 +148,7 @@ class PostgreSQLProvider(Object):
                 BlockedStatus(
                     e.message
                     if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
-                    else f"Failed to initialize {self.relation_name} relation"
+                    else f"Failed to initialize relation {self.relation_name}"
                 )
             )
 
@@ -321,6 +321,11 @@ class PostgreSQLProvider(Object):
             self.charm.is_blocked
             and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ) and not self.check_for_invalid_extra_user_roles(relation.id):
+            self.charm.set_unit_status(ActiveStatus())
+        if (
+            self.charm.is_blocked
+            and "Failed to initialize relation" in self.charm.unit.status.message
+        ):
             self.charm.set_unit_status(ActiveStatus())
 
         self._update_unit_status_on_blocking_endpoint_simultaneously()
