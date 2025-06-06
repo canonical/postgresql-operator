@@ -1246,24 +1246,28 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             )
 
     @property
-    def _unit_ip(self) -> str:
+    def _unit_ip(self) -> str | None:
         """Current unit ip."""
-        return str(self.model.get_binding(PEER).network.bind_address)
+        if addr := self.model.get_binding(PEER).network.bind_address:
+            return str(addr)
 
     @property
-    def _database_ip(self) -> str:
+    def _database_ip(self) -> str | None:
         """Database endpoint address."""
-        return str(self.model.get_binding(DATABASE).network.bind_address)
+        if addr := self.model.get_binding(DATABASE).network.bind_address:
+            return str(addr)
 
     @property
-    def _replication_offer_ip(self) -> str:
+    def _replication_offer_ip(self) -> str | None:
         """Async replication offer endpoint address."""
-        return str(self.model.get_binding(REPLICATION_OFFER_RELATION).network.bind_address)
+        if addr := self.model.get_binding(REPLICATION_OFFER_RELATION).network.bind_address:
+            return str(addr)
 
     @property
-    def _replication_consumer_ip(self) -> str:
+    def _replication_consumer_ip(self) -> str | None:
         """Async replication consumer endpoint address."""
-        return str(self.model.get_binding(REPLICATION_CONSUMER_RELATION).network.bind_address)
+        if addr := self.model.get_binding(REPLICATION_CONSUMER_RELATION).network.bind_address:
+            return str(addr)
 
     @property
     def listen_ips(self) -> list[str]:
@@ -2323,6 +2327,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Updates Patroni config file based on the existence of the TLS files."""
         if refresh is None:
             refresh = self.refresh
+
+        if not self._unit_ip:
+            logger.debug("update_config: cannot generate config. No IP set yet.")
+            return False
 
         limit_memory = None
         if self.config.profile_limit_memory:
