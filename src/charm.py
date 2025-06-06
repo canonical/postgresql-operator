@@ -33,10 +33,14 @@ from charms.postgresql_k8s.v0.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_STATS,
     PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
@@ -266,8 +270,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             deleted_label=SECRET_DELETED_LABEL,
         )
 
-        run_cmd = "/usr/bin/juju-exec"
-        self._observer = ClusterTopologyObserver(self, run_cmd)
+        self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
         self.framework.observe(
             self.on.authorisation_rules_change, self._on_authorisation_rules_change
@@ -1693,7 +1696,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug("Starting LDAP sync service")
         postgres_snap.restart(services=["ldap-sync"])
 
-    def _start_primary(self, event: StartEvent) -> None:
+    def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
@@ -1707,6 +1710,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if not self._can_connect_to_postgresql:
+            logger.debug("Deferring on_start: awaiting for database to start")
+            self.unit.status = WaitingStatus("awaiting for database to start")
+            event.defer()
+            return
+
+        if not self.primary_endpoint:
+            logger.debug("Deferrring on_start: awaitng start of the primary")
+            self.unit.status = WaitingStatus("awaiting start of the primary")
+            event.defer()
+            return
+
+        try:
+            self.postgresql.create_predefined_roles()
+        except PostgreSQLCreatePredefinedRolesError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to create pre-defined roles")
+            return
+
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
@@ -1715,16 +1737,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             users = self.postgresql.list_users()
             if "postgres" not in users:
                 self.postgresql.create_user("postgres", new_password(), admin=True)
-                # Create the backup user.
+            # Create the backup user.
             if BACKUP_USER not in users:
-                self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
+                self.postgresql.create_user(
+                    BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
+                )
+                self.postgresql.grant_database_privileges_to_user(
+                    BACKUP_USER, "postgres", ["connect"]
+                )
             if MONITORING_USER not in users:
                 # Create the monitoring user.
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles=["pg_monitor"],
+                    extra_user_roles=[ROLE_STATS],
                 )
+        except PostgreSQLGrantDatabasePrivilegesToUserError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to grant database privileges to user")
+            return
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.set_unit_status(BlockedStatus("Failed to create postgres user"))
@@ -1812,13 +1843,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
+            updateable_users = [*SYSTEM_USERS, BACKUP_USER]
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
             for user, password in list(updated_passwords.items()):
-                if user not in SYSTEM_USERS:
+                if user not in updateable_users:
                     logger.error(
-                        f"Can only update system users: {', '.join(SYSTEM_USERS)} not {user}"
+                        f"Can only update system users: {', '.join(updateable_users)} not {user}"
                     )
                     updated_passwords.pop(user)
                     continue
