@@ -97,6 +97,7 @@ bootstrap:
         logging_collector: 'on'
         wal_level: logical
         shared_preload_libraries: 'timescaledb,pgaudit,set_user'
+        session_preload_libraries: 'login_hook'
         set_user.block_log_statement: 'on'
         set_user.exit_on_error: 'on'
         set_user.superuser_allowlist: '+charmed_dba'
@@ -136,6 +137,7 @@ postgresql:
   data_dir: {{ data_path }}
   parameters:
     shared_preload_libraries: 'timescaledb,pgaudit,set_user'
+    session_preload_libraries: 'login_hook'
     set_user.block_log_statement: 'on'
     set_user.exit_on_error: 'on'
     set_user.superuser_allowlist: '+charmed_dba'

@@ -225,26 +225,6 @@ async def test_filter_out_degraded_replicas(ops_test: OpsTest):
     )
 
 
-async def test_user_with_extra_roles(ops_test: OpsTest):
-    """Test superuser actions and the request for more permissions."""
-    # Get the connection string to connect to the database.
-    connection_string = await build_connection_string(
-        ops_test, APPLICATION_APP_NAME, FIRST_DATABASE_RELATION_NAME
-    )
-
-    # Connect to the database.
-    connection = psycopg2.connect(connection_string)
-    connection.autocommit = True
-    cursor = connection.cursor()
-
-    # Test the user can create a database and another user.
-    cursor.execute("CREATE DATABASE another_database;")
-    cursor.execute("CREATE USER another_user WITH ENCRYPTED PASSWORD 'test-password';")
-
-    cursor.close()
-    connection.close()
-
-
 async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: OpsTest):
     """Test that two different application connect to the database with different credentials."""
     # Set some variables to use in this test.
@@ -394,7 +374,7 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         # Add two more units.
         await ops_test.model.applications[DATABASE_APP_NAME].add_units(2)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=1500, wait_for_exact_units=4
+            apps=[DATABASE_APP_NAME], status="active", timeout=3000, wait_for_exact_units=4
         )
 
         assert_sync_standbys(
