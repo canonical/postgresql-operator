@@ -669,7 +669,7 @@ def test_on_start(harness):
         # Then test the event of a correct cluster bootstrapping.
         _restart_services_after_reboot.reset_mock()
         harness.charm.on.start.emit()
-        assert _postgresql.create_user.call_count == 4  # Considering the previous failed call.
+        assert _postgresql.create_user.call_count == 3  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
