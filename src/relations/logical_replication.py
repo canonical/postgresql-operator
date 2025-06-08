@@ -212,9 +212,7 @@ class PostgreSQLLogicalReplication(Object):
         secret_content = self.model.get_secret(
             id=event.relation.data[event.app]["secret-id"]
         ).get_content(refresh=True)
-        subscriptions = json.loads(
-            self.charm.app_peer_data.get("logical-replication-subscriptions", "{}")
-        )
+        subscriptions = self._subscriptions_info()
         publications = json.loads(event.relation.data[event.app].get("publications", "{}"))
 
         for database, publication in publications.items():
@@ -247,7 +245,9 @@ class PostgreSQLLogicalReplication(Object):
             logger.info(f"Dropped redundant subscription {subscription} from database {database}")
             del subscriptions[database]
 
-        self.charm.app_peer_data["logical-replication-subscriptions"] = json.dumps(subscriptions)
+        self.charm.app_peer_data["logical-replication-subscriptions"] = json.dumps({
+            str(event.relation.id): subscriptions
+        })
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         if event.departing_unit == self.charm.unit and self.charm._peers is not None:
@@ -269,13 +269,10 @@ class PostgreSQLLogicalReplication(Object):
             event.defer()
             return
 
-        subscriptions = json.loads(
-            self.charm.app_peer_data.get("logical-replication-subscriptions", "{}")
-        )
-        for database, subscription in subscriptions.items():
+        for database, subscription in self._subscriptions_info().items():
             self.charm.postgresql.drop_subscription(database, subscription)
             logger.info(
-                f"Dropped subscription {subscriptions} from database {database} due to relation break"
+                f"Dropped subscription {subscription} from database {database} due to relation break"
             )
         self.charm.app_peer_data["logical-replication-subscriptions"] = ""
 
@@ -323,10 +320,7 @@ class PostgreSQLLogicalReplication(Object):
             secret_content = self.model.get_secret(
                 id=relation.data[relation.app]["secret-id"], label=SECRET_LABEL
             ).get_content(refresh=True)
-            subscriptions = json.loads(
-                self.charm.app_peer_data.get("logical-replication-subscriptions", "{}")
-            )
-            for database, subscription in subscriptions.items():
+            for database, subscription in self._subscriptions_info().items():
                 self.charm.postgresql.update_subscription(
                     database,
                     subscription,
@@ -397,9 +391,7 @@ class PostgreSQLLogicalReplication(Object):
         subscription_request_config = json.loads(
             self.charm.config.logical_replication_subscription_request or "{}"
         )
-        subscriptions = json.loads(
-            self.charm.app_peer_data.get("logical-replication-subscriptions", "{}")
-        )
+        subscriptions = self._subscriptions_info()
         relation.data[self.model.app]["subscription-request"] = (
             self.charm.config.logical_replication_subscription_request
         )
@@ -409,7 +401,9 @@ class PostgreSQLLogicalReplication(Object):
             self.charm.postgresql.drop_subscription(database, subscription)
             logger.info(f"Dropped redundant subscription {subscription} from database {database}")
             del subscriptions[database]
-        self.charm.app_peer_data["logical-replication-subscriptions"] = json.dumps(subscriptions)
+        self.charm.app_peer_data["logical-replication-subscriptions"] = json.dumps({
+            str(relation.id): subscriptions
+        })
 
     def _validate_subscription_request(self) -> bool:
         try:
@@ -619,6 +613,13 @@ class PostgreSQLLogicalReplication(Object):
         self.charm.app_peer_data["logical-replication-published-resources"] = json.dumps(
             published_resources
         )
+
+    def _subscriptions_info(self) -> dict[str, str]:
+        for subscriptions_info in json.loads(
+            self.charm.app_peer_data.get("logical-replication-subscriptions", "{}")
+        ).values():
+            return subscriptions_info
+        return {}
 
     def _create_user(self, relation_id: int) -> tuple[str, str]:
         user = f"logical-replication-relation-{relation_id}"
