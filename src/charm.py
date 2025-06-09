@@ -2165,7 +2165,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     user, current_host=self.is_connectivity_enabled
                 )
             )
-            # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
+            # Add "landscape" superuser by default to the list when the "db-admin" relation is present
+            # or when the "database" relation has "extra-user-roles" set to "SUPERUSER" (which may mean
+            # that PgBouncer is related to the database and there is the possibility that Landscape
+            # is related to it).
             if any(
                 True
                 for relation in self.client_relations
