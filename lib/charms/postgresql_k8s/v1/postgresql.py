@@ -331,12 +331,9 @@ class PostgreSQL:
         connection = None
         try:
             for database in ["postgres", "template1"]:
-                with (
-                    self._connect_to_database(
-                        database=database,
-                    ) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database=database,
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS set_user;"))
         finally:
             if connection is not None:
@@ -421,10 +418,9 @@ class PostgreSQL:
             # Existing objects need to be reassigned in each database
             # before the user can be deleted.
             for database in databases:
-                with (
-                    self._connect_to_database(database) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(
                         SQL("REASSIGN OWNED BY {} TO {};").format(
                             Identifier(user), Identifier(self.user)
@@ -515,10 +511,9 @@ class PostgreSQL:
 
             # Enable/disabled the extension in each database.
             for database in databases:
-                with (
-                    self._connect_to_database(database=database) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
                     for extension, enable in ordered_extensions.items():
                         cursor.execute(
                             f"CREATE EXTENSION IF NOT EXISTS {extension};"
@@ -562,10 +557,9 @@ class PostgreSQL:
         Returns:
             Set of PostgreSQL text search configs.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT CONCAT('pg_catalog.', cfgname) FROM pg_ts_config;")
             text_search_configs = cursor.fetchall()
             return {text_search_config[0] for text_search_config in text_search_configs}
@@ -576,10 +570,9 @@ class PostgreSQL:
         Returns:
             Set of PostgreSQL timezones.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT name FROM pg_timezone_names;")
             timezones = cursor.fetchall()
             return {timezone[0] for timezone in timezones}
@@ -590,10 +583,9 @@ class PostgreSQL:
         Returns:
             Set of PostgreSQL table access methods.
         """
-        with (
-            self._connect_to_database(database_host=self.current_host) as connection,
-            connection.cursor() as cursor,
-        ):
+        with self._connect_to_database(
+            database_host=self.current_host
+        ) as connection, connection.cursor() as cursor:
             cursor.execute("SELECT amname FROM pg_am WHERE amtype = 't';")
             access_methods = cursor.fetchall()
             return {access_method[0] for access_method in access_methods}
@@ -606,10 +598,9 @@ class PostgreSQL:
         """
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT version();")
                 # Split to get only the version number.
                 return cursor.fetchone()[0].split(" ")[1]
@@ -628,12 +619,9 @@ class PostgreSQL:
             whether TLS is enabled.
         """
         try:
-            with (
-                self._connect_to_database(
-                    database_host=self.current_host if check_current_host else None
-                ) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=self.current_host if check_current_host else None
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute("SHOW ssl;")
                 return "on" in cursor.fetchone()[0]
         except psycopg2.Error:
@@ -653,10 +641,9 @@ class PostgreSQL:
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT groname FROM pg_catalog.pg_group WHERE groname LIKE '%_access';"
                 )
@@ -684,10 +671,9 @@ class PostgreSQL:
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     SQL(
                         "SELECT TRUE FROM pg_catalog.pg_user WHERE usename = {} AND usesuper;"
@@ -723,10 +709,9 @@ class PostgreSQL:
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 if group:
                     query = SQL(
                         "SELECT usename FROM (SELECT UNNEST(grolist) AS user_id FROM pg_catalog.pg_group WHERE groname = {}) AS g JOIN pg_catalog.pg_user AS u ON g.user_id = u.usesysid;"
@@ -756,10 +741,9 @@ class PostgreSQL:
         connection = None
         host = self.current_host if current_host else None
         try:
-            with (
-                self._connect_to_database(database_host=host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT usename "
                     "FROM pg_catalog.pg_user "
@@ -795,15 +779,23 @@ class PostgreSQL:
         connection = None
         cursor = None
         try:
-            with (
-                self._connect_to_database(database="template1") as connection,
-                connection.cursor() as cursor,
-            ):
-                if temp_location is not None:
-                    cursor.execute("SELECT TRUE FROM pg_tablespace WHERE spcname='temp';")
-                    if cursor.fetchone() is None:
-                        cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
-                        cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+            connection = self._connect_to_database()
+            cursor = connection.cursor()
+
+            if temp_location is not None:
+                cursor.execute("SELECT TRUE FROM pg_tablespace WHERE spcname='temp';")
+                if cursor.fetchone() is None:
+                    cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
+                    cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
+
+            cursor.close()
+            cursor = None
+            connection.close()
+            connection = None
+
+            with self._connect_to_database(
+                database="template1"
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';"
                 )
@@ -890,6 +882,10 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
     WHEN TAG IN ('DROP SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
                     """)
+
+            connection.close()
+            connection = None
+
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
                 cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
@@ -956,12 +952,9 @@ END;
 $$ LANGUAGE plpgsql;"""
         try:
             for database in ["postgres", "template1"]:
-                with (
-                    self._connect_to_database(
-                        database=database,
-                    ) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database=database,
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
                     cursor.execute(SQL("CREATE SCHEMA IF NOT EXISTS login_hook;"))
                     cursor.execute(SQL(function_creation_statement))
@@ -1041,10 +1034,9 @@ END;
 $$ LANGUAGE plpgsql security definer;"""
         try:
             for database in ["postgres", "template1"]:
-                with (
-                    self._connect_to_database(database=database) as connection,
-                    connection.cursor() as cursor,
-                ):
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
                     cursor.execute(SQL(function_creation_statement))
                     cursor.execute(
                         SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
@@ -1073,10 +1065,9 @@ $$ LANGUAGE plpgsql security definer;"""
         """
         connection = None
         try:
-            with (
-                self._connect_to_database(database_host=database_host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=database_host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
@@ -1213,10 +1204,9 @@ $$ LANGUAGE plpgsql security definer;"""
             Whether the date style is valid.
         """
         try:
-            with (
-                self._connect_to_database(database_host=self.current_host) as connection,
-                connection.cursor() as cursor,
-            ):
+            with self._connect_to_database(
+                database_host=self.current_host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     SQL(
                         "SET DateStyle to {};",
