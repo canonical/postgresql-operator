@@ -2166,7 +2166,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 )
             )
             # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
-            if any(True for relation in self.client_relations if relation.name == "db-admin"):
+            if any(
+                True
+                for relation in self.client_relations
+                if relation.name == "db-admin"  # Possibly Landscape relation.
+                or (
+                    relation.name == "database"
+                    and relation.data[relation.app].get("extra-user-roles") == "SUPERUSER"
+                )  # PgBouncer (which may me related to Landscape).
+            ):
                 user_database_map["landscape"] = "all"
         if self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled) != set(
             ACCESS_GROUPS
