@@ -19,13 +19,13 @@ juju add-model <model name>
 
 Then, either continue with the `juju` client **or** use the `terraform juju` client to deploy the PostgreSQL charm.
 
-**To deploy with the `juju` client:**
+To deploy with the `juju` client:
 ```shell
 juju deploy postgresql -n <number_of_replicas>
 ```
 > See also: [`juju deploy` command](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/deploy/)
 
-**To deploy with `terraform juju`**, follow the guide [How to deploy using Terraform].
+To deploy with `terraform juju`, follow the guide [How to deploy using Terraform].
 > See also: [Terraform Provider for Juju documentation](https://canonical-terraform-provider-juju.readthedocs-hosted.com/en/latest/)
 
 If you are not sure where to start or would like a more guided walkthrough for setting up your environment, see the [Charmed PostgreSQL tutorial][Tutorial].
@@ -41,19 +41,16 @@ The guides below go through the steps to install different cloud services and bo
 
 [How to deploy on multiple availability zones (AZ)] demonstrates how to deploy a cluster on a cloud using different AZs for high availability.
 
-## Special deployment scenarios
+## Special deployments
 
-These guides cover some specific deployment scenarios and configurations.
+These guides cover some specific deployment scenarios and architectures.
 
-### Networking
-
+### External TLS access 
 [How to deploy for external TLS VIP access] goes over an example deployment of PostgreSQL, PgBouncer and HAcluster that require external TLS/SSL access via [Virtual IP (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address).
 
 See also:
 * [How to enable TLS]
 * [How to connect from outside the local network]
-
-[How to deploy on juju spaces] goes over how to configure your deployment of PostgreSQL and client application to use juju spaces to separate network traffic.
 
 ### Airgapped
 [How to deploy in an offline or air-gapped environment] goes over the special configuration steps for installing PostgreSQL in an airgapped environment via CharmHub and the Snap Store Proxy.
@@ -62,11 +59,6 @@ See also:
 Cluster-cluster, cross-regional, or multi-server asynchronous replication focuses on disaster recovery by distributing data across different servers. 
 
 The [Cross-regional async replication] guide goes through the steps to set up clusters for cluster-cluster replication, integrate with a client, and remove or recover a failed cluster.
-
-### Juju storage
-Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilize data volume provided by different clouds while keeping the same UI/UX for end users.
-
-See: [How to deploy on juju storage]
 
 ---
 
@@ -86,8 +78,6 @@ See: [How to deploy on juju storage]
 [How to deploy for external TLS VIP access]: /t/16576
 [How to enable TLS]: /t/9685
 [How to connect from outside the local network]: /t/15802
-[How to deploy on juju spaces]: /t/17416
 
 [How to deploy in an offline or air-gapped environment]: /t/15746
 [Cross-regional async replication]: /t/15412
-[How to deploy on juju storage]: /t/17529

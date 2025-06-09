@@ -836,7 +836,7 @@ END; $$;"""
                     "SELECT usename "
                     "FROM pg_catalog.pg_user "
                     "WHERE usename LIKE 'relation_id_%' OR usename LIKE 'relation-%' "
-                    "OR usename LIKE 'pgbouncer_auth_relation_id_%' OR usename LIKE '%_user_%_%';"
+                    "OR usename LIKE 'pgbouncer_auth_relation_%' OR usename LIKE '%_user_%_%';"
                 )
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
@@ -918,7 +918,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                   END IF;
                 END LOOP;
                 -- Remove users that don't exist anymore from the pg_hba file.
-                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
+                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
                 LOOP
                   DELETE FROM pg_hba WHERE lines = rec.lines;
                   changes := changes + 1;
@@ -949,11 +949,12 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
                 cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
-                for user in self.system_users:Add commentMore actions
+                for user in self.system_users:
                     cursor.execute(
                         SQL("GRANT ALL PRIVILEGES ON DATABASE postgres TO {};").format(
                             Identifier(user)
                         )
+                    )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up databases: {e}")
             raise PostgreSQLDatabasesSetupError() from e

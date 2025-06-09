@@ -62,7 +62,7 @@ juju run -m rome db1/leader create-replication
 To switchover and use `lisbon` as the primary instead, run
 
 ```shell
-juju run -m lisbon db2/leader promote-to-primary scope=cluster
+juju run -m lisbon db2/leader promote-to-primary
 ```
 
 ## Scale a cluster
