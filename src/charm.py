@@ -2157,12 +2157,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.is_cluster_initialised or not self._patroni.member_started:
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
-        for user in self.postgresql.list_users_from_relation(
-            current_host=self.is_connectivity_enabled
+        for user in sorted(
+            self.postgresql.list_users_from_relation(current_host=self.is_connectivity_enabled)
         ):
             user_database_map[user] = ",".join(
-                self.postgresql.list_accessible_databases_for_user(
-                    user, current_host=self.is_connectivity_enabled
+                sorted(
+                    self.postgresql.list_accessible_databases_for_user(
+                        user, current_host=self.is_connectivity_enabled
+                    )
                 )
             )
             # Add "landscape" superuser by default to the list when the "db-admin" relation is present
