@@ -801,6 +801,9 @@ class PostgreSQL:
             ):
                 if temp_location is not None:
                     cursor.execute("SELECT TRUE FROM pg_tablespace WHERE spcname='temp';")
+                    if cursor.fetchone() is None:
+                        cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
+                        cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
                 cursor.execute(
                     "SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';"
                 )
