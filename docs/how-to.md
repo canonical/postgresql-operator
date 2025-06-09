@@ -17,10 +17,6 @@ Specific deployment scenarios and architectures:
 * [Terraform]
 * [Air-gapped]
 * [TLS VIP access]
-* [Juju spaces]
-* [Air-gapped]
-* [Terraform]
-* [Juju storage]
 
 ## Usage and maintenance
 
@@ -29,7 +25,6 @@ Specific deployment scenarios and architectures:
 * [Scale replicas]
 * [Enable TLS]
 * [Enable plugins/extensions]
-* [Switchover/failover]
 
 ## Backup and restore
 * [Configure S3 AWS]
@@ -41,10 +36,9 @@ Specific deployment scenarios and architectures:
 
 ## Monitoring (COS)
 
-* [Enable monitoring] with Grafana
-* [Enable alert rules] with Prometheus
-* [Enable tracing] with Tempo
-* [Enable profiling] with Parca
+* [Enable monitoring]
+* [Enable alert rules]
+* [Enable tracing]
 
 ## Minor upgrades
 * [Perform a minor upgrade]
@@ -75,17 +69,13 @@ This section is for charm developers looking to support PostgreSQL integrations 
 [GCE]: /t/15722
 [Azure]: /t/15733
 [Multi-AZ]: /t/15749
-[Juju spaces]: /t/17416
 [Terraform]: /t/14916
 [Air-gapped]: /t/15746
 [TLS VIP access]: /t/16576
-[Juju storage]: /t/17529
-
 [Integrate with another application]: /t/9687
 [External access]: /t/15802
 [Scale replicas]: /t/9689
 [Enable TLS]: /t/9685
-[Switchover/failover]: /t/17523
 
 [Configure S3 AWS]: /t/9681
 [Configure S3 RadosGW]: /t/10313
@@ -97,8 +87,7 @@ This section is for charm developers looking to support PostgreSQL integrations 
 [Enable monitoring]: /t/10600
 [Enable alert rules]: /t/13084
 [Enable tracing]: /t/14521
-[Enable profiling]: /t/17172
-
+ 
 [Perform a minor upgrade]: /t/12089
 [Perform a minor rollback]: /t/12090
 
