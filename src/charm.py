@@ -1545,15 +1545,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
 
         # Safeguard against starting while refreshing.
-        # if self.refresh is None:
-        #     logger.debug("Defer on_start: Refresh could be in progress")
-        #     event.defer()
-        #     return False
-        # if self.refresh.in_progress:
-        #     # TODO: we should probably start workload if scale up while refresh in progress
-        #     logger.debug("Defer on_start: Refresh in progress")
-        #     event.defer()
-        #     return False
+        if self.refresh is None:
+            logger.debug("Defer on_start: Refresh could be in progress")
+            event.defer()
+            return False
+        if self.refresh.in_progress:
+            # TODO: we should probably start workload if scale up while refresh in progress
+            logger.debug("Defer on_start: Refresh in progress")
+            event.defer()
+            return False
 
         # Doesn't try to bootstrap the cluster if it's in a blocked state
         # caused, for example, because a failed installation of packages.
