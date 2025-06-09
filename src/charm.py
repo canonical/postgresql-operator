@@ -2178,7 +2178,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 or (
                     relation.name == "database"
                     and relation.data[relation.app].get("extra-user-roles") == "SUPERUSER"
-                )  # PgBouncer (which may me related to Landscape).
+                )  # PgBouncer (which may be related to Landscape).
             ):
                 user_database_map["landscape"] = "all"
         if self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled) != set(
