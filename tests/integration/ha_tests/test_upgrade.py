@@ -33,17 +33,11 @@ TIMEOUT = 30 * 60
 @pytest.mark.abort_on_fail
 async def test_deploy_latest(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    await ops_test.juju(
-        "deploy",
+    await ops_test.model.deploy(
         DATABASE_APP_NAME,
-        "-n",
-        3,
-        "--channel",
-        "16/edge",
-        "--config",
-        "profile=testing",
-        "--base",
-        "ubuntu@24.04",
+        num_units=3,
+        channel="16/edge",
+        config={"profile": "testing"},
     )
     await ops_test.model.deploy(
         APPLICATION_NAME,
