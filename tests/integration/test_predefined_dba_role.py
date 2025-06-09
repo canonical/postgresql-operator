@@ -76,6 +76,9 @@ async def test_charmed_dba_role(ops_test: OpsTest):
         try:
             with connection.cursor() as cursor:
                 instance = "primary" if read_write_endpoint else "replica"
+                logger.info(f"Resetting the user to the {username} user in the {instance}")
+                cursor.execute("RESET ROLE;")
+                check_connected_user(cursor, username, username, primary=read_write_endpoint)
                 logger.info(f"Testing escalation to the rewind user in the {instance}")
                 cursor.execute("SELECT set_user('rewind'::TEXT);")
                 check_connected_user(cursor, username, "rewind", primary=read_write_endpoint)
