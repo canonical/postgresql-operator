@@ -105,6 +105,7 @@ async def test_charmed_read_role(ops_test: OpsTest):
         connection.autocommit = True
 
         with connection.cursor() as cursor:
+            logger.info("Checking that the charmed_read role can read from the database")
             cursor.execute("RESET ROLE;")
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%' AND table_type <> 'VIEW';"
@@ -117,6 +118,10 @@ async def test_charmed_read_role(ops_test: OpsTest):
             assert data == sorted(["test_data", "test_data_2"]), (
                 "Unexpected data in charmed_read_database with charmed_read role"
             )
+            logger.info("Checking that the charmed_read role cannot write to the database")
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+    connection.close()
 
     await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
         f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
