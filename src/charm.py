@@ -1735,8 +1735,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
-            if "postgres" not in users:
-                self.postgresql.create_user("postgres", new_password(), admin=True)
             # Create the backup user.
             if BACKUP_USER not in users:
                 self.postgresql.create_user(

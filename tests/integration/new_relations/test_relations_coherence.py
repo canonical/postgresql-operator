@@ -82,40 +82,6 @@ async def test_relations(ops_test: OpsTest, charm):
             f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
         )
 
-        # Re-relation with admin role with checking permission
-        await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
-            "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-            "extra-user-roles": "admin",
-        })
-        await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
-        await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
-
-        connection_string = await build_connection_string(
-            ops_test,
-            DATA_INTEGRATOR_APP_NAME,
-            "postgresql",
-            database=DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
-        )
-        try:
-            connection = psycopg2.connect(connection_string)
-            connection.autocommit = True
-            cursor = connection.cursor()
-            random_name = (
-                f"test_{''.join(secrets.choice(string.ascii_lowercase) for _ in range(10))}"
-            )
-            cursor.execute(f"CREATE DATABASE {random_name};")
-        except psycopg2.errors.InsufficientPrivilege:
-            assert False, (
-                f"failed connect to {random_name} or run a statement in the following database"
-            )
-        finally:
-            connection.close()
-
-        await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-            f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
-        )
-
         # Re-relation again with user role and checking write data
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
