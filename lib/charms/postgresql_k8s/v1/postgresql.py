@@ -1246,3 +1246,21 @@ $$ LANGUAGE plpgsql security definer;"""
                     return False
 
         return True
+
+    def is_user_in_hba(self, username: str) -> bool:
+        """Check if user was added in pg_hba."""
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL(
+                        "SELECT COUNT(*) FROM pg_hba_file_rules WHERE {} = ANY(user_name);"
+                    ).format(Literal(username))
+                )
+                return cursor.fetchone()[0] > 0
+        except psycopg2.Error as e:
+            logger.debug(f"Failed to check pg_hba: {e}")
+            return False
+        finally:
+            if connection:
+                connection.close()
