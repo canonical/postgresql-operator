@@ -24,6 +24,7 @@ from charms.postgresql_k8s.v1.postgresql import (
 from ops.charm import RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ALL_CLIENT_RELATIONS,
@@ -153,7 +154,17 @@ class PostgreSQLProvider(Object):
                     else f"Failed to initialize relation {self.relation_name}"
                 )
             )
-        self.charm.unit_peer_data.update({"pg_hba_needs_update_timestamp": str(datetime.now())})
+
+        # Try to wait for pg_hba trigger
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
+                with attempt:
+                    self.charm.postgresql.is_user_in_hba(user)
+            self.charm.unit_peer_data.update({
+                "pg_hba_needs_update_timestamp": str(datetime.now())
+            })
+        except RetryError:
+            logger.warning("database requested: Unable to check pg_hba rule update")
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         # Check for some conditions before trying to access the PostgreSQL instance.
