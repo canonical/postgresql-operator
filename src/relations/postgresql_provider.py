@@ -5,6 +5,7 @@
 
 import logging
 import typing
+from datetime import datetime
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -152,6 +153,7 @@ class PostgreSQLProvider(Object):
                     else f"Failed to initialize relation {self.relation_name}"
                 )
             )
+        self.charm.unit_peer_data.update({"pg_hba_needs_update_timestamp": str(datetime.now())})
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         # Check for some conditions before trying to access the PostgreSQL instance.
