@@ -530,37 +530,31 @@ async def test_scaling(
     await are_writes_increasing(ops_test)
 
     async with ops_test.fast_forward(FAST_INTERVAL), fast_forward(second_model, FAST_INTERVAL):
-        logger.info("scaling out the first cluster")
+        logger.info("scaling out the clusters")
         first_cluster_original_size = len(
             first_model.applications[DATABASE_APP_NAME].units, timeout=2500
         )
-        await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1)
-
-        logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, extra_model=second_model)
-
-        logger.info("scaling out the second cluster")
         second_cluster_original_size = len(second_model.applications[DATABASE_APP_NAME].units)
-        await scale_application(
-            ops_test,
-            DATABASE_APP_NAME,
-            second_cluster_original_size + 1,
-            model=second_model,
-            timeout=2500,
+        await gather(
+            scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1),
+            scale_application(
+                ops_test,
+                DATABASE_APP_NAME,
+                second_cluster_original_size + 1,
+                model=second_model,
+                timeout=2500,
+            ),
         )
 
         logger.info("checking whether writes are increasing")
         await are_writes_increasing(ops_test, extra_model=second_model)
 
-        logger.info("scaling in the first cluster")
-        await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size)
-
-        logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, extra_model=second_model)
-
-        logger.info("scaling in the second cluster")
-        await scale_application(
-            ops_test, DATABASE_APP_NAME, second_cluster_original_size, model=second_model
+        logger.info("scaling in the clusters")
+        await gather(
+            scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size),
+            scale_application(
+                ops_test, DATABASE_APP_NAME, second_cluster_original_size, model=second_model
+            ),
         )
 
         logger.info("checking whether writes are increasing")
