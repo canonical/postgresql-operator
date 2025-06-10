@@ -2157,16 +2157,29 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.is_cluster_initialised or not self._patroni.member_started:
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
-        for user in self.postgresql.list_users_from_relation(
-            current_host=self.is_connectivity_enabled
+        for user in sorted(
+            self.postgresql.list_users_from_relation(current_host=self.is_connectivity_enabled)
         ):
             user_database_map[user] = ",".join(
-                self.postgresql.list_accessible_databases_for_user(
-                    user, current_host=self.is_connectivity_enabled
+                sorted(
+                    self.postgresql.list_accessible_databases_for_user(
+                        user, current_host=self.is_connectivity_enabled
+                    )
                 )
             )
-            # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
-            if any(True for relation in self.client_relations if relation.name == "db-admin"):
+            # Add "landscape" superuser by default to the list when the "db-admin" relation is present
+            # or when the "database" relation has "extra-user-roles" set to "SUPERUSER" (which may mean
+            # that PgBouncer is related to the database and there is the possibility that Landscape
+            # is related to it).
+            if any(
+                True
+                for relation in self.client_relations
+                if relation.name == "db-admin"  # Possibly Landscape relation.
+                or (
+                    relation.name == "database"
+                    and relation.data[relation.app].get("extra-user-roles") == "SUPERUSER"
+                )  # PgBouncer (which may be related to Landscape).
+            ):
                 user_database_map["landscape"] = "all"
         if self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled) != set(
             ACCESS_GROUPS
