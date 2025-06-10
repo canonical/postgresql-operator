@@ -531,7 +531,9 @@ async def test_scaling(
 
     async with ops_test.fast_forward(FAST_INTERVAL), fast_forward(second_model, FAST_INTERVAL):
         logger.info("scaling out the first cluster")
-        first_cluster_original_size = len(first_model.applications[DATABASE_APP_NAME].units)
+        first_cluster_original_size = len(
+            first_model.applications[DATABASE_APP_NAME].units, timeout=2500
+        )
         await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1)
 
         logger.info("checking whether writes are increasing")
@@ -540,7 +542,11 @@ async def test_scaling(
         logger.info("scaling out the second cluster")
         second_cluster_original_size = len(second_model.applications[DATABASE_APP_NAME].units)
         await scale_application(
-            ops_test, DATABASE_APP_NAME, second_cluster_original_size + 1, model=second_model
+            ops_test,
+            DATABASE_APP_NAME,
+            second_cluster_original_size + 1,
+            model=second_model,
+            timeout=2500,
         )
 
         logger.info("checking whether writes are increasing")
