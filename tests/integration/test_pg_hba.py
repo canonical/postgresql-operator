@@ -76,6 +76,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
             connection.autocommit = True
             with connection.cursor() as cursor:
                 logger.info("Dropping database objects from the previous test run (if any)")
+                cursor.execute("RESET ROLE;")
                 cursor.execute(f"DROP USER IF EXISTS {FIRST_RELATION_USER};")
                 cursor.execute(
                     f"SELECT datname FROM pg_database WHERE datname='{SECOND_DATABASE}';"
