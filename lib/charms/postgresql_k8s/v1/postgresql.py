@@ -160,6 +160,7 @@ class PostgreSQL:
             connection = self._connect_to_database()
             connection.autocommit = True
             with connection.cursor() as cursor:
+                cursor.execute("RESET ROLE;")
                 if enable:
                     cursor.execute("ALTER SYSTEM SET pgaudit.log = 'ROLE,DDL,MISC,MISC_SET';")
                     cursor.execute("ALTER SYSTEM SET pgaudit.log_client TO off;")
@@ -304,6 +305,7 @@ class PostgreSQL:
                     user_definition += " CREATEDB"
                 if privileges:
                     user_definition += f" {' '.join(privileges)}"
+                cursor.execute(SQL("RESET ROLE;"))
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(SQL(f"{user_definition};").format(Identifier(user)))
