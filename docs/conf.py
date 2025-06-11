@@ -193,7 +193,7 @@ html_theme_options = {
 # NOTE: If undefined, set to None, or empty,
 #       the sphinx_reredirects extension will be disabled.
 
-redirects = {}
+# redirects = {}
 
 rediraffe_redirects = "redirects.txt"
 
