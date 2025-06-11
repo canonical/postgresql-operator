@@ -170,9 +170,12 @@ class PostgreSQLProvider(Object):
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.is_cluster_initialised:
             logger.debug(
-                "Deferring on_relation_changed: Cluster must be initialized before configuration can be updated with relation users"
+                "Early exit on_relation_changed: Cluster must be initialized before configuration can be updated with relation users"
             )
-            event.defer()
+            return
+
+        if not self.charm._patroni.member_started:
+            logger.debug("Early exit on_relation_changed: Member not started yet")
             return
 
         user = f"relation-{event.relation.id}"
