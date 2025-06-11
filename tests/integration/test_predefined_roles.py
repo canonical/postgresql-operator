@@ -198,6 +198,7 @@ async def test_charmed_dml_role(ops_test: OpsTest):
                 database="charmed_dml_database",
             )
     with connection.cursor() as cursor:
+        connection.autocommit = True
         cursor.execute("INSERT INTO test_table (data) VALUES ('test_data_3');")
     connection.close()
 
