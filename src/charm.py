@@ -276,6 +276,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.on.authorisation_rules_change, self._on_authorisation_rules_change
         )
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
+        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -438,6 +439,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         timestamp = datetime.now()
         self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
         logger.debug(f"authorisation rules changed at {timestamp}")
+
+    def _on_databases_change(self, _):
+        """Handle databases change event."""
+        self.update_config()
+        logger.debug("databases changed")
+        self._on_authorisation_rules_change(None)
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""

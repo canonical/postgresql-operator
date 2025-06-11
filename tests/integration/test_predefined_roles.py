@@ -9,6 +9,7 @@ import psycopg2
 import psycopg2.sql
 import pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .helpers import (
     CHARM_BASE,
@@ -187,16 +188,18 @@ async def test_charmed_dml_role(ops_test: OpsTest):
                 )
             )
 
-    with (
-        db_connect(
-            primary_address,
-            data_integrator_2_password,
-            username=data_integrator_2_user,
-            database="charmed_dml_database",
-        ) as connection,
-        connection.cursor() as cursor,
-    ):
+    connection.close()
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            connection = db_connect(
+                primary_address,
+                data_integrator_2_password,
+                username=data_integrator_2_user,
+                database="charmed_dml_database",
+            )
+    with connection.cursor() as cursor:
         cursor.execute("INSERT INTO test_table (data) VALUES ('test_data_3');")
+    connection.close()
 
     with db_connect(
         primary_address, operator_password, username="operator", database="charmed_dml_database"

@@ -26,6 +26,10 @@ class AuthorisationRulesChangeEvent(EventBase):
     """A custom event for authorisation rules changes."""
 
 
+class DatabasesChangeEvent(EventBase):
+    """A custom event for databases changes."""
+
+
 class ClusterTopologyChangeCharmEvents(CharmEvents):
     """A CharmEvents extension for cluster topology changes.
 
@@ -34,6 +38,7 @@ class ClusterTopologyChangeCharmEvents(CharmEvents):
 
     authorisation_rules_change = EventSource(AuthorisationRulesChangeEvent)
     cluster_topology_change = EventSource(ClusterTopologyChangeEvent)
+    databases_change = EventSource(DatabasesChangeEvent)
 
 
 class ClusterTopologyObserver(Object):
