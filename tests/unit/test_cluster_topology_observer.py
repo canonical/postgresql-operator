@@ -141,6 +141,7 @@ def test_dispatch(harness):
 
 def test_main():
     with (
+        patch("scripts.cluster_topology_observer.check_for_database_changes"),
         patch("scripts.cluster_topology_observer.check_for_authorisation_rules_changes"),
         patch.object(
             sys,
