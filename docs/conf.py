@@ -195,6 +195,7 @@ html_theme_options = {
 
 redirects = {}
 
+rediraffe_redirects = "redirects.txt"
 
 ###########################
 # Link checker exceptions #
@@ -258,6 +259,7 @@ extensions = [
     "sphinxcontrib.cairosvgconverter",
     "sphinx_last_updated_by_git",
     "sphinx.ext.intersphinx",
+    "sphinxext.rediraffe"
 ]
 
 # Excludes files or directories from processing
