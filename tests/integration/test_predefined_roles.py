@@ -127,7 +127,9 @@ async def test_charmed_read_role(ops_test: OpsTest):
         logger.info("Checking that the charmed_read role cannot write to an existing table")
         cursor.execute("RESET ROLE;")
         with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-            cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
+            cursor.execute(
+                "INSERT INTO test_table (data) VALUES ('test_data_3'), ('test_data_4');"
+            )
     connection.close()
 
     await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
