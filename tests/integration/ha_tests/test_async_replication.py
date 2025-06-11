@@ -533,15 +533,12 @@ async def test_scaling(
     first_cluster_original_size = len(first_model.applications[DATABASE_APP_NAME].units)
     second_cluster_original_size = len(second_model.applications[DATABASE_APP_NAME].units)
     await gather(
-        scale_application(
-            ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1, timeout=2500
-        ),
+        scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1),
         scale_application(
             ops_test,
             DATABASE_APP_NAME,
             second_cluster_original_size + 1,
             model=second_model,
-            timeout=2500,
         ),
     )
 
