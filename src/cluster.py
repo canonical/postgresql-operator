@@ -495,6 +495,8 @@ class Patroni:
             True if services is ready False otherwise. Retries over a period of 60 seconds times to
             allow server time to start up.
         """
+        if not self.is_patroni_running():
+            return False
         try:
             response = self.get_patroni_health()
         except RetryError:
@@ -978,6 +980,16 @@ class Patroni:
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+
+    def is_patroni_running(self) -> bool:
+        """Check if the Patroni service is running."""
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            logger.debug(f"Failed to check Patroni service: {e}")
+            return False
 
     def restart_patroni(self) -> bool:
         """Restart Patroni.
