@@ -906,6 +906,7 @@ $$ LANGUAGE plpgsql security definer;"""
             with self._connect_to_database(
                 database_host=database_host
             ) as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("RESET ROLE;"))
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
