@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 55
+LIBPATCH = 56
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -1078,3 +1078,21 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
                     return False
 
         return True
+
+    def is_user_in_hba(self, username: str) -> bool:
+        """Check if user was added in pg_hba."""
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL(
+                        "SELECT COUNT(*) FROM pg_hba_file_rules WHERE {} = ANY(user_name);"
+                    ).format(Literal(username))
+                )
+                return cursor.fetchone()[0] > 0
+        except psycopg2.Error as e:
+            logger.debug(f"Failed to check pg_hba: {e}")
+            return False
+        finally:
+            if connection:
+                connection.close()
