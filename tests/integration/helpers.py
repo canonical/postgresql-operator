@@ -1018,7 +1018,12 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
 
 
 async def scale_application(
-    ops_test: OpsTest, application_name: str, count: int, model: Model = None
+    ops_test: OpsTest,
+    application_name: str,
+    count: int,
+    model: Model = None,
+    timeout=2000,
+    idle_period: int = 30,
 ) -> None:
     """Scale a given application to a specific unit count.
 
@@ -1027,6 +1032,8 @@ async def scale_application(
         application_name: The name of the application
         count: The desired number of units to scale to
         model: The model to scale the application in
+        timeout: timeout period
+        idle_period: idle period
     """
     if model is None:
         model = ops_test.model
@@ -1039,8 +1046,8 @@ async def scale_application(
     await model.wait_for_idle(
         apps=[application_name],
         status="active",
-        timeout=2000,
-        idle_period=30,
+        timeout=timeout,
+        idle_period=idle_period,
         wait_for_exact_units=count,
     )
 
