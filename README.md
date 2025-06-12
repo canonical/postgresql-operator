@@ -1,4 +1,5 @@
 # Charmed PostgreSQL VM Operator
+
 [![CharmHub Badge](https://charmhub.io/postgresql/badge.svg)](https://charmhub.io/postgresql)
 [![Release](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml?query=branch%3Amain)
@@ -131,6 +132,7 @@ juju integrate postgresql <application_name>
 ```
 
 To remove a relation:
+
 ```shell
 juju remove-relation postgresql <application_name>
 ```
@@ -138,6 +140,7 @@ juju remove-relation postgresql <application_name>
 #### Legacy `pgsql` interface
 
 We have also added support for the two database legacy relations from the [original version](https://launchpad.net/postgresql-charm) of the charm via the `pgsql` interface. Please note that these relations will be deprecated.
+
  ```shell
 juju relate postgresql:db mailman3-core
 juju relate postgresql:db-admin landscape-server
