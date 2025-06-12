@@ -2495,22 +2495,30 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.is_cluster_initialised or not self._patroni.member_started:
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
-        for user in self.postgresql.list_users_from_relation(
-            current_host=self.is_connectivity_enabled
-        ):
-            user_database_map[user] = ",".join(
-                self.postgresql.list_accessible_databases_for_user(
-                    user, current_host=self.is_connectivity_enabled
+        try:
+            for user in self.postgresql.list_users_from_relation(
+                current_host=self.is_connectivity_enabled
+            ):
+                user_database_map[user] = ",".join(
+                    self.postgresql.list_accessible_databases_for_user(
+                        user, current_host=self.is_connectivity_enabled
+                    )
                 )
-            )
-            # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
-            if any(True for relation in self.client_relations if relation.name == "db-admin"):
-                user_database_map["landscape"] = "all"
-        if self.postgresql.list_access_groups(current_host=self.is_connectivity_enabled) != set(
-            ACCESS_GROUPS
-        ):
-            user_database_map.update({USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"})
-        return user_database_map
+                # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
+                if any(True for relation in self.client_relations if relation.name == "db-admin"):
+                    user_database_map["landscape"] = "all"
+            if self.postgresql.list_access_groups(
+                current_host=self.is_connectivity_enabled
+            ) != set(ACCESS_GROUPS):
+                user_database_map.update({
+                    USER: "all",
+                    REPLICATION_USER: "all",
+                    REWIND_USER: "all",
+                })
+            return user_database_map
+        except PostgreSQLListUsersError:
+            logger.debug("relations_user_databases_map: Unable to get users")
+            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
