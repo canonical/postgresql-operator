@@ -495,6 +495,8 @@ class Patroni:
             True if services is ready False otherwise. Retries over a period of 60 seconds times to
             allow server time to start up.
         """
+        if not self.is_patroni_running():
+            return False
         try:
             response = self.get_patroni_health()
         except RetryError:
@@ -648,6 +650,7 @@ class Patroni:
         restore_to_latest: bool = False,
         parameters: dict[str, str] | None = None,
         no_peers: bool = False,
+        user_databases_map: dict[str, str] | None = None,
     ) -> None:
         """Render the Patroni configuration file.
 
@@ -665,6 +668,7 @@ class Patroni:
             restore_to_latest: restore all the WAL transaction logs from the stanza.
             parameters: PostgreSQL parameters to be added to the postgresql.conf file.
             no_peers: Don't include peers.
+            user_databases_map: map of databases to be accessible by each user.
         """
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
@@ -713,6 +717,7 @@ class Patroni:
             raft_password=self.raft_password,
             ldap_parameters=self._dict_to_hba_string(ldap_params),
             patroni_password=self.patroni_password,
+            user_databases_map=user_databases_map,
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
@@ -975,6 +980,16 @@ class Patroni:
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+
+    def is_patroni_running(self) -> bool:
+        """Check if the Patroni service is running."""
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            logger.debug(f"Failed to check Patroni service: {e}")
+            return False
 
     def restart_patroni(self) -> bool:
         """Restart Patroni.

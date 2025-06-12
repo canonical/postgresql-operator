@@ -95,6 +95,7 @@ def request_database(_harness):
 
 def test_on_database_requested(harness):
     with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.PostgreSQLProvider.update_endpoints") as _update_endpoints,
