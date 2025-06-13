@@ -165,14 +165,19 @@ postgresql:
     - local all operator scram-sha-256
     - local all monitoring password
     {%- if not connectivity %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} md5
+    - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}
     - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 md5
-    - {{ 'hostssl' if enable_tls else 'host' }} all +relation_access 0.0.0.0/0 md5
+    {%- for user, databases in user_databases_map.items() %}
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
+    {%- endfor %}
     {%- else %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 md5
+    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 md5
+    {%- for user, databases in user_databases_map.items() %}
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
+    {%- endfor %}
     {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
     # Allow replications connections from other cluster members.
