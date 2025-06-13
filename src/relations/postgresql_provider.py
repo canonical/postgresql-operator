@@ -4,6 +4,7 @@
 """Postgres client relation hooks & helpers."""
 
 import logging
+from datetime import datetime
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -22,6 +23,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.charm import CharmBase, RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ALL_CLIENT_RELATIONS,
@@ -65,9 +67,6 @@ class PostgreSQLProvider(Object):
         self.database_provides = DatabaseProvides(self.charm, relation_name=self.relation_name)
         self.framework.observe(
             self.database_provides.on.database_requested, self._on_database_requested
-        )
-        self.framework.observe(
-            charm.on[self.relation_name].relation_changed, self._on_relation_changed
         )
 
     @staticmethod
@@ -145,27 +144,16 @@ class PostgreSQLProvider(Object):
                 else f"Failed to initialize {self.relation_name} relation"
             )
 
-    def _on_relation_changed(self, event: RelationChangedEvent) -> None:
-        # Check for some conditions before trying to access the PostgreSQL instance.
-        if not self.charm.is_cluster_initialised:
-            logger.debug(
-                "Deferring on_relation_changed: Cluster must be initialized before configuration can be updated with relation users"
-            )
-            event.defer()
-            return
-
-        user = f"relation-{event.relation.id}"
+        # Try to wait for pg_hba trigger
         try:
-            if user not in self.charm.postgresql.list_users():
-                logger.debug("Deferring on_relation_changed: user was not created yet")
-                event.defer()
-                return
-        except PostgreSQLListUsersError:
-            logger.debug("Deferring on_relation_changed: failed to list users")
-            event.defer()
-            return
-
-        self.charm.update_config()
+            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
+                with attempt:
+                    self.charm.postgresql.is_user_in_hba(user)
+            self.charm.unit_peer_data.update({
+                "pg_hba_needs_update_timestamp": str(datetime.now())
+            })
+        except RetryError:
+            logger.warning("database requested: Unable to check pg_hba rule update")
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Correctly update the status."""
