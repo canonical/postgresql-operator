@@ -11,6 +11,7 @@ import pytest
 PG_NAME = "postgresql"
 APP_NAME = "postgresql-test-app"
 ISOLATED_APP_NAME = "isolated-app"
+SLEEP_TIME = 20
 TIMEOUT = 60 * 15
 
 
@@ -50,10 +51,10 @@ def test_integrate_with_spaces(juju: jubilant.Juju):
     # Relate the database to the application
     juju.integrate(PG_NAME, f"{APP_NAME}:database")
 
-    sleep(10)
+    sleep(SLEEP_TIME)
     # Wait for the relation to be established
     logger.info("Waiting for relation to be established")
-    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=10)
+    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=SLEEP_TIME)
 
     status = juju.status()
 
@@ -64,7 +65,7 @@ def test_integrate_with_spaces(juju: jubilant.Juju):
     juju.exec("sudo ip route flush default", unit=unit)
     logger.info(f"Check for continuous writes on {unit=}")
     juju.run(unit, "start-continuous-writes")
-    sleep(10)
+    sleep(SLEEP_TIME)
     task = juju.run(unit, "show-continuous-writes")
 
     assert task.status == "completed", "Show continuous writes failed"
@@ -85,9 +86,9 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
 
     # Relate the database to the application
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")
-    sleep(10)
+    sleep(SLEEP_TIME)
     # Wait for the relation to be established
-    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=10)
+    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=SLEEP_TIME)
 
     status = juju.status()
     unit = next(iter(status.apps[ISOLATED_APP_NAME].units))
