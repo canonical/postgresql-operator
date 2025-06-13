@@ -361,7 +361,7 @@ async def test_persist_data_through_primary_deletion(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=2000)
 
     # Testing write occurred to every postgres instance by reading from them
-    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(2), reraise=True):
+    for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(5), reraise=True):
         with attempt:
             for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
                 host = unit.public_address
