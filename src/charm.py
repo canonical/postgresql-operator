@@ -101,7 +101,9 @@ from constants import (
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
+    REPLICATION_USER,
     REWIND_PASSWORD_KEY,
+    REWIND_USER,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
@@ -270,7 +272,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
+        self.framework.observe(
+            self.on.authorisation_rules_change, self._on_authorisation_rules_change
+        )
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
+        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -427,6 +433,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.unit.status = self.refresh.unit_status_lower_priority()
             new_refresh_unit_status = self.refresh.unit_status_lower_priority().message
         path.write_text(json.dumps(new_refresh_unit_status))
+
+    def _on_authorisation_rules_change(self, _):
+        """Handle authorisation rules change event."""
+        timestamp = datetime.now()
+        self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
+        logger.debug(f"authorisation rules changed at {timestamp}")
+
+    def _on_databases_change(self, _):
+        """Handle databases change event."""
+        self.update_config()
+        logger.debug("databases changed")
+        self._on_authorisation_rules_change(None)
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -1761,6 +1779,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.postgresql.create_access_groups()
             self.postgresql.grant_internal_access_group_memberships()
 
+        access_groups = self.postgresql.list_access_groups()
+        if access_groups != set(ACCESS_GROUPS):
+            self.postgresql.create_access_groups()
+            self.postgresql.grant_internal_access_group_memberships()
+
         self.postgresql_client_relation.oversee_users()
 
         # Set the flag to enable the replicas to start the Patroni service.
@@ -2329,6 +2352,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
             no_peers=no_peers,
+            user_databases_map=self.relations_user_databases_map,
         )
         if no_peers:
             return True
@@ -2464,6 +2488,37 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def client_relations(self) -> list[Relation]:
         """Return the list of established client relations."""
         return self.model.relations.get("database", [])
+
+    @property
+    def relations_user_databases_map(self) -> dict:
+        """Returns a user->databases map for all relations."""
+        if not self.is_cluster_initialised or not self._patroni.member_started:
+            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
+        user_database_map = {}
+        try:
+            for user in self.postgresql.list_users_from_relation(
+                current_host=self.is_connectivity_enabled
+            ):
+                user_database_map[user] = ",".join(
+                    self.postgresql.list_accessible_databases_for_user(
+                        user, current_host=self.is_connectivity_enabled
+                    )
+                )
+                # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
+                if any(True for relation in self.client_relations if relation.name == "db-admin"):
+                    user_database_map["landscape"] = "all"
+            if self.postgresql.list_access_groups(
+                current_host=self.is_connectivity_enabled
+            ) != set(ACCESS_GROUPS):
+                user_database_map.update({
+                    USER: "all",
+                    REPLICATION_USER: "all",
+                    REWIND_USER: "all",
+                })
+            return user_database_map
+        except PostgreSQLListUsersError:
+            logger.debug("relations_user_databases_map: Unable to get users")
+            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None

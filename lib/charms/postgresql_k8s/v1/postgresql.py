@@ -115,6 +115,10 @@ class PostgreSQLGetPostgreSQLVersionError(Exception):
     """Exception raised when retrieving PostgreSQL version fails."""
 
 
+class PostgreSQLListAccessibleDatabasesForUserError(Exception):
+    """Exception raised when retrieving the accessible databases for a user fails."""
+
+
 class PostgreSQLListGroupsError(Exception):
     """Exception raised when retrieving PostgreSQL groups list fails."""
 
@@ -201,6 +205,11 @@ class PostgreSQL:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 for group in ACCESS_GROUPS:
                     cursor.execute(
+                        SQL("SELECT TRUE FROM pg_roles WHERE rolname={};").format(Literal(group))
+                    )
+                    if cursor.fetchone() is not None:
+                        continue
+                    cursor.execute(
                         SQL("CREATE ROLE {} NOLOGIN;").format(
                             Identifier(group),
                         )
@@ -271,11 +280,7 @@ class PostgreSQL:
             roles = privileges = None
             if extra_user_roles:
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
-                roles = [
-                    role
-                    for role in extra_user_roles
-                    if role in valid_roles
-                ]
+                roles = [role for role in extra_user_roles if role in valid_roles]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
@@ -297,7 +302,9 @@ class PostgreSQL:
                     user_definition = "ALTER ROLE {} "
                 else:
                     user_definition = "CREATE ROLE {} "
-                user_definition += f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
+                user_definition += (
+                    f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
+                )
                 if in_role:
                     user_definition += f" IN ROLE {in_role}"
                 if can_create_database:
@@ -353,7 +360,7 @@ class PostgreSQL:
             ],
             ROLE_DBA: [
                 f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;"
-            ]
+            ],
         }
 
         _, existing_roles = self.list_valid_privileges_and_roles()
@@ -621,15 +628,22 @@ class PostgreSQL:
             # Connection errors happen when PostgreSQL has not started yet.
             return False
 
-    def list_access_groups(self) -> Set[str]:
+    def list_access_groups(self, current_host=False) -> Set[str]:
         """Returns the list of PostgreSQL database access groups.
+
+        Args:
+            current_host: whether to check the current host
+                instead of the primary host.
 
         Returns:
             List of PostgreSQL database access groups.
         """
         connection = None
+        host = self.current_host if current_host else None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT groname FROM pg_catalog.pg_group WHERE groname LIKE '%_access';"
                 )
@@ -642,16 +656,69 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
-    def list_users(self) -> Set[str]:
+    def list_accessible_databases_for_user(self, user: str, current_host=False) -> Set[str]:
+        """Returns the list of accessible databases for a specific user.
+
+        Args:
+            user: the user to check.
+            current_host: whether to check the current host
+                instead of the primary host.
+
+        Returns:
+            List of accessible database (the ones where
+                the user has the CONNECT privilege).
+        """
+        connection = None
+        host = self.current_host if current_host else None
+        try:
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL(
+                        "SELECT TRUE FROM pg_catalog.pg_user WHERE usename = {} AND usesuper;"
+                    ).format(Literal(user))
+                )
+                if cursor.fetchone() is not None:
+                    return {"all"}
+                cursor.execute(
+                    SQL(
+                        "SELECT datname FROM pg_catalog.pg_database WHERE has_database_privilege({}, datname, 'CONNECT') AND NOT datistemplate;"
+                    ).format(Literal(user))
+                )
+                databases = cursor.fetchall()
+                return {database[0] for database in databases}
+        except psycopg2.Error as e:
+            logger.error(f"Failed to list accessible databases for user {user}: {e}")
+            raise PostgreSQLListAccessibleDatabasesForUserError() from e
+        finally:
+            if connection is not None:
+                connection.close()
+
+    def list_users(self, group: Optional[str] = None, current_host=False) -> Set[str]:
         """Returns the list of PostgreSQL database users.
+
+        Args:
+            group: optional group to filter the users.
+            current_host: whether to check the current host
+                instead of the primary host.
 
         Returns:
             List of PostgreSQL database users.
         """
         connection = None
+        host = self.current_host if current_host else None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT usename FROM pg_catalog.pg_user;")
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
+                if group:
+                    query = SQL(
+                        "SELECT usename FROM (SELECT UNNEST(grolist) AS user_id FROM pg_catalog.pg_group WHERE groname = {}) AS g JOIN pg_catalog.pg_user AS u ON g.user_id = u.usesysid;"
+                    ).format(Literal(group))
+                else:
+                    query = "SELECT usename FROM pg_catalog.pg_user;"
+                cursor.execute(query)
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
         except psycopg2.Error as e:
@@ -661,19 +728,27 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
-    def list_users_from_relation(self) -> Set[str]:
+    def list_users_from_relation(self, current_host=False) -> Set[str]:
         """Returns the list of PostgreSQL database users that were created by a relation.
+
+        Args:
+            current_host: whether to check the current host
+                instead of the primary host.
 
         Returns:
             List of PostgreSQL database users.
         """
         connection = None
+        host = self.current_host if current_host else None
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
+            with self._connect_to_database(
+                database_host=host
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
                     "SELECT usename "
                     "FROM pg_catalog.pg_user "
-                    "WHERE usename LIKE 'relation_id_%' OR usename LIKE 'relation-%';"
+                    "WHERE usename LIKE 'relation_id_%' OR usename LIKE 'relation-%' "
+                    "OR usename LIKE 'pgbouncer_auth_relation_%' OR usename LIKE '%_user_%_%';"
                 )
                 usernames = cursor.fetchall()
                 return {username[0] for username in usernames}
@@ -713,24 +788,113 @@ class PostgreSQL:
                     cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
                     cursor.execute("GRANT CREATE ON TABLESPACE temp TO public;")
 
-            # Allow access to the postgres database only to the system users.
-            cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
-            cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
-            for user in self.system_users:
+            cursor.close()
+            cursor = None
+            connection.close()
+            connection = None
+
+            with self._connect_to_database(
+                database="template1"
+            ) as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    SQL("GRANT ALL PRIVILEGES ON DATABASE postgres TO {};").format(
-                        Identifier(user)
+                    "SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';"
+                )
+                if cursor.fetchone() is None:
+                    self.create_user(
+                        "charmed_databases_owner",
+                        can_create_database=True,
                     )
-                )
 
-            cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';")
-            if cursor.fetchone() is None:
-                self.create_user(
-                    "charmed_databases_owner", can_create_database=True,
-                )
+                self.set_up_login_hook_function()
+                self.set_up_predefined_catalog_roles_function()
 
-            self.set_up_login_hook_function()
-            self.set_up_predefined_catalog_roles_function()
+                # Create database function and event trigger to identify users created by PgBouncer.
+                cursor.execute(
+                    "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
+                )
+                if cursor.fetchone() is None:
+                    cursor.execute("""
+CREATE OR REPLACE FUNCTION update_pg_hba()
+    RETURNS event_trigger
+    LANGUAGE plpgsql
+    AS $$
+        DECLARE
+          hba_file TEXT;
+          copy_command TEXT;
+          connection_type TEXT;
+          rec record;
+          insert_value TEXT;
+          changes INTEGER = 0;
+        BEGIN
+          -- Don't execute on replicas.
+          IF NOT pg_is_in_recovery() THEN
+            -- Load the current authorisation rules.
+            DROP TABLE IF EXISTS pg_hba;
+            CREATE TEMPORARY TABLE pg_hba (lines TEXT);
+            SELECT setting INTO hba_file FROM pg_settings WHERE name = 'hba_file';
+            IF hba_file IS NOT NULL THEN
+                copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
+                EXECUTE copy_command;
+                -- Build a list of the relation users and the databases they can access.
+                DROP TABLE IF EXISTS relation_users;
+                CREATE TEMPORARY TABLE relation_users AS
+                  SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename NOT IN ('backup', 'monitoring', 'operator', 'postgres', 'replication', 'rewind')) AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
+                IF (SELECT COUNT(lines) FROM pg_hba WHERE lines LIKE 'hostssl %') > 0 THEN
+                  connection_type := 'hostssl';
+                ELSE
+                  connection_type := 'host';
+                END IF;
+                -- Add the new users to the pg_hba file.
+                FOR rec IN SELECT * FROM relation_users
+                LOOP
+                  insert_value := connection_type || ' ' || rec.databases || ' ' || rec.user || ' 0.0.0.0/0 md5';
+                  IF (SELECT COUNT(lines) FROM pg_hba WHERE lines = insert_value) = 0 THEN
+                    INSERT INTO pg_hba (lines) VALUES (insert_value);
+                    changes := changes + 1;
+                  END IF;
+                END LOOP;
+                -- Remove users that don't exist anymore from the pg_hba file.
+                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
+                LOOP
+                  DELETE FROM pg_hba WHERE lines = rec.lines;
+                  changes := changes + 1;
+                END LOOP;
+                -- Apply the changes to the pg_hba file.
+                IF changes > 0 THEN
+                  copy_command='COPY pg_hba TO ''' || hba_file || '''' ;
+                  EXECUTE copy_command;
+                  PERFORM pg_reload_conf();
+                END IF;
+            END IF;
+          END IF;
+        END;
+    $$;
+                    """)
+                    cursor.execute("""
+CREATE EVENT TRIGGER update_pg_hba_on_create_schema
+    ON ddl_command_end
+    WHEN TAG IN ('CREATE SCHEMA')
+    EXECUTE FUNCTION update_pg_hba();
+                    """)
+                    cursor.execute("""
+CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
+    ON ddl_command_end
+    WHEN TAG IN ('DROP SCHEMA')
+    EXECUTE FUNCTION update_pg_hba();
+                    """)
+
+            connection.close()
+            connection = None
+
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
+                cursor.execute("REVOKE CREATE ON SCHEMA public FROM PUBLIC;")
+                for user in self.system_users:
+                    cursor.execute(
+                        SQL("GRANT ALL PRIVILEGES ON DATABASE postgres TO {};").format(
+                            Identifier(user)
+                        )
+                    )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up databases: {e}")
             raise PostgreSQLDatabasesSetupError() from e
@@ -1082,3 +1246,21 @@ $$ LANGUAGE plpgsql security definer;"""
                     return False
 
         return True
+
+    def is_user_in_hba(self, username: str) -> bool:
+        """Check if user was added in pg_hba."""
+        connection = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL(
+                        "SELECT COUNT(*) FROM pg_hba_file_rules WHERE {} = ANY(user_name);"
+                    ).format(Literal(username))
+                )
+                return cursor.fetchone()[0] > 0
+        except psycopg2.Error as e:
+            logger.debug(f"Failed to check pg_hba: {e}")
+            return False
+        finally:
+            if connection:
+                connection.close()

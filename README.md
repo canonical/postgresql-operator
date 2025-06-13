@@ -1,22 +1,18 @@
 # Charmed PostgreSQL VM Operator
+
 [![CharmHub Badge](https://charmhub.io/postgresql/badge.svg)](https://charmhub.io/postgresql)
 [![Release](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml/badge.svg)](https://github.com/canonical/postgresql-operator/actions/workflows/release.yaml)
 [![Tests](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml/badge.svg?branch=main)](https://github.com/canonical/postgresql-operator/actions/workflows/ci.yaml?query=branch%3Amain)
 [![codecov](https://codecov.io/gh/canonical/postgresql-operator/graph/badge.svg?token=4V2mu7aWmu)](https://codecov.io/gh/canonical/postgresql-operator)
 
-## Description
 
-This repository contains a [Juju Charm](https://charmhub.io/postgresql) for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines ([LXD](https://ubuntu.com/lxd)).
-To deploy on Kubernetes, please use [Charmed PostgreSQL K8s Operator](https://charmhub.io/postgresql-k8s).
+This repository contains a charmed operator for deploying [PostgreSQL](https://www.postgresql.org/about/) on virtual machines via the [Juju orchestration engine](https://juju.is/).
+
+To learn more about how to deploy and operate Charmed PostgreSQL, see the [official documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/).
+
+## Overview
 
 This operator provides a PostgreSQL database with replication enabled: one primary instance and one (or more) hot standby replicas. The Operator in this repository is a Python script which wraps PostgreSQL versions distributed by Ubuntu Jammy series and adding [Patroni](https://github.com/zalando/patroni) on top of it, providing lifecycle management and handling events (install, configure, integrate, remove, etc).
-
-## README contents
-
-* [Basic usage](#basic-usage): Deploy and scale Charmerd PostgreSQL
-* [Integrations](#integrations-relations): Supported interfaces for integrations
-* [Contributing](#contributing)
-* [Licensing and trademark](#licensing-and-trademark)
   
 ## Basic usage
 
@@ -131,6 +127,7 @@ juju integrate postgresql <application_name>
 ```
 
 To remove a relation:
+
 ```shell
 juju remove-relation postgresql <application_name>
 ```
@@ -138,6 +135,7 @@ juju remove-relation postgresql <application_name>
 #### Legacy `pgsql` interface
 
 We have also added support for the two database legacy relations from the [original version](https://launchpad.net/postgresql-charm) of the charm via the `pgsql` interface. Please note that these relations will be deprecated.
+
  ```shell
 juju relate postgresql:db mailman3-core
 juju relate postgresql:db-admin landscape-server
