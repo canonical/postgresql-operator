@@ -5,12 +5,13 @@
 
 import logging
 import typing
+from datetime import datetime
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
     DatabaseRequestedEvent,
 )
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_RELATION,
     ACCESS_GROUPS,
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
@@ -23,6 +24,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from ops.charm import RelationBrokenEvent, RelationChangedEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ALL_CLIENT_RELATIONS,
@@ -110,12 +112,13 @@ class PostgreSQLProvider(Object):
         try:
             # Creates the user and the database for this specific relation.
             user = f"relation-{event.relation.id}"
-            password = new_password()
-            self.charm.postgresql.create_user(user, password, extra_user_roles=extra_user_roles)
             plugins = self.charm.get_plugins()
 
-            self.charm.postgresql.create_database(
-                database, user, plugins=plugins, client_relations=self.charm.client_relations
+            self.charm.postgresql.create_database(database, plugins=plugins)
+
+            password = new_password()
+            self.charm.postgresql.create_user(
+                user, password, extra_user_roles=extra_user_roles, in_role=f"{database}_admin"
             )
 
             # Share the credentials with the application.
@@ -133,6 +136,8 @@ class PostgreSQLProvider(Object):
             self.update_endpoints(event)
 
             self._update_unit_status(event.relation)
+
+            self.charm.update_config()
         except (
             PostgreSQLCreateDatabaseError,
             PostgreSQLCreateUserError,
@@ -143,9 +148,20 @@ class PostgreSQLProvider(Object):
                 BlockedStatus(
                     e.message
                     if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
-                    else f"Failed to initialize {self.relation_name} relation"
+                    else f"Failed to initialize relation {self.relation_name}"
                 )
             )
+
+        # Try to wait for pg_hba trigger
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
+                with attempt:
+                    self.charm.postgresql.is_user_in_hba(user)
+            self.charm.unit_peer_data.update({
+                "pg_hba_needs_update_timestamp": str(datetime.now())
+            })
+        except RetryError:
+            logger.warning("database requested: Unable to check pg_hba rule update")
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Correctly update the status."""
@@ -294,6 +310,11 @@ class PostgreSQLProvider(Object):
             self.charm.is_blocked
             and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
         ) and not self.check_for_invalid_extra_user_roles(relation.id):
+            self.charm.set_unit_status(ActiveStatus())
+        if (
+            self.charm.is_blocked
+            and "Failed to initialize relation" in self.charm.unit.status.message
+        ):
             self.charm.set_unit_status(ActiveStatus())
 
         self._update_unit_status_on_blocking_endpoint_simultaneously()

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import botocore
 import psycopg2
+import pytest
 import requests
 import yaml
 from juju.model import Model
@@ -37,6 +38,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 
 class SecretNotFoundError(Exception):
@@ -276,18 +278,22 @@ def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
     return len(switchover_history_info.json())
 
 
-def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
+def db_connect(
+    host: str, password: str, username: str = "operator", database: str = "postgres"
+) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
     Args:
         host: the IP of the postgres host
-        password: operator user password
+        password: user password
+        username: username to connect with
+        database: database to connect to
 
     Returns:
         psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='{username}' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
@@ -427,7 +433,7 @@ async def deploy_and_relate_bundle_with_postgresql(
                 else:
                     await ops_test.juju("deploy", patched.name)
 
-    async with ops_test.fast_forward(fast_interval="30s"):
+    async with ops_test.fast_forward(fast_interval="60s"):
         # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
             main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
@@ -733,6 +739,80 @@ def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> 
     return model.units.get(unit_name).public_address
 
 
+def check_connected_user(
+    cursor, session_user: str, current_user: str, primary: bool = True
+) -> None:
+    cursor.execute("SELECT session_user,current_user;")
+    result = cursor.fetchone()
+    if result is not None:
+        instance = "primary" if primary else "replica"
+        assert result[0] == session_user, (
+            f"The session user should be the {session_user} user in the {instance}"
+        )
+        assert result[1] == current_user, (
+            f"The current user should be the {current_user} user in the {instance}"
+        )
+    else:
+        assert False, "No result returned from the query"
+
+
+async def check_roles_and_their_permissions(
+    ops_test: OpsTest, relation_endpoint: str, database_name: str
+) -> None:
+    action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
+        action_name="get-credentials"
+    )
+    result = await action.wait()
+    data_integrator_credentials = result.results
+    username = data_integrator_credentials[relation_endpoint]["username"]
+    uris = data_integrator_credentials[relation_endpoint]["uris"]
+    connection = None
+    try:
+        connection = psycopg2.connect(uris)
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            logger.info(
+                "Checking that the relation user is automatically escalated to the database owner user"
+            )
+            check_connected_user(cursor, username, f"{database_name}_owner")
+            logger.info("Creating a test table and inserting data")
+            cursor.execute("CREATE TABLE test_table (id INTEGER);")
+            logger.info("Inserting data into the test table")
+            cursor.execute("INSERT INTO test_table(id) VALUES(1);")
+            logger.info("Reading data from the test table")
+            cursor.execute("SELECT * FROM test_table;")
+            result = cursor.fetchall()
+            assert len(result) == 1, "The database owner user should be able to read the data"
+
+            logger.info("Checking that the database owner user can't create a database")
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute(f"CREATE DATABASE {database_name}_2;")
+
+            logger.info("Checking that the relation user can't create a table")
+            cursor.execute("RESET ROLE;")
+            check_connected_user(cursor, username, username)
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+    finally:
+        if connection is not None:
+            connection.close()
+
+    connection_string = f"host={data_integrator_credentials[relation_endpoint]['read-only-endpoints'].split(':')[0]} dbname={data_integrator_credentials[relation_endpoint]['database']} user={username} password={data_integrator_credentials[relation_endpoint]['password']}"
+    connection = None
+    try:
+        connection = psycopg2.connect(connection_string)
+        with connection.cursor() as cursor:
+            logger.info("Checking that the relation user can read data from the database")
+            check_connected_user(cursor, username, username, primary=False)
+            logger.info("Reading data from the test table")
+            cursor.execute("SELECT * FROM test_table;")
+            result = cursor.fetchall()
+            assert len(result) == 1, "The relation user should be able to read the data"
+    finally:
+        if connection is not None:
+            connection.close()
+
+
 async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
     """Returns whether TLS is enabled on the specific PostgreSQL instance.
 
@@ -896,6 +976,14 @@ async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
     return primary != old_primary
 
 
+def relations(ops_test: OpsTest, provider_app: str, requirer_app: str) -> list:
+    return [
+        relation
+        for relation in ops_test.model.applications[provider_app].relations
+        if not relation.is_peer and relation.requires.application_name == requirer_app
+    ]
+
+
 async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
     """Restart the machine where a unit run on.
 
@@ -930,7 +1018,12 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
 
 
 async def scale_application(
-    ops_test: OpsTest, application_name: str, count: int, model: Model = None
+    ops_test: OpsTest,
+    application_name: str,
+    count: int,
+    model: Model = None,
+    timeout=2000,
+    idle_period: int = 30,
 ) -> None:
     """Scale a given application to a specific unit count.
 
@@ -939,6 +1032,8 @@ async def scale_application(
         application_name: The name of the application
         count: The desired number of units to scale to
         model: The model to scale the application in
+        timeout: timeout period
+        idle_period: idle period
     """
     if model is None:
         model = ops_test.model
@@ -951,8 +1046,8 @@ async def scale_application(
     await model.wait_for_idle(
         apps=[application_name],
         status="active",
-        timeout=2000,
-        idle_period=30,
+        timeout=timeout,
+        idle_period=idle_period,
         wait_for_exact_units=count,
     )
 

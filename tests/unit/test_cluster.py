@@ -548,6 +548,7 @@ def test_member_started_true(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.return_value.json.return_value = {"state": "running"}
 
@@ -566,6 +567,7 @@ def test_member_started_false(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.return_value.json.return_value = {"state": "stopped"}
 
@@ -584,6 +586,7 @@ def test_member_started_error(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.side_effect = Exception
 

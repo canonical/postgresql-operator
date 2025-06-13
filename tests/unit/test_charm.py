@@ -13,7 +13,7 @@ import psycopg2
 import pytest
 import tomli
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
 )
@@ -600,7 +600,17 @@ def test_on_start(harness):
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
-        ) as _is_storage_attached,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
+        patch(
+            "charm.PostgresqlOperatorCharm.primary_endpoint",
+            new_callable=PropertyMock,
+            return_value=True,
+        ),
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
     ):
@@ -659,7 +669,7 @@ def test_on_start(harness):
         # Then test the event of a correct cluster bootstrapping.
         _restart_services_after_reboot.reset_mock()
         harness.charm.on.start.emit()
-        assert _postgresql.create_user.call_count == 4  # Considering the previous failed call.
+        assert _postgresql.create_user.call_count == 3  # Considering the previous failed call.
         _oversee_users.assert_called_once()
         _enable_disable_extensions.assert_called_once()
         _set_primary_status_message.assert_called_once()
@@ -912,7 +922,7 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _handle_processes_failures,
         patch("charm.PostgreSQLBackups.can_use_s3_repository") as _can_use_s3_repository,
         patch(
-            "charms.postgresql_k8s.v0.postgresql.PostgreSQL.get_current_timeline"
+            "charms.postgresql_k8s.v1.postgresql.PostgreSQL.get_current_timeline"
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
@@ -1189,6 +1199,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1218,6 +1229,7 @@ def test_update_config(harness):
             restore_to_latest=False,
             parameters={"test": "test"},
             no_peers=False,
+            user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
