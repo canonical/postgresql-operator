@@ -108,7 +108,7 @@ juju relate postgresql myclientapp
 When an application charm requests a new user through the relation/integration it can specify that the user should have the `admin` role in the `extra-user-roles` field. The `admin` role enables the new user to read and write to all databases (for the `postgres` system database it can only read data) and also to create and delete non-system databases.
 
 ```{note}
-`extra-user-roles` is only supported by the modern interface `postgresql_client`. It is not supported for the legacy `pgsql` interface. R
+`extra-user-roles` is only supported by the modern interface `postgresql_client`. It is not supported for the legacy `pgsql` interface.
 
 Read more about the supported charm interfaces in [](/explanation/interfaces-and-endpoints).
 ```
