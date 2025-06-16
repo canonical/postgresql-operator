@@ -978,8 +978,9 @@ DECLARE
 BEGIN
 	database := (SELECT current_database());
 	current_session_user := (SELECT session_user);
-    owner_user := database || '_owner';
-    admin_user := database || '_admin';
+    owner_user := quote_ident(database || '_owner');
+    admin_user := quote_ident(database || '_admin');
+    database := quote_ident(database);
     
     IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
         statements := ARRAY[
