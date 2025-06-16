@@ -307,7 +307,7 @@ class PostgreSQL:
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
                 if in_role:
-                    user_definition += f" IN ROLE {in_role}"
+                    user_definition += f" IN ROLE \"{in_role}\""
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
