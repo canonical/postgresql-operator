@@ -20,8 +20,8 @@ from typing import TYPE_CHECKING, Any, TypedDict
 import charm_refresh
 import psutil
 import requests
-from aiohttp import BasicAuth, ClientError, ClientSession, ClientTimeout
 from charms.operator_libs_linux.v2 import snap
+from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
@@ -299,29 +299,23 @@ class Patroni:
                     return member["state"]
         return ""
 
-    async def _aiohttp_get_request(self, url):
+    async def _httpx_get_request(self, url):
         ssl_ctx = ssl.create_default_context()
         with suppress(FileNotFoundError):
             ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
-        async with ClientSession(
-            auth=self._patroni_async_auth,
-            timeout=ClientTimeout(total=API_REQUEST_TIMEOUT),
-        ) as session:
+        async with AsyncClient(
+            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
+        ) as client:
             try:
-                async with session.get(url, ssl=ssl_ctx) as response:
-                    if response.status > 299:
-                        logger.debug(
-                            "Call failed with status code {response.status}: {response.text()}"
-                        )
-                        return
-                    return await response.json()
-            except (ClientError, ValueError):
+                async with client.get(url) as response:
+                    return response.json()
+            except (HTTPError, ValueError):
                 return None
 
     async def _async_get_request(self, uri, endpoints):
         tasks = [
-            create_task(self._aiohttp_get_request(f"http://{ip}:8008{uri}")) for ip in endpoints
-        ] + [create_task(self._aiohttp_get_request(f"https://{ip}:8008{uri}")) for ip in endpoints]
+            create_task(self._httpx_get_request(f"https://{ip}:8008{uri}")) for ip in endpoints
+        ]
         for task in as_completed(tasks):
             if result := await task:
                 for task in tasks:
