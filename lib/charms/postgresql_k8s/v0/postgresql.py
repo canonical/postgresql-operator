@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 56
+LIBPATCH = 53
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -777,7 +777,7 @@ END; $$;"""
                 "superuser",
             }, {role[0] for role in cursor.fetchall() if role[0]}
 
-    def set_up_database(self, temp_location: Optional[str] = None) -> None:
+    def set_up_database(self) -> None:
         """Set up postgres database with the right permissions."""
         connection = None
         cursor = None
