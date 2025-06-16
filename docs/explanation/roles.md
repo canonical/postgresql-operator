@@ -41,7 +41,7 @@ Charmed PostgreSQL 16 introduces the following instance level predefined roles:
 * charmed_read (inherit from pg_read_all_data)
 * charmed_dml (inherit from pg_write_all_data)
 * charmed_backup (inherit from pg_checkpoint)
-* charmed_dba (WIP)
+* charmed_dba (allowed to escalate to any other user, including the superuser `operator`)
 * charmed_instance_admin (WIP)
 
 ```text
@@ -55,6 +55,18 @@ test123=> SELECT * FROM pg_roles;
  charmed_backup              | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16392
 ...
 ```
+
+Charmed PostgreSQL 16 also introduces catalog/database level roles, with permissions tied to each database that's created. Example for a database named `test`:
+
+```text
+test123=> SELECT * FROM pg_roles where rolname like 'test_%';;
+          rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+ test_owner                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16479
+ test_admin                 | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16480
+```
+
+The `*_admin` role is assigned to each relation user (explained in the next section) with access to the specific database. When that user connects to the database, it's auto-escalated to the `*_owner` user, which will own every object inside the database, simplifying the permissions to perform operations on those objects when a new user requests access to that same database.
 
 <!--TODO: are the next two sections also relevant for 16?-->
 ### Relation specific roles
