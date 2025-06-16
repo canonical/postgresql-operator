@@ -243,11 +243,11 @@ class PostgreSQL:
             if cursor.fetchone() is None:
                 cursor.execute(SQL("SET ROLE charmed_databases_owner;"))
                 cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
-            cursor.execute(
-                SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
-                    Identifier(database)
+                cursor.execute(
+                    SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
+                        Identifier(database)
+                    )
                 )
-            )
             with self._connect_to_database(database=database) as conn, conn.cursor() as curs:
                 curs.execute(SQL("SELECT set_up_predefined_catalog_roles();"))
         except psycopg2.Error as e:
