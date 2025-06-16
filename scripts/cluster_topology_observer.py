@@ -9,7 +9,7 @@ import sys
 from asyncio import as_completed, get_running_loop, run, wait
 from contextlib import suppress
 from os import environ
-from ssl import CERT_NONE, create_default_context
+from ssl import create_default_context
 from time import sleep
 from urllib.parse import urljoin
 from urllib.request import urlopen
@@ -157,8 +157,6 @@ async def main():
         context = create_default_context()
         with suppress(FileNotFoundError):
             context.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
-        context.check_hostname = False
-        context.verify_mode = CERT_NONE
 
         cluster_status = None
         loop = get_running_loop()
