@@ -148,7 +148,8 @@ class PostgreSQLProvider(Object):
         try:
             for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
                 with attempt:
-                    self.charm.postgresql.is_user_in_hba(user)
+                    if not self.charm.postgresql.is_user_in_hba(user):
+                        raise Exception("pg_hba not ready")
             self.charm.unit_peer_data.update({
                 "pg_hba_needs_update_timestamp": str(datetime.now())
             })

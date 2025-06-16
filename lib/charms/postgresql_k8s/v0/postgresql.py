@@ -777,9 +777,10 @@ END; $$;"""
                 "superuser",
             }, {role[0] for role in cursor.fetchall() if role[0]}
 
-    def set_up_database(self) -> None:
+    def set_up_database(self, temp_location: Optional[str] = None) -> None:
         """Set up postgres database with the right permissions."""
         connection = None
+        cursor = None
         try:
             with self._connect_to_database(
                 database="template1"
@@ -879,6 +880,8 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
             logger.error(f"Failed to set up databases: {e}")
             raise PostgreSQLDatabasesSetupError() from e
         finally:
+            if cursor is not None:
+                cursor.close()
             if connection is not None:
                 connection.close()
 
