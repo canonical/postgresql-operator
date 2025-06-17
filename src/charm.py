@@ -2036,9 +2036,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
             data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
-                os.remove(os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"))
-                logger.info("PostgreSQL data directory was not empty. Removed pg_wal")
-                return True
+                # Restart the workload if it's stuck on the starting state after a restart.
+                try:
+                    is_standby_leader = self.is_standby_leader
+                except RetryError:
+                    return False
+                if is_standby_leader:
+                    os.remove(os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"))
+                    logger.info("PostgreSQL data directory was not empty. Removed pg_wal")
+                    return True
             try:
                 self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")
