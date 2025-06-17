@@ -42,7 +42,6 @@ Charmed PostgreSQL 16 introduces the following instance level predefined roles:
 * charmed_dml (inherit from pg_write_all_data)
 * charmed_backup (inherit from pg_checkpoint)
 * charmed_dba (allowed to escalate to any other user, including the superuser `operator`)
-* charmed_instance_admin (WIP)
 
 ```text
 test123=> SELECT * FROM pg_roles;
