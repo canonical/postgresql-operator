@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 56
+LIBPATCH = 53
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -780,6 +780,7 @@ END; $$;"""
     def set_up_database(self) -> None:
         """Set up postgres database with the right permissions."""
         connection = None
+        cursor = None
         try:
             with self._connect_to_database(
                 database="template1"
@@ -879,6 +880,8 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
             logger.error(f"Failed to set up databases: {e}")
             raise PostgreSQLDatabasesSetupError() from e
         finally:
+            if cursor is not None:
+                cursor.close()
             if connection is not None:
                 connection.close()
 
