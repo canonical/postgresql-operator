@@ -2035,7 +2035,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # process is running by the PostgreSQL process not).
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
             data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
-            if all(content.startswith("pg_wal") for content in data_directory_contents):
+            if len(data_directory_contents) > 0 and all(
+                content.startswith("pg_wal") for content in data_directory_contents
+            ):
                 os.rename(
                     os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
                     os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{datetime.now(UTC).isoformat()}"),
