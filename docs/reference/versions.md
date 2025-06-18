@@ -28,14 +28,17 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
   * All replicas are now [synchronous units]
   * Switchover the primary unit via `promote-to-primary scope=unit`
   * Raft re-init helper: `promote-to-primary scope=unit force=yes`
-* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords](/how-to/manage-passwords)
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords]
 * [Timescale Community Edition]
 * [Extended COS integration]
   * [Profiling via Parca]
   * [Tracing via Tempo]
 * Improved [security hardening]
-* (WIP) [Improved built-in roles](/explanation/roles) 
+* [Improved built-in roles]
 * New "juju refresh" library (Refresh v3)
+* Migrated to TLS v4 library
+  * New endpoints `client-certificates` and `peer-certificates`
+  * Endpoint `peer-interfaces` uses TLS by default
 
 <!--
 Saving the following items for release notes:
@@ -55,7 +58,7 @@ Read more about Charmed PostgreSQL 16 features in the [release notes].
 * [Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/) has been replaced by [Timescale Community edition](https://docs.timescale.com/about/latest/timescaledb-editions/). 
 * The charm action `set-tls-private-key ` has been removed (will be re-introduced as Juju User Secrets)
 * The charm actions `pre-upgrade-check` and `resume-upgrade ` have been removed (replaced with `pre-refresh-check` and `resume-refresh` accordingly to be consistent with `juju refresh`)
-
+* The charm endpoint `certificates` has ben split into `client-certificates` and `peer-certificates`.
 
 ## PostgreSQL 14
 
@@ -110,9 +113,9 @@ Learn more in the [legacy charm explanation page].
 [security hardening]: /explanation/security/index
 [Multiple Juju storage support]: /how-to/deploy/juju-storage
 [Juju Spaces support]: /how-to/deploy/juju-spaces
-
+[Improved built-in roles]: /explanation/roles
 [release notes]: /reference/releases
-
+[internal passwords]: /how-to/manage-passwords
 [Interfaces and endpoints]: /explanation/interfaces-and-endpoints
 
 [Deployment]: /how-to/deploy/index
