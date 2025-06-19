@@ -622,7 +622,7 @@ class PostgreSQLLogicalReplication(Object):
         return {}
 
     def _create_user(self, relation_id: int) -> tuple[str, str]:
-        user = f"logical-replication-relation-{relation_id}"
+        user = f"logical_replication_relation_{relation_id}"
         password = new_password()
         logger.info(
             f"Creating new user {user} for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation_id}"
