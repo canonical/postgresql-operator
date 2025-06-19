@@ -2690,12 +2690,9 @@ def test_handle_processes_failures(harness):
         )
         _rename.reset_mock()
 
-        # Will move pg_wal if there's only a pg_wal dir or other moved dirs
+        # Will not move pg_wal if there's only a pg_wal dir or other moved dirs
         _listdir.return_value = ["pg_wal", f"pg_wal-{_now.isoformat()}"]
         assert harness.charm._handle_processes_failures()
-        assert not _restart_patroni.called
-        _rename.assert_called_once_with(
-            os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
-            os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{_now.isoformat()}"),
-        )
-        _rename.reset_mock()
+        _restart_patroni.assert_called_once_with()
+        assert not _rename.called
+        _restart_patroni.reset_mock()
