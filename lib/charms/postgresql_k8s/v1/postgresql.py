@@ -164,6 +164,7 @@ class PostgreSQL:
             connection = self._connect_to_database()
             connection.autocommit = True
             with connection.cursor() as cursor:
+                cursor.execute("RESET ROLE;")
                 if enable:
                     cursor.execute("ALTER SYSTEM SET pgaudit.log = 'ROLE,DDL,MISC,MISC_SET';")
                     cursor.execute("ALTER SYSTEM SET pgaudit.log_client TO off;")
@@ -242,11 +243,11 @@ class PostgreSQL:
             if cursor.fetchone() is None:
                 cursor.execute(SQL("SET ROLE charmed_databases_owner;"))
                 cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
-            cursor.execute(
-                SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
-                    Identifier(database)
+                cursor.execute(
+                    SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
+                        Identifier(database)
+                    )
                 )
-            )
             with self._connect_to_database(database=database) as conn, conn.cursor() as curs:
                 curs.execute(SQL("SELECT set_up_predefined_catalog_roles();"))
         except psycopg2.Error as e:
@@ -306,11 +307,12 @@ class PostgreSQL:
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
                 if in_role:
-                    user_definition += f" IN ROLE {in_role}"
+                    user_definition += f" IN ROLE \"{in_role}\""
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
                     user_definition += f" {' '.join(privileges)}"
+                cursor.execute(SQL("RESET ROLE;"))
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(SQL(f"{user_definition};").format(Identifier(user)))
@@ -976,8 +978,9 @@ DECLARE
 BEGIN
 	database := (SELECT current_database());
 	current_session_user := (SELECT session_user);
-    owner_user := database || '_owner';
-    admin_user := database || '_admin';
+    owner_user := quote_ident(database || '_owner');
+    admin_user := quote_ident(database || '_admin');
+    database := quote_ident(database);
     
     IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
         statements := ARRAY[
@@ -1068,6 +1071,7 @@ $$ LANGUAGE plpgsql security definer;"""
             with self._connect_to_database(
                 database_host=database_host
             ) as connection, connection.cursor() as cursor:
+                cursor.execute(SQL("RESET ROLE;"))
                 cursor.execute(SQL("BEGIN;"))
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(
