@@ -14,6 +14,7 @@ from pathlib import Path
 
 import botocore
 import psycopg2
+import pytest
 import requests
 import yaml
 from juju.model import Model
@@ -37,6 +38,7 @@ METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 DATABASE_APP_NAME = METADATA["name"]
 STORAGE_PATH = METADATA["storage"]["data"]["location"]
 APPLICATION_NAME = "postgresql-test-app"
+DATA_INTEGRATOR_APP_NAME = "data-integrator"
 
 
 class SecretNotFoundError(Exception):
@@ -115,7 +117,7 @@ def change_primary_start_timeout(
 
 
 def get_patroni_cluster(unit_ip: str) -> dict[str, str]:
-    resp = requests.get(f"http://{unit_ip}:8008/cluster")
+    resp = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
     return resp.json()
 
 
@@ -210,7 +212,7 @@ def check_patroni(ops_test: OpsTest, unit_name: str, restart_time: float) -> boo
         whether Patroni is running correctly.
     """
     unit_ip = get_unit_address(ops_test, unit_name)
-    health_info = requests.get(f"http://{unit_ip}:8008/health").json()
+    health_info = requests.get(f"https://{unit_ip}:8008/health", verify=False).json()
     postmaster_start_time = datetime.strptime(
         health_info["postmaster_start_time"], "%Y-%m-%d %H:%M:%S.%f%z"
     ).timestamp()
@@ -235,7 +237,7 @@ async def check_cluster_members(ops_test: OpsTest, application_name: str) -> Non
             expected_members = get_application_units(ops_test, application_name)
             expected_members_ips = get_application_units_ips(ops_test, application_name)
 
-            r = requests.get(f"http://{address}:8008/cluster")
+            r = requests.get(f"https://{address}:8008/cluster", verify=False)
             assert [member["name"] for member in r.json()["members"]] == expected_members
             assert [member["host"] for member in r.json()["members"]] == expected_members_ips
 
@@ -272,22 +274,26 @@ def convert_records_to_dict(records: list[tuple]) -> dict:
 def count_switchovers(ops_test: OpsTest, unit_name: str) -> int:
     """Return the number of performed switchovers."""
     unit_address = get_unit_address(ops_test, unit_name)
-    switchover_history_info = requests.get(f"http://{unit_address}:8008/history")
+    switchover_history_info = requests.get(f"https://{unit_address}:8008/history", verify=False)
     return len(switchover_history_info.json())
 
 
-def db_connect(host: str, password: str) -> psycopg2.extensions.connection:
+def db_connect(
+    host: str, password: str, username: str = "operator", database: str = "postgres"
+) -> psycopg2.extensions.connection:
     """Returns psycopg2 connection object linked to postgres db in the given host.
 
     Args:
         host: the IP of the postgres host
-        password: operator user password
+        password: user password
+        username: username to connect with
+        database: database to connect to
 
     Returns:
         psycopg2 connection object linked to postgres db, under "operator" user.
     """
     return psycopg2.connect(
-        f"dbname='postgres' user='operator' host='{host}' password='{password}' connect_timeout=10"
+        f"dbname='{database}' user='{username}' host='{host}' password='{password}' connect_timeout=10"
     )
 
 
@@ -427,7 +433,7 @@ async def deploy_and_relate_bundle_with_postgresql(
                 else:
                     await ops_test.juju("deploy", patched.name)
 
-    async with ops_test.fast_forward(fast_interval="30s"):
+    async with ops_test.fast_forward(fast_interval="60s"):
         # Relate application to PostgreSQL.
         relation = await ops_test.model.relate(
             main_application_name, f"{DATABASE_APP_NAME}:{relation_name}"
@@ -689,27 +695,24 @@ async def get_primary(ops_test: OpsTest, unit_name: str, model=None) -> str:
     return action.results["primary"]
 
 
-async def get_tls_ca(
-    ops_test: OpsTest,
-    unit_name: str,
-) -> str:
+async def get_tls_ca(ops_test: OpsTest, unit_name: str, relation: str = "client") -> str:
     """Returns the TLS CA used by the unit.
 
     Args:
         ops_test: The ops test framework instance
         unit_name: The name of the unit
+        relation: TLS relation to get the CA from
 
     Returns:
         TLS CA or an empty string if there is no CA.
     """
     raw_data = (await ops_test.juju("show-unit", unit_name))[1]
+    endpoint = f"{relation}-certificates"
     if not raw_data:
         raise ValueError(f"no unit info could be grabbed for {unit_name}")
     data = yaml.safe_load(raw_data)
     # Filter the data based on the relation name.
-    relation_data = [
-        v for v in data[unit_name]["relation-info"] if v["endpoint"] == "certificates"
-    ]
+    relation_data = [v for v in data[unit_name]["relation-info"] if v["endpoint"] == endpoint]
     if len(relation_data) == 0:
         return ""
     return json.loads(relation_data[0]["application-data"]["certificates"])[0].get("ca")
@@ -734,6 +737,80 @@ def get_unit_address(ops_test: OpsTest, unit_name: str, model: Model = None) -> 
     if model is None:
         model = ops_test.model
     return model.units.get(unit_name).public_address
+
+
+def check_connected_user(
+    cursor, session_user: str, current_user: str, primary: bool = True
+) -> None:
+    cursor.execute("SELECT session_user,current_user;")
+    result = cursor.fetchone()
+    if result is not None:
+        instance = "primary" if primary else "replica"
+        assert result[0] == session_user, (
+            f"The session user should be the {session_user} user in the {instance}"
+        )
+        assert result[1] == current_user, (
+            f"The current user should be the {current_user} user in the {instance}"
+        )
+    else:
+        assert False, "No result returned from the query"
+
+
+async def check_roles_and_their_permissions(
+    ops_test: OpsTest, relation_endpoint: str, database_name: str
+) -> None:
+    action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
+        action_name="get-credentials"
+    )
+    result = await action.wait()
+    data_integrator_credentials = result.results
+    username = data_integrator_credentials[relation_endpoint]["username"]
+    uris = data_integrator_credentials[relation_endpoint]["uris"]
+    connection = None
+    try:
+        connection = psycopg2.connect(uris)
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            logger.info(
+                "Checking that the relation user is automatically escalated to the database owner user"
+            )
+            check_connected_user(cursor, username, f"{database_name}_owner")
+            logger.info("Creating a test table and inserting data")
+            cursor.execute("CREATE TABLE test_table (id INTEGER);")
+            logger.info("Inserting data into the test table")
+            cursor.execute("INSERT INTO test_table(id) VALUES(1);")
+            logger.info("Reading data from the test table")
+            cursor.execute("SELECT * FROM test_table;")
+            result = cursor.fetchall()
+            assert len(result) == 1, "The database owner user should be able to read the data"
+
+            logger.info("Checking that the database owner user can't create a database")
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute(f"CREATE DATABASE {database_name}_2;")
+
+            logger.info("Checking that the relation user can't create a table")
+            cursor.execute("RESET ROLE;")
+            check_connected_user(cursor, username, username)
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+    finally:
+        if connection is not None:
+            connection.close()
+
+    connection_string = f"host={data_integrator_credentials[relation_endpoint]['read-only-endpoints'].split(':')[0]} dbname={data_integrator_credentials[relation_endpoint]['database']} user={username} password={data_integrator_credentials[relation_endpoint]['password']}"
+    connection = None
+    try:
+        connection = psycopg2.connect(connection_string)
+        with connection.cursor() as cursor:
+            logger.info("Checking that the relation user can read data from the database")
+            check_connected_user(cursor, username, username, primary=False)
+            logger.info("Reading data from the test table")
+            cursor.execute("SELECT * FROM test_table;")
+            result = cursor.fetchall()
+            assert len(result) == 1, "The relation user should be able to read the data"
+    finally:
+        if connection is not None:
+            connection.close()
 
 
 async def check_tls(ops_test: OpsTest, unit_name: str, enabled: bool) -> bool:
@@ -838,7 +915,7 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
         Whether TLS is enabled/disabled on Patroni REST API.
     """
     unit_address = get_unit_address(ops_test, unit_name)
-    tls_ca = await get_tls_ca(ops_test, unit_name)
+    tls_ca = await get_tls_ca(ops_test, unit_name, "peer")
 
     # If there is no TLS CA in the relation, something is wrong in
     # the relation between the TLS Certificates Operator and PostgreSQL.
@@ -855,11 +932,10 @@ async def check_tls_patroni_api(ops_test: OpsTest, unit_name: str, enabled: bool
                 temp_ca_file.seek(0)
 
                 # The CA bundle file is used to validate the server certificate when
-                # TLS is enabled, otherwise True is set because it's the default value
-                # for the verify parameter.
+                # peer TLS is enabled, otherwise don't validate the internal cert.
                 health_info = requests.get(
-                    f"{'https' if enabled else 'http'}://{unit_address}:8008/health",
-                    verify=temp_ca_file.name if enabled else True,
+                    f"https://{unit_address}:8008/health",
+                    verify=temp_ca_file.name if enabled else False,
                 )
                 return health_info.status_code == 200
     except RetryError:
@@ -900,6 +976,14 @@ async def primary_changed(ops_test: OpsTest, old_primary: str) -> bool:
     return primary != old_primary
 
 
+def relations(ops_test: OpsTest, provider_app: str, requirer_app: str) -> list:
+    return [
+        relation
+        for relation in ops_test.model.applications[provider_app].relations
+        if not relation.is_peer and relation.requires.application_name == requirer_app
+    ]
+
+
 async def restart_machine(ops_test: OpsTest, unit_name: str) -> None:
     """Restart the machine where a unit run on.
 
@@ -934,7 +1018,12 @@ async def run_command_on_unit(ops_test: OpsTest, unit_name: str, command: str) -
 
 
 async def scale_application(
-    ops_test: OpsTest, application_name: str, count: int, model: Model = None
+    ops_test: OpsTest,
+    application_name: str,
+    count: int,
+    model: Model = None,
+    timeout=2000,
+    idle_period: int = 30,
 ) -> None:
     """Scale a given application to a specific unit count.
 
@@ -943,6 +1032,8 @@ async def scale_application(
         application_name: The name of the application
         count: The desired number of units to scale to
         model: The model to scale the application in
+        timeout: timeout period
+        idle_period: idle period
     """
     if model is None:
         model = ops_test.model
@@ -955,8 +1046,8 @@ async def scale_application(
     await model.wait_for_idle(
         apps=[application_name],
         status="active",
-        timeout=2000,
-        idle_period=30,
+        timeout=timeout,
+        idle_period=idle_period,
         wait_for_exact_units=count,
     )
 
@@ -971,7 +1062,9 @@ def restart_patroni(ops_test: OpsTest, unit_name: str, password: str) -> None:
     """
     unit_ip = get_unit_address(ops_test, unit_name)
     requests.post(
-        f"http://{unit_ip}:8008/restart", auth=requests.auth.HTTPBasicAuth("patroni", password)
+        f"https://{unit_ip}:8008/restart",
+        auth=requests.auth.HTTPBasicAuth("patroni", password),
+        verify=False,
     )
 
 
@@ -1046,18 +1139,19 @@ def switchover(
     """
     primary_ip = get_unit_address(ops_test, current_primary)
     response = requests.post(
-        f"http://{primary_ip}:8008/switchover",
+        f"https://{primary_ip}:8008/switchover",
         json={
             "leader": current_primary.replace("/", "-"),
             "candidate": candidate.replace("/", "-") if candidate else None,
         },
         auth=requests.auth.HTTPBasicAuth("patroni", password),
+        verify=False,
     )
     assert response.status_code == 200
     app_name = current_primary.split("/")[0]
     for attempt in Retrying(stop=stop_after_attempt(30), wait=wait_fixed(2), reraise=True):
         with attempt:
-            response = requests.get(f"http://{primary_ip}:8008/cluster")
+            response = requests.get(f"https://{primary_ip}:8008/cluster", verify=False)
             assert response.status_code == 200
             standbys = len([
                 member for member in response.json()["members"] if member["role"] == "sync_standby"
@@ -1132,7 +1226,10 @@ async def backup_operations(
     )
 
     await ops_test.model.relate(
-        f"{database_app_name}:certificates", f"{tls_certificates_app_name}:certificates"
+        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+    )
+    await ops_test.model.relate(
+        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)

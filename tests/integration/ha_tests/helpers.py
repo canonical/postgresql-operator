@@ -162,7 +162,6 @@ async def change_patroni_setting(
             so it uses the primary).
         tls: if Patroni is serving using tls.
     """
-    schema = "https" if tls else "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
@@ -173,9 +172,9 @@ async def change_patroni_setting(
                 primary_name = await get_primary(ops_test, app)
                 unit_ip = get_unit_address(ops_test, primary_name)
             requests.patch(
-                f"{schema}://{unit_ip}:8008/config",
+                f"https://{unit_ip}:8008/config",
                 json={setting: value},
-                verify=not tls,
+                verify=False,
                 auth=requests.auth.HTTPBasicAuth("patroni", password),
             )
 
@@ -202,7 +201,7 @@ async def change_wal_settings(
         with attempt:
             unit_ip = get_unit_address(ops_test, unit_name)
             requests.patch(
-                f"http://{unit_ip}:8008/config",
+                f"https://{unit_ip}:8008/config",
                 json={
                     "postgresql": {
                         "parameters": {
@@ -213,6 +212,7 @@ async def change_wal_settings(
                     }
                 },
                 auth=requests.auth.HTTPBasicAuth("patroni", password),
+                verify=False,
             )
 
 
@@ -385,7 +385,7 @@ async def fetch_cluster_members(ops_test: OpsTest, use_ip_from_inside: bool = Fa
             if use_ip_from_inside
             else get_unit_ip(ops_test, unit.name)
         )
-        cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+        cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
         if len(member_ips) > 0:
             # If the list of members IPs was already fetched, also compare the
             # list provided by other members.
@@ -437,13 +437,12 @@ async def get_patroni_setting(ops_test: OpsTest, setting: str, tls: bool = False
     Returns:
         the value of the configuration or None if it's using the default value.
     """
-    schema = "https" if tls else "http"
     for attempt in Retrying(stop=stop_after_delay(30 * 2), wait=wait_fixed(3)):
         with attempt:
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
-            configuration_info = requests.get(f"{schema}://{unit_ip}:8008/config", verify=not tls)
+            configuration_info = requests.get(f"https://{unit_ip}:8008/config", verify=False)
             value = configuration_info.json().get(setting)
             return int(value) if value is not None else None
 
@@ -463,7 +462,7 @@ async def get_postgresql_parameter(ops_test: OpsTest, parameter_name: str) -> in
             app = await app_name(ops_test)
             primary_name = await get_primary(ops_test, app)
             unit_ip = get_unit_address(ops_test, primary_name)
-            configuration_info = requests.get(f"http://{unit_ip}:8008/config")
+            configuration_info = requests.get(f"https://{unit_ip}:8008/config", verify=False)
             postgresql_dict = configuration_info.json().get("postgresql")
             if postgresql_dict is None:
                 return None
@@ -589,7 +588,7 @@ async def is_replica(ops_test: OpsTest, unit_name: str, use_ip_from_inside: bool
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 3), wait=wait_fixed(3)):
             with attempt:
-                cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+                cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
 
                 # The unit may take some time to be listed on Patroni REST API cluster endpoint.
                 if member_name not in {
@@ -622,7 +621,7 @@ async def get_cluster_roles(
     )
 
     members = {"replicas": [], "primaries": [], "sync_standbys": []}
-    cluster_info = requests.get(f"http://{unit_ip}:8008/cluster")
+    cluster_info = requests.get(f"https://{unit_ip}:8008/cluster", verify=False)
     member_list = cluster_info.json()["members"]
     logger.info(f"Cluster members are: {member_list}")
     for member in member_list:
@@ -725,7 +724,7 @@ async def is_postgresql_ready(ops_test, unit_name: str, use_ip_from_inside: bool
     try:
         for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3)):
             with attempt:
-                instance_health_info = requests.get(f"http://{unit_ip}:8008/health")
+                instance_health_info = requests.get(f"https://{unit_ip}:8008/health", verify=False)
                 assert instance_health_info.status_code == 200
     except RetryError:
         return False
@@ -1079,11 +1078,24 @@ async def get_detached_storages(ops_test: OpsTest) -> list[str]:
 
 async def check_password_auth(ops_test: OpsTest, unit_name: str) -> bool:
     """Checks if "operator" password is valid for current postgresql db."""
-    stdout = await run_command_on_unit(
-        ops_test,
+    complete_command = [
+        "exec",
+        "--unit",
         unit_name,
-        """grep -E 'password authentication failed for user' /var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*""",
-    )
+        "--",
+        "grep",
+        "-E",
+        "'password'",
+        "/var/snap/charmed-postgresql/common/var/log/postgresql/postgresql*",
+    ]
+    return_code, stdout, _ = await ops_test.juju(*complete_command)
+    if return_code != 0:
+        raise Exception(
+            "Expected command %s to succeed. Instead it failed: %s with code: ",
+            complete_command,
+            stdout,
+            return_code,
+        )
     return 'password authentication failed for user "operator"' not in stdout
 
 

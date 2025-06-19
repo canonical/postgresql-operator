@@ -124,8 +124,12 @@ async def test_deploy_async_replication_setup(
             num_units=CLUSTER_SIZE,
             config={"profile": "testing"},
         )
-    await ops_test.model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
-    await second_model.deploy(APPLICATION_NAME, channel="latest/edge", num_units=1)
+    await ops_test.model.deploy(
+        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+    )
+    await second_model.deploy(
+        APPLICATION_NAME, channel="latest/edge", num_units=1, config={"sleep_interval": 1000}
+    )
 
     async with ops_test.fast_forward(), fast_forward(second_model):
         await gather(
@@ -525,36 +529,32 @@ async def test_scaling(
     logger.info("checking whether writes are increasing")
     await are_writes_increasing(ops_test)
 
-    async with ops_test.fast_forward(FAST_INTERVAL), fast_forward(second_model, FAST_INTERVAL):
-        logger.info("scaling out the first cluster")
-        first_cluster_original_size = len(first_model.applications[DATABASE_APP_NAME].units)
-        await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1)
+    logger.info("scaling out the clusters")
+    first_cluster_original_size = len(first_model.applications[DATABASE_APP_NAME].units)
+    second_cluster_original_size = len(second_model.applications[DATABASE_APP_NAME].units)
+    await gather(
+        scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size + 1),
+        scale_application(
+            ops_test,
+            DATABASE_APP_NAME,
+            second_cluster_original_size + 1,
+            model=second_model,
+        ),
+    )
 
-        logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, extra_model=second_model)
+    logger.info("checking whether writes are increasing")
+    await are_writes_increasing(ops_test, extra_model=second_model)
 
-        logger.info("scaling out the second cluster")
-        second_cluster_original_size = len(second_model.applications[DATABASE_APP_NAME].units)
-        await scale_application(
-            ops_test, DATABASE_APP_NAME, second_cluster_original_size + 1, model=second_model
-        )
-
-        logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, extra_model=second_model)
-
-        logger.info("scaling in the first cluster")
-        await scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size)
-
-        logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, extra_model=second_model)
-
-        logger.info("scaling in the second cluster")
-        await scale_application(
+    logger.info("scaling in the clusters")
+    await gather(
+        scale_application(ops_test, DATABASE_APP_NAME, first_cluster_original_size),
+        scale_application(
             ops_test, DATABASE_APP_NAME, second_cluster_original_size, model=second_model
-        )
+        ),
+    )
 
-        logger.info("checking whether writes are increasing")
-        await are_writes_increasing(ops_test, extra_model=second_model)
+    logger.info("checking whether writes are increasing")
+    await are_writes_increasing(ops_test, extra_model=second_model)
 
     # Verify that no writes to the database were missed after stopping the writes
     # (check that all the units have all the writes).

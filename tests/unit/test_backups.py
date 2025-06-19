@@ -94,18 +94,6 @@ def test_can_initialise_stanza(harness):
         _member_started.return_value = False
         assert not harness.charm.backup._can_initialise_stanza
 
-        # Test when the unit hasn't configured TLS yet while other unit already has TLS enabled.
-        harness.add_relation_unit(
-            harness.model.get_relation(PEER).id, f"{harness.charm.app.name}/1"
-        )
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                harness.model.get_relation(PEER).id,
-                f"{harness.charm.app.name}/1",
-                {"tls": "enabled"},
-            )
-        assert not harness.charm.backup._can_initialise_stanza
-
         # Test when everything is ok to initialise the stanza.
         _member_started.return_value = True
         assert harness.charm.backup._can_initialise_stanza
@@ -140,32 +128,13 @@ def test_can_unit_perform_backup(harness):
         # Test when running the check in the primary, there are replicas and TLS is enabled.
         harness.charm.unit.status = ActiveStatus()
         _planned_units.return_value = 2
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.unit.name,
-                {"tls": "True"},
-            )
         assert harness.charm.backup._can_unit_perform_backup() == (
             False,
             "Unit cannot perform backups as it is the cluster primary",
         )
 
-        # Test when running the check in a replica and TLS is disabled.
-        _is_primary.return_value = False
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                peer_rel_id,
-                harness.charm.unit.name,
-                {"tls": ""},
-            )
-        assert harness.charm.backup._can_unit_perform_backup() == (
-            False,
-            "Unit cannot perform backups as TLS is not enabled",
-        )
-
         # Test when Patroni or PostgreSQL hasn't started yet.
-        _is_primary.return_value = True
+        _is_primary.return_value = False
         _member_started.return_value = False
         assert harness.charm.backup._can_unit_perform_backup() == (
             False,
@@ -975,6 +944,7 @@ def test_on_s3_credential_changed(harness):
         ) as _is_standby_leader,
         patch("time.gmtime"),
         patch("time.asctime", return_value="Thu Feb 24 05:00:00 2022"),
+        patch("charm.PostgresqlOperatorCharm.get_secret"),
     ):
         peer_rel_id = harness.model.get_relation(PEER).id
         # Test when the cluster was not initialised yet.
@@ -1173,7 +1143,6 @@ def test_on_create_backup_action(harness):
         ) as _is_primary,
         patch("charm.PostgreSQLBackups._upload_content_to_s3") as _upload_content_to_s3,
         patch("backups.datetime") as _datetime,
-        patch("ops.JujuVersion.from_environ") as _from_environ,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
         patch("charm.PostgreSQLBackups._can_unit_perform_backup") as _can_unit_perform_backup,
     ):
@@ -1208,13 +1177,12 @@ def test_on_create_backup_action(harness):
             [],
         )
         _datetime.now.return_value.strftime.return_value = "2023-01-01T09:00:00Z"
-        _from_environ.return_value = "test-juju-version"
         _upload_content_to_s3.return_value = False
         expected_metadata = f"""Date Backup Requested: 2023-01-01T09:00:00Z
 Model Name: {harness.charm.model.name}
 Application Name: {harness.charm.model.app.name}
 Unit Name: {harness.charm.unit.name}
-Juju Version: test-juju-version
+Juju Version: 0.0.0
 """
         harness.charm.backup._on_create_backup_action(mock_event)
         _upload_content_to_s3.assert_called_once_with(
@@ -1746,8 +1714,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
         with open("templates/pgbackrest.conf.j2") as file:
             template = Template(file.read())
         expected_content = template.render(
-            enable_tls=harness.charm.is_tls_enabled
-            and len(harness.charm.peer_members_endpoints) > 0,
+            enable_tls=len(harness.charm._peer_members_ips) > 0,
             peer_endpoints=harness.charm._peer_members_ips,
             path="test-path/",
             data_path="/var/snap/charmed-postgresql/common/var/lib/postgresql",
@@ -1890,9 +1857,6 @@ def test_start_stop_pgbackrest_service(harness):
             "charm.PostgresqlOperatorCharm._peer_members_ips", new_callable=PropertyMock
         ) as _peer_members_ips,
         patch(
-            "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
-        ) as _is_tls_enabled,
-        patch(
             "charm.PostgreSQLBackups._render_pgbackrest_conf_file"
         ) as _render_pgbackrest_conf_file,
         patch("charm.PostgreSQLBackups._are_backup_settings_ok") as _are_backup_settings_ok,
@@ -1913,16 +1877,9 @@ def test_start_stop_pgbackrest_service(harness):
         stop.assert_not_called()
         restart.assert_not_called()
 
-        # Test when TLS is not enabled (should stop the service).
-        _render_pgbackrest_conf_file.return_value = True
-        _is_tls_enabled.return_value = False
-        assert harness.charm.backup.start_stop_pgbackrest_service()
-        stop.assert_called_once()
-        restart.assert_not_called()
-
         # Test when there are no replicas.
         stop.reset_mock()
-        _is_tls_enabled.return_value = True
+        _render_pgbackrest_conf_file.return_value = True
         _peer_members_ips.return_value = []
         assert harness.charm.backup.start_stop_pgbackrest_service()
         stop.assert_called_once()

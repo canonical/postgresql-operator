@@ -29,18 +29,21 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
     REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_STATS,
     PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
 )
-from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import main
@@ -98,12 +101,15 @@ from constants import (
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
+    REPLICATION_USER,
     REWIND_PASSWORD_KEY,
+    REWIND_USER,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
     SYSTEM_USERS,
+    TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
     TLS_KEY_FILE,
@@ -116,6 +122,8 @@ from constants import (
 from ldap import PostgreSQLLDAP
 from relations.async_replication import PostgreSQLAsyncReplication
 from relations.postgresql_provider import PostgreSQLProvider
+from relations.tls import TLS
+from relations.tls_transfer import TLSTransfer
 from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
@@ -232,7 +240,8 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         PostgreSQLBackups,
         PostgreSQLLDAP,
         PostgreSQLProvider,
-        PostgreSQLTLS,
+        TLS,
+        TLSTransfer,
         RollingOpsManager,
     ),
 )
@@ -263,10 +272,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             deleted_label=SECRET_DELETED_LABEL,
         )
 
-        run_cmd = "/usr/bin/juju-exec"
-        self._observer = ClusterTopologyObserver(self, run_cmd)
+        self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
+        self.framework.observe(
+            self.on.authorisation_rules_change, self._on_authorisation_rules_change
+        )
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
+        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -288,7 +300,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.backup = PostgreSQLBackups(self, "s3-parameters")
         self.ldap = PostgreSQLLDAP(self, "ldap")
-        self.tls = PostgreSQLTLS(self, PEER)
+        self.tls = TLS(self, PEER)
+        self.tls_transfer = TLSTransfer(self, PEER)
         self.async_replication = PostgreSQLAsyncReplication(self)
         self.restart_manager = RollingOpsManager(
             charm=self, relation="restart", callback=self._restart
@@ -423,6 +436,18 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             new_refresh_unit_status = self.refresh.unit_status_lower_priority().message
         path.write_text(json.dumps(new_refresh_unit_status))
 
+    def _on_authorisation_rules_change(self, _):
+        """Handle authorisation rules change event."""
+        timestamp = datetime.now()
+        self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
+        logger.debug(f"authorisation rules changed at {timestamp}")
+
+    def _on_databases_change(self, _):
+        """Handle databases change event."""
+        self.update_config()
+        logger.debug("databases changed")
+        self._on_authorisation_rules_change(None)
+
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
         return [
@@ -430,7 +455,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "metrics_path": "/metrics",
                 "static_configs": [{"targets": [f"{self._unit_ip}:8008"]}],
                 "tls_config": {"insecure_skip_verify": True},
-                "scheme": "https" if self.is_tls_enabled else "http",
+                "scheme": "https",
             }
         ]
 
@@ -615,16 +640,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         else:
             return primary_endpoint
-
-    def get_hostname_by_unit(self, _) -> str:
-        """Create a DNS name for a PostgreSQL unit.
-
-        Returns:
-            A string representing the hostname of the PostgreSQL unit.
-        """
-        # For now, as there is no DNS hostnames on VMs, and it would also depend on
-        # the underlying provider (LXD, MAAS, etc.), the unit IP is returned.
-        return self._unit_ip
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
@@ -838,8 +853,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         if not self.is_cluster_initialised:
-            logger.debug("Deferring on_peer_relation_changed: cluster not initialized")
-            event.defer()
+            logger.debug("Early exit on_peer_relation_changed: cluster not initialized")
             return False
 
         # Check whether raft is stuck.
@@ -1010,7 +1024,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # hook, the configuration is updated and the service is started - or only
         # reloaded in the other units).
         stored_ip = self.unit_peer_data.get("ip")
-        current_ip = self.get_hostname_by_unit(None)
+        current_ip = self._unit_ip
         if stored_ip is None:
             self.unit_peer_data.update({"ip": current_ip})
             return False
@@ -1116,7 +1130,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._get_password(),
             self._replication_password,
             self.get_secret(APP_SCOPE, REWIND_PASSWORD_KEY),
-            bool(self.unit_peer_data.get("tls")),
             self.get_secret(APP_SCOPE, RAFT_PASSWORD_KEY),
             self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
@@ -1149,7 +1162,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
-        return all(self.tls.get_tls_files())
+        return all(self.tls.get_client_tls_files())
 
     @property
     def _peer_members_ips(self) -> set[str]:
@@ -1386,6 +1399,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.info("Removing %s from the cluster", ip)
             self._remove_from_members_ips(ip)
 
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
+            self.tls.generate_internal_peer_ca()
+            self.tls.generate_internal_peer_cert()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1424,6 +1440,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Defer on_config_changed: Refresh in progress")
             event.defer()
             return
+
+        if self._update_member_ip():
+            # Update the sync-standby endpoint in the async replication data.
+            self.async_replication.update_async_replication_data()
+            return
+
         try:
             self._validate_config_options()
             # update config on every run
@@ -1444,11 +1466,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if self.is_blocked and "Configuration Error" in self.unit.status.message:
             self.set_unit_status(ActiveStatus())
-
-        if self._update_member_ip():
-            # Update the sync-standby endpoint in the async replication data.
-            self.async_replication.update_async_replication_data()
-            return
 
         # Update the sync-standby endpoint in the async replication data.
         self.async_replication.update_async_replication_data()
@@ -1573,7 +1590,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        self.unit_peer_data.update({"ip": self.get_hostname_by_unit(None)})
+        if not self.get_secret(APP_SCOPE, "internal-ca"):
+            logger.info("leader not elected and/or internal CA not yet generated")
+            event.defer()
+            return
+        if not self.get_secret(UNIT_SCOPE, "internal-cert"):
+            self.tls.generate_internal_peer_cert()
+
+        self.unit_peer_data.update({"ip": self._unit_ip})
 
         # Open port
         try:
@@ -1681,7 +1705,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug("Starting LDAP sync service")
         postgres_snap.restart(services=["ldap-sync"])
 
-    def _start_primary(self, event: StartEvent) -> None:
+    def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
@@ -1695,24 +1719,50 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
+        if not self._can_connect_to_postgresql:
+            logger.debug("Deferring on_start: awaiting for database to start")
+            self.unit.status = WaitingStatus("awaiting for database to start")
+            event.defer()
+            return
+
+        if not self.primary_endpoint:
+            logger.debug("Deferrring on_start: awaitng start of the primary")
+            self.unit.status = WaitingStatus("awaiting start of the primary")
+            event.defer()
+            return
+
+        try:
+            self.postgresql.create_predefined_instance_roles()
+        except PostgreSQLCreatePredefinedRolesError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to create pre-defined roles")
+            return
+
         # Create the default postgres database user that is needed for some
         # applications (not charms) like Landscape Server.
         try:
             # This event can be run on a replica if the machines are restarted.
             # For that case, check whether the postgres user already exits.
             users = self.postgresql.list_users()
-            if "postgres" not in users:
-                self.postgresql.create_user("postgres", new_password(), admin=True)
-                # Create the backup user.
+            # Create the backup user.
             if BACKUP_USER not in users:
-                self.postgresql.create_user(BACKUP_USER, new_password(), admin=True)
+                self.postgresql.create_user(
+                    BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
+                )
+                self.postgresql.grant_database_privileges_to_user(
+                    BACKUP_USER, "postgres", ["connect"]
+                )
             if MONITORING_USER not in users:
                 # Create the monitoring user.
                 self.postgresql.create_user(
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles=["pg_monitor"],
+                    extra_user_roles=[ROLE_STATS],
                 )
+        except PostgreSQLGrantDatabasePrivilegesToUserError as e:
+            logger.exception(e)
+            self.unit.status = BlockedStatus("Failed to grant database privileges to user")
+            return
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
             self.set_unit_status(BlockedStatus("Failed to create postgres user"))
@@ -1725,6 +1775,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.postgresql.set_up_database(
             temp_location="/var/snap/charmed-postgresql/common/data/temp"
         )
+
+        access_groups = self.postgresql.list_access_groups()
+        if access_groups != set(ACCESS_GROUPS):
+            self.postgresql.create_access_groups()
+            self.postgresql.grant_internal_access_group_memberships()
 
         access_groups = self.postgresql.list_access_groups()
         if access_groups != set(ACCESS_GROUPS):
@@ -1795,13 +1850,14 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
+            updateable_users = [*SYSTEM_USERS, BACKUP_USER]
             # get the secret content and check each user configured there
             # only SYSTEM_USERS with changed passwords are processed, all others ignored
             updated_passwords = self.get_secret_from_id(secret_id=admin_secret_id)
             for user, password in list(updated_passwords.items()):
-                if user not in SYSTEM_USERS:
+                if user not in updateable_users:
                     logger.error(
-                        f"Can only update system users: {', '.join(SYSTEM_USERS)} not {user}"
+                        f"Can only update system users: {', '.join(updateable_users)} not {user}"
                     )
                     updated_passwords.pop(user)
                     continue
@@ -2061,8 +2117,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Request the certificate only if there is already one. If there isn't,
         # the certificate will be generated in the relation joined event when
         # relating to the TLS Certificates Operator.
-        if all(self.tls.get_tls_files()):
-            self.tls._request_certificate(self.get_secret("unit", "private-key"))
+        if all(self.tls.get_client_tls_files()) or all(self.tls.get_peer_tls_files()):
+            self.tls.refresh_tls_certificates_event.emit()
+        if self.get_secret(UNIT_SCOPE, "internal-cert"):
+            self.tls.generate_internal_peer_cert()
 
     @property
     def is_blocked(self) -> bool:
@@ -2146,13 +2204,25 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def push_tls_files_to_workload(self) -> bool:
         """Move TLS files to the PostgreSQL storage path and enable TLS."""
-        key, ca, cert = self.tls.get_tls_files()
+        key, ca, cert = self.tls.get_client_tls_files()
         if key is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_KEY_FILE}", key, 0o600)
         if ca is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}", ca, 0o600)
         if cert is not None:
             self._patroni.render_file(f"{PATRONI_CONF_PATH}/{TLS_CERT_FILE}", cert, 0o600)
+
+        key, ca, cert = self.tls.get_peer_tls_files()
+        if key is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_KEY_FILE}", key, 0o600)
+        if ca is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CA_FILE}", ca, 0o600)
+        if cert is not None:
+            self._patroni.render_file(f"{PATRONI_CONF_PATH}/peer_{TLS_CERT_FILE}", cert, 0o600)
+
+        self._patroni.render_file(
+            f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}", self.tls.get_peer_ca_bundle(), 0o600
+        )
 
         try:
             return self.update_config()
@@ -2261,7 +2331,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if refresh is None:
             refresh = self.refresh
 
-        enable_tls = self.is_tls_enabled
         limit_memory = None
         if self.config.profile_limit_memory:
             limit_memory = self.config.profile_limit_memory * 10**6
@@ -2276,7 +2345,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             connectivity=self.is_connectivity_enabled,
             is_creating_backup=is_creating_backup,
             enable_ldap=self.is_ldap_enabled,
-            enable_tls=enable_tls,
+            enable_tls=self.is_tls_enabled,
             backup_id=self.app_peer_data.get("restoring-backup"),
             pitr_target=self.app_peer_data.get("restore-to-time"),
             restore_timeline=self.app_peer_data.get("restore-timeline"),
@@ -2285,6 +2354,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             restore_stanza=self.app_peer_data.get("restore-stanza"),
             parameters=pg_parameters,
             no_peers=no_peers,
+            user_databases_map=self.relations_user_databases_map,
         )
         if no_peers:
             return True
@@ -2294,17 +2364,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # then mark TLS as enabled. This commonly happens when the charm is deployed
             # in a bundle together with the TLS certificates operator. This flag is used to
             # know when to call the Patroni API using HTTP or HTTPS.
-            self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+            self.unit_peer_data.update({
+                "tls": "enabled" if self.is_tls_enabled else "",
+            })
             self.postgresql_client_relation.update_endpoints()
             logger.debug("Early exit update_config: Workload not started yet")
             return True
 
         if not self._patroni.member_started:
-            if enable_tls:
+            if self.is_tls_enabled:
                 logger.debug(
                     "Early exit update_config: patroni not responding but TLS is enabled."
                 )
-                self._handle_postgresql_restart_need(True)
+                self._handle_postgresql_restart_need()
                 return True
             logger.debug("Early exit update_config: Patroni not started yet")
             return False
@@ -2327,7 +2399,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "wal_keep_size": self.config.durability_wal_keep_size,
         })
 
-        self._handle_postgresql_restart_need(enable_tls)
+        self._handle_postgresql_restart_need()
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -2369,7 +2441,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 "storage_default_table_access_method config option has an invalid value"
             )
 
-    def _handle_postgresql_restart_need(self, enable_tls: bool) -> None:
+    def _handle_postgresql_restart_need(self) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
             restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
@@ -2391,7 +2463,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             # Ignore the error, as it happens only to indicate that the configuration has not changed.
             pass
-        self.unit_peer_data.update({"tls": "enabled" if enable_tls else ""})
+        self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
 
         # Restart PostgreSQL if TLS configuration has changed
@@ -2418,6 +2490,37 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def client_relations(self) -> list[Relation]:
         """Return the list of established client relations."""
         return self.model.relations.get("database", [])
+
+    @property
+    def relations_user_databases_map(self) -> dict:
+        """Returns a user->databases map for all relations."""
+        if not self.is_cluster_initialised or not self._patroni.member_started:
+            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
+        user_database_map = {}
+        try:
+            for user in self.postgresql.list_users_from_relation(
+                current_host=self.is_connectivity_enabled
+            ):
+                user_database_map[user] = ",".join(
+                    self.postgresql.list_accessible_databases_for_user(
+                        user, current_host=self.is_connectivity_enabled
+                    )
+                )
+                # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
+                if any(True for relation in self.client_relations if relation.name == "db-admin"):
+                    user_database_map["landscape"] = "all"
+            if self.postgresql.list_access_groups(
+                current_host=self.is_connectivity_enabled
+            ) != set(ACCESS_GROUPS):
+                user_database_map.update({
+                    USER: "all",
+                    REPLICATION_USER: "all",
+                    REWIND_USER: "all",
+                })
+            return user_database_map
+        except PostgreSQLListUsersError:
+            logger.debug("relations_user_databases_map: Unable to get users")
+            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None

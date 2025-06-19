@@ -87,7 +87,6 @@ def patroni(harness, peers_ips):
         "fake-superuser-password",
         "fake-replication-password",
         "fake-rewind-password",
-        False,
         "fake-raft-password",
         "fake-patroni-password",
     )
@@ -102,13 +101,13 @@ def test_get_alternative_patroni_url(peers_ips, patroni):
 
     # Test the first URL that is returned (it should have the current unit IP).
     url = patroni._get_alternative_patroni_url(attempt)
-    assert url == f"http://{patroni.unit_ip}:8008"
+    assert url == f"https://{patroni.unit_ip}:8008"
 
     # Test returning the other servers URLs.
     for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
         attempt.retry_state.attempt_number = attempt_number
         url = patroni._get_alternative_patroni_url(attempt)
-        assert url.split("http://")[1].split(":8008")[0] in peers_ips
+        assert url.split("https://")[1].split(":8008")[0] in peers_ips
 
 
 def test_get_member_ip(peers_ips, patroni):
@@ -452,8 +451,8 @@ def test_reinitialize_postgresql(peers_ips, patroni):
     with patch("requests.post") as _post:
         patroni.reinitialize_postgresql()
         _post.assert_called_once_with(
-            f"http://{patroni.unit_ip}:8008/reinitialize",
-            verify=True,
+            f"https://{patroni.unit_ip}:8008/reinitialize",
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -470,9 +469,9 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover()
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover",
+            "https://1.1.1.1:8008/switchover",
             json={"leader": "primary"},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -482,9 +481,9 @@ def test_switchover(peers_ips, patroni):
         patroni.switchover("candidate")
 
         _post.assert_called_once_with(
-            "http://1.1.1.1:8008/switchover",
+            "https://1.1.1.1:8008/switchover",
             json={"leader": "primary", "candidate": "candidate"},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -518,9 +517,9 @@ def test_update_synchronous_node_count(peers_ips, patroni):
         patroni.update_synchronous_node_count()
 
         _patch.assert_called_once_with(
-            "http://1.1.1.1:8008/config",
+            "https://1.1.1.1:8008/config",
             json={"synchronous_node_count": 0},
-            verify=True,
+            verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
@@ -563,13 +562,17 @@ def test_member_started_true(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.return_value.json.return_value = {"state": "running"}
 
         assert patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -578,13 +581,17 @@ def test_member_started_false(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.return_value.json.return_value = {"state": "stopped"}
 
         assert not patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -593,13 +600,17 @@ def test_member_started_error(peers_ips, patroni):
         patch("cluster.requests.get") as _get,
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
         patch("cluster.wait_fixed", return_value=wait_fixed(0)),
+        patch("charm.Patroni.is_patroni_running", return_value=True),
     ):
         _get.side_effect = Exception
 
         assert not patroni.member_started
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -614,7 +625,10 @@ def test_member_inactive_true(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -629,7 +643,10 @@ def test_member_inactive_false(peers_ips, patroni):
         assert not patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 
@@ -644,7 +661,10 @@ def test_member_inactive_error(peers_ips, patroni):
         assert patroni.member_inactive
 
         _get.assert_called_once_with(
-            "http://1.1.1.1:8008/health", verify=True, timeout=5, auth=patroni._patroni_auth
+            "https://1.1.1.1:8008/health",
+            verify=patroni.verify,
+            timeout=5,
+            auth=patroni._patroni_auth,
         )
 
 

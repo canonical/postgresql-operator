@@ -314,7 +314,7 @@ from typing import (
 import opentelemetry
 import ops
 from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import (
-    encode_spans,
+    encode_spans # type: ignore
 )
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
@@ -348,7 +348,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 7
+LIBPATCH = 8
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -704,7 +704,14 @@ def _get_server_cert(
             f"{charm_type}.{server_cert_attr} is None; sending traces over INSECURE connection."
         )
         return
-    elif not Path(server_cert).is_absolute():
+    if not isinstance(server_cert, (str, Path)):
+        logger.warning(
+            f"{charm_type}.{server_cert_attr} has unexpected type {type(server_cert)}; "
+            f"sending traces over INSECURE connection."
+        )
+        return
+    path = Path(server_cert)
+    if not path.is_absolute() or not path.exists():
         raise ValueError(
             f"{charm_type}.{server_cert_attr} should resolve to a valid tls cert absolute path (string | Path)); "
             f"got {server_cert} instead."

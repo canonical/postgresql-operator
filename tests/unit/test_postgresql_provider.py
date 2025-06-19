@@ -4,7 +4,7 @@
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
-from charms.postgresql_k8s.v0.postgresql import (
+from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
@@ -95,6 +95,7 @@ def request_database(_harness):
 
 def test_on_database_requested(harness):
     with (
+        patch("charm.PostgresqlOperatorCharm.update_config"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("charm.PostgreSQLProvider.update_endpoints") as _update_endpoints,
@@ -120,10 +121,10 @@ def test_on_database_requested(harness):
             "1.1.1.1",
         ]
         postgresql_mock.create_user = PropertyMock(
-            side_effect=[None, PostgreSQLCreateUserError, None, None]
+            side_effect=[None, PostgreSQLCreateUserError, None]
         )
         postgresql_mock.create_database = PropertyMock(
-            side_effect=[None, PostgreSQLCreateDatabaseError, None]
+            side_effect=[None, PostgreSQLCreateDatabaseError, None, None]
         )
         postgresql_mock.get_postgresql_version = PropertyMock(
             side_effect=[
@@ -151,14 +152,11 @@ def test_on_database_requested(harness):
             user,
             "test-password",
             extra_user_roles=expected_user_roles,
+            in_role="test_database_admin",
         )
-        database_relation = harness.model.get_relation(RELATION_NAME)
-        client_relations = [database_relation]
         postgresql_mock.create_database.assert_called_once_with(
             DATABASE,
-            user,
             plugins=["pgaudit"],
-            client_relations=client_relations,
         )
         postgresql_mock.get_postgresql_version.assert_called_once()
         _update_endpoints.assert_called_once()

@@ -20,7 +20,7 @@ from .helpers import (
 
 logger = logging.getLogger(__name__)
 
-TIMEOUT = 900
+TIMEOUT = 25 * 60
 
 
 @pytest.mark.abort_on_fail
@@ -41,6 +41,7 @@ async def test_deploy_stable(ops_test: OpsTest) -> None:
         APPLICATION_NAME,
         num_units=1,
         channel="latest/edge",
+        config={"sleep_interval": 500},
     )
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
@@ -83,33 +84,35 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
 
     logger.info("Wait for upgrade to start")
     try:
-        # Blocked status is expected due to compatibility checks.
+        # Blocked status is expected due to:
+        # (on PR) compatibility checks (on PR charm revision is '16/1.25.0+dirty...')
+        # (non-PR) the first unit upgraded and paused (pause_after_unit_refresh=first)
         await ops_test.model.block_until(lambda: application.status == "blocked", timeout=60 * 3)
 
-        logger.info("Wait for refresh to block due to compatibility checks")
+        logger.info("Wait for refresh to block as paused or incompatible")
         async with ops_test.fast_forward("60s"):
             await ops_test.model.wait_for_idle(
                 apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
             )
-
-        assert "Refresh incompatible" in application.status_message, (
-            "Application refresh not blocked due to incompatibility"
-        )
 
         # Highest to lowest unit number
         refresh_order = sorted(
             application.units, key=lambda unit: int(unit.name.split("/")[1]), reverse=True
         )
-        action = await refresh_order[0].run_action(
-            "force-refresh-start", **{"check-compatibility": False}
-        )
-        await action.wait()
 
-        logger.info("Wait for first unit to upgrade")
-        async with ops_test.fast_forward("60s"):
-            await ops_test.model.wait_for_idle(
-                apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+        if "Refresh incompatible" in application.status_message:
+            logger.info("Application refresh is blocked due to incompatibility")
+
+            action = await refresh_order[0].run_action(
+                "force-refresh-start", **{"check-compatibility": False}
             )
+            await action.wait()
+
+            logger.info("Wait for first incompatible unit to upgrade")
+            async with ops_test.fast_forward("60s"):
+                await ops_test.model.wait_for_idle(
+                    apps=[DATABASE_APP_NAME], idle_period=30, timeout=TIMEOUT
+                )
 
         logger.info("Run resume-refresh action")
         action = await refresh_order[1].run_action("resume-refresh")
@@ -117,6 +120,7 @@ async def test_upgrade_from_stable(ops_test: OpsTest, charm):
     except TimeoutError:
         # If the application didn't get into the blocked state, it should have upgraded only
         # the charm code because the snap revision didn't change.
+        logger.info("Upgrade completed without snap refresh (charm.py upgrade only)")
         assert application.status == "active", (
             "Application didn't reach blocked or active state after refresh attempt"
         )
