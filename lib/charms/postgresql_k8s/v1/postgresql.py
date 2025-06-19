@@ -386,7 +386,7 @@ class PostgreSQL:
                 connection.close()
 
     def grant_database_privileges_to_user(
-        self, user: str, database: str, privileges: list[str]
+        self, user: str, database: str, privileges: List[str]
     ) -> None:
         """Grant the specified privileges on the provided database for the user."""
         try:
