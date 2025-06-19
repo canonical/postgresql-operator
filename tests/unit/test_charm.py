@@ -3,9 +3,11 @@
 import itertools
 import json
 import logging
+import os
 import pathlib
 import platform
 import subprocess
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
 import charm_refresh
@@ -43,7 +45,7 @@ from cluster import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from constants import PEER, SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
+from constants import PEER, POSTGRESQL_DATA_PATH, SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -2642,3 +2644,55 @@ def test_get_ldap_parameters(harness):
         harness.charm.get_ldap_parameters()
         _get_relation_data.assert_called_once()
         _get_relation_data.reset_mock()
+
+
+def test_handle_processes_failures(harness):
+    _now = datetime.now(UTC)
+    with (
+        patch(
+            "charm.Patroni.member_inactive",
+            new_callable=PropertyMock,
+            return_value=False,
+        ) as _member_inactive,
+        patch(
+            "charm.Patroni.restart_patroni",
+        ) as _restart_patroni,
+        patch("charm.os.listdir", return_value=["other_dirs", "pg_wal"]) as _listdir,
+        patch("charm.os.rename") as _rename,
+        patch("charm.datetime") as _datetime,
+    ):
+        _datetime.now.return_value = _now
+        rel_id = harness.model.get_relation(PEER).id
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"cluster_initialised": "True", "members_ips": '["192.0.2.0"]'},
+            )
+
+        # Does nothing if member is inactive
+        assert not harness.charm._handle_processes_failures()
+        assert not _restart_patroni.called
+
+        # Will not remove pg_wal if dir look right
+        _member_inactive.return_value = True
+        assert harness.charm._handle_processes_failures()
+        _restart_patroni.assert_called_once_with()
+        _restart_patroni.reset_mock()
+
+        # Will move pg_wal if there's only a pg_wal dir
+        _listdir.return_value = ["pg_wal"]
+        assert harness.charm._handle_processes_failures()
+        assert not _restart_patroni.called
+        _rename.assert_called_once_with(
+            os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
+            os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{_now.isoformat()}"),
+        )
+        _rename.reset_mock()
+
+        # Will not move pg_wal if there's only a pg_wal dir or other moved dirs
+        _listdir.return_value = ["pg_wal", f"pg_wal-{_now.isoformat()}"]
+        assert harness.charm._handle_processes_failures()
+        _restart_patroni.assert_called_once_with()
+        assert not _rename.called
+        _restart_patroni.reset_mock()
