@@ -285,7 +285,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 18
+LIBPATCH = 19
 
 PYDEPS = ["pydantic>=1.10,<2", "poetry-core"]
 
@@ -929,7 +929,7 @@ class DataUpgrade(Object, ABC):
             # for k8s run version checks only on highest ordinal unit
             if (
                 self.charm.unit.name
-                == f"{self.charm.app.name}/{self.charm.app.planned_units() -1}"
+                == f"{self.charm.app.name}/{self.charm.app.planned_units() - 1}"
             ):
                 try:
                     self._upgrade_supported_check()
