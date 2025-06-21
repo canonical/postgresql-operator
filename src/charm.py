@@ -17,7 +17,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Optional, get_args
+from typing import Literal, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
@@ -1090,7 +1090,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
 
-    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> Optional[str]:
+    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> str | None:
         """Get the IP address of a specific unit.
 
         Args:
