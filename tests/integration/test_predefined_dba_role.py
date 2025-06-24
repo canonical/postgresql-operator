@@ -15,6 +15,10 @@ from .helpers import (
     DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
     check_connected_user,
+    db_connect,
+    get_password,
+    get_primary,
+    get_unit_address,
 )
 from .new_relations.helpers import build_connection_string
 
@@ -56,6 +60,31 @@ async def test_charmed_dba_role(ops_test: OpsTest):
         apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
     )
 
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    primary_address = get_unit_address(ops_test, primary)
+    operator_password = await get_password(ops_test, "operator")
+
+    # Create a test database to check the dblink functionality.
+    connection = None
+    cursor = None
+    try:
+        connection = db_connect(
+            primary_address,
+            operator_password,
+            username="operator",
+            database="charmed_dba_database",
+        )
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS dblink;")
+        cursor.execute("DROP DATABASE IF EXISTS test;")
+        cursor.execute("CREATE DATABASE test;")
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if connection is not None:
+            connection.close()
+
     action = await ops_test.model.units[f"{DATA_INTEGRATOR_APP_NAME}/0"].run_action(
         action_name="get-credentials"
     )
@@ -91,6 +120,33 @@ async def test_charmed_dba_role(ops_test: OpsTest):
                 logger.info(f"Resetting the user to the {username} user in the {instance}")
                 cursor.execute("SELECT reset_user();")
                 check_connected_user(cursor, username, username, primary=read_write_endpoint)
+                logger.info(
+                    f"Testing connection to another database through the same session in the {instance}"
+                )
+                other_database_connection_string = (
+                    await build_connection_string(
+                        ops_test,
+                        DATA_INTEGRATOR_APP_NAME,
+                        "postgresql",
+                        database="test",
+                        read_only_endpoint=(not read_write_endpoint),
+                    )
+                ).replace("'", "")
+                cursor.execute(
+                    f"SELECT * FROM dblink('{other_database_connection_string}', 'SELECT current_database() AS database') AS t1(database TEXT);"
+                )
+                assert cursor.fetchone()[0] == "test"
         finally:
             if connection is not None:
                 connection.close()
+
+        connection = psycopg2.connect(other_database_connection_string)
+        try:
+            with connection.cursor() as cursor:
+                logger.info(
+                    f"Testing connection to another database through another session in the {instance}"
+                )
+                cursor.execute("SELECT current_database();")
+                assert cursor.fetchone()[0] == "test"
+        finally:
+            connection.close()
