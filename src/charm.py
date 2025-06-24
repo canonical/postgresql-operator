@@ -1737,11 +1737,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.postgresql.create_access_groups()
             self.postgresql.grant_internal_access_group_memberships()
 
-        access_groups = self.postgresql.list_access_groups()
-        if access_groups != set(ACCESS_GROUPS):
-            self.postgresql.create_access_groups()
-            self.postgresql.grant_internal_access_group_memberships()
-
         self.postgresql_client_relation.oversee_users()
 
     def _start_primary(self, event: StartEvent) -> None:
