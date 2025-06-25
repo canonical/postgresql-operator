@@ -57,7 +57,8 @@ logger = logging.getLogger(__name__)
 
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
-RUNNING_STATES = ["running", "streaming"]
+STARTED_STATES = ["running", "streaming"]
+RUNNING_STATES = [*STARTED_STATES, "starting"]
 
 PATRONI_TIMEOUT = 10
 
@@ -376,7 +377,7 @@ class Patroni:
         if cluster_status:
             for member in cluster_status:
                 if member["role"] == "standby_leader":
-                    if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                    if check_whether_is_running and member["state"] not in STARTED_STATES:
                         logger.warning(f"standby leader {member['name']} is not running")
                         continue
                     standby_leader = member["name"]
@@ -421,7 +422,7 @@ class Patroni:
         # a standby leader, because sometimes there may exist (for some period of time)
         # only replicas after a failed switchover.
         return all(
-            member["state"] in RUNNING_STATES for member in cluster_status.json()["members"]
+            member["state"] in STARTED_STATES for member in cluster_status.json()["members"]
         ) and any(
             member["role"] in ["leader", "standby_leader"]
             for member in cluster_status.json()["members"]
@@ -579,7 +580,7 @@ class Patroni:
         if not cluster_status:
             return []
 
-        return [member for member in cluster_status if member["state"] in RUNNING_STATES]
+        return [member for member in cluster_status if member["state"] in STARTED_STATES]
 
     def are_replicas_up(self) -> dict[str, bool] | None:
         """Check if cluster members are running or streaming."""

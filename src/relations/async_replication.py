@@ -642,7 +642,7 @@ class PostgreSQLAsyncReplication(Object):
                 event.defer()
 
     @property
-    def _primary_cluster_endpoint(self) -> typing.Optional[str]:
+    def _primary_cluster_endpoint(self) -> str | None:
         """Return the endpoint from one of the sync-standbys, or from the primary if there is no sync-standby."""
         sync_standby_names = self.charm._patroni.get_sync_standby_names()
         if len(sync_standby_names) > 0:
@@ -682,7 +682,7 @@ class PostgreSQLAsyncReplication(Object):
             raise Exception(f"Failed to remove contents from {path} with error: {e!s}") from e
 
     @property
-    def _relation(self) -> typing.Optional[Relation]:
+    def _relation(self) -> Relation | None:
         """Return the relation object."""
         for relation in [
             self.model.get_relation(REPLICATION_OFFER_RELATION),

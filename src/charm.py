@@ -15,9 +15,9 @@ import re
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Literal, Optional, get_args
+from typing import Literal, get_args
 from urllib.parse import urlparse
 
 import charm_refresh
@@ -128,6 +128,8 @@ from rotate_logs import RotateLogs
 from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
+logging.getLogger("httpx").setLevel(logging.WARNING)
+logging.getLogger("httpcore").setLevel(logging.WARNING)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
@@ -911,23 +913,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        # Restart the workload if it's stuck on the starting state after a timeline divergence
-        # due to a backup that was restored.
-        if (
-            not self.is_primary
-            and not self.is_standby_leader
-            and (
-                self._patroni.member_replication_lag == "unknown"
-                or int(self._patroni.member_replication_lag) > 1000
-            )
-        ):
-            logger.warning("Degraded member detected: reinitialising unit")
-            self.set_unit_status(MaintenanceStatus("reinitialising replica"))
-            self._patroni.reinitialize_postgresql()
-            logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
-            event.defer()
-            return
-
         self._start_stop_pgbackrest_service(event)
 
         # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
@@ -1088,7 +1073,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except RetryError:
             self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
 
-    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> Optional[str]:
+    def _get_unit_ip(self, unit: Unit, relation_name: str = PEER) -> str | None:
         """Get the IP address of a specific unit.
 
         Args:
@@ -1703,7 +1688,41 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug("Starting LDAP sync service")
         postgres_snap.restart(services=["ldap-sync"])
 
-    def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
+    def _setup_users(self) -> None:
+        self.postgresql.create_predefined_instance_roles()
+
+        # Create the default postgres database user that is needed for some
+        # applications (not charms) like Landscape Server.
+
+        # This event can be run on a replica if the machines are restarted.
+        # For that case, check whether the postgres user already exits.
+        users = self.postgresql.list_users()
+        # Create the backup user.
+        if BACKUP_USER not in users:
+            self.postgresql.create_user(
+                BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
+            )
+            self.postgresql.grant_database_privileges_to_user(BACKUP_USER, "postgres", ["connect"])
+        if MONITORING_USER not in users:
+            # Create the monitoring user.
+            self.postgresql.create_user(
+                MONITORING_USER,
+                self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
+                extra_user_roles=[ROLE_STATS],
+            )
+
+        self.postgresql.set_up_database(
+            temp_location="/var/snap/charmed-postgresql/common/data/temp"
+        )
+
+        access_groups = self.postgresql.list_access_groups()
+        if access_groups != set(ACCESS_GROUPS):
+            self.postgresql.create_access_groups()
+            self.postgresql.grant_internal_access_group_memberships()
+
+        self.postgresql_client_relation.oversee_users()
+
+    def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
@@ -1730,33 +1749,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            self.postgresql.create_predefined_instance_roles()
+            self._setup_users()
         except PostgreSQLCreatePredefinedRolesError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create pre-defined roles")
             return
-
-        # Create the default postgres database user that is needed for some
-        # applications (not charms) like Landscape Server.
-        try:
-            # This event can be run on a replica if the machines are restarted.
-            # For that case, check whether the postgres user already exits.
-            users = self.postgresql.list_users()
-            # Create the backup user.
-            if BACKUP_USER not in users:
-                self.postgresql.create_user(
-                    BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
-                )
-                self.postgresql.grant_database_privileges_to_user(
-                    BACKUP_USER, "postgres", ["connect"]
-                )
-            if MONITORING_USER not in users:
-                # Create the monitoring user.
-                self.postgresql.create_user(
-                    MONITORING_USER,
-                    self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles=[ROLE_STATS],
-                )
         except PostgreSQLGrantDatabasePrivilegesToUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to grant database privileges to user")
@@ -1769,22 +1766,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Deferriing on_start: Unable to list users")
             event.defer()
             return
-
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
-
-        access_groups = self.postgresql.list_access_groups()
-        if access_groups != set(ACCESS_GROUPS):
-            self.postgresql.create_access_groups()
-            self.postgresql.grant_internal_access_group_memberships()
-
-        access_groups = self.postgresql.list_access_groups()
-        if access_groups != set(ACCESS_GROUPS):
-            self.postgresql.create_access_groups()
-            self.postgresql.grant_internal_access_group_memberships()
-
-        self.postgresql_client_relation.oversee_users()
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
@@ -1931,7 +1912,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-        if self._handle_workload_failures():
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
             return
 
         # Update the sync-standby endpoint in the async replication data.
@@ -1961,6 +1943,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self._patroni.member_started:
             logger.debug("Restore check early exit: Patroni has not started yet")
+            return False
+
+        try:
+            self._setup_users()
+        except Exception as e:
+            logger.exception(e)
             return False
 
         restoring_backup = self.app_peer_data.get("restoring-backup")
@@ -2036,8 +2024,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self._unit_ip in self.members_ips and self._patroni.member_inactive:
             data_directory_contents = os.listdir(POSTGRESQL_DATA_PATH)
             if len(data_directory_contents) == 1 and data_directory_contents[0] == "pg_wal":
-                os.remove(os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"))
-                logger.info("PostgreSQL data directory was not empty. Removed pg_wal")
+                os.rename(
+                    os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
+                    os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{datetime.now(UTC).isoformat()}"),
+                )
+                logger.info("PostgreSQL data directory was not empty. Moved pg_wal")
                 return True
             try:
                 self._patroni.restart_patroni()
@@ -2046,40 +2037,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
                 return False
-
-        return False
-
-    def _handle_workload_failures(self) -> bool:
-        """Handle workload (Patroni or PostgreSQL) failures.
-
-        Returns:
-            a bool indicating whether the charm performed any action.
-        """
-        # Restart the workload if it's stuck on the starting state after a restart.
-        try:
-            is_primary = self.is_primary
-            is_standby_leader = self.is_standby_leader
-        except RetryError:
-            return False
-
-        if (
-            not self.has_raft_keys()
-            and not is_primary
-            and not is_standby_leader
-            and not self._patroni.member_started
-            and "postgresql_restarted" in self._peers.data[self.unit]
-            and self._patroni.member_replication_lag == "unknown"
-        ):
-            logger.warning("Workload failure detected. Reinitialising unit.")
-            self.set_unit_status(MaintenanceStatus("reinitialising replica"))
-            self._patroni.reinitialize_postgresql()
-            return True
-
-        # Restart the service if the current cluster member is isolated from the cluster
-        # (stuck with the "awaiting for member to start" message).
-        if not self._patroni.member_started and self._patroni.is_member_isolated:
-            self._patroni.restart_patroni()
-            return True
 
         return False
 
