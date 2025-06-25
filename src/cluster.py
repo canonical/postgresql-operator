@@ -263,7 +263,7 @@ class Patroni:
             f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
         ):
             return response["members"]
-        return []
+        raise RetryError(last_attempt=Exception("Unable to reach any units"))
 
     def get_member_ip(self, member_name: str) -> str | None:
         """Get cluster member IP address.
@@ -274,13 +274,14 @@ class Patroni:
         Returns:
             IP address of the cluster member.
         """
-        cluster_status = self.cluster_status()
-        if not cluster_status:
-            return
+        try:
+            cluster_status = self.cluster_status()
 
-        for member in cluster_status:
-            if member["name"] == member_name:
-                return member["host"]
+            for member in cluster_status:
+                if member["name"] == member_name:
+                    return member["host"]
+        except RetryError:
+            logger.debug("Unable to get IP. Cluster status unreachable")
 
     def get_member_status(self, member_name: str) -> str:
         """Get cluster member status.
@@ -351,7 +352,8 @@ class Patroni:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if cluster_status := self.cluster_status(alternative_endpoints):
+        try:
+            cluster_status = self.cluster_status(alternative_endpoints)
             for member in cluster_status:
                 if member["role"] == "leader":
                     primary = member["name"]
@@ -359,6 +361,8 @@ class Patroni:
                         # Change the last dash to / in order to match unit name pattern.
                         primary = label2name(primary)
                     return primary
+        except RetryError:
+            logger.debug("Unable to get primary. Cluster status unreachable")
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
