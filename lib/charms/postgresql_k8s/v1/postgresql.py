@@ -263,7 +263,7 @@ class PostgreSQL:
         password: Optional[str] = None,
         admin: bool = False,
         extra_user_roles: Optional[List[str]] = None,
-        in_role: Optional[str] = None,
+        database: Optional[str] = None,
         can_create_database: bool = False,
     ) -> None:
         """Creates a database user.
@@ -273,7 +273,7 @@ class PostgreSQL:
             password: password to be assigned to the user.
             admin: whether the user should have additional admin privileges.
             extra_user_roles: additional privileges and/or roles to be assigned to the user.
-            in_role: role to be assigned to the user.
+            database: optional database to allow the user to connect to.
             can_create_database: whether the user should be able to create databases.
         """
         try:
@@ -306,8 +306,14 @@ class PostgreSQL:
                 user_definition += (
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
-                if in_role:
-                    user_definition += f" IN ROLE \"{in_role}\""
+                connect_statement = None
+                if database:
+                    if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP]):
+                        user_definition += f" IN ROLE \"{database}_admin\""
+                    else:
+                        connect_statement = SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                            Identifier(database), Identifier(user)
+                        )
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
@@ -317,6 +323,8 @@ class PostgreSQL:
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(SQL(f"{user_definition};").format(Identifier(user)))
                 cursor.execute(SQL("COMMIT;"))
+                if connect_statement:
+                    cursor.execute(connect_statement)
 
                 # Add extra user roles to the new user.
                 if roles:

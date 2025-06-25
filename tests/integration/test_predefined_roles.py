@@ -107,7 +107,6 @@ async def test_charmed_read_role(ops_test: OpsTest):
 
         with connection.cursor() as cursor:
             logger.info("Checking that the charmed_read role can read from the database")
-            cursor.execute("RESET ROLE;")
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%' AND table_type <> 'VIEW';"
             )
@@ -126,7 +125,6 @@ async def test_charmed_read_role(ops_test: OpsTest):
 
     with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
         logger.info("Checking that the charmed_read role cannot write to an existing table")
-        cursor.execute("RESET ROLE;")
         with pytest.raises(psycopg2.errors.InsufficientPrivilege):
             cursor.execute(
                 "INSERT INTO test_table (data) VALUES ('test_data_3'), ('test_data_4');"
@@ -144,6 +142,7 @@ async def test_charmed_dml_role(ops_test: OpsTest):
     """Test the charmed_dml role."""
     await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
         "database-name": "charmed_dml_database",
+        "extra-user-roles": "charmed_dml",
     })
     await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
     await ops_test.model.wait_for_idle(
@@ -157,6 +156,18 @@ async def test_charmed_dml_role(ops_test: OpsTest):
     await ops_test.model.add_relation(f"{DATA_INTEGRATOR_APP_NAME}2", DATABASE_APP_NAME)
     await ops_test.model.wait_for_idle(apps=[f"{DATA_INTEGRATOR_APP_NAME}2"], status="active")
 
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    primary_address = get_unit_address(ops_test, primary)
+    operator_password = await get_password(ops_test, "operator")
+
+    with db_connect(
+        primary_address, operator_password, username="operator", database="charmed_dml_database"
+    ) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
+    connection.close()
+
     connection_string = await build_connection_string(
         ops_test,
         DATA_INTEGRATOR_APP_NAME,
@@ -168,19 +179,24 @@ async def test_charmed_dml_role(ops_test: OpsTest):
         connection.autocommit = True
 
         with connection.cursor() as cursor:
-            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
-
             cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
+    connection.close()
 
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2"]), (
-                "Unexpected data in charmed_dml_database with charmed_dml role"
-            )
-
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    primary_address = get_unit_address(ops_test, primary)
-    operator_password = await get_password(ops_test, "operator")
+    with (
+        db_connect(
+            primary_address,
+            operator_password,
+            username="operator",
+            database="charmed_dml_database",
+        ) as connection,
+        connection.cursor() as cursor,
+    ):
+        cursor.execute("SELECT data FROM test_table;")
+        data = sorted([row[0] for row in cursor.fetchall()])
+        assert data == sorted(["test_data", "test_data_2"]), (
+            "Unexpected data in charmed_dml_database with charmed_dml role"
+        )
+    connection.close()
 
     secret_uri = await get_application_relation_data(
         ops_test,
@@ -201,6 +217,7 @@ async def test_charmed_dml_role(ops_test: OpsTest):
                     psycopg2.sql.Identifier(data_integrator_2_user)
                 )
             )
+    connection.close()
 
     connection.close()
     for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
@@ -227,6 +244,7 @@ async def test_charmed_dml_role(ops_test: OpsTest):
             assert data == sorted(["test_data", "test_data_2", "test_data_3"]), (
                 "Unexpected data in charmed_read_database with charmed_read role"
             )
+    connection.close()
 
     await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
         f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"

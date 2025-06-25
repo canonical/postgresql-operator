@@ -113,7 +113,7 @@ class PostgreSQLProvider(Object):
 
             password = new_password()
             self.charm.postgresql.create_user(
-                user, password, extra_user_roles=extra_user_roles, in_role=f"{database}_admin"
+                user, password, extra_user_roles=extra_user_roles, database=database
             )
 
             # Share the credentials with the application.
