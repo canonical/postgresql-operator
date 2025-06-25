@@ -793,6 +793,12 @@ async def check_roles_and_their_permissions(
             check_connected_user(cursor, username, username)
             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                 cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+
+            logger.info(
+                "Checking that the relation user can escalate back to the database owner user"
+            )
+            cursor.execute(f"SET ROLE {database_name}_owner;")
+            check_connected_user(cursor, username, f"{database_name}_owner")
     finally:
         if connection is not None:
             connection.close()

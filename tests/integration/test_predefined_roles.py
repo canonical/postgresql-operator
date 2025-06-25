@@ -131,6 +131,14 @@ async def test_charmed_read_role(ops_test: OpsTest):
             )
     connection.close()
 
+    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+        logger.info(
+            "Checking that the charmed_read role can't escalate to the database owner user"
+        )
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            cursor.execute("SET ROLE charmed_read_database_owner;")
+    connection.close()
+
     await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
         f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
     )
@@ -179,6 +187,7 @@ async def test_charmed_dml_role(ops_test: OpsTest):
         connection.autocommit = True
 
         with connection.cursor() as cursor:
+            logger.info("Checking that the charmed_dml role can write data")
             cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
     connection.close()
 
@@ -201,9 +210,19 @@ async def test_charmed_dml_role(ops_test: OpsTest):
     with (
         psycopg2.connect(connection_string) as connection,
         connection.cursor() as cursor,
-        pytest.raises(psycopg2.errors.InsufficientPrivilege),
     ):
-        cursor.execute("SELECT data FROM test_table;")
+        logger.info("Checking that the charmed_dml role can't read data")
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            cursor.execute("SELECT data FROM test_table;")
+    connection.close()
+
+    with (
+        psycopg2.connect(connection_string) as connection,
+        connection.cursor() as cursor,
+    ):
+        logger.info("Checking that the charmed_dml role can't escalate to the database owner user")
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            cursor.execute("SET ROLE charmed_read_database_owner;")
     connection.close()
 
     secret_uri = await get_application_relation_data(
