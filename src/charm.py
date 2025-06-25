@@ -1688,7 +1688,41 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.debug("Starting LDAP sync service")
         postgres_snap.restart(services=["ldap-sync"])
 
-    def _start_primary(self, event: StartEvent) -> None:  # noqa: C901
+    def _setup_users(self) -> None:
+        self.postgresql.create_predefined_instance_roles()
+
+        # Create the default postgres database user that is needed for some
+        # applications (not charms) like Landscape Server.
+
+        # This event can be run on a replica if the machines are restarted.
+        # For that case, check whether the postgres user already exits.
+        users = self.postgresql.list_users()
+        # Create the backup user.
+        if BACKUP_USER not in users:
+            self.postgresql.create_user(
+                BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
+            )
+            self.postgresql.grant_database_privileges_to_user(BACKUP_USER, "postgres", ["connect"])
+        if MONITORING_USER not in users:
+            # Create the monitoring user.
+            self.postgresql.create_user(
+                MONITORING_USER,
+                self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
+                extra_user_roles=[ROLE_STATS],
+            )
+
+        self.postgresql.set_up_database(
+            temp_location="/var/snap/charmed-postgresql/common/data/temp"
+        )
+
+        access_groups = self.postgresql.list_access_groups()
+        if access_groups != set(ACCESS_GROUPS):
+            self.postgresql.create_access_groups()
+            self.postgresql.grant_internal_access_group_memberships()
+
+        self.postgresql_client_relation.oversee_users()
+
+    def _start_primary(self, event: StartEvent) -> None:
         """Bootstrap the cluster."""
         # Set some information needed by Patroni to bootstrap the cluster.
         if not self._patroni.bootstrap_cluster():
@@ -1715,33 +1749,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         try:
-            self.postgresql.create_predefined_instance_roles()
+            self._setup_users()
         except PostgreSQLCreatePredefinedRolesError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to create pre-defined roles")
             return
-
-        # Create the default postgres database user that is needed for some
-        # applications (not charms) like Landscape Server.
-        try:
-            # This event can be run on a replica if the machines are restarted.
-            # For that case, check whether the postgres user already exits.
-            users = self.postgresql.list_users()
-            # Create the backup user.
-            if BACKUP_USER not in users:
-                self.postgresql.create_user(
-                    BACKUP_USER, new_password(), extra_user_roles=[ROLE_BACKUP]
-                )
-                self.postgresql.grant_database_privileges_to_user(
-                    BACKUP_USER, "postgres", ["connect"]
-                )
-            if MONITORING_USER not in users:
-                # Create the monitoring user.
-                self.postgresql.create_user(
-                    MONITORING_USER,
-                    self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
-                    extra_user_roles=[ROLE_STATS],
-                )
         except PostgreSQLGrantDatabasePrivilegesToUserError as e:
             logger.exception(e)
             self.unit.status = BlockedStatus("Failed to grant database privileges to user")
@@ -1754,22 +1766,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Deferriing on_start: Unable to list users")
             event.defer()
             return
-
-        self.postgresql.set_up_database(
-            temp_location="/var/snap/charmed-postgresql/common/data/temp"
-        )
-
-        access_groups = self.postgresql.list_access_groups()
-        if access_groups != set(ACCESS_GROUPS):
-            self.postgresql.create_access_groups()
-            self.postgresql.grant_internal_access_group_memberships()
-
-        access_groups = self.postgresql.list_access_groups()
-        if access_groups != set(ACCESS_GROUPS):
-            self.postgresql.create_access_groups()
-            self.postgresql.grant_internal_access_group_memberships()
-
-        self.postgresql_client_relation.oversee_users()
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
@@ -1947,6 +1943,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self._patroni.member_started:
             logger.debug("Restore check early exit: Patroni has not started yet")
+            return False
+
+        try:
+            self._setup_users()
+        except Exception as e:
+            logger.exception(e)
             return False
 
         restoring_backup = self.app_peer_data.get("restoring-backup")
