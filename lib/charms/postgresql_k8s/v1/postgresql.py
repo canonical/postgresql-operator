@@ -361,9 +361,7 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
             ROLE_DBA: [
-                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;",
-                f"GRANT CONNECT ON DATABASE postgres TO {ROLE_DBA};",
-                f"GRANT CONNECT ON DATABASE template1 TO {ROLE_DBA};"
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;"
             ],
         }
 
