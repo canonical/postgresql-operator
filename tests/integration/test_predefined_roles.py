@@ -198,6 +198,14 @@ async def test_charmed_dml_role(ops_test: OpsTest):
         )
     connection.close()
 
+    with (
+        psycopg2.connect(connection_string) as connection,
+        connection.cursor() as cursor,
+        pytest.raises(psycopg2.errors.InsufficientPrivilege),
+    ):
+        cursor.execute("SELECT data FROM test_table;")
+    connection.close()
+
     secret_uri = await get_application_relation_data(
         ops_test,
         f"{DATA_INTEGRATOR_APP_NAME}2",
@@ -255,3 +263,49 @@ async def test_charmed_dml_role(ops_test: OpsTest):
     await ops_test.model.wait_for_idle(
         apps=[DATA_INTEGRATOR_APP_NAME, f"{DATA_INTEGRATOR_APP_NAME}2"], status="blocked"
     )
+
+
+@pytest.mark.abort_on_fail
+async def test_both_charmed_read_and_charmed_dml_roles(ops_test: OpsTest):
+    """Test both charmed_read and charmed_dml roles."""
+    await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
+        "database-name": "charmed_read_and_dml_database",
+        "extra-user-roles": "charmed_read,charmed_dml",
+    })
+    await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
+    await ops_test.model.wait_for_idle(
+        apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
+    )
+
+    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    primary_address = get_unit_address(ops_test, primary)
+    operator_password = await get_password(ops_test, "operator")
+
+    with db_connect(
+        primary_address,
+        operator_password,
+        username="operator",
+        database="charmed_read_and_dml_database",
+    ) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
+    connection.close()
+
+    connection_string = await build_connection_string(
+        ops_test,
+        DATA_INTEGRATOR_APP_NAME,
+        "postgresql",
+        database="charmed_read_and_dml_database",
+    )
+
+    with psycopg2.connect(connection_string) as connection:
+        connection.autocommit = True
+        with connection.cursor() as cursor:
+            cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
+            cursor.execute("SELECT data FROM test_table;")
+            data = sorted([row[0] for row in cursor.fetchall()])
+            assert data == sorted(["test_data", "test_data_2"]), (
+                "Unexpected data in charmed_read_and_dml_database with charmed_read and charmed_dml roles"
+            )
+    connection.close()
