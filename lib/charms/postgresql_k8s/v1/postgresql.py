@@ -53,6 +53,7 @@ ROLE_READ = "charmed_read"
 ROLE_DML = "charmed_dml"
 ROLE_BACKUP = "charmed_backup"
 ROLE_DBA = "charmed_dba"
+ROLE_DATABASES_OWNER = "charmed_databases_owner"
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -241,7 +242,7 @@ class PostgreSQL:
                 SQL("SELECT datname FROM pg_database WHERE datname={};").format(Literal(database))
             )
             if cursor.fetchone() is None:
-                cursor.execute(SQL("SET ROLE charmed_databases_owner;"))
+                cursor.execute(SQL("SET ROLE {};").format(Identifier(ROLE_DATABASES_OWNER)))
                 cursor.execute(SQL("CREATE DATABASE {};").format(Identifier(database)))
                 cursor.execute(
                     SQL("REVOKE ALL PRIVILEGES ON DATABASE {} FROM PUBLIC;").format(
@@ -355,10 +356,10 @@ class PostgreSQL:
                 f"CREATE ROLE {ROLE_STATS} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_monitor",
             ],
             ROLE_READ: [
-                f"CREATE ROLE {ROLE_READ} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_read_all_data",
+                f"CREATE ROLE {ROLE_READ} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_read_all_data, {ROLE_STATS}",
             ],
             ROLE_DML: [
-                f"CREATE ROLE {ROLE_DML} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data",
+                f"CREATE ROLE {ROLE_DML} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_write_all_data, {ROLE_READ}",
             ],
             ROLE_BACKUP: [
                 f"CREATE ROLE {ROLE_BACKUP} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE pg_checkpoint",
@@ -385,6 +386,7 @@ class PostgreSQL:
                     logger.info(f"Creating predefined role {role}")
 
                     for query in queries:
+                        logger.error(f"Executing query: {query}")
                         cursor.execute(SQL(query))
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined instance roles: {e}")
@@ -807,12 +809,13 @@ class PostgreSQL:
                 database="template1"
             ) as connection, connection.cursor() as cursor:
                 cursor.execute(
-                    "SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';"
+                    f"SELECT TRUE FROM pg_roles WHERE rolname='{ROLE_DATABASES_OWNER}';"
                 )
                 if cursor.fetchone() is None:
                     self.create_user(
-                        "charmed_databases_owner",
+                        ROLE_DATABASES_OWNER,
                         can_create_database=True,
+                        extra_user_roles=[ROLE_DML],
                     )
 
                 self.set_up_login_hook_function()
@@ -916,7 +919,7 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
 
     def set_up_login_hook_function(self) -> None:
         """Create a login hook function to set the user for the current session."""
-        function_creation_statement = """CREATE OR REPLACE FUNCTION login_hook.login() RETURNS VOID AS $$
+        function_creation_statement = f"""CREATE OR REPLACE FUNCTION login_hook.login() RETURNS VOID AS $$
 DECLARE
 	ex_state TEXT;
 	ex_message TEXT;
@@ -942,11 +945,11 @@ BEGIN
 
 	EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', db_admin_role, cur_user) INTO is_user_admin;
 
-EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', 'charmed_databases_owner', cur_user) INTO user_has_createdb;
+EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', '{ROLE_DATABASES_OWNER}', cur_user) INTO user_has_createdb;
 
 	BEGIN
 		IF user_has_createdb = true THEN
-			EXECUTE format('SET ROLE %L', 'charmed_databases_owner');
+			EXECUTE format('SET ROLE %L', '{ROLE_DATABASES_OWNER}');
 		ELSE
 IF is_user_admin = true THEN
 				db_owner_role = db_name || '_owner';
@@ -975,7 +978,7 @@ $$ LANGUAGE plpgsql;"""
 
     def set_up_predefined_catalog_roles_function(self) -> None:
         """Create predefined catalog roles function."""
-        function_creation_statement = """CREATE OR REPLACE FUNCTION set_up_predefined_catalog_roles() RETURNS VOID AS $$
+        function_creation_statement = f"""CREATE OR REPLACE FUNCTION set_up_predefined_catalog_roles() RETURNS VOID AS $$
 DECLARE
     database TEXT;
     current_session_user TEXT;
@@ -1002,7 +1005,7 @@ BEGIN
     END IF;
 
     statements := ARRAY[
-        'REVOKE CREATE ON DATABASE ' || database || ' FROM charmed_databases_owner;',
+        'REVOKE CREATE ON DATABASE ' || database || ' FROM {ROLE_DATABASES_OWNER};',
         'ALTER SCHEMA public OWNER TO ' || owner_user || ';',
         'GRANT CONNECT ON DATABASE ' || database || ' TO ' || admin_user || ';'
     ];
@@ -1054,8 +1057,8 @@ $$ LANGUAGE plpgsql security definer;"""
                     )
                     cursor.execute(
                         SQL(
-                            "GRANT execute ON FUNCTION set_up_predefined_catalog_roles TO charmed_databases_owner;"
-                        )
+                            "GRANT execute ON FUNCTION set_up_predefined_catalog_roles TO {};"
+                        ).format(Identifier(ROLE_DATABASES_OWNER))
                     )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
