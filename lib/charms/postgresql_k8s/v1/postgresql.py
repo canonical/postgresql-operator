@@ -386,7 +386,6 @@ class PostgreSQL:
                     logger.info(f"Creating predefined role {role}")
 
                     for query in queries:
-                        logger.error(f"Executing query: {query}")
                         cursor.execute(SQL(query))
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined instance roles: {e}")

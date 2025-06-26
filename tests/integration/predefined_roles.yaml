@@ -1,0 +1,67 @@
+allowed-combinations:
+  - [""]
+  - ["charmed_stats"]
+  - ["charmed_read"]
+  - ["charmed_dml"]
+  # - ["admin"]
+  # - ["admin", "CREATEDB"]
+extra-user-roles:
+  - !PredefinedRole
+    name: "" # When no extra user role is requested (regular relation user).
+    permissions:
+      - escalate-to-database-owner: true
+
+  - !PredefinedRole
+    name: "charmed_{}_owner"
+    database-owner: true
+    permissions:
+      - create-objects: true
+      - read-data: true
+      - write-data: true
+
+  - !PredefinedRole
+    name: "charmed_stats"
+    permissions:
+      - read-data:
+          - databases:
+              - "*"
+
+  - !PredefinedRole
+    name: "charmed_read"
+    in-roles:
+      - "charmed_stats"
+    permissions:
+      - read-data:
+          - databases:
+              - "*"
+
+  - !PredefinedRole
+    name: "charmed_dml"
+    permissions:
+      - write-data:
+          - databases:
+              - "*"
+
+  - !PredefinedRole
+    name: "charmed_dba"
+    in-roles:
+      - "charmed_dml"
+    permissions:
+      - connect:
+          - databases:
+              - "*"
+      - set-user: true
+
+  - !PredefinedRole
+    name: "admin"
+    in-roles:
+      - "charmed_dml"
+    permissions:
+      - escalate-to-database-owner:
+          - databases:
+              - "*"
+
+  - !PredefinedRole
+    name: "CREATEDB"
+    permissions:
+    - create-databases: true
