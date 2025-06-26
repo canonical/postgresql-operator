@@ -171,14 +171,18 @@ postgresql:
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}
     - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
-    {%- for user, databases in user_databases_map.items() %}
+    {%-   for user, databases in user_databases_map.items() %}
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 scram-sha-256
-    {%- endfor %}
+    {%-   endfor %}
     {%- else %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
-    {%- for user, databases in user_databases_map.items() %}
+    {%-   for user, databases in user_databases_map.items() %}
+    {%-     if 'pgbouncer_auth_relation_' in user %}
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
+    {%-     else %}
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 scram-sha-256
-    {%- endfor %}
+    {%-     endif %}
+    {%-   endfor %}
     {%- endif %}
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 scram-sha-256
     # Allow replications connections from other cluster members.
@@ -187,7 +191,8 @@ postgresql:
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    scram-sha-256
-    {% endfor %}
+    {%- endfor %}
+
   pg_ident:
   - operator snap_daemon backup
   authentication:
