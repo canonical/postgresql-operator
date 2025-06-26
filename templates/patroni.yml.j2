@@ -181,28 +181,33 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_admin 0.0.0.0/0 scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_databases_owner 0.0.0.0/0 scram-sha-256
     {%- if not connectivity %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} md5
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}
-    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 md5
-    {%- for user, databases in user_databases_map.items() %}
-    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
-    {%- endfor %}
+    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
+    {%-   for user, databases in user_databases_map.items() %}
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 scram-sha-256
+    {%-   endfor %}
     {%- else %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 md5
-    {%- for user, databases in user_databases_map.items() %}
+    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
+    {%-   for user, databases in user_databases_map.items() %}
+    {%-     if 'pgbouncer_auth_relation_' in user %}
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
-    {%- endfor %}
+    {%-     else %}
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 scram-sha-256
+    {%-     endif %}
+    {%-   endfor %}
     {%- endif %}
-    - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 md5
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication 127.0.0.1/32 scram-sha-256
     # Allow replications connections from other cluster members.
     {%- for endpoint in extra_replication_endpoints %}
-    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 md5
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 scram-sha-256
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
-    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
-    {% endfor %}
+    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    scram-sha-256
+    {%- endfor %}
+
   pg_ident:
   - operator _daemon_ backup
   authentication:
