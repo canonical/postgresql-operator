@@ -7,6 +7,7 @@ import logging
 import psycopg2 as psycopg2
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .helpers import (
     DATA_INTEGRATOR_APP_NAME,
@@ -233,10 +234,14 @@ async def test_newly_created_database_permissions(ops_test: OpsTest) -> None:
     username = data_integrator_credentials[RELATION_ENDPOINT]["username"]
     password = data_integrator_credentials[RELATION_ENDPOINT]["password"]
     primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
+    host = get_unit_address(ops_test, primary)
     connection = None
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            connection = db_connect(
+                host, password, username=username, database=f"{DATABASE_NAME}_2"
+            )
     try:
-        host = get_unit_address(ops_test, primary)
-        connection = db_connect(host, password, username=username, database=f"{DATABASE_NAME}_2")
         connection.autocommit = True
         with connection.cursor() as cursor:
             logger.info("Checking that the charmed_databases_owner user can create a table")

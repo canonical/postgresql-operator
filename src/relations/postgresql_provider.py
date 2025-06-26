@@ -5,6 +5,7 @@
 
 import logging
 import typing
+from datetime import datetime
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -20,15 +21,15 @@ from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.charm import RelationBrokenEvent, RelationChangedEvent
+from ops.charm import RelationBrokenEvent
 from ops.framework import Object
 from ops.model import ActiveStatus, BlockedStatus, Relation
+from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 
 from constants import (
     ALL_CLIENT_RELATIONS,
     APP_SCOPE,
     DATABASE_PORT,
-    ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE,
 )
 from utils import label2name, new_password
 
@@ -59,10 +60,6 @@ class PostgreSQLProvider(Object):
         super().__init__(charm, self.relation_name)
         self.framework.observe(
             charm.on[self.relation_name].relation_broken, self._on_relation_broken
-        )
-        self.framework.observe(
-            charm.on[self.relation_name].relation_changed,
-            self._on_relation_changed_event,
         )
         self.charm = charm
 
@@ -134,6 +131,8 @@ class PostgreSQLProvider(Object):
             self.update_endpoints(event)
 
             self._update_unit_status(event.relation)
+
+            self.charm.update_config()
         except (
             PostgreSQLCreateDatabaseError,
             PostgreSQLCreateUserError,
@@ -147,6 +146,19 @@ class PostgreSQLProvider(Object):
                     else f"Failed to initialize relation {self.relation_name}"
                 )
             )
+            return
+
+        # Try to wait for pg_hba trigger
+        try:
+            for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(1)):
+                with attempt:
+                    if not self.charm.postgresql.is_user_in_hba(user):
+                        raise Exception("pg_hba not ready")
+            self.charm.unit_peer_data.update({
+                "pg_hba_needs_update_timestamp": str(datetime.now())
+            })
+        except RetryError:
+            logger.warning("database requested: Unable to check pg_hba rule update")
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Correctly update the status."""
@@ -284,11 +296,6 @@ class PostgreSQLProvider(Object):
             self.database_provides.set_tls(relation_id, tls)
             self.database_provides.set_tls_ca(relation_id, ca)
 
-    def _check_multiple_endpoints(self) -> bool:
-        """Checks if there are relations with other endpoints."""
-        relation_names = {relation.name for relation in self.charm.client_relations}
-        return "database" in relation_names and len(relation_names) > 1
-
     def _update_unit_status(self, relation: Relation) -> None:
         """# Clean up Blocked status if it's due to extensions request."""
         if (
@@ -299,27 +306,6 @@ class PostgreSQLProvider(Object):
         if (
             self.charm.is_blocked
             and "Failed to initialize relation" in self.charm.unit.status.message
-        ):
-            self.charm.set_unit_status(ActiveStatus())
-
-        self._update_unit_status_on_blocking_endpoint_simultaneously()
-
-    def _on_relation_changed_event(self, event: RelationChangedEvent) -> None:
-        """Event emitted when the relation has changed."""
-        # Leader only
-        if not self.charm.unit.is_leader():
-            return
-
-        if self._check_multiple_endpoints():
-            self.charm.set_unit_status(BlockedStatus(ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE))
-            return
-
-    def _update_unit_status_on_blocking_endpoint_simultaneously(self):
-        """Clean up Blocked status if this is due related of multiple endpoints."""
-        if (
-            self.charm.is_blocked
-            and self.charm.unit.status.message == ENDPOINT_SIMULTANEOUSLY_BLOCKING_MESSAGE
-            and not self._check_multiple_endpoints()
         ):
             self.charm.set_unit_status(ActiveStatus())
 

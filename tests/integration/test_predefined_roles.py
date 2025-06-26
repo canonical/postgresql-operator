@@ -9,6 +9,7 @@ import psycopg2
 import psycopg2.sql
 import pytest
 from pytest_operator.plugin import OpsTest
+from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .helpers import (
     CHARM_BASE,
@@ -105,6 +106,7 @@ async def test_charmed_read_role(ops_test: OpsTest):
         connection.autocommit = True
 
         with connection.cursor() as cursor:
+            logger.info("Checking that the charmed_read role can read from the database")
             cursor.execute("RESET ROLE;")
             cursor.execute(
                 "SELECT table_name FROM information_schema.tables WHERE table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%' AND table_type <> 'VIEW';"
@@ -117,6 +119,19 @@ async def test_charmed_read_role(ops_test: OpsTest):
             assert data == sorted(["test_data", "test_data_2"]), (
                 "Unexpected data in charmed_read_database with charmed_read role"
             )
+            logger.info("Checking that the charmed_read role cannot create a new table")
+            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
+    connection.close()
+
+    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
+        logger.info("Checking that the charmed_read role cannot write to an existing table")
+        cursor.execute("RESET ROLE;")
+        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+            cursor.execute(
+                "INSERT INTO test_table (data) VALUES ('test_data_3'), ('test_data_4');"
+            )
+    connection.close()
 
     await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
         f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
@@ -187,16 +202,19 @@ async def test_charmed_dml_role(ops_test: OpsTest):
                 )
             )
 
-    with (
-        db_connect(
-            primary_address,
-            data_integrator_2_password,
-            username=data_integrator_2_user,
-            database="charmed_dml_database",
-        ) as connection,
-        connection.cursor() as cursor,
-    ):
+    connection.close()
+    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
+        with attempt:
+            connection = db_connect(
+                primary_address,
+                data_integrator_2_password,
+                username=data_integrator_2_user,
+                database="charmed_dml_database",
+            )
+    with connection.cursor() as cursor:
+        connection.autocommit = True
         cursor.execute("INSERT INTO test_table (data) VALUES ('test_data_3');")
+    connection.close()
 
     with db_connect(
         primary_address, operator_password, username="operator", database="charmed_dml_database"
