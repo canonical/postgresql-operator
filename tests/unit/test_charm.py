@@ -3,9 +3,11 @@
 import itertools
 import json
 import logging
+import os
 import pathlib
 import platform
 import subprocess
+from datetime import UTC, datetime
 from unittest.mock import MagicMock, Mock, PropertyMock, call, mock_open, patch, sentinel
 
 import charm_refresh
@@ -43,7 +45,7 @@ from cluster import (
     SwitchoverFailedError,
     SwitchoverNotSyncError,
 )
-from constants import PEER, SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
+from constants import PEER, POSTGRESQL_DATA_PATH, SECRET_INTERNAL_LABEL, UPDATE_CERTS_BIN_PATH
 
 CREATE_CLUSTER_CONF_PATH = "/etc/postgresql-common/createcluster.d/pgcharm.conf"
 
@@ -801,7 +803,6 @@ def test_on_update_status(harness):
         ) as _set_primary_status_message,
         patch("charm.Patroni.restart_patroni") as _restart_patroni,
         patch("charm.Patroni.is_member_isolated") as _is_member_isolated,
-        patch("charm.Patroni.reinitialize_postgresql") as _reinitialize_postgresql,
         patch(
             "charm.Patroni.member_replication_lag", new_callable=PropertyMock
         ) as _member_replication_lag,
@@ -872,24 +873,9 @@ def test_on_update_status(harness):
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
 
-        # Test the reinitialisation of the replica when its lag is unknown
-        # after a restart.
-        _set_primary_status_message.reset_mock()
-        _is_primary.return_value = False
-        _is_standby_leader.return_value = False
-        _member_started.return_value = False
-        _is_member_isolated.return_value = False
-        _member_replication_lag.return_value = "unknown"
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                rel_id, harness.charm.unit.name, {"postgresql_restarted": "True"}
-            )
-        harness.charm.on.update_status.emit()
-        _reinitialize_postgresql.assert_called_once()
-        _restart_patroni.assert_not_called()
-        _set_primary_status_message.assert_not_called()
-
         # Test call to restart when the member is isolated from the cluster.
+        _set_primary_status_message.reset_mock()
+        _member_started.return_value = False
         _is_member_isolated.return_value = True
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -907,9 +893,6 @@ def test_on_update_status_after_restore_operation(harness):
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
         patch(
-            "charm.PostgresqlOperatorCharm._handle_workload_failures"
-        ) as _handle_workload_failures,
-        patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
         patch(
@@ -924,6 +907,7 @@ def test_on_update_status_after_restore_operation(harness):
         patch(
             "charms.postgresql_k8s.v1.postgresql.PostgreSQL.get_current_timeline"
         ) as _get_current_timeline,
+        patch("charm.PostgresqlOperatorCharm._setup_users") as _setup_users,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.get_member_status") as _get_member_status,
@@ -944,7 +928,6 @@ def test_on_update_status_after_restore_operation(harness):
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
-        _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         assert isinstance(harness.charm.unit.status, BlockedStatus)
 
@@ -957,7 +940,6 @@ def test_on_update_status_after_restore_operation(harness):
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
-        _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
@@ -971,13 +953,11 @@ def test_on_update_status_after_restore_operation(harness):
         _member_started.return_value = True
         _can_use_s3_repository.return_value = (True, None)
         _handle_processes_failures.return_value = False
-        _handle_workload_failures.return_value = False
         harness.charm.on.update_status.emit()
         _update_config.assert_called_once()
         _handle_processes_failures.assert_called_once()
         _oversee_users.assert_called_once()
         _update_relation_endpoints.assert_called_once()
-        _handle_workload_failures.assert_called_once()
         _set_primary_status_message.assert_called_once()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
@@ -2642,3 +2622,55 @@ def test_get_ldap_parameters(harness):
         harness.charm.get_ldap_parameters()
         _get_relation_data.assert_called_once()
         _get_relation_data.reset_mock()
+
+
+def test_handle_processes_failures(harness):
+    _now = datetime.now(UTC)
+    with (
+        patch(
+            "charm.Patroni.member_inactive",
+            new_callable=PropertyMock,
+            return_value=False,
+        ) as _member_inactive,
+        patch(
+            "charm.Patroni.restart_patroni",
+        ) as _restart_patroni,
+        patch("charm.os.listdir", return_value=["other_dirs", "pg_wal"]) as _listdir,
+        patch("charm.os.rename") as _rename,
+        patch("charm.datetime") as _datetime,
+    ):
+        _datetime.now.return_value = _now
+        rel_id = harness.model.get_relation(PEER).id
+        with harness.hooks_disabled():
+            harness.update_relation_data(
+                rel_id,
+                harness.charm.app.name,
+                {"cluster_initialised": "True", "members_ips": '["192.0.2.0"]'},
+            )
+
+        # Does nothing if member is inactive
+        assert not harness.charm._handle_processes_failures()
+        assert not _restart_patroni.called
+
+        # Will not remove pg_wal if dir look right
+        _member_inactive.return_value = True
+        assert harness.charm._handle_processes_failures()
+        _restart_patroni.assert_called_once_with()
+        _restart_patroni.reset_mock()
+
+        # Will move pg_wal if there's only a pg_wal dir
+        _listdir.return_value = ["pg_wal"]
+        assert harness.charm._handle_processes_failures()
+        assert not _restart_patroni.called
+        _rename.assert_called_once_with(
+            os.path.join(POSTGRESQL_DATA_PATH, "pg_wal"),
+            os.path.join(POSTGRESQL_DATA_PATH, f"pg_wal-{_now.isoformat()}"),
+        )
+        _rename.reset_mock()
+
+        # Will not move pg_wal if there's only a pg_wal dir or other moved dirs
+        _listdir.return_value = ["pg_wal", f"pg_wal-{_now.isoformat()}"]
+        assert harness.charm._handle_processes_failures()
+        _restart_patroni.assert_called_once_with()
+        assert not _rename.called
+        _restart_patroni.reset_mock()
