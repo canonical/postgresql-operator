@@ -25,6 +25,7 @@ REQUESTED_DATABASE_NAME = "requested-database"
 OTHER_DATABASE_NAME = "other-database"
 RELATION_ENDPOINT = "postgresql"
 CONFIGURATION_FILE_PATH = "tests/integration/predefined_roles.yaml"
+TIMEOUT = 15 * 60
 
 
 class PredefinedRole(yaml.YAMLObject):
@@ -69,7 +70,9 @@ async def test_deploy(ops_test: OpsTest, charm, predefined_roles_combinations) -
         # Drop the database requested by each data integrator when restarting the test.
         database_name = f"{REQUESTED_DATABASE_NAME}-{index}"
         if drop_databases:
-            logger.info(f"Dropping {database_name} database from already deployed database charm")
+            logger.info(
+                f"Dropping {database_name} database (and it's related users) from already deployed database charm"
+            )
             primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
             connection = None
             try:
@@ -79,6 +82,8 @@ async def test_deploy(ops_test: OpsTest, charm, predefined_roles_combinations) -
                 connection.autocommit = True
                 with connection.cursor() as cursor:
                     cursor.execute(f'DROP DATABASE IF EXISTS "{database_name}";')
+                    cursor.execute(f'DROP ROLE IF EXISTS "{database_name}_admin";')
+                    cursor.execute(f'DROP ROLE IF EXISTS "{database_name}_owner";')
             finally:
                 if connection is not None:
                     connection.close()
@@ -126,4 +131,4 @@ async def test_deploy(ops_test: OpsTest, charm, predefined_roles_combinations) -
         applications.append(data_integrator_app_name)
 
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(apps=applications, status="active")
+        await ops_test.model.wait_for_idle(apps=applications, status="active", timeout=TIMEOUT)
