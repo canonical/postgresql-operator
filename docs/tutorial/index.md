@@ -188,10 +188,10 @@ You can see below the output for the list of databases. `postgres` is the defaul
 (3 rows)
 ```
 
-In order to execute queries, we should enter psql's interactive terminal by running the following command, again typing password when requested:
+In order to execute queries, we should enter `psql`'s interactive terminal by running the following command, again typing password when requested:
 
 ```text
- psql --host=10.1.110.80 --username=operator --password postgres
+psql --host=10.1.110.80 --username=operator --password postgres
 ```
 
 The output should be something like this:
@@ -666,7 +666,7 @@ multipass delete --purge my-vm
 - Check out our other other charm offerings, like [MySQL](https://charmhub.io/mysql) and [Kafka](https://charmhub.io/kafka?channel=edge)
 - Read about [High Availability best practices](https://canonical.com/blog/database-high-availability)
 - [Report](https://github.com/canonical/postgresql-operator/issues) any problems you encountered
-- [Give us your feedback](https://chat.charmhub.io/charmhub/channels/data-platform)
+- [Give us your feedback](/reference/contacts)
 - [Contribute to the code base](https://github.com/canonical/postgresql-operator)
 
 <!--Links-->

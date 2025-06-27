@@ -38,7 +38,7 @@ This configuration will be enforced in **every** Charmed PostgreSQL application 
 ```{caution} 
 The retention is **not** enforced automatically once a backup is older than the set amount of days. Backups older than the set retention time will only get expired only once a newer backup is created.
 
-This behavior avoids complete backup deletion if no newer backups have been created in the charm.
+This behaviour avoids complete backup deletion if no newer backups have been created in the charm.
 ```
 
 The s3-integrator charm accepts many [configurations](https://charmhub.io/s3-integrator/configure) - enter whichever are necessary for your S3 storage.

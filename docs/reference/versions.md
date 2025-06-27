@@ -79,7 +79,7 @@ Read more about Charmed PostgreSQL 14 features in the [release notes].
 
 ### Deprecated
 
-* The track `14` is in bug-fixing/support mode. New Charmed PostgreSQL `16` features will NOT be backported to track `14`.
+* The track `14` is in bug-fixing/support mode. New Charmed PostgreSQL `16` features will NOT be back-ported to track `14`.
 * Charmed PostgreSQL 14 ships [Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/) only.
 
 ## Legacy PostgreSQL charm

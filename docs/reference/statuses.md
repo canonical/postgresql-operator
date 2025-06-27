@@ -1,7 +1,7 @@
 # Charm statuses
 
 ```{caution}
-This reference is a work in progress and not fit for production. Contact [Canonical Data Platform team](https://chat.charmhub.io/charmhub/channels/data-platform) if you are interested in the topic.
+This reference is a work in progress and not fit for production. [Contact us](/reference/contacts) if you are interested in the topic.
 ```
 
 The charm follows [standard Juju applications statuses](https://juju.is/docs/olm/status-values#application-status). Here you can find the expected end-users reaction on different statuses:
@@ -13,8 +13,8 @@ The charm follows [standard Juju applications statuses](https://juju.is/docs/olm
 | **maintenance** | any | Charm is performing the internal maintenance (e.g. cluster re-configuration, upgrade, ...) | No actions required |
 | **blocked** | the S3 repository has backups from another cluster | The bucket contains foreign backup. To avoid accident DB corruption, use clean bucket. The cluster identified by Juju app name + DB UUID. | Choose/change the new S3 [bucket](https://charmhub.io/s3-integrator/configuration#bucket)/[path](https://charmhub.io/s3-integrator/configuration#path) OR clean the current one. |
 | **blocked** | failed to update cluster members on member | TODO: error/retry? | |
-| **blocked** | failed to install snap packages | There are issues with the network connection and/or the Snap Store | Check your internet connection and https://status.snapcraft.io/. Remove the application and when everything is ok, deploy the charm again |
-| **blocked** | failed to patch snap seccomp profile | The charm failed to patch one issue that happens when pgBackRest restores a backup (this blocked status should be removed when https://github.com/pgbackrest/pgbackrest/releases/tag/release%2F2.46 is added to the snap) | Remove the unit and add it back again |
+| **blocked** | failed to install snap packages | There are issues with the network connection and/or the Snap Store | Check your internet connection and https://status.snapcraft.io/. Remove the application and when everything is OK, deploy the charm again |
+| **blocked** | failed to patch snap `seccomp` profile | The charm failed to patch one issue that happens when pgBackRest restores a backup (this blocked status should be removed when https://github.com/pgbackrest/pgbackrest/releases/tag/release%2F2.46 is added to the snap) | Remove the unit and add it back again |
 | **blocked** | failed to set up postgresql_exporter options | The charm failed to set up the metrics exporter | Remove the unit and add it back again |
 | **blocked** | failed to start Patroni | TODO: error/retry? | |
 | **blocked** | Failed to create postgres user | The charm couldn't create the default `postgres` database user due to connection problems | Connect to the database using the `operator` user and the password from the `get-password` action, then run `CREATE ROLE postgres WITH LOGIN SUPERUSER;` |

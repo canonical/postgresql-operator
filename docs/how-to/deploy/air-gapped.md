@@ -11,16 +11,16 @@ Canonical does not prescribe how you should set up your specific air-gapped envi
 * DNS is configured to the local nameservers.
 * [Juju is configured](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#configure-juju) to use local air-gapped services.
 * The [`store-admin`](https://snapcraft.io/store-admin) tool is installed and configured.
-* [Air-gapped CharmHub](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/) is installed and running.
+* [Air-gapped Charmhub](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/) is installed and running.
 * [Air-gapped Snap Store Proxy](https://documentation.ubuntu.com/snap-store-proxy/) is installed and running.
 * Local APT and LXD Images caches are reachable.
 
 ## Air-gapped day-to-day example
 
 ### 1. Export snaps and charms
-Exporting VM SNAPs and Charms and  are currently independent processes. The `store-admin` tool is designed to simplify the process. 
+Exporting VM snaps and charms are currently independent processes. The `store-admin` tool is designed to simplify the process. 
 
-Future improvements are planned to the `store-admin` tool so that it could potentially export all necessary SNAP resource(s) from the official SnapStore with Charms simultaneously. Other planned improvements include supporting the export of specific charm and resource by revisions ([PF-5369](https://warthogs.atlassian.net/browse/PF-5369), [PF-5185](https://warthogs.atlassian.net/browse/PF-5185)).
+Future improvements are planned to the `store-admin` tool so that it could potentially export all necessary snap resource(s) from the official Snap Store with charms simultaneously. Other planned improvements include supporting the export of specific charm and resource by revisions ([PF-5369](https://warthogs.atlassian.net/browse/PF-5369), [PF-5185](https://warthogs.atlassian.net/browse/PF-5185)).
 
 #### Charms
  The necessary charm(s) can be exported as bundle or independently (charm-by-charm). See the Snap Proxy documentation:
@@ -60,8 +60,8 @@ Successfully exported charm bundle postgresql-bundle: /home/ubuntu/snap/store-ad
 ```
 </details>
 
-#### SNAPs
-Usually charms require SNAPs (and some manually pin them). For the manual SNAP exports, follow the official Snap Store Proxy documentation: [Offline Charmhub configuration > Export SNAP](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#export-snap-resources). Data team is shipping the mapping [snap.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/) to the published [bundle.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/):
+#### Snaps
+Usually charms require snaps (and some manually pin them). For the manual snap exports, follow the official Snap Store Proxy documentation: [Offline Charmhub configuration > Export snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#export-snap-resources). Data team is shipping the mapping [snap.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/) to the published [bundle.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/):
 
 > **Warning**: always use snap.yaml and bundle.yaml from the same Git commit (to match each other)!
 
@@ -104,7 +104,7 @@ Always check [checksum](https://en.wikipedia.org/wiki/Checksum) for the transfer
 
 ### 3. Import snaps and charms
 
- Import the [snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap/#importing-pushing-snaps) and [charm](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) blobs into local air-gapped CharmHub:
+ Import the [snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap/#importing-pushing-snaps) and [charm](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) blobs into local air-gapped Charmhub:
 
 When importing machine charms that depend on a snap for functionality, you must first manually import the required snap.
 
@@ -132,10 +132,10 @@ Use [the official release notes](/reference/releases) as a reference.
 
 ## Additional resources
 
-* https://docs.ubuntu.com/snap-store-proxy/en/airgap
-* https://documentation.ubuntu.com/snap-store-proxy/
-* https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/
-* https://ubuntu.com/kubernetes/docs/install-offline
+* `https://docs.ubuntu.com/snap-store-proxy/en/airgap`
+* `https://documentation.ubuntu.com/snap-store-proxy/`
+* `https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/`
+* `https://ubuntu.com/kubernetes/docs/install-offline`
 * [Charmed Kubeflow > Install in an airgapped environment](https://charmed-kubeflow.io/docs/install-in-an-airgapped-environment)
 *  [Wikipedia > Air gap (networking)](https://en.wikipedia.org/wiki/Air_gap_(networking))
 

@@ -30,7 +30,7 @@ Charmed PostgreSQL can be used to deploy a secure PostgreSQL cluster that provid
 * PgBouncer connections
 * External clients connections
 
-To set up a secure connection Charmed PostgreSQL and Charmed PgBouncer need to be integrated with TLS Certificate Provider charms, e.g. self-signed-certificates operator. Certificate Signing Requests (CSRs) are generated for every unit using the tls_certificates_interface library that uses the cryptography Python library to create X.509 compatible certificates. The CSR is signed by the TLS Certificate Provider, returned to the units, and stored in Juju secret. The relation also provides the CA certificate, which is loaded into Juju secret.
+To set up a secure connection Charmed PostgreSQL and Charmed PgBouncer need to be integrated with TLS Certificate Provider charms, e.g. self-signed-certificates operator. Certificate Signing Requests (CSRs) are generated for every unit using the `tls_certificates_interface` library that uses the cryptography Python library to create X.509 compatible certificates. The CSR is signed by the TLS Certificate Provider, returned to the units, and stored in Juju secret. The relation also provides the CA certificate, which is loaded into Juju secret.
 
 Encryption at rest is currently not supported, although it can be provided by the substrate (cloud or on-premises).
 

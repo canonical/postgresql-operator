@@ -15,7 +15,7 @@ The basic requirements to follow along with this example setup are the following
 * A fully deployed and running Juju machine environment
   * See the [PostgreSQL Tutorial](/tutorial/index) for a quick setup with Multipass
   * See the official [Juju deployment guide](https://juju.is/docs/juju/tutorial#deploy) for more details
-* A spare virtual IP address for [hacluster](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741#using-a-virtual-ip-to-connect-to-pgbouncer)
+* A spare virtual IP address for [`hacluster`](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741#using-a-virtual-ip-to-connect-to-pgbouncer)
   * See the PgBouncer guide: [How to use a VIP to connect to PgBouncer](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
 * DNS record pointing to VIP above (`my-tls-example-db.local` is used as an example here)
 
@@ -174,7 +174,7 @@ At this point, Juju is responsible for the health of the clusters/applications:
 * The PostgreSQL charm will restart the workload if PostgreSQL is not healthy.
 * The Juju agent will restart the unit/vm/container if it is no longer reachable/healthy (in the same AZ).
 * The Juju controller will make sure Juju agent is up and running and charm is healthy.
-* The HACluster charm will make sure the VIP is always reachable and routes to a single PgBouncer.
+* The HA Cluster charm will make sure the VIP is always reachable and routes to a single PgBouncer.
 * PgBouncer will balance incoming connections and makes sure write traffic goes to the primary PostgreSQL unit.
 * The TLS operator (in this example, the `self-signed-certificates` charm) is responsible for providing all components with signed ready-to-use TLS artifacts.
 

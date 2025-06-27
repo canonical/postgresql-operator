@@ -16,7 +16,7 @@ The charm supports several Juju releases from [2.9 LTS](https://juju.is/docs/juj
 | [![3.4]](https://juju.is/docs/juju/roadmap#juju-juju-34) | `3.4.3+` | [363]+ | Know Juju issues with previous minor versions |
 | [![3.3]](https://juju.is/docs/juju/roadmap#juju-juju-33) | `3.3.0+` | from [363] to [430] | No known issues |
 | [![3.2]](https://juju.is/docs/juju/roadmap#juju-juju-32) | `3.2.0+` | from [363] to [430]  | No known issues |
-| [![3.1]](https://juju.is/docs/juju/roadmap#juju-juju-31) | `3.1.7+` | from [336] to [430] | Juju secrets were stabilized in `3.1.7` |
+| [![3.1]](https://juju.is/docs/juju/roadmap#juju-juju-31) | `3.1.7+` | from [336] to [430] | Juju secrets were stabilised in `3.1.7` |
 | [![2.9 LTS]](https://juju.is/docs/juju/roadmap#juju-juju-29)  | `2.9.49+` | [288]+ | |
 |  | `2.9.32+` | from [288] to [430] | No tests for older Juju versions. |
 

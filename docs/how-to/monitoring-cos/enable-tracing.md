@@ -25,10 +25,10 @@ juju switch <k8s_controller_name>:<cos_model_name>
 ```
 
 Then, deploy the dependencies of Tempo following [this tutorial](https://discourse.charmhub.io/t/tutorial-deploy-tempo-ha-on-top-of-cos-lite/15489). In particular, we would want to:
-- Deploy the minio charm
-- Deploy the s3 integrator charm
-- Add a bucket into minio using a python script
-- Configure s3 integrator with the minio credentials
+- Deploy the MinIO charm
+- Deploy the S3 integrator charm
+- Add a bucket into MinIO using a python script
+- Configure S3 integrator with the MinIO credentials
 
 Finally, deploy and integrate with Tempo HA in [a monolithic setup](https://discourse.charmhub.io/t/tutorial-deploy-tempo-ha-on-top-of-cos-lite/15489#deploy-monolithic-setup).
 
