@@ -28,7 +28,7 @@ For a given release, this table shows:
 
 ## Architecture and base
 
-Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneously for different [bases/series](https://juju.is/docs/juju/base) using the same charm code. In other words, one release contains multiple revisions.
+Several [revisions](https://documentation.ubuntu.com/juju/3.6/reference/charm/#charm-revision) are released simultaneously for different [bases/series](https://juju.is/docs/juju/base) using the same charm code. In other words, one release contains multiple revisions.
 
 If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.
 

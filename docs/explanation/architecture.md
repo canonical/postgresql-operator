@@ -105,14 +105,14 @@ Accordingly to the [Juju SDK](https://juju.is/docs/sdk/event): “an event is a 
 
 For this charm, the following events are observed:
 
-1. [`on_install`](https://juju.is/docs/sdk/install-event): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
-2. [`leader-elected`](https://juju.is/docs/sdk/leader-elected-event): generate all the secrets to bootstrap the cluster.
+1. [`on_install`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#install): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
+2. [`leader-elected`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-elected): generate all the secrets to bootstrap the cluster.
 3. [`leader-settings-changed`](https://juju.is/docs/sdk/leader-settings-changed-event): Handle the leader settings changed event.
-4. [`start`](https://juju.is/docs/sdk/start-event): Init/setting up the cluster node.
-5. [`config_changed`](https://juju.is/docs/sdk/config-changed-event): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
-6. [`update-status`](https://juju.is/docs/sdk/update-status-event): Takes care of workload health checks.
+4. [`start`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#start): Init/setting up the cluster node.
+5. [`config_changed`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#config-changed): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
+6. [`update-status`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status): Takes care of workload health checks.
 <!--- 7. database_storage_detaching: TODO: ops? event?
-8. TODO: any other events?
+1. TODO: any other events?
 --->
 
 ### Charm code overview

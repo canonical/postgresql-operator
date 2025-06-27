@@ -9,10 +9,10 @@ Canonical does not prescribe how you should set up your specific air-gapped envi
 
 * A VM/hardware resources available for Juju.
 * DNS is configured to the local nameservers.
-* [Juju is configured](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#configure-juju) to use local air-gapped services.
+* DNS is configured to the local nameservers.
+* [Juju is configured](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#configure-juju) to use local air-gapped services.
 * The [`store-admin`](https://snapcraft.io/store-admin) tool is installed and configured.
-* [Air-gapped Charmhub](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/) is installed and running.
-* [Air-gapped Snap Store Proxy](https://documentation.ubuntu.com/snap-store-proxy/) is installed and running.
+* [Air-gapped Charmhub](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#offline-charmhub-configuration) is installed and running.
 * Local APT and LXD Images caches are reachable.
 
 ## Air-gapped day-to-day example
@@ -23,9 +23,9 @@ Exporting VM snaps and charms are currently independent processes. The `store-ad
 Future improvements are planned to the `store-admin` tool so that it could potentially export all necessary snap resource(s) from the official Snap Store with charms simultaneously. Other planned improvements include supporting the export of specific charm and resource by revisions ([PF-5369](https://warthogs.atlassian.net/browse/PF-5369), [PF-5185](https://warthogs.atlassian.net/browse/PF-5185)).
 
 #### Charms
- The necessary charm(s) can be exported as bundle or independently (charm-by-charm). See the Snap Proxy documentation:
-* [Offline Charmhub configuration > Export charm bundle](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#export-charm-bundles)
-* [Offline Charmhub configuration > Export charms](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#export-charms)
+The necessary charm(s) can be exported as bundle or independently (charm-by-charm). See the Snap Proxy documentation:
+* [Offline Charmhub configuration > Export charm bundle](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#export-charm-bundles)
+* [Offline Charmhub configuration > Export charms](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#export-charms)
 
 The bundle export example:
 
@@ -114,7 +114,7 @@ sudo snap-store-proxy push-snap /var/snap/snap-store-proxy/common/snaps-to-push/
 sudo snap-store-proxy push-charm-bundle /var/snap/snap-store-proxy/common/charms-to-push/postgresql-bundle-20241003T104903.tar.gz
 ```
 
-When [re-importing](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) charms or importing other revisions, make sure to provide the `--push-channel-map`.
+When [re-importing](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#import-packages) charms or importing other revisions, make sure to provide the `--push-channel-map`.
 
 ### 4. Deploy PostgreSQL
 
