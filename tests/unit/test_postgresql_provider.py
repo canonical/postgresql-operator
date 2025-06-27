@@ -152,7 +152,7 @@ def test_on_database_requested(harness):
             user,
             "test-password",
             extra_user_roles=expected_user_roles,
-            in_role="test_database_admin",
+            database="test_database",
         )
         postgresql_mock.create_database.assert_called_once_with(
             DATABASE,

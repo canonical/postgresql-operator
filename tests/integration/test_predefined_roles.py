@@ -1,239 +1,203 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-
-import asyncio
 import logging
 
+import jubilant
 import psycopg2
-import psycopg2.sql
-import pytest
-from pytest_operator.plugin import OpsTest
+import pytest as pytest
+import yaml
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .helpers import (
-    CHARM_BASE,
     DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
     db_connect,
+)
+from .jubilant_helpers import (
+    get_credentials,
     get_password,
     get_primary,
     get_unit_address,
-)
-from .new_relations.helpers import (
-    build_connection_string,
-    get_application_relation_data,
-    get_juju_secret,
+    relations,
 )
 
 logger = logging.getLogger(__name__)
 
+REQUESTED_DATABASE_NAME = "requested-database"
+OTHER_DATABASE_NAME = "other-database"
+RELATION_ENDPOINT = "postgresql"
+CONFIGURATION_FILE_PATH = "tests/integration/predefined_roles.yaml"
 TIMEOUT = 15 * 60
 
-# NOTE: We are unable to test set_user_u('operator') as dba user because psycopg2
-# runs every query in a transaction and running set_user() is not supported in transactions.
+
+class PredefinedRole(yaml.YAMLObject):
+    yaml_tag = "!PredefinedRole"
+
+    def __init__(self, name, database_owner, in_roles, permissions):
+        self.name = name
+        self.database_owner = database_owner
+        self.in_roles = in_roles
+        self.permissions = permissions
+
+
+@pytest.fixture(scope="module")
+def predefined_roles() -> str:
+    with open(CONFIGURATION_FILE_PATH) as file:
+        data = yaml.load(file, Loader=yaml.Loader)
+        return data["extra-user-roles"]
+
+
+@pytest.fixture(scope="module")
+def predefined_roles_combinations() -> str:
+    with open(CONFIGURATION_FILE_PATH) as file:
+        data = yaml.load(file, Loader=yaml.Loader)
+        return data["allowed-combinations"]
 
 
 @pytest.mark.abort_on_fail
-@pytest.mark.skip_if_deployed
-async def test_deploy(ops_test: OpsTest, charm: str):
-    """Deploy the postgresql charm."""
-    async with ops_test.fast_forward("10s"):
-        await asyncio.gather(
-            ops_test.model.deploy(
-                charm,
-                application_name=DATABASE_APP_NAME,
-                num_units=2,
-                base=CHARM_BASE,
-                config={"profile": "testing"},
-            ),
-            ops_test.model.deploy(
+def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> None:
+    """Deploy and relate the charms."""
+    drop_databases = False
+    reset_relation = False
+
+    # Deploy the database charm if not already deployed.
+    if DATABASE_APP_NAME not in juju.status().apps:
+        logger.info("Deploying database charm")
+        juju.deploy(
+            charm,
+            config={"profile": "testing"},
+            num_units=2,
+        )
+    else:
+        drop_databases = True
+
+    for combination in predefined_roles_combinations:
+        # Drop the database requested by each data integrator when restarting the test.
+        suffix = (
+            f"-{'-'.join(combination)}".replace("_", "-").lower()
+            if "-".join(combination) != ""
+            else ""
+        )
+        database_name = f"{REQUESTED_DATABASE_NAME}{suffix}"
+        if drop_databases:
+            logger.info(
+                f"Dropping {database_name} database (and it's related users) from already deployed database charm"
+            )
+            connection = None
+            try:
+                primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+                host = get_unit_address(juju, primary)
+                password = get_password()
+                connection = db_connect(host, password)
+                connection.autocommit = True
+                with connection.cursor() as cursor:
+                    cursor.execute(f'DROP DATABASE IF EXISTS "{database_name}";')
+                    cursor.execute(f'DROP ROLE IF EXISTS "{database_name}_admin";')
+                    cursor.execute(f'DROP ROLE IF EXISTS "{database_name}_owner";')
+            finally:
+                if connection is not None:
+                    connection.close()
+            reset_relation = True
+
+        # Deploy the data integrator charm for each combination of predefined roles.
+        data_integrator_app_name = f"{DATA_INTEGRATOR_APP_NAME}{suffix}"
+        extra_user_roles = ",".join(combination)
+        if data_integrator_app_name not in juju.status().apps:
+            logger.info(
+                f"Deploying data integrator charm {'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'}"
+            )
+            juju.deploy(
                 DATA_INTEGRATOR_APP_NAME,
-                base=CHARM_BASE,
-            ),
-            ops_test.model.deploy(
-                DATA_INTEGRATOR_APP_NAME,
-                application_name=f"{DATA_INTEGRATOR_APP_NAME}2",
-                base=CHARM_BASE,
-            ),
+                app=data_integrator_app_name,
+                config={"database-name": database_name, "extra-user-roles": extra_user_roles},
+            )
+        else:
+            logger.info("Resetting extra user roles in already deployed data integrator charm")
+            juju.config(
+                app=data_integrator_app_name,
+                values={
+                    "database-name": database_name,
+                    "extra-user-roles": extra_user_roles,
+                },
+            )
+            reset_relation = True
+
+        # Relate the data integrator charm to the database charm.
+        existing_relations = relations(juju, DATABASE_APP_NAME, data_integrator_app_name)
+        if reset_relation and existing_relations:
+            logger.info("Removing existing relation between charms")
+            juju.remove_relation(
+                f"{data_integrator_app_name}:{RELATION_ENDPOINT}", DATABASE_APP_NAME
+            )
+
+            def all_blocked(status: jubilant.Status, app_name=data_integrator_app_name) -> bool:
+                return jubilant.all_blocked(status, app_name)
+
+            juju.wait(lambda status: all_blocked(status), timeout=TIMEOUT)
+            logger.info("Adding relation between charms")
+            for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5)):
+                with attempt:
+                    juju.integrate(data_integrator_app_name, DATABASE_APP_NAME)
+        if not existing_relations:
+            logger.info("Adding relation between charms")
+            juju.integrate(data_integrator_app_name, DATABASE_APP_NAME)
+
+    juju.wait(lambda status: jubilant.all_active(status), timeout=TIMEOUT)
+
+
+def test_connection(juju: jubilant.Juju, predefined_roles_combinations) -> None:
+    """Check that the data integrator user can connect to the allowed databases."""
+    primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+    host = get_unit_address(juju, primary)
+    password = get_password()
+    connection = None
+    cursor = None
+    try:
+        connection = db_connect(host, password)
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS dblink;")
+        cursor.execute(f'DROP DATABASE IF EXISTS "{OTHER_DATABASE_NAME}";')
+        cursor.execute(f'CREATE DATABASE "{OTHER_DATABASE_NAME}";')
+        cursor.execute("SELECT datname FROM pg_database;")
+        databases = sorted(database[0] for database in cursor.fetchall())
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if connection is not None:
+            connection.close()
+
+    data_integrator_apps = [
+        app for app in juju.status().apps if app.startswith(DATA_INTEGRATOR_APP_NAME)
+    ]
+    for data_integrator_app_name in data_integrator_apps:
+        credentials = get_credentials(juju, f"{data_integrator_app_name}/0")
+        user = credentials["postgresql"]["username"]
+        password = credentials["postgresql"]["password"]
+        database = credentials["postgresql"]["database"]
+        extra_user_roles = juju.config(app=data_integrator_app_name, app_config=True).get(
+            "extra_user_roles"
         )
-
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=TIMEOUT
-        )
-        assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
-
-        await ops_test.model.wait_for_idle(
-            apps=[DATA_INTEGRATOR_APP_NAME, f"{DATA_INTEGRATOR_APP_NAME}2"],
-            status="blocked",
-            timeout=(5 * 60),
-        )
-
-
-@pytest.mark.abort_on_fail
-async def test_charmed_read_role(ops_test: OpsTest):
-    """Test the charmed_read predefined role."""
-    await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
-        "database-name": "charmed_read_database",
-        "extra-user-roles": "charmed_read",
-    })
-    await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-    await ops_test.model.wait_for_idle(
-        apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
-    )
-
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    primary_address = get_unit_address(ops_test, primary)
-    operator_password = await get_password(ops_test, "operator")
-
-    with db_connect(
-        primary_address, operator_password, username="operator", database="charmed_read_database"
-    ) as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
-            cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
-
-    connection_string = await build_connection_string(
-        ops_test,
-        DATA_INTEGRATOR_APP_NAME,
-        "postgresql",
-        database="charmed_read_database",
-    )
-
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            logger.info("Checking that the charmed_read role can read from the database")
-            cursor.execute("RESET ROLE;")
-            cursor.execute(
-                "SELECT table_name FROM information_schema.tables WHERE table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%' AND table_type <> 'VIEW';"
-            )
-            tables = [row[0] for row in cursor.fetchall()]
-            assert tables == ["test_table"], "Unexpected tables in the database"
-
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2"]), (
-                "Unexpected data in charmed_read_database with charmed_read role"
-            )
-            logger.info("Checking that the charmed_read role cannot create a new table")
-            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
-    connection.close()
-
-    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-        logger.info("Checking that the charmed_read role cannot write to an existing table")
-        cursor.execute("RESET ROLE;")
-        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-            cursor.execute(
-                "INSERT INTO test_table (data) VALUES ('test_data_3'), ('test_data_4');"
-            )
-    connection.close()
-
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
-    )
-    await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
-
-
-@pytest.mark.abort_on_fail
-async def test_charmed_dml_role(ops_test: OpsTest):
-    """Test the charmed_dml role."""
-    await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
-        "database-name": "charmed_dml_database",
-    })
-    await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-    await ops_test.model.wait_for_idle(
-        apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
-    )
-
-    await ops_test.model.applications[f"{DATA_INTEGRATOR_APP_NAME}2"].set_config({
-        "database-name": "throwaway",
-        "extra-user-roles": "charmed_dml",
-    })
-    await ops_test.model.add_relation(f"{DATA_INTEGRATOR_APP_NAME}2", DATABASE_APP_NAME)
-    await ops_test.model.wait_for_idle(apps=[f"{DATA_INTEGRATOR_APP_NAME}2"], status="active")
-
-    connection_string = await build_connection_string(
-        ops_test,
-        DATA_INTEGRATOR_APP_NAME,
-        "postgresql",
-        database="charmed_dml_database",
-    )
-
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
-
-            cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
-
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2"]), (
-                "Unexpected data in charmed_dml_database with charmed_dml role"
-            )
-
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    primary_address = get_unit_address(ops_test, primary)
-    operator_password = await get_password(ops_test, "operator")
-
-    secret_uri = await get_application_relation_data(
-        ops_test,
-        f"{DATA_INTEGRATOR_APP_NAME}2",
-        "postgresql",
-        "secret-user",
-    )
-    secret_data = await get_juju_secret(ops_test, secret_uri)
-    data_integrator_2_user = secret_data["username"]
-    data_integrator_2_password = secret_data["password"]
-
-    with db_connect(primary_address, operator_password, username="operator") as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            cursor.execute(
-                psycopg2.sql.SQL("GRANT connect ON DATABASE charmed_dml_database TO {};").format(
-                    psycopg2.sql.Identifier(data_integrator_2_user)
-                )
-            )
-
-    connection.close()
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            connection = db_connect(
-                primary_address,
-                data_integrator_2_password,
-                username=data_integrator_2_user,
-                database="charmed_dml_database",
-            )
-    with connection.cursor() as cursor:
-        connection.autocommit = True
-        cursor.execute("INSERT INTO test_table (data) VALUES ('test_data_3');")
-    connection.close()
-
-    with db_connect(
-        primary_address, operator_password, username="operator", database="charmed_dml_database"
-    ) as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2", "test_data_3"]), (
-                "Unexpected data in charmed_read_database with charmed_read role"
-            )
-
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
-    )
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}2:postgresql"
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[DATA_INTEGRATOR_APP_NAME, f"{DATA_INTEGRATOR_APP_NAME}2"], status="blocked"
-    )
+        primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+        host = get_unit_address(juju, primary)
+        for database_to_test in databases:
+            connection = None
+            try:
+                message_prefix = f"Checking that {user} user ({'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'})"
+                if database_to_test in [database, OTHER_DATABASE_NAME]:
+                    logger.info(f"{message_prefix} can connect to {database_to_test} database")
+                    connection = db_connect(
+                        host, password, username=user, database=database_to_test
+                    )
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_database();")
+                        assert cursor.fetchone()[0] == database_to_test
+                else:
+                    logger.info(f"{message_prefix} can't connect to {database_to_test} database")
+                    with pytest.raises(psycopg2.OperationalError) as exc_info:
+                        db_connect(host, password, username=user, database=database_to_test)
+                    assert "no pg_hba.conf entry" in str(exc_info.value)
+            finally:
+                if connection is not None:
+                    connection.close()
