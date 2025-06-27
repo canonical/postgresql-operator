@@ -1006,7 +1006,11 @@ BEGIN
     statements := ARRAY[
         'REVOKE CREATE ON DATABASE ' || database || ' FROM {ROLE_DATABASES_OWNER};',
         'ALTER SCHEMA public OWNER TO ' || owner_user || ';',
-        'GRANT CONNECT ON DATABASE ' || database || ' TO ' || admin_user || ';'
+        'GRANT CONNECT ON DATABASE ' || database || ' TO ' || admin_user || ';',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_READ};',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DML};',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DBA};',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DATABASES_OWNER};'
     ];
     FOREACH statement IN ARRAY statements
     LOOP
