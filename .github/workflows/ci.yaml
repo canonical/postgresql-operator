@@ -51,15 +51,13 @@ jobs:
     name: Build charm
     uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v32.1.0
 
-  integration-test:
-    name: Integration test charm
+  release:
+    name: Release charm
     needs:
-      - lint
-      - unit-test
       - build
-    uses: ./.github/workflows/integration_test.yaml
+    uses: canonical/data-platform-workflows/.github/workflows/release_charm_pr.yaml@v32.1.0
     with:
+      track: '16'
       artifact-prefix: ${{ needs.build.outputs.artifact-prefix }}
-    secrets: inherit
-    permissions:
-      contents: write  # Needed for Allure Report
+    secrets:
+      charmhub-token: ${{ secrets.CHARMHUB_TOKEN }}
