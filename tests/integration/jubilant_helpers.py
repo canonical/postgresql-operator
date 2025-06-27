@@ -8,6 +8,23 @@ from constants import PEER
 from .helpers import DATABASE_APP_NAME, SecretNotFoundError
 
 
+def get_credentials(
+    juju: jubilant.Juju,
+    unit_name: str,
+) -> dict:
+    """Get the data integrator credentials.
+
+    Args:
+        juju: the jubilant.Juju instance.
+        unit_name: the name of the unit.
+
+    Returns:
+        the data integrator credentials.
+    """
+    action = juju.run(unit_name, "get-credentials")
+    return action.results
+
+
 def get_password(
     username: str = "operator",
     database_app_name: str = DATABASE_APP_NAME,
@@ -23,6 +40,7 @@ def get_password(
     """
     secret = get_secret_by_label(label=f"{PEER}.{database_app_name}.app")
     password = secret.get(f"{username}-password")
+    print(f"Retrieved password for {username}: {password}")
 
     return password
 

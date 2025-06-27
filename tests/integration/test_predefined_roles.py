@@ -4,6 +4,7 @@
 import logging
 
 import jubilant
+import psycopg2
 import pytest as pytest
 import yaml
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -13,7 +14,13 @@ from .helpers import (
     DATABASE_APP_NAME,
     db_connect,
 )
-from .jubilant_helpers import get_password, get_primary, get_unit_address, relations
+from .jubilant_helpers import (
+    get_credentials,
+    get_password,
+    get_primary,
+    get_unit_address,
+    relations,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +72,21 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
     else:
         drop_databases = True
 
-    for index, combination in enumerate(predefined_roles_combinations):
+    for combination in predefined_roles_combinations:
         # Drop the database requested by each data integrator when restarting the test.
-        database_name = f"{REQUESTED_DATABASE_NAME}-{index}"
+        suffix = (
+            f"-{'-'.join(combination)}".replace("_", "-").lower()
+            if "-".join(combination) != ""
+            else ""
+        )
+        database_name = f"{REQUESTED_DATABASE_NAME}{suffix}"
         if drop_databases:
             logger.info(
                 f"Dropping {database_name} database (and it's related users) from already deployed database charm"
             )
-            primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
             connection = None
             try:
+                primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
                 host = get_unit_address(juju, primary)
                 password = get_password()
                 connection = db_connect(host, password)
@@ -89,7 +101,7 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
             reset_relation = True
 
         # Deploy the data integrator charm for each combination of predefined roles.
-        data_integrator_app_name = f"{DATA_INTEGRATOR_APP_NAME}{index}"
+        data_integrator_app_name = f"{DATA_INTEGRATOR_APP_NAME}{suffix}"
         extra_user_roles = ",".join(combination)
         if data_integrator_app_name not in juju.status().apps:
             logger.info(
@@ -132,3 +144,60 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
             juju.integrate(data_integrator_app_name, DATABASE_APP_NAME)
 
     juju.wait(lambda status: jubilant.all_active(status), timeout=TIMEOUT)
+
+
+def test_connection(juju: jubilant.Juju, predefined_roles_combinations) -> None:
+    """Check that the data integrator user can connect to the allowed databases."""
+    primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+    host = get_unit_address(juju, primary)
+    password = get_password()
+    connection = None
+    cursor = None
+    try:
+        connection = db_connect(host, password)
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("CREATE EXTENSION IF NOT EXISTS dblink;")
+        cursor.execute(f'DROP DATABASE IF EXISTS "{OTHER_DATABASE_NAME}";')
+        cursor.execute(f'CREATE DATABASE "{OTHER_DATABASE_NAME}";')
+        cursor.execute("SELECT datname FROM pg_database;")
+        databases = sorted(database[0] for database in cursor.fetchall())
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if connection is not None:
+            connection.close()
+
+    data_integrator_apps = [
+        app for app in juju.status().apps if app.startswith(DATA_INTEGRATOR_APP_NAME)
+    ]
+    for data_integrator_app_name in data_integrator_apps:
+        credentials = get_credentials(juju, f"{data_integrator_app_name}/0")
+        user = credentials["postgresql"]["username"]
+        password = credentials["postgresql"]["password"]
+        database = credentials["postgresql"]["database"]
+        extra_user_roles = juju.config(app=data_integrator_app_name, app_config=True).get(
+            "extra_user_roles"
+        )
+        primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+        host = get_unit_address(juju, primary)
+        for database_to_test in databases:
+            connection = None
+            try:
+                message_prefix = f"Checking that {user} user ({'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'})"
+                if database_to_test in [database, OTHER_DATABASE_NAME]:
+                    logger.info(f"{message_prefix} can connect to {database_to_test} database")
+                    connection = db_connect(
+                        host, password, username=user, database=database_to_test
+                    )
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_database();")
+                        assert cursor.fetchone()[0] == database_to_test
+                else:
+                    logger.info(f"{message_prefix} can't connect to {database_to_test} database")
+                    with pytest.raises(psycopg2.OperationalError) as exc_info:
+                        db_connect(host, password, username=user, database=database_to_test)
+                    assert "no pg_hba.conf entry" in str(exc_info.value)
+            finally:
+                if connection is not None:
+                    connection.close()
