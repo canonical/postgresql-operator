@@ -5,9 +5,10 @@ This page goes over some recommended tools and approaches to troubleshooting the
 Before anything, always run `juju status` to check the [list of charm statuses](/reference/statuses) and the recommended fixes. This alone may already solve your issue. 
 
 Otherwise, this reference goes over how to troubleshoot this charm via:
-- [`juju` logs](#juju-logs)
-- [`snap-based charm`](#snap-based-charm)
-- [Installing extra software](#install-extra-software)
+- [Troubleshooting](#troubleshooting)
+  - [Juju logs](#juju-logs)
+  - [Snap-based charm](#snap-based-charm)
+  - [Install extra software](#install-extra-software)
 
 
 ```{caution}
@@ -74,7 +75,7 @@ Name                Version  Rev  Tracking       Publisher        Notes
 charmed-postgresql  14.9     70   latest/stable  dataplatformbot  held
 ```
 
-From here you can make sure all snap (systemd) services are running:
+From here you can make sure all snap (`systemd`) services are running:
 
 ```text
 ubuntu@juju-fd7874-0# sudo snap services
@@ -136,7 +137,7 @@ ubuntu     10234  0.0  0.0  17208  7944 ?        R    21:47   0:00 sshd: ubuntu@
 ubuntu@juju-fd7874-0:~$
 ```
 
-The list of running snap/systemd services will depend on configured (enabled) [COS integration](/how-to/monitoring-cos/enable-monitoring) and/or [backup](/how-to/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
+The list of running snap/`systemd` services will depend on configured (enabled) [COS integration](/how-to/monitoring-cos/enable-monitoring) and/or [backup](/how-to/back-up-and-restore/create-a-backup) functionality. The snap service `charmed-postgresql.patroni` must always be active and currently running (the Linux processes `snapd`, `patroni` and `postgres`).
 
 To access PostgreSQL, check the [charm users concept](/explanation/users) and request `operator` credentials to use `psql`:
 

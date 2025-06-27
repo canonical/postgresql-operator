@@ -1,6 +1,6 @@
 # How to deploy using Terraform
 
-[Terraform](https://www.terraform.io/) is an infrastructure automation tool to provision and manage resources in clouds or data centers. To deploy Charmed PostgreSQL using Terraform and Juju, you can use the [Juju Terraform Provider](https://registry.terraform.io/providers/juju/juju/latest). 
+[Terraform](https://www.terraform.io/) is an infrastructure automation tool to provision and manage resources in clouds or data centres. To deploy Charmed PostgreSQL using Terraform and Juju, you can use the [Juju Terraform Provider](https://registry.terraform.io/providers/juju/juju/latest). 
 
 The easiest way is to start from [these examples of terraform modules](https://github.com/canonical/terraform-modules) prepared by Canonical. This page will guide you through a deployment using an example module for PostgreSQL on machines.
 

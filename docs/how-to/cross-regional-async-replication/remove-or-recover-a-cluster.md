@@ -4,7 +4,7 @@ This guide will cover how to manage clusters using an example PostgreSQL deploym
 
 ## Prerequisites
 * Juju `v.3.4.2+`
-* Make sure your machine(s) fulfill the [system requirements](/reference/system-requirements)
+* Make sure your machine(s) fulfil the [system requirements](/reference/system-requirements)
 * See [supported target/source model relationships](/how-to/cross-regional-async-replication/index).
 * A cross-regional async replication setup
   * See [How to set up clusters](/how-to/cross-regional-async-replication/set-up-clusters)

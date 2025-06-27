@@ -142,7 +142,7 @@ Now you can run
 to create a new model to deploy workloads.
 ```
 
-You can check the [Azure instances availability](https://portal.azure.com/#browse/Microsoft.Compute%2FVirtualMachines):
+You can check the [Azure instances availability](https://portal.azure.com/#browse/Microsoft.Compute/VirtualMachines):
 
 ![image|689x313](azure-availability.png)
 

@@ -20,7 +20,7 @@ This guide assumes you have:
 
 Follow the official OpenStack guide: [Single-node deployment][Single-node guided]. 
 
-Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual fqdn fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
+Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual {spellexception}`fqdn` fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
 
 ## Enable OpenStack images auto-sync
 
@@ -30,7 +30,7 @@ Follow the official [Images Sync] guide to enable auto-sync and wait for the ima
 
 Follow the MicroStack guide [Manage workloads with Juju] from the beginning, and stop after the section "Create a Juju controller". 
 
-To summarize, the relevant sections are:
+To summarise, the relevant sections are:
 * Set up the bastion
 * Install and configure the Juju client
 * Create a Juju controller 

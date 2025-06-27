@@ -11,12 +11,12 @@ The environment where Charmed PostgreSQL operates can be divided into two compon
 
 ### Cloud
 
-Charmed PostgreSQL can be deployed on top of several clouds and virtualization layers:
+Charmed PostgreSQL can be deployed on top of several clouds and virtualisation layers:
 
 |Cloud|Security guides|
 | --- | --- |
 |OpenStack|[OpenStack Security Guide](https://docs.openstack.org/security-guide/)|
-|AWS|[Best Practices for Security, Identity and Compliance](https://aws.amazon.com/architecture/security-identity-compliance), [AWS security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html#access-keys-and-secret-access-keys)|
+|AWS|[Best Practices for Security, Identity and Compliance](https://aws.amazon.com/architecture/security-identity-compliance), [AWS security credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/security-creds.html)|
 |Azure|[Azure security best practices and patterns](https://learn.microsoft.com/en-us/azure/security/fundamentals/best-practices-and-patterns), [Managed identities for Azure resource](https://learn.microsoft.com/en-us/entra/identity/managed-identities-azure-resources/)|
 |GCP|[Google security overview](https://cloud.google.com/docs/security)|
 
@@ -26,7 +26,7 @@ Juju is the component responsible for orchestrating the entire lifecycle, from d
 
 #### Cloud credentials
 
-When configuring cloud credentials to be used with Juju, ensure that users have correct permissions to operate at the required level. Juju superusers responsible for bootstrapping and managing controllers require elevated permissions to manage several kinds of resources, such as virtual machines, networks, storages, etc. Please refer to the links below for more information on the policies required to be used depending on the cloud.
+When configuring cloud credentials to be used with Juju, ensure that users have correct permissions to operate at the required level. Juju superusers responsible for bootstrapping and managing controllers require elevated permissions to manage several kinds of resources, such as virtual machines, networks, storage, etc. Please refer to the links below for more information on the policies required to be used depending on the cloud.
 
 |Cloud|Cloud user policies|
 | --- | --- |
@@ -39,7 +39,7 @@ When configuring cloud credentials to be used with Juju, ensure that users have 
 
 It is very important that Juju users are set up with minimal permissions depending on the scope of their operations. Please refer to the [User access levels](https://juju.is/docs/juju/user-permissions) documentation for more information on the access levels and corresponding abilities.
 
-Juju user credentials must be stored securely and rotated regularly to limit the chances of unauthorized access due to credentials leakage.
+Juju user credentials must be stored securely and rotated regularly to limit the chances of unauthorised access due to credentials leakage.
 
 ## Applications
 

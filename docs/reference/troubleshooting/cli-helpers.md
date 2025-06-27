@@ -150,8 +150,8 @@ ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-post
 
 #### Re-initialisation
 
-Sometimes the cluster member might stuck in the middle of nowhere, the easiest way to try is [reinit the Patroni cluster member](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-reinit).
-<details><summary>Example: cluster member re-initialization</summary>
+Sometimes the cluster member might stuck in the middle of nowhere, the easiest way to try is [`reinit` the Patroni cluster member](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-reinit).
+<details><summary>Example: cluster member re-initialisation</summary>
 
 ```text
 ubuntu@juju-b87344-2:~$ sudo -u snap_daemon patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml reinit postgresql postgresql-1
@@ -248,7 +248,7 @@ Pay attention to TLS relation with PostgreSQL and access Patroni REST API accord
 
 ### Raft library
 
-Patroni relies on the Raft library for the consensus handling and Primary election. It is implemented using [pySyncObj](https://github.com/bakwc/PySyncObj) and available as a CLI tool. 
+Patroni relies on the Raft library for the consensus handling and Primary election. It is implemented using [`pySyncObj`](https://github.com/bakwc/PySyncObj) and available as a CLI tool. 
 
 While **you should not interact with Raft library manually**,  you can check its internal status. Note that a password is mandatory to access Raft.
 
@@ -315,23 +315,23 @@ charmed-postgresql.pg-config          charmed-postgresql.pg-dropcluster     char
 ```
 </details>
 
-#### pg_dump / pg_dumpall
+#### `pg_dump` / `pg_dumpall`
 
 These tools are designed to dump the PostgreSQL content. Due to the strictly confined SNAP, the context is limited to SNAP itself (and not the POSIX user triggered the tool). Also, due to security reasons the default `postgres` user cannot access DB, use user `operator` (you can find it's credential in Juju Secrets).
 
-<details><summary>Example:  pg-dump/pg-dumpall usage</summary>
+<details><summary>Example: <code>pg-dump/pg-dumpall</code> usage</summary>
 
 ```text 
 charmed-postgresql.pg-dump -c -C -U operator -W -h /tmp -d mydb | tee mydb.sql >/dev/null
 ```
 
-Also you can pass password using env variable PGPASSWORD, however it is NOT recommended for productions as DB password will be stored in shell history:
+Also you can pass password using the environment variable `PGPASSWORD`, however it is NOT recommended for productions as the database password will be stored in the shell's history:
 
 ```text
 PGPASSWORD=my$ecretp@ss charmed-postgresql.pg-dumpall -c -U operator -h /tmp  | tee all_DBs.txt >/dev/null
 ```
 
-Note, the local SNAP /tmp could be used as well:
+Note, the local snap/`tmp` could be used as well:
 
 ```text
 PGPASSWORD=my$ecretp@ss charmed-postgresql.pg-dumpall -c -U operator -h /tmp  -f /tmp/test.sql

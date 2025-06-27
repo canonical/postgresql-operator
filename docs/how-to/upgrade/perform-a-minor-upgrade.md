@@ -78,7 +78,7 @@ juju run postgresql/leader pre-upgrade-check
 ```
 Make sure there are no errors in the result output.
 
-This action will configure the charm to minimize the amount of primary switchover, among other preparations for a safe upgrade process. After successful execution, the charm is ready to be upgraded.
+This action will configure the charm to minimise the amount of primary switchover, among other preparations for a safe upgrade process. After successful execution, the charm is ready to be upgraded.
 
 ## Step 3: Upgrade
 

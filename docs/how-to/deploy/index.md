@@ -44,7 +44,7 @@ See also:
 * [How to connect from outside the local network]
 
 ## Airgapped
-[How to deploy in an offline or air-gapped environment] goes over the special configuration steps for installing PostgreSQL in an airgapped environment via CharmHub and the Snap Store Proxy.
+[How to deploy in an offline or air-gapped environment] goes over the special configuration steps for installing PostgreSQL in an airgapped environment via Charmhub and the Snap Store Proxy.
 
 ## Cluster-cluster replication
 
@@ -53,7 +53,7 @@ Cluster-cluster, cross-regional, or multi-server asynchronous replication focuse
 The [Cross-regional async replication] guide goes through the steps to set up clusters for cluster-cluster replication, integrate with a client, and remove or recover a failed cluster.
 
 ## Juju storage
-Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilize data volume provided by different clouds while keeping the same UI/UX for end users.
+Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilise data volume provided by different clouds while keeping the same UI/UX for end users.
 
 See: [How to deploy on juju storage]
 

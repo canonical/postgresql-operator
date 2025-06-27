@@ -9,14 +9,14 @@ Read the [](#prerequisites) section carefully if you are deploying PostgreSQL in
 ## Prerequisites
 
 * A juju model with [Charmed PostgreSQL deployed](/how-to/deploy/index).
-* **If you are using an LXD model**, LXD's virtualization type must be set to `virtual-machine`.
-  * See [](#lxd-virtualization-type) for more details.
-* **If your base is `ubuntu@22.4`**, you must use the `generic` flavor of Linux. 
+* **If you are using an LXD model**, LXD's virtualisation type must be set to `virtual-machine`.
+  * See [](#lxd-virtualisation-type) for more details.
+* **If your base is `ubuntu@22.4`**, you must use the `generic` flavour of Linux. 
   * See [](#base-ubuntu-version) for more details.
 
-### LXD virtualization type
+### LXD virtualisation type
 
-If you are deploying Charmed PostgreSQL in a LXD model, ensure that LXD's virtualization type is set to `virtual-machine` for the Juju application.
+If you are deploying Charmed PostgreSQL in a LXD model, ensure that LXD's virtualisation type is set to `virtual-machine` for the Juju application.
 
 This is because LXD does not allow `/sys/kernel/tracing` to be mounted in a system container (even in privileged mode) due to security isolation concerns. 
 
@@ -27,14 +27,14 @@ juju deploy postgresql --channel 14/stable --constraints="virt-type=virtual-mach
 ```
 
 ### Base (Ubuntu version)
-If your base is `ubuntu@22.04`, ensure that your are using the `generic` flavor of Linux.
+If your base is `ubuntu@22.04`, ensure that your are using the `generic` flavour of Linux.
 
 You can confirm this with
 ```
 uname -r
 ``` 
 
-If you do not have the `generic` flavor, you can enable it on a unit to be profiled as follows:
+If you do not have the `generic` flavour, you can enable it on a unit to be profiled as follows:
 
 ```text
 juju ssh postgresql/0 bash
@@ -103,7 +103,7 @@ juju integrate postgresql parca-agent
 
 #### 4. Integrate `parca-agent` with `parca-k8s`
 
-Consume the parca offer from [Step 2](#parca-offer-interfaces) and integrate with them:
+Consume the Parca offer from [Step 2](#parca-offer-interfaces) and integrate with them:
 
 ```text
 juju find-offers <k8s_controller_name>:

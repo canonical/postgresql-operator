@@ -35,7 +35,7 @@ The "modern" charm provides temporary support for the legacy interfaces:
 
 Reactive charms cannot be upgraded to an operator-framework-based version. To move database data, the new DB application must be launched nearby, and data should be copied from "legacy" application to the "modern" one. 
 
-Please [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) if you need migration instructions.
+Please [contact us](/reference/contacts) if you need migration instructions.
 ```
 
 ## How to deploy old "legacy" PostgreSQL charm
@@ -60,7 +60,7 @@ A common error message is: `cannot deploy application "postgresql": unknown opti
 
 The legacy charm config options were not moved to the modern charm due to no need. The modern charm applies the best possible configuration automatically. 
 
-Feel free to [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) about the DB tuning/config options.
+Feel free to [contact us](/reference/contacts) about the DB tuning/config options.
 
 ## Extensions supported by modern charm
 
@@ -80,7 +80,7 @@ For more information about migrating the new interface, see [this guide](/how-to
 
 At the moment, the modern charms support PostgreSQL 14 (based on Jammy/22.04 series) only.
 
-Please [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) if you need different versions/series.
+Please [contact us](/reference/contacts) if you need different versions/series.
 
 ## Supported architectures
 

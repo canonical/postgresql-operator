@@ -25,7 +25,7 @@ Charmed PostgreSQL is an official distribution of PostgreSQL. It’s an open-sou
 - Explore [Canonical Data solutions](https://canonical.com/data)
 - [Contacts us](/reference/contacts) for all further questions
 
-## Licencing & Trademark
+## Licensing & Trademark
 
 The Charmed PostgreSQL Operator is distributed under the [Apache Software Licence version 2.0](https://github.com/canonical/postgresql-operator/blob/main/LICENSE). It depends on [PostgreSQL](https://www.postgresql.org/ftp/source/), which is licensed under the [PostgreSQL License](https://www.postgresql.org/about/licence/) - a liberal open-source licence similar to the BSD or MIT licences.
 
