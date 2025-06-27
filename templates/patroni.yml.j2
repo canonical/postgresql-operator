@@ -106,7 +106,7 @@ bootstrap:
   method: pgbackrest
   pgbackrest:
     command: >
-      pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }} --process-max={{process_max}}
+      pgbackrest {{ pgbackrest_configuration_file }} --stanza={{ restore_stanza }} --pg1-path={{ data_path }}
       {%- if backup_id %} --set={{ backup_id }} {%- endif %}
       {%- if restore_timeline %} --target-timeline="0x{{ restore_timeline }}" {% endif %}
       {%- if restore_to_latest %} --type=default {%- else %}

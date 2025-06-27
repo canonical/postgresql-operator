@@ -719,7 +719,6 @@ class Patroni:
             ldap_parameters=self._dict_to_hba_string(ldap_params),
             patroni_password=self.patroni_password,
             user_databases_map=user_databases_map,
-            process_max=max(os.cpu_count() - 2, 1),
         )
         self.render_file(f"{PATRONI_CONF_PATH}/patroni.yaml", rendered, 0o600)
 
