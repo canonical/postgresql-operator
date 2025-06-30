@@ -53,7 +53,8 @@ logger = logging.getLogger(__name__)
 
 PG_BASE_CONF_PATH = f"{POSTGRESQL_CONF_PATH}/postgresql.conf"
 
-RUNNING_STATES = ["running", "streaming"]
+STARTED_STATES = ["running", "streaming"]
+RUNNING_STATES = [*STARTED_STATES, "starting"]
 
 PATRONI_TIMEOUT = 10
 
@@ -336,7 +337,7 @@ class Patroni:
                 )
                 for member in cluster_status.json()["members"]:
                     if member["role"] == "standby_leader":
-                        if check_whether_is_running and member["state"] not in RUNNING_STATES:
+                        if check_whether_is_running and member["state"] not in STARTED_STATES:
                             logger.warning(f"standby leader {member['name']} is not running")
                             continue
                         standby_leader = member["name"]
@@ -416,7 +417,7 @@ class Patroni:
         # a standby leader, because sometimes there may exist (for some period of time)
         # only replicas after a failed switchover.
         return all(
-            member["state"] in RUNNING_STATES for member in cluster_status.json()["members"]
+            member["state"] in STARTED_STATES for member in cluster_status.json()["members"]
         ) and any(
             member["role"] in ["leader", "standby_leader"]
             for member in cluster_status.json()["members"]
@@ -496,6 +497,8 @@ class Patroni:
             True if services is ready False otherwise. Retries over a period of 60 seconds times to
             allow server time to start up.
         """
+        if not self.is_patroni_running():
+            return False
         try:
             response = self.get_patroni_health()
         except RetryError:
@@ -517,7 +520,7 @@ class Patroni:
             return True
 
         return response["state"] not in [
-            *RUNNING_STATES,
+            *STARTED_STATES,
             "creating replica",
             "starting",
             "restarting",
@@ -964,6 +967,16 @@ class Patroni:
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+
+    def is_patroni_running(self) -> bool:
+        """Check if the Patroni service is running."""
+        try:
+            cache = snap.SnapCache()
+            selected_snap = cache["charmed-postgresql"]
+            return selected_snap.services["patroni"]["active"]
+        except snap.SnapError as e:
+            logger.debug(f"Failed to check Patroni service: {e}")
+            return False
 
     def restart_patroni(self) -> bool:
         """Restart Patroni.
