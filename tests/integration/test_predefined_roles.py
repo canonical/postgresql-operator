@@ -2,6 +2,7 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
+from time import sleep
 from typing import List, Dict
 
 import jubilant
@@ -120,6 +121,8 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
             juju.integrate(data_integrator_app_name, DATABASE_APP_NAME)
 
     juju.wait(lambda status: jubilant.all_active(status), timeout=TIMEOUT)
+
+    sleep(30) # Wait for HBA rules to be updated.
 
 
 def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
