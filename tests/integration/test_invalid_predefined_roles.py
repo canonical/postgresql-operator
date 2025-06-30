@@ -88,7 +88,7 @@ def test_extra_user_roles(juju: jubilant.Juju, predefined_roles, predefined_role
 
         logger.info("Waiting for the database charm to block due to invalid extra user roles")
         juju.wait(lambda status: data_integrator_blocked(status), delay=30, timeout=TIMEOUT)
-        assert juju.status().apps[DATABASE_APP_NAME].app_status.message == "invalid role(s) for extra user roles", "The database charm didn't block as expected due to invalid extra user roles."
+        assert juju.status().get_units(DATABASE_APP_NAME).get(f"{DATABASE_APP_NAME}/0").workload_status.message == "invalid role(s) for extra user roles", "The database charm didn't block as expected due to invalid extra user roles."
 
         logger.info("Removing relation between charms")
         juju.remove_relation(
