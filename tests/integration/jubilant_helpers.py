@@ -1,5 +1,6 @@
 import json
 import subprocess
+from typing import Dict
 
 import jubilant
 
@@ -106,3 +107,86 @@ def relations(juju: jubilant.Juju, provider_app: str, requirer_app: str) -> list
             True for relation_instance in relation if relation_instance.related_app == requirer_app
         )
     ]
+
+
+def roles_attributes(predefined_roles: Dict, combination: str) -> Dict:
+    auto_escalate_to_database_owner = False
+    connect = False
+    create_databases = False
+    create_objects = False
+    escalate_to_database_owner = False
+    read_data = False
+    read_stats = False
+    set_up_predefined_catalog_roles = False
+    set_user = False
+    write_data = False
+    for role in combination.split(","):
+        if role not in predefined_roles:
+            raise ValueError(f"Role {role} not found in predefined roles.")
+
+        # Whether the relation user is auto-escalated to the database owner user at login
+        # (True or False).
+        if not auto_escalate_to_database_owner:
+            auto_escalate_to_database_owner = predefined_roles[role]["auto-escalate-to-database-owner"]
+
+        role_permissions = predefined_roles[role]["permissions"]
+
+        # Permission to connect to the requested database (True value) or to all databases
+        # ("*" value).
+        role_can_connect = role_permissions["connect"]
+        if not connect or role_can_connect == "*":
+            connect = role_can_connect
+
+        # Permission to create databases (True or False).
+        if not create_databases:
+            create_databases = role_permissions["create-databases"]
+
+        # Permission to create objects in the requested database (True value) or in all databases
+        # ("*" value).
+        role_can_create_objects = role_permissions["create-objects"]
+        if not create_objects or role_can_create_objects == "*":
+            create_objects = role_can_create_objects
+
+        # Permission to escalate to the database owner user in the requested database (True value)
+        # or in all databases ("*" value).
+        role_can_escalate_to_database_owner = role_permissions["escalate-to-database-owner"]
+        if not escalate_to_database_owner or role_can_escalate_to_database_owner == "*":
+            escalate_to_database_owner = role_can_escalate_to_database_owner
+
+        # Permission to read data in the requested database (True value) or in all databases
+        # ("*" value).
+        role_can_read_data = role_permissions["read-data"]
+        if not read_data or role_can_read_data == "*":
+            read_data = role_can_read_data
+
+        read_stats = role_permissions["read-stats"]
+
+        # Permission to set up predefined catalog roles ("*" for all databases or False for not being
+        # able to do it).
+        role_can_set_up_predefined_catalog_roles = role_permissions["set-up-predefined-catalog-roles"]
+        if not set_up_predefined_catalog_roles or role_can_set_up_predefined_catalog_roles == "*":
+            set_up_predefined_catalog_roles = role_can_set_up_predefined_catalog_roles
+
+        # Permission to call the set_user function (True or False).
+        if not set_user:
+            set_user = role_permissions["set-user"]
+
+        # Permission to write data in the requested database (True value) or in all databases
+        # ("*" value).
+        role_can_write_data = role_permissions["write-data"]
+        if not write_data or role_can_write_data == "*":
+            write_data = role_can_write_data
+    return {
+        "auto-escalate-to-database-owner": auto_escalate_to_database_owner,
+        "permissions": {
+            "connect": connect,
+            "create-databases": create_databases,
+            "create-objects": create_objects,
+            "escalate-to-database-owner": escalate_to_database_owner,
+            "read-data": read_data,
+            "read-stats": read_stats,
+            "set-up-predefined-catalog-roles": set_up_predefined_catalog_roles,
+            "set-user": set_user,
+            "write-data": write_data,
+        },
+    }

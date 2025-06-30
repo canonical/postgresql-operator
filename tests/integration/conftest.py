@@ -3,6 +3,7 @@
 import logging
 import os
 import uuid
+from typing import List, Dict
 
 import boto3
 import jubilant
@@ -125,3 +126,122 @@ def juju(request: pytest.FixtureRequest):
 
     if request.session.testsfailed:
         print(log, end="")
+
+
+@pytest.fixture(scope="module")
+def predefined_roles() -> Dict:
+    """Return a list of predefined roles with their expected permissions."""
+    return {
+        "": {
+            "auto-escalate-to-database-owner": True,
+            "permissions": {
+                "connect": True,
+                "create-databases": False,
+                "create-objects": False,
+                "escalate-to-database-owner": True,
+                "read-data": False,
+                "read-stats": False,
+                "set-up-predefined-catalog-roles": False,
+                "set-user": False,
+                "write-data": False,
+            },
+        },
+        "charmed_stats": {
+            "auto-escalate-to-database-owner": False,
+            "permissions": {
+                "connect": "*",
+                "create-databases": False,
+                "create-objects": False,
+                "escalate-to-database-owner": False,
+                "read-data": False,
+                "read-stats": True,
+                "set-up-predefined-catalog-roles": False,
+                "set-user": False,
+                "write-data": False,
+            },
+        },
+        "charmed_read": {
+            "auto-escalate-to-database-owner": False,
+            "permissions": {
+                "connect": "*",
+                "create-databases": False,
+                "create-objects": False,
+                "escalate-to-database-owner": False,
+                "read-data": "*",
+                "read-stats": True,
+                "set-up-predefined-catalog-roles": False,
+                "set-user": False,
+                "write-data": False,
+            },
+        },
+        "charmed_dml": {
+            "auto-escalate-to-database-owner": False,
+            "permissions": {
+                "connect": "*",
+                "create-databases": False,
+                "create-objects": False,
+                "escalate-to-database-owner": False,
+                "read-data": "*",
+                "read-stats": True,
+                "set-up-predefined-catalog-roles": False,
+                "set-user": False,
+                "write-data": "*",
+            },
+        },
+        "charmed_dba": {
+            "auto-escalate-to-database-owner": False,
+            "permissions": {
+                "connect": "*",
+                "create-databases": False,
+                "create-objects": False,
+                "escalate-to-database-owner": "*",
+                "read-data": "*",
+                "read-stats": True,
+                "set-up-predefined-catalog-roles": False,
+                "set-user": True,
+                "write-data": "*",
+            },
+        },
+        "charmed_admin": {
+            "auto-escalate-to-database-owner": False,
+            "permissions": {
+                "connect": "*",
+                "create-databases": False,
+                "create-objects": False,
+                "escalate-to-database-owner": "*",
+                "read-data": "*",
+                "read-stats": True,
+                "set-up-predefined-catalog-roles": False,
+                "set-user": False,
+                "write-data": "*",
+            },
+        },
+        "CREATEDB": {
+            "auto-escalate-to-database-owner": False,
+            "permissions": {
+                "connect": "*",
+                "create-databases": True,
+                "create-objects": False,
+                "escalate-to-database-owner": False,
+                "read-data": False,
+                "read-stats": False,
+                "set-up-predefined-catalog-roles": "*",
+                "set-user": False,
+                "write-data": False,
+            },
+        },
+    }
+
+
+@pytest.fixture(scope="module")
+def predefined_roles_combinations() -> List:
+    """Return a list of valid combinations of predefined roles."""
+    return [
+        ("",),
+        ("charmed_stats",),
+        ("charmed_read",),
+        ("charmed_dml",),
+        ("charmed_admin",),
+        # ("CREATEDB",),
+        # ("charmed_admin", "CREATEDB"),
+    ]

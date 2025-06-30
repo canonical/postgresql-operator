@@ -26,6 +26,8 @@ from typing import Dict, List, Optional, Set, Tuple
 import psycopg2
 from psycopg2.sql import SQL, Identifier, Literal
 
+from constants import BACKUP_USER, SYSTEM_USERS
+
 # The unique Charmhub library identifier, never change it
 LIBID = "24ee217a54e840a598ff21a079c3e678"
 
@@ -53,7 +55,14 @@ ROLE_READ = "charmed_read"
 ROLE_DML = "charmed_dml"
 ROLE_BACKUP = "charmed_backup"
 ROLE_DBA = "charmed_dba"
+ROLE_ADMIN = "charmed_admin"
 ROLE_DATABASES_OWNER = "charmed_databases_owner"
+ALLOWED_ROLES = {
+    ROLE_STATS,
+    ROLE_READ,
+    ROLE_DML,
+    ROLE_ADMIN,
+}
 
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
@@ -282,7 +291,7 @@ class PostgreSQL:
             roles = privileges = None
             if extra_user_roles:
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
-                roles = [role for role in extra_user_roles if role in valid_roles]
+                roles = [role for role in extra_user_roles if (user == BACKUP_USER or user in SYSTEM_USERS or role in valid_roles or role == ACCESS_GROUP_RELATION)]
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
@@ -310,7 +319,7 @@ class PostgreSQL:
                 connect_statement = None
                 if database:
                     if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP]):
-                        user_definition += f" IN ROLE \"{database}_admin\""
+                        user_definition += f" IN ROLE \"charmed_{database}_admin\", \"charmed_{database}_dml\""
                     else:
                         connect_statement = SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(database), Identifier(user)
@@ -370,11 +379,14 @@ class PostgreSQL:
                 f"GRANT execute ON FUNCTION pg_switch_wal TO {ROLE_BACKUP}",
             ],
             ROLE_DBA: [
-                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;"
+                f"CREATE ROLE {ROLE_DBA} NOSUPERUSER CREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE {ROLE_DML};"
             ],
+            ROLE_ADMIN: [
+                f"CREATE ROLE {ROLE_ADMIN} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE {ROLE_DML}",
+            ]
         }
 
-        _, existing_roles = self.list_valid_privileges_and_roles()
+        existing_roles = self.list_existing_roles()
 
         try:
             with self._connect_to_database() as connection, connection.cursor() as cursor:
@@ -770,6 +782,17 @@ class PostgreSQL:
             if connection is not None:
                 connection.close()
 
+    def list_existing_roles(self) -> Set[str]:
+        """Returns a set containing the existing roles.
+
+        Returns:
+            Set containing the existing roles.
+        """
+        with self._connect_to_database() as connection, connection.cursor() as cursor:
+            cursor.execute("SELECT rolname FROM pg_roles;")
+            return {role[0] for role in cursor.fetchall() if role[0]}
+
+
     def list_valid_privileges_and_roles(self) -> Tuple[Set[str], Set[str]]:
         """Returns two sets with valid privileges and roles.
 
@@ -777,13 +800,10 @@ class PostgreSQL:
             Tuple containing two sets: the first with valid privileges
                 and the second with valid roles.
         """
-        with self._connect_to_database() as connection, connection.cursor() as cursor:
-            cursor.execute("SELECT rolname FROM pg_roles;")
-            return {
-                "createdb",
-                "createrole",
-                "superuser",
-            }, {role[0] for role in cursor.fetchall() if role[0]}
+        return {
+            "createdb",
+            "superuser",
+        }, ALLOWED_ROLES
 
     def set_up_database(self, temp_location: Optional[str] = None) -> None:
         """Set up postgres database with the right permissions."""
@@ -940,7 +960,7 @@ BEGIN
 	cur_user := (SELECT current_user);
 
 	EXECUTE 'SELECT current_database()' INTO db_name;
-	db_admin_role = db_name || '_admin';
+	db_admin_role = 'charmed_' || db_name || '_admin';
 
 	EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', db_admin_role, cur_user) INTO is_user_admin;
 
@@ -951,7 +971,7 @@ EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_ro
 			EXECUTE format('SET ROLE %L', '{ROLE_DATABASES_OWNER}');
 		ELSE
 IF is_user_admin = true THEN
-				db_owner_role = db_name || '_owner';
+				db_owner_role = 'charmed_' || db_name || '_owner';
 				EXECUTE format('SET ROLE %L', db_owner_role);
 			END IF;
 		END IF;
@@ -983,19 +1003,22 @@ DECLARE
     current_session_user TEXT;
     owner_user TEXT;
     admin_user TEXT;
+    dml_user TEXT;
     statements TEXT[];
     statement TEXT;
 BEGIN
 	database := (SELECT current_database());
 	current_session_user := (SELECT session_user);
-    owner_user := quote_ident(database || '_owner');
-    admin_user := quote_ident(database || '_admin');
+    owner_user := quote_ident('charmed_' || database || '_owner');
+    admin_user := quote_ident('charmed_' || database || '_admin');
+    dml_user := quote_ident('charmed_' || database || '_dml');
     database := quote_ident(database);
     
     IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
         statements := ARRAY[
             'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
-            'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';'
+            'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';',
+            'CREATE ROLE ' || dml_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;'
         ];
         FOREACH statement IN ARRAY statements
         LOOP
@@ -1007,9 +1030,12 @@ BEGIN
         'REVOKE CREATE ON DATABASE ' || database || ' FROM {ROLE_DATABASES_OWNER};',
         'ALTER SCHEMA public OWNER TO ' || owner_user || ';',
         'GRANT CONNECT ON DATABASE ' || database || ' TO ' || admin_user || ';',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_STATS};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_READ};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DML};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DBA};',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_ADMIN};',
+        'GRANT ' || admin_user || ' TO {ROLE_ADMIN} WITH INHERIT FALSE;',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DATABASES_OWNER};'
     ];
     FOREACH statement IN ARRAY statements
@@ -1019,8 +1045,14 @@ BEGIN
 
     IF current_session_user LIKE 'relation-%' OR current_session_user LIKE 'relation_id_%' THEN
         RAISE NOTICE 'Granting % to %', admin_user, current_session_user;
-        statement := 'GRANT ' || admin_user || ' TO "' || current_session_user || '";';
-        EXECUTE statement;
+        statements := ARRAY[
+            'GRANT ' || admin_user || ' TO "' || current_session_user || '" WITH INHERIT FALSE;',
+            'GRANT ' || dml_user || ' TO "' || current_session_user || '" WITH INHERIT TRUE;'
+        ];
+        FOREACH statement IN ARRAY statements
+        LOOP
+            EXECUTE statement;
+        END LOOP;
     END IF;
 
     statements := ARRAY[
