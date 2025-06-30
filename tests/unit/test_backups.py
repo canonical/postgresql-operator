@@ -1,5 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+from os import cpu_count
 from pathlib import PosixPath
 from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
@@ -1754,6 +1755,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             storage_path=harness.charm._storage_path,
             user="backup",
             retention_full=30,
+            process_max=max(cpu_count() - 2, 1),
         )
 
         # Patch the `open` method with our mock.

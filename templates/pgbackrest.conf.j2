@@ -1,5 +1,6 @@
 [global]
 backup-standby=y
+compress-type=zst
 lock-path=/tmp
 log-path={{ log_path }}
 repo1-retention-full-type=time
@@ -47,3 +48,6 @@ pg{{ ns.count }}-user={{ user }}
 {% set ns.count = ns.count + 1 %}
 {%- endfor %}
 {%- endif %}
+
+[global:restore]
+process-max={{process_max}}
