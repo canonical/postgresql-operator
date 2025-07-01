@@ -195,6 +195,8 @@ class PostgreSQLLogicalReplication(Object):
                 f"{LOGICAL_REPLICATION_RELATION} #{event.relation.id} join early exit due to validation error"
             )
             return
+        if not self._validate_subscription_request():
+            return
         event.relation.data[self.model.app]["subscription-request"] = (
             self.charm.config.logical_replication_subscription_request or ""
         )
