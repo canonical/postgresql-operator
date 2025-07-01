@@ -338,20 +338,28 @@ class Patroni:
         return run(self._async_get_request(uri, endpoints, verify))
 
     def get_primary(
-        self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
+        self,
+        unit_name_pattern=False,
+        alternative_endpoints: list[str] | None = None,
+        cached: bool = False,
     ) -> str | None:
         """Get primary instance.
 
         Args:
             unit_name_pattern: whether to convert pod name to unit name
             alternative_endpoints: list of alternative endpoints to check for the primary.
+            cached: to use the cached cluster status or not.
 
         Returns:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
         try:
-            cluster_status = self.cluster_status(alternative_endpoints)
+            cluster_status = (
+                self.cluster_status(alternative_endpoints)
+                if cached
+                else self.cached_cluster_status
+            )
             for member in cluster_status:
                 if member["role"] == "leader":
                     primary = member["name"]
@@ -420,6 +428,11 @@ class Patroni:
             member["role"] in ["leader", "standby_leader"] for member in members
         )
 
+    @property
+    def cached_patroni_health(self) -> dict[str, str]:
+        """Cached local unit health."""
+        return self.get_patroni_health()
+
     def get_patroni_health(self) -> dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(7)):
@@ -440,7 +453,7 @@ class Patroni:
         # cluster member; the "is_creating_backup" tag means that the member is creating
         # a backup).
         try:
-            members = self.cluster_status()
+            members = self.cached_cluster_status
         except RetryError:
             return False
 
@@ -489,7 +502,7 @@ class Patroni:
         if not self.is_patroni_running():
             return False
         try:
-            response = self.get_patroni_health()
+            response = self.cached_patroni_health
         except RetryError:
             return False
 
@@ -504,7 +517,7 @@ class Patroni:
             seconds times to allow server time to start up.
         """
         try:
-            response = self.get_patroni_health()
+            response = self.cached_patroni_health
         except RetryError:
             return True
 

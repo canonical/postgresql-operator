@@ -174,7 +174,7 @@ def test_primary_endpoint(harness):
         assert harness.charm.primary_endpoint == "1.1.1.1"
 
         _patroni.return_value.get_member_ip.assert_called_once_with(sentinel.primary)
-        _patroni.return_value.get_primary.assert_called_once_with()
+        _patroni.return_value.get_primary.assert_called_once_with(cached=True)
 
 
 def test_primary_endpoint_no_peers(harness):
