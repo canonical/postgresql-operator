@@ -602,7 +602,7 @@ def test_on_start(harness):
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
-        ) as _is_storage_attached,
+        ),
         patch(
             "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
             new_callable=PropertyMock,
