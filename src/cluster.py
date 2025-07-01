@@ -516,18 +516,6 @@ class Patroni:
         ]
 
     @property
-    def member_replication_lag(self) -> str:
-        """Member replication lag."""
-        try:
-            for member in self.cached_cluster_status:
-                if member["name"] == self.member_name:
-                    return member.get("lag", "unknown")
-
-            return "unknown"
-        except RetryError:
-            return "unknown"
-
-    @property
     def is_member_isolated(self) -> bool:
         """Returns whether the unit is isolated from the cluster."""
         try:

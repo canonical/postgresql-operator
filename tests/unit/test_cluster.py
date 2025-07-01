@@ -12,7 +12,6 @@ from ops.testing import Harness
 from pysyncobj.utility import UtilityException
 from tenacity import (
     RetryError,
-    Retrying,
     stop_after_delay,
     wait_fixed,
 )
@@ -402,30 +401,6 @@ def test_stop_patroni(peers_ips, patroni):
 
         # Test a fail scenario.
         assert not patroni.stop_patroni()
-
-
-def test_member_replication_lag(peers_ips, patroni):
-    with patch("charm.Patroni.parallel_patroni_get_request") as _parallel_patroni_get_request:
-        _parallel_patroni_get_request.return_value = {
-            "members": [
-                {"name": "postgresql-1"},
-                {"name": "postgresql-0", "lag": "1"},
-            ]
-        }
-        # Test when the cluster member has a value for the lag field.
-        lag = patroni.member_replication_lag
-        assert lag == "1"
-
-        # Test when the cluster member doesn't have a value for the lag field.
-        patroni.member_name = "postgresql-1"
-        lag = patroni.member_replication_lag
-        assert lag == "unknown"
-
-        # Test when the API call fails.
-        _parallel_patroni_get_request.side_effect = RetryError(last_attempt=None)
-        with patch.object(Retrying, "iter", Mock(side_effect=RetryError(None))):
-            lag = patroni.member_replication_lag
-            assert lag == "unknown"
 
 
 def test_reinitialize_postgresql(peers_ips, patroni):
