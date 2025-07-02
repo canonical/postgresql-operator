@@ -1012,9 +1012,8 @@ BEGIN
     owner_user := quote_ident('charmed_' || database || '_owner');
     admin_user := quote_ident('charmed_' || database || '_admin');
     dml_user := quote_ident('charmed_' || database || '_dml');
-    database := quote_ident(database);
     
-    IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
+    IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=FORMAT('%s', 'charmed_' || database || '_owner')) = 0 THEN
         statements := ARRAY[
             'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
             'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';',
@@ -1025,6 +1024,8 @@ BEGIN
             EXECUTE statement;
         END LOOP;
     END IF;
+    
+    database := quote_ident(database);
 
     statements := ARRAY[
         'REVOKE CREATE ON DATABASE ' || database || ' FROM {ROLE_DATABASES_OWNER};',
