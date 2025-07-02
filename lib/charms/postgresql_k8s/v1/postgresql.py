@@ -291,7 +291,12 @@ class PostgreSQL:
             roles = privileges = None
             if extra_user_roles:
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
-                roles = [role for role in extra_user_roles if (user == BACKUP_USER or user in SYSTEM_USERS or role in valid_roles or role == ACCESS_GROUP_RELATION)]
+                roles = [role for role in extra_user_roles if (user == BACKUP_USER or user in SYSTEM_USERS or role in valid_roles or role == ACCESS_GROUP_RELATION or role == "createdb")]
+                if "createdb" in extra_user_roles:
+                    extra_user_roles.remove("createdb")
+                    roles.remove("createdb")
+                    extra_user_roles.append(ROLE_DATABASES_OWNER)
+                    roles.append(ROLE_DATABASES_OWNER)
                 privileges = {
                     extra_user_role
                     for extra_user_role in extra_user_roles
@@ -801,7 +806,6 @@ class PostgreSQL:
                 and the second with valid roles.
         """
         return {
-            "createdb",
             "superuser",
         }, ALLOWED_ROLES
 
@@ -962,7 +966,7 @@ BEGIN
 	EXECUTE 'SELECT current_database()' INTO db_name;
 	db_admin_role = 'charmed_' || db_name || '_admin';
 
-	EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', db_admin_role, cur_user) INTO is_user_admin;
+	EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND (b.rolname = %L OR b.rolname = %L) and c.rolname = %L)', db_admin_role, '{ROLE_ADMIN}', cur_user) INTO is_user_admin;
 
 EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', '{ROLE_DATABASES_OWNER}', cur_user) INTO user_has_createdb;
 
@@ -1017,7 +1021,8 @@ BEGIN
         statements := ARRAY[
             'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
             'CREATE ROLE ' || admin_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION NOINHERIT IN ROLE ' || owner_user || ';',
-            'CREATE ROLE ' || dml_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;'
+            'CREATE ROLE ' || dml_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
+            'GRANT ' || owner_user || ' TO {ROLE_ADMIN} WITH INHERIT FALSE;'
         ];
         FOREACH statement IN ARRAY statements
         LOOP
@@ -1057,6 +1062,8 @@ BEGIN
     END IF;
 
     statements := ARRAY[
+        'GRANT CREATE ON DATABASE ' || database || ' TO ' || owner_user || ';',
+        'GRANT TEMPORARY ON DATABASE ' || database || ' TO ' || owner_user || ';',
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON TABLES TO ' || admin_user || ';',
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT EXECUTE ON FUNCTIONS TO ' || admin_user || ';',
         'ALTER DEFAULT PRIVILEGES FOR ROLE ' || owner_user || ' GRANT SELECT ON SEQUENCES TO ' || admin_user || ';',
@@ -1083,19 +1090,26 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql security definer;"""
         try:
-            for database in ["postgres", "template1"]:
-                with self._connect_to_database(
-                    database=database
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute(SQL(function_creation_statement))
-                    cursor.execute(
-                        SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
-                    )
-                    cursor.execute(
-                        SQL(
-                            "GRANT execute ON FUNCTION set_up_predefined_catalog_roles TO {};"
-                        ).format(Identifier(ROLE_DATABASES_OWNER))
-                    )
+            with self._connect_to_database(
+                database="template1"
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute(SQL(function_creation_statement))
+                cursor.execute(
+                    SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
+                )
+                cursor.execute(
+                    SQL("REVOKE EXECUTE ON FUNCTION set_up_predefined_catalog_roles FROM PUBLIC;")
+                )
+                cursor.execute(
+                    SQL(
+                        "GRANT EXECUTE ON FUNCTION set_up_predefined_catalog_roles TO {};"
+                    ).format(Identifier(ROLE_DATABASES_OWNER))
+                )
+                cursor.execute(
+                    SQL(
+                        "REVOKE CREATE ON DATABASE {} FROM {};"
+                    ).format(Identifier("template1"), Identifier(ROLE_DATABASES_OWNER))
+                )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e

@@ -125,9 +125,10 @@ def roles_attributes(predefined_roles: Dict, combination: str) -> Dict:
             raise ValueError(f"Role {role} not found in predefined roles.")
 
         # Whether the relation user is auto-escalated to the database owner user at login
-        # (True or False).
-        if not auto_escalate_to_database_owner:
-            auto_escalate_to_database_owner = predefined_roles[role]["auto-escalate-to-database-owner"]
+        # in the requested database (True value) or in all databases ("*" value).
+        will_auto_escalate_to_database_owner = predefined_roles[role]["auto-escalate-to-database-owner"]
+        if not auto_escalate_to_database_owner or will_auto_escalate_to_database_owner == "*":
+            auto_escalate_to_database_owner = will_auto_escalate_to_database_owner
 
         role_permissions = predefined_roles[role]["permissions"]
 

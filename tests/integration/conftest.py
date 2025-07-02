@@ -203,7 +203,7 @@ def predefined_roles() -> Dict:
             },
         },
         "charmed_admin": {
-            "auto-escalate-to-database-owner": True,
+            "auto-escalate-to-database-owner": "*",
             "permissions": {
                 "connect": "*",
                 "create-databases": False,
@@ -242,6 +242,5 @@ def predefined_roles_combinations() -> List:
         ("charmed_read",),
         ("charmed_dml",),
         ("charmed_admin",),
-        # ("CREATEDB",),
-        # ("charmed_admin", "CREATEDB"),
+        ("charmed_admin", "CREATEDB"),
     ]

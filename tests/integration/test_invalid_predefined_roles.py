@@ -99,3 +99,5 @@ def test_extra_user_roles(juju: jubilant.Juju, predefined_roles, predefined_role
         juju.wait(lambda status: database_active(status), delay=15, timeout=TIMEOUT)
         juju.wait(lambda status: data_integrator_blocked(status), delay=15, timeout=TIMEOUT)
 
+    # Test requesting template and postgres databases.
+
