@@ -747,10 +747,10 @@ def check_connected_user(
     if result is not None:
         instance = "primary" if primary else "replica"
         assert result[0] == session_user, (
-            f"The session user should be the {session_user} user in the {instance}"
+            f"The session user should be the {session_user} user in the {instance} (it's currently {result[0]})"
         )
         assert result[1] == current_user, (
-            f"The current user should be the {current_user} user in the {instance}"
+            f"The current user should be the {current_user} user in the {instance} (it's currently {result[1]})"
         )
     else:
         assert False, "No result returned from the query"

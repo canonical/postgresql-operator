@@ -3,7 +3,6 @@
 # See LICENSE file for licensing details.
 import logging
 from time import sleep
-from typing import List, Dict
 
 import jubilant
 import psycopg2
@@ -13,6 +12,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from .helpers import (
     DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
+    check_connected_user,
     db_connect,
 )
 from .jubilant_helpers import (
@@ -20,7 +20,8 @@ from .jubilant_helpers import (
     get_password,
     get_primary,
     get_unit_address,
-    relations, roles_attributes,
+    relations,
+    roles_attributes,
 )
 
 logger = logging.getLogger(__name__)
@@ -170,7 +171,6 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
             connection = None
             try:
                 connect_permission = attributes["permissions"]["connect"]
-                logger.info(f"connect_permission: {connect_permission}")
                 message_prefix = f"Checking that {user} user ({'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'})"
                 if (connect_permission == "*" and database_to_test not in ["postgres", "template0", "template1"]) or (connect_permission == True and database_to_test == database) or database_to_test == OTHER_DATABASE_NAME:
                     logger.info(f"{message_prefix} can connect to {database_to_test} database")
@@ -187,10 +187,15 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
                     assert "no pg_hba.conf entry" in str(exc_info.value)
 
                 if connection is not None:
-                    logger.info("Doing it again")
-                    with connection.cursor() as cursor:
-                        cursor.execute("SELECT current_database();")
-                        assert cursor.fetchone()[0] == database_to_test
+                    with connection, connection.cursor() as cursor:
+                        message_prefix = f"Checking that {user} user ({'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'})"
+                        database_owner_user = f"charmed_{database_to_test}_owner"
+                        if attributes["auto-escalate-to-database-owner"] and database_to_test == database:
+                            logger.info(f"{message_prefix} auto escalates to {database_owner_user}")
+                            check_connected_user(cursor, user, database_owner_user)
+                        else:
+                            logger.info(f"{message_prefix} doesn't auto escalate to {database_owner_user}")
+                            check_connected_user(cursor, user, user)
                     connection.close()
                     connection = None
             finally:

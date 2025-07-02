@@ -203,7 +203,7 @@ def predefined_roles() -> Dict:
             },
         },
         "charmed_admin": {
-            "auto-escalate-to-database-owner": False,
+            "auto-escalate-to-database-owner": True,
             "permissions": {
                 "connect": "*",
                 "create-databases": False,
