@@ -338,28 +338,20 @@ class Patroni:
         return run(self._async_get_request(uri, endpoints, verify))
 
     def get_primary(
-        self,
-        unit_name_pattern=False,
-        alternative_endpoints: list[str] | None = None,
-        cached: bool = False,
+        self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
     ) -> str | None:
         """Get primary instance.
 
         Args:
             unit_name_pattern: whether to convert pod name to unit name
             alternative_endpoints: list of alternative endpoints to check for the primary.
-            cached: to use the cached cluster status or not.
 
         Returns:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
         try:
-            cluster_status = (
-                self.cluster_status(alternative_endpoints)
-                if cached
-                else self.cached_cluster_status
-            )
+            cluster_status = self.cluster_status(alternative_endpoints)
             for member in cluster_status:
                 if member["role"] == "leader":
                     primary = member["name"]

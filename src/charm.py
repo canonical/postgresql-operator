@@ -621,7 +621,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("primary endpoint early exit: Peer relation not joined yet.")
             return None
         try:
-            primary = self._patroni.get_primary(cached=True)
+            primary = self._patroni.get_primary()
             if primary is None and (standby_leader := self._patroni.get_standby_leader()):
                 primary = standby_leader
             primary_endpoint = self._patroni.get_member_ip(primary)
@@ -1136,7 +1136,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def is_primary(self) -> bool:
         """Return whether this unit is the primary instance."""
-        return self.unit.name == self._patroni.get_primary(unit_name_pattern=True, cached=True)
+        return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
 
     @property
     def is_standby_leader(self) -> bool:
