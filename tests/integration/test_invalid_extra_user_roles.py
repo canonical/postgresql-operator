@@ -71,14 +71,14 @@ def test_extra_user_roles(juju: jubilant.Juju, predefined_roles, predefined_role
     logger.info(f"Invalid combinations: {invalid_extra_user_roles_combinations}")
 
     for invalid_extra_user_roles_combination in invalid_extra_user_roles_combinations:
-        logger.info(f"Setting invalid extra user roles combination: {', '.join(invalid_extra_user_roles_combination)}")
+        logger.info(f"Requesting invalid extra user roles combination: {', '.join(invalid_extra_user_roles_combination)}")
         juju.config(
             app=DATA_INTEGRATOR_APP_NAME,
             values={
                 "extra-user-roles": ",".join(invalid_extra_user_roles_combination),
             },
         )
-        juju.wait(lambda status: data_integrator_blocked(status), delay=15, timeout=TIMEOUT)
+        juju.wait(lambda status: data_integrator_blocked(status), timeout=TIMEOUT)
 
         logger.info("Adding relation between charms")
         for attempt in Retrying(stop=stop_after_delay(120), wait=wait_fixed(5)):
