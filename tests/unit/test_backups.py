@@ -15,7 +15,7 @@ from tenacity import RetryError, wait_fixed
 
 from backups import ListBackupsError
 from charm import PostgresqlOperatorCharm
-from constants import PEER
+from constants import PEER, POSTGRESQL_ARCHIVE_PATH
 
 ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE = "the S3 repository has backups from another cluster"
 FAILED_TO_ACCESS_CREATE_BUCKET_ERROR_MESSAGE = (
@@ -1732,6 +1732,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             user="backup",
             retention_full=30,
             process_max=max(cpu_count() - 2, 1),
+            archive_path=POSTGRESQL_ARCHIVE_PATH,
         )
 
         # Patch the `open` method with our mock.
