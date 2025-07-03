@@ -1,12 +1,19 @@
 import json
 import subprocess
-from typing import Dict
+from enum import Enum
 
 import jubilant
 
 from constants import PEER
 
 from .helpers import DATABASE_APP_NAME, SecretNotFoundError
+
+
+class RoleAttributeValue(Enum):
+    NO = 0
+    YES = 1
+    REQUESTED_DATABASE = 2
+    ALL_DATABASES = 3
 
 
 def get_credentials(
@@ -109,17 +116,17 @@ def relations(juju: jubilant.Juju, provider_app: str, requirer_app: str) -> list
     ]
 
 
-def roles_attributes(predefined_roles: Dict, combination: str) -> Dict:
-    auto_escalate_to_database_owner = False
-    connect = False
-    create_databases = False
-    create_objects = False
-    escalate_to_database_owner = False
-    read_data = False
-    read_stats = False
-    set_up_predefined_catalog_roles = False
-    set_user = False
-    write_data = False
+def roles_attributes(predefined_roles: dict, combination: str) -> dict:
+    auto_escalate_to_database_owner = RoleAttributeValue.NO
+    connect = RoleAttributeValue.NO
+    create_databases = RoleAttributeValue.NO
+    create_objects = RoleAttributeValue.NO
+    escalate_to_database_owner = RoleAttributeValue.NO
+    read_data = RoleAttributeValue.NO
+    read_stats = RoleAttributeValue.NO
+    set_up_predefined_catalog_roles = RoleAttributeValue.NO
+    set_user = RoleAttributeValue.NO
+    write_data = RoleAttributeValue.NO
     for role in combination.split(","):
         if role not in predefined_roles:
             raise ValueError(f"Role {role} not found in predefined roles.")
@@ -127,7 +134,7 @@ def roles_attributes(predefined_roles: Dict, combination: str) -> Dict:
         # Whether the relation user is auto-escalated to the database owner user at login
         # in the requested database (True value) or in all databases ("*" value).
         will_auto_escalate_to_database_owner = predefined_roles[role]["auto-escalate-to-database-owner"]
-        if not auto_escalate_to_database_owner or will_auto_escalate_to_database_owner == "*":
+        if auto_escalate_to_database_owner == RoleAttributeValue.NO or will_auto_escalate_to_database_owner == "*":
             auto_escalate_to_database_owner = will_auto_escalate_to_database_owner
 
         role_permissions = predefined_roles[role]["permissions"]
@@ -135,47 +142,47 @@ def roles_attributes(predefined_roles: Dict, combination: str) -> Dict:
         # Permission to connect to the requested database (True value) or to all databases
         # ("*" value).
         role_can_connect = role_permissions["connect"]
-        if not connect or role_can_connect == "*":
+        if connect == RoleAttributeValue.NO or role_can_connect == "*":
             connect = role_can_connect
 
-        # Permission to create databases (True or False).
-        if not create_databases:
+        # Permission to create databases (True or RoleAttributeValue.NO).
+        if create_databases == RoleAttributeValue.NO:
             create_databases = role_permissions["create-databases"]
 
         # Permission to create objects in the requested database (True value) or in all databases
         # ("*" value).
         role_can_create_objects = role_permissions["create-objects"]
-        if not create_objects or role_can_create_objects == "*":
+        if create_objects == RoleAttributeValue.NO or role_can_create_objects == "*":
             create_objects = role_can_create_objects
 
         # Permission to escalate to the database owner user in the requested database (True value)
         # or in all databases ("*" value).
         role_can_escalate_to_database_owner = role_permissions["escalate-to-database-owner"]
-        if not escalate_to_database_owner or role_can_escalate_to_database_owner == "*":
+        if escalate_to_database_owner == RoleAttributeValue.NO or role_can_escalate_to_database_owner == "*":
             escalate_to_database_owner = role_can_escalate_to_database_owner
 
         # Permission to read data in the requested database (True value) or in all databases
         # ("*" value).
         role_can_read_data = role_permissions["read-data"]
-        if not read_data or role_can_read_data == "*":
+        if read_data == RoleAttributeValue.NO or role_can_read_data == "*":
             read_data = role_can_read_data
 
         read_stats = role_permissions["read-stats"]
 
-        # Permission to set up predefined catalog roles ("*" for all databases or False for not being
+        # Permission to set up predefined catalog roles ("*" for all databases or RoleAttributeValue.NO for not being
         # able to do it).
         role_can_set_up_predefined_catalog_roles = role_permissions["set-up-predefined-catalog-roles"]
-        if not set_up_predefined_catalog_roles or role_can_set_up_predefined_catalog_roles == "*":
+        if set_up_predefined_catalog_roles == RoleAttributeValue.NO or role_can_set_up_predefined_catalog_roles == "*":
             set_up_predefined_catalog_roles = role_can_set_up_predefined_catalog_roles
 
-        # Permission to call the set_user function (True or False).
-        if not set_user:
+        # Permission to call the set_user function (True or RoleAttributeValue.NO).
+        if set_user == RoleAttributeValue.NO:
             set_user = role_permissions["set-user"]
 
         # Permission to write data in the requested database (True value) or in all databases
         # ("*" value).
         role_can_write_data = role_permissions["write-data"]
-        if not write_data or role_can_write_data == "*":
+        if write_data == RoleAttributeValue.NO or role_can_write_data == "*":
             write_data = role_can_write_data
     return {
         "auto-escalate-to-database-owner": auto_escalate_to_database_owner,

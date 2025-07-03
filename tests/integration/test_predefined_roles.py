@@ -6,7 +6,10 @@ import logging
 import jubilant
 import psycopg2
 import pytest as pytest
-from psycopg2.sql import Identifier, SQL
+from psycopg2.sql import (
+    SQL,
+    Identifier,
+)
 
 from .helpers import (
     DATA_INTEGRATOR_APP_NAME,
@@ -15,6 +18,7 @@ from .helpers import (
     db_connect,
 )
 from .jubilant_helpers import (
+    RoleAttributeValue,
     get_credentials,
     get_password,
     get_primary,
@@ -144,7 +148,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
             operator_cursor = None
             try:
                 connect_permission = attributes["permissions"]["connect"]
-                if (connect_permission == "*" and (("CREATEDB" in extra_user_roles and database_to_test not in ["postgres", "template0"]) or database_to_test not in ["postgres", "template0", "template1"])) or (connect_permission == True and database_to_test == database) or database_to_test == OTHER_DATABASE_NAME:
+                if (connect_permission == RoleAttributeValue.ALL_DATABASES and (("CREATEDB" in extra_user_roles and database_to_test not in ["postgres", "template0"]) or database_to_test not in ["postgres", "template0", "template1"])) or (connect_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or database_to_test == OTHER_DATABASE_NAME:
                     logger.info(f"{message_prefix} can connect to {database_to_test} database")
                     connection = db_connect(
                         host, password, username=user, database=database_to_test
@@ -162,7 +166,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
                     auto_escalate_to_database_owner = attributes["auto-escalate-to-database-owner"]
                     database_owner_user = f"charmed_{database_to_test}_owner"
                     with connection, connection.cursor() as cursor:
-                        if (auto_escalate_to_database_owner == "*" and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (auto_escalate_to_database_owner == True and database_to_test == database):
+                        if (auto_escalate_to_database_owner == RoleAttributeValue.ALL_DATABASES and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (auto_escalate_to_database_owner == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
                             logger.info(f"{message_prefix} auto escalates to {database_owner_user}")
                             check_connected_user(cursor, user, database_owner_user)
                         else:
@@ -184,16 +188,15 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
 
                     # Test objects creation.
                     create_objects_permission = attributes["permissions"]["create-objects"]
-                    if (create_objects_permission == "*" and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (create_objects_permission == "*" and database_to_test == database) or (escalate_to_database_owner_permission == "*" and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (escalate_to_database_owner_permission == True and database_to_test == database):
+                    if (create_objects_permission == RoleAttributeValue.ALL_DATABASES and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (create_objects_permission == RoleAttributeValue.ALL_DATABASES and database_to_test == database) or (escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
                         logger.info(f"{message_prefix} can create schemas")
                         with connection.cursor() as cursor:
                             cursor.execute(statements["schema"])
                             cursor.execute(statements["create"])
                     else:
                         logger.info(f"{message_prefix} can't create schemas")
-                        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                            with connection.cursor() as cursor:
-                                cursor.execute(statements["schema"])
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(statements["schema"])
 
                         operator_connection = db_connect(host, operator_password, database=database_to_test)
                         operator_connection.autocommit = True
@@ -207,54 +210,56 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
 
                     # Test write permissions.
                     write_data_permission = attributes["permissions"]["write-data"]
-                    if write_data_permission == "*" or (write_data_permission == True and database_to_test == database) or escalate_to_database_owner_permission == "*" or (escalate_to_database_owner_permission == True and database_to_test == database):
+                    if write_data_permission == RoleAttributeValue.ALL_DATABASES or (write_data_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES or (escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
                         logger.info(f"{message_prefix} can write to tables in {schema_name} schema")
                         with connection.cursor() as cursor:
-                            if escalate_to_database_owner_permission and not auto_escalate_to_database_owner:
+                            if ((escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES) and auto_escalate_to_database_owner == RoleAttributeValue.NO:
                                 cursor.execute(SQL("SET ROLE {};").format(Identifier(database_owner_user)))
                             cursor.execute(statements["write"])
                     else:
                         logger.info(f"{message_prefix} can't write to tables in {schema_name} schema")
-                        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                            with connection.cursor() as cursor:
-                                cursor.execute(statements["write"])
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(statements["write"])
 
                     # Test read permissions.
                     read_data_permission = attributes["permissions"]["read-data"]
-                    if read_data_permission == "*" or (read_data_permission == True and database_to_test == database) or escalate_to_database_owner_permission == "*" or (escalate_to_database_owner_permission == True and database_to_test == database):
+                    if read_data_permission == RoleAttributeValue.ALL_DATABASES or (read_data_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES or (escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
                         logger.info(f"{message_prefix} can read from tables in {schema_name} schema")
                         with connection.cursor() as cursor:
-                            if escalate_to_database_owner_permission and not auto_escalate_to_database_owner:
+                            if ((escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES) and auto_escalate_to_database_owner == RoleAttributeValue.NO:
                                 cursor.execute(SQL("SET ROLE {};").format(Identifier(database_owner_user)))
                             cursor.execute(statements["read"])
                     else:
                         logger.info(f"{message_prefix} can't read from tables in {schema_name} schema")
-                        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                            with connection.cursor() as cursor:
-                                cursor.execute(statements["read"])
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(statements["read"])
 
                     # Do the following operations only once.
                     if database_to_test == database:
                         # Test permission to call the set_up_predefined_catalog_roles function.
                         statement = "SELECT set_up_predefined_catalog_roles();"
-                        if attributes["permissions"]["set-up-predefined-catalog-roles"]:
+                        if attributes["permissions"]["set-up-predefined-catalog-roles"] == RoleAttributeValue.YES:
                             logger.info(f"{message_prefix} can call the set-up-predefined-catalog-roles function")
                             with connection.cursor() as cursor:
                                 cursor.execute(SQL("SET ROLE {};").format(Identifier(ROLE_DATABASES_OWNER)))
                                 cursor.execute(statement)
                         else:
                             logger.info(f"{message_prefix} can't call the set-up-predefined-catalog-roles function")
-                            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                                with connection.cursor() as cursor:
-                                    cursor.execute(statement)
+                            with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                                cursor.execute(statement)
 
-                        # Test database creation.
+                        # Test database creation, change and removal.
                         cursor = connection.cursor()
                         create_database_statement = SQL("CREATE DATABASE {};").format(Identifier(f"{OTHER_DATABASE_NAME}-{user}"))
+                        first_alter_database_statement = SQL("ALTER DATABASE {} RENAME TO {};").format(Identifier(f"{OTHER_DATABASE_NAME}-{user}"), Identifier(f"{OTHER_DATABASE_NAME}-{user}-1"))
+                        second_alter_database_statement = SQL("ALTER DATABASE {} RENAME TO {};").format(Identifier(f"{OTHER_DATABASE_NAME}-{user}-1"), Identifier(f"{OTHER_DATABASE_NAME}-{user}"))
                         drop_database_statement = SQL("DROP DATABASE {};").format(Identifier(OTHER_DATABASE_NAME))
-                        if attributes["permissions"]["create-databases"]:
+                        if attributes["permissions"]["create-databases"] == RoleAttributeValue.YES:
                             logger.info(f"{message_prefix} can create databases")
                             cursor.execute(create_database_statement)
+                            logger.info(f"{message_prefix} can alter databases")
+                            cursor.execute(first_alter_database_statement)
+                            cursor.execute(second_alter_database_statement)
                             logger.info(f"{message_prefix} can't drop databases")
                             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                                 cursor.execute(drop_database_statement)
@@ -262,6 +267,19 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
                             logger.info(f"{message_prefix} can't create databases")
                             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                                 cursor.execute(create_database_statement)
+
+                            operator_connection = db_connect(host, operator_password, database=database_to_test)
+                            operator_connection.autocommit = True
+                            operator_cursor = operator_connection.cursor()
+                            operator_cursor.execute(create_database_statement)
+                            operator_cursor.close()
+                            operator_cursor = None
+                            operator_connection.close()
+                            operator_connection = None
+
+                            logger.info(f"{message_prefix} can't alter databases")
+                            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                                cursor.execute(first_alter_database_statement)
                             logger.info(f"{message_prefix} can't drop databases")
                             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                                 cursor.execute(drop_database_statement)
