@@ -250,19 +250,23 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
 
                         # Test database creation, change and removal.
                         cursor = connection.cursor()
-                        create_database_statement = SQL("CREATE DATABASE {};").format(Identifier(f"{OTHER_DATABASE_NAME}-{user}"))
-                        first_alter_database_statement = SQL("ALTER DATABASE {} RENAME TO {};").format(Identifier(f"{OTHER_DATABASE_NAME}-{user}"), Identifier(f"{OTHER_DATABASE_NAME}-{user}-1"))
-                        second_alter_database_statement = SQL("ALTER DATABASE {} RENAME TO {};").format(Identifier(f"{OTHER_DATABASE_NAME}-{user}-1"), Identifier(f"{OTHER_DATABASE_NAME}-{user}"))
-                        drop_database_statement = SQL("DROP DATABASE {};").format(Identifier(OTHER_DATABASE_NAME))
+                        new_database_name = f"{OTHER_DATABASE_NAME}-{user}"
+                        create_database_statement = SQL("CREATE DATABASE {};").format(Identifier(new_database_name))
+                        first_alter_database_statement = SQL("ALTER DATABASE {} RENAME TO {};").format(Identifier(new_database_name), Identifier(f"{new_database_name}-1"))
+                        second_alter_database_statement = SQL("ALTER DATABASE {} RENAME TO {};").format(Identifier(f"{new_database_name}-1"), Identifier(new_database_name))
+                        first_drop_database_statement = SQL("DROP DATABASE {};").format(Identifier(new_database_name))
+                        second_drop_database_statement = SQL("DROP DATABASE {};").format(Identifier(OTHER_DATABASE_NAME))
                         if attributes["permissions"]["create-databases"] == RoleAttributeValue.YES:
                             logger.info(f"{message_prefix} can create databases")
                             cursor.execute(create_database_statement)
                             logger.info(f"{message_prefix} can alter databases")
                             cursor.execute(first_alter_database_statement)
                             cursor.execute(second_alter_database_statement)
-                            logger.info(f"{message_prefix} can't drop databases")
+                            logger.info(f"{message_prefix} can drop databases owned by the user")
+                            cursor.execute(first_drop_database_statement)
+                            logger.info(f"{message_prefix} can't drop databases not owned by the user")
                             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                                cursor.execute(drop_database_statement)
+                                cursor.execute(second_drop_database_statement)
                         else:
                             logger.info(f"{message_prefix} can't create databases")
                             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
@@ -282,7 +286,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
                                 cursor.execute(first_alter_database_statement)
                             logger.info(f"{message_prefix} can't drop databases")
                             with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                                cursor.execute(drop_database_statement)
+                                cursor.execute(first_drop_database_statement)
             finally:
                 if cursor is not None:
                     cursor.close()
