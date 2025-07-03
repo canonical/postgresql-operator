@@ -128,9 +128,6 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
     set_user = RoleAttributeValue.NO
     write_data = RoleAttributeValue.NO
     for role in combination.split(","):
-        if role not in predefined_roles:
-            raise ValueError(f"Role {role} not found in predefined roles.")
-
         # Whether the relation user is auto-escalated to the database owner user at login
         # in the requested database (True value) or in all databases ("*" value).
         will_auto_escalate_to_database_owner = predefined_roles[role]["auto-escalate-to-database-owner"]
@@ -146,8 +143,7 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
             connect = role_can_connect
 
         # Permission to create databases (True or RoleAttributeValue.NO).
-        if create_databases == RoleAttributeValue.NO:
-            create_databases = role_permissions["create-databases"]
+        create_databases = role_permissions["create-databases"] if create_databases == RoleAttributeValue.NO else create_databases
 
         # Permission to create objects in the requested database (True value) or in all databases
         # ("*" value).
@@ -176,8 +172,7 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
             set_up_predefined_catalog_roles = role_can_set_up_predefined_catalog_roles
 
         # Permission to call the set_user function (True or RoleAttributeValue.NO).
-        if set_user == RoleAttributeValue.NO:
-            set_user = role_permissions["set-user"]
+        set_user = role_permissions["set-user"] if set_user == RoleAttributeValue.NO else set_user
 
         # Permission to write data in the requested database (True value) or in all databases
         # ("*" value).
