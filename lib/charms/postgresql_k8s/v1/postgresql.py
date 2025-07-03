@@ -968,16 +968,16 @@ BEGIN
 
 	EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND (b.rolname = %L OR b.rolname = %L) and c.rolname = %L)', db_admin_role, '{ROLE_ADMIN}', cur_user) INTO is_user_admin;
 
-EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', '{ROLE_DATABASES_OWNER}', cur_user) INTO user_has_createdb;
+    EXECUTE format('SELECT EXISTS(SELECT * FROM pg_auth_members a, pg_roles b, pg_roles c WHERE a.roleid = b.oid AND a.member = c.oid AND b.rolname = %L and c.rolname = %L)', '{ROLE_DATABASES_OWNER}', cur_user) INTO user_has_createdb;
 
 	BEGIN
-		IF user_has_createdb = true THEN
-			EXECUTE format('SET ROLE %L', '{ROLE_DATABASES_OWNER}');
+	    IF is_user_admin = true THEN
+			db_owner_role = 'charmed_' || db_name || '_owner';
+			EXECUTE format('SET ROLE %L', db_owner_role);
 		ELSE
-IF is_user_admin = true THEN
-				db_owner_role = 'charmed_' || db_name || '_owner';
-				EXECUTE format('SET ROLE %L', db_owner_role);
-			END IF;
+            IF user_has_createdb = true THEN
+			    EXECUTE format('SET ROLE %L', '{ROLE_DATABASES_OWNER}');
+		    END IF;
 		END IF;
 	EXCEPTION
 		WHEN OTHERS THEN
