@@ -113,6 +113,12 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
                                 if schema_name.startswith("relation-") and schema_name.endswith("_schema"):
                                     logger.info(f"Dropping schema {schema_name} created by the test")
                                     sub_cursor.execute(SQL("DROP SCHEMA {} CASCADE;").format(Identifier(schema_name)))
+                            sub_cursor.execute("SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';")
+                            for table in sub_cursor.fetchall():
+                                table_name = table[0]
+                                if table_name.startswith("test_table_"):
+                                    logger.info(f"Dropping table {table_name} created by the test")
+                                    sub_cursor.execute(SQL("DROP TABLE public.{};").format(Identifier(table_name)))
                     finally:
                         if sub_connection is not None:
                             sub_connection.close()
@@ -175,34 +181,39 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
 
                     escalate_to_database_owner_permission = attributes["permissions"]["escalate-to-database-owner"]
 
-                    schema_name = f"{user}_schema"
-                    statements ={
-                        "schema": SQL("CREATE SCHEMA {};").format(Identifier(schema_name)),
-                        "create": SQL("CREATE TABLE {}.test_table(value TEXT);").format(Identifier(schema_name)),
-                        "create-in-public-schema": SQL("CREATE TABLE test_table_{}(value TEXT);").format(Identifier(user)),
-                        "write": SQL("INSERT INTO {}.test_table VALUES ('test');").format(Identifier(schema_name)),
-                        "write-in-public-schema": SQL("INSERT INTO test_table_{} VALUES ('test');").format(Identifier(user)),
-                        "read": SQL("SELECT * FROM {}.test_table;").format(Identifier(schema_name)),
-                        "read-in-public-schema": SQL("SELECT * FROM test_table_{};").format(Identifier(user)),
-                    }
-
                     # Test objects creation.
+                    # TODO: test view creation.
+                    # TODO: test sequence creation.
+                    # TODO: test function creation.
+                    # TODO: test index creation.
                     create_objects_permission = attributes["permissions"]["create-objects"]
+                    schema_name = f"{user}_schema"
+                    create_schema_statement = SQL("CREATE SCHEMA {};").format(Identifier(schema_name))
+                    create_table_statement = SQL("CREATE TABLE {}.test_table(value TEXT);").format(Identifier(schema_name))
+                    create_table_in_public_schema_statement = SQL("CREATE TABLE public.{}(value TEXT);").format(Identifier(f"test_table_{user}"))
                     if (create_objects_permission == RoleAttributeValue.ALL_DATABASES and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (create_objects_permission == RoleAttributeValue.ALL_DATABASES and database_to_test == database) or (escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES and database_to_test not in [OTHER_DATABASE_NAME, "template1"]) or (escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
-                        logger.info(f"{message_prefix} can create schemas")
                         with connection.cursor() as cursor:
-                            cursor.execute(statements["schema"])
-                            cursor.execute(statements["create"])
+                            logger.info(f"{message_prefix} can create schemas")
+                            cursor.execute(create_schema_statement)
+                            logger.info(f"{message_prefix} can create tables")
+                            cursor.execute(create_table_statement)
+                            logger.info(f"{message_prefix} can create tables in public schema")
+                            cursor.execute(create_table_in_public_schema_statement)
                     else:
                         logger.info(f"{message_prefix} can't create schemas")
                         with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
-                            cursor.execute(statements["schema"])
+                            cursor.execute(create_schema_statement)
+
+                        logger.info(f"{message_prefix} can't create tables in public schema")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(create_table_in_public_schema_statement)
 
                         operator_connection = db_connect(host, operator_password, database=database_to_test)
                         operator_connection.autocommit = True
                         operator_cursor = operator_connection.cursor()
-                        operator_cursor.execute(statements["schema"])
-                        operator_cursor.execute(statements["create"])
+                        operator_cursor.execute(create_schema_statement)
+                        operator_cursor.execute(create_table_statement)
+                        operator_cursor.execute(create_table_in_public_schema_statement)
                         operator_cursor.close()
                         operator_cursor = None
                         operator_connection.close()
@@ -210,29 +221,57 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
 
                     # Test write permissions.
                     write_data_permission = attributes["permissions"]["write-data"]
+                    insert_statement = SQL("INSERT INTO {}.test_table VALUES ('test');").format(Identifier(schema_name))
+                    update_statement = SQL("UPDATE {}.test_table SET value = 'updated' WHERE value = 'test';").format(Identifier(schema_name))
+                    delete_statement = SQL("DELETE FROM {}.test_table WHERE value = 'updated';").format(Identifier(schema_name))
+                    insert_in_public_schema_statement = SQL("INSERT INTO public.{} VALUES ('test');").format(Identifier(f"test_table_{user}"))
                     if write_data_permission == RoleAttributeValue.ALL_DATABASES or (write_data_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES or (escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
-                        logger.info(f"{message_prefix} can write to tables in {schema_name} schema")
                         with connection.cursor() as cursor:
+                            logger.info(f"{message_prefix} can write to tables in {schema_name} schema")
                             if ((escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES) and auto_escalate_to_database_owner == RoleAttributeValue.NO:
                                 cursor.execute(SQL("SET ROLE {};").format(Identifier(database_owner_user)))
-                            cursor.execute(statements["write"])
+                            cursor.execute(insert_statement)
+                            cursor.execute(update_statement)
+                            cursor.execute(delete_statement)
+                            logger.info(f"{message_prefix} can write to tables in public schema")
+                            cursor.execute(insert_in_public_schema_statement)
                     else:
                         logger.info(f"{message_prefix} can't write to tables in {schema_name} schema")
                         with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
-                            cursor.execute(statements["write"])
+                            cursor.execute(insert_statement)
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(update_statement)
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(delete_statement)
+                        logger.info(f"{message_prefix} can't write to tables in public schema")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(insert_in_public_schema_statement)
 
                     # Test read permissions.
+                    # TODO: read views.
+                    # TODO: read sequences.
                     read_data_permission = attributes["permissions"]["read-data"]
+                    select_statement = SQL("SELECT * FROM {}.test_table;").format(Identifier(schema_name))
+                    select_in_public_schema_statement = SQL("SELECT * FROM public.{};").format(Identifier(f"test_table_{user}"))
                     if read_data_permission == RoleAttributeValue.ALL_DATABASES or (read_data_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES or (escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database):
-                        logger.info(f"{message_prefix} can read from tables in {schema_name} schema")
                         with connection.cursor() as cursor:
                             if ((escalate_to_database_owner_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES) and auto_escalate_to_database_owner == RoleAttributeValue.NO:
                                 cursor.execute(SQL("SET ROLE {};").format(Identifier(database_owner_user)))
-                            cursor.execute(statements["read"])
+                            logger.info(f"{message_prefix} can read from tables in {schema_name} schema")
+                            cursor.execute(select_statement)
+                            logger.info(f"{message_prefix} can read from tables in public schema")
+                            cursor.execute(select_in_public_schema_statement)
                     else:
                         logger.info(f"{message_prefix} can't read from tables in {schema_name} schema")
                         with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
-                            cursor.execute(statements["read"])
+                            cursor.execute(select_statement)
+                        logger.info(f"{message_prefix} can't read from tables in public schema")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(select_in_public_schema_statement)
+
+                    # TODO: test stats permissions.
+
+                    # TODO: execute functions.
 
                     # Do the following operations only once.
                     if database_to_test == database:
