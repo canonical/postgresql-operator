@@ -1262,6 +1262,7 @@ Stderr:
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
+            process_max=max(os.cpu_count() - 2, 1),
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
