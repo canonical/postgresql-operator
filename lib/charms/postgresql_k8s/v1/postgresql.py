@@ -825,6 +825,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           copy_command TEXT;
           connection_type TEXT;
           rec record;
+          auth_method TEXT;
           insert_value TEXT;
           changes INTEGER = 0;
         BEGIN
@@ -849,7 +850,11 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                 -- Add the new users to the pg_hba file.
                 FOR rec IN SELECT * FROM relation_users
                 LOOP
-                  insert_value := connection_type || ' ' || rec.databases || ' ' || rec.user || ' 0.0.0.0/0 md5';
+                  auth_method := 'scram-sha-256';
+                  IF rec.user LIKE 'pgbouncer_auth_relation_%' THEN
+                    auth_method := 'md5';
+                  END IF;
+                  insert_value := connection_type || ' ' || rec.databases || ' ' || rec.user || ' 0.0.0.0/0 ' || auth_method;
                   IF (SELECT COUNT(lines) FROM pg_hba WHERE lines = insert_value) = 0 THEN
                     INSERT INTO pg_hba (lines) VALUES (insert_value);
                     changes := changes + 1;
