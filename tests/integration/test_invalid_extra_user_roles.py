@@ -66,7 +66,7 @@ def test_extra_user_roles(juju: jubilant.Juju, predefined_roles, predefined_role
     """Check that invalid extra user roles make the database charm block."""
     # Remove the empty role (no extra user roles, i.e., regular relation user).
     del predefined_roles[""]
-    invalid_extra_user_roles_combinations = [("backup",), ("charmed_dba",), ("invalid",), ("invalid", "invalid"), ("monitoring",), ("postgres",), ("replication",), ("rewind",)]
+    invalid_extra_user_roles_combinations = [("backup",), ("charmed_dba",), ("invalid",), ("invalid", "invalid"), ("monitoring",), ("postgres",), ("pg_monitor",), ("replication",), ("rewind",)]
     invalid_extra_user_roles_combinations.extend([combination for combination in combinations(predefined_roles.keys(), 2) if combination not in predefined_roles_combinations])
     logger.info(f"Invalid combinations: {invalid_extra_user_roles_combinations}")
 
