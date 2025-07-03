@@ -49,6 +49,8 @@ POSTGRESQL_CONF_PATH = f"{SNAP_CONF_PATH}/postgresql"
 POSTGRESQL_DATA_PATH = f"{SNAP_DATA_PATH}/postgresql"
 POSTGRESQL_LOGS_PATH = f"{SNAP_LOGS_PATH}/postgresql"
 
+POSTGRESQL_ARCHIVE_PATH = f"{SNAP_COMMON_PATH}/data/archive"
+
 UPDATE_CERTS_BIN_PATH = "/usr/sbin/update-ca-certificates"
 
 PGBACKREST_CONFIGURATION_FILE = f"--config={PGBACKREST_CONF_PATH}/pgbackrest.conf"
