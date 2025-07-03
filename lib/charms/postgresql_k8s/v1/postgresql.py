@@ -290,6 +290,13 @@ class PostgreSQL:
             # Separate roles and privileges from the provided extra user roles.
             roles = privileges = None
             if extra_user_roles:
+                if len(extra_user_roles) > 2 and sorted(extra_user_roles) != [ROLE_ADMIN, "createdb", "relation_access"]:
+                    logger.error(
+                        "Invalid extra user roles: "
+                        f"{', '.join(extra_user_roles)}. "
+                        f"Only 'createdb' and '{ROLE_ADMIN}' are allowed together."
+                    )
+                    raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
                 roles = [role for role in extra_user_roles if (user == BACKUP_USER or user in SYSTEM_USERS or role in valid_roles or role == ACCESS_GROUP_RELATION or role == "createdb")]
                 if "createdb" in extra_user_roles:
