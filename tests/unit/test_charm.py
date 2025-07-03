@@ -89,9 +89,9 @@ def test_on_install(harness):
         pg_snap.alias.assert_any_call("patronictl")
 
         assert _check_call.call_count == 3
-        _check_call.assert_any_call(["mkdir", "-p", "/home/snap_daemon"])
-        _check_call.assert_any_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])
-        _check_call.assert_any_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])
+        _check_call.assert_any_call(["mkdir", "-p", "/home/_daemon_"])
+        _check_call.assert_any_call(["chown", "_daemon_:_daemon_", "/home/_daemon_"])
+        _check_call.assert_any_call(["usermod", "-d", "/home/_daemon_", "_daemon_"])
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
@@ -125,7 +125,7 @@ def test_on_install_failed_to_create_home(harness):
         pg_snap.alias.assert_any_call("psql")
         pg_snap.alias.assert_any_call("patronictl")
 
-        _logger_exception.assert_called_once_with("Unable to create snap_daemon home dir")
+        _logger_exception.assert_called_once_with("Unable to create _daemon_ home dir")
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)

@@ -492,7 +492,7 @@ def test_execute_command(harness):
         _run.assert_called_once_with(
             command, input=None, capture_output=True, preexec_fn=ANY, timeout=None
         )
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _getpwnam.assert_called_once_with("_daemon_")
 
         # Test when the command runs successfully.
         _run.reset_mock()
@@ -505,7 +505,7 @@ def test_execute_command(harness):
         _run.assert_called_once_with(
             command, input=b"fake input", capture_output=True, preexec_fn=ANY, timeout=5
         )
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _getpwnam.assert_called_once_with("_daemon_")
 
 
 def test_format_backup_list(harness):

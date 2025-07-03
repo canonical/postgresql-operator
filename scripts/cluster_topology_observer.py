@@ -102,7 +102,7 @@ def check_for_database_changes(run_cmd, unit, charm_dir, previous_databases):
         "-E",
         "-H",
         "-u",
-        "snap_daemon",
+        "_daemon_",
         "charmed-postgresql.patronictl",
         "-c",
         conf_file_path,

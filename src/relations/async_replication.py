@@ -336,7 +336,7 @@ class PostgreSQLAsyncReplication(Object):
         """Returns the PostgreSQL system identifier from this instance."""
 
         def demote():
-            pw_record = pwd.getpwnam("snap_daemon")
+            pw_record = pwd.getpwnam("_daemon_")
 
             def result():
                 os.setgid(pw_record.pw_gid)
