@@ -557,7 +557,15 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                         ):
                             cursor.execute(select_in_public_schema_statement)
 
-                    # TODO: test stats permissions.
+                    if attributes["permissions"]["read-stats"] == RoleAttributeValue.ALL_DATABASES:
+                        logger.info(f"{message_prefix} can read stats in all databases")
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT * FROM pg_stat_activity;")
+                    else:
+                        logger.info(f"{message_prefix} can't read stats in all databases")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                            with connection.cursor() as cursor:
+                                cursor.execute("SELECT * FROM pg_stat_activity;")
 
                     # TODO: execute functions.
 
