@@ -257,9 +257,47 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             )
                             check_connected_user(cursor, user, user)
 
+                    # Test escalation to the database owner user.
                     escalate_to_database_owner_permission = attributes["permissions"][
                         "escalate-to-database-owner"
                     ]
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_user;")
+                        previous_current_user = cursor.fetchone()[0]
+                        cursor.execute("RESET ROLE;")
+                        check_connected_user(cursor, user, user)
+                    if (
+                        (
+                            escalate_to_database_owner_permission
+                            == RoleAttributeValue.ALL_DATABASES
+                            and database_to_test not in [OTHER_DATABASE_NAME, "template1"]
+                        )
+                        or (
+                            escalate_to_database_owner_permission
+                            == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                    ):
+                        logger.info(
+                            f"{message_prefix} can escalate to {database_owner_user}"
+                        )
+                        with connection.cursor() as cursor:
+                            cursor.execute(SQL("SET ROLE {};").format(Identifier(database_owner_user)))
+                            check_connected_user(cursor, user, database_owner_user)
+                    elif database_to_test not in [OTHER_DATABASE_NAME, "template1"]:  # Because there is not charmed_database_owner role in those databases.
+                        logger.info(
+                            f"{message_prefix} can't escalate to {database_owner_user}"
+                        )
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(SQL("SET ROLE {};").format(Identifier(database_owner_user)))
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_user;")
+                        current_user = cursor.fetchone()[0]
+                        if current_user != previous_current_user:
+                            cursor.execute(SQL("SET ROLE {};").format(Identifier(previous_current_user)))
 
                     # Test objects creation.
                     # TODO: test function creation/change.
