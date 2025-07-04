@@ -332,7 +332,14 @@ class PostgreSQL:
         """Create predefined instance roles."""
         connection = None
         try:
-            for database in ["postgres", "template1"]:
+            databases = []
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT datname FROM pg_database where datname <> 'template0';")
+                db = cursor.fetchone()
+                while db:
+                    databases.append(db[0])
+                    db = cursor.fetchone()
+            for database in databases:
                 with self._connect_to_database(
                     database=database,
                 ) as connection, connection.cursor() as cursor:
