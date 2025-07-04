@@ -130,8 +130,13 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
     for role in combination.split(","):
         # Whether the relation user is auto-escalated to the database owner user at login
         # in the requested database (True value) or in all databases ("*" value).
-        will_auto_escalate_to_database_owner = predefined_roles[role]["auto-escalate-to-database-owner"]
-        if auto_escalate_to_database_owner == RoleAttributeValue.NO or will_auto_escalate_to_database_owner == "*":
+        will_auto_escalate_to_database_owner = predefined_roles[role][
+            "auto-escalate-to-database-owner"
+        ]
+        if (
+            auto_escalate_to_database_owner == RoleAttributeValue.NO
+            or will_auto_escalate_to_database_owner == "*"
+        ):
             auto_escalate_to_database_owner = will_auto_escalate_to_database_owner
 
         role_permissions = predefined_roles[role]["permissions"]
@@ -143,7 +148,11 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
             connect = role_can_connect
 
         # Permission to create databases (True or RoleAttributeValue.NO).
-        create_databases = role_permissions["create-databases"] if create_databases == RoleAttributeValue.NO else create_databases
+        create_databases = (
+            role_permissions["create-databases"]
+            if create_databases == RoleAttributeValue.NO
+            else create_databases
+        )
 
         # Permission to create objects in the requested database (True value) or in all databases
         # ("*" value).
@@ -154,7 +163,10 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
         # Permission to escalate to the database owner user in the requested database (True value)
         # or in all databases ("*" value).
         role_can_escalate_to_database_owner = role_permissions["escalate-to-database-owner"]
-        if escalate_to_database_owner == RoleAttributeValue.NO or role_can_escalate_to_database_owner == "*":
+        if (
+            escalate_to_database_owner == RoleAttributeValue.NO
+            or role_can_escalate_to_database_owner == "*"
+        ):
             escalate_to_database_owner = role_can_escalate_to_database_owner
 
         # Permission to read data in the requested database (True value) or in all databases
@@ -167,8 +179,13 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
 
         # Permission to set up predefined catalog roles ("*" for all databases or RoleAttributeValue.NO for not being
         # able to do it).
-        role_can_set_up_predefined_catalog_roles = role_permissions["set-up-predefined-catalog-roles"]
-        if set_up_predefined_catalog_roles == RoleAttributeValue.NO or role_can_set_up_predefined_catalog_roles == "*":
+        role_can_set_up_predefined_catalog_roles = role_permissions[
+            "set-up-predefined-catalog-roles"
+        ]
+        if (
+            set_up_predefined_catalog_roles == RoleAttributeValue.NO
+            or role_can_set_up_predefined_catalog_roles == "*"
+        ):
             set_up_predefined_catalog_roles = role_can_set_up_predefined_catalog_roles
 
         # Permission to call the set_user function (True or RoleAttributeValue.NO).
