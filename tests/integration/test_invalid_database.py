@@ -63,39 +63,26 @@ def test_deploy(juju: jubilant.Juju, charm) -> None:
     juju.wait(lambda status: data_integrator_blocked(status), timeout=TIMEOUT)
 
 
-def test_extra_user_roles(
+def test_database(
     juju: jubilant.Juju, predefined_roles, predefined_roles_combinations
 ) -> None:
-    """Check that invalid extra user roles make the database charm block."""
-    # Remove the empty role (no extra user roles, i.e., regular relation user).
+    """Check that an invalid database name makes the database charm block."""
     del predefined_roles[""]
-    invalid_extra_user_roles_combinations = [
-        ("backup",),
-        ("charmed_backup",),
-        ("charmed_dba",),
-        ("invalid",),
-        ("invalid", "invalid"),
-        ("monitoring",),
-        ("postgres",),
-        ("pg_monitor",),
-        ("replication",),
-        ("rewind",),
+    invalid_database_names = [
+        "postgres",
+        "template0",
+        "template1",
     ]
-    invalid_extra_user_roles_combinations.extend([
-        combination
-        for combination in combinations(predefined_roles.keys(), 2)
-        if combination not in predefined_roles_combinations
-    ])
-    logger.info(f"Invalid combinations: {invalid_extra_user_roles_combinations}")
+    logger.info(f"Invalid database names: {invalid_database_names}")
 
-    for invalid_extra_user_roles_combination in invalid_extra_user_roles_combinations:
+    for invalid_database_name in invalid_database_names:
         logger.info(
-            f"Requesting invalid extra user roles combination: {', '.join(invalid_extra_user_roles_combination)}"
+            f"Requesting invalid database name: {invalid_database_name}"
         )
         juju.config(
             app=DATA_INTEGRATOR_APP_NAME,
             values={
-                "extra-user-roles": ",".join(invalid_extra_user_roles_combination),
+                "database-name": invalid_database_name,
             },
         )
         juju.wait(lambda status: data_integrator_blocked(status), timeout=TIMEOUT)
@@ -105,7 +92,7 @@ def test_extra_user_roles(
             with attempt:
                 juju.integrate(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
 
-        logger.info("Waiting for the database charm to block due to invalid extra user roles")
+        logger.info("Waiting for the database charm to block due to invalid database name")
 
         def all_units_blocked(status: jubilant.Status) -> bool:
             for app in status.apps:
@@ -120,8 +107,8 @@ def test_extra_user_roles(
             .get_units(DATABASE_APP_NAME)
             .get(f"{DATABASE_APP_NAME}/0")
             .workload_status.message
-            == "invalid role(s) for extra user roles"
-        ), "The database charm didn't block as expected due to invalid extra user roles."
+            == "invalid database name"
+        ), "The database charm didn't block as expected due to invalid database name."
 
         logger.info("Removing relation between charms")
         juju.remove_relation(f"{DATA_INTEGRATOR_APP_NAME}:{RELATION_ENDPOINT}", DATABASE_APP_NAME)

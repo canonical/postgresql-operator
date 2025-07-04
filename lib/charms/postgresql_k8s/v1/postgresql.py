@@ -64,6 +64,7 @@ ALLOWED_ROLES = {
     ROLE_ADMIN,
 }
 
+INVALID_DATABASE_NAME_BLOCKING_MESSAGE = "invalid database name"
 INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE = "invalid role(s) for extra user roles"
 
 REQUIRED_PLUGINS = {
@@ -87,6 +88,10 @@ class PostgreSQLAssignGroupError(Exception):
 
 class PostgreSQLCreateDatabaseError(Exception):
     """Exception raised when creating a database fails."""
+
+    def __init__(self, message: Optional[str] = None):
+        super().__init__(message)
+        self.message = message
 
 
 class PostgreSQLCreateGroupError(Exception):
@@ -243,6 +248,9 @@ class PostgreSQL:
             database: database to be created.
             plugins: extensions to enable in the new database.
         """
+        if database in ["postgres", "template0", "template1"]:
+            logger.error(f"Invalid database name: {database}.")
+            raise PostgreSQLCreateDatabaseError(INVALID_DATABASE_NAME_BLOCKING_MESSAGE)
         plugins = plugins if plugins else []
         try:
             connection = self._connect_to_database()

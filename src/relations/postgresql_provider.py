@@ -14,6 +14,7 @@ from charms.data_platform_libs.v0.data_interfaces import (
 from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUP_RELATION,
     ACCESS_GROUPS,
+    INVALID_DATABASE_NAME_BLOCKING_MESSAGE,
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
@@ -142,7 +143,7 @@ class PostgreSQLProvider(Object):
             self.charm.set_unit_status(
                 BlockedStatus(
                     e.message
-                    if issubclass(type(e), PostgreSQLCreateUserError) and e.message is not None
+                    if (issubclass(type(e), PostgreSQLCreateDatabaseError) or issubclass(type(e), PostgreSQLCreateUserError)) and e.message is not None
                     else f"Failed to initialize relation {self.relation_name}"
                 )
             )
@@ -300,8 +301,11 @@ class PostgreSQLProvider(Object):
         """# Clean up Blocked status if it's due to extensions request."""
         if (
             self.charm.is_blocked
-            and self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
-        ) and not self.check_for_invalid_extra_user_roles(relation.id):
+            and (
+                self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+                or self.charm.unit.status.message == INVALID_DATABASE_NAME_BLOCKING_MESSAGE
+            )
+        ) and not self.check_for_invalid_extra_user_roles(relation.id) and not self.check_for_invalid_database_name(relation.id):
             self.charm.set_unit_status(ActiveStatus())
         if (
             self.charm.is_blocked
@@ -328,4 +332,19 @@ class PostgreSQLProvider(Object):
                         and extra_user_role not in valid_roles
                     ):
                         return True
+        return False
+
+    def check_for_invalid_database_name(self, relation_id: int) -> bool:
+        """Checks if there are relations with invalid database names.
+
+        Args:
+            relation_id: current relation to be skipped.
+        """
+        for relation in self.charm.model.relations.get(self.relation_name, []):
+            if relation.id == relation_id:
+                continue
+            for data in relation.data.values():
+                database = data.get("database")
+                if database not in ["postgres", "template0", "template1"]:
+                    return True
         return False
