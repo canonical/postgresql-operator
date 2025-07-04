@@ -496,7 +496,6 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             cursor.execute(insert_in_public_schema_statement)
 
                     # Test read permissions.
-                    # TODO: read views.
                     # TODO: read sequences.
                     read_data_permission = attributes["permissions"]["read-data"]
                     select_statement = SQL("SELECT * FROM {}.test_table;").format(
@@ -504,6 +503,12 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                     )
                     select_in_public_schema_statement = SQL("SELECT * FROM public.{};").format(
                         Identifier(f"test_table_{user}")
+                    )
+                    select_view_statement = SQL("SELECT * FROM {}.test_view;").format(
+                        Identifier(schema_name)
+                    )
+                    select_view_in_public_schema_statement = SQL("SELECT * FROM public.{};").format(
+                        Identifier(f"test_view_{user}")
                     )
                     if (
                         read_data_permission == RoleAttributeValue.ALL_DATABASES
@@ -541,6 +546,10 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             cursor.execute(select_statement)
                             logger.info(f"{message_prefix} can read from tables in public schema")
                             cursor.execute(select_in_public_schema_statement)
+                            logger.info(f"{message_prefix} can read from views in {schema_name} schema")
+                            cursor.execute(select_view_statement)
+                            logger.info(f"{message_prefix} can read from views in public schema")
+                            cursor.execute(select_view_in_public_schema_statement)
                     else:
                         logger.info(
                             f"{message_prefix} can't read from tables in {schema_name} schema"
@@ -556,6 +565,20 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             connection.cursor() as cursor,
                         ):
                             cursor.execute(select_in_public_schema_statement)
+                        logger.info(
+                            f"{message_prefix} can't read from views in {schema_name} schema"
+                        )
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(select_view_statement)
+                        logger.info(f"{message_prefix} can't read from views in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(select_view_in_public_schema_statement)
 
                     if attributes["permissions"]["read-stats"] == RoleAttributeValue.ALL_DATABASES:
                         logger.info(f"{message_prefix} can read stats in all databases")
