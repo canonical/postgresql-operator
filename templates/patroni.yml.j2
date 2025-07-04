@@ -164,6 +164,7 @@ postgresql:
     - local all backup peer map=operator
     - local all operator scram-sha-256
     - local all monitoring password
+    - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_backup 0.0.0.0/0 scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_dba 0.0.0.0/0 scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_databases_owner 0.0.0.0/0 scram-sha-256
     {%- if not connectivity %}

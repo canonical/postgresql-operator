@@ -32,6 +32,7 @@ logger = logging.getLogger(__name__)
 OTHER_DATABASE_NAME = "other-database"
 REQUESTED_DATABASE_NAME = "requested-database"
 RELATION_ENDPOINT = "postgresql"
+ROLE_BACKUP = "charmed_backup"
 ROLE_DBA = "charmed_dba"
 ROLE_DATABASES_OWNER = "charmed_databases_owner"
 TIMEOUT = 15 * 60
@@ -49,7 +50,7 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
             num_units=1,
         )
 
-    combinations = [*predefined_roles_combinations, (ROLE_DBA,)]
+    combinations = [*predefined_roles_combinations, (ROLE_BACKUP,), (ROLE_DBA,)]
     for combination in combinations:
         # Define an application name suffix and a database name based on the combination
         # of predefined roles.
@@ -62,7 +63,7 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
 
         # Deploy the data integrator charm for each combination of predefined roles.
         data_integrator_app_name = f"{DATA_INTEGRATOR_APP_NAME}{suffix}"
-        extra_user_roles = "" if combination[0] == ROLE_DBA else ",".join(combination)
+        extra_user_roles = "" if combination[0] in [ROLE_BACKUP, ROLE_DBA] else ",".join(combination)
         if data_integrator_app_name not in juju.status().apps:
             logger.info(
                 f"Deploying data integrator charm {'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'}"
@@ -155,7 +156,34 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
         database = credentials["postgresql"]["database"]
         config = juju.config(app=data_integrator_app_name)
         logger.info(f"Config for {data_integrator_app_name}: {config}")
-        if data_integrator_app_name.endswith(ROLE_DBA.replace("_", "-")):
+        if data_integrator_app_name.endswith(ROLE_BACKUP.replace("_", "-")):
+            connection = None
+            try:
+                with db_connect(host, operator_password) as connection:
+                    connection.autocommit = True
+                    with connection.cursor() as cursor:
+                        logger.info(
+                            f"Granting {ROLE_BACKUP} role to {user} user to correctly check that role permissions"
+                        )
+                        cursor.execute(
+                            SQL("GRANT {} TO {};").format(Identifier(ROLE_BACKUP), Identifier(user))
+                        )
+                        cursor.execute(
+                            SQL("REVOKE {} FROM {};").format(
+                                Identifier(f"charmed_{database}_dml"), Identifier(user)
+                            )
+                        )
+                        cursor.execute(
+                            SQL("REVOKE {} FROM {};").format(
+                                Identifier(f"charmed_{database}_admin"), Identifier(user)
+                            )
+                        )
+            finally:
+                if connection is not None:
+                    connection.close()
+
+            extra_user_roles = ROLE_BACKUP
+        elif data_integrator_app_name.endswith(ROLE_DBA.replace("_", "-")):
             connection = None
             try:
                 with db_connect(host, operator_password) as connection:
@@ -196,17 +224,15 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
             operator_connection = None
             operator_cursor = None
             try:
-                # TODO: remove conditions based on CREATEDB.
-                # TODO: validate access to system databases.
-                # TODO: test backup role.
                 connect_permission = attributes["permissions"]["connect"]
+                run_backup_commands_permission = attributes["permissions"]["run-backup-commands"]
                 set_user_permission = attributes["permissions"]["set-user"]
                 if (
                     (
                         connect_permission == RoleAttributeValue.ALL_DATABASES
                         and (
                             (
-                                "CREATEDB" in extra_user_roles
+                                ("CREATEDB" in extra_user_roles or run_backup_commands_permission == RoleAttributeValue.YES)
                                 and database_to_test not in ["postgres", "template0"]
                             )
                             or database_to_test not in ["postgres", "template0", "template1"]
@@ -300,11 +326,6 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             cursor.execute(SQL("SET ROLE {};").format(Identifier(previous_current_user)))
 
                     # Test objects creation.
-                    # TODO: test function creation/change.
-                    # TODO: test view change.
-                    # TODO: test sequence creation.
-                    # TODO: test function creation.
-                    # TODO: test index creation.
                     create_objects_permission = attributes["permissions"]["create-objects"]
                     schema_name = f"{user}_schema"
                     create_schema_statement = SQL("CREATE SCHEMA {};").format(
@@ -496,7 +517,6 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             cursor.execute(insert_in_public_schema_statement)
 
                     # Test read permissions.
-                    # TODO: read sequences.
                     read_data_permission = attributes["permissions"]["read-data"]
                     select_statement = SQL("SELECT * FROM {}.test_table;").format(
                         Identifier(schema_name)
@@ -581,16 +601,46 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             cursor.execute(select_view_in_public_schema_statement)
 
                     if attributes["permissions"]["read-stats"] == RoleAttributeValue.ALL_DATABASES:
-                        logger.info(f"{message_prefix} can read stats in all databases")
+                        logger.info(f"{message_prefix} can read stats")
                         with connection.cursor() as cursor:
                             cursor.execute("SELECT * FROM pg_stat_activity;")
                     else:
-                        logger.info(f"{message_prefix} can't read stats in all databases")
+                        logger.info(f"{message_prefix} can't read stats")
                         with pytest.raises(psycopg2.errors.InsufficientPrivilege):
                             with connection.cursor() as cursor:
                                 cursor.execute("SELECT * FROM pg_stat_activity;")
 
-                    # TODO: execute functions.
+                    checkpoint_command = "CHECKPOINT;"
+                    backup_start_command = "SELECT pg_backup_start('test');"
+                    backup_stop_command = "SELECT pg_backup_stop();"
+                    create_restore_point_command = "SELECT pg_create_restore_point('test');"
+                    switch_wal_command = "SELECT pg_switch_wal();"
+                    if run_backup_commands_permission == RoleAttributeValue.YES:
+                        logger.info(f"{message_prefix} can run checkpoint command")
+                        with connection.cursor() as cursor:
+                            cursor.execute(checkpoint_command)
+                    else:
+                        logger.info(f"{message_prefix} can't run checkpoint command")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(checkpoint_command)
+
+                    if run_backup_commands_permission == RoleAttributeValue.YES:
+                        logger.info(f"{message_prefix} can run backup commands")
+                        with connection.cursor() as cursor:
+                            cursor.execute(backup_start_command)
+                            cursor.execute(backup_stop_command)
+                            cursor.execute(create_restore_point_command)
+                            cursor.execute(switch_wal_command)
+                    else:
+                        logger.info(f"{message_prefix} can't run backup commands")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(backup_start_command)
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(backup_stop_command)
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(create_restore_point_command)
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute(switch_wal_command)
 
                     if set_user_permission == RoleAttributeValue.YES and database_to_test not in [
                         OTHER_DATABASE_NAME,

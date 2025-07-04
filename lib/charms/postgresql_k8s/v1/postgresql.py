@@ -398,19 +398,21 @@ class PostgreSQL:
             ]
         }
 
-        existing_roles = self.list_existing_roles()
-
         try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                for role, queries in role_to_queries.items():
-                    if role in existing_roles:
-                        logger.debug(f"Role {role} already exists")
-                        continue
-
-                    logger.info(f"Creating predefined role {role}")
-
-                    for query in queries:
-                        cursor.execute(SQL(query))
+            for database in ["postgres", "template1"]:
+                with self._connect_to_database(
+                    database=database,
+                ) as connection, connection.cursor() as cursor:
+                    existing_roles = self.list_existing_roles()
+                    for role, queries in role_to_queries.items():
+                        for index, query in enumerate(queries):
+                            if index == 0:
+                                if role in existing_roles:
+                                    logger.debug(f"Role {role} already exists")
+                                    continue
+                                else:
+                                    logger.info(f"Creating predefined role {role}")
+                            cursor.execute(SQL(query))
         except psycopg2.Error as e:
             logger.error(f"Failed to create predefined instance roles: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e

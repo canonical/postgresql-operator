@@ -124,6 +124,7 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
     escalate_to_database_owner = RoleAttributeValue.NO
     read_data = RoleAttributeValue.NO
     read_stats = RoleAttributeValue.NO
+    run_backup_commands = RoleAttributeValue.NO
     set_up_predefined_catalog_roles = RoleAttributeValue.NO
     set_user = RoleAttributeValue.NO
     write_data = RoleAttributeValue.NO
@@ -177,6 +178,8 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
 
         read_stats = role_permissions["read-stats"] if role_permissions["read-stats"] != RoleAttributeValue.NO else read_stats
 
+        run_backup_commands = role_permissions["run-backup-commands"] if role_permissions["run-backup-commands"] != RoleAttributeValue.NO else run_backup_commands
+
         # Permission to set up predefined catalog roles ("*" for all databases or RoleAttributeValue.NO for not being
         # able to do it).
         role_can_set_up_predefined_catalog_roles = role_permissions[
@@ -205,6 +208,7 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
             "escalate-to-database-owner": escalate_to_database_owner,
             "read-data": read_data,
             "read-stats": read_stats,
+            "run-backup-commands": run_backup_commands,
             "set-up-predefined-catalog-roles": set_up_predefined_catalog_roles,
             "set-user": set_user,
             "write-data": write_data,

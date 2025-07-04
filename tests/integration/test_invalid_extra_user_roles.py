@@ -88,8 +88,6 @@ def test_extra_user_roles(
     ])
     logger.info(f"Invalid combinations: {invalid_extra_user_roles_combinations}")
 
-    # TODO: remove relation_access from error message.
-    # TODO: test groups.
     for invalid_extra_user_roles_combination in invalid_extra_user_roles_combinations:
         logger.info(
             f"Requesting invalid extra user roles combination: {', '.join(invalid_extra_user_roles_combination)}"
