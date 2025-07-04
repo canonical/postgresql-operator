@@ -337,14 +337,19 @@ class PostgreSQL:
                 user_definition += (
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
-                connect_statement = None
+                connect_statements = []
                 if database:
                     if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
                         user_definition += f" IN ROLE \"charmed_{database}_admin\", \"charmed_{database}_dml\""
                     else:
-                        connect_statement = SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                        connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(database), Identifier(user)
-                        )
+                        ))
+                if any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA, ROLE_ADMIN, ROLE_DATABASES_OWNER]):
+                    for system_database in ["postgres", "template1"]:
+                        connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                            Identifier(system_database), Identifier(user)
+                        ))
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
@@ -354,8 +359,9 @@ class PostgreSQL:
                 cursor.execute(SQL("SET LOCAL log_statement = 'none';"))
                 cursor.execute(SQL(f"{user_definition};").format(Identifier(user)))
                 cursor.execute(SQL("COMMIT;"))
-                if connect_statement:
-                    cursor.execute(connect_statement)
+                if len(connect_statements) > 0:
+                    for connect_statement in connect_statements:
+                        cursor.execute(connect_statement)
 
                 # Add extra user roles to the new user.
                 if roles:

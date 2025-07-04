@@ -35,6 +35,7 @@ RELATION_ENDPOINT = "postgresql"
 ROLE_BACKUP = "charmed_backup"
 ROLE_DBA = "charmed_dba"
 ROLE_DATABASES_OWNER = "charmed_databases_owner"
+NO_CATALOG_LEVEL_ROLES_DATABASES = [OTHER_DATABASE_NAME, "postgres", "template1"]
 TIMEOUT = 15 * 60
 
 
@@ -111,21 +112,15 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                     sub_connection = db_connect(host, operator_password, database=database)
                     sub_connection.autocommit = True
                     with sub_connection.cursor() as sub_cursor:
-                        sub_cursor.execute(
-                            "SELECT schema_name FROM information_schema.schemata;"
-                        )
+                        sub_cursor.execute("SELECT schema_name FROM information_schema.schemata;")
                         for schema in sub_cursor.fetchall():
                             schema_name = schema[0]
                             if schema_name.startswith("relation-") and schema_name.endswith(
                                 "_schema"
                             ):
-                                logger.info(
-                                    f"Dropping schema {schema_name} created by the test"
-                                )
+                                logger.info(f"Dropping schema {schema_name} created by the test")
                                 sub_cursor.execute(
-                                    SQL("DROP SCHEMA {} CASCADE;").format(
-                                        Identifier(schema_name)
-                                    )
+                                    SQL("DROP SCHEMA {} CASCADE;").format(Identifier(schema_name))
                                 )
                         sub_cursor.execute(
                             "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
@@ -183,6 +178,12 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                                 Identifier(f"charmed_{database}_admin"), Identifier(user)
                             )
                         )
+                        for system_database in ["postgres", "template1"]:
+                            cursor.execute(
+                                SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                                    Identifier(system_database), Identifier(user)
+                                )
+                            )
             finally:
                 if connection is not None:
                     connection.close()
@@ -210,6 +211,12 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                                 Identifier(f"charmed_{database}_admin"), Identifier(user)
                             )
                         )
+                        for system_database in ["postgres", "template1"]:
+                            cursor.execute(
+                                SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                                    Identifier(system_database), Identifier(user)
+                                )
+                            )
             finally:
                 if connection is not None:
                     connection.close()
@@ -233,23 +240,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                 run_backup_commands_permission = attributes["permissions"]["run-backup-commands"]
                 set_user_permission = attributes["permissions"]["set-user"]
                 if (
-                    (
-                        connect_permission == RoleAttributeValue.ALL_DATABASES
-                        and (
-                            (
-                                (
-                                    "CREATEDB" in extra_user_roles
-                                    or run_backup_commands_permission == RoleAttributeValue.YES
-                                )
-                                and database_to_test != "postgres"
-                            )
-                            or database_to_test not in ["postgres", "template1"]
-                            or (
-                                set_user_permission == RoleAttributeValue.YES
-                                and database_to_test == "template1"
-                            )
-                        )
-                    )
+                    connect_permission == RoleAttributeValue.ALL_DATABASES
                     or (
                         connect_permission == RoleAttributeValue.REQUESTED_DATABASE
                         and database_to_test == database
@@ -275,7 +266,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                     with connection, connection.cursor() as cursor:
                         if (
                             auto_escalate_to_database_owner == RoleAttributeValue.ALL_DATABASES
-                            and database_to_test not in [OTHER_DATABASE_NAME, "template1"]
+                            and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
                         ) or (
                             auto_escalate_to_database_owner
                             == RoleAttributeValue.REQUESTED_DATABASE
@@ -302,7 +293,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                         check_connected_user(cursor, user, user)
                     if (
                         escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES
-                        and database_to_test not in [OTHER_DATABASE_NAME, "template1"]
+                        and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
                     ) or (
                         escalate_to_database_owner_permission
                         == RoleAttributeValue.REQUESTED_DATABASE
@@ -314,10 +305,9 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                                 SQL("SET ROLE {};").format(Identifier(database_owner_user))
                             )
                             check_connected_user(cursor, user, database_owner_user)
-                    elif database_to_test not in [
-                        OTHER_DATABASE_NAME,
-                        "template1",
-                    ]:  # Because there is not charmed_database_owner role in those databases.
+                    elif (
+                        database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                    ):  # Because there is not charmed_database_owner role in those databases.
                         logger.info(f"{message_prefix} can't escalate to {database_owner_user}")
                         with (
                             pytest.raises(psycopg2.errors.InsufficientPrivilege),
@@ -355,7 +345,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                     if (
                         (
                             create_objects_permission == RoleAttributeValue.ALL_DATABASES
-                            and database_to_test not in [OTHER_DATABASE_NAME, "template1"]
+                            and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
                         )
                         or (
                             create_objects_permission == RoleAttributeValue.REQUESTED_DATABASE
@@ -364,7 +354,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                         or (
                             escalate_to_database_owner_permission
                             == RoleAttributeValue.ALL_DATABASES
-                            and database_to_test not in [OTHER_DATABASE_NAME, "template1"]
+                            and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
                         )
                         or (
                             escalate_to_database_owner_permission
@@ -479,7 +469,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             logger.info(
                                 f"{message_prefix} can write to tables in {schema_name} schema"
                             )
-                            if database_to_test not in [OTHER_DATABASE_NAME, "template1"] and (
+                            if database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES and (
                                 (
                                     (
                                         escalate_to_database_owner_permission
@@ -554,7 +544,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                         )
                     ):
                         with connection.cursor() as cursor:
-                            if database_to_test not in [OTHER_DATABASE_NAME, "template1"] and (
+                            if database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES and (
                                 (
                                     (
                                         escalate_to_database_owner_permission
@@ -670,10 +660,10 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                         ):
                             cursor.execute(switch_wal_command)
 
-                    if set_user_permission == RoleAttributeValue.YES and database_to_test not in [
-                        OTHER_DATABASE_NAME,
-                        "template1",
-                    ]:
+                    if (
+                        set_user_permission == RoleAttributeValue.YES
+                        and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                    ):
                         logger.info(f"{message_prefix} can call the set_user function")
                         with connection.cursor() as cursor:
                             cursor.execute("RESET ROLE;")

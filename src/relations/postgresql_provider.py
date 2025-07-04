@@ -143,7 +143,11 @@ class PostgreSQLProvider(Object):
             self.charm.set_unit_status(
                 BlockedStatus(
                     e.message
-                    if (issubclass(type(e), PostgreSQLCreateDatabaseError) or issubclass(type(e), PostgreSQLCreateUserError)) and e.message is not None
+                    if (
+                        issubclass(type(e), PostgreSQLCreateDatabaseError)
+                        or issubclass(type(e), PostgreSQLCreateUserError)
+                    )
+                    and e.message is not None
                     else f"Failed to initialize relation {self.relation_name}"
                 )
             )
@@ -300,12 +304,16 @@ class PostgreSQLProvider(Object):
     def _update_unit_status(self, relation: Relation) -> None:
         """# Clean up Blocked status if it's due to extensions request."""
         if (
-            self.charm.is_blocked
-            and (
-                self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
-                or self.charm.unit.status.message == INVALID_DATABASE_NAME_BLOCKING_MESSAGE
+            (
+                self.charm.is_blocked
+                and (
+                    self.charm.unit.status.message == INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE
+                    or self.charm.unit.status.message == INVALID_DATABASE_NAME_BLOCKING_MESSAGE
+                )
             )
-        ) and not self.check_for_invalid_extra_user_roles(relation.id) and not self.check_for_invalid_database_name(relation.id):
+            and not self.check_for_invalid_extra_user_roles(relation.id)
+            and not self.check_for_invalid_database_name(relation.id)
+        ):
             self.charm.set_unit_status(ActiveStatus())
         if (
             self.charm.is_blocked
