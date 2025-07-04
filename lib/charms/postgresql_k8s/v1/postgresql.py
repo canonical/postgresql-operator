@@ -974,7 +974,8 @@ $$ LANGUAGE plpgsql;"""
             logger.error(f"Failed to create login hook function: {e}")
             raise e
         finally:
-            connection.close()
+            if connection:
+                connection.close()
 
     def set_up_predefined_catalog_roles_function(self) -> None:
         """Create predefined catalog roles function."""
