@@ -298,7 +298,8 @@ class PostgreSQL:
             # Separate roles and privileges from the provided extra user roles.
             roles = privileges = None
             if extra_user_roles:
-                if len(extra_user_roles) > 2 and sorted(extra_user_roles) != [ROLE_ADMIN, "createdb", "relation_access"]:
+                if len(extra_user_roles) > 2 and sorted(extra_user_roles) != [ROLE_ADMIN, "createdb", ACCESS_GROUP_RELATION]:
+                    extra_user_roles.remove(ACCESS_GROUP_RELATION)
                     logger.error(
                         "Invalid extra user roles: "
                         f"{', '.join(extra_user_roles)}. "
