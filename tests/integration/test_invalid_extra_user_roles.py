@@ -70,6 +70,8 @@ def test_extra_user_roles(juju: jubilant.Juju, predefined_roles, predefined_role
     invalid_extra_user_roles_combinations.extend([combination for combination in combinations(predefined_roles.keys(), 2) if combination not in predefined_roles_combinations])
     logger.info(f"Invalid combinations: {invalid_extra_user_roles_combinations}")
 
+    # TODO: remove relation_access from error message.
+    # TODO: test groups.
     for invalid_extra_user_roles_combination in invalid_extra_user_roles_combinations:
         logger.info(f"Requesting invalid extra user roles combination: {', '.join(invalid_extra_user_roles_combination)}")
         juju.config(

@@ -330,7 +330,7 @@ class PostgreSQL:
                 )
                 connect_statement = None
                 if database:
-                    if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP]):
+                    if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
                         user_definition += f" IN ROLE \"charmed_{database}_admin\", \"charmed_{database}_dml\""
                     else:
                         connect_statement = SQL("GRANT CONNECT ON DATABASE {} TO {};").format(

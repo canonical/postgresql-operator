@@ -49,7 +49,7 @@ def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> No
             num_units=1,
         )
 
-    combinations = predefined_roles_combinations + [(ROLE_DBA,)]
+    combinations = [*predefined_roles_combinations, (ROLE_DBA,)]
     for combination in combinations:
         # Define an application name suffix and a database name based on the combination
         # of predefined roles.
@@ -149,6 +149,8 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
                     with connection.cursor() as cursor:
                         logger.info(f"Granting {ROLE_DBA} role to {user} user to correctly check that role permissions")
                         cursor.execute(SQL("GRANT {} TO {};").format(Identifier(ROLE_DBA), Identifier(user)))
+                        cursor.execute(SQL("REVOKE {} FROM {};").format(Identifier(f"charmed_{database}_dml"), Identifier(user)))
+                        cursor.execute(SQL("REVOKE {} FROM {};").format(Identifier(f"charmed_{database}_admin"), Identifier(user)))
             finally:
                 if connection is not None:
                     connection.close()
@@ -171,8 +173,10 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
             try:
                 # TODO: remove conditions based on CREATEDB.
                 # TODO: validate access to system databases.
+                # TODO: test backup role.
                 connect_permission = attributes["permissions"]["connect"]
-                if (connect_permission == RoleAttributeValue.ALL_DATABASES and (("CREATEDB" in extra_user_roles and database_to_test not in ["postgres", "template0"]) or database_to_test not in ["postgres", "template0", "template1"])) or (connect_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or database_to_test == OTHER_DATABASE_NAME:
+                set_user_permission = attributes["permissions"]["set-user"]
+                if (connect_permission == RoleAttributeValue.ALL_DATABASES and (("CREATEDB" in extra_user_roles and database_to_test not in ["postgres", "template0"]) or database_to_test not in ["postgres", "template0", "template1"] or (set_user_permission == RoleAttributeValue.YES and database_to_test == "template1"))) or (connect_permission == RoleAttributeValue.REQUESTED_DATABASE and database_to_test == database) or database_to_test == OTHER_DATABASE_NAME:
                     logger.info(f"{message_prefix} can connect to {database_to_test} database")
                     connection = db_connect(
                         host, password, username=user, database=database_to_test
@@ -293,7 +297,26 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:
 
                     # TODO: execute functions.
 
-                    # TODO: test set_user.
+                    if set_user_permission == RoleAttributeValue.YES and database_to_test not in [OTHER_DATABASE_NAME, "template1"]:
+                        logger.info(f"{message_prefix} can call the set_user function")
+                        with connection.cursor() as cursor:
+                            cursor.execute("RESET ROLE;")
+                            cursor.execute("SELECT set_user('rewind'::TEXT);")
+                            check_connected_user(cursor, user, "rewind")
+                            cursor.execute("SELECT reset_user();")
+                            check_connected_user(cursor, user, user)
+                            cursor.execute("SELECT set_user_u('operator'::TEXT);")
+                            check_connected_user(cursor, user, "operator")
+                            cursor.execute("SELECT reset_user();")
+                            check_connected_user(cursor, user, user)
+                    else:
+                        logger.info(f"{message_prefix} can't call the set_user function")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute("RESET ROLE;")
+                            cursor.execute("SELECT set_user('rewind'::TEXT);")
+                        with pytest.raises(psycopg2.errors.InsufficientPrivilege), connection.cursor() as cursor:
+                            cursor.execute("RESET ROLE;")
+                            cursor.execute("SELECT set_user_u('operator'::TEXT);")
 
                     # Do the following operations only once.
                     if database_to_test == database:
