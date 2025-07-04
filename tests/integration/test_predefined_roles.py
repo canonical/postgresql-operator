@@ -133,7 +133,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                                 if table_name.startswith("test_table_"):
                                     logger.info(f"Dropping table {table_name} created by the test")
                                     sub_cursor.execute(
-                                        SQL("DROP TABLE public.{};").format(Identifier(table_name))
+                                        SQL("DROP TABLE public.{} CASCADE;").format(Identifier(table_name))
                                     )
                     finally:
                         if sub_connection is not None:
@@ -262,7 +262,8 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                     ]
 
                     # Test objects creation.
-                    # TODO: test view creation.
+                    # TODO: test function creation/change.
+                    # TODO: test view change.
                     # TODO: test sequence creation.
                     # TODO: test function creation.
                     # TODO: test index creation.
@@ -277,6 +278,12 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                     create_table_in_public_schema_statement = SQL(
                         "CREATE TABLE public.{}(value TEXT);"
                     ).format(Identifier(f"test_table_{user}"))
+                    create_view_statement = SQL("CREATE VIEW {}.test_view AS SELECT * FROM {}.test_table;").format(
+                        Identifier(schema_name), Identifier(schema_name)
+                    )
+                    create_view_in_public_schema_statement = SQL(
+                        "CREATE VIEW public.{} AS SELECT * FROM public.{};"
+                    ).format(Identifier(f"test_view_{user}"), Identifier(f"test_table_{user}"))
                     if (
                         (
                             create_objects_permission == RoleAttributeValue.ALL_DATABASES
@@ -316,13 +323,32 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             cursor.execute(create_table_statement)
                             logger.info(f"{message_prefix} can create tables in public schema")
                             cursor.execute(create_table_in_public_schema_statement)
+                            logger.info(f"{message_prefix} can create view")
+                            cursor.execute(create_view_statement)
+                            logger.info(f"{message_prefix} can create views in public schema")
+                            cursor.execute(create_view_in_public_schema_statement)
                     else:
+                        operator_connection = db_connect(
+                            host, operator_password, database=database_to_test
+                        )
+                        operator_connection.autocommit = True
+                        operator_cursor = operator_connection.cursor()
+
                         logger.info(f"{message_prefix} can't create schemas")
                         with (
                             pytest.raises(psycopg2.errors.InsufficientPrivilege),
                             connection.cursor() as cursor,
                         ):
                             cursor.execute(create_schema_statement)
+                        operator_cursor.execute(create_schema_statement)
+
+                        logger.info(f"{message_prefix} can't create tables")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_table_statement)
+                        operator_cursor.execute(create_table_statement)
 
                         logger.info(f"{message_prefix} can't create tables in public schema")
                         with (
@@ -330,15 +356,24 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                             connection.cursor() as cursor,
                         ):
                             cursor.execute(create_table_in_public_schema_statement)
-
-                        operator_connection = db_connect(
-                            host, operator_password, database=database_to_test
-                        )
-                        operator_connection.autocommit = True
-                        operator_cursor = operator_connection.cursor()
-                        operator_cursor.execute(create_schema_statement)
-                        operator_cursor.execute(create_table_statement)
                         operator_cursor.execute(create_table_in_public_schema_statement)
+
+                        logger.info(f"{message_prefix} can't create views")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_view_statement)
+                        operator_cursor.execute(create_view_statement)
+
+                        logger.info(f"{message_prefix} can't create views in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_view_in_public_schema_statement)
+                        operator_cursor.execute(create_view_in_public_schema_statement)
+
                         operator_cursor.close()
                         operator_cursor = None
                         operator_connection.close()

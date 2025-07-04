@@ -71,6 +71,7 @@ def test_extra_user_roles(
     del predefined_roles[""]
     invalid_extra_user_roles_combinations = [
         ("backup",),
+        ("charmed_backup",),
         ("charmed_dba",),
         ("invalid",),
         ("invalid", "invalid"),
