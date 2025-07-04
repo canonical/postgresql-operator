@@ -176,9 +176,17 @@ def roles_attributes(predefined_roles: dict, combination: str) -> dict:
         if read_data == RoleAttributeValue.NO or role_can_read_data == "*":
             read_data = role_can_read_data
 
-        read_stats = role_permissions["read-stats"] if role_permissions["read-stats"] != RoleAttributeValue.NO else read_stats
+        read_stats = (
+            role_permissions["read-stats"]
+            if role_permissions["read-stats"] != RoleAttributeValue.NO
+            else read_stats
+        )
 
-        run_backup_commands = role_permissions["run-backup-commands"] if role_permissions["run-backup-commands"] != RoleAttributeValue.NO else run_backup_commands
+        run_backup_commands = (
+            role_permissions["run-backup-commands"]
+            if role_permissions["run-backup-commands"] != RoleAttributeValue.NO
+            else run_backup_commands
+        )
 
         # Permission to set up predefined catalog roles ("*" for all databases or RoleAttributeValue.NO for not being
         # able to do it).
