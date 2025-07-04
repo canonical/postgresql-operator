@@ -952,8 +952,17 @@ IF is_user_admin = true THEN
 	END;
 END;
 $$ LANGUAGE plpgsql;"""
+        connection = None
         try:
-            for database in ["postgres", "template1"]:
+            databases = []
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT datname FROM pg_database where datname <> 'template0';")
+                db = cursor.fetchone()
+                while db:
+                    databases.append(db[0])
+                    db = cursor.fetchone()
+
+            for database in databases:
                 with self._connect_to_database(
                     database=database,
                 ) as connection, connection.cursor() as cursor:
@@ -964,6 +973,8 @@ $$ LANGUAGE plpgsql;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to create login hook function: {e}")
             raise e
+        finally:
+            connection.close()
 
     def set_up_predefined_catalog_roles_function(self) -> None:
         """Create predefined catalog roles function."""
