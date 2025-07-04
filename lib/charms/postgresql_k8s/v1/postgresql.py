@@ -332,14 +332,7 @@ class PostgreSQL:
         """Create predefined instance roles."""
         connection = None
         try:
-            databases = []
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT datname FROM pg_database where datname <> 'template0';")
-                db = cursor.fetchone()
-                while db:
-                    databases.append(db[0])
-                    db = cursor.fetchone()
-            for database in databases:
+            for database in self._get_existing_databases():
                 with self._connect_to_database(
                     database=database,
                 ) as connection, connection.cursor() as cursor:
@@ -786,17 +779,22 @@ class PostgreSQL:
     def _get_existing_databases(self) -> List[str]:
         # Template1 should go first
         databases = ["template1"]
-        with self._connect_to_database() as connection, connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT datname FROM pg_database WHERE datname <> 'template0' AND datname <> 'template1';"
-            )
-            db = cursor.fetchone()
-            while db:
-                databases.append(db[0])
+        connection = None
+        cursor = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT datname FROM pg_database WHERE datname <> 'template0' AND datname <> 'template1';"
+                )
                 db = cursor.fetchone()
-
-        cursor.close()
-        connection.close()
+                while db:
+                    databases.append(db[0])
+                    db = cursor.fetchone()
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
         return databases
 
     def set_up_database(self, temp_location: Optional[str] = None) -> None:
@@ -1001,7 +999,7 @@ BEGIN
     owner_user := quote_ident(database || '_owner');
     admin_user := quote_ident(database || '_admin');
     database := quote_ident(database);
-    
+
     IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
         statements := ARRAY[
             'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
