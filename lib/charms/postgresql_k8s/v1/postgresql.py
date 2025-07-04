@@ -1039,7 +1039,6 @@ $$ LANGUAGE plpgsql security definer;"""
         try:
             databases = []
             with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute()
                 cursor.execute("SELECT datname FROM pg_database where datname <> 'template0';")
                 db = cursor.fetchone()
                 while db:
