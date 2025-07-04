@@ -98,7 +98,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
         cursor = connection.cursor()
         cursor.execute(f'DROP DATABASE IF EXISTS "{OTHER_DATABASE_NAME}";')
         cursor.execute(f'CREATE DATABASE "{OTHER_DATABASE_NAME}";')
-        cursor.execute("SELECT datname FROM pg_database;")
+        cursor.execute("SELECT datname FROM pg_database WHERE datname != 'template0';")
         databases = []
         for database in sorted(database[0] for database in cursor.fetchall()):
             if database.startswith(f"{OTHER_DATABASE_NAME}-"):
@@ -106,43 +106,42 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                 cursor.execute(SQL("DROP DATABASE {};").format(Identifier(database)))
             else:
                 databases.append(database)
-                if database != "template0":
-                    sub_connection = None
-                    try:
-                        sub_connection = db_connect(host, operator_password, database=database)
-                        sub_connection.autocommit = True
-                        with sub_connection.cursor() as sub_cursor:
-                            sub_cursor.execute(
-                                "SELECT schema_name FROM information_schema.schemata;"
-                            )
-                            for schema in sub_cursor.fetchall():
-                                schema_name = schema[0]
-                                if schema_name.startswith("relation-") and schema_name.endswith(
-                                    "_schema"
-                                ):
-                                    logger.info(
-                                        f"Dropping schema {schema_name} created by the test"
+                sub_connection = None
+                try:
+                    sub_connection = db_connect(host, operator_password, database=database)
+                    sub_connection.autocommit = True
+                    with sub_connection.cursor() as sub_cursor:
+                        sub_cursor.execute(
+                            "SELECT schema_name FROM information_schema.schemata;"
+                        )
+                        for schema in sub_cursor.fetchall():
+                            schema_name = schema[0]
+                            if schema_name.startswith("relation-") and schema_name.endswith(
+                                "_schema"
+                            ):
+                                logger.info(
+                                    f"Dropping schema {schema_name} created by the test"
+                                )
+                                sub_cursor.execute(
+                                    SQL("DROP SCHEMA {} CASCADE;").format(
+                                        Identifier(schema_name)
                                     )
-                                    sub_cursor.execute(
-                                        SQL("DROP SCHEMA {} CASCADE;").format(
-                                            Identifier(schema_name)
-                                        )
+                                )
+                        sub_cursor.execute(
+                            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
+                        )
+                        for table in sub_cursor.fetchall():
+                            table_name = table[0]
+                            if table_name.startswith("test_table_"):
+                                logger.info(f"Dropping table {table_name} created by the test")
+                                sub_cursor.execute(
+                                    SQL("DROP TABLE public.{} CASCADE;").format(
+                                        Identifier(table_name)
                                     )
-                            sub_cursor.execute(
-                                "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
-                            )
-                            for table in sub_cursor.fetchall():
-                                table_name = table[0]
-                                if table_name.startswith("test_table_"):
-                                    logger.info(f"Dropping table {table_name} created by the test")
-                                    sub_cursor.execute(
-                                        SQL("DROP TABLE public.{} CASCADE;").format(
-                                            Identifier(table_name)
-                                        )
-                                    )
-                    finally:
-                        if sub_connection is not None:
-                            sub_connection.close()
+                                )
+                finally:
+                    if sub_connection is not None:
+                        sub_connection.close()
         logger.info(f"Databases to test: {databases}")
     finally:
         if cursor is not None:
@@ -242,9 +241,9 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
                                     "CREATEDB" in extra_user_roles
                                     or run_backup_commands_permission == RoleAttributeValue.YES
                                 )
-                                and database_to_test not in ["postgres", "template0"]
+                                and database_to_test != "postgres"
                             )
-                            or database_to_test not in ["postgres", "template0", "template1"]
+                            or database_to_test not in ["postgres", "template1"]
                             or (
                                 set_user_permission == RoleAttributeValue.YES
                                 and database_to_test == "template1"
