@@ -307,7 +307,7 @@ class PostgreSQL:
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
                 if in_role:
-                    user_definition += f" IN ROLE \"{in_role}\""
+                    user_definition += f' IN ROLE "{in_role}"'
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
@@ -1035,8 +1035,18 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql security definer;"""
+        connection = None
         try:
-            for database in ["postgres", "template1"]:
+            databases = []
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute()
+                cursor.execute("SELECT datname FROM pg_database where datname <> 'template0';")
+                db = cursor.fetchone()
+                while db:
+                    databases.append(db[0])
+                    db = cursor.fetchone()
+
+            for database in databases:
                 with self._connect_to_database(
                     database=database
                 ) as connection, connection.cursor() as cursor:
@@ -1052,6 +1062,9 @@ $$ LANGUAGE plpgsql security definer;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection:
+                connection.close()
 
     def update_user_password(
         self, username: str, password: str, database_host: Optional[str] = None
