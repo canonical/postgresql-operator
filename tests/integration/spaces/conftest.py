@@ -15,28 +15,6 @@ dhcp-option=6"""
 logger = logging.getLogger(__name__)
 
 
-@pytest.fixture(scope="module")
-def juju(request: pytest.FixtureRequest):
-    """Pytest fixture that wraps :meth:`jubilant.with_model`.
-
-    This adds command line parameter ``--keep-models`` (see help for details).
-    """
-    model = request.config.getoption("--model")
-    keep_models = bool(request.config.getoption("--keep-models"))
-
-    if model:
-        juju = jubilant.Juju(model=model)  # type: ignore
-        yield juju
-        log = juju.debug_log(limit=1000)
-    else:
-        with jubilant.temp_model(keep=keep_models) as juju:
-            yield juju
-            log = juju.debug_log(limit=1000)
-
-    if request.session.testsfailed:
-        print(log, end="")
-
-
 def _lxd_network(name: str, subnet: str, external: bool = True):
     try:
         output = subprocess.run(
