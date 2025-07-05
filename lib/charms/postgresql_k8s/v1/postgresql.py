@@ -307,7 +307,7 @@ class PostgreSQL:
                     f"WITH LOGIN{' SUPERUSER' if admin else ''} ENCRYPTED PASSWORD '{password}'"
                 )
                 if in_role:
-                    user_definition += f" IN ROLE \"{in_role}\""
+                    user_definition += f' IN ROLE "{in_role}"'
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
@@ -332,7 +332,7 @@ class PostgreSQL:
         """Create predefined instance roles."""
         connection = None
         try:
-            for database in ["postgres", "template1"]:
+            for database in self._get_existing_databases():
                 with self._connect_to_database(
                     database=database,
                 ) as connection, connection.cursor() as cursor:
@@ -776,6 +776,27 @@ class PostgreSQL:
                 "superuser",
             }, {role[0] for role in cursor.fetchall() if role[0]}
 
+    def _get_existing_databases(self) -> List[str]:
+        # Template1 should go first
+        databases = ["template1"]
+        connection = None
+        cursor = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT datname FROM pg_database WHERE datname <> 'template0' AND datname <> 'template1';"
+                )
+                db = cursor.fetchone()
+                while db:
+                    databases.append(db[0])
+                    db = cursor.fetchone()
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+        return databases
+
     def set_up_database(self, temp_location: Optional[str] = None) -> None:
         """Set up postgres database with the right permissions."""
         connection = None
@@ -952,10 +973,11 @@ IF is_user_admin = true THEN
 	END;
 END;
 $$ LANGUAGE plpgsql;"""
+        connection = None
         try:
-            for database in ["postgres", "template1"]:
+            for database in self._get_existing_databases():
                 with self._connect_to_database(
-                    database=database,
+                    database=database
                 ) as connection, connection.cursor() as cursor:
                     cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
                     cursor.execute(SQL("CREATE SCHEMA IF NOT EXISTS login_hook;"))
@@ -964,6 +986,9 @@ $$ LANGUAGE plpgsql;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to create login hook function: {e}")
             raise e
+        finally:
+            if connection:
+                connection.close()
 
     def set_up_predefined_catalog_roles_function(self) -> None:
         """Create predefined catalog roles function."""
@@ -981,7 +1006,7 @@ BEGIN
     owner_user := quote_ident(database || '_owner');
     admin_user := quote_ident(database || '_admin');
     database := quote_ident(database);
-    
+
     IF (SELECT COUNT(rolname) FROM pg_roles WHERE rolname=admin_user) = 0 THEN
         statements := ARRAY[
             'CREATE ROLE ' || owner_user || ' NOSUPERUSER NOCREATEDB NOCREATEROLE NOLOGIN NOREPLICATION;',
@@ -1035,8 +1060,9 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql security definer;"""
+        connection = None
         try:
-            for database in ["postgres", "template1"]:
+            for database in self._get_existing_databases():
                 with self._connect_to_database(
                     database=database
                 ) as connection, connection.cursor() as cursor:
@@ -1052,6 +1078,9 @@ $$ LANGUAGE plpgsql security definer;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection:
+                connection.close()
 
     def update_user_password(
         self, username: str, password: str, database_host: Optional[str] = None
