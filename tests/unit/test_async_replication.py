@@ -1,8 +1,13 @@
+import contextlib
 from unittest.mock import MagicMock, PropertyMock, patch
-from src.relations.async_replication import PostgreSQLAsyncReplication
-from src.relations.async_replication import READ_ONLY_MODE_BLOCKING_MESSAGE
-from src.relations.async_replication import StandbyClusterAlreadyPromotedError
-
+import pytest
+from ops.model import WaitingStatus
+from src.relations.async_replication import (
+    PostgreSQLAsyncReplication,
+    NotReadyError,
+    READ_ONLY_MODE_BLOCKING_MESSAGE,
+    StandbyClusterAlreadyPromotedError
+)
 def test_can_promote_cluster():
     """Tests all conditions in _can_promote_cluster"""
     
@@ -78,3 +83,134 @@ def test_can_promote_cluster():
             with patch.object(PostgreSQLAsyncReplication, '_handle_forceful_promotion', return_value=True):
                 relation = PostgreSQLAsyncReplication(mock_charm)
                 assert relation._can_promote_cluster(mock_event) is True
+
+def test_handle_database_start():
+    """Tests all conditions in _handle_database_start"""
+    
+    def create_mock_unit():
+        unit = MagicMock()
+        unit.name = f"unit-{id(unit)}" 
+        return unit
+
+    # 1. Test when database is started (member_started = True) and all units ready
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm._patroni.member_started = True
+    mock_charm.unit.is_leader.return_value = True
+    
+    # Create mock units
+    mock_unit1 = create_mock_unit()
+    mock_unit2 = create_mock_unit()
+    mock_charm.unit = create_mock_unit()
+    mock_charm.app = MagicMock()
+    
+    # Setup peers data structure with proper keys
+    mock_peers_data = {
+        mock_charm.unit: MagicMock(),
+        mock_unit1: MagicMock(),
+        mock_unit2: MagicMock(),
+        mock_charm.app: MagicMock()
+    }
+    mock_charm._peers = MagicMock()
+    mock_charm._peers.data = mock_peers_data
+    mock_charm._peers.units = [mock_unit1, mock_unit2]
+    
+    with patch.object(PostgreSQLAsyncReplication, '_get_highest_promoted_cluster_counter_value', return_value="1"), \
+         patch.object(PostgreSQLAsyncReplication, '_is_following_promoted_cluster', return_value=False):
+        
+        # Configure all units to have matching counter values
+        for unit in [mock_unit1, mock_unit2, mock_charm.unit]:
+            mock_peers_data[unit].get.return_value = "1"
+        
+        relation = PostgreSQLAsyncReplication(mock_charm)
+        relation._handle_database_start(mock_event)
+        
+        # Verify updates when all units are ready
+        mock_peers_data[mock_charm.unit].update.assert_any_call({"stopped": ""})
+        mock_peers_data[mock_charm.unit].update.assert_any_call({
+            "unit-promoted-cluster-counter": "1"
+        })
+        mock_charm.update_config.assert_called_once()
+        mock_peers_data[mock_charm.app].update.assert_called_once_with({
+            "cluster_initialised": "True"
+        })
+        mock_charm._set_primary_status_message.assert_called_once()
+
+    # 2. Test when not all units are ready (leader case)
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm._patroni.member_started = True
+    mock_charm.unit.is_leader.return_value = True
+    
+    mock_unit1 = create_mock_unit()
+    mock_unit2 = create_mock_unit()
+    mock_charm.unit = create_mock_unit()
+    mock_charm.app = MagicMock()
+    
+    mock_peers_data = {
+        mock_charm.unit: MagicMock(),
+        mock_unit1: MagicMock(),
+        mock_unit2: MagicMock(),
+        mock_charm.app: MagicMock()
+    }
+    mock_charm._peers = MagicMock()
+    mock_charm._peers.data = mock_peers_data
+    mock_charm._peers.units = [mock_unit1, mock_unit2]
+    
+    with patch.object(PostgreSQLAsyncReplication, '_get_highest_promoted_cluster_counter_value', return_value="1"), \
+         patch.object(PostgreSQLAsyncReplication, '_is_following_promoted_cluster', return_value=True):
+        
+        # Configure some units to have mismatched counter values
+        mock_peers_data[mock_charm.unit].get.return_value = "1"
+        mock_peers_data[mock_unit1].get.return_value = "1"
+        mock_peers_data[mock_unit2].get.return_value = "0"  # Different value
+        
+        relation = PostgreSQLAsyncReplication(mock_charm)
+        relation._handle_database_start(mock_event)
+        
+        # Verify waiting status and deferral
+        assert isinstance(mock_charm.unit.status, WaitingStatus)
+        mock_event.defer.assert_called_once()
+
+    # 3. Test when database is not started (non-leader case)
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm._patroni.member_started = False
+    mock_charm.unit.is_leader.return_value = False
+    
+    with patch.object(PostgreSQLAsyncReplication, '_get_highest_promoted_cluster_counter_value'), \
+         patch('src.relations.async_replication.contextlib.suppress') as mock_suppress:
+        
+        mock_suppress.return_value.__enter__.return_value = None
+        mock_charm._patroni.reload_patroni_configuration.side_effect = NotReadyError()
+        
+        relation = PostgreSQLAsyncReplication(mock_charm)
+        relation._handle_database_start(mock_event)
+        
+        # Verify retry and deferral
+        mock_charm._patroni.reload_patroni_configuration.assert_called_once()
+        assert isinstance(mock_charm.unit.status, WaitingStatus)
+        mock_event.defer.assert_called_once()
+
+    # 4. Test when database is starting (leader case)
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm._patroni.member_started = False
+    mock_charm.unit.is_leader.return_value = True
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._handle_database_start(mock_event)
+    
+    # Verify waiting status and deferral
+    assert isinstance(mock_charm.unit.status, WaitingStatus)
+    mock_event.defer.assert_called_once()
+
+
+def test__on_async_relation_changed():
+    pass
+
+def test_on_secret_changed():
+    pass
+
+def test_stop_database():
+    pass
