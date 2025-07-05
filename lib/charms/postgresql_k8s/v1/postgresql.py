@@ -816,28 +816,27 @@ class PostgreSQL:
             connection.close()
             connection = None
 
-            for database in self._get_existing_databases():
-                with self._connect_to_database(
-                    database=database
-                ) as connection, connection.cursor() as cursor:
-                    cursor.execute(
-                        "SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';"
+            with self._connect_to_database(
+                database="template1"
+            ) as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT TRUE FROM pg_roles WHERE rolname='charmed_databases_owner';"
+                )
+                if cursor.fetchone() is None:
+                    self.create_user(
+                        "charmed_databases_owner",
+                        can_create_database=True,
                     )
-                    if cursor.fetchone() is None:
-                        self.create_user(
-                            "charmed_databases_owner",
-                            can_create_database=True,
-                        )
 
-                    self.set_up_login_hook_function(cursor)
-                    self.set_up_predefined_catalog_roles_function(cursor)
+                self.set_up_login_hook_function()
+                self.set_up_predefined_catalog_roles_function()
 
-                    # Create database function and event trigger to identify users created by PgBouncer.
-                    cursor.execute(
-                        "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
-                    )
-                    if cursor.fetchone() is None:
-                        cursor.execute("""
+                # Create database function and event trigger to identify users created by PgBouncer.
+                cursor.execute(
+                    "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
+                )
+                if cursor.fetchone() is None:
+                    cursor.execute("""
 CREATE OR REPLACE FUNCTION update_pg_hba()
     RETURNS event_trigger
     LANGUAGE plpgsql
@@ -893,22 +892,22 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           END IF;
         END;
     $$;
-                        """)
-                        cursor.execute("""
+                    """)
+                    cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_create_schema
     ON ddl_command_end
     WHEN TAG IN ('CREATE SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
-                        """)
-                        cursor.execute("""
+                    """)
+                    cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
     ON ddl_command_end
     WHEN TAG IN ('DROP SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
-                        """)
+                    """)
 
-                connection.close()
-                connection = None
+            connection.close()
+            connection = None
 
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("REVOKE ALL PRIVILEGES ON DATABASE postgres FROM PUBLIC;")
@@ -928,7 +927,7 @@ CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
             if connection is not None:
                 connection.close()
 
-    def set_up_login_hook_function(self, cursor) -> None:
+    def set_up_login_hook_function(self) -> None:
         """Create a login hook function to set the user for the current session."""
         function_creation_statement = """CREATE OR REPLACE FUNCTION login_hook.login() RETURNS VOID AS $$
 DECLARE
@@ -974,16 +973,24 @@ IF is_user_admin = true THEN
 	END;
 END;
 $$ LANGUAGE plpgsql;"""
+        connection = None
         try:
-            cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
-            cursor.execute(SQL("CREATE SCHEMA IF NOT EXISTS login_hook;"))
-            cursor.execute(SQL(function_creation_statement))
-            cursor.execute(SQL("GRANT EXECUTE ON FUNCTION login_hook.login() TO PUBLIC;"))
+            for database in self._get_existing_databases():
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
+                    cursor.execute(SQL("CREATE SCHEMA IF NOT EXISTS login_hook;"))
+                    cursor.execute(SQL(function_creation_statement))
+                    cursor.execute(SQL("GRANT EXECUTE ON FUNCTION login_hook.login() TO PUBLIC;"))
         except psycopg2.Error as e:
             logger.error(f"Failed to create login hook function: {e}")
             raise e
+        finally:
+            if connection:
+                connection.close()
 
-    def set_up_predefined_catalog_roles_function(self, cursor) -> None:
+    def set_up_predefined_catalog_roles_function(self) -> None:
         """Create predefined catalog roles function."""
         function_creation_statement = """CREATE OR REPLACE FUNCTION set_up_predefined_catalog_roles() RETURNS VOID AS $$
 DECLARE
@@ -1053,19 +1060,27 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql security definer;"""
+        connection = None
         try:
-            cursor.execute(SQL(function_creation_statement))
-            cursor.execute(
-                SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
-            )
-            cursor.execute(
-                SQL(
-                    "GRANT execute ON FUNCTION set_up_predefined_catalog_roles TO charmed_databases_owner;"
-                )
-            )
+            for database in self._get_existing_databases():
+                with self._connect_to_database(
+                    database=database
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL(function_creation_statement))
+                    cursor.execute(
+                        SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
+                    )
+                    cursor.execute(
+                        SQL(
+                            "GRANT execute ON FUNCTION set_up_predefined_catalog_roles TO charmed_databases_owner;"
+                        )
+                    )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection:
+                connection.close()
 
     def update_user_password(
         self, username: str, password: str, database_host: Optional[str] = None
