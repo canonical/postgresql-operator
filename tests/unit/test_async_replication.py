@@ -8,6 +8,13 @@ from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
     StandbyClusterAlreadyPromotedError
 )
+
+def create_mock_unit(name="unit"):
+    unit = MagicMock()
+    unit.name = name
+    return unit
+
+
 def test_can_promote_cluster():
     """Tests all conditions in _can_promote_cluster"""
     
@@ -86,11 +93,6 @@ def test_can_promote_cluster():
 
 def test_handle_database_start():
     """Tests all conditions in _handle_database_start"""
-    
-    def create_mock_unit():
-        unit = MagicMock()
-        unit.name = f"unit-{id(unit)}" 
-        return unit
 
     # 1. Test when database is started (member_started = True) and all units ready
     mock_charm = MagicMock()
@@ -206,8 +208,83 @@ def test_handle_database_start():
     mock_event.defer.assert_called_once()
 
 
-def test__on_async_relation_changed():
-    pass
+def test_on_async_relation_changed():
+    """Tests all conditions in _on_async_relation_changed"""
+
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.unit = create_mock_unit("leader")
+    mock_charm.app = MagicMock() 
+    mock_unit1 = create_mock_unit("unit1")
+    mock_unit2 = create_mock_unit("unit2")
+    mock_charm._peers.units = [mock_unit1, mock_unit2]
+    mock_charm._peers.data = {
+        mock_charm.unit: {"stopped": "1"},
+        mock_unit1: {"unit-promoted-cluster-counter": "5"},
+        mock_unit2: {"unit-promoted-cluster-counter": "5"},
+        mock_charm.app: {"promoted-cluster-counter": "5"},
+    }
+    mock_charm.is_unit_stopped = True
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+
+    with patch.object(relation, "_get_primary_cluster", return_value=None), \
+         patch.object(relation, "_set_app_status") as mock_status:
+        relation._on_async_relation_changed(mock_event)
+        mock_status.assert_called_once()
+        mock_event.defer.assert_not_called() 
+
+
+    with patch.object(relation, "_get_primary_cluster", return_value="clusterX"), \
+         patch.object(relation, "_configure_primary_cluster", return_value=True):
+        relation._on_async_relation_changed(mock_event)
+        mock_event.defer.assert_not_called()
+
+
+    mock_charm.unit.is_leader.return_value = False
+    with patch.object(relation, "_get_primary_cluster", return_value="clusterX"), \
+         patch.object(relation, "_configure_primary_cluster", return_value=False), \
+         patch.object(relation, "_is_following_promoted_cluster", return_value=True):
+        relation._on_async_relation_changed(mock_event)
+        mock_event.defer.assert_not_called()
+
+
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.is_unit_stopped = False  
+    with patch.object(relation, "_get_primary_cluster", return_value="clusterX"), \
+         patch.object(relation, "_configure_primary_cluster", return_value=False), \
+         patch.object(relation, "_is_following_promoted_cluster", return_value=False), \
+         patch.object(relation, "_stop_database", return_value=True), \
+         patch.object(relation, "_get_highest_promoted_cluster_counter_value", return_value="5"):
+        relation._on_async_relation_changed(mock_event)
+        assert isinstance(mock_charm.unit.status, WaitingStatus)
+        mock_event.defer.assert_called()
+
+
+    mock_charm.is_unit_stopped = True
+    with patch.object(relation, "_get_primary_cluster", return_value="clusterX"), \
+         patch.object(relation, "_configure_primary_cluster", return_value=False), \
+         patch.object(relation, "_is_following_promoted_cluster", return_value=False), \
+         patch.object(relation, "_stop_database", return_value=True), \
+         patch.object(relation, "_get_highest_promoted_cluster_counter_value", return_value="5"), \
+         patch.object(relation, "_wait_for_standby_leader", return_value=True):
+        relation._on_async_relation_changed(mock_event)
+
+        mock_charm._patroni.start_patroni.assert_not_called()
+
+    with patch.object(relation, "_get_primary_cluster", return_value="clusterX"), \
+         patch.object(relation, "_configure_primary_cluster", return_value=False), \
+         patch.object(relation, "_is_following_promoted_cluster", return_value=False), \
+         patch.object(relation, "_stop_database", return_value=True), \
+         patch.object(relation, "_get_highest_promoted_cluster_counter_value", return_value="5"), \
+         patch.object(relation, "_wait_for_standby_leader", return_value=False), \
+         patch.object(mock_charm._patroni, "start_patroni", return_value=True), \
+         patch.object(relation, "_handle_database_start") as mock_handle_start:
+        relation._on_async_relation_changed(mock_event)
+        mock_charm.update_config.assert_called_once()
+        mock_handle_start.assert_called_once_with(mock_event)
 
 def test_on_secret_changed():
     pass
