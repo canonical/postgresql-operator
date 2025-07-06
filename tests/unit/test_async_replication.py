@@ -9,6 +9,11 @@ from src.relations.async_replication import (
     StandbyClusterAlreadyPromotedError
 )
 
+REPLICATION_OFFER_RELATION = "replication-offer"
+REPLICATION_CONSUMER_RELATION = "replication-consumer"
+PEER = "peer"
+SECRET_LABEL = "secret-label"
+
 def create_mock_unit(name="unit"):
     unit = MagicMock()
     unit.name = name
@@ -287,7 +292,24 @@ def test_on_async_relation_changed():
         mock_handle_start.assert_called_once_with(mock_event)
 
 def test_on_secret_changed():
-    pass
+    """Test _on_secret_changed"""
+    # 1. relation is None
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        '_relation',
+        new_callable=PropertyMock,
+        return_value=None
+    ):
+        with patch('logging.Logger.debug') as mock_debug:
+            relation._on_secret_changed(mock_event)
+            
+            mock_debug.assert_called_once_with("Early exit on_secret_changed: No relation found.")
+            mock_event.defer.assert_not_called()
 
 def test_stop_database():
     pass
