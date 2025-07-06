@@ -28,12 +28,10 @@ def test_can_promote_cluster():
     mock_event = MagicMock()
     type(mock_charm).is_cluster_initialised = PropertyMock(return_value=False)
     
-    with patch.object(PostgreSQLAsyncReplication, '_get_primary_cluster') as mock_get_primary:
-        relation = PostgreSQLAsyncReplication(mock_charm)
-        mock_get_primary.return_value = (MagicMock(), "0")
-        
-        assert relation._can_promote_cluster(mock_event) is False
-        mock_event.fail.assert_called_with("Cluster not initialised yet.")
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    assert relation._can_promote_cluster(mock_event) is False
+    mock_event.fail.assert_called_with("Cluster not initialised yet.")
 
     # 2. Test when cluster is initialized but no relation exists
     mock_charm = MagicMock()
