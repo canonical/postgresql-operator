@@ -931,7 +931,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
             END IF;
           END IF;
         END;
-    $$;
+    $$ SECURITY DEFINER;
                     """)
                     cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_create_schema
