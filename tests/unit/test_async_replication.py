@@ -1,6 +1,7 @@
 import contextlib
 from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
+import os
 from ops.model import WaitingStatus
 from src.relations.async_replication import (
     PostgreSQLAsyncReplication,
@@ -13,6 +14,10 @@ REPLICATION_OFFER_RELATION = "replication-offer"
 REPLICATION_CONSUMER_RELATION = "replication-consumer"
 PEER = "peer"
 SECRET_LABEL = "secret-label"
+SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
+
+SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/etc"
+PATRONI_CONF_PATH = f"{SNAP_CONF_PATH}/patroni"
 
 def create_mock_unit(name="unit"):
     unit = MagicMock()
@@ -310,4 +315,103 @@ def test_on_secret_changed():
             mock_event.defer.assert_not_called()
 
 def test_stop_database():
-    pass
+    """Test _stop_database"""
+    # Setup mock objects
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm.is_unit_stopped = False
+    mock_charm.unit.is_leader.return_value = False
+    mock_charm._patroni.stop_patroni.return_value = True
+    
+    # Properly setup peers data structure
+    mock_unit = MagicMock()
+    mock_app = MagicMock()
+    mock_charm.unit = mock_unit
+    mock_charm.app = mock_app
+    mock_charm._peers.data = {
+        mock_app: {},
+        mock_unit: {}
+    }
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    # 1. Test early exit when following promoted cluster
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        '_is_following_promoted_cluster',
+        return_value=True
+    ), patch('os.path.exists', return_value=True):
+        result = relation._stop_database(mock_event)
+        assert result is True
+        mock_charm._patroni.stop_patroni.assert_not_called()
+
+    # # 2. Test successful stop sequence for non-leader unit with data path
+    # with patch.object(
+    #     PostgreSQLAsyncReplication,
+    #     '_is_following_promoted_cluster',
+    #     return_value=False
+    # ), patch('os.path.exists', return_value=True), \
+    #     patch.object(PostgreSQLAsyncReplication, '_configure_standby_cluster', return_value=True), \
+    #     patch.object(PostgreSQLAsyncReplication, '_reinitialise_pgdata'), \
+    #     patch('shutil.rmtree'), \
+    #     patch('pathlib.Path') as mock_path:
+        
+    #     # Mock the constants
+    #     with patch('relations.async_replication.PATRONI_CONF_PATH', '/mock/patroni/conf'):
+    #         # Setup mock for the raft directory check
+    #         mock_path_instance = MagicMock()
+    #         mock_path.return_value = mock_path_instance
+    #         mock_path_instance.exists.return_value = True
+    #         mock_path_instance.is_dir.return_value = True
+            
+    #         result = relation._stop_database(mock_event)
+    #         assert result is True
+    #         mock_charm._patroni.stop_patroni.assert_called_once()
+    #         mock_path.assert_called_once_with('/mock/patroni/conf/raft')
+    #         assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
+
+    # 3. Test deferral when patroni fails to stop
+    # with patch.object(
+    #     PostgreSQLAsyncReplication,
+    #     '_is_following_promoted_cluster',
+    #     return_value=False
+    # ), patch('os.path.exists', return_value=True):
+    #     mock_charm._patroni.stop_patroni.return_value = False
+    #     result = relation._stop_database(mock_event)
+    #     assert result is False
+    #     mock_event.defer.assert_called_once()
+
+    # 4. Test non-leader with no data path
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        '_is_following_promoted_cluster',
+        return_value=False
+    ), patch('os.path.exists', return_value=False):
+        mock_charm.unit.is_leader.return_value = False
+        result = relation._stop_database(mock_event)
+        assert result is False
+        mock_charm._patroni.stop_patroni.assert_not_called()
+
+    # 5. Test leader unit behavior
+    with patch.object(
+        PostgreSQLAsyncReplication,
+        '_is_following_promoted_cluster',
+        return_value=False
+    ), patch('os.path.exists', return_value=True), \
+       patch.object(PostgreSQLAsyncReplication, '_configure_standby_cluster', return_value=True), \
+       patch.object(PostgreSQLAsyncReplication, '_reinitialise_pgdata'), \
+       patch('shutil.rmtree'), \
+       patch('pathlib.Path') as mock_path:
+        
+        # Setup mock for the raft directory check
+        mock_path_instance = MagicMock()
+        mock_path.return_value = mock_path_instance
+        mock_path_instance.exists.return_value = True
+        mock_path_instance.is_dir.return_value = True
+        
+        mock_charm.unit.is_leader.return_value = True
+        result = relation._stop_database(mock_event)
+        assert result is True
+        mock_charm._patroni.stop_patroni.assert_called_once()
+        assert mock_charm._peers.data[mock_app].get("cluster_initialised") == ""
+        assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
