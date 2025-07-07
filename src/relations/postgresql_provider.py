@@ -139,7 +139,6 @@ class PostgreSQLProvider(Object):
             PostgreSQLCreateUserError,
             PostgreSQLGetPostgreSQLVersionError,
         ) as e:
-            logger.exception(e)
             self.charm.set_unit_status(
                 BlockedStatus(
                     e.message
