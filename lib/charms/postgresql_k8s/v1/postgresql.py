@@ -889,7 +889,10 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           -- Don't execute on replicas.
           IF NOT pg_is_in_recovery() THEN
             -- Load the current authorisation rules.
-            DROP TABLE IF EXISTS pg_hba;
+            PERFORM TRUE FROM pg_tables WHERE schemaname = 'public' AND tablename = 'pg_hba';
+            IF FOUND THEN
+                DROP TABLE pg_hba;
+            END IF;
             CREATE TEMPORARY TABLE pg_hba (lines TEXT);
             SELECT setting INTO hba_file FROM pg_settings WHERE name = 'hba_file';
             IF hba_file IS NOT NULL THEN
