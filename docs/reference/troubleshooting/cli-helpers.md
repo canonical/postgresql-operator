@@ -216,7 +216,7 @@ ubuntu@juju360:~$ curl 10.189.210.55:8008/cluster | jq # where 10.189.210.55 is 
 </details>
 
 ```{note}
-The Patroni REST API can be accessed anonymously in read-only mode only. The Juju secret `patroni-password` is mandatory to apply any chances via Patroni REST API.
+The Patroni REST API can be accessed anonymously in read-only mode only. The Juju secret `patroni-password` is mandatory to apply any changes via Patroni REST API.
 ```
 
 Example of authenticated changes via Patroni REST API:
