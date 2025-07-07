@@ -2,6 +2,7 @@ import contextlib
 from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
 import os
+from tenacity import RetryError
 from ops.model import WaitingStatus
 from src.relations.async_replication import (
     PostgreSQLAsyncReplication,
@@ -346,29 +347,24 @@ def test_stop_database():
         mock_charm._patroni.stop_patroni.assert_not_called()
 
     # # 2. Test successful stop sequence for non-leader unit with data path
-    # with patch.object(
-    #     PostgreSQLAsyncReplication,
-    #     '_is_following_promoted_cluster',
-    #     return_value=False
-    # ), patch('os.path.exists', return_value=True), \
-    #     patch.object(PostgreSQLAsyncReplication, '_configure_standby_cluster', return_value=True), \
-    #     patch.object(PostgreSQLAsyncReplication, '_reinitialise_pgdata'), \
-    #     patch('shutil.rmtree'), \
-    #     patch('pathlib.Path') as mock_path:
+    # mock_retry = MagicMock()
+    # mock_retry.side_effect = RetryError(MagicMock())
+    # mock_charm._patroni.stop_patroni.return_value = False
+    
+    # with patch('tenacity.Retrying', mock_retry), \
+    #      patch('pwd.getpwnam') as mock_getpwnam, \
+    #      patch.object(PostgreSQLAsyncReplication, '_is_following_promoted_cluster', return_value=False), \
+    #      patch('os.path.exists', return_value=True):
         
-    #     # Mock the constants
-    #     with patch('relations.async_replication.PATRONI_CONF_PATH', '/mock/patroni/conf'):
-    #         # Setup mock for the raft directory check
-    #         mock_path_instance = MagicMock()
-    #         mock_path.return_value = mock_path_instance
-    #         mock_path_instance.exists.return_value = True
-    #         mock_path_instance.is_dir.return_value = True
-            
-    #         result = relation._stop_database(mock_event)
-    #         assert result is True
-    #         mock_charm._patroni.stop_patroni.assert_called_once()
-    #         mock_path.assert_called_once_with('/mock/patroni/conf/raft')
-    #         assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
+    #     # Mock the system user response
+    #     mock_getpwnam.return_value = MagicMock(pw_uid=1000, pw_gid=1000)
+        
+    #     relation = PostgreSQLAsyncReplication(mock_charm)
+    #     result = relation._stop_database(mock_event)
+        
+    #     assert result is False
+    #     mock_event.defer.assert_called_once()
+
 
     # 3. Test deferral when patroni fails to stop
     # with patch.object(
@@ -382,6 +378,7 @@ def test_stop_database():
     #     mock_event.defer.assert_called_once()
 
     # 4. Test non-leader with no data path
+    mock_charm._patroni.stop_patroni.return_value = True
     with patch.object(
         PostgreSQLAsyncReplication,
         '_is_following_promoted_cluster',
