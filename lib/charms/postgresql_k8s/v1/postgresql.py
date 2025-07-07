@@ -899,7 +899,10 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                 copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
                 EXECUTE copy_command;
                 -- Build a list of the relation users and the databases they can access.
-                DROP TABLE IF EXISTS relation_users;
+                PERFORM TRUE FROM pg_tables WHERE schemaname = 'public' AND tablename = 'relation_users';
+                IF FOUND THEN
+                    DROP TABLE relation_users;
+                END IF;
                 CREATE TEMPORARY TABLE relation_users AS
                   SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename NOT IN ('backup', 'monitoring', 'operator', 'postgres', 'replication', 'rewind')) AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
                 IF (SELECT COUNT(lines) FROM pg_hba WHERE lines LIKE 'hostssl %') > 0 THEN
