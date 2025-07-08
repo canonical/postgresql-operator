@@ -121,9 +121,3 @@ class ClusterTopologyObserver(Object):
             self._charm._peers.data[self._charm.unit].update({"observer-pid": ""})
         except OSError:
             pass
-
-    @property
-    def unit_tag(self):
-        """Juju-style tag identifying the unit being run by this charm."""
-        unit_num = self._charm.unit.name.split("/")[-1]
-        return f"unit-{self._charm.app.name}-{unit_num}"

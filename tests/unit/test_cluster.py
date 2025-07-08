@@ -11,10 +11,7 @@ from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
 from tenacity import (
-    AttemptManager,
-    RetryCallState,
     RetryError,
-    Retrying,
     stop_after_delay,
     wait_fixed,
 )
@@ -93,47 +90,26 @@ def patroni(harness, peers_ips):
     yield patroni
 
 
-def test_get_alternative_patroni_url(peers_ips, patroni):
-    # Mock tenacity attempt.
-    retry = Retrying()
-    retry_state = RetryCallState(retry, None, None, None)
-    attempt = AttemptManager(retry_state)
-
-    # Test the first URL that is returned (it should have the current unit IP).
-    url = patroni._get_alternative_patroni_url(attempt)
-    assert url == f"https://{patroni.unit_ip}:8008"
-
-    # Test returning the other servers URLs.
-    for attempt_number in range(attempt.retry_state.attempt_number + 1, len(peers_ips) + 2):
-        attempt.retry_state.attempt_number = attempt_number
-        url = patroni._get_alternative_patroni_url(attempt)
-        assert url.split("https://")[1].split(":8008")[0] in peers_ips
-
-
 def test_get_member_ip(peers_ips, patroni):
-    with (
-        patch("requests.get", side_effect=mocked_requests_get),
-        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
-    ):
-        # Test error on trying to get the member IP.
-        _patroni_url.return_value = "http://server2"
-        with pytest.raises(RetryError):
-            patroni.get_member_ip(patroni.member_name)
-            assert False
+    with patch(
+        "charm.Patroni.parallel_patroni_get_request", return_value=None
+    ) as _parallel_patroni_get_request:
+        # No IP if no members
+        assert patroni.get_member_ip(patroni.member_name) is None
 
-        # Test using an alternative Patroni URL.
-        _patroni_url.return_value = "http://server1"
-
-        ip = patroni.get_member_ip(patroni.member_name)
-        assert ip == "1.1.1.1"
-
-        # Test using the current Patroni URL.
-        ip = patroni.get_member_ip(patroni.member_name)
-        assert ip == "1.1.1.1"
-
-        # Test when not having that specific member in the cluster.
-        ip = patroni.get_member_ip("other-member-name")
-        assert ip is None
+        _parallel_patroni_get_request.return_value = {
+            "members": [
+                {
+                    "name": "postgresql-1",
+                    "host": "2.2.2.2",
+                },
+                {
+                    "name": "postgresql-0",
+                    "host": "1.1.1.1",
+                },
+            ]
+        }
+        assert patroni.get_member_ip(patroni.member_name) == "1.1.1.1"
 
 
 def test_get_patroni_health(peers_ips, patroni):
@@ -195,42 +171,43 @@ def test_dict_to_hba_string(harness, patroni):
 
 def test_get_primary(peers_ips, patroni):
     with (
-        patch("requests.get", side_effect=mocked_requests_get),
-        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
+        patch(
+            "charm.Patroni.parallel_patroni_get_request", return_value=None
+        ) as _parallel_patroni_get_request,
     ):
-        # Test error on trying to get the member IP.
-        _patroni_url.return_value = "http://server2"
-        with pytest.raises(RetryError):
-            patroni.get_primary(patroni.member_name)
-            assert False
+        # No primary if no members
+        assert patroni.get_primary() is None
 
+        _parallel_patroni_get_request.return_value = {
+            "members": [
+                {
+                    "name": "postgresql-1",
+                    "role": "replica",
+                },
+                {
+                    "name": "postgresql-0",
+                    "role": "leader",
+                },
+            ]
+        }
         # Test using the current Patroni URL.
-        _patroni_url.return_value = "http://server1"
-        primary = patroni.get_primary()
-        assert primary == "postgresql-0"
+        assert patroni.get_primary() == "postgresql-0"
 
         # Test requesting the primary in the unit name pattern.
-        _patroni_url.return_value = "http://server1"
-        primary = patroni.get_primary(unit_name_pattern=True)
-        assert primary == "postgresql/0"
+        assert patroni.get_primary(unit_name_pattern=True) == "postgresql/0"
 
 
 def test_is_creating_backup(peers_ips, patroni):
-    with patch("requests.get") as _get:
+    with patch("charm.Patroni.cluster_status") as _cluster_status:
         # Test when one member is creating a backup.
-        response = _get.return_value
-        response.json.return_value = {
-            "members": [
-                {"name": "postgresql-0"},
-                {"name": "postgresql-1", "tags": {"is_creating_backup": True}},
-            ]
-        }
+        _cluster_status.return_value = [
+            {"name": "postgresql-0"},
+            {"name": "postgresql-1", "tags": {"is_creating_backup": True}},
+        ]
         assert patroni.is_creating_backup
 
         # Test when no member is creating a backup.
-        response.json.return_value = {
-            "members": [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
-        }
+        _cluster_status.return_value = [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         assert not patroni.is_creating_backup
 
 
@@ -238,6 +215,7 @@ def test_is_replication_healthy(peers_ips, patroni):
     with (
         patch("requests.get") as _get,
         patch("charm.Patroni.get_primary"),
+        patch("charm.Patroni.get_member_ip"),
         patch("cluster.stop_after_delay", return_value=stop_after_delay(0)),
     ):
         # Test when replication is healthy.
@@ -423,28 +401,6 @@ def test_stop_patroni(peers_ips, patroni):
 
         # Test a fail scenario.
         assert not patroni.stop_patroni()
-
-
-def test_member_replication_lag(peers_ips, patroni):
-    with (
-        patch("requests.get", side_effect=mocked_requests_get) as _get,
-        patch("charm.Patroni._patroni_url", new_callable=PropertyMock) as _patroni_url,
-    ):
-        # Test when the cluster member has a value for the lag field.
-        _patroni_url.return_value = "http://server1"
-        lag = patroni.member_replication_lag
-        assert lag == "1"
-
-        # Test when the cluster member doesn't have a value for the lag field.
-        patroni.member_name = "postgresql-1"
-        lag = patroni.member_replication_lag
-        assert lag == "unknown"
-
-        # Test when the API call fails.
-        _patroni_url.return_value = "http://server2"
-        with patch.object(Retrying, "iter", Mock(side_effect=RetryError(None))):
-            lag = patroni.member_replication_lag
-            assert lag == "unknown"
 
 
 def test_reinitialize_postgresql(peers_ips, patroni):
@@ -902,18 +858,14 @@ def test_reinitialise_raft_data(patroni):
 
 
 def test_are_replicas_up(patroni):
-    with (
-        patch("requests.get") as _get,
-    ):
-        _get.return_value.json.return_value = {
-            "members": [
-                {"host": "1.1.1.1", "state": "running"},
-                {"host": "2.2.2.2", "state": "streaming"},
-                {"host": "3.3.3.3", "state": "other state"},
-            ]
-        }
+    with patch("charm.Patroni.cluster_status") as _cluster_status:
+        _cluster_status.return_value = [
+            {"host": "1.1.1.1", "state": "running"},
+            {"host": "2.2.2.2", "state": "streaming"},
+            {"host": "3.3.3.3", "state": "other state"},
+        ]
         assert patroni.are_replicas_up() == {"1.1.1.1": True, "2.2.2.2": True, "3.3.3.3": False}
 
         # Return None on error
-        _get.side_effect = Exception
+        _cluster_status.side_effect = Exception
         assert patroni.are_replicas_up() is None

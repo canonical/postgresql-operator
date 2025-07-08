@@ -340,7 +340,7 @@ class PostgreSQL:
                 connect_statements = []
                 if database:
                     if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
-                        user_definition += f" IN ROLE \"charmed_{database}_admin\", \"charmed_{database}_dml\""
+                        user_definition += f' IN ROLE "charmed_{database}_admin", "charmed_{database}_dml"'
                     else:
                         connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(database), Identifier(user)
@@ -377,7 +377,7 @@ class PostgreSQL:
         """Create predefined instance roles."""
         connection = None
         try:
-            for database in ["postgres", "template1"]:
+            for database in self._get_existing_databases():
                 with self._connect_to_database(
                     database=database,
                 ) as connection, connection.cursor() as cursor:
@@ -833,6 +833,27 @@ class PostgreSQL:
             "superuser",
         }, ALLOWED_ROLES
 
+    def _get_existing_databases(self) -> List[str]:
+        # Template1 should go first
+        databases = ["template1"]
+        connection = None
+        cursor = None
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    "SELECT datname FROM pg_database WHERE datname <> 'template0' AND datname <> 'template1';"
+                )
+                db = cursor.fetchone()
+                while db:
+                    databases.append(db[0])
+                    db = cursor.fetchone()
+        finally:
+            if cursor:
+                cursor.close()
+            if connection:
+                connection.close()
+        return databases
+
     def set_up_database(self, temp_location: Optional[str] = None) -> None:
         """Set up postgres database with the right permissions."""
         connection = None
@@ -1016,10 +1037,11 @@ BEGIN
 	END;
 END;
 $$ LANGUAGE plpgsql;"""
+        connection = None
         try:
-            for database in ["postgres", "template1"]:
+            for database in self._get_existing_databases():
                 with self._connect_to_database(
-                    database=database,
+                    database=database
                 ) as connection, connection.cursor() as cursor:
                     cursor.execute(SQL("CREATE EXTENSION IF NOT EXISTS login_hook;"))
                     cursor.execute(SQL("CREATE SCHEMA IF NOT EXISTS login_hook;"))
@@ -1028,6 +1050,9 @@ $$ LANGUAGE plpgsql;"""
         except psycopg2.Error as e:
             logger.error(f"Failed to create login hook function: {e}")
             raise e
+        finally:
+            if connection:
+                connection.close()
 
     def set_up_predefined_catalog_roles_function(self) -> None:
         """Create predefined catalog roles function."""
@@ -1119,30 +1144,35 @@ BEGIN
     END LOOP;
 END;
 $$ LANGUAGE plpgsql security definer;"""
+        connection = None
         try:
-            with self._connect_to_database(
-                database="template1"
-            ) as connection, connection.cursor() as cursor:
-                cursor.execute(SQL(function_creation_statement))
-                cursor.execute(
-                    SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
-                )
-                cursor.execute(
-                    SQL("REVOKE EXECUTE ON FUNCTION set_up_predefined_catalog_roles FROM PUBLIC;")
-                )
-                cursor.execute(
-                    SQL(
-                        "GRANT EXECUTE ON FUNCTION set_up_predefined_catalog_roles TO {};"
-                    ).format(Identifier(ROLE_DATABASES_OWNER))
-                )
-                cursor.execute(
-                    SQL(
-                        "REVOKE CREATE ON DATABASE {} FROM {};"
-                    ).format(Identifier("template1"), Identifier(ROLE_DATABASES_OWNER))
-                )
+            for database in self._get_existing_databases():
+                with self._connect_to_database(
+                        database=database
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(SQL(function_creation_statement))
+                    cursor.execute(
+                        SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
+                    )
+                    cursor.execute(
+                        SQL("REVOKE EXECUTE ON FUNCTION set_up_predefined_catalog_roles FROM PUBLIC;")
+                    )
+                    cursor.execute(
+                        SQL(
+                            "GRANT EXECUTE ON FUNCTION set_up_predefined_catalog_roles TO {};"
+                        ).format(Identifier(ROLE_DATABASES_OWNER))
+                    )
+                    cursor.execute(
+                        SQL(
+                            "REVOKE CREATE ON DATABASE {} FROM {};"
+                        ).format(Identifier("template1"), Identifier(ROLE_DATABASES_OWNER))
+                    )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
             raise PostgreSQLCreatePredefinedRolesError() from e
+        finally:
+            if connection:
+                connection.close()
 
     def update_user_password(
         self, username: str, password: str, database_host: Optional[str] = None
