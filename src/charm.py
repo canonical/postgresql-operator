@@ -1961,6 +1961,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Restore check early exit: can't get current wal timeline")
             return False
 
+        self.enable_disable_extensions()
+
         # Remove the restoring backup flag and the restore stanza name.
         self.app_peer_data.update({
             "restoring-backup": "",

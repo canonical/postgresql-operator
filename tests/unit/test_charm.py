@@ -908,6 +908,9 @@ def test_on_update_status_after_restore_operation(harness):
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.get_member_status") as _get_member_status,
+        patch(
+            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
+        ) as _enable_disable_extensions,
     ):
         _get_current_timeline.return_value = "2"
         rel_id = harness.model.get_relation(PEER).id
@@ -926,6 +929,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
+        _enable_disable_extensions.assert_not_called()
         assert isinstance(harness.charm.unit.status, BlockedStatus)
 
         # Test when the restore operation hasn't finished yet.
@@ -938,6 +942,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
+        _enable_disable_extensions.assert_not_called()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Assert that the backup id is still in the application relation databag.
@@ -956,6 +961,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_called_once()
         _update_relation_endpoints.assert_called_once()
         _set_primary_status_message.assert_called_once()
+        _enable_disable_extensions.assert_called_once_with()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Assert that the backup id is not in the application relation databag anymore.
