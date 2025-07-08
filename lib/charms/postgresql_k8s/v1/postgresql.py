@@ -910,7 +910,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           -- Don't execute on replicas.
           IF NOT pg_is_in_recovery() THEN
             -- Load the current authorisation rules.
-            PERFORM TRUE FROM pg_tables WHERE schemaname = 'public' AND tablename = 'pg_hba';
+            PERFORM TRUE FROM pg_tables WHERE schemaname LIKE 'pg_temp_%' AND tablename = 'pg_hba';
             IF FOUND THEN
                 DROP TABLE pg_hba;
             END IF;
@@ -920,7 +920,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                 copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
                 EXECUTE copy_command;
                 -- Build a list of the relation users and the databases they can access.
-                PERFORM TRUE FROM pg_tables WHERE schemaname = 'public' AND tablename = 'relation_users';
+                PERFORM TRUE FROM pg_tables WHERE schemaname LIKE 'pg_temp_%' AND tablename = 'relation_users';
                 IF FOUND THEN
                     DROP TABLE relation_users;
                 END IF;
