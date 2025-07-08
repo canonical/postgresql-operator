@@ -337,6 +337,7 @@ class PostgreSQLProvider(Object):
                     if (
                         extra_user_role not in valid_privileges
                         and extra_user_role not in valid_roles
+                        and extra_user_role != "createdb"
                     ):
                         return True
         return False
