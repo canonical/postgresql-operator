@@ -352,6 +352,6 @@ class PostgreSQLProvider(Object):
                 continue
             for data in relation.data.values():
                 database = data.get("database")
-                if database not in ["postgres", "template0", "template1"]:
+                if database in ["postgres", "template0", "template1"]:
                     return True
         return False
