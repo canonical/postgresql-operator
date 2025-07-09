@@ -17,6 +17,7 @@ The operator uses the following internal DB users:
 * `rewind` - the internal user for synchronizing a PostgreSQL cluster with another copy of the same cluster.
 * `monitoring` - the user for [COS integration](/how-to/monitoring-cos/enable-monitoring).
 * `backups` - the user to [perform/list/restore backups](/how-to/back-up-and-restore/create-a-backup).
+* `ldap` - the user for [LDAP synchronization](/how-to/enable-ldap) when LDAP integration is enabled. This user has the `CREATEROLE` privilege to manage PostgreSQL roles synchronized from LDAP.
 
 The full list of internal users is available in charm [source code](https://github.com/canonical/postgresql-operator/blob/main/src/constants.py). The full dump of internal users (on the newly installed charm):
 
@@ -26,6 +27,7 @@ postgres=# \du
   Role name  |                         Attributes                         |  Member of   
 -------------+------------------------------------------------------------+--------------
  backup      | Superuser                                                  | {}
+ ldap        | Create role                                                | {}
  monitoring  |                                                            | {pg_monitor}
  operator    | Superuser, Create role, Create DB, Replication, Bypass RLS | {}
  postgres    | Superuser                                                  | {}
@@ -51,7 +53,7 @@ password:
   description: The password will be auto-generated if this option is not specified.
 username:
   type: string
-  description: The username, the default value 'operator'. Possible values - operator, replication, rewind.
+  description: The username, the default value 'operator'. Possible values - operator, replication, rewind, monitoring, backup, ldap.
 ```
 
 For example, to generate a new random password for *internal* user:
