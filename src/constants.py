@@ -18,6 +18,7 @@ PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
 REPLICATION_USER = "replication"
 REWIND_USER = "rewind"
+LDAP_USER = "ldap"
 TLS_KEY_FILE = "key.pem"
 TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"
@@ -27,7 +28,7 @@ MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
 # List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
+SYSTEM_USERS = [BACKUP_USER, REPLICATION_USER, REWIND_USER, USER, MONITORING_USER, LDAP_USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
@@ -67,6 +68,7 @@ REPLICATION_PASSWORD_KEY = "replication-password"  # noqa: S105
 REWIND_PASSWORD_KEY = "rewind-password"  # noqa: S105
 USER_PASSWORD_KEY = "operator-password"  # noqa: S105
 MONITORING_PASSWORD_KEY = "monitoring-password"  # noqa: S105
+LDAP_PASSWORD_KEY = "ldap-password"  # noqa: S105
 RAFT_PASSWORD_KEY = "raft-password"  # noqa: S105
 PATRONI_PASSWORD_KEY = "patroni-password"  # noqa: S105
 SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
