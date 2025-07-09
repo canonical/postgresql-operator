@@ -218,8 +218,8 @@ class Patroni:
         Args:
             path: path to a file or directory.
         """
-        # Get the uid/gid for the snap_daemon user.
-        user_database = pwd.getpwnam("snap_daemon")
+        # Get the uid/gid for the _daemon_ user.
+        user_database = pwd.getpwnam("_daemon_")
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
@@ -590,7 +590,7 @@ class Patroni:
             mode: access permission mask applied to the
               file using chmod (e.g. 0o640).
             change_owner: whether to change the file owner
-              to the snap_daemon user.
+              to the _daemon_ user.
         """
         # TODO: keep this method to use it also for generating replication configuration files and
         # move it to an utils / helpers file.
