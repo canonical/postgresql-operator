@@ -41,6 +41,7 @@ from constants import (
     PGBACKREST_EXECUTABLE,
     PGBACKREST_LOGROTATE_FILE,
     PGBACKREST_LOGS_PATH,
+    POSTGRESQL_ARCHIVE_PATH,
     POSTGRESQL_DATA_PATH,
     UNIT_SCOPE,
 )
@@ -1270,6 +1271,7 @@ Stderr:
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
             process_max=max(os.cpu_count() - 2, 1),
+            archive_path=POSTGRESQL_ARCHIVE_PATH,
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
