@@ -346,26 +346,6 @@ def test_stop_database():
         assert result is True
         mock_charm._patroni.stop_patroni.assert_not_called()
 
-    # # 2. Test successful stop sequence for non-leader unit with data path
-    # mock_retry = MagicMock()
-    # mock_retry.side_effect = RetryError(MagicMock())
-    # mock_charm._patroni.stop_patroni.return_value = False
-    
-    # with patch('tenacity.Retrying', mock_retry), \
-    #      patch('pwd.getpwnam') as mock_getpwnam, \
-    #      patch.object(PostgreSQLAsyncReplication, '_is_following_promoted_cluster', return_value=False), \
-    #      patch('os.path.exists', return_value=True):
-        
-    #     # Mock the system user response
-    #     mock_getpwnam.return_value = MagicMock(pw_uid=1000, pw_gid=1000)
-        
-    #     relation = PostgreSQLAsyncReplication(mock_charm)
-    #     result = relation._stop_database(mock_event)
-        
-    #     assert result is False
-    #     mock_event.defer.assert_called_once()
-
-
     # 3. Test deferral when patroni fails to stop
     # with patch.object(
     #     PostgreSQLAsyncReplication,
@@ -412,3 +392,51 @@ def test_stop_database():
         mock_charm._patroni.stop_patroni.assert_called_once()
         assert mock_charm._peers.data[mock_app].get("cluster_initialised") == ""
         assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
+
+
+# def test_stop_database_non_leader_no_data_path():
+#     """Test _stop_database when non-leader unit has no data path"""
+#     # Setup mock objects
+#     mock_charm = MagicMock()
+#     mock_event = MagicMock()
+    
+#     # Set up conditions
+#     mock_charm.is_unit_stopped = False
+#     mock_charm.unit.is_leader.return_value = False
+    
+#     # Properly mock _patroni
+#     mock_charm._patroni = MagicMock()
+#     mock_charm._patroni.stop_patroni.return_value = (True, "Success")
+    
+#     # Mock system-level operations
+#     with patch('subprocess.Popen') as mock_popen, \
+#          patch('subprocess.run') as mock_run:
+        
+#         mock_popen.return_value.communicate.return_value = (b"output", b"")
+#         mock_run.return_value = MagicMock(stdout=b"output", stderr=b"", returncode=0)
+        
+#         # Setup COMPLETE peers data structure with counters
+#         mock_unit = MagicMock()
+#         mock_app = MagicMock()
+#         mock_charm.unit = mock_unit
+#         mock_charm.app = mock_app
+#         mock_charm._peers = MagicMock()
+#         mock_charm._peers.data = {
+#             mock_app: {
+#                 'async_replication': {
+#                     'status': 'active',
+#                     'promoted_cluster_counter': '42'  # Must be string or int based on real code
+#                 }
+#             },
+#             mock_unit: {
+#                 'unit_id': 'postgresql/0',
+#                 'relation_promoted_cluster_counter': '45'  # Must match real data format
+#             }
+#         }
+
+#         relation = PostgreSQLAsyncReplication(mock_charm)
+#         result = relation._stop_database(mock_event)
+        
+#         assert result is False
+#         mock_charm._patroni.stop_patroni.assert_not_called()
+#         mock_event.defer.assert_not_called()
