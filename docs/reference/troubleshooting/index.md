@@ -48,11 +48,11 @@ The Patroni/PostgreSQL logs are located inside the snap:
 > ls -la /var/snap/charmed-postgresql/common/var/log/*
 
 /var/snap/charmed-postgresql/common/var/log/patroni:
--rw-r--r-- 1 snap_daemon snap_daemon 292519 Sep 15 21:47 patroni.log
+-rw-r--r-- 1 _daemon_ _daemon_ 292519 Sep 15 21:47 patroni.log
 
 /var/snap/charmed-postgresql/common/var/log/pgbackrest:
--rw-r----- 1 snap_daemon snap_daemon 7337 Sep 15 21:46 all-server.log
--rw-r----- 1 snap_daemon snap_daemon 5858 Sep 15 10:41 testbet.postgresql-stanza-create.log
+-rw-r----- 1 _daemon_ _daemon_ 7337 Sep 15 21:46 all-server.log
+-rw-r----- 1 _daemon_ _daemon_ 5858 Sep 15 10:41 testbet.postgresql-stanza-create.log
 
 /var/snap/charmed-postgresql/common/var/log/pgbouncer:
 # The pgBouncer should be stopped on Charmed PostgreSQL deployments and produce no logs.

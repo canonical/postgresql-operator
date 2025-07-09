@@ -344,7 +344,7 @@ class PostgreSQLBackups(Object):
         """Execute a command in the workload container."""
 
         def demote():
-            pw_record = pwd.getpwnam("snap_daemon")
+            pw_record = pwd.getpwnam("_daemon_")
 
             def result():
                 os.setgid(pw_record.pw_gid)

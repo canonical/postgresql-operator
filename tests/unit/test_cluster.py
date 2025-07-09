@@ -274,7 +274,7 @@ def test_render_file(peers_ips, patroni):
         # Check the rendered file is opened with "w+" mode.
         assert mock.call_args_list[0][0] == (filename, "w+")
         # Ensure that the correct user is lookup up.
-        _pwnam.assert_called_with("snap_daemon")
+        _pwnam.assert_called_with("_daemon_")
         # Ensure the file is chmod'd correctly.
         _chmod.assert_called_with(filename, 0o640)
         # Ensure the file is chown'd correctly.
@@ -499,7 +499,7 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
 
         patroni.configure_patroni_on_unit()
 
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _getpwnam.assert_called_once_with("_daemon_")
 
         _chown.assert_any_call(
             "/var/snap/charmed-postgresql/common/var/lib/postgresql",
