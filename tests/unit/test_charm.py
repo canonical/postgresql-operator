@@ -64,7 +64,6 @@ def harness():
 
 def test_on_install(harness):
     with (
-        patch("charm.subprocess.check_call") as _check_call,
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
         patch(
@@ -87,45 +86,6 @@ def test_on_install(harness):
         assert pg_snap.alias.call_count == 2
         pg_snap.alias.assert_any_call("psql")
         pg_snap.alias.assert_any_call("patronictl")
-
-        assert _check_call.call_count == 3
-        _check_call.assert_any_call(["mkdir", "-p", "/home/snap_daemon"])
-        _check_call.assert_any_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])
-        _check_call.assert_any_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])
-
-        # Assert the status set by the event handler.
-        assert isinstance(harness.model.unit.status, WaitingStatus)
-
-
-def test_on_install_failed_to_create_home(harness):
-    with (
-        patch("charm.subprocess.check_call") as _check_call,
-        patch("charm.snap.SnapCache") as _snap_cache,
-        patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
-        patch(
-            "charm.PostgresqlOperatorCharm._reboot_on_detached_storage"
-        ) as _reboot_on_detached_storage,
-        patch(
-            "charm.PostgresqlOperatorCharm._is_storage_attached",
-            side_effect=[False, True, True],
-        ) as _is_storage_attached,
-        patch("charm.logger.exception") as _logger_exception,
-    ):
-        # Test without storage.
-        harness.charm.on.install.emit()
-        _reboot_on_detached_storage.assert_called_once()
-        pg_snap = _snap_cache.return_value[charm_refresh.snap_name()]
-        _check_call.side_effect = [subprocess.CalledProcessError(-1, ["test"])]
-
-        # Test without adding Patroni resource.
-        harness.charm.on.install.emit()
-        # Assert that the needed calls were made.
-        _install_snap_package.assert_called_once_with(revision=None)
-        assert pg_snap.alias.call_count == 2
-        pg_snap.alias.assert_any_call("psql")
-        pg_snap.alias.assert_any_call("patronictl")
-
-        _logger_exception.assert_called_once_with("Unable to create snap_daemon home dir")
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)

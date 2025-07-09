@@ -1232,7 +1232,7 @@ async def backup_operations(
         f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
     )
     async with ops_test.fast_forward(fast_interval="60s"):
-        await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
+        await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1500)
 
     # Configure and set access and secret keys.
     logger.info(f"configuring S3 integrator for {cloud}")

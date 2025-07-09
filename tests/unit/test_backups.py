@@ -2,7 +2,7 @@
 # See LICENSE file for licensing details.
 from os import cpu_count
 from subprocess import CompletedProcess, TimeoutExpired
-from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
+from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
 
 import botocore as botocore
 import pytest
@@ -483,29 +483,21 @@ def test_change_connectivity_to_database(harness):
 def test_execute_command(harness):
     with (
         patch("backups.run") as _run,
-        patch("pwd.getpwnam") as _getpwnam,
     ):
         # Test when the command fails.
         command = ["rm", "-r", "/var/snap/charmed-postgresql/common/data/db"]
         _run.return_value = CompletedProcess(command, 1, b"", b"fake stderr")
         assert harness.charm.backup._execute_command(command) == (1, "", "fake stderr")
-        _run.assert_called_once_with(
-            command, input=None, capture_output=True, preexec_fn=ANY, timeout=None
-        )
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _run.assert_called_once_with(command, input=None, capture_output=True, timeout=None)
 
         # Test when the command runs successfully.
         _run.reset_mock()
-        _getpwnam.reset_mock()
         _run.side_effect = None
         _run.return_value = CompletedProcess(command, 0, b"fake stdout", b"")
         assert harness.charm.backup._execute_command(
             command, command_input=b"fake input", timeout=5
         ) == (0, "fake stdout", "")
-        _run.assert_called_once_with(
-            command, input=b"fake input", capture_output=True, preexec_fn=ANY, timeout=5
-        )
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _run.assert_called_once_with(command, input=b"fake input", capture_output=True, timeout=5)
 
 
 def test_format_backup_list(harness):

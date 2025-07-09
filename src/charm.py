@@ -1324,16 +1324,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except snap.SnapError:
             logger.warning("Unable to create psql alias")
 
-        # Create the user home directory for the snap_daemon user.
-        # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
-        try:
-            # Input is hardcoded
-            subprocess.check_call(["mkdir", "-p", "/home/snap_daemon"])  # noqa: S607
-            subprocess.check_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])  # noqa: S607
-            subprocess.check_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])  # noqa: S607
-        except subprocess.CalledProcessError:
-            logger.exception("Unable to create snap_daemon home dir")
-
         self.set_unit_status(WaitingStatus("waiting to start PostgreSQL"))
 
     def _on_leader_elected(self, event: LeaderElectedEvent) -> None:  # noqa: C901
