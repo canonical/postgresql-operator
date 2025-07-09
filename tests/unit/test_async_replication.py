@@ -1,4 +1,5 @@
 import contextlib
+from email.mime import application
 from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
 import os
@@ -99,6 +100,21 @@ def test_can_promote_cluster():
             with patch.object(PostgreSQLAsyncReplication, '_handle_forceful_promotion', return_value=True):
                 relation = PostgreSQLAsyncReplication(mock_charm)
                 assert relation._can_promote_cluster(mock_event) is True
+
+    
+    # 4. 
+    mock_app = MagicMock(spec=application)
+    mock_charm.app = mock_app
+
+    with patch.object(PostgreSQLAsyncReplication, '_get_primary_cluster') as mock_get_primary:
+        mock_get_primary.return_value = mock_app  
+        
+        relation = PostgreSQLAsyncReplication(mock_charm)
+        result = relation._can_promote_cluster(mock_event)
+        
+        assert result is False
+        mock_event.fail.assert_called_with("This cluster is already the primary cluster.")
+
 
 def test_handle_database_start():
     """Tests all conditions in _handle_database_start"""
