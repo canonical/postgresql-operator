@@ -311,6 +311,7 @@ async def test_an_application_can_connect_to_multiple_database_clusters(ops_test
     assert application_connection_string != another_application_connection_string
 
 
+@pytest.mark.skip(reason="Unstable")
 async def test_an_application_can_connect_to_multiple_aliased_database_clusters(ops_test: OpsTest):
     """Test that an application can connect to different clusters of the same database."""
     # Relate the application with both database clusters

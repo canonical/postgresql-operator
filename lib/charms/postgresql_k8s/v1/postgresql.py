@@ -248,6 +248,14 @@ class PostgreSQL:
             database: database to be created.
             plugins: extensions to enable in the new database.
         """
+        # The limit of 49 characters for the database name is due to the usernames that
+        # are created for each database, which have the prefix `charmed_` and a suffix
+        # like `_owner`, which summed to the database name must not exceed PostgreSQL
+        # maximum identifier length (63 characters, which is, the prefix, 8 characters,
+        # + database name, 49 characters maximum, + suffix, 6 characters).
+        if len(database) > 49:
+            logger.error(f"Invalid database name (it must not exceed 49 characters): {database}.")
+            raise PostgreSQLCreateDatabaseError(INVALID_DATABASE_NAME_BLOCKING_MESSAGE)
         if database in ["postgres", "template0", "template1"]:
             logger.error(f"Invalid database name: {database}.")
             raise PostgreSQLCreateDatabaseError(INVALID_DATABASE_NAME_BLOCKING_MESSAGE)
