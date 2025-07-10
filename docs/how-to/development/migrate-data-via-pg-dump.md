@@ -10,7 +10,7 @@ If you are using an earlier version, be aware that:
  - `juju run` replaces `juju run-action --wait` in `juju v.2.9` 
  - `juju integrate` replaces `juju relate` and `juju add-relation` in `juju v.2.9`
 
-For more information, check the [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022).
+For more information, check the [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-0-0-22-oct-2022).
 ```
 
 ## Do you need to migrate?
@@ -45,7 +45,7 @@ Always test migration in a safe environment before performing it in production!
 
 - **[Your application is compatible](/explanation/legacy-charm) with Charmed PostgreSQL VM**
 - A client machine with access to the deployed legacy charm
-- `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://juju.is/docs/juju/roadmap#juju-3-0-0---22-oct-2022) for more information about key differences)
+- `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-0-0-22-oct-2022) for more information about key differences)
 - Enough storage in the cluster to support backup/restore of the databases.
 
 ## Obtain existing database credentials

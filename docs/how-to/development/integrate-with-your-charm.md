@@ -10,7 +10,7 @@ Most existing charms currently use [ops-lib-pgsql](https://github.com/canonical/
 Legacy charm details are described [here](/explanation/legacy-charm).
 
 ## Integrate your charm with PostgreSQL
-> See also: [Juju documentation | Integration](https://juju.is/docs/juju/integration)
+> See also: [Juju documentation | Integration](https://documentation.ubuntu.com/juju/3.6/reference/relation/)
 
 **For a detailed tutorial** about integrating your charm with the PostgreSQL charm, refer to [Juju | Integrate your charm with PostgreSQL](https://juju.is/docs/sdk/integrate-your-charm-with-postgresql). 
 
