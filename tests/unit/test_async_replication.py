@@ -1,9 +1,5 @@
-import contextlib
 from email.mime import application
 from unittest.mock import MagicMock, PropertyMock, patch
-import pytest
-import os
-from tenacity import RetryError
 from ops.model import WaitingStatus
 from src.relations.async_replication import (
     PostgreSQLAsyncReplication,
@@ -12,14 +8,7 @@ from src.relations.async_replication import (
     StandbyClusterAlreadyPromotedError
 )
 
-REPLICATION_OFFER_RELATION = "replication-offer"
-REPLICATION_CONSUMER_RELATION = "replication-consumer"
 PEER = "peer"
-SECRET_LABEL = "secret-label"
-SNAP_CURRENT_PATH = "/var/snap/charmed-postgresql/current"
-
-SNAP_CONF_PATH = f"{SNAP_CURRENT_PATH}/etc"
-PATRONI_CONF_PATH = f"{SNAP_CONF_PATH}/patroni"
 
 def create_mock_unit(name="unit"):
     unit = MagicMock()
@@ -45,7 +34,6 @@ def test_can_promote_cluster():
     mock_event = MagicMock()
     type(mock_charm).is_cluster_initialised = PropertyMock(return_value=True)
     
-    # Create fresh mocks for this test case
     mock_peers_data = MagicMock()
     mock_peers_data.update = MagicMock()
     
@@ -54,8 +42,7 @@ def test_can_promote_cluster():
                       _get_primary_cluster=MagicMock(),
                       _set_app_status=MagicMock(),
                       _handle_forceful_promotion=MagicMock(return_value=False)):
-        
-        # Setup test-specific conditions
+
         mock_charm._patroni = MagicMock()
         mock_charm._patroni.get_standby_leader.return_value = "standby-leader"
         mock_charm._patroni.promote_standby_cluster.return_value = True
@@ -67,7 +54,6 @@ def test_can_promote_cluster():
         relation = PostgreSQLAsyncReplication(mock_charm)
         assert relation._can_promote_cluster(mock_event) is False
         
-        # Verify only the expected calls for this test case
         mock_peers_data.update.assert_called_once_with({
             "promoted-cluster-counter": ""
         })
@@ -92,9 +78,8 @@ def test_can_promote_cluster():
     type(mock_charm).is_cluster_initialised = PropertyMock(return_value=True)
     
     with patch.object(PostgreSQLAsyncReplication, '_get_primary_cluster') as mock_get_primary:
-        # Mock that relation exists
         with patch.object(PostgreSQLAsyncReplication, '_relation', new_callable=PropertyMock) as mock_relation:
-            mock_relation.return_value = MagicMock()  # Simulate existing relation
+            mock_relation.return_value = MagicMock()  
             
             mock_get_primary.return_value = (MagicMock(), "1")
             with patch.object(PostgreSQLAsyncReplication, '_handle_forceful_promotion', return_value=True):
@@ -125,13 +110,11 @@ def test_handle_database_start():
     mock_charm._patroni.member_started = True
     mock_charm.unit.is_leader.return_value = True
     
-    # Create mock units
     mock_unit1 = create_mock_unit()
     mock_unit2 = create_mock_unit()
     mock_charm.unit = create_mock_unit()
     mock_charm.app = MagicMock()
     
-    # Setup peers data structure with proper keys
     mock_peers_data = {
         mock_charm.unit: MagicMock(),
         mock_unit1: MagicMock(),
@@ -145,14 +128,12 @@ def test_handle_database_start():
     with patch.object(PostgreSQLAsyncReplication, '_get_highest_promoted_cluster_counter_value', return_value="1"), \
          patch.object(PostgreSQLAsyncReplication, '_is_following_promoted_cluster', return_value=False):
         
-        # Configure all units to have matching counter values
         for unit in [mock_unit1, mock_unit2, mock_charm.unit]:
             mock_peers_data[unit].get.return_value = "1"
         
         relation = PostgreSQLAsyncReplication(mock_charm)
         relation._handle_database_start(mock_event)
         
-        # Verify updates when all units are ready
         mock_peers_data[mock_charm.unit].update.assert_any_call({"stopped": ""})
         mock_peers_data[mock_charm.unit].update.assert_any_call({
             "unit-promoted-cluster-counter": "1"
@@ -187,15 +168,13 @@ def test_handle_database_start():
     with patch.object(PostgreSQLAsyncReplication, '_get_highest_promoted_cluster_counter_value', return_value="1"), \
          patch.object(PostgreSQLAsyncReplication, '_is_following_promoted_cluster', return_value=True):
         
-        # Configure some units to have mismatched counter values
         mock_peers_data[mock_charm.unit].get.return_value = "1"
         mock_peers_data[mock_unit1].get.return_value = "1"
-        mock_peers_data[mock_unit2].get.return_value = "0"  # Different value
+        mock_peers_data[mock_unit2].get.return_value = "0" 
         
         relation = PostgreSQLAsyncReplication(mock_charm)
         relation._handle_database_start(mock_event)
         
-        # Verify waiting status and deferral
         assert isinstance(mock_charm.unit.status, WaitingStatus)
         mock_event.defer.assert_called_once()
 
@@ -214,7 +193,6 @@ def test_handle_database_start():
         relation = PostgreSQLAsyncReplication(mock_charm)
         relation._handle_database_start(mock_event)
         
-        # Verify retry and deferral
         mock_charm._patroni.reload_patroni_configuration.assert_called_once()
         assert isinstance(mock_charm.unit.status, WaitingStatus)
         mock_event.defer.assert_called_once()
@@ -333,14 +311,12 @@ def test_on_secret_changed():
 
 def test_stop_database():
     """Test _stop_database"""
-    # Setup mock objects
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_charm.is_unit_stopped = False
     mock_charm.unit.is_leader.return_value = False
     mock_charm._patroni.stop_patroni.return_value = True
     
-    # Properly setup peers data structure
     mock_unit = MagicMock()
     mock_app = MagicMock()
     mock_charm.unit = mock_unit
@@ -362,18 +338,7 @@ def test_stop_database():
         assert result is True
         mock_charm._patroni.stop_patroni.assert_not_called()
 
-    # 3. Test deferral when patroni fails to stop
-    # with patch.object(
-    #     PostgreSQLAsyncReplication,
-    #     '_is_following_promoted_cluster',
-    #     return_value=False
-    # ), patch('os.path.exists', return_value=True):
-    #     mock_charm._patroni.stop_patroni.return_value = False
-    #     result = relation._stop_database(mock_event)
-    #     assert result is False
-    #     mock_event.defer.assert_called_once()
-
-    # 4. Test non-leader with no data path
+    # 2. Test non-leader with no data path
     mock_charm._patroni.stop_patroni.return_value = True
     with patch.object(
         PostgreSQLAsyncReplication,
@@ -385,7 +350,7 @@ def test_stop_database():
         assert result is False
         mock_charm._patroni.stop_patroni.assert_not_called()
 
-    # 5. Test leader unit behavior
+    # 3. Test leader unit behavior
     with patch.object(
         PostgreSQLAsyncReplication,
         '_is_following_promoted_cluster',
@@ -410,6 +375,7 @@ def test_stop_database():
         assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
 
 def test__configure_primary_cluster():
+    # 1.
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_charm.app = MagicMock()
@@ -438,7 +404,6 @@ def test__configure_primary_cluster():
     mock_charm.app = MagicMock()
     mock_charm.unit.is_leader.return_value = True
     mock_charm.update_config = MagicMock()
-    #mock_charm._update_primary_cluster_data = MagicMock()
     mock_charm._patroni.get_standby_leader.return_value = True
     mock_charm._patroni.promote_standby_cluster = MagicMock()
 
@@ -472,52 +437,3 @@ def test__configure_primary_cluster():
     mock_charm.update_config.assert_called_once()
     relation._update_primary_cluster_data.assert_called_once()
     assert result is True
-
-
-
-# def test_stop_database_non_leader_no_data_path():
-#     """Test _stop_database when non-leader unit has no data path"""
-#     # Setup mock objects
-#     mock_charm = MagicMock()
-#     mock_event = MagicMock()
-    
-#     # Set up conditions
-#     mock_charm.is_unit_stopped = False
-#     mock_charm.unit.is_leader.return_value = False
-    
-#     # Properly mock _patroni
-#     mock_charm._patroni = MagicMock()
-#     mock_charm._patroni.stop_patroni.return_value = (True, "Success")
-    
-#     # Mock system-level operations
-#     with patch('subprocess.Popen') as mock_popen, \
-#          patch('subprocess.run') as mock_run:
-        
-#         mock_popen.return_value.communicate.return_value = (b"output", b"")
-#         mock_run.return_value = MagicMock(stdout=b"output", stderr=b"", returncode=0)
-        
-#         # Setup COMPLETE peers data structure with counters
-#         mock_unit = MagicMock()
-#         mock_app = MagicMock()
-#         mock_charm.unit = mock_unit
-#         mock_charm.app = mock_app
-#         mock_charm._peers = MagicMock()
-#         mock_charm._peers.data = {
-#             mock_app: {
-#                 'async_replication': {
-#                     'status': 'active',
-#                     'promoted_cluster_counter': '42'  # Must be string or int based on real code
-#                 }
-#             },
-#             mock_unit: {
-#                 'unit_id': 'postgresql/0',
-#                 'relation_promoted_cluster_counter': '45'  # Must match real data format
-#             }
-#         }
-
-#         relation = PostgreSQLAsyncReplication(mock_charm)
-#         result = relation._stop_database(mock_event)
-        
-#         assert result is False
-#         mock_charm._patroni.stop_patroni.assert_not_called()
-#         mock_event.defer.assert_not_called()
