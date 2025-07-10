@@ -344,7 +344,7 @@ class PostgreSQLBackups(Object):
         """Execute a command in the workload container."""
 
         def demote():
-            pw_record = pwd.getpwnam("snap_daemon")
+            pw_record = pwd.getpwnam("_daemon_")
 
             def result():
                 os.setgid(pw_record.pw_gid)
@@ -1269,6 +1269,7 @@ Stderr:
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
+            process_max=max(os.cpu_count() - 2, 1),
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)

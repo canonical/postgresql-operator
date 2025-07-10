@@ -89,9 +89,9 @@ def test_on_install(harness):
         pg_snap.alias.assert_any_call("patronictl")
 
         assert _check_call.call_count == 3
-        _check_call.assert_any_call(["mkdir", "-p", "/home/snap_daemon"])
-        _check_call.assert_any_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])
-        _check_call.assert_any_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])
+        _check_call.assert_any_call(["mkdir", "-p", "/home/_daemon_"])
+        _check_call.assert_any_call(["chown", "_daemon_:_daemon_", "/home/_daemon_"])
+        _check_call.assert_any_call(["usermod", "-d", "/home/_daemon_", "_daemon_"])
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
@@ -125,7 +125,7 @@ def test_on_install_failed_to_create_home(harness):
         pg_snap.alias.assert_any_call("psql")
         pg_snap.alias.assert_any_call("patronictl")
 
-        _logger_exception.assert_called_once_with("Unable to create snap_daemon home dir")
+        _logger_exception.assert_called_once_with("Unable to create _daemon_ home dir")
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
@@ -602,7 +602,7 @@ def test_on_start(harness):
         patch(
             "charm.PostgresqlOperatorCharm._is_storage_attached",
             side_effect=[False, True, True, True, True, True],
-        ) as _is_storage_attached,
+        ),
         patch(
             "charm.PostgresqlOperatorCharm._can_connect_to_postgresql",
             new_callable=PropertyMock,
@@ -803,9 +803,6 @@ def test_on_update_status(harness):
         ) as _set_primary_status_message,
         patch("charm.Patroni.restart_patroni") as _restart_patroni,
         patch("charm.Patroni.is_member_isolated") as _is_member_isolated,
-        patch(
-            "charm.Patroni.member_replication_lag", new_callable=PropertyMock
-        ) as _member_replication_lag,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
             "charm.PostgresqlOperatorCharm.is_standby_leader", new_callable=PropertyMock
@@ -911,6 +908,9 @@ def test_on_update_status_after_restore_operation(harness):
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.get_member_status") as _get_member_status,
+        patch(
+            "charm.PostgresqlOperatorCharm.enable_disable_extensions"
+        ) as _enable_disable_extensions,
     ):
         _get_current_timeline.return_value = "2"
         rel_id = harness.model.get_relation(PEER).id
@@ -929,6 +929,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
+        _enable_disable_extensions.assert_not_called()
         assert isinstance(harness.charm.unit.status, BlockedStatus)
 
         # Test when the restore operation hasn't finished yet.
@@ -941,6 +942,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
+        _enable_disable_extensions.assert_not_called()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Assert that the backup id is still in the application relation databag.
@@ -959,6 +961,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_called_once()
         _update_relation_endpoints.assert_called_once()
         _set_primary_status_message.assert_called_once()
+        _enable_disable_extensions.assert_called_once_with()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
         # Assert that the backup id is not in the application relation databag anymore.
@@ -1383,9 +1386,6 @@ def test_on_peer_relation_changed(harness):
             "backups.PostgreSQLBackups.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
         patch("charm.Patroni.reinitialize_postgresql") as _reinitialize_postgresql,
-        patch(
-            "charm.Patroni.member_replication_lag", new_callable=PropertyMock
-        ) as _member_replication_lag,
         patch("charm.PostgresqlOperatorCharm.is_standby_leader") as _is_standby_leader,
         patch("charm.PostgresqlOperatorCharm.is_primary") as _is_primary,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
@@ -1466,15 +1466,14 @@ def test_on_peer_relation_changed(harness):
         # huge or unknown lag.
         relation = harness.model.get_relation(PEER, rel_id)
         _member_started.return_value = True
-        for values in itertools.product([True, False], ["0", "1000", "1001", "unknown"]):
+        for values in [True, False]:
             _defer.reset_mock()
             _start_stop_pgbackrest_service.reset_mock()
-            _is_primary.return_value = values[0]
-            _is_standby_leader.return_value = values[0]
-            _member_replication_lag.return_value = values[1]
+            _is_primary.return_value = values
+            _is_standby_leader.return_value = values
             harness.charm.unit.status = ActiveStatus()
             harness.charm.on.database_peers_relation_changed.emit(relation)
-            if _is_primary.return_value == values[0] or int(values[1]) <= 1000:
+            if _is_primary.return_value == values:
                 _defer.assert_not_called()
                 _start_stop_pgbackrest_service.assert_called_once()
                 assert isinstance(harness.charm.unit.status, ActiveStatus)

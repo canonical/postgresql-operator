@@ -1,5 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+from os import cpu_count
 from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import ANY, MagicMock, PropertyMock, call, mock_open, patch
 
@@ -491,7 +492,7 @@ def test_execute_command(harness):
         _run.assert_called_once_with(
             command, input=None, capture_output=True, preexec_fn=ANY, timeout=None
         )
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _getpwnam.assert_called_once_with("_daemon_")
 
         # Test when the command runs successfully.
         _run.reset_mock()
@@ -504,7 +505,7 @@ def test_execute_command(harness):
         _run.assert_called_once_with(
             command, input=b"fake input", capture_output=True, preexec_fn=ANY, timeout=5
         )
-        _getpwnam.assert_called_once_with("snap_daemon")
+        _getpwnam.assert_called_once_with("_daemon_")
 
 
 def test_format_backup_list(harness):
@@ -1730,6 +1731,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             storage_path=harness.charm._storage_path,
             user="backup",
             retention_full=30,
+            process_max=max(cpu_count() - 2, 1),
         )
 
         # Patch the `open` method with our mock.

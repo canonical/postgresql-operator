@@ -47,8 +47,7 @@ PostgreSQL is a trademark or registered trademark of PostgreSQL Global Developme
 :hidden:
 
 Home <self>
-tutorial*/index
-how*/index
-reference*/index
-explanation*/index
-*
+tutorial/index
+how-to/index
+reference/index
+explanation/index

@@ -48,7 +48,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             ),
         )
 
-        await ops_test.model.wait_for_idle(status="active", timeout=1500)
+        await ops_test.model.wait_for_idle(status="active", timeout=1800)
 
 
 @pytest.mark.abort_on_fail

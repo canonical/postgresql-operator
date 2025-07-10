@@ -130,6 +130,7 @@ from utils import label2name, new_password
 logger = logging.getLogger(__name__)
 logging.getLogger("httpx").setLevel(logging.WARNING)
 logging.getLogger("httpcore").setLevel(logging.WARNING)
+logging.getLogger("asyncio").setLevel(logging.WARNING)
 
 PRIMARY_NOT_REACHABLE_MESSAGE = "waiting for primary to be reachable from this unit"
 EXTENSIONS_DEPENDENCY_MESSAGE = "Unsatisfied plugin dependencies. Please check the logs"
@@ -1323,15 +1324,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except snap.SnapError:
             logger.warning("Unable to create psql alias")
 
-        # Create the user home directory for the snap_daemon user.
+        # Create the user home directory for the _daemon_ user.
         # This is needed due to https://bugs.launchpad.net/snapd/+bug/2011581.
         try:
             # Input is hardcoded
-            subprocess.check_call(["mkdir", "-p", "/home/snap_daemon"])  # noqa: S607
-            subprocess.check_call(["chown", "snap_daemon:snap_daemon", "/home/snap_daemon"])  # noqa: S607
-            subprocess.check_call(["usermod", "-d", "/home/snap_daemon", "snap_daemon"])  # noqa: S607
+            subprocess.check_call(["mkdir", "-p", "/home/_daemon_"])  # noqa: S607
+            subprocess.check_call(["chown", "_daemon_:_daemon_", "/home/_daemon_"])  # noqa: S607
+            subprocess.check_call(["usermod", "-d", "/home/_daemon_", "_daemon_"])  # noqa: S607
         except subprocess.CalledProcessError:
-            logger.exception("Unable to create snap_daemon home dir")
+            logger.exception("Unable to create _daemon_ home dir")
 
         self.set_unit_status(WaitingStatus("waiting to start PostgreSQL"))
 
@@ -1959,6 +1960,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except PostgreSQLGetCurrentTimelineError:
             logger.debug("Restore check early exit: can't get current wal timeline")
             return False
+
+        self.enable_disable_extensions()
 
         # Remove the restoring backup flag and the restore stanza name.
         self.app_peer_data.update({

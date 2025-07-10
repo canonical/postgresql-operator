@@ -11,25 +11,25 @@ PostgreSQL and Patroni logs can be found in `/var/snap/charmed-postgresql/common
 ```text
 > ls -alh /var/snap/charmed-postgresql/common/var/log/postgresql
 total 20K
-drwxr-xr-x 2 snap_daemon root        4.0K Oct 11 15:09 .
-drwxr-xr-x 6 snap_daemon root        4.0K Oct 11 15:04 ..
--rw------- 1 snap_daemon snap_daemon 4.3K Oct 11 15:05 postgresql-3_1505.log
--rw------- 1 snap_daemon snap_daemon    0 Oct 11 15:06 postgresql-3_1506.log
--rw------- 1 snap_daemon snap_daemon    0 Oct 11 15:07 postgresql-3_1507.log
--rw------- 1 snap_daemon snap_daemon  817 Oct 11 15:08 postgresql-3_1508.log
--rw------- 1 snap_daemon snap_daemon    0 Oct 11 15:09 postgresql-3_1509.log
+drwxr-xr-x 2 _daemon_ root        4.0K Oct 11 15:09 .
+drwxr-xr-x 6 _daemon_ root        4.0K Oct 11 15:04 ..
+-rw------- 1 _daemon_ _daemon_ 4.3K Oct 11 15:05 postgresql-3_1505.log
+-rw------- 1 _daemon_ _daemon_    0 Oct 11 15:06 postgresql-3_1506.log
+-rw------- 1 _daemon_ _daemon_    0 Oct 11 15:07 postgresql-3_1507.log
+-rw------- 1 _daemon_ _daemon_  817 Oct 11 15:08 postgresql-3_1508.log
+-rw------- 1 _daemon_ _daemon_    0 Oct 11 15:09 postgresql-3_1509.log
 ```
 
 ```text
 >  ls -alh /var/snap/charmed-postgresql/common/var/log/patroni/
 total 28K
-drwxr-xr-x 2 snap_daemon root        4.0K Oct 11 15:29 .
-drwxr-xr-x 6 snap_daemon root        4.0K Oct 11 15:25 ..
--rw-r--r-- 1 snap_daemon snap_daemon  356 Oct 11 15:29 patroni.log
--rw-r--r-- 1 snap_daemon snap_daemon  534 Oct 11 15:28 patroni.log.1
--rw-r--r-- 1 snap_daemon snap_daemon  520 Oct 11 15:27 patroni.log.2
--rw-r--r-- 1 snap_daemon snap_daemon  584 Oct 11 15:27 patroni.log.3
--rw-r--r-- 1 snap_daemon snap_daemon  464 Oct 11 15:27 patroni.log.4
+drwxr-xr-x 2 _daemon_ root        4.0K Oct 11 15:29 .
+drwxr-xr-x 6 _daemon_ root        4.0K Oct 11 15:25 ..
+-rw-r--r-- 1 _daemon_ _daemon_  356 Oct 11 15:29 patroni.log
+-rw-r--r-- 1 _daemon_ _daemon_  534 Oct 11 15:28 patroni.log.1
+-rw-r--r-- 1 _daemon_ _daemon_  520 Oct 11 15:27 patroni.log.2
+-rw-r--r-- 1 _daemon_ _daemon_  584 Oct 11 15:27 patroni.log.3
+-rw-r--r-- 1 _daemon_ _daemon_  464 Oct 11 15:27 patroni.log.4
 ```
 
 The PostgreSQL log naming convention  is `postgresql-<weekday>_<hour><minute>.log`. The log message format is `<date> <time> UTC [<pid>]: <connection details> <level>: <message>`. E.g:
@@ -64,11 +64,11 @@ If S3 backups are enabled, Pgbackrest logs would be located in `/var/snap/charme
 ```text
 > ls -alh  /var/snap/charmed-postgresql/common/var/log/pgbackrest/
 total 20K
-drwxr-xr-x 2 snap_daemon root        4.0K Oct 11 15:14 .
-drwxr-xr-x 6 snap_daemon root        4.0K Oct 11 15:04 ..
--rw-r----- 1 snap_daemon snap_daemon 1.7K Oct 11 15:14 pg.pg-backup.log
--rw-r----- 1 snap_daemon snap_daemon  717 Oct 11 15:14 pg.pg-expire.log
--rw-r----- 1 snap_daemon snap_daemon  859 Oct 11 15:08 pg.pg-stanza-create.log
+drwxr-xr-x 2 _daemon_ root        4.0K Oct 11 15:14 .
+drwxr-xr-x 6 _daemon_ root        4.0K Oct 11 15:04 ..
+-rw-r----- 1 _daemon_ _daemon_ 1.7K Oct 11 15:14 pg.pg-backup.log
+-rw-r----- 1 _daemon_ _daemon_  717 Oct 11 15:14 pg.pg-expire.log
+-rw-r----- 1 _daemon_ _daemon_  859 Oct 11 15:08 pg.pg-stanza-create.log
 ```
 
 The naming convention of the Pgbackrest logs is `<model name>.patroni-<postgresql app name>-<action>.log`. Log output should look similar to:

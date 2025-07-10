@@ -11,18 +11,21 @@ import pwd
 import re
 import shutil
 import subprocess
+from asyncio import as_completed, create_task, run, wait
+from contextlib import suppress
 from pathlib import Path
+from ssl import CERT_NONE, create_default_context
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import charm_refresh
 import psutil
 import requests
 from charms.operator_libs_linux.v2 import snap
+from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from tenacity import (
-    AttemptManager,
     RetryError,
     Retrying,
     retry,
@@ -173,6 +176,10 @@ class Patroni:
         return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
     @property
+    def _patroni_async_auth(self) -> BasicAuth:
+        return BasicAuth("patroni", password=self.patroni_password)
+
+    @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"https://{self.unit_ip}:8008"
@@ -211,23 +218,16 @@ class Patroni:
         Args:
             path: path to a file or directory.
         """
-        # Get the uid/gid for the snap_daemon user.
-        user_database = pwd.getpwnam("snap_daemon")
+        # Get the uid/gid for the _daemon_ user.
+        user_database = pwd.getpwnam("_daemon_")
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
     @property
-    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        cluster_status = requests.get(
-            f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-            verify=self.verify,
-            timeout=API_REQUEST_TIMEOUT,
-            auth=self._patroni_auth,
-        )
-        return {member["name"] for member in cluster_status.json()["members"]}
+        return {member["name"] for member in self.cached_cluster_status}
 
     def _create_directory(self, path: str, mode: int) -> None:
         """Creates a directory.
@@ -249,28 +249,19 @@ class Patroni:
             if snp["name"] == charm_refresh.snap_name():
                 return snp["version"]
 
-    def cluster_status(
-        self, alternative_endpoints: list | None = None
-    ) -> list[ClusterMember] | None:
+    @property
+    def cached_cluster_status(self):
+        """Cached cluster status."""
+        return self.cluster_status()
+
+    def cluster_status(self, alternative_endpoints: list | None = None) -> list[ClusterMember]:
         """Query the cluster status."""
         # Request info from cluster endpoint (which returns all members of the cluster).
-        # TODO we don't know the other cluster's ca
-        verify = self.verify if not alternative_endpoints else False
-        for attempt in Retrying(
-            stop=stop_after_attempt(
-                len(alternative_endpoints) if alternative_endpoints else len(self.peers_ips)
-            )
+        if response := self.parallel_patroni_get_request(
+            f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
         ):
-            with attempt:
-                request_url = self._get_alternative_patroni_url(attempt, alternative_endpoints)
-
-                cluster_status = requests.get(
-                    f"{request_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                    verify=verify,
-                    timeout=API_REQUEST_TIMEOUT,
-                    auth=self._patroni_auth,
-                )
-                return cluster_status.json()["members"]
+            return response["members"]
+        raise RetryError(last_attempt=Exception("Unable to reach any units"))
 
     def get_member_ip(self, member_name: str) -> str | None:
         """Get cluster member IP address.
@@ -281,13 +272,14 @@ class Patroni:
         Returns:
             IP address of the cluster member.
         """
-        cluster_status = self.cluster_status()
-        if not cluster_status:
-            return
+        try:
+            cluster_status = self.cluster_status()
 
-        for member in cluster_status:
-            if member["name"] == member_name:
-                return member["host"]
+            for member in cluster_status:
+                if member["name"] == member_name:
+                    return member["host"]
+        except RetryError:
+            logger.debug("Unable to get IP. Cluster status unreachable")
 
     def get_member_status(self, member_name: str) -> str:
         """Get cluster member status.
@@ -307,6 +299,44 @@ class Patroni:
                     return member["state"]
         return ""
 
+    async def _httpx_get_request(self, url: str, verify: bool = True):
+        ssl_ctx = create_default_context()
+        if verify:
+            with suppress(FileNotFoundError):
+                ssl_ctx.load_verify_locations(cafile=f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}")
+        else:
+            ssl_ctx.check_hostname = False
+            ssl_ctx.verify_mode = CERT_NONE
+        async with AsyncClient(
+            auth=self._patroni_async_auth, timeout=API_REQUEST_TIMEOUT, verify=ssl_ctx
+        ) as client:
+            try:
+                return (await client.get(url)).json()
+            except (HTTPError, ValueError):
+                return None
+
+    async def _async_get_request(self, uri: str, endpoints: list[str], verify: bool = True):
+        tasks = [
+            create_task(self._httpx_get_request(f"https://{ip}:8008{uri}", verify))
+            for ip in endpoints
+        ]
+        for task in as_completed(tasks):
+            if result := await task:
+                for task in tasks:
+                    task.cancel()
+                await wait(tasks)
+                return result
+
+    def parallel_patroni_get_request(self, uri: str, endpoints: list[str] | None = None) -> dict:
+        """Call all possible patroni endpoints in parallel."""
+        if not endpoints:
+            endpoints = (self.unit_ip, *self.peers_ips)
+            verify = True
+        else:
+            # TODO we don't know the other cluster's ca
+            verify = False
+        return run(self._async_get_request(uri, endpoints, verify))
+
     def get_primary(
         self, unit_name_pattern=False, alternative_endpoints: list[str] | None = None
     ) -> str | None:
@@ -320,7 +350,8 @@ class Patroni:
             primary pod or unit name.
         """
         # Request info from cluster endpoint (which returns all members of the cluster).
-        if cluster_status := self.cluster_status(alternative_endpoints):
+        try:
+            cluster_status = self.cluster_status(alternative_endpoints)
             for member in cluster_status:
                 if member["role"] == "leader":
                     primary = member["name"]
@@ -328,6 +359,8 @@ class Patroni:
                         # Change the last dash to / in order to match unit name pattern.
                         primary = label2name(primary)
                     return primary
+        except RetryError:
+            logger.debug("Unable to get primary. Cluster status unreachable")
 
     def get_standby_leader(
         self, unit_name_pattern=False, check_whether_is_running: bool = False
@@ -366,31 +399,6 @@ class Patroni:
                     sync_standbys.append(label2name(member["name"]))
         return sync_standbys
 
-    def _get_alternative_patroni_url(
-        self, attempt: AttemptManager, alternative_endpoints: list[str] | None = None
-    ) -> str:
-        """Get an alternative REST API URL from another member each time.
-
-        When the Patroni process is not running in the current unit it's needed
-        to use a URL from another cluster member REST API to do some operations.
-        """
-        if alternative_endpoints is not None:
-            return self._patroni_url.replace(
-                self.unit_ip, alternative_endpoints[attempt.retry_state.attempt_number - 1]
-            )
-        attempt_number = attempt.retry_state.attempt_number
-        if attempt_number > 1:
-            url = self._patroni_url
-            if (attempt_number - 1) <= len(self.peers_ips):
-                unit_number = attempt_number - 2
-            else:
-                unit_number = attempt_number - 2 - len(self.peers_ips)
-            other_unit_ip = list(self.peers_ips)[unit_number]
-            url = url.replace(self.unit_ip, other_unit_ip)
-        else:
-            url = self._patroni_url
-        return url
-
     def are_all_members_ready(self) -> bool:
         """Check if all members are correctly running Patroni and PostgreSQL.
 
@@ -401,26 +409,21 @@ class Patroni:
         # Request info from cluster endpoint
         # (which returns all members of the cluster and their states).
         try:
-            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
-                with attempt:
-                    cluster_status = requests.get(
-                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                        verify=self.verify,
-                        timeout=API_REQUEST_TIMEOUT,
-                        auth=self._patroni_auth,
-                    )
+            members = self.cluster_status()
         except RetryError:
             return False
 
         # Check if all members are running and one of them is a leader (primary) or
         # a standby leader, because sometimes there may exist (for some period of time)
         # only replicas after a failed switchover.
-        return all(
-            member["state"] in STARTED_STATES for member in cluster_status.json()["members"]
-        ) and any(
-            member["role"] in ["leader", "standby_leader"]
-            for member in cluster_status.json()["members"]
+        return all(member["state"] in STARTED_STATES for member in members) and any(
+            member["role"] in ["leader", "standby_leader"] for member in members
         )
+
+    @property
+    def cached_patroni_health(self) -> dict[str, str]:
+        """Cached local unit health."""
+        return self.get_patroni_health()
 
     def get_patroni_health(self) -> dict[str, str]:
         """Gets, retires and parses the Patroni health endpoint."""
@@ -442,20 +445,12 @@ class Patroni:
         # cluster member; the "is_creating_backup" tag means that the member is creating
         # a backup).
         try:
-            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
-                with attempt:
-                    r = requests.get(
-                        f"{self._patroni_url}/cluster",
-                        verify=self.verify,
-                        auth=self._patroni_auth,
-                        timeout=PATRONI_TIMEOUT,
-                    )
+            members = self.cached_cluster_status
         except RetryError:
             return False
 
         return any(
-            "tags" in member and member["tags"].get("is_creating_backup")
-            for member in r.json()["members"]
+            "tags" in member and member["tags"].get("is_creating_backup") for member in members
         )
 
     def is_replication_healthy(self) -> bool:
@@ -499,7 +494,7 @@ class Patroni:
         if not self.is_patroni_running():
             return False
         try:
-            response = self.get_patroni_health()
+            response = self.cached_patroni_health
         except RetryError:
             return False
 
@@ -514,7 +509,7 @@ class Patroni:
             seconds times to allow server time to start up.
         """
         try:
-            response = self.get_patroni_health()
+            response = self.cached_patroni_health
         except RetryError:
             return True
 
@@ -524,27 +519,6 @@ class Patroni:
             "starting",
             "restarting",
         ]
-
-    @property
-    def member_replication_lag(self) -> str:
-        """Member replication lag."""
-        try:
-            for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-                with attempt:
-                    cluster_status = requests.get(
-                        f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                        verify=self.verify,
-                        timeout=API_REQUEST_TIMEOUT,
-                        auth=self._patroni_auth,
-                    )
-        except RetryError:
-            return "unknown"
-
-        for member in cluster_status.json()["members"]:
-            if member["name"] == self.member_name:
-                return member.get("lag", "unknown")
-
-        return "unknown"
 
     @property
     def is_member_isolated(self) -> bool:
@@ -579,16 +553,8 @@ class Patroni:
     def are_replicas_up(self) -> dict[str, bool] | None:
         """Check if cluster members are running or streaming."""
         try:
-            response = requests.get(
-                f"{self._patroni_url}/cluster",
-                verify=self.verify,
-                auth=self._patroni_auth,
-                timeout=PATRONI_TIMEOUT,
-            )
-            return {
-                member["host"]: member["state"] in ["running", "streaming"]
-                for member in response.json()["members"]
-            }
+            members = self.cluster_status()
+            return {member["host"]: member["state"] in STARTED_STATES for member in members}
         except Exception:
             logger.exception("Unable to get the state of the cluster")
             return
@@ -624,7 +590,7 @@ class Patroni:
             mode: access permission mask applied to the
               file using chmod (e.g. 0o640).
             change_owner: whether to change the file owner
-              to the snap_daemon user.
+              to the _daemon_ user.
         """
         # TODO: keep this method to use it also for generating replication configuration files and
         # move it to an utils / helpers file.
@@ -899,15 +865,8 @@ class Patroni:
     def get_running_cluster_members(self) -> list[str]:
         """List running patroni members."""
         try:
-            members = requests.get(
-                f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
-                verify=self.verify,
-                timeout=API_REQUEST_TIMEOUT,
-                auth=self._patroni_auth,
-            ).json()["members"]
-            return [
-                member["name"] for member in members if member["state"] in ("streaming", "running")
-            ]
+            members = self.cluster_status()
+            return [member["name"] for member in members if member["state"] in STARTED_STATES]
         except Exception:
             return []
 
