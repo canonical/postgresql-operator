@@ -64,6 +64,7 @@ def harness():
 
 def test_on_install(harness):
     with (
+        patch("charm.subprocess.check_call") as _check_call,
         patch("charm.snap.SnapCache") as _snap_cache,
         patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
         patch(
