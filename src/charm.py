@@ -2345,7 +2345,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
             "max_replication_slots": 25,
-            "max_wal_senders": 25
+            "max_wal_senders": 25,
             "wal_keep_size": self.config.durability_wal_keep_size,
         })
 
