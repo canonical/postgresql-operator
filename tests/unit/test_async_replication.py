@@ -1,4 +1,3 @@
-from email.mime import application
 from unittest.mock import MagicMock, PropertyMock, patch
 from ops.model import WaitingStatus
 from src.relations.async_replication import (
@@ -88,7 +87,7 @@ def test_can_promote_cluster():
 
     
     # 4. 
-    mock_app = MagicMock(spec=application)
+    mock_app = MagicMock()
     mock_charm.app = mock_app
 
     with patch.object(PostgreSQLAsyncReplication, '_get_primary_cluster') as mock_get_primary:
