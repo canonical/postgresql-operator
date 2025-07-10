@@ -44,6 +44,10 @@ class MockCharm(CharmBase):
     def _peers(self) -> Relation | None:
         return None
 
+    @property
+    def is_cluster_initialised(self) -> bool:
+        return True
+
 
 @pytest.fixture(autouse=True)
 def harness():
