@@ -136,6 +136,7 @@ class TLS(Object):
         )
 
     def _on_peer_certificate_available(self, event: EventBase) -> None:
+        self._on_certificate_available(event)
         certs, _ = self.peer_certificate.get_assigned_certificates()
         new_ca = str(certs[0].ca) if certs else None
         current_ca = self.charm.get_secret(UNIT_SCOPE, "current-ca")
@@ -143,7 +144,6 @@ class TLS(Object):
         if new_ca != current_ca:
             self.charm.set_secret(UNIT_SCOPE, "current-ca", new_ca)
             self.charm.set_secret(UNIT_SCOPE, "old-ca", current_ca)
-        self._on_certificate_available(event)
 
     def _on_certificate_available(self, event: EventBase) -> None:
         if not self.charm.get_secret(APP_SCOPE, "internal-ca"):
