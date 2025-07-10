@@ -78,7 +78,7 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     juju.deploy(
         APP_NAME,
         app=ISOLATED_APP_NAME,
-        channel="latest/edge",
+        channel="latest/beta",
         constraints={"spaces": "isolated"},
         bind={"database": "isolated"},
     )
@@ -88,7 +88,9 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")
     sleep(SLEEP_TIME)
     # Wait for the relation to be established
-    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=SLEEP_TIME)
+    juju.wait(
+        lambda status: jubilant.all_active(status, PG_NAME, ISOLATED_APP_NAME), delay=SLEEP_TIME
+    )
 
     status = juju.status()
     unit = next(iter(status.apps[ISOLATED_APP_NAME].units))
