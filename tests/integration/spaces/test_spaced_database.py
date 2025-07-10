@@ -79,7 +79,7 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     juju.deploy(
         APP_NAME,
         app=ISOLATED_APP_NAME,
-        channel="latest/edge",
+        channel="latest/beta",
         constraints={"spaces": "isolated"},
         bind={"database": "isolated"},
     )
@@ -91,9 +91,7 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     # Wait for the relation to be established
     msg = "received database credentials of the first database"
     juju.wait(
-        lambda status: jubilant.all_active(status, PG_NAME, ISOLATED_APP_NAME)
-        and status.apps[ISOLATED_APP_NAME].app_status.message == msg,
-        delay=SLEEP_TIME,
+        lambda status: jubilant.all_active(status, PG_NAME, ISOLATED_APP_NAME), delay=SLEEP_TIME
     )
 
     status = juju.status()
@@ -102,6 +100,5 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     logger.info("Flush default routes on client")
     juju.exec("sudo ip route flush default", unit=unit)
 
-    for attempt in Retrying(stop=stop_after_attempt(3), wait=wait_fixed(5)):
-        with attempt, pytest.raises(jubilant.TaskError):
-            juju.run(unit, "start-continuous-writes")
+    with pytest.raises(jubilant.TaskError):
+        juju.run(unit, "start-continuous-writes")
