@@ -93,9 +93,5 @@ For details on the cryptography used by Charmed PostgreSQL, see the [Cryptograph
 
 
 ```{toctree}
-:titlesonly:
-:maxdepth: 2
-:glob:
-:hidden:
-
 Cryptography <cryptography>
+```
