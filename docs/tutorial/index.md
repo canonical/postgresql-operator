@@ -390,7 +390,7 @@ Learn more about managing user credentials in [](/how-to/manage-passwords) and [
 
 ## Integrate with other applications
 
-[Integrations](https://juju.is/docs/sdk/integration), known as "relations" in Juju 2.9, are the easiest way to create a user for PostgreSQL in Charmed PostgreSQL VM. 
+[Integrations](https://documentation.ubuntu.com/juju/3.6/reference/relation/), known as "relations" in Juju 2.9, are the easiest way to create a user for PostgreSQL in Charmed PostgreSQL VM. 
 
 Integrations automatically create a username, password, and database for the desired user/application. The best practice is to connect to PostgreSQL via a specific user rather than the admin user.
 

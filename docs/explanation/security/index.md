@@ -22,7 +22,7 @@ Charmed PostgreSQL can be deployed on top of several clouds and virtualisation l
 
 ### Juju
 
-Juju is the component responsible for orchestrating the entire lifecycle, from deployment to Day 2 operations. For more information on Juju security hardening, see the [Juju security page](https://canonical-juju.readthedocs-hosted.com/en/latest/user/explanation/juju-security/) and the [How to harden your deployment](https://juju.is/docs/juju/harden-your-deployment) guide.
+Juju is the component responsible for orchestrating the entire lifecycle, from deployment to Day 2 operations. For more information on Juju security hardening, see the [Juju security page](https://canonical-juju.readthedocs-hosted.com/en/latest/user/explanation/juju-security/) and the [How to harden your deployment](https://documentation.ubuntu.com/juju/latest/howto/manage-your-deployment/#harden-your-deployment) guide.
 
 #### Cloud credentials
 

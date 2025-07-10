@@ -61,7 +61,7 @@ Successfully exported charm bundle postgresql-bundle: /home/ubuntu/snap/store-ad
 </details>
 
 #### Snaps
-Usually charms require snaps (and some manually pin them). For the manual snap exports, follow the official Snap Store Proxy documentation: [Offline Charmhub configuration > Export snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#export-snap-resources). Data team is shipping the mapping [snap.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/) to the published [bundle.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/):
+Usually charms require snaps (and some manually pin them). For the manual snap exports, follow the official Snap Store Proxy documentation: [Offline Charmhub configuration > Export snap](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#export-snap-resources). Data team is shipping the mapping [snap.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/) to the published [bundle.yaml](https://github.com/canonical/postgresql-bundle/blob/main/releases/latest/):
 
 > **Warning**: always use snap.yaml and bundle.yaml from the same Git commit (to match each other)!
 
@@ -104,7 +104,7 @@ Always check [checksum](https://en.wikipedia.org/wiki/Checksum) for the transfer
 
 ### 3. Import snaps and charms
 
- Import the [snap](https://documentation.ubuntu.com/snap-store-proxy/en/airgap/#importing-pushing-snaps) and [charm](https://documentation.ubuntu.com/snap-store-proxy/en/airgap-charmhub/#import-packages) blobs into local air-gapped Charmhub:
+Import the [snap](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap/#importing-pushing-snaps) and [charm](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#import-packages) blobs into local air-gapped Charmhub:
 
 When importing machine charms that depend on a snap for functionality, you must first manually import the required snap.
 
@@ -114,7 +114,7 @@ sudo snap-store-proxy push-snap /var/snap/snap-store-proxy/common/snaps-to-push/
 sudo snap-store-proxy push-charm-bundle /var/snap/snap-store-proxy/common/charms-to-push/postgresql-bundle-20241003T104903.tar.gz
 ```
 
-When [re-importing](https://documentation.ubuntu.com/enterprise-store/main/how-to/airgap-charmhub/#import-packages) charms or importing other revisions, make sure to provide the `--push-channel-map`.
+When re-importing charms or importing other revisions, make sure to provide the `--push-channel-map`.
 
 ### 4. Deploy PostgreSQL
 

@@ -107,7 +107,7 @@ For this charm, the following events are observed:
 
 1. [`on_install`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#install): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
 2. [`leader-elected`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-elected): generate all the secrets to bootstrap the cluster.
-3. [`leader-settings-changed`](https://juju.is/docs/sdk/leader-settings-changed-event): Handle the leader settings changed event.
+3. [`leader-settings-changed`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-settings-changed): Handle the leader settings changed event.
 4. [`start`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#start): Init/setting up the cluster node.
 5. [`config_changed`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#config-changed): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
 6. [`update-status`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status): Takes care of workload health checks.
@@ -119,11 +119,11 @@ For this charm, the following events are observed:
 
 [`src/charm.py`](https://github.com/canonical/postgresql-operator/blob/main/src/charm.py) is the default entry point for a charm and has the `PostgresqlOperatorCharm` Python class which inherits from `CharmBase`.
 
-`CharmBase` is the base class from which all Charms are formed, defined by [Ops](https://juju.is/docs/sdk/ops) (Python framework for developing charms). See more information in [Charm](https://juju.is/docs/sdk/constructs#charm).
+`CharmBase` is the base class from which all Charms are formed, defined by [Ops](https://ops.readthedocs.io/en/latest/) (Python framework for developing charms). See more information in the [Ops documentation for `CharmBase`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.CharmBase).
 
 The `__init__` method guarantees that the charm observes all events relevant to its operation and handles them.
 
-The VM and K8s charm flavours shares the codebase via [charm libraries](https://juju.is/docs/sdk/libraries) in [lib/charms/postgresql_k8s/v0/](https://github.com/canonical/postgresql-k8s-operator/blob/main/lib/charms/postgresql_k8s/v0/postgresql.py) (of K8s flavour of the charm!):
+The VM and K8s charm flavours shares the codebase via charm libraries in [`lib/charms/postgresql_k8s/v0/`](https://github.com/canonical/postgresql-k8s-operator/blob/main/lib/charms/postgresql_k8s/v0/postgresql.py) (of K8s flavour of the charm!):
 ```text
 > charmcraft list-lib postgresql-k8s                                                                                                                                                                                                               
 Library name    API    Patch                                                                                                                                                                                                                          

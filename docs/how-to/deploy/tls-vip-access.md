@@ -32,7 +32,7 @@ This setup deploys the following components:
 * The [`postgresql`](https://charmhub.io/postgresql) charm (3 units, as a single cluster).
 * The [`self-signed-certificates`](https://charmhub.io/self-signed-certificates) charm as the TLS provider. 
   * Note that this is not suitable for production deployments. See the guide: [Security with X.509 certificates](https://charmhub.io/topics/security-with-x-509-certificates).
-* The [`data-integrator`](https://charmhub.io/data-integrator) charm as a [principal](https://juju.is/docs/sdk/charm-taxonomy#principal-charms) charm for the [subordinated](https://juju.is/docs/sdk/charm-taxonomy#subordinate-charms) charms below (3 units for high availability):
+* The [`data-integrator`](https://charmhub.io/data-integrator) charm as a [principal](https://documentation.ubuntu.com/juju/3.6/reference/charm/#principal) charm for the [subordinated](https://documentation.ubuntu.com/juju/3.6/reference/charm/#subordinate) charms below (3 units for high availability):
   * The latest [`pgbouncer`](https://charmhub.io/pgbouncer?channel=1/stable) charm as a load-balancer and connection pooler (3 units).
   * The [`hacluster`](https://charmhub.io/hacluster) charm for VIP handling (3 units are the minimum for HA).
   * (optional) The COS [`grafana-agent`](https://charmhub.io/grafana-agent) charm for Monitoring purposes.

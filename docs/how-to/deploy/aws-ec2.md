@@ -185,7 +185,7 @@ From here you can [use/scale/backup/restore/refresh](/tutorial/index) your newly
 
 ## Expose database (optional)
 
-If necessary to access DB from outside of AWS (warning: [opening ports to public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications)) open the AWS firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
+If necessary to access DB from outside of AWS (warning: opening ports to public is risky) open the AWS firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
 ```text
 juju expose postgresql
 ```

@@ -2,7 +2,7 @@
 
 This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release.
 
-To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://juju.is/docs/juju/channel#risk).
+To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk).
 
 To see all releases and commits, check the [Charmed PostgreSQL Releases page on GitHub](https://github.com/canonical/postgresql-operator/releases).
 
