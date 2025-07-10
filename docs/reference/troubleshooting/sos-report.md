@@ -7,7 +7,7 @@ You can use the [built-in version of SoS](#use-built-in-sos-recommended), or [re
 ```{caution}
 Always review the collected data before sharing it! 
 
-The generated archive may contain sensitive data. Its content should be reviewed by the originating organization before being passed to any third party.
+The generated archive may contain sensitive data. Its content should be reviewed by the originating organisation before being passed to any third party.
 ```
 
 ## Use built-in SoS (recommended)
@@ -33,7 +33,7 @@ Your sos report has been generated and saved in:
 ...
 ```
 
-Use `juju scp` to copy logs from Juju unit to localhost:
+Use `juju scp` to copy logs from Juju unit to `localhost`:
 ```text
 juju scp postgresql/0:/tmp/sosreport-juju-d4c067-1-2025-04-07-chdmwlz.tar.xz .
 ```
@@ -56,7 +56,7 @@ For more information on Canonical visit:
         Commercial Support : https://www.canonical.com
 
 The generated archive may contain data considered sensitive and its
-content should be reviewed by the originating organization before being
+content should be reviewed by the originating organisation before being
 passed to any third party.
 
 No changes will be made to system configuration.
@@ -92,16 +92,16 @@ juju scp postgresql/0:/tmp/sosreport-juju-d4c067-1-2025-04-07-qntyqpz.tar.xz .
 
 ### Collect logs from several units
 
-The sos tool allows you to collect logs from several Juju units (replace <UNIT_A/B/...> labels with proper Juju unit like `postgresql/0`).
+The SoS tool allows you to collect logs from several Juju units (replace <UNIT_A/B/...> labels with proper Juju unit like `postgresql/0`).
 
 Run the following command from outside the Juju units:
 ```text
 sos collect --cluster-type juju --no-local -c "juju.units=<UNIT_A>,<UNIT_B>,<...>" --batch -o system,systemd,snap,charmed_postgresql --low-priority
 ```
 
-## Use the latest sos plugins from Git
+## Use the latest SoS plugins from Git
 
-The latest version of [sos plugins](https://github.com/sosreport/sos/tree/main/sos/report/plugins) can be retrieved from Git easily:
+The latest version of [SoS plugins](https://github.com/sosreport/sos/tree/main/sos/report/plugins) can be retrieved from Git easily:
 ```text
 git clone https://github.com/sosreport/sos.git
 cd sos

@@ -53,7 +53,7 @@ created key [aaaaaaa....aaaaaaa] of type [json] as [sa-private-key.json] for [ju
 
 ## Bootstrap Juju controller on GCE
 
-Move the newly exported GCloud json file into a snap-accessible folder due to a known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
+Move the newly exported GCloud JSON file into a snap-accessible folder due to a known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
 
 
 ```text
@@ -263,7 +263,7 @@ Remove GCloud credentials from Juju:
 > juju remove-credential google juju-gce-account
 ```
 
-Finally, remove GCloud jsonfile user credentials (to avoid forgetting and leaking):
+Finally, remove GCloud JSON file user credentials (to avoid forgetting and leaking):
 ```text
 rm -f /var/snap/juju/common/sa-private-key.json
 ```

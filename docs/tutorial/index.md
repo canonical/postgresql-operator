@@ -188,7 +188,7 @@ You can see below the output for the list of databases. `postgres` is the defaul
 (3 rows)
 ```
 
-In order to execute queries, we should enter psql's interactive terminal by running the following command, again typing password when requested:
+In order to execute queries, we should enter the `psql` interactive terminal by running the following command, again typing password when requested:
 
 ```text
  psql --host=10.1.110.80 --username=operator --password postgres

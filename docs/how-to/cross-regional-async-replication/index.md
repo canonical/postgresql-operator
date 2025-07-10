@@ -4,7 +4,7 @@ Cross-regional (or multi-server) asynchronous replication focuses on disaster re
 
 ## Prerequisites
 * Juju `v.3.4.2+`
-* Make sure your machine(s) fulfill the [system requirements](/reference/system-requirements)
+* Make sure your machine(s) fulfil the [system requirements](/reference/system-requirements)
 
 ### Substrate dependencies
 

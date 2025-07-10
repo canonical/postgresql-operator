@@ -6,7 +6,7 @@
 ## Set up Juju and Azure tooling
 
 ```{caution}
-The `Azure interactive` method (with web browser authentication `service-principal-secret-via-browser`) described here is only supported starting Juju 3.6-rc1+!
+The `Azure interactive` method (with web browser authentication `service-principal-secret-via-browser`) described here is only supported starting Juju `3.6-rc1+`!
 ```
 
 ### Install Juju and Azure CLI

@@ -5,24 +5,32 @@
 This guide goes through the steps for setting up Sunbeam and deploying Charmed PostgreSQL. 
 
 ## Prerequisites
+
+This guide assumes you have:
+
 * A physical or virtual machine running Ubuntu 22.04+
-  * If you'd like to follow this guide in an isolated test environment, you can use [Multipass](https://documentation.ubuntu.com/multipass/en/latest/).
+  * If you'd like to follow this guide in an isolated test environment, you can launch a [Multipass](https://documentation.ubuntu.com/multipass/en/latest/) instance.
 * Hardware requirements depend on planned deployment size.
   * Recommended: 8 CPU cores, 32GB RAM, 100GB of storage
   * Minimum: See the requirements listed in the [Sunbeam documentation][Single-node guided]
+* Juju 3 (`3.6+` is recommended)
+  * See: [How to install Juju](https://documentation.ubuntu.com/juju/3.6/howto/manage-juju/#install-juju)
 
 ## Install and bootstrap Sunbeam
+
 Follow the official OpenStack guide: [Single-node deployment][Single-node guided]. 
 
-Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual fqdn fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
+Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual {spellexception}`fqdn` fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
 
 ## Enable OpenStack images auto-sync
+
 Follow the official [Images Sync] guide to enable auto-sync and wait for the image `22.04` to be downloaded.
 
 ## Set up Juju inside an OpenStack bastion
+
 Follow the MicroStack guide [Manage workloads with Juju] from the beginning, and stop after the section "Create a Juju controller". 
 
-To summarize, the relevant sections are:
+To summarise, the relevant sections are:
 * Set up the bastion
 * Install and configure the Juju client
 * Create a Juju controller 
@@ -32,7 +40,7 @@ To summarize, the relevant sections are:
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
 ```text
 juju add-model postgresql
-juju deploy postgresql --channel 16/stable --base ubuntu@22.04 -n 3
+juju deploy postgresql --channel 16/edge --base ubuntu@22.04 -n 3
 ```
 
 Sample output of `juju status --watch 1s`:
@@ -41,7 +49,7 @@ Model       Controller     Cloud/Region       Version  SLA          Timestamp
 postgresql  my-controller  sunbeam/RegionOne  3.5.4    unsupported  19:42:44Z
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  14.12    active      3  postgresql  14/stable  468  no       
+postgresql  16    active      3  postgresql     16/edge    468  no       
 
 Unit           Workload  Agent  Machine  Public address   Ports     Message
 postgresql/0*  active    idle   0        192.168.122.211  5432/tcp  Primary
@@ -54,7 +62,8 @@ Machine  State    Address          Inst id                               Base   
 2        started  192.168.122.14   6f9ad7cd-2a9d-435e-a6d8-3e39bf2218cd  ubuntu@22.04  nova  ACTIVE
 ```
 
-## (Optional) Access the OpenStack dashboard 
+## (Optional) Access the OpenStack dashboard
+
 Follow the official guide: [Accessing the OpenStack dashboard].
 
 ````{note}

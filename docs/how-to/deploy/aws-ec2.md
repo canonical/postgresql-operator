@@ -10,7 +10,7 @@ sudo snap install juju
 ```
 
 Follow the installation guides for:
-* [AWs CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) - the Amazon Web Services CLI
+* [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) - the Amazon Web Services CLI
 
 To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
 

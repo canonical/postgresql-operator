@@ -1,6 +1,6 @@
 # How to enable LDAP authentication
 
-The Lightweight Directory Access Protocol (LDAP) enables centralized authentication for PostgreSQL clusters, reducing the overhead of managing local credentials and access policies.
+The Lightweight Directory Access Protocol (LDAP) enables centralised authentication for PostgreSQL clusters, reducing the overhead of managing local credentials and access policies.
 
 This guide goes over the steps to integrate LDAP as an authentication method with the PostgreSQL charm, all within the Juju ecosystem.
 
@@ -107,7 +107,7 @@ juju integrate postgresql:receive-ca-cert send-ca-cert
 
 ## Map LDAP users to PostgreSQL
 
-To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorization groups. To create those groups before hand, refer to the [Data Integrator charm](https://charmhub.io/data-integrator).
+To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorisation groups. To create those groups before hand, refer to the [Data Integrator charm](https://charmhub.io/data-integrator).
 
 ```text
 juju config postgresql ldap_map="<ldap_group>=<psql_group>"
