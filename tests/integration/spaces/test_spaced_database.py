@@ -7,7 +7,6 @@ from time import sleep
 
 import jubilant
 import pytest
-from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 PG_NAME = "postgresql"
 APP_NAME = "postgresql-test-app"
@@ -89,7 +88,6 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")
     sleep(SLEEP_TIME)
     # Wait for the relation to be established
-    msg = "received database credentials of the first database"
     juju.wait(
         lambda status: jubilant.all_active(status, PG_NAME, ISOLATED_APP_NAME), delay=SLEEP_TIME
     )
