@@ -409,6 +409,71 @@ def test_stop_database():
         assert mock_charm._peers.data[mock_app].get("cluster_initialised") == ""
         assert mock_charm._peers.data[mock_unit].get("stopped") == "True"
 
+def test__configure_primary_cluster():
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm.app = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    result = relation._configure_primary_cluster(None,mock_event)
+    assert result is False
+
+    # 2.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm.app = MagicMock()
+    mock_charm.unit.is_leader.return_value = False
+    mock_charm.update_config = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation.is_primary_cluster = MagicMock(return_value=False)
+    result = relation._configure_primary_cluster(mock_charm.app,mock_event)
+    mock_charm.update_config.assert_called_once()
+    assert result is True
+
+    # 3. 
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm.app = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.update_config = MagicMock()
+    #mock_charm._update_primary_cluster_data = MagicMock()
+    mock_charm._patroni.get_standby_leader.return_value = True
+    mock_charm._patroni.promote_standby_cluster = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation.is_primary_cluster = MagicMock(return_value=True)
+
+    relation._update_primary_cluster_data = MagicMock()
+
+    result = relation._configure_primary_cluster(mock_charm.app,mock_event)
+
+    mock_charm.update_config.assert_called_once()
+    relation._update_primary_cluster_data.assert_called_once()
+    mock_charm._patroni.promote_standby_cluster()
+    assert result is True
+
+    # 4. 
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm.app = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm.update_config = MagicMock()
+    mock_charm._patroni.get_standby_leader.return_value = None
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation.is_primary_cluster = MagicMock(return_value=True)
+
+    relation._update_primary_cluster_data = MagicMock()
+
+    result = relation._configure_primary_cluster(mock_charm.app,mock_event)
+
+    mock_charm.update_config.assert_called_once()
+    relation._update_primary_cluster_data.assert_called_once()
+    assert result is True
+
+
 
 # def test_stop_database_non_leader_no_data_path():
 #     """Test _stop_database when non-leader unit has no data path"""
