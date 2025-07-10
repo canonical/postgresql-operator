@@ -1,239 +1,796 @@
 #!/usr/bin/env python3
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
-
-import asyncio
 import logging
 
+import jubilant
 import psycopg2
-import psycopg2.sql
-import pytest
-from pytest_operator.plugin import OpsTest
-from tenacity import Retrying, stop_after_delay, wait_fixed
+import pytest as pytest
+from psycopg2.sql import (
+    SQL,
+    Identifier,
+)
 
 from .helpers import (
-    CHARM_BASE,
     DATA_INTEGRATOR_APP_NAME,
     DATABASE_APP_NAME,
+    check_connected_user,
     db_connect,
+)
+from .jubilant_helpers import (
+    RoleAttributeValue,
+    get_credentials,
     get_password,
     get_primary,
     get_unit_address,
-)
-from .new_relations.helpers import (
-    build_connection_string,
-    get_application_relation_data,
-    get_juju_secret,
+    relations,
+    roles_attributes,
 )
 
 logger = logging.getLogger(__name__)
 
+OTHER_DATABASE_NAME = "other-database"
+REQUESTED_DATABASE_NAME = "requested-database"
+RELATION_ENDPOINT = "postgresql"
+ROLE_BACKUP = "charmed_backup"
+ROLE_DBA = "charmed_dba"
+ROLE_DATABASES_OWNER = "charmed_databases_owner"
+NO_CATALOG_LEVEL_ROLES_DATABASES = [OTHER_DATABASE_NAME, "postgres", "template1"]
 TIMEOUT = 15 * 60
 
-# NOTE: We are unable to test set_user_u('operator') as dba user because psycopg2
-# runs every query in a transaction and running set_user() is not supported in transactions.
-
 
 @pytest.mark.abort_on_fail
-@pytest.mark.skip_if_deployed
-async def test_deploy(ops_test: OpsTest, charm: str):
-    """Deploy the postgresql charm."""
-    async with ops_test.fast_forward("10s"):
-        await asyncio.gather(
-            ops_test.model.deploy(
-                charm,
-                application_name=DATABASE_APP_NAME,
-                num_units=2,
-                base=CHARM_BASE,
-                config={"profile": "testing"},
-            ),
-            ops_test.model.deploy(
+def test_deploy(juju: jubilant.Juju, charm, predefined_roles_combinations) -> None:
+    """Deploy and relate the charms."""
+    # Deploy the database charm if not already deployed.
+    if DATABASE_APP_NAME not in juju.status().apps:
+        logger.info("Deploying database charm")
+        juju.deploy(
+            charm,
+            config={"profile": "testing"},
+            num_units=1,
+        )
+
+    combinations = [*predefined_roles_combinations, (ROLE_BACKUP,), (ROLE_DBA,)]
+    for combination in combinations:
+        # Define an application name suffix and a database name based on the combination
+        # of predefined roles.
+        suffix = (
+            f"-{'-'.join(combination)}".replace("_", "-").lower()
+            if "-".join(combination) != ""
+            else ""
+        )
+        database_name = f"{REQUESTED_DATABASE_NAME}{suffix}"
+
+        # Deploy the data integrator charm for each combination of predefined roles.
+        data_integrator_app_name = f"{DATA_INTEGRATOR_APP_NAME}{suffix}"
+        extra_user_roles = (
+            "" if combination[0] in [ROLE_BACKUP, ROLE_DBA] else ",".join(combination)
+        )
+        if data_integrator_app_name not in juju.status().apps:
+            logger.info(
+                f"Deploying data integrator charm {'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'}"
+            )
+            juju.deploy(
                 DATA_INTEGRATOR_APP_NAME,
-                base=CHARM_BASE,
-            ),
-            ops_test.model.deploy(
-                DATA_INTEGRATOR_APP_NAME,
-                application_name=f"{DATA_INTEGRATOR_APP_NAME}2",
-                base=CHARM_BASE,
-            ),
+                app=data_integrator_app_name,
+                config={"database-name": database_name, "extra-user-roles": extra_user_roles},
+            )
+
+        # Relate the data integrator charm to the database charm.
+        existing_relations = relations(juju, DATABASE_APP_NAME, data_integrator_app_name)
+        if not existing_relations:
+            logger.info("Adding relation between charms")
+            juju.integrate(data_integrator_app_name, DATABASE_APP_NAME)
+
+    juju.wait(lambda status: jubilant.all_active(status), timeout=TIMEOUT)
+
+
+def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C901
+    """Check that the data integrator user can perform the expected operations in each database."""
+    primary = get_primary(juju, f"{DATABASE_APP_NAME}/0")
+    host = get_unit_address(juju, primary)
+    operator_password = get_password()
+    connection = None
+    cursor = None
+    try:
+        connection = db_connect(host, operator_password)
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute(f'DROP DATABASE IF EXISTS "{OTHER_DATABASE_NAME}";')
+        cursor.execute(f'CREATE DATABASE "{OTHER_DATABASE_NAME}";')
+        cursor.execute("SELECT datname FROM pg_database WHERE datname != 'template0';")
+        databases = []
+        for database in sorted(database[0] for database in cursor.fetchall()):
+            if database.startswith(f"{OTHER_DATABASE_NAME}-"):
+                logger.info(f"Dropping database {database} created by the test")
+                cursor.execute(SQL("DROP DATABASE {};").format(Identifier(database)))
+            else:
+                databases.append(database)
+                sub_connection = None
+                try:
+                    sub_connection = db_connect(host, operator_password, database=database)
+                    sub_connection.autocommit = True
+                    with sub_connection.cursor() as sub_cursor:
+                        sub_cursor.execute("SELECT schema_name FROM information_schema.schemata;")
+                        for schema in sub_cursor.fetchall():
+                            schema_name = schema[0]
+                            if schema_name.startswith("relation-") and schema_name.endswith(
+                                "_schema"
+                            ):
+                                logger.info(f"Dropping schema {schema_name} created by the test")
+                                sub_cursor.execute(
+                                    SQL("DROP SCHEMA {} CASCADE;").format(Identifier(schema_name))
+                                )
+                        sub_cursor.execute(
+                            "SELECT table_name FROM information_schema.tables WHERE table_schema = 'public';"
+                        )
+                        for table in sub_cursor.fetchall():
+                            table_name = table[0]
+                            if table_name.startswith("test_table_"):
+                                logger.info(f"Dropping table {table_name} created by the test")
+                                sub_cursor.execute(
+                                    SQL("DROP TABLE public.{} CASCADE;").format(
+                                        Identifier(table_name)
+                                    )
+                                )
+                finally:
+                    if sub_connection is not None:
+                        sub_connection.close()
+        logger.info(f"Databases to test: {databases}")
+    finally:
+        if cursor is not None:
+            cursor.close()
+        if connection is not None:
+            connection.close()
+
+    # Create a schema in the other database to update the pg_hba rules immediately.
+    connection = None
+    try:
+        with db_connect(host, operator_password, database=OTHER_DATABASE_NAME) as connection:
+            connection.autocommit = True
+            with connection.cursor() as cursor:
+                logger.info(f"Creating schema in database {OTHER_DATABASE_NAME}")
+                cursor.execute(f'CREATE SCHEMA "{OTHER_DATABASE_NAME}";')
+    finally:
+        if connection is not None:
+            connection.close()
+
+    data_integrator_apps = [
+        app for app in juju.status().apps if app.startswith(DATA_INTEGRATOR_APP_NAME)
+    ]
+    for data_integrator_app_name in data_integrator_apps:
+        credentials = get_credentials(juju, f"{data_integrator_app_name}/0")
+        user = credentials["postgresql"]["username"]
+        password = credentials["postgresql"]["password"]
+        database = credentials["postgresql"]["database"]
+        config = juju.config(app=data_integrator_app_name)
+        logger.info(f"Config for {data_integrator_app_name}: {config}")
+        if data_integrator_app_name.endswith(ROLE_BACKUP.replace("_", "-")):
+            connection = None
+            try:
+                with db_connect(host, operator_password) as connection:
+                    connection.autocommit = True
+                    with connection.cursor() as cursor:
+                        logger.info(
+                            f"Granting {ROLE_BACKUP} role to {user} user to correctly check that role permissions"
+                        )
+                        cursor.execute(
+                            SQL("GRANT {} TO {};").format(
+                                Identifier(ROLE_BACKUP), Identifier(user)
+                            )
+                        )
+                        cursor.execute(
+                            SQL("REVOKE {} FROM {};").format(
+                                Identifier(f"charmed_{database}_dml"), Identifier(user)
+                            )
+                        )
+                        cursor.execute(
+                            SQL("REVOKE {} FROM {};").format(
+                                Identifier(f"charmed_{database}_admin"), Identifier(user)
+                            )
+                        )
+                        for system_database in ["postgres", "template1"]:
+                            cursor.execute(
+                                SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                                    Identifier(system_database), Identifier(user)
+                                )
+                            )
+            finally:
+                if connection is not None:
+                    connection.close()
+
+            extra_user_roles = ROLE_BACKUP
+        elif data_integrator_app_name.endswith(ROLE_DBA.replace("_", "-")):
+            connection = None
+            try:
+                with db_connect(host, operator_password) as connection:
+                    connection.autocommit = True
+                    with connection.cursor() as cursor:
+                        logger.info(
+                            f"Granting {ROLE_DBA} role to {user} user to correctly check that role permissions"
+                        )
+                        cursor.execute(
+                            SQL("GRANT {} TO {};").format(Identifier(ROLE_DBA), Identifier(user))
+                        )
+                        cursor.execute(
+                            SQL("REVOKE {} FROM {};").format(
+                                Identifier(f"charmed_{database}_dml"), Identifier(user)
+                            )
+                        )
+                        cursor.execute(
+                            SQL("REVOKE {} FROM {};").format(
+                                Identifier(f"charmed_{database}_admin"), Identifier(user)
+                            )
+                        )
+                        for system_database in ["postgres", "template1"]:
+                            cursor.execute(
+                                SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                                    Identifier(system_database), Identifier(user)
+                                )
+                            )
+            finally:
+                if connection is not None:
+                    connection.close()
+
+            extra_user_roles = ROLE_DBA
+        else:
+            extra_user_roles = config.get("extra-user-roles", "")
+        logger.info(
+            f"User is {user}, database is {database}, extra user roles are '{extra_user_roles}'"
         )
+        attributes = roles_attributes(predefined_roles, extra_user_roles)
+        logger.info(f"Attributes for user {user}: '{attributes}'")
+        message_prefix = f"Checking that {user} user ({'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'})"
+        for database_to_test in databases:
+            connection = None
+            cursor = None
+            operator_connection = None
+            operator_cursor = None
+            try:
+                connect_permission = attributes["permissions"]["connect"]
+                run_backup_commands_permission = attributes["permissions"]["run-backup-commands"]
+                set_user_permission = attributes["permissions"]["set-user"]
+                if (
+                    connect_permission == RoleAttributeValue.ALL_DATABASES
+                    or (
+                        connect_permission == RoleAttributeValue.REQUESTED_DATABASE
+                        and database_to_test == database
+                    )
+                    or database_to_test == OTHER_DATABASE_NAME
+                ):
+                    logger.info(f"{message_prefix} can connect to {database_to_test} database")
+                    connection = db_connect(
+                        host, password, username=user, database=database_to_test
+                    )
+                    connection.autocommit = True
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_database();")
+                        assert cursor.fetchone()[0] == database_to_test
+                else:
+                    logger.info(f"{message_prefix} can't connect to {database_to_test} database")
+                    with pytest.raises(psycopg2.OperationalError):
+                        db_connect(host, password, username=user, database=database_to_test)
 
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=TIMEOUT
-        )
-        assert ops_test.model.applications[DATABASE_APP_NAME].units[0].workload_status == "active"
+                if connection is not None:
+                    auto_escalate_to_database_owner = attributes["auto-escalate-to-database-owner"]
+                    database_owner_user = f"charmed_{database_to_test}_owner"
+                    with connection, connection.cursor() as cursor:
+                        if (
+                            auto_escalate_to_database_owner == RoleAttributeValue.ALL_DATABASES
+                            and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                        ) or (
+                            auto_escalate_to_database_owner
+                            == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        ):
+                            logger.info(
+                                f"{message_prefix} auto escalates to {database_owner_user}"
+                            )
+                            check_connected_user(cursor, user, database_owner_user)
+                        else:
+                            logger.info(
+                                f"{message_prefix} doesn't auto escalate to {database_owner_user}"
+                            )
+                            check_connected_user(cursor, user, user)
 
-        await ops_test.model.wait_for_idle(
-            apps=[DATA_INTEGRATOR_APP_NAME, f"{DATA_INTEGRATOR_APP_NAME}2"],
-            status="blocked",
-            timeout=(5 * 60),
-        )
+                    # Test escalation to the database owner user.
+                    escalate_to_database_owner_permission = attributes["permissions"][
+                        "escalate-to-database-owner"
+                    ]
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_user;")
+                        previous_current_user = cursor.fetchone()[0]
+                        cursor.execute("RESET ROLE;")
+                        check_connected_user(cursor, user, user)
+                    if (
+                        escalate_to_database_owner_permission == RoleAttributeValue.ALL_DATABASES
+                        and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                    ) or (
+                        escalate_to_database_owner_permission
+                        == RoleAttributeValue.REQUESTED_DATABASE
+                        and database_to_test == database
+                    ):
+                        logger.info(f"{message_prefix} can escalate to {database_owner_user}")
+                        with connection.cursor() as cursor:
+                            cursor.execute(
+                                SQL("SET ROLE {};").format(Identifier(database_owner_user))
+                            )
+                            check_connected_user(cursor, user, database_owner_user)
+                    elif (
+                        database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                    ):  # Because there is not charmed_database_owner role in those databases.
+                        logger.info(f"{message_prefix} can't escalate to {database_owner_user}")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(
+                                SQL("SET ROLE {};").format(Identifier(database_owner_user))
+                            )
+                    with connection.cursor() as cursor:
+                        cursor.execute("SELECT current_user;")
+                        current_user = cursor.fetchone()[0]
+                        if current_user != previous_current_user:
+                            cursor.execute(
+                                SQL("SET ROLE {};").format(Identifier(previous_current_user))
+                            )
 
+                    # Test objects creation.
+                    create_objects_permission = attributes["permissions"]["create-objects"]
+                    schema_name = f"{user}_schema"
+                    create_schema_statement = SQL("CREATE SCHEMA {};").format(
+                        Identifier(schema_name)
+                    )
+                    create_table_statement = SQL("CREATE TABLE {}.test_table(value TEXT);").format(
+                        Identifier(schema_name)
+                    )
+                    create_table_in_public_schema_statement = SQL(
+                        "CREATE TABLE public.{}(value TEXT);"
+                    ).format(Identifier(f"test_table_{user}"))
+                    create_view_statement = SQL(
+                        "CREATE VIEW {}.test_view AS SELECT * FROM {}.test_table;"
+                    ).format(Identifier(schema_name), Identifier(schema_name))
+                    create_view_in_public_schema_statement = SQL(
+                        "CREATE VIEW public.{} AS SELECT * FROM public.{};"
+                    ).format(Identifier(f"test_view_{user}"), Identifier(f"test_table_{user}"))
+                    if (
+                        (
+                            create_objects_permission == RoleAttributeValue.ALL_DATABASES
+                            and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                        )
+                        or (
+                            create_objects_permission == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                        or (
+                            escalate_to_database_owner_permission
+                            == RoleAttributeValue.ALL_DATABASES
+                            and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                        )
+                        or (
+                            escalate_to_database_owner_permission
+                            == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                    ):
+                        with connection.cursor() as cursor:
+                            if (
+                                (
+                                    escalate_to_database_owner_permission
+                                    == RoleAttributeValue.REQUESTED_DATABASE
+                                    and database_to_test == database
+                                )
+                                or escalate_to_database_owner_permission
+                                == RoleAttributeValue.ALL_DATABASES
+                            ) and auto_escalate_to_database_owner == RoleAttributeValue.NO:
+                                cursor.execute(
+                                    SQL("SET ROLE {};").format(Identifier(database_owner_user))
+                                )
+                            logger.info(f"{message_prefix} can create schemas")
+                            cursor.execute(create_schema_statement)
+                            logger.info(f"{message_prefix} can create tables")
+                            cursor.execute(create_table_statement)
+                            logger.info(f"{message_prefix} can create tables in public schema")
+                            cursor.execute(create_table_in_public_schema_statement)
+                            logger.info(f"{message_prefix} can create view")
+                            cursor.execute(create_view_statement)
+                            logger.info(f"{message_prefix} can create views in public schema")
+                            cursor.execute(create_view_in_public_schema_statement)
+                    else:
+                        operator_connection = db_connect(
+                            host, operator_password, database=database_to_test
+                        )
+                        operator_connection.autocommit = True
+                        operator_cursor = operator_connection.cursor()
 
-@pytest.mark.abort_on_fail
-async def test_charmed_read_role(ops_test: OpsTest):
-    """Test the charmed_read predefined role."""
-    await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
-        "database-name": "charmed_read_database",
-        "extra-user-roles": "charmed_read",
-    })
-    await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-    await ops_test.model.wait_for_idle(
-        apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
-    )
+                        logger.info(f"{message_prefix} can't create schemas")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_schema_statement)
+                        operator_cursor.execute(create_schema_statement)
 
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    primary_address = get_unit_address(ops_test, primary)
-    operator_password = await get_password(ops_test, "operator")
+                        logger.info(f"{message_prefix} can't create tables")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_table_statement)
+                        operator_cursor.execute(create_table_statement)
 
-    with db_connect(
-        primary_address, operator_password, username="operator", database="charmed_read_database"
-    ) as connection:
-        connection.autocommit = True
+                        logger.info(f"{message_prefix} can't create tables in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_table_in_public_schema_statement)
+                        operator_cursor.execute(create_table_in_public_schema_statement)
 
-        with connection.cursor() as cursor:
-            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
-            cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
+                        logger.info(f"{message_prefix} can't create views")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_view_statement)
+                        operator_cursor.execute(create_view_statement)
 
-    connection_string = await build_connection_string(
-        ops_test,
-        DATA_INTEGRATOR_APP_NAME,
-        "postgresql",
-        database="charmed_read_database",
-    )
+                        logger.info(f"{message_prefix} can't create views in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_view_in_public_schema_statement)
+                        operator_cursor.execute(create_view_in_public_schema_statement)
 
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
+                        operator_cursor.close()
+                        operator_cursor = None
+                        operator_connection.close()
+                        operator_connection = None
 
-        with connection.cursor() as cursor:
-            logger.info("Checking that the charmed_read role can read from the database")
-            cursor.execute("RESET ROLE;")
-            cursor.execute(
-                "SELECT table_name FROM information_schema.tables WHERE table_name NOT LIKE 'pg_%' AND table_name NOT LIKE 'sql_%' AND table_type <> 'VIEW';"
-            )
-            tables = [row[0] for row in cursor.fetchall()]
-            assert tables == ["test_table"], "Unexpected tables in the database"
+                    # Test write permissions.
+                    write_data_permission = attributes["permissions"]["write-data"]
+                    insert_statement = SQL("INSERT INTO {}.test_table VALUES ('test');").format(
+                        Identifier(schema_name)
+                    )
+                    update_statement = SQL(
+                        "UPDATE {}.test_table SET value = 'updated' WHERE value = 'test';"
+                    ).format(Identifier(schema_name))
+                    delete_statement = SQL(
+                        "DELETE FROM {}.test_table WHERE value = 'updated';"
+                    ).format(Identifier(schema_name))
+                    insert_in_public_schema_statement = SQL(
+                        "INSERT INTO public.{} VALUES ('test');"
+                    ).format(Identifier(f"test_table_{user}"))
+                    if (
+                        write_data_permission == RoleAttributeValue.ALL_DATABASES
+                        or (
+                            write_data_permission == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                        or escalate_to_database_owner_permission
+                        == RoleAttributeValue.ALL_DATABASES
+                        or (
+                            escalate_to_database_owner_permission
+                            == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                    ):
+                        with connection.cursor() as cursor:
+                            logger.info(
+                                f"{message_prefix} can write to tables in {schema_name} schema"
+                            )
+                            if database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES and (
+                                (
+                                    (
+                                        escalate_to_database_owner_permission
+                                        == RoleAttributeValue.REQUESTED_DATABASE
+                                        and database_to_test == database
+                                    )
+                                    or escalate_to_database_owner_permission
+                                    == RoleAttributeValue.ALL_DATABASES
+                                )
+                                and auto_escalate_to_database_owner == RoleAttributeValue.NO
+                            ):
+                                cursor.execute(
+                                    SQL("SET ROLE {};").format(Identifier(database_owner_user))
+                                )
+                            cursor.execute(insert_statement)
+                            cursor.execute(update_statement)
+                            cursor.execute(delete_statement)
+                            logger.info(f"{message_prefix} can write to tables in public schema")
+                            cursor.execute(insert_in_public_schema_statement)
+                    else:
+                        logger.info(
+                            f"{message_prefix} can't write to tables in {schema_name} schema"
+                        )
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(insert_statement)
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(update_statement)
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(delete_statement)
+                        logger.info(f"{message_prefix} can't write to tables in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(insert_in_public_schema_statement)
 
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2"]), (
-                "Unexpected data in charmed_read_database with charmed_read role"
-            )
-            logger.info("Checking that the charmed_read role cannot create a new table")
-            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-                cursor.execute("CREATE TABLE test_table_2 (id INTEGER);")
-    connection.close()
+                    # Test read permissions.
+                    read_data_permission = attributes["permissions"]["read-data"]
+                    select_statement = SQL("SELECT * FROM {}.test_table;").format(
+                        Identifier(schema_name)
+                    )
+                    select_in_public_schema_statement = SQL("SELECT * FROM public.{};").format(
+                        Identifier(f"test_table_{user}")
+                    )
+                    select_view_statement = SQL("SELECT * FROM {}.test_view;").format(
+                        Identifier(schema_name)
+                    )
+                    select_view_in_public_schema_statement = SQL(
+                        "SELECT * FROM public.{};"
+                    ).format(Identifier(f"test_view_{user}"))
+                    if (
+                        read_data_permission == RoleAttributeValue.ALL_DATABASES
+                        or (
+                            read_data_permission == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                        or escalate_to_database_owner_permission
+                        == RoleAttributeValue.ALL_DATABASES
+                        or (
+                            escalate_to_database_owner_permission
+                            == RoleAttributeValue.REQUESTED_DATABASE
+                            and database_to_test == database
+                        )
+                    ):
+                        with connection.cursor() as cursor:
+                            if database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES and (
+                                (
+                                    (
+                                        escalate_to_database_owner_permission
+                                        == RoleAttributeValue.REQUESTED_DATABASE
+                                        and database_to_test == database
+                                    )
+                                    or escalate_to_database_owner_permission
+                                    == RoleAttributeValue.ALL_DATABASES
+                                )
+                                and auto_escalate_to_database_owner == RoleAttributeValue.NO
+                            ):
+                                cursor.execute(
+                                    SQL("SET ROLE {};").format(Identifier(database_owner_user))
+                                )
+                            logger.info(
+                                f"{message_prefix} can read from tables in {schema_name} schema"
+                            )
+                            cursor.execute(select_statement)
+                            logger.info(f"{message_prefix} can read from tables in public schema")
+                            cursor.execute(select_in_public_schema_statement)
+                            logger.info(
+                                f"{message_prefix} can read from views in {schema_name} schema"
+                            )
+                            cursor.execute(select_view_statement)
+                            logger.info(f"{message_prefix} can read from views in public schema")
+                            cursor.execute(select_view_in_public_schema_statement)
+                    else:
+                        logger.info(
+                            f"{message_prefix} can't read from tables in {schema_name} schema"
+                        )
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(select_statement)
+                        logger.info(f"{message_prefix} can't read from tables in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(select_in_public_schema_statement)
+                        logger.info(
+                            f"{message_prefix} can't read from views in {schema_name} schema"
+                        )
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(select_view_statement)
+                        logger.info(f"{message_prefix} can't read from views in public schema")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(select_view_in_public_schema_statement)
 
-    with psycopg2.connect(connection_string) as connection, connection.cursor() as cursor:
-        logger.info("Checking that the charmed_read role cannot write to an existing table")
-        cursor.execute("RESET ROLE;")
-        with pytest.raises(psycopg2.errors.InsufficientPrivilege):
-            cursor.execute(
-                "INSERT INTO test_table (data) VALUES ('test_data_3'), ('test_data_4');"
-            )
-    connection.close()
+                    if attributes["permissions"]["read-stats"] == RoleAttributeValue.ALL_DATABASES:
+                        logger.info(f"{message_prefix} can read stats")
+                        with connection.cursor() as cursor:
+                            cursor.execute("SELECT * FROM pg_stat_activity;")
+                    else:
+                        logger.info(f"{message_prefix} can't read stats")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute("SELECT * FROM pg_stat_activity;")
 
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
-    )
-    await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
+                    checkpoint_command = "CHECKPOINT;"
+                    backup_start_command = "SELECT pg_backup_start('test');"
+                    backup_stop_command = "SELECT pg_backup_stop();"
+                    create_restore_point_command = "SELECT pg_create_restore_point('test');"
+                    switch_wal_command = "SELECT pg_switch_wal();"
+                    if run_backup_commands_permission == RoleAttributeValue.YES:
+                        logger.info(f"{message_prefix} can run checkpoint command")
+                        with connection.cursor() as cursor:
+                            cursor.execute(checkpoint_command)
+                    else:
+                        logger.info(f"{message_prefix} can't run checkpoint command")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(checkpoint_command)
 
+                    if run_backup_commands_permission == RoleAttributeValue.YES:
+                        logger.info(f"{message_prefix} can run backup commands")
+                        with connection.cursor() as cursor:
+                            cursor.execute(backup_start_command)
+                            cursor.execute(backup_stop_command)
+                            cursor.execute(create_restore_point_command)
+                            cursor.execute(switch_wal_command)
+                    else:
+                        logger.info(f"{message_prefix} can't run backup commands")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(backup_start_command)
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(backup_stop_command)
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(create_restore_point_command)
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute(switch_wal_command)
 
-@pytest.mark.abort_on_fail
-async def test_charmed_dml_role(ops_test: OpsTest):
-    """Test the charmed_dml role."""
-    await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
-        "database-name": "charmed_dml_database",
-    })
-    await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-    await ops_test.model.wait_for_idle(
-        apps=[DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME], status="active"
-    )
+                    if (
+                        set_user_permission == RoleAttributeValue.YES
+                        and database_to_test not in NO_CATALOG_LEVEL_ROLES_DATABASES
+                    ):
+                        logger.info(f"{message_prefix} can call the set_user function")
+                        with connection.cursor() as cursor:
+                            cursor.execute("RESET ROLE;")
+                            cursor.execute("SELECT set_user('rewind'::TEXT);")
+                            check_connected_user(cursor, user, "rewind")
+                            cursor.execute("SELECT reset_user();")
+                            check_connected_user(cursor, user, user)
+                            cursor.execute("SELECT set_user_u('operator'::TEXT);")
+                            check_connected_user(cursor, user, "operator")
+                            cursor.execute("SELECT reset_user();")
+                            check_connected_user(cursor, user, user)
+                    else:
+                        logger.info(f"{message_prefix} can't call the set_user function")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute("RESET ROLE;")
+                            cursor.execute("SELECT set_user('rewind'::TEXT);")
+                        with (
+                            pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                            connection.cursor() as cursor,
+                        ):
+                            cursor.execute("RESET ROLE;")
+                            cursor.execute("SELECT set_user_u('operator'::TEXT);")
 
-    await ops_test.model.applications[f"{DATA_INTEGRATOR_APP_NAME}2"].set_config({
-        "database-name": "throwaway",
-        "extra-user-roles": "charmed_dml",
-    })
-    await ops_test.model.add_relation(f"{DATA_INTEGRATOR_APP_NAME}2", DATABASE_APP_NAME)
-    await ops_test.model.wait_for_idle(apps=[f"{DATA_INTEGRATOR_APP_NAME}2"], status="active")
+                    # Do the following operations only once.
+                    if database_to_test == database:
+                        # Test permission to call the set_up_predefined_catalog_roles function.
+                        statement = "SELECT set_up_predefined_catalog_roles();"
+                        if (
+                            attributes["permissions"]["set-up-predefined-catalog-roles"]
+                            == RoleAttributeValue.YES
+                        ):
+                            logger.info(
+                                f"{message_prefix} can call the set-up-predefined-catalog-roles function"
+                            )
+                            with connection.cursor() as cursor:
+                                cursor.execute(
+                                    SQL("SET ROLE {};").format(Identifier(ROLE_DATABASES_OWNER))
+                                )
+                                cursor.execute(statement)
+                        else:
+                            logger.info(
+                                f"{message_prefix} can't call the set-up-predefined-catalog-roles function"
+                            )
+                            with (
+                                pytest.raises(psycopg2.errors.InsufficientPrivilege),
+                                connection.cursor() as cursor,
+                            ):
+                                cursor.execute(statement)
 
-    connection_string = await build_connection_string(
-        ops_test,
-        DATA_INTEGRATOR_APP_NAME,
-        "postgresql",
-        database="charmed_dml_database",
-    )
+                        # Test database creation, change and removal.
+                        cursor = connection.cursor()
+                        new_database_name = f"{OTHER_DATABASE_NAME}-{user}"
+                        create_database_statement = SQL("CREATE DATABASE {};").format(
+                            Identifier(new_database_name)
+                        )
+                        first_alter_database_statement = SQL(
+                            "ALTER DATABASE {} RENAME TO {};"
+                        ).format(
+                            Identifier(new_database_name), Identifier(f"{new_database_name}-1")
+                        )
+                        second_alter_database_statement = SQL(
+                            "ALTER DATABASE {} RENAME TO {};"
+                        ).format(
+                            Identifier(f"{new_database_name}-1"), Identifier(new_database_name)
+                        )
+                        first_drop_database_statement = SQL("DROP DATABASE {};").format(
+                            Identifier(new_database_name)
+                        )
+                        second_drop_database_statement = SQL("DROP DATABASE {};").format(
+                            Identifier(OTHER_DATABASE_NAME)
+                        )
+                        if attributes["permissions"]["create-databases"] == RoleAttributeValue.YES:
+                            logger.info(f"{message_prefix} can create databases")
+                            cursor.execute(create_database_statement)
+                            logger.info(f"{message_prefix} can alter databases")
+                            cursor.execute(first_alter_database_statement)
+                            cursor.execute(second_alter_database_statement)
+                            logger.info(f"{message_prefix} can drop databases owned by the user")
+                            cursor.execute(first_drop_database_statement)
+                            logger.info(
+                                f"{message_prefix} can't drop databases not owned by the user"
+                            )
+                            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                                cursor.execute(second_drop_database_statement)
+                        else:
+                            logger.info(f"{message_prefix} can't create databases")
+                            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                                cursor.execute(create_database_statement)
 
-    with psycopg2.connect(connection_string) as connection:
-        connection.autocommit = True
+                            operator_connection = db_connect(
+                                host, operator_password, database=database_to_test
+                            )
+                            operator_connection.autocommit = True
+                            operator_cursor = operator_connection.cursor()
+                            operator_cursor.execute(create_database_statement)
+                            operator_cursor.close()
+                            operator_cursor = None
+                            operator_connection.close()
+                            operator_connection = None
 
-        with connection.cursor() as cursor:
-            cursor.execute("CREATE TABLE test_table (id SERIAL PRIMARY KEY, data TEXT);")
-
-            cursor.execute("INSERT INTO test_table (data) VALUES ('test_data'), ('test_data_2');")
-
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2"]), (
-                "Unexpected data in charmed_dml_database with charmed_dml role"
-            )
-
-    primary = await get_primary(ops_test, f"{DATABASE_APP_NAME}/0")
-    primary_address = get_unit_address(ops_test, primary)
-    operator_password = await get_password(ops_test, "operator")
-
-    secret_uri = await get_application_relation_data(
-        ops_test,
-        f"{DATA_INTEGRATOR_APP_NAME}2",
-        "postgresql",
-        "secret-user",
-    )
-    secret_data = await get_juju_secret(ops_test, secret_uri)
-    data_integrator_2_user = secret_data["username"]
-    data_integrator_2_password = secret_data["password"]
-
-    with db_connect(primary_address, operator_password, username="operator") as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            cursor.execute(
-                psycopg2.sql.SQL("GRANT connect ON DATABASE charmed_dml_database TO {};").format(
-                    psycopg2.sql.Identifier(data_integrator_2_user)
-                )
-            )
-
-    connection.close()
-    for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
-        with attempt:
-            connection = db_connect(
-                primary_address,
-                data_integrator_2_password,
-                username=data_integrator_2_user,
-                database="charmed_dml_database",
-            )
-    with connection.cursor() as cursor:
-        connection.autocommit = True
-        cursor.execute("INSERT INTO test_table (data) VALUES ('test_data_3');")
-    connection.close()
-
-    with db_connect(
-        primary_address, operator_password, username="operator", database="charmed_dml_database"
-    ) as connection:
-        connection.autocommit = True
-
-        with connection.cursor() as cursor:
-            cursor.execute("SELECT data FROM test_table;")
-            data = sorted([row[0] for row in cursor.fetchall()])
-            assert data == sorted(["test_data", "test_data_2", "test_data_3"]), (
-                "Unexpected data in charmed_read_database with charmed_read role"
-            )
-
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}:postgresql"
-    )
-    await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
-        f"{DATABASE_APP_NAME}:database", f"{DATA_INTEGRATOR_APP_NAME}2:postgresql"
-    )
-    await ops_test.model.wait_for_idle(
-        apps=[DATA_INTEGRATOR_APP_NAME, f"{DATA_INTEGRATOR_APP_NAME}2"], status="blocked"
-    )
+                            logger.info(f"{message_prefix} can't alter databases")
+                            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                                cursor.execute(first_alter_database_statement)
+                            logger.info(f"{message_prefix} can't drop databases")
+                            with pytest.raises(psycopg2.errors.InsufficientPrivilege):
+                                cursor.execute(first_drop_database_statement)
+            finally:
+                if cursor is not None:
+                    cursor.close()
+                if connection is not None:
+                    connection.close()
+                if operator_cursor is not None:
+                    operator_cursor.close()
+                if operator_connection is not None:
+                    operator_connection.close()
