@@ -459,4 +459,15 @@ def test__configure_primary_cluster():
 
 
 def test__on_async_relation_departed():
-    pass
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_peers = MagicMock()
+
+    mock_event.departing_unit = MagicMock()
+    mock_charm.unit = mock_event.departing_unit
+    mock_charm._peers = mock_peers
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    result = relation._on_async_relation_departed(mock_event)
+    assert result is None  
