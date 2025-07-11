@@ -97,12 +97,12 @@ def check_for_database_changes(run_cmd, unit, charm_dir, previous_databases):
         password = conf_file_contents["postgresql"]["authentication"]["superuser"]["password"]
     env = environ.copy()
     env["PGPASSWORD"] = password
+    # Fake cert location for patronictl
+    env["PGSSLCERT"] = "/var/snap/charmed-postgresql/current/etc/patroni/nonexistent_cert.pem"
     command = [
         "sudo",
         "-E",
         "-H",
-        "-u",
-        "_daemon_",
         "charmed-postgresql.patronictl",
         "-c",
         conf_file_path,
