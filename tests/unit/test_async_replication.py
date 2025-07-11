@@ -569,3 +569,56 @@ def test_on_create_replication():
         
     assert result is None
     
+def test_promote_to_primary():
+
+    # 1.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_relation = MagicMock()
+    mock_relation.status = MagicMock()
+    mock_relation.status.message =  "Something"
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._get_primary_cluster = MagicMock(return_value = None)
+
+    type(relation).app = PropertyMock(return_value=mock_relation)
+    result = relation.promote_to_primary(mock_event)
+
+    assert result is None
+    mock_event.fail.assert_called_once_with(
+           "No primary cluster found. Run `create-replication` action in the cluster where the offer was created."
+        )
+    
+    # 2.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_relation = MagicMock()
+    mock_relation.status = MagicMock()
+    mock_relation.status.message =  READ_ONLY_MODE_BLOCKING_MESSAGE
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._get_primary_cluster = MagicMock(return_value = None)
+
+    type(relation).app = PropertyMock(return_value=mock_relation)
+    relation._handle_replication_change = MagicMock(return_value=False)
+
+    result = relation.promote_to_primary(mock_event)
+
+    assert result is None
+
+    # 3.
+    # mock_charm = MagicMock()
+    # mock_event = MagicMock()
+    # mock_relation = MagicMock()
+    # mock_relation.status = MagicMock()
+    # mock_relation.status.message =  READ_ONLY_MODE_BLOCKING_MESSAGE
+    
+    # relation = PostgreSQLAsyncReplication(mock_charm)
+    # relation._get_primary_cluster = MagicMock(return_value = None)
+
+    # type(relation).app = PropertyMock(return_value=mock_relation)
+    # relation._handle_replication_change = MagicMock(return_value=True)
+
+    # result = relation.promote_to_primary(mock_event)
+
+    # assert result is None
