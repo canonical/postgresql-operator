@@ -76,6 +76,8 @@ from constants import (
     BACKUP_USER,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
+    LDAP_PASSWORD_KEY,
+    LDAP_USER,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
@@ -1106,6 +1108,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             REPLICATION_PASSWORD_KEY,
             REWIND_PASSWORD_KEY,
             MONITORING_PASSWORD_KEY,
+            LDAP_PASSWORD_KEY,
             RAFT_PASSWORD_KEY,
             PATRONI_PASSWORD_KEY,
         ):
@@ -1407,8 +1410,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "ldap-sync.postgres_host": "127.0.0.1",
             "ldap-sync.postgres_port": DATABASE_PORT,
             "ldap-sync.postgres_database": DATABASE_DEFAULT_NAME,
-            "ldap-sync.postgres_username": USER,
-            "ldap-sync.postgres_password": self._get_password(),
+            "ldap-sync.postgres_username": LDAP_USER,
+            "ldap-sync.postgres_password": self.get_secret(APP_SCOPE, LDAP_PASSWORD_KEY),
         })
 
         logger.debug("Starting LDAP sync service")
@@ -1445,6 +1448,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     MONITORING_USER,
                     self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY),
                     extra_user_roles=["pg_monitor"],
+                )
+            if LDAP_USER not in users:
+                # Create the LDAP user with minimal privileges to create roles.
+                self.postgresql.create_user(
+                    LDAP_USER,
+                    self.get_secret(APP_SCOPE, LDAP_PASSWORD_KEY),
+                    extra_user_roles=["CREATEROLE"],
                 )
         except PostgreSQLCreateUserError as e:
             logger.exception(e)
