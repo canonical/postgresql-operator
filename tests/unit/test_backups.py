@@ -1776,7 +1776,7 @@ def test_render_pgbackrest_conf_file(harness, tls_ca_chain_filename):
             call(
                 "/var/snap/charmed-postgresql/current/etc/pgbackrest/pgbackrest.conf",
                 expected_content,
-                0o644,
+                0o640,
             ),
             call(
                 "/etc/logrotate.d/pgbackrest.logrotate",
