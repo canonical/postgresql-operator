@@ -313,10 +313,10 @@ from typing import (
 
 import opentelemetry
 import ops
-from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import (
+from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import ( # type: ignore
     encode_spans # type: ignore
 )
-from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter
+from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # type: ignore
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import ReadableSpan, Span, TracerProvider
 from opentelemetry.sdk.trace.export import (
@@ -348,7 +348,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 8
+LIBPATCH = 9
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 

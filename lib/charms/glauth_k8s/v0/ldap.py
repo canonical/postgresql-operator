@@ -147,7 +147,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 10
+LIBPATCH = 11
 
 PYDEPS = ["pydantic"]
 
@@ -256,13 +256,11 @@ class Secret:
         cls,
         charm: CharmBase,
         label: str,
-        *,
-        content: Optional[dict[str, str]] = None,
-    ) -> "Secret":
+    ) -> Optional["Secret"]:
         try:
             secret = charm.model.get_secret(label=label)
         except SecretNotFoundError:
-            secret = charm.app.add_secret(label=label, content=content)
+            return None
 
         return Secret(secret)
 
@@ -411,7 +409,8 @@ class LdapProvider(Object):
             self.charm,
             label=BIND_ACCOUNT_SECRET_LABEL_TEMPLATE.substitute(relation_id=event.relation.id),
         )
-        secret.remove()
+        if secret:
+            secret.remove()
 
     def get_bind_password(self, relation_id: int) -> Optional[str]:
         """Retrieve the bind account password for a given integration."""
@@ -490,14 +489,26 @@ class LdapRequirer(Object):
         """Handle the event emitted when the LDAP related information is ready."""
         provider_app = event.relation.app
 
-        if not event.relation.data.get(provider_app):
+        if not (provider_data := event.relation.data.get(provider_app)):
             return
 
-        self.on.ldap_ready.emit(event.relation)
+        provider_data = dict(provider_data)
+        if self._load_provider_data(provider_data):
+            self.on.ldap_ready.emit(event.relation)
 
     def _on_ldap_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Handle the event emitted when the LDAP integration is broken."""
         self.on.ldap_unavailable.emit(event.relation)
+
+    def _load_provider_data(self, provider_data: dict) -> Optional[LdapProviderData]:
+        if secret_id := provider_data.get("bind_password_secret"):
+            secret = self.charm.model.get_secret(id=secret_id)
+            provider_data["bind_password"] = secret.get_content().get("password")
+
+        try:
+            return LdapProviderData(**provider_data)
+        except ValidationError:
+            return None
 
     def consume_ldap_relation_data(
         self,
@@ -513,10 +524,10 @@ class LdapRequirer(Object):
             return None
 
         provider_data = dict(relation.data.get(relation.app))
-        if secret_id := provider_data.get("bind_password_secret"):
-            secret = self.charm.model.get_secret(id=secret_id)
-            provider_data["bind_password"] = secret.get_content().get("password")
-        return LdapProviderData(**provider_data) if provider_data else None
+        if not provider_data:
+            return None
+
+        return self._load_provider_data(provider_data)
 
     def _is_relation_active(self, relation: Relation) -> bool:
         """Whether the relation is active based on contained data."""
