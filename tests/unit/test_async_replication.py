@@ -7,6 +7,7 @@ from src.relations.async_replication import (
     NotReadyError,
     PostgreSQLAsyncReplication,
     StandbyClusterAlreadyPromotedError,
+    REPLICATION_CONSUMER_RELATION,
 )
 
 PEER = "peer"
@@ -498,4 +499,73 @@ def test_on_async_relation_joined():
     }
     
     relation._get_highest_promoted_cluster_counter_value.assert_called_once()
+
+def test_on_create_replication():
+    # 1.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    relation._get_primary_cluster = MagicMock(return_value=True)
+    
+    result = relation._on_create_replication(mock_event)
+    
+    assert result is None
+    mock_event.fail.assert_called_once_with(
+            "There is already a replication set up."
+        )
+
+    # 2.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    relation._get_primary_cluster = MagicMock(return_value=None)
+    
+    mock_relation = MagicMock()
+    mock_relation.name = REPLICATION_CONSUMER_RELATION
+    type(relation)._relation = PropertyMock(return_value=mock_relation)
+    
+    result = relation._on_create_replication(mock_event)
+        
+    assert result is None
+    mock_event.fail.assert_called_once_with(
+            "This action must be run in the cluster where the offer was created."
+        )
+    # 3.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    relation._get_primary_cluster = MagicMock(return_value=None)
+
+    relation._handle_replication_change = MagicMock(return_value=True)
+    
+    mock_relation = MagicMock()
+    mock_relation.name = "Something"
+    type(relation)._relation = PropertyMock(return_value=mock_relation)
+    
+    result = relation._on_create_replication(mock_event)
+        
+    assert result is None
+
+    # 4.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    relation._get_primary_cluster = MagicMock(return_value=None)
+
+    relation._handle_replication_change = MagicMock(return_value=False)
+    
+    mock_relation = MagicMock()
+    mock_relation.name = "Something"
+    type(relation)._relation = PropertyMock(return_value=mock_relation)
+    
+    result = relation._on_create_replication(mock_event)
+        
+    assert result is None
     
