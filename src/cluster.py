@@ -260,6 +260,7 @@ class Patroni:
         if response := self.parallel_patroni_get_request(
             f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
         ):
+            logger.debug("Patroni cluster members: %s", response["members"])
             return response["members"]
         raise RetryError(last_attempt=Exception("Unable to reach any units"))
 
