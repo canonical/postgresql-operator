@@ -52,7 +52,7 @@ The snap "charmed-postgresql" also ships list of tools used by charm:
 * `charmed-postgresql.pgbackrest` - a tool to backup/restore PostgreSQL DB.
 
 ```{warning}
-All snap resources must be executed under the special user `snapd_daemon` only!
+All snap resources must be executed under the special snap user `_daemon_` only!
 ```
 
 ## Integrations
