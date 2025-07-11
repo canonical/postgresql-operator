@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 from ops.model import WaitingStatus
+import pytest
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
@@ -622,3 +623,61 @@ def test_promote_to_primary():
     # result = relation.promote_to_primary(mock_event)
 
     # assert result is None
+
+def test__configure_standby_cluster():
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._relation = MagicMock()
+    relation._relation.name = REPLICATION_CONSUMER_RELATION  
+    relation._update_internal_secret = MagicMock(return_value=False)
+
+    result = relation._configure_standby_cluster(mock_event)
+    
+
+    assert result is False
+
+    mock_event.defer.assert_called_once()
+
+    # 2. 
+    
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._relation = MagicMock()
+    relation._relation.name = "something_else"
+    relation._update_internal_secret = MagicMock(return_value=True)
+    relation.get_system_identifier = MagicMock(return_value=(None, 2)) 
+
+
+    with pytest.raises(Exception) as exc_info:
+        relation._configure_standby_cluster(mock_event)
+    
+    assert str(exc_info.value) == "2" 
+
+    # 3. 
+    
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._relation = MagicMock()
+    relation._relation.name = "some_relation"  
+    relation._relation.app = "remote-app"
+    relation._relation.data = {relation._relation.app: {"system-id": "123"}} 
+    
+
+    relation._update_internal_secret = MagicMock(return_value=True)
+    relation.get_system_identifier = MagicMock(return_value=("456", None))  
+    relation.charm = MagicMock()
+    relation.charm.app_peer_data = {}
+    
+
+    with patch("subprocess.check_call") as mock_check_call:
+        
+        result = relation._configure_standby_cluster(mock_event)
+        
+        assert result is True
+        mock_check_call.assert_called_once()
