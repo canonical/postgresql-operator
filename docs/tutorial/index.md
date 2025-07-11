@@ -240,7 +240,7 @@ You will now see the list of default databases in the unit. `postgres` is the de
 
 ```
 
-In order to run queries, we can enter the `psql` interactive terminal by running the following command, again typing password when requested:
+In order to run queries, we can enter the `psql` interactive terminal by running the following command, again typing the password when requested:
 
 ```{terminal}
 :input: sudo psql --host=10.1.110.80 --username=operator --password postgres
