@@ -462,12 +462,40 @@ def test__on_async_relation_departed():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_peers = MagicMock()
-
+    mock_unit_data = {}
     mock_event.departing_unit = MagicMock()
     mock_charm.unit = mock_event.departing_unit
     mock_charm._peers = mock_peers
+    mock_peers.data = {mock_charm.unit: mock_unit_data}
 
     relation = PostgreSQLAsyncReplication(mock_charm)
 
     result = relation._on_async_relation_departed(mock_event)
     assert result is None  
+    assert mock_unit_data == {"departing": "True"}
+
+def test_on_async_relation_joined():
+
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_peers = MagicMock()
+    mock_unit_data = {}  
+    
+    mock_charm._unit_ip = "10.0.0.1"
+    mock_charm._peers = mock_peers
+    mock_peers.data = {mock_charm.unit: mock_unit_data}
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    
+    relation._get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
+    
+    result = relation._on_async_relation_joined(mock_event)
+    
+    assert result is None
+    
+    assert mock_unit_data == {
+        "unit-promoted-cluster-counter": "1"
+    }
+    
+    relation._get_highest_promoted_cluster_counter_value.assert_called_once()
+    
