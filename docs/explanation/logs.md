@@ -98,5 +98,5 @@ Charmed PostgreSQL is configured to rotate PostgreSQL text logs every minute and
 
 For PostgreSQL, logs will be truncated when the week turns and the same minute of the same hour of the same weekday comes to pass. E.g. at 12:01 UTC on Monday either a new log file will be created or last week's log will be overwritten.
 
-Due to Patroni only supporting size based rotation, it has been configured to retain logs for a comparatively similar timeframe as PostgreSQL. The assumed size of a minute of Patroni logs is 600 bytes, but the estimation is bound to be imprecise. Patroni will retain 10,080 log files (for every minute of a week). The current log is `patroni.log`, when rotating Patroni will append a number to the name of the file and remove logs over the limit.
+Due to Patroni only supporting size based rotation, it has been configured to retain logs for a comparatively similar time frame as PostgreSQL. The assumed size of a minute of Patroni logs is 600 bytes, but the estimation is bound to be imprecise. Patroni will retain 10,080 log files (for every minute of a week). The current log is `patroni.log`, when rotating Patroni will append a number to the name of the file and remove logs over the limit.
 

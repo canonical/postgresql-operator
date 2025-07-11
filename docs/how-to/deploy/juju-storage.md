@@ -1,8 +1,8 @@
 # Deploy on Juju storage
 
-Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilize data volume provided by different [clouds](https://documentation.ubuntu.com/juju/3.6/reference/cloud/#cloud) while keeping the same UI/UX for end users.
+Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilise data volume provided by different [clouds](https://documentation.ubuntu.com/juju/3.6/reference/cloud/#cloud) while keeping the same UI/UX for end users.
 
-[Charmed PostgreSQL 16](https://charmhub.io/postgresql?channel=16/candidate) supports multiple storages: `archive`, `data`, `logs` and `temp`.
+[Charmed PostgreSQL 16](https://charmhub.io/postgresql?channel=16/edge) supports multiple storage types: `archive`, `data`, `logs` and `temp`.
 
 The [legacy PostgreSQL charm](/explanation/legacy-charm) in track [`latest`](https://charmhub.io/postgresql?channel=latest/stable)" does **not** support the Juju storage abstraction.
 
@@ -83,7 +83,7 @@ Charmed PostgreSQL 16 uses Juju user secrets to handle credentials:
 
 # Re-deploy new app re-using old storage and old credentials
 > juju deploy postgresql \
-  --channel 16/candidate \
+  --channel 16/edge \
   --attach-storage pgdata/5 \
   --config system-users=newsecret54321id
 

@@ -150,8 +150,8 @@ ubuntu@juju-b87344-2:~$ sudo patronictl -c /var/snap/charmed-postgresql/current/
 
 #### Re-initialisation
 
-Sometimes the cluster member might stuck in the middle of nowhere, the easiest way to try is [reinit the Patroni cluster member](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-reinit).
-<details><summary>Example: cluster member re-initialization</summary>
+Sometimes the cluster member might stuck in the middle of nowhere, the easiest way to try is [`reinit` the Patroni cluster member](https://patroni.readthedocs.io/en/latest/patronictl.html#patronictl-reinit).
+<details><summary>Example: cluster member re-initialisation</summary>
 
 ```text
 ubuntu@juju-b87344-2:~$ sudo patronictl -c /var/snap/charmed-postgresql/current/etc/patroni/patroni.yaml reinit postgresql postgresql-1
@@ -248,7 +248,7 @@ Pay attention to TLS relation with PostgreSQL and access Patroni REST API accord
 
 ### Raft library
 
-Patroni relies on the Raft library for the consensus handling and Primary election. It is implemented using [pySyncObj](https://github.com/bakwc/PySyncObj) and available as a CLI tool. 
+Patroni relies on the Raft library for the consensus handling and Primary election. It is implemented using [`pySyncObj`](https://github.com/bakwc/PySyncObj) and available as a CLI tool. 
 
 While **you should not interact with Raft library manually**,  you can check its internal status. Note that a password is mandatory to access Raft.
 

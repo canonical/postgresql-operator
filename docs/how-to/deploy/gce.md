@@ -53,7 +53,7 @@ created key [aaaaaaa....aaaaaaa] of type [json] as [sa-private-key.json] for [ju
 
 ## Bootstrap Juju controller on GCE
 
-Move the newly exported GCloud json file into a snap-accessible folder due to a known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
+Move the newly exported GCloud JSON file into a snap-accessible folder due to a known Juju [issue](https://bugs.launchpad.net/juju/+bug/2007575).
 
 
 ```text
@@ -197,7 +197,7 @@ From here you can [use/scale/backup/restore/refresh](/tutorial/index) your newly
 
 ## Expose database (optional)
 
-If necessary to access DB from outside of GCloud (warning: [opening ports to public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications)) open the GCloud firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
+If necessary to access DB from outside of GCloud (warning: opening ports to public is risky) open the GCloud firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
 ```text
 juju expose postgresql
 ```
@@ -263,7 +263,7 @@ Remove GCloud credentials from Juju:
 > juju remove-credential google juju-gce-account
 ```
 
-Finally, remove GCloud jsonfile user credentials (to avoid forgetting and leaking):
+Finally, remove GCloud JSON file user credentials (to avoid forgetting and leaking):
 ```text
 rm -f /var/snap/juju/common/sa-private-key.json
 ```

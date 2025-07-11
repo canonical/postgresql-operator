@@ -7,7 +7,7 @@ This guide will teach you how to deploy and configure the s3-integrator charm on
 > See also: [](/how-to/back-up-and-restore/configure-s3-aws)
 
 ```{note}
-The Charmed PostgreSQL backup tool ([pgBackRest](https://pgbackrest.org/)) can currently only interact with S3-compatible storages if they work with [SSL/TLS](https://github.com/pgbackrest/pgbackrest/issues/2340).
+The Charmed PostgreSQL backup tool ([pgBackRest](https://pgbackrest.org/)) can currently only interact with S3-compatible storage if they work with [SSL/TLS](https://github.com/pgbackrest/pgbackrest/issues/2340).
 
 Backup via the plain HTTP is currently not supported.
 ```

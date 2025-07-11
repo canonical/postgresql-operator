@@ -4,7 +4,6 @@
 
 ![image|690x423, 100%](architecture-diagram.png)
 
-<a name="hld"></a>
 ## HLD (High Level Design)
 
 The charm design leverages on the SNAP “[charmed-postgresql](https://snapcraft.io/charmed-postgresql)” which is deployed by Juju on the specified VM/MAAS/bare-metal machine based on Ubuntu Jammy/22.04. SNAP allows to run PostgreSQL service(s) in a secure and isolated environment ([strict confinement](https://ubuntu.com/blog/demystifying-snap-confinement)). The installed SNAP:
@@ -56,7 +55,6 @@ The snap "charmed-postgresql" also ships list of tools used by charm:
 All snap resources must be executed under the special snap user `_daemon_` only!
 ```
 
-<a name="integrations"></a>
 ## Integrations
 
 ### PgBouncer
@@ -85,7 +83,7 @@ GLAuth is a secure, easy-to-use and open-sourced LDAP server which provides capa
 
 ### Grafana
 
-Grafana is an open-source visualization tools that allows to query, visualize, alert on, and visualize metrics from mixed datasources in configurable dashboards for observability. This charms is shipped with its own Grafana dashboard and supports integration with the [Grafana Operator](https://charmhub.io/grafana-k8s) to simplify observability. Please follow [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) setup.
+Grafana is an open-source visualisation tools that allows to query, visualise, alert on, and visualise metrics from mixed data sources in configurable dashboards for observability. This charms is shipped with its own Grafana dashboard and supports integration with the [Grafana Operator](https://charmhub.io/grafana-k8s) to simplify observability. Please follow [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) setup.
 
 ### Loki
 
@@ -97,7 +95,7 @@ Prometheus is an open-source systems monitoring and alerting toolkit with a dime
 
 ## LLD (Low Level Design)
 
-Please check the charm state machines displayed in the [workflow diagrams](https://canonical-charmed-postgresql-k8s.readthedocs-hosted.com/14/explanation/flowcharts/). The low-level logic is mostly common for both VM and K8s charms.
+Please check the charm state machines displayed in the [workflow diagrams](https://discourse.charmhub.io/t/charmed-postgresql-k8s-explanations-charm-flowcharts/9305). The low-level logic is mostly common for both VM and K8s charms.
 
 <!--- TODO: Describe all possible installations? Cross-model/controller? --->
 
@@ -107,25 +105,26 @@ Accordingly to the [Juju SDK](https://juju.is/docs/sdk/event): “an event is a 
 
 For this charm, the following events are observed:
 
-1. [`on_install`](https://juju.is/docs/sdk/install-event): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
-2. [`leader-elected`](https://juju.is/docs/sdk/leader-elected-event): generate all the secrets to bootstrap the cluster.
-3. [`leader-settings-changed`](https://juju.is/docs/sdk/leader-settings-changed-event): Handle the leader settings changed event.
-4. [`start`](https://juju.is/docs/sdk/start-event): Init/setting up the cluster node.
-5. [`config_changed`](https://juju.is/docs/sdk/config-changed-event): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
-6. [`update-status`](https://juju.is/docs/sdk/update-status-event): Takes care of workload health checks.
+1. [`on_install`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#install): install the snap "charmed-postgresql" and perform basic preparations to bootstrap the cluster on the first leader (or join the already configured cluster). 
+2. [`leader-elected`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-elected): generate all the secrets to bootstrap the cluster.
+3. [`leader-settings-changed`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#leader-settings-changed): Handle the leader settings changed event.
+4. [`start`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#start): Init/setting up the cluster node.
+5. [`config_changed`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#config-changed): usually fired in response to a configuration change using the GUI or CLI. Create and set default cluster and cluster-set names in the peer relation databag (on the leader only).
+6. [`update-status`](https://documentation.ubuntu.com/juju/3.6/reference/hook/#update-status): Takes care of workload health checks.
 <!--- 7. database_storage_detaching: TODO: ops? event?
-8. TODO: any other events?
+1. TODO: any other events?
 --->
 
 ### Charm code overview
 
-[`src/charm.py`](https://github.com/canonical/postgresql-operator/blob/main/src/charm.py) is the default entry point for a charm and has the `PostgresqlOperatorCharm` Python class which inherits from CharmBase.
+[`src/charm.py`](https://github.com/canonical/postgresql-operator/blob/main/src/charm.py) is the default entry point for a charm and has the `PostgresqlOperatorCharm` Python class which inherits from `CharmBase`.
 
-CharmBase is the base class from which all Charms are formed, defined by [Ops](https://juju.is/docs/sdk/ops) (Python framework for developing charms). See more information in [Charm](https://juju.is/docs/sdk/constructs#charm).
+`CharmBase` is the base class from which all Charms are formed, defined by [Ops](https://ops.readthedocs.io/en/latest/) (Python framework for developing charms). See more information in the [Ops documentation for `CharmBase`](https://ops.readthedocs.io/en/latest/reference/ops.html#ops.CharmBase).
 
 The `__init__` method guarantees that the charm observes all events relevant to its operation and handles them.
 
-The VM and K8s charm flavors shares the codebase via [charm libraries](https://juju.is/docs/sdk/libraries) in [lib/charms/postgresql_k8s/v0/](https://github.com/canonical/postgresql-k8s-operator/blob/main/lib/charms/postgresql_k8s/v0/postgresql.py) (of K8s flavor of the charm!):
+The VM and K8s charm flavours shares the codebase via charm libraries in [`lib/charms/postgresql_k8s/v0/`](https://github.com/canonical/postgresql-k8s-operator/blob/main/lib/charms/postgresql_k8s/v0/postgresql.py) (of K8s flavour of the charm!):
+
 ```text
 > charmcraft list-lib postgresql-k8s                                                                                                                                                                                                               
 Library name    API    Patch                                                                                                                                                                                                                          

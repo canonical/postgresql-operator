@@ -1,9 +1,9 @@
-# Charm types: "legacy" vs "modern"
+# Legacy charm
 
-There are [two types of charms](https://juju.is/docs/sdk/charm-taxonomy#charm-types-by-generation) stored under the same charm name `postgresql`:
+There are [two types of charms](https://documentation.ubuntu.com/juju/3.6/reference/charm/#by-generation) stored under the same charm name `postgresql`:
 
-1. [Reactive](https://juju.is/docs/sdk/charm-taxonomy#reactive)  charm in the channel `latest/stable` (called `legacy`)
-2. [Ops-based](https://juju.is/docs/sdk/ops) charm in the channels `14/stable` and `16/stable` (called `modern`)
+1. [Reactive](https://documentation.ubuntu.com/juju/3.6/reference/charm/#reactive)  charm in the channel `latest/stable` (called `legacy`)
+2. [Ops-based](https://documentation.ubuntu.com/juju/3.6/reference/charm/#ops) charm in the channel `14/stable` (called `modern`)
 
 The legacy charm provided endpoints `db` and `db-admin` (for the interface `pgsql`). The modern charm provides old endpoints as well + new endpoint `database` (for the interface `postgresql_client`). Read more details about the available [endpoints/interfaces](/explanation/interfaces-and-endpoints).
 
@@ -11,9 +11,9 @@ The legacy charm provided endpoints `db` and `db-admin` (for the interface `pgsq
 Choose one endpoint to use, rather than relating both simultaneously.
 ```
 
-<!--TODO: Explain `latest` in the context of `16`-->
+<!--TODO: Explain in the context of 16 -->
 
-## The default track `latest` vs `14`
+## The default track "latest" vs "14"
 
 The [default track](https://docs.openstack.org/charm-guide/yoga/project/charm-delivery.html) has been switched from the `latest` to `14`. It is [to ensure](https://discourse.charmhub.io/t/request-switch-default-track-from-latest-to-14-for-postgresql-k8s-charms/10314) all new deployments use a modern codebase. We strongly advise against using the latest track due to its implicit nature. In doing so, a future charm upgrade may result in a PostgreSQL version incompatible with an integrated application. Track 14 guarantees PostgreSQL 14 deployment only. The track `latest` will be closed after all applications migrated from Reactive to Ops-based charm.
 
@@ -31,12 +31,13 @@ The "modern" charm provides temporary support for the legacy interfaces:
 
 * **proper migration**: migrate the application to the new interface "[postgresql_client](https://github.com/canonical/charm-relation-interfaces)". The application will connect PostgreSQL using "[data_interfaces](https://charmhub.io/data-platform-libs/libraries/data_interfaces)" library from "[data-platform-libs](https://github.com/canonical/data-platform-libs/)" via endpoint `database`.
 
+
 ```{warning}
 **In-place upgrades are not supported for this case.**
 
 Reactive charms cannot be upgraded to an operator-framework-based version. To move database data, the new DB application must be launched nearby, and data should be copied from "legacy" application to the "modern" one. 
 
-Please [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) if you need migration instructions.
+Please [contact us](/reference/contacts) if you need migration instructions.
 ```
 
 ## How to deploy old "legacy" PostgreSQL charm
@@ -49,7 +50,7 @@ Deploy the charm using the channel `latest/stable`:
     channel: latest/stable
 ```
 
-```{note}
+```{caution}
 Remove the charm store prefix `cs:` from the bundle. 
 
 Otherwise, the modern charm will be chosen by Juju (due to the default track pointing to `14/stable` and not `latest/stable`).
@@ -61,7 +62,7 @@ A common error message is: `cannot deploy application "postgresql": unknown opti
 
 The legacy charm config options were not moved to the modern charm due to no need. The modern charm applies the best possible configuration automatically. 
 
-Feel free to [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) about the DB tuning/config options.
+Feel free to [contact us](/reference/contacts) about the DB tuning/config options.
 
 ## Extensions supported by modern charm
 
@@ -81,7 +82,7 @@ For more information about migrating the new interface, see [this guide](/how-to
 
 At the moment, the modern charms support PostgreSQL 14 (based on Jammy/22.04 series) only.
 
-Please [contact us](https://chat.charmhub.io/charmhub/channels/data-platform) if you need different versions/series.
+Please [contact us](/reference/contacts) if you need different versions/series.
 
 ## Supported architectures
 

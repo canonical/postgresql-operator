@@ -37,11 +37,11 @@ test123=> SELECT * FROM pg_roles;
 
 Charmed PostgreSQL 16 introduces the following instance level predefined roles:
 
-* charmed_stats (inherit from pg_monitor)
-* charmed_read (inherit from pg_read_all_data)
-* charmed_dml (inherit from pg_write_all_data)
-* charmed_backup (inherit from pg_checkpoint)
-* charmed_dba (allowed to escalate to any other user, including the superuser `operator`)
+* `charmed_stats` (inherit from pg_monitor)
+* `charmed_read` (inherit from pg_read_all_data)
+* `charmed_dml` (inherit from pg_write_all_data)
+* `charmed_backup` (inherit from pg_checkpoint)
+* `charmed_dba` (allowed to escalate to any other user, including the superuser `operator`)
 
 ```text
 test123=> SELECT * FROM pg_roles;
@@ -55,7 +55,7 @@ test123=> SELECT * FROM pg_roles;
 ...
 ```
 
-Charmed PostgreSQL 16 also introduces catalog/database level roles, with permissions tied to each database that's created. Example for a database named `test`:
+Charmed PostgreSQL 16 also introduces catalogue/database level roles, with permissions tied to each database that's created. Example for a database named `test`:
 
 ```text
 test123=> SELECT * FROM pg_roles where rolname like 'test_%';;

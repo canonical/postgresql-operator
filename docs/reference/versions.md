@@ -2,7 +2,7 @@
 
 Charmed PostgreSQL is shipped in following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track): 
 
-* [PostgreSQL 16] (channel `16/candidate`)
+* [PostgreSQL 16] (channel `16/edge`)
 * [PostgreSQL 14] (channel `14/stable`)
 * [Legacy PostgreSQL charm] (channel `latest/stable`) -> **deprecated**
 
@@ -10,7 +10,7 @@ This includes two major PostgreSQL versions,  `14` and `16`, matching [Ubuntu ve
 
 ## PostgreSQL 16
 
-PostgreSQL 16 is shipped in track `16` and is available for testing in the channel `16/candidate`.
+PostgreSQL 16 is shipped in track `16` and is available for testing in the channel `16/edge`.
 
 >Released alongside [PgBouncer] and [Data Integrator](https://charmhub.io/data-integrator) for Ubuntu 24.04
 
@@ -58,7 +58,7 @@ Read more about Charmed PostgreSQL 16 features in the [release notes].
 * [Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/) has been replaced by [Timescale Community edition](https://docs.timescale.com/about/latest/timescaledb-editions/). 
 * The charm action `set-tls-private-key ` has been removed (will be re-introduced as Juju User Secrets)
 * The charm actions `pre-upgrade-check` and `resume-upgrade ` have been removed (replaced with `pre-refresh-check` and `resume-refresh` accordingly to be consistent with `juju refresh`)
-* The charm endpoint `certificates` has ben split into `client-certificates` and `peer-certificates`.
+* The charm endpoint `certificates` has been split into `client-certificates` and `peer-certificates`.
 
 ## PostgreSQL 14
 
@@ -82,7 +82,7 @@ Read more about Charmed PostgreSQL 14 features in the [release notes].
 
 ### Deprecated
 
-* The track `14` is in bug-fixing/support mode. New Charmed PostgreSQL `16` features will NOT be backported to track `14`.
+* The track `14` is in bug-fixing/support mode. New Charmed PostgreSQL `16` features will NOT be back-ported to track `14`.
 * Charmed PostgreSQL 14 ships [Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/) only.
 
 ## Legacy PostgreSQL charm

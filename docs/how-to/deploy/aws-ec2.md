@@ -10,7 +10,7 @@ sudo snap install juju
 ```
 
 Follow the installation guides for:
-* [AWs CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) - the Amazon Web Services CLI
+* [AWS CLI](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html) - the Amazon Web Services CLI
 
 To check they are all correctly installed, you can run the commands demonstrated below with sample outputs:
 
@@ -94,7 +94,8 @@ to create a new model to deploy workloads.
 ```
 </details>
 
-You can check the [AWS EC2 instance availability](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#Instances:instanceState=running) (ensure the right AWS region chosen!):
+<!--TODO: Check this link: [AWS EC2 instance availability](https://us-east-1.console.aws.amazon.com/ec2/home?region=us-east-1#Instances:instanceState=running) -->
+You can check the AWS EC2 instance availability (ensure the right AWS region chosen!):
 ![image|690x118](aws-ec2-availability.png)
 
 Create a new Juju model:
@@ -183,7 +184,7 @@ From here you can [use/scale/backup/restore/refresh](/tutorial/index) your newly
 
 ## Expose database (optional)
 
-If necessary to access DB from outside of AWS (warning: [opening ports to public is risky](https://www.beyondtrust.com/blog/entry/what-is-an-open-port-what-are-the-security-implications)) open the AWS firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
+If necessary to access DB from outside of AWS (warning: opening ports to public is risky) open the AWS firewall using the simple [juju expose](https://juju.is/docs/juju/juju-expose) functionality: 
 ```text
 juju expose postgresql
 ```

@@ -3,9 +3,8 @@
 This guide goes over an example deployment of PostgreSQL, PgBouncer and HAcluster that require external TLS/SSL access via [Virtual IP (VIP)](https://en.wikipedia.org/wiki/Virtual_IP_address).   
 
 It combines the following guides, where you can find more detailed information:
-* [PostgreSQL | How to connect from outside the local network](/how-to/external-network-access)
+* [](/how-to/external-network-access)
 * [PgBouncer | How to connect from outside the local network](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
-
 
 ## Requirements
 
@@ -14,9 +13,9 @@ Although Canonical does not prescribe how you should set up your environment, we
 The basic requirements to follow along with this example setup are the following:
 
 * A fully deployed and running Juju machine environment
-  * See the [](/tutorial/index) for a quick setup with Multipass
+  * See the [PostgreSQL Tutorial](/tutorial/index) for a quick setup with Multipass
   * See the official [Juju deployment guide](https://juju.is/docs/juju/tutorial#deploy) for more details
-* A spare virtual IP address for [hacluster](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741#using-a-virtual-ip-to-connect-to-pgbouncer)
+* A spare virtual IP address for [`hacluster`](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741)
   * See the PgBouncer guide: [How to use a VIP to connect to PgBouncer](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
 * DNS record pointing to VIP above (`my-tls-example-db.local` is used as an example here)
 
@@ -33,7 +32,7 @@ This setup deploys the following components:
 * The [`postgresql`](https://charmhub.io/postgresql) charm (3 units, as a single cluster).
 * The [`self-signed-certificates`](https://charmhub.io/self-signed-certificates) charm as the TLS provider. 
   * Note that this is not suitable for production deployments. See the guide: [Security with X.509 certificates](https://charmhub.io/topics/security-with-x-509-certificates).
-* The [`data-integrator`](https://charmhub.io/data-integrator) charm as a [principal](https://juju.is/docs/sdk/charm-taxonomy#principal-charms) charm for the [subordinated](https://juju.is/docs/sdk/charm-taxonomy#subordinate-charms) charms below (3 units for high availability):
+* The [`data-integrator`](https://charmhub.io/data-integrator) charm as a [principal](https://documentation.ubuntu.com/juju/3.6/reference/charm/#principal) charm for the [subordinated](https://documentation.ubuntu.com/juju/3.6/reference/charm/#subordinate) charms below (3 units for high availability):
   * The latest [`pgbouncer`](https://charmhub.io/pgbouncer?channel=1/stable) charm as a load-balancer and connection pooler (3 units).
   * The [`hacluster`](https://charmhub.io/hacluster) charm for VIP handling (3 units are the minimum for HA).
   * (optional) The COS [`grafana-agent`](https://charmhub.io/grafana-agent) charm for Monitoring purposes.
@@ -49,7 +48,7 @@ juju add-model my-external-tls-db
 Deploy `postgresql` and `self-signed-certificates`:
 
 ```text
-juju deploy postgresql --channel 16/stable -n 3
+juju deploy postgresql --channel 14/stable -n 3
 juju deploy self-signed-certificates
 juju integrate postgresql self-signed-certificates
 ```
@@ -175,7 +174,7 @@ At this point, Juju is responsible for the health of the clusters/applications:
 * The PostgreSQL charm will restart the workload if PostgreSQL is not healthy.
 * The Juju agent will restart the unit/vm/container if it is no longer reachable/healthy (in the same AZ).
 * The Juju controller will make sure Juju agent is up and running and charm is healthy.
-* The HACluster charm will make sure the VIP is always reachable and routes to a single PgBouncer.
+* The HA Cluster charm will make sure the VIP is always reachable and routes to a single PgBouncer.
 * PgBouncer will balance incoming connections and makes sure write traffic goes to the primary PostgreSQL unit.
 * The TLS operator (in this example, the `self-signed-certificates` charm) is responsible for providing all components with signed ready-to-use TLS artifacts.
 

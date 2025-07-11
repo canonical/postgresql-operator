@@ -13,7 +13,7 @@ It is recommended to use 3+ units cluster size in production (due to [Raft conse
 
 All SQL transactions have to be confirmed by all Sync Standby unit(s) before Primary unit commit transaction to the client. Therefore, high-performance and high-availability is a trade-off between "sync standby" and "replica" unit count in the cluster.
 
-Starting from revision 561, all Charmed PostgreSQL units are configured as Sync Standby members by default. It provides better guarantees for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=14/stable#synchronous_node_count)'.
+Starting from revision 561, all Charmed PostgreSQL units are configured as Sync Standby members by default. It provides better guarantees for the data survival when two of three units gone simultaneously. Users can re-configure the necessary synchronous units count using Juju config option '[synchronous_node_count](https://charmhub.io/postgresql/configurations?channel=16/edge)'.
 
 ## Primary
 
@@ -21,6 +21,7 @@ The simplest way to find the Primary unit is to run `juju status`. Please be awa
 
 ```text
 ubuntu@juju360:~$ juju status postgresql
+
 Model       Controller  Cloud/Region         Version  SLA          Timestamp
 postgresql  lxd         localhost/localhost  3.6.5    unsupported  13:04:15+02:00
 
