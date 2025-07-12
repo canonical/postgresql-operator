@@ -14,7 +14,11 @@ To create a secret in Juju containing one or more user passwords:
 juju add-secret <secret_name> <user_a>=<password_a> <user_b>=<password_b>
 ```
 
-The command above will output a secret URI, which you'll need for configuring `system-users`.
+The command above will output a secret URI similar to the example below, which you'll need for configuring `system-users`:
+
+```text
+secret:a2whj30el0fco390bt9f
+```
 
 Admin users that were not included in the secret will use an automatically created password.
 
@@ -29,7 +33,11 @@ juju grant-secret <secret_name> postgresql
 To set the `system-users` config option to the secret URI:
 
 ```text
-juju config charm-app system-users=<secret_URI>
+juju config postgresql system-users=<secret_URI>
+```
+
+```{tip}
+Note that `<secret_URI>` includes the `secret:` prefix.
 ```
 
 When the `system-users` config option is set, the charm will:
