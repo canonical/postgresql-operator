@@ -1260,7 +1260,7 @@ Stderr:
             process_max=max(os.cpu_count() - 2, 1),
         )
         # Render pgBackRest config file.
-        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o644)
+        self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
 
         # Render the logrotate configuration file.
         with open("templates/pgbackrest.logrotate.j2") as file:
