@@ -16,6 +16,7 @@ from src.relations.async_replication import (
 
 PEER = "peer"
 
+
 def create_mock_unit(name="unit"):
     unit = MagicMock()
     unit.name = name
@@ -461,6 +462,7 @@ def test__configure_primary_cluster():
     relation._update_primary_cluster_data.assert_called_once()
     assert result is True
 
+
 def test__on_async_relation_departed():
     mock_charm = MagicMock()
     mock_event = MagicMock()
@@ -477,8 +479,8 @@ def test__on_async_relation_departed():
     assert result is None
     assert mock_unit_data == {"departing": "True"}
 
-def test_on_async_relation_joined():
 
+def test_on_async_relation_joined():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_peers = MagicMock()
@@ -496,11 +498,10 @@ def test_on_async_relation_joined():
 
     assert result is None
 
-    assert mock_unit_data == {
-        "unit-promoted-cluster-counter": "1"
-    }
+    assert mock_unit_data == {"unit-promoted-cluster-counter": "1"}
 
     relation._get_highest_promoted_cluster_counter_value.assert_called_once()
+
 
 def test_on_create_replication():
     # 1.
@@ -513,9 +514,7 @@ def test_on_create_replication():
     result = relation._on_create_replication(mock_event)
 
     assert result is None
-    mock_event.fail.assert_called_once_with(
-            "There is already a replication set up."
-        )
+    mock_event.fail.assert_called_once_with("There is already a replication set up.")
 
     # 2.
     mock_charm = MagicMock()
@@ -533,8 +532,8 @@ def test_on_create_replication():
 
     assert result is None
     mock_event.fail.assert_called_once_with(
-            "This action must be run in the cluster where the offer was created."
-        )
+        "This action must be run in the cluster where the offer was created."
+    )
     # 3.
     mock_charm = MagicMock()
     mock_event = MagicMock()
@@ -571,34 +570,35 @@ def test_on_create_replication():
 
     assert result is None
 
-def test_promote_to_primary():
 
+def test_promote_to_primary():
     # 1.
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_relation = MagicMock()
     mock_relation.status = MagicMock()
-    mock_relation.status.message =  "Something"
+    mock_relation.status.message = "Something"
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    relation._get_primary_cluster = MagicMock(return_value = None)
+    relation._get_primary_cluster = MagicMock(return_value=None)
 
     type(relation).app = PropertyMock(return_value=mock_relation)
     result = relation.promote_to_primary(mock_event)
     assert result is None
+
     mock_event.fail.assert_called_once_with(
-           "No primary cluster found. Run `create-replication` action in the cluster where the offer was created."
-        )
+        "No primary cluster found. Run `create-replication` action in the cluster where the offer was created."
+    )
 
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_relation = MagicMock()
     mock_relation.status = MagicMock()
-    mock_relation.status.message =  READ_ONLY_MODE_BLOCKING_MESSAGE
+    mock_relation.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
 
     relation = PostgreSQLAsyncReplication(mock_charm)
-    relation._get_primary_cluster = MagicMock(return_value = None)
+    relation._get_primary_cluster = MagicMock(return_value=None)
 
     type(relation).app = PropertyMock(return_value=mock_relation)
     relation._handle_replication_change = MagicMock(return_value=False)
@@ -606,6 +606,7 @@ def test_promote_to_primary():
     result = relation.promote_to_primary(mock_event)
 
     assert result is None
+
 
 def test__configure_standby_cluster():
     mock_charm = MagicMock()
@@ -653,11 +654,11 @@ def test__configure_standby_cluster():
     relation.charm.app_peer_data = {}
 
     with patch("subprocess.check_call") as mock_check_call:
-
         result = relation._configure_standby_cluster(mock_event)
 
         assert result is True
         mock_check_call.assert_called_once()
+
 
 def test_wait_for_standby_leader():
     # 1.
@@ -700,6 +701,7 @@ def test_wait_for_standby_leader():
 
     result = relation._wait_for_standby_leader(mock_event)
     assert result is False
+
 
 def test_update_primary_cluster_data():
     pass
