@@ -703,5 +703,24 @@ def test_wait_for_standby_leader():
     assert result is False
 
 
-def test_update_primary_cluster_data():
+def test_get_partner_addresses():
+    mock_charm = MagicMock()
+
+    mock_charm._peer_members_ips = ["str"]
+    mock_charm.app = MagicMock()
+    mock_charm.unit = MagicMock()
+    mock_charm.unit.is_leader.return_value = True
+    mock_charm._peers = MagicMock()
+    mock_charm._peers.data = {mock_charm.unit: {}}
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._get_primary_cluster = MagicMock(return_value=None)
+    relation._get_highest_promoted_cluster_counter_value = MagicMock(return_value=None)
+
+    result = relation.get_partner_addresses()
+
+    assert result == ["str"]
+
+
+def test_get_primary_cluster():
     pass
