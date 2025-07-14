@@ -50,7 +50,7 @@ resource "juju_application" "machine_postgresql" {
 
   charm {
     name    = "postgresql"
-    channel = "14/stable"
+    channel = "16/stable"
   }
 
   config = {
@@ -91,7 +91,7 @@ Model         Controller  Cloud/Region         Version  SLA          Timestamp
 my-model  lxd         localhost/localhost  3.5.2    unsupported  14:04:26+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  14.11    active      1  postgresql  14/stable  429  no       
+postgresql  16.19    active      1  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 postgresql/0*  active    idle   0        10.142.152.90   5432/tcp  Primary
@@ -141,11 +141,11 @@ Terraform will perform the following actions:
       - units       = 1 -> null
 
       - charm {
-          - base     = "ubuntu@22.04" -> null
-          - channel  = "14/stable" -> null
+          - base     = "ubuntu@24.04" -> null
+          - channel  = "16/stable" -> null
           - name     = "postgresql" -> null
-          - revision = 429 -> null
-          - series   = "jammy" -> null
+          - revision = 843 -> null
+          - series   = "noble" -> null
         }
     }
 

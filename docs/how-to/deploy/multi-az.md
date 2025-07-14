@@ -48,7 +48,7 @@ Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:16:52+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  14.12    active      3  postgresql  14/stable  468  no       
+postgresql  16.19    active      3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 postgresql/0   active    idle   0        34.148.44.51    5432/tcp  
@@ -93,7 +93,7 @@ Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:25:14+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  14.12    active    2/3  postgresql  14/stable  468  no       
+postgresql  16.19    active    2/3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 postgresql/0   active    idle   0        34.148.44.51    5432/tcp  
@@ -122,7 +122,7 @@ Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:30:09+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  14.12    active      2  postgresql  14/stable  468  no       
+postgresql  16.19    active      2  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 postgresql/0   active    idle   0        34.148.44.51    5432/tcp  
@@ -144,7 +144,7 @@ Model    Controller  Cloud/Region     Version    SLA          Timestamp
 mymodel  gce         google/us-east1  3.5.4      unsupported  00:30:42+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql           active    2/3  postgresql  14/stable  468  no       
+postgresql           active    2/3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent       Machine  Public address  Ports     Message
 postgresql/0   active    idle        0        34.148.44.51    5432/tcp  

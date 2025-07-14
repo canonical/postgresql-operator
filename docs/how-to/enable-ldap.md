@@ -30,7 +30,7 @@ Deploy the [GLAuth charm](https://charmhub.io/glauth-k8s):
 ```text
 juju add-model glauth
 juju deploy self-signed-certificates
-juju deploy postgresql-k8s --channel 16/stable --trust
+juju deploy postgresql-k8s --channel 14/stable --trust
 juju deploy glauth-k8s --channel edge --trust
 ```
 
