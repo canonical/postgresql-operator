@@ -607,23 +607,6 @@ def test_promote_to_primary():
 
     assert result is None
 
-    # 3.
-    # mock_charm = MagicMock()
-    # mock_event = MagicMock()
-    # mock_relation = MagicMock()
-    # mock_relation.status = MagicMock()
-    # mock_relation.status.message =  READ_ONLY_MODE_BLOCKING_MESSAGE
-    
-    # relation = PostgreSQLAsyncReplication(mock_charm)
-    # relation._get_primary_cluster = MagicMock(return_value = None)
-
-    # type(relation).app = PropertyMock(return_value=mock_relation)
-    # relation._handle_replication_change = MagicMock(return_value=True)
-
-    # result = relation.promote_to_primary(mock_event)
-
-    # assert result is None
-
 def test__configure_standby_cluster():
     mock_charm = MagicMock()
     mock_event = MagicMock()
@@ -681,3 +664,49 @@ def test__configure_standby_cluster():
         
         assert result is True
         mock_check_call.assert_called_once()
+
+def test_wait_for_standby_leader():
+    # 1.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)  
+
+    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.unit.is_leader.return_value = False
+    mock_charm._patroni.is_member_isolated = True
+    mock_charm._patroni.restart_patroni = MagicMock()
+
+    result = relation._wait_for_standby_leader(mock_event)
+    assert result is True
+    mock_charm._patroni.restart_patroni.assert_called_once()
+    mock_event.defer.assert_called_once()
+
+    # 2.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)  
+ 
+    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.unit.is_leader.return_value = False
+    mock_charm._patroni.is_member_isolated = False
+
+    result = relation._wait_for_standby_leader(mock_event)
+    assert result is True
+    mock_event.defer.assert_called_once()
+
+    # 3.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    
+    relation = PostgreSQLAsyncReplication(mock_charm)  
+ 
+    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.unit.is_leader.return_value = True
+
+    result = relation._wait_for_standby_leader(mock_event)
+    assert result is False
+
+def test_update_primary_cluster_data():
+    pass
