@@ -137,8 +137,6 @@ postgresql/0*  active    idle   0        10.26.224.154   5432/tcp  Primary
 
 Machine  State    Address        Inst id        Base          AZ  Message
 0        started  10.26.224.154  juju-1c143d-0  ubuntu@24.04      Running
-
-
 ```
 
 You can also watch juju logs with the [`juju debug-log`](https://juju.is/docs/juju/juju-debug-log) command.
@@ -283,19 +281,19 @@ The output should be the same as the one obtained before with `psql`, but this t
 
 Next, we'll create and connect to a new database within the interactive shell. Note that this is only for educational purposes -- we will go over the safe way to create databases in a later section about integrations.
 
-Create and connect to a new database called `mynewdatabase`:
+Create and connect to a new database called `testdatabase`:
 
 ```text
-postgres=# CREATE DATABASE mynewdatabase;
-postgres=# \c mynewdatabase
+postgres=# CREATE DATABASE mydb-test;
+postgres=# \c mydb-test
 
-You are now connected to database "mynewdatabase" as user "operator".
+You are now connected to database "mydb-test" as user "operator".
 ```
 
 We can now create a new table inside this database:
 
 ```text
-mynewdatabase=# CREATE TABLE mytable (
+mydb-test=# CREATE TABLE mytable (
 	id SERIAL PRIMARY KEY,
 	name VARCHAR(50),
 	age INT
@@ -305,13 +303,13 @@ mynewdatabase=# CREATE TABLE mytable (
 and insert an element into it:
 
 ```text
-mynewdatabase=# INSERT INTO mytable (name, age) VALUES ('Numbat', 20);
+mydb-test=# INSERT INTO mytable (name, age) VALUES ('Numbat', 20);
 ```
 
 We can see our new table element by submitting a query:
 
 ```text
-mynewdatabase=# SELECT * FROM mytable;
+mydb-test=# SELECT * FROM mytable;
 
  id | name | age
 ----+------+-----
@@ -322,10 +320,10 @@ mynewdatabase=# SELECT * FROM mytable;
 You can try multiple SQL commands inside this environment. Once you're ready, reconnect to the default postgres database and drop the sample database we created:
 
 ```text
-mynewdatabase=# \c postgres
+mydb-test=# \c postgres
 
 You are now connected to database "postgres" as user "operator".
-postgres=# DROP DATABASE mynewdatabase;
+postgres=# DROP DATABASE mydb-test;
 ```
 
 When you’re ready to leave the PostgreSQL shell, you can just type `exit`. This will take you back to the host of Charmed PostgreSQL (`postgresql/0`). Exit this host by once again typing exit. Now you will be in your original shell where you first started the tutorial. Here you can interact with Juju and LXD.
@@ -422,10 +420,10 @@ Integrations automatically create a username, password, and database for the des
 
 In this tutorial, we will relate to the [data integrator charm](https://charmhub.io/data-integrator). This is a bare-bones charm that allows for central management of database users. It automatically provides credentials and endpoints that are needed to connect with a charmed database application.
 
-To deploy `data-integrator` and associate it to a new database called `test-database`:
+To deploy `data-integrator` and associate it to a new database called `mydb-integrator`:
 
 ```{terminal}
-:input: juju deploy data-integrator --config database-name=test-database
+:input: juju deploy data-integrator --config database-name=mydb-integrator
 :user: ubuntu
 :host: my-vm
 
@@ -489,64 +487,88 @@ postgresql:refresh-v-three             postgresql:refresh-v-three             re
 postgresql:restart                     postgresql:restart                     rolling_op             peer   
 ```
 
-<!--TODO with secrets 
-To retrieve the username, password and database name, run the command
+To retrieve the username, password and database name, run the `get-credentials` Juju action:
 
-```text
-juju run data-integrator/leader get-credentials
-```
+```{terminal}
+:input: juju run data-integrator/leader get-credentials
+:user: ubuntu
+:host: my-vm
 
-Example output:
-```yaml
-unit-data-integrator-0:
-  UnitId: data-integrator/0
-  id: "20"
-  results:
-    ok: "True"
-    postgresql:
-      database: test-database
-      endpoints: 10.89.49.129:5432
-      password: 136bvw0s7FjJ6mxZ
-      read-only-endpoints: 10.89.49.197:5432
-      username: relation-3
-      version: "14.7"
-  status: completed
-  timing:
-    completed: 2023-03-20 09:22:50 +0000 UTC
-    enqueued: 2023-03-20 09:22:46 +0000 UTC
-    started: 2023-03-20 09:22:50 +0000 UTC
+Running operation 3 with 1 task
+  - task 4 on unit-data-integrator-0
+
+Waiting for task 4...
+ok: "True"
+postgresql:
+  data: '{"database": "mydb-integrator", "external-node-connectivity": "true", "requested-secrets":
+    "[\"username\", \"password\", \"tls\", \"tls-ca\", \"uris\"]"}'
+  database: mydb-integrator
+  endpoints: 10.26.224.154:5432
+  password: MpMfj5ZnlmCAjnBB
+
+  ...
+
+  uris: postgresql://relation-4:MpMfj5ZnlmCAjnBB@10.26.224.154:5432/mydb-integrator
+  username: relation-4
+  version: "16.9"
 ```
-Note that your hostnames, usernames, and passwords will likely be different.
 
 ### Access the related database
 
-Use `endpoints`, `username`, `password` from above to connect newly created database `test-database` on the PostgreSQL server:
+Use `endpoints`, `username`, `password` from above to connect newly created database `mydb-integrator` on the PostgreSQL server.
 
-```text
-> psql --host=10.89.49.129 --username=relation-3 --password test-database
-...
-test-database=> \l
-...
- test-database | operator | UTF8     | C.UTF-8 | C.UTF-8 | =Tc/operator             +
-               |          |          |         |         | operator=CTc/operator    +
-               |          |          |         |         | "relation-3"=CTc/operator
-...
+```{terminal}
+:input: juju ssh --container postgresql postgresql/leader bash
+:user: ubuntu
+:host: my-vm
 ```
 
-The newly created database `test-database` is also available on all other PostgreSQL cluster members:
+This time, your `host` is the postgresql leader unit (see the `endpoints:` field in the previous output), but your `username`, `password`, and database name are different since we are accessing the PostgreSQL server via a `data-integrator` user.
 
-```text
-> psql --host=10.89.49.197 --username=relation-3 --password --list
-...
- test-database | operator | UTF8     | C.UTF-8 | C.UTF-8 | =Tc/operator             +
-               |          |          |         |         | operator=CTc/operator    +
-               |          |          |         |         | "relation-3"=CTc/operator
-...
+```{terminal}
+:input: sudo psql --host=10.26.224.154 --username=relation-4 --password mydb-integrator
+:user: ubuntu
+:host: juju-1c143d-0
+
+Password:
 ```
 
-When you relate two applications, Charmed PostgreSQL automatically sets up a new user and database for you.
-Note the database name we specified when we first deployed the `data-integrator` charm: `--config database-name=test-database`.
--->
+When you enter the interactive prompt for `mydb-integrator`, type `\l` to view your list of databases.
+```text
+psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
+Type "help" for help.
+
+mydb-integrator=> \l
+                                     List of databases
+     Name        |          Owner          | ... |                    Access privileges                     
+-----------------+-------------------------+---- +----------------------------------------------------------
+ postgres        | operator                | ... | operator=CTc/operator                                     +
+                 |                         | ... | backup=c/operator                                         +
+                 |                         | ... | monitoring=CTc/operator                                   +
+                 |                         | ... | charmed_databases_owner=c/operator                        +
+                 |                         | ... | replication=CTc/operator                                  +
+                 |                         | ... | rewind=CTc/operator  
+ template0       | operator                | ... | =c/operator                                               +
+                 |                         | ... | operator=CTc/operator  
+ template1       | operator                | ... | =c/operator                                               +
+                 |                         | ... | operator=CTc/operator                                     +
+                 |                         | ... | backup=c/operator                                         +
+                 |                         | ... | monitoring=c/operator                                     +
+                 |                         | ... | charmed_databases_owner=c/operator  
+ mydb-integrator | charmed_databases_owner | ... | charmed_databases_owner=Tc/charmed_databases_owner        +
+                 |                         | ... | "charmed_mydb-integrator_admin"=c/charmed_databases_owner +
+                 |                         | ... | charmed_stats=c/charmed_databases_owner                   +
+                 |                         | ... | charmed_read=c/charmed_databases_owner                    +
+                 |                         | ... | charmed_dml=c/charmed_databases_owner                     +
+                 |                         | ... | charmed_dba=c/charmed_databases_owner                     +
+                 |                         | ... | charmed_admin=c/charmed_databases_owner                   +
+                 |                         | ... | "charmed_mydb-integrator_owner"=CT/charmed_databases_owner
+
+```
+
+The newly created database `mydb-integrator` is also available on all other PostgreSQL cluster members, so you can enter the same interactive terminal on different units.
+
+Type `exit` to leave the interactive prompt, then `exit` again to go back to the Multipass VM.
 
 ### Remove the user
 
@@ -557,24 +579,27 @@ Removing the integration automatically removes the user that was created when th
 :user: ubuntu
 :host: my-vm
 ```
-<!-- TODO with secrets (different username?)>
-Now try again to connect to the same PostgreSQL you just used in the previous section:
 
-```text
-> psql --host=10.89.49.129 --username=relation-3 --password --list
+If you try to connect to the same PostgreSQL unit you used in the previous section, you'll get an error message. 
+
+```{terminal}
+:input: juju ssh --container postgresql postgresql/leader bash
+:user: ubuntu
+:host: my-vm
 ```
 
-This will output an error message like the one shown below:
+```{terminal}
+:input: sudo psql --host=10.26.224.154 --username=relation-4 --password --list
+:user: ubuntu
+:host: juju-1c143d-0
 
-```text
-psql: error: connection to server at "10.89.49.129", port 5432 failed: FATAL:  password authentication failed for user "relation-3"
+Password:
+psql: error: connection to server at "10.89.49.154", port 5432 failed: FATAL:  password authentication failed for user "relation-4"
 ```
 
 This is expected, since this user no longer exists after removing the integration.
 
-Data remains on the server at this stage.
-
-To create a user again, integrate the applications again:
+Data remains on the server at this stage. To create a user again, exit the unit and integrate the applications again:
 
 ```{terminal}
 :input: juju integrate data-integrator postgresql
@@ -584,14 +609,16 @@ To create a user again, integrate the applications again:
 
 Re-integrating generates a new user and password:
 
-```text
-juju run data-integrator/leader get-credentials
+```{terminal}
+:input: juju run data-integrator/leader get-credentials
+:user: ubuntu
+:host: my-vm
 ```
 
 You can then connect to the database with these new credentials.
 
 From here you will see all of your data is still present in the database.
--->
+
 
 ## Enable encryption with TLS
 
@@ -642,7 +669,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 ```
 
 To enable TLS on Charmed PostgreSQL, integrate the two applications:
-<!--TODO: check that client-certificates is the correct endpoint -->
+
 ```{terminal}
 :scroll:
 :input: juju integrate postgresql:client-certificates self-signed-certificates:certificates
