@@ -86,15 +86,15 @@ A controller can work with different [models](https://juju.is/docs/juju/model). 
 :host: my-vm
 ``` 
 
-You can now view the model you created by running the command `juju status`. 
+You can now view the model you created by running the command [`juju status`](https://juju.is/docs/juju/juju-status). 
 
 ```{terminal}
 :input: juju status
 :user: ubuntu
 :host: my-vm
 
-Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord   localhost/localhost  3.6.8    unsupported  15:31:14+02:00
+Model     Controller  Cloud/Region         Version   SLA          Timestamp
+tutorial  overlord    localhost/localhost   3.6.8    unsupported  15:31:14+02:00
 
 Model "admin/tutorial" is empty.
 ```
@@ -119,13 +119,15 @@ You can track the progress by running:
 :host: my-vm
 ```
 
-This command is useful for checking the real-time information about the state of a charm and the machines hosting it. Check the [`juju status` documentation](https://juju.is/docs/juju/juju-status) for more information about its usage.
+```{tip}
+You can open a separate terminal window, enter the same Multipass VM, and keep `juju status --watch 1s` permanently running in it.
+```
 
 When the application is ready, `juju status` will show something similar to the sample output below:
 
 ```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord   localhost/localhost  3.6.8    unsupported  15:38:30+02:00
+tutorial  overlord   localhost/localhost   3.6.8    unsupported  15:38:30+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message     
 postgresql  16.9     active      1  postgresql  16/stable  843  no                                     
@@ -202,8 +204,10 @@ We'll need the IP address associated with the specific application unit we want 
 Since we will use the leader unit to connect to PostgreSQL, we are interested in the address for the unit marked with `*`, like in the output below:
 
 ```text
+...
 Unit           Workload  Agent  Machine  Public address  Ports     Message    
 postgresql/0*  active    idle   0        10.26.224.154   5432/tcp  Primary 
+...
 ```
 
 While still in the leader unit's shell, run the command below to list all databases currently available. Remember to change the example IP to yours.
@@ -277,7 +281,9 @@ postgres=# \l
 
 The output should be the same as the one obtained before with `psql`, but this time we did not need to specify any parameters since we are already connected to the PostgreSQL application.
 
-To create and connect to a new sample database, we can run the following commands:
+Next, we'll create and connect to a new database within the interactive shell. Note that this is only for educational purposes -- we will go over the safe way to create databases in a later section about integrations.
+
+Create and connect to a new database called `mynewdatabase`:
 
 ```text
 postgres=# CREATE DATABASE mynewdatabase;
@@ -365,17 +371,15 @@ tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:04:14+02:00
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
 postgresql  16.9     active      3  postgresql  16/stable  843  no
 
-Unit           Workload  Agent  Machine  Public address                          Ports     Message
-postgresql/0*  active    idle   0        10.26.224.154                           5432/tcp  Primary
-postgresql/1   active    idle   1        10.26.224.142                         
-  5432/tcp
-postgresql/2   active    idle   2        10.26.224.123                           5432/tcp
+Unit           Workload  Agent  Machine  Public address  Ports     Message
+postgresql/0*  active    idle   0        10.26.224.154   5432/tcp  Primary
+postgresql/1   active    idle   1        10.26.224.142   5432/tcp
+postgresql/2   active    idle   2        10.26.224.123   5432/tcp
 
-Machine  State    Address                                 Inst id        Base          AZ  Message
-0        started  10.26.224.154                           juju-1c143d-0  ubuntu@24.04      Running
-1        started  10.26.224.142                         
-  juju-1c143d-1  ubuntu@24.04      Running
-2        started  10.26.224.123                           juju-1c143d-2  ubuntu@24.04      Running
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.26.224.154  juju-1c143d-0  ubuntu@24.04      Running
+1        started  10.26.224.142  juju-1c143d-1  ubuntu@24.04      Running
+2        started  10.26.224.123  juju-1c143d-2  ubuntu@24.04      Running
 ```
 
 ### Remove units
@@ -432,7 +436,7 @@ Running `juju status` will show you `data-integrator` in a `blocked` state. This
 
 ```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:26:58+02:00
+tutorial  overlord    localhost/localhost   3.6.8    unsupported  17:26:58+02:00
 
 App              Version  Status   Scale  Charm            Channel        Rev  Exposed  Message    
 data-integrator           blocked      1  data-integrator  latest/stable  78   no       Please relate the data-integrator with the desired product
@@ -461,7 +465,7 @@ Wait for `juju status --watch 1s --relations` to show all applications/units as 
 
 ```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
-tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:29:08+02:00
+tutorial  overlord    localhost/localhost  3.6.8    unsupported  17:29:08+02:00
 
 App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message     
 data-integrator           active      1  data-integrator  latest/stable  78   no                                                                  
@@ -617,7 +621,7 @@ Wait until the `self-signed-certificates` app is up and active, use `juju status
 
 ```text
 Model     Controller  Cloud/Region         Version  SLA          Timestamp                                      
-tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:43:44+02:00                                 
+tutorial  overlord   localhost/localhost   3.6.8    unsupported  17:43:44+02:00                                 
                                                                                                                 
 App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
 data-integrator                    active      1  data-integrator           latest/stable  78   no
@@ -640,6 +644,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 To enable TLS on Charmed PostgreSQL, integrate the two applications:
 <!--TODO: check that client-certificates is the correct endpoint -->
 ```{terminal}
+:scroll:
 :input: juju integrate postgresql:client-certificates self-signed-certificates:certificates
 :user: ubuntu
 :host: my-vm
@@ -672,6 +677,7 @@ Congratulations! PostgreSQL is now using TLS certificate generated by the extern
 To remove the external TLS, remove the integration:
 
 ```{terminal}
+:scroll:
 :input: juju remove-relation postgresql:client-certificates self-signed-certificates:certificates
 :user: ubuntu
 :host: my-vm

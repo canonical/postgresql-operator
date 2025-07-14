@@ -8,7 +8,7 @@ The [legacy PostgreSQL charm](/explanation/legacy-charm) in track [`latest`](htt
 
 ## Check Juju storage details
 
-Check the [`metadata.yaml`](https://github.com/canonical/postgresql-operator/blob/16/stable/metadata.yaml) for find Juju storage name and tech details:
+Check the [`metadata.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/metadata.yaml) for find Juju storage name and tech details:
 
 <details><summary>Charmed PostgreSQL 16 storage list</summary>
 
