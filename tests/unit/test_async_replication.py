@@ -1,18 +1,20 @@
+# Copyright 2024 Canonical Ltd.
+# See LICENSE file for licensing details.
+
 from unittest.mock import MagicMock, PropertyMock, patch
 
-from ops.model import WaitingStatus
 import pytest
+from ops.model import WaitingStatus
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
+    REPLICATION_CONSUMER_RELATION,
     NotReadyError,
     PostgreSQLAsyncReplication,
     StandbyClusterAlreadyPromotedError,
-    REPLICATION_CONSUMER_RELATION,
 )
 
 PEER = "peer"
-
 
 def create_mock_unit(name="unit"):
     unit = MagicMock()
@@ -459,7 +461,6 @@ def test__configure_primary_cluster():
     relation._update_primary_cluster_data.assert_called_once()
     assert result is True
 
-
 def test__on_async_relation_departed():
     mock_charm = MagicMock()
     mock_event = MagicMock()
@@ -473,7 +474,7 @@ def test__on_async_relation_departed():
     relation = PostgreSQLAsyncReplication(mock_charm)
 
     result = relation._on_async_relation_departed(mock_event)
-    assert result is None  
+    assert result is None
     assert mock_unit_data == {"departing": "True"}
 
 def test_on_async_relation_joined():
@@ -481,24 +482,24 @@ def test_on_async_relation_joined():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_peers = MagicMock()
-    mock_unit_data = {}  
-    
+    mock_unit_data = {}
+
     mock_charm._unit_ip = "10.0.0.1"
     mock_charm._peers = mock_peers
     mock_peers.data = {mock_charm.unit: mock_unit_data}
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
-    
+
     relation._get_highest_promoted_cluster_counter_value = MagicMock(return_value="1")
-    
+
     result = relation._on_async_relation_joined(mock_event)
-    
+
     assert result is None
-    
+
     assert mock_unit_data == {
         "unit-promoted-cluster-counter": "1"
     }
-    
+
     relation._get_highest_promoted_cluster_counter_value.assert_called_once()
 
 def test_on_create_replication():
@@ -506,11 +507,11 @@ def test_on_create_replication():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     relation = PostgreSQLAsyncReplication(mock_charm)
-    
+
     relation._get_primary_cluster = MagicMock(return_value=True)
-    
+
     result = relation._on_create_replication(mock_event)
-    
+
     assert result is None
     mock_event.fail.assert_called_once_with(
             "There is already a replication set up."
@@ -519,17 +520,17 @@ def test_on_create_replication():
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
-    
+
     relation._get_primary_cluster = MagicMock(return_value=None)
-    
+
     mock_relation = MagicMock()
     mock_relation.name = REPLICATION_CONSUMER_RELATION
     type(relation)._relation = PropertyMock(return_value=mock_relation)
-    
+
     result = relation._on_create_replication(mock_event)
-        
+
     assert result is None
     mock_event.fail.assert_called_once_with(
             "This action must be run in the cluster where the offer was created."
@@ -537,39 +538,39 @@ def test_on_create_replication():
     # 3.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
-    
+
     relation._get_primary_cluster = MagicMock(return_value=None)
 
     relation._handle_replication_change = MagicMock(return_value=True)
-    
+
     mock_relation = MagicMock()
     mock_relation.name = "Something"
     type(relation)._relation = PropertyMock(return_value=mock_relation)
-    
+
     result = relation._on_create_replication(mock_event)
-        
+
     assert result is None
 
     # 4.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
-    
+
     relation._get_primary_cluster = MagicMock(return_value=None)
 
     relation._handle_replication_change = MagicMock(return_value=False)
-    
+
     mock_relation = MagicMock()
     mock_relation.name = "Something"
     type(relation)._relation = PropertyMock(return_value=mock_relation)
-    
+
     result = relation._on_create_replication(mock_event)
-        
+
     assert result is None
-    
+
 def test_promote_to_primary():
 
     # 1.
@@ -578,25 +579,24 @@ def test_promote_to_primary():
     mock_relation = MagicMock()
     mock_relation.status = MagicMock()
     mock_relation.status.message =  "Something"
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._get_primary_cluster = MagicMock(return_value = None)
 
     type(relation).app = PropertyMock(return_value=mock_relation)
     result = relation.promote_to_primary(mock_event)
-
     assert result is None
     mock_event.fail.assert_called_once_with(
            "No primary cluster found. Run `create-replication` action in the cluster where the offer was created."
         )
-    
+
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_relation = MagicMock()
     mock_relation.status = MagicMock()
     mock_relation.status.message =  READ_ONLY_MODE_BLOCKING_MESSAGE
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._get_primary_cluster = MagicMock(return_value = None)
 
@@ -610,58 +610,52 @@ def test_promote_to_primary():
 def test__configure_standby_cluster():
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._relation = MagicMock()
-    relation._relation.name = REPLICATION_CONSUMER_RELATION  
+    relation._relation.name = REPLICATION_CONSUMER_RELATION
     relation._update_internal_secret = MagicMock(return_value=False)
 
     result = relation._configure_standby_cluster(mock_event)
-    
 
     assert result is False
 
     mock_event.defer.assert_called_once()
 
-    # 2. 
-    
+    # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._relation = MagicMock()
     relation._relation.name = "something_else"
     relation._update_internal_secret = MagicMock(return_value=True)
-    relation.get_system_identifier = MagicMock(return_value=(None, 2)) 
-
+    relation.get_system_identifier = MagicMock(return_value=(None, 2))
 
     with pytest.raises(Exception) as exc_info:
         relation._configure_standby_cluster(mock_event)
-    
-    assert str(exc_info.value) == "2" 
 
-    # 3. 
-    
+    assert str(exc_info.value) == "2"
+
+    # 3.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
+
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._relation = MagicMock()
-    relation._relation.name = "some_relation"  
+    relation._relation.name = "some_relation"
     relation._relation.app = "remote-app"
-    relation._relation.data = {relation._relation.app: {"system-id": "123"}} 
-    
+    relation._relation.data = {relation._relation.app: {"system-id": "123"}}
 
     relation._update_internal_secret = MagicMock(return_value=True)
-    relation.get_system_identifier = MagicMock(return_value=("456", None))  
+    relation.get_system_identifier = MagicMock(return_value=("456", None))
     relation.charm = MagicMock()
     relation.charm.app_peer_data = {}
-    
 
     with patch("subprocess.check_call") as mock_check_call:
-        
+
         result = relation._configure_standby_cluster(mock_event)
-        
+
         assert result is True
         mock_check_call.assert_called_once()
 
@@ -669,8 +663,8 @@ def test_wait_for_standby_leader():
     # 1.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
-    relation = PostgreSQLAsyncReplication(mock_charm)  
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
 
     mock_charm._patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = False
@@ -685,9 +679,9 @@ def test_wait_for_standby_leader():
     # 2.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
-    relation = PostgreSQLAsyncReplication(mock_charm)  
- 
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
     mock_charm._patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = False
     mock_charm._patroni.is_member_isolated = False
@@ -699,9 +693,8 @@ def test_wait_for_standby_leader():
     # 3.
     mock_charm = MagicMock()
     mock_event = MagicMock()
-    
-    relation = PostgreSQLAsyncReplication(mock_charm)  
- 
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
     mock_charm._patroni.get_standby_leader.return_value = None
     mock_charm.unit.is_leader.return_value = True
 
