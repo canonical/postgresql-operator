@@ -2,7 +2,7 @@
 
 Charmed PostgreSQL separates TimescaleDB editions for different [Charmhub tracks](https://canonical-charmcraft.readthedocs-hosted.com/en/stable/howto/manage-channels/):
 
-[Charmed PostgreSQL 16](https://charmhub.io/postgresql?channel=16/edge) ships [Timescale Community edition](https://docs.timescale.com/about/latest/timescaledb-editions/).
+[Charmed PostgreSQL 16](https://charmhub.io/postgresql?channel=16/stable) ships [Timescale Community edition](https://docs.timescale.com/about/latest/timescaledb-editions/).
 
 ## Enable TimescaleDB
 

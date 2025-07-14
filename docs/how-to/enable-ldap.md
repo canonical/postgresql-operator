@@ -6,7 +6,7 @@ This guide goes over the steps to integrate LDAP as an authentication method wit
 
 ## Prerequisites
 
-* Charmed PostgreSQL channel `14/edge` or `16/edge` (revision `600` or higher)
+* Charmed PostgreSQL channel `14/stable` or `16/stable` (revision `600` or higher)
 * Juju `v3.6` or higher
 
 ## Deploy an LDAP server in a K8s environment

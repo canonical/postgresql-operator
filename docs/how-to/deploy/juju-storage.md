@@ -2,13 +2,13 @@
 
 Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju/3.6/reference/storage/) abstraction to utilise data volume provided by different [clouds](https://documentation.ubuntu.com/juju/3.6/reference/cloud/#cloud) while keeping the same UI/UX for end users.
 
-[Charmed PostgreSQL 16](https://charmhub.io/postgresql?channel=16/edge) supports multiple storage types: `archive`, `data`, `logs` and `temp`.
+[Charmed PostgreSQL 16](https://charmhub.io/postgresql?channel=16/stable) supports multiple storage types: `archive`, `data`, `logs` and `temp`.
 
 The [legacy PostgreSQL charm](/explanation/legacy-charm) in track [`latest`](https://charmhub.io/postgresql?channel=latest/stable)" does **not** support the Juju storage abstraction.
 
 ## Check Juju storage details
 
-Check the [`metadata.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/metadata.yaml) for find Juju storage name and tech details:
+Check the [`metadata.yaml`](https://github.com/canonical/postgresql-operator/blob/16/stable/metadata.yaml) for find Juju storage name and tech details:
 
 <details><summary>Charmed PostgreSQL 16 storage list</summary>
 
@@ -83,7 +83,7 @@ Charmed PostgreSQL 16 uses Juju user secrets to handle credentials:
 
 # Re-deploy new app re-using old storage and old credentials
 > juju deploy postgresql \
-  --channel 16/edge \
+  --channel 16/stable \
   --attach-storage pgdata/5 \
   --config system-users=newsecret54321id
 
@@ -99,8 +99,8 @@ Prepare the test data to restore later:
 > juju add-model teststorage
 
 # Deploy the new postgresql to dump storage with credentials
-> juju deploy postgresql --channel 16/edge --storage pgdata=5Gcompleted
-Deployed "postgresql" from charm-hub charm "postgresql", revision 613 in channel 16/edge on ubuntu@24.04/stable
+> juju deploy postgresql --channel 16/stable --storage pgdata=5Gcompleted
+Deployed "postgresql" from charm-hub charm "postgresql", revision 613 in channel 16/stable on ubuntu@24.04/stable
 
 # Wait for deployment completed:
 > juju status
@@ -177,10 +177,10 @@ secret:d09vcn1oie738j7af4ng
 
 # Re-deploy app with old storage and old passwords
 > juju deploy postgresql \
-  --channel 16/edge \
+  --channel 16/stable \
   --attach-storage pgdata/0 \
   --config system-users=d09vcn1oie738j7af4ng
-Deployed "postgresql" from charm-hub charm "postgresql", revision 613 in channel 16/edge on ubuntu@24.04/stable
+Deployed "postgresql" from charm-hub charm "postgresql", revision 613 in channel 16/stable on ubuntu@24.04/stable
 
 # Grant new application access to manually created Juju User secret
 > juju grant-secret mypgpass postgresql

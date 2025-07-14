@@ -26,7 +26,7 @@ First, we will set up a cloud environment using [Multipass](https://multipass.ru
 To learn about other types of deployment environments and methods, see [](/how-to/deploy/index).
 ```
 
-### Multipass
+### Create a Multipass VM
 
 [Multipass](https://multipass.run/) is a quick and easy way to launch virtual machines running Ubuntu. It uses the [cloud-init](https://cloud-init.io/) standard to install and configure all the necessary parts automatically.
 
@@ -66,7 +66,7 @@ Welcome to Ubuntu 24.04.2 LTS (GNU/Linux 6.8.0-63-generic x86_64)
 The files `/var/log/cloud-init.log` and `/var/log/cloud-init-output.log` contain all low-level installation details. 
 ```
 
-### Juju
+### Set up Juju
 
 Since `my-vm` already has Juju and LXD installed, we can go ahead and [bootstrap](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/bootstrap/#details) a cloud. In this tutorial, we will use a local LXD [controller](https://documentation.ubuntu.com/juju/3.6/reference/controller/). 
 
@@ -104,7 +104,7 @@ Model "admin/tutorial" is empty.
 To deploy Charmed PostgreSQL, run:
 
 ```{terminal}
-:input: juju deploy postgresql --channel=16/edge
+:input: juju deploy postgresql --channel=16/stable
 :user: ubuntu
 :host: my-vm
 ```
@@ -128,7 +128,7 @@ Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  15:38:30+02:00
 
 App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message     
-postgresql  16.9     active      1  postgresql  16/edge  843  no                                     
+postgresql  16.9     active      1  postgresql  16/stable  843  no                                     
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message    
 postgresql/0*  active    idle   0        10.26.224.154   5432/tcp  Primary                                      
@@ -363,7 +363,7 @@ Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:04:14+02:00
 
 App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
-postgresql  16.9     active      3  postgresql  16/edge  843  no
+postgresql  16.9     active      3  postgresql  16/stable  843  no
 
 Unit           Workload  Agent  Machine  Public address                          Ports     Message
 postgresql/0*  active    idle   0        10.26.224.154                           5432/tcp  Primary
@@ -398,7 +398,7 @@ Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:14:38+02:00
 
 App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
-postgresql  16.9     active      2  postgresql  16/edge  843  no
+postgresql  16.9     active      2  postgresql  16/stable  843  no
 
 Unit           Workload  Agent      Machine  Public address                          Ports     Message   
 postgresql/0*  active    idle       0        10.26.224.154                           5432/tcp                          
@@ -437,7 +437,7 @@ tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:26:58+02:00
 
 App              Version  Status   Scale  Charm            Channel        Rev  Exposed  Message    
 data-integrator           blocked      1  data-integrator  latest/stable   78  no       Please relate the data-integrator with the desired product
-postgresql       16.9     active       2  postgresql       16/edge        843  no    
+postgresql       16.9     active       2  postgresql       16/stable        843  no    
 
 Unit                Workload  Agent  Machine  Public address                          Ports     Message       
 data-integrator/0*  blocked   idle   3        10.26.224.131                                     Please relate the data-integrator with the desired product
@@ -468,7 +468,7 @@ tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:29:08+02:00
 
 App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message     
 data-integrator           active      1  data-integrator  latest/stable   78  no                                                                  
-postgresql       16.9     active      2  postgresql       16/edge        843  no     
+postgresql       16.9     active      2  postgresql       16/stable        843  no     
 
 Unit                Workload  Agent  Machine  Public address                          Ports     Message       
 data-integrator/0*  active    idle   3        10.26.224.131                                                                                                   
@@ -626,7 +626,7 @@ tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:43:44+02:00
                                                                                                                 
 App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
 data-integrator                    active      1  data-integrator           latest/stable   78  no
-postgresql                16.9     active      2  postgresql                16/edge        843  no              
+postgresql                16.9     active      2  postgresql                16/stable        843  no              
 self-signed-certificates           active      1  self-signed-certificates  1/stable       317  no              
                                                                                                                 
 Unit                         Workload  Agent  Machine  Public address                          Ports     Message
@@ -738,4 +738,4 @@ multipass delete --purge my-vm
 
 <!--Links-->
 
-[Charmhub PostgreSQL VM]: https://charmhub.io/postgresql?channel=16/edge
+[Charmhub PostgreSQL VM]: https://charmhub.io/postgresql?channel=16/stable
