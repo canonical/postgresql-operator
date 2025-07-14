@@ -580,10 +580,12 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
 
         another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
         data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
+        # Base is ignored
         await ops_test.model.deploy(
             DATA_INTEGRATOR_APP_NAME,
             application_name=another_data_integrator_app_name,
-            base=CHARM_BASE,
+            channel="latest/edge",
+            series="jammy",
         )
         await ops_test.model.wait_for_idle(
             apps=[another_data_integrator_app_name], status="blocked"
