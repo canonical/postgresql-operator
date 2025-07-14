@@ -5,6 +5,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 from ops.model import WaitingStatus
+from tenacity import RetryError
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
@@ -770,3 +771,37 @@ def test_handle_replication_change():
     relation._update_primary_cluster_data.assert_called_once_with(2, 12345)
     relation._re_emit_async_relation_changed_event.assert_called_once()
     mock_event.fail.assert_not_called()
+
+
+def test_handle_forceful_promotion():
+    # 1.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+
+    mock_event.params.get.return_value = True
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    result = relation._handle_forceful_promotion(mock_event)
+
+    assert result is True
+    # 2.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+
+    mock_event.params.get.return_value = False
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    relation._relation = MagicMock()
+    relation._relation.app = MagicMock()
+    relation._relation.app.name = "test-app"
+
+    relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
+
+    mock_charm._patroni.get_primary.side_effect = RetryError("timeout")
+
+    result = relation._handle_forceful_promotion(mock_event)
+
+    mock_event.fail.assert_called_once_with(
+        "test-app isn't reachable. Pass `force=true` to promote anyway."
+    )
+    assert result is False
