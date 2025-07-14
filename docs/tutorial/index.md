@@ -127,7 +127,7 @@ When the application is ready, `juju status` will show something similar to the 
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  15:38:30+02:00
 
-App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message     
+App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message     
 postgresql  16.9     active      1  postgresql  16/stable  843  no                                     
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message    
@@ -362,7 +362,7 @@ You’ll know that all three nodes are in sync when `juju status` reports `Workl
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:04:14+02:00
 
-App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
 postgresql  16.9     active      3  postgresql  16/stable  843  no
 
 Unit           Workload  Agent  Machine  Public address                          Ports     Message
@@ -397,18 +397,17 @@ You’ll know that the replica was successfully removed when `juju status --watc
 Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:14:38+02:00
 
-App         Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
 postgresql  16.9     active      2  postgresql  16/stable  843  no
 
-Unit           Workload  Agent      Machine  Public address                          Ports     Message   
-postgresql/0*  active    idle       0        10.26.224.154                           5432/tcp                          
-postgresql/1   active    executing  1        10.26.224.142                         
+Unit           Workload  Agent      Machine  Public address    Ports     Message   
+postgresql/0*  active    idle       0        10.26.224.154     5432/tcp                          
+postgresql/1   active    executing  1        10.26.224.142     
   5432/tcp   
                                                                                                                                               
-Machine  State    Address                                 Inst id        Base          AZ  Message
-0        started  10.26.224.154                           juju-1c143d-0  ubuntu@24.04      Running
-1        started  10.26.224.142                         
-  juju-1c143d-1  ubuntu@24.04      Running
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.26.224.154   juju-1c143d-0  ubuntu@24.04      Running
+1        started  10.26.224.142   juju-1c143d-1  ubuntu@24.04      Running
 ```
 
 ## Integrate with other applications
@@ -436,20 +435,18 @@ Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:26:58+02:00
 
 App              Version  Status   Scale  Charm            Channel        Rev  Exposed  Message    
-data-integrator           blocked      1  data-integrator  latest/stable   78  no       Please relate the data-integrator with the desired product
-postgresql       16.9     active       2  postgresql       16/stable        843  no    
+data-integrator           blocked      1  data-integrator  latest/stable  78   no       Please relate the data-integrator with the desired product
+postgresql       16.9     active       2  postgresql       16/stable      843  no    
 
-Unit                Workload  Agent  Machine  Public address                          Ports     Message       
-data-integrator/0*  blocked   idle   3        10.26.224.131                                     Please relate the data-integrator with the desired product
-postgresql/0*       active    idle   0        10.26.224.154                           5432/tcp  Primary       
-postgresql/1        active    idle   1        10.26.224.142                         
-  5432/tcp       
+Unit                Workload  Agent  Machine  Public address  Ports     Message       
+data-integrator/0*  blocked   idle   3        10.26.224.131             Please relate the data-integrator with the desired product
+postgresql/0*       active    idle   0        10.26.224.154   5432/tcp  Primary       
+postgresql/1        active    idle   1        10.26.224.142   5432/tcp       
 
-Machine  State    Address                                 Inst id        Base          AZ  Message
-0        started  10.26.224.154                           juju-1c143d-0  ubuntu@24.04      Running
-1        started  10.26.224.142                         
-  juju-1c143d-1  ubuntu@24.04      Running
-3        started  10.26.224.131                           juju-1c143d-3  ubuntu@22.04      Running      
+Machine  State    Address       Inst id        Base          AZ  Message
+0        started  10.26.224.154 juju-1c143d-0  ubuntu@24.04      Running
+1        started  10.26.224.142 juju-1c143d-1  ubuntu@24.04      Running
+3        started  10.26.224.131 juju-1c143d-3  ubuntu@22.04      Running      
 ```
 
 Now that the `data-integrator` charm has been set up, we can relate it to PostgreSQL. This will automatically create a username, password, and database for `data-integrator`:
@@ -467,20 +464,18 @@ Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:29:08+02:00
 
 App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message     
-data-integrator           active      1  data-integrator  latest/stable   78  no                                                                  
-postgresql       16.9     active      2  postgresql       16/stable        843  no     
+data-integrator           active      1  data-integrator  latest/stable  78   no                                                                  
+postgresql       16.9     active      2  postgresql       16/stable      843  no     
 
-Unit                Workload  Agent  Machine  Public address                          Ports     Message       
-data-integrator/0*  active    idle   3        10.26.224.131                                                                                                   
-postgresql/0*       active    idle   0        10.26.224.154                           5432/tcp  Primary       
-postgresql/1        active    idle   1        10.26.224.142                         
-  5432/tcp       
+Unit                Workload  Agent  Machine  Public address  Ports     Message       
+data-integrator/0*  active    idle   3        10.26.224.131                                                                           
+postgresql/0*       active    idle   0        10.26.224.154   5432/tcp  Primary       
+postgresql/1        active    idle   1        10.26.224.142   5432/tcp       
 
-Machine  State    Address                                 Inst id        Base          AZ  Message
-0        started  10.26.224.154                           juju-1c143d-0  ubuntu@24.04      Running
-1        started  10.26.224.142                         
-  juju-1c143d-1  ubuntu@24.04      Running
-3        started  10.26.224.131                           juju-1c143d-3  ubuntu@22.04      Running
+Machine  State    Address        Inst id        Base          AZ  Message
+0        started  10.26.224.154  juju-1c143d-0  ubuntu@24.04      Running
+1        started  10.26.224.142  juju-1c143d-1  ubuntu@24.04      Running
+3        started  10.26.224.131  juju-1c143d-3  ubuntu@22.04      Running
 
 Integration provider                   Requirer                               Interface              Type     Message
 data-integrator:data-integrator-peers  data-integrator:data-integrator-peers  data-integrator-peers  peer            
@@ -625,23 +620,21 @@ Model     Controller  Cloud/Region         Version  SLA          Timestamp
 tutorial  overlord   localhost/localhost  3.6.8    unsupported  17:43:44+02:00                                 
                                                                                                                 
 App                       Version  Status  Scale  Charm                     Channel        Rev  Exposed  Message
-data-integrator                    active      1  data-integrator           latest/stable   78  no
-postgresql                16.9     active      2  postgresql                16/stable        843  no              
+data-integrator                    active      1  data-integrator           latest/stable  78   no
+postgresql                16.9     active      2  postgresql                16/stable      843  no              
 self-signed-certificates           active      1  self-signed-certificates  1/stable       317  no              
                                                                                                                 
-Unit                         Workload  Agent  Machine  Public address                          Ports     Message
-data-integrator/0*           active    idle   3        10.26.224.131                                            
-postgresql/0*                active    idle   0        10.26.224.154                           5432/tcp  Primary
-postgresql/1                 active    idle   1        10.26.224.142                         
-  5432/tcp
-self-signed-certificates/0*  active    idle   4        10.26.224.62                               
+Unit                         Workload  Agent  Machine  Public address  Ports     Message
+data-integrator/0*           active    idle   3        10.26.224.131                    
+postgresql/0*                active    idle   0        10.26.224.154   5432/tcp  Primary
+postgresql/1                 active    idle   1        10.26.224.142   5432/tcp
+self-signed-certificates/0*  active    idle   4        10.26.224.62       
                                                                                                   
-Machine  State    Address                                 Inst id        Base          AZ  Message
-0        started  10.26.224.154                           juju-1c143d-0  ubuntu@24.04      Running
-1        started  10.26.224.142                         
-  juju-1c143d-1  ubuntu@24.04      Running
-3        started  10.26.224.131                           juju-1c143d-3  ubuntu@22.04      Running                   
-4        started  10.26.224.62                            juju-1c143d-4  ubuntu@24.04      Running       
+Machine  State    Address         Inst id        Base          AZ  Message
+0        started  10.26.224.154   juju-1c143d-0  ubuntu@24.04      Running
+1        started  10.26.224.142   juju-1c143d-1  ubuntu@24.04      Running
+3        started  10.26.224.131   juju-1c143d-3  ubuntu@22.04      Running                   
+4        started  10.26.224.62    juju-1c143d-4  ubuntu@24.04      Running       
 ```
 
 To enable TLS on Charmed PostgreSQL, integrate the two applications:
