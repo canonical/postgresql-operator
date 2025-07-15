@@ -824,3 +824,29 @@ def test_handle_forceful_promotion():
     result = relation._handle_forceful_promotion(mock_event)
 
     assert result is True
+
+
+def test_on_async_relation_broken():
+    # 1.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+    mock_charm._peers = True
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    result = relation._on_async_relation_broken(mock_event)
+
+    assert result is None
+    # 2.
+    mock_charm = MagicMock()
+    mock_charm._peers = MagicMock()
+    mock_charm.is_unit_departing = False
+    mock_charm._patroni.get_standby_leader.return_value = None
+    mock_charm.unit.is_leader.return_value = True
+    mock_event = MagicMock()
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+    relation._on_async_relation_broken(mock_event)
+
+    assert mock_charm.update_config.called
+
