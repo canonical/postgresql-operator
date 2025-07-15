@@ -397,13 +397,13 @@ class PostgreSQL:
                 )
                 connect_statements = []
                 if database:
-                    if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
+                    if roles and not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
                         user_definition += f' IN ROLE "charmed_{database}_admin", "charmed_{database}_dml"'
                     else:
                         connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(database), Identifier(user)
                         ))
-                if any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA, ROLE_ADMIN, ROLE_DATABASES_OWNER]):
+                if roles and any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA, ROLE_ADMIN, ROLE_DATABASES_OWNER]):
                     for system_database in ["postgres", "template1"]:
                         connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(system_database), Identifier(user)
