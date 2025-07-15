@@ -2139,11 +2139,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     try:
                         # Storage path is constant
                         subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
-                        raise Exception
+                        return True
                     except subprocess.CalledProcessError:
-                        return False
+                        raise Exception
         except RetryError:
-            return True
+            return False
 
     @property
     def _peers(self) -> Relation:
