@@ -2402,6 +2402,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception as e:
             logger.error(f"Reload patroni call failed! error: {e!s}")
 
+        time.sleep(2) # Patroni need a bit to set flag on the API
         restart_pending = self._patroni.is_restart_pending()
         logger.debug(f"Checking if restart pending: {restart_postgresql} or {restart_pending}")
         restart_postgresql = restart_postgresql or restart_pending
