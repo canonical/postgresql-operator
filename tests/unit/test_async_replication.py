@@ -805,3 +805,22 @@ def test_handle_forceful_promotion():
         "test-app isn't reachable. Pass `force=true` to promote anyway."
     )
     assert result is False
+    # 3.
+    mock_charm = MagicMock()
+    mock_event = MagicMock()
+
+    mock_event.params.get.return_value = False
+
+    relation = PostgreSQLAsyncReplication(mock_charm)
+
+    relation._relation = MagicMock()
+    relation._relation.app = MagicMock()
+    relation._relation.app.name = "test-app"
+
+    relation.get_all_primary_cluster_endpoints = MagicMock(return_value=[1, 2, 3])
+
+    mock_charm._patroni.get_primary.side_effect = None
+
+    result = relation._handle_forceful_promotion(mock_event)
+
+    assert result is True
