@@ -42,7 +42,7 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
-|[553]  | ![check] |        |  ![check]  |
+|[553] | ![check] |          |  ![check]  |
 |[552] |          | ![check] |  ![check]  |
 
 <details>
@@ -52,8 +52,8 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 |:--------:|:-----:|:-----:|:-----:|
 |[468] |![check]  |          | ![check] |
 |[467] |          | ![check] | ![check] |
-|[430] |![check]  |          | ![check] |
-|[429] |          | ![check] | ![check] |
+|[430] |          | ![check] | ![check] |
+|[429] |![check]  |          | ![check] |
 |[363] |![check]  |          | ![check] |          
 |[351] |![check]  |          | ![check] |         
 |[336] |![check]  |          | ![check] |       
