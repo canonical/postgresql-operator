@@ -31,7 +31,7 @@ from ops.model import (
 )
 from ops.testing import Harness
 from psycopg2 import OperationalError
-from tenacity import RetryError, wait_fixed
+from tenacity import RetryError
 
 from backups import CANNOT_RESTORE_PITR
 from charm import (
