@@ -853,7 +853,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _peer_relation_changed_checks(self, event: HookEvent) -> bool:
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
-        if event.unit and event.unit != self.unit:
+        if (hasattr(event, "unit") and event.unit) and event.unit != self.unit:
             return False
 
         if not self.is_cluster_initialised:
