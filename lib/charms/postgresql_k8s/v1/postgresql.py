@@ -255,8 +255,10 @@ class PostgreSQL:
              psycopg2 connection object.
         """
         host = database_host if database_host is not None else self.primary_host
+        dbname = database if database else self.database
+        logger.debug(f"New DB connection: dbname='{dbname}' user='{self.user}' host='{host}' connect_timeout=1")
         connection = psycopg2.connect(
-            f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
+            f"dbname='{dbname}' user='{self.user}' host='{host}'"
             f"password='{self.password}' connect_timeout=1"
         )
         connection.autocommit = True
