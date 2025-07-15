@@ -275,6 +275,7 @@ class PostgreSQL:
                     )
                 )
             with self._connect_to_database(database=database) as conn, conn.cursor() as curs:
+                curs.execute(SQL("SET ROLE {};").format(Identifier(ROLE_DATABASES_OWNER)))
                 curs.execute(SQL("SELECT set_up_predefined_catalog_roles();"))
         except psycopg2.Error as e:
             logger.error(f"Failed to create database: {e}")
@@ -347,13 +348,13 @@ class PostgreSQL:
                 )
                 connect_statements = []
                 if database:
-                    if not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
+                    if roles is not None and not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
                         user_definition += f' IN ROLE "charmed_{database}_admin", "charmed_{database}_dml"'
                     else:
                         connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(database), Identifier(user)
                         ))
-                if any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA, ROLE_ADMIN, ROLE_DATABASES_OWNER]):
+                if roles is not None and any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA, ROLE_ADMIN, ROLE_DATABASES_OWNER]):
                     for system_database in ["postgres", "template1"]:
                         connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
                             Identifier(system_database), Identifier(user)
@@ -908,6 +909,7 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
     LANGUAGE plpgsql
     AS $$
         DECLARE
+          temp_schema TEXT;
           hba_file TEXT;
           copy_command TEXT;
           connection_type TEXT;
@@ -918,9 +920,16 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           -- Don't execute on replicas.
           IF NOT pg_is_in_recovery() THEN
             -- Load the current authorisation rules.
-            PERFORM TRUE FROM pg_tables WHERE schemaname LIKE 'pg_temp_%' AND tablename = 'pg_hba';
-            IF FOUND THEN
-                DROP TABLE pg_hba;
+            SELECT nspname INTO temp_schema FROM pg_namespace WHERE  oid = pg_my_temp_schema();
+            IF temp_schema != '' THEN
+                PERFORM TRUE FROM pg_tables WHERE schemaname = temp_schema AND tablename = 'pg_hba';
+                IF FOUND THEN
+                    DROP TABLE pg_hba;
+                END IF;
+                PERFORM TRUE FROM pg_tables WHERE schemaname = temp_schema AND tablename = 'relation_users';
+                IF FOUND THEN
+                    DROP TABLE relation_users;
+                END IF;
             END IF;
             CREATE TEMPORARY TABLE pg_hba (lines TEXT);
             SELECT setting INTO hba_file FROM pg_settings WHERE name = 'hba_file';
@@ -928,10 +937,6 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
                 copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
                 EXECUTE copy_command;
                 -- Build a list of the relation users and the databases they can access.
-                PERFORM TRUE FROM pg_tables WHERE schemaname LIKE 'pg_temp_%' AND tablename = 'relation_users';
-                IF FOUND THEN
-                    DROP TABLE relation_users;
-                END IF;
                 CREATE TEMPORARY TABLE relation_users AS
                   SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename NOT IN ('backup', 'monitoring', 'operator', 'postgres', 'replication', 'rewind')) AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
                 IF (SELECT COUNT(lines) FROM pg_hba WHERE lines LIKE 'hostssl %') > 0 THEN
