@@ -2473,18 +2473,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.reload_patroni_configuration()
         except Exception as e:
             logger.error(f"Reload patroni call failed! error: {e!s}")
-        # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
-        # which tells how much time Patroni will wait before checking the configuration
-        # file again to reload it.
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
-                with attempt:
-                    restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
-                    if not restart_postgresql:
-                        raise Exception
-        except RetryError:
-            # Ignore the error, as it happens only to indicate that the configuration has not changed.
-            pass
+
+        restart_pending = self._patroni.is_restart_pending()
+        logger.debug(f"Checking if restart pending: {restart_postgresql} or {restart_pending}")
+        restart_postgresql = restart_postgresql or restart_pending
+
         self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
 
