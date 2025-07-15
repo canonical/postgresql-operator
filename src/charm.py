@@ -2134,11 +2134,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
         try:
-            # Storage path is constant
-            subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
+            for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(60)):
+                with attempt:
+                    try:
+                        # Storage path is constant
+                        subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
+                        raise Exception
+                    except subprocess.CalledProcessError:
+                        return False
+        except RetryError:
             return True
-        except subprocess.CalledProcessError:
-            return False
 
     @property
     def _peers(self) -> Relation:
