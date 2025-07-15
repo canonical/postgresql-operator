@@ -849,4 +849,3 @@ def test_on_async_relation_broken():
     relation._on_async_relation_broken(mock_event)
 
     assert mock_charm.update_config.called
-
