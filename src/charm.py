@@ -2141,6 +2141,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         subprocess.check_call(["/usr/bin/mountpoint", "-q", self._storage_path])  # noqa: S603
                         return True
                     except subprocess.CalledProcessError:
+                        logger.error("Data directory is not attached. Checking again...")
                         raise Exception
         except RetryError:
             return False
