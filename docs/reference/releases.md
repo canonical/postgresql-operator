@@ -2,7 +2,7 @@
 
 This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release.
 
-To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://juju.is/docs/juju/channel#risk).
+To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk).
 
 To see all releases and commits, check the [Charmed PostgreSQL Releases page on GitHub](https://github.com/canonical/postgresql-operator/releases).
 
@@ -28,7 +28,7 @@ For a given release, this table shows:
 
 ## Architecture and base
 
-Several [revisions](https://juju.is/docs/sdk/revision) are released simultaneously for different [bases/series](https://juju.is/docs/juju/base) using the same charm code. In other words, one release contains multiple revisions.
+Several [revisions](https://documentation.ubuntu.com/juju/3.6/reference/charm/#charm-revision) are released simultaneously for different [bases/series](https://juju.is/docs/juju/base) using the same charm code. In other words, one release contains multiple revisions.
 
 If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.
 
@@ -42,7 +42,7 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 | Revision | amd64 | arm64 | Ubuntu 22.04 LTS
 |:--------:|:-----:|:-----:|:-----:|
-|[553]  | ![check] |        |  ![check]  |
+|[553] | ![check] |          |  ![check]  |
 |[552] |          | ![check] |  ![check]  |
 
 <details>
@@ -52,8 +52,8 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 |:--------:|:-----:|:-----:|:-----:|
 |[468] |![check]  |          | ![check] |
 |[467] |          | ![check] | ![check] |
-|[430] |![check]  |          | ![check] |
-|[429] |          | ![check] | ![check] |
+|[430] |          | ![check] | ![check] |
+|[429] |![check]  |          | ![check] |
 |[363] |![check]  |          | ![check] |          
 |[351] |![check]  |          | ![check] |         
 |[336] |![check]  |          | ![check] |       

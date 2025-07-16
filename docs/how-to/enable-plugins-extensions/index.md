@@ -43,3 +43,4 @@ Not all PostgreSQL extensions are available. The list of supported extensions is
 :hidden:
 
 Enable TimescaleDB <enable-timescaledb>
+```
