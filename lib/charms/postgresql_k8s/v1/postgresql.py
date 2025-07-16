@@ -1216,23 +1216,6 @@ $$ LANGUAGE plpgsql security definer;"""
             if connection is not None:
                 connection.close()
 
-    def is_restart_pending(self) -> bool:
-        """Query pg_settings for pending restart."""
-        connection = None
-        try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM pg_settings WHERE pending_restart=True;")
-                return cursor.fetchone()[0] > 0
-        except psycopg2.OperationalError:
-            logger.warning("Failed to connect to PostgreSQL.")
-            return False
-        except psycopg2.Error as e:
-            logger.error(f"Failed to check if restart is pending: {e}")
-            return False
-        finally:
-            if connection:
-                connection.close()
-
     @staticmethod
     def build_postgresql_group_map(group_map: Optional[str]) -> List[Tuple]:
         """Build the PostgreSQL authorization group-map.
