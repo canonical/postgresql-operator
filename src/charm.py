@@ -2369,6 +2369,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._restart_metrics_service(postgres_snap)
         self._restart_ldap_sync_service(postgres_snap)
 
+        self.unit_peer_data.update({
+            "user_hash": self.postgresql_client_relation.generate_user_hash
+        })
+        if self.unit.is_leader():
+            self.app_peer_data.update({
+                "user_hash": self.postgresql_client_relation.generate_user_hash
+            })
         return True
 
     def _validate_config_options(self) -> None:
@@ -2474,6 +2481,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     REPLICATION_USER: "all",
                     REWIND_USER: "all",
                 })
+
+            # Copy relations users directly instead of waiting for them to be created
+            for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
+                user = f"relation-{relation.id}"
+                if user not in user_database_map and (
+                    database
+                    := self.postgresql_client_relation.database_provides.fetch_relation_field(
+                        relation.id, "database"
+                    )
+                ):
+                    user_database_map[user] = database
             return user_database_map
         except PostgreSQLListUsersError:
             logger.debug("relations_user_databases_map: Unable to get users")
