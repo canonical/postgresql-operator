@@ -1,6 +1,7 @@
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
 
+# import json
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
@@ -10,6 +11,7 @@ from tenacity import RetryError
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
     REPLICATION_CONSUMER_RELATION,
+    # REPLICATION_OFFER_RELATION,
     NotReadyError,
     PostgreSQLAsyncReplication,
     StandbyClusterAlreadyPromotedError,
@@ -866,3 +868,13 @@ def test_on_async_relation_broken():
     relation._on_async_relation_broken(mock_event)
 
     assert mock_charm.update_config.called
+
+
+# def test_update_primary_cluster_data():
+#     mock_charm = MagicMock()
+#     relation = PostgreSQLAsyncReplication(mock_charm)
+#     #relation._relation.data = json()
+#     relation._relation.name = REPLICATION_OFFER_RELATION
+
+#     result = relation._update_primary_cluster_data(None, "Something")
+#     assert result is None
