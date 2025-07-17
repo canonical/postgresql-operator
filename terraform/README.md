@@ -22,32 +22,33 @@ juju add-model welcome
 
 To deploy Charmed PostgreSQL into the model `welcome`, run:
 ```
-terraform apply -var="juju_model_name=welcome" -auto-approve
+terraform apply -var='juju_model_name=welcome' -auto-approve
 ```
 
 By default, this Terraform module will deploy PostgreSQL with `1` unit only.
 To configure the module to deploy `3` units, run:
 ```
-terraform apply -var="juju_model_name=welcome" -var="units=3" -auto-approve
+terraform apply -var='juju_model_name=welcome' -var='units=3' -auto-approve
 ```
 
 The juju storage directives config example:
 ```
-terraform apply -var="juju_model_name=welcome" -auto-approve \
+terraform apply -var='juju_model_name=welcome' -auto-approve \
   -var='storage={data="10G", archive="2G,lxd", logs="3G", temp="tmpfs,2G"}'
 ```
 
 The juju constraints example:
 ```
-terraform apply -var="juju_model_name=welcome" -auto-approve \
+terraform apply -var='juju_model_name=welcome' -auto-approve \
   -var='constraints=arch=amd64 cores=4 mem=4096M virt-type=virtual-machine'
 ```
 
 Example of deploying to the specific Juju machine:
 ```
-> juju add-machine
-created machine 19
-> terraform apply -var="juju_model_name=welcome" -var='machine=19'
+juju add-machine
+> created machine 19
+
+terraform apply -var='juju_model_name=welcome' -var='machine=19'
 ```
 Note: the module variables `units` and `machine` are self-exclusive.
 
