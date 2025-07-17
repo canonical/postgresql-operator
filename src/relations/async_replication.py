@@ -252,7 +252,7 @@ class PostgreSQLAsyncReplication(Object):
             == self._get_highest_promoted_cluster_counter_value()
         ):
             logger.debug(f"Partner addresses: {self.charm._peer_members_ips}")
-            return self.charm._peer_members_ips
+            return list(self.charm._peer_members_ips)
 
         logger.debug("Partner addresses: []")
         return []
@@ -645,19 +645,20 @@ class PostgreSQLAsyncReplication(Object):
     def _primary_cluster_endpoint(self) -> str | None:
         """Return the endpoint from one of the sync-standbys, or from the primary if there is no sync-standby."""
         sync_standby_names = self.charm._patroni.get_sync_standby_names()
-        if len(sync_standby_names) > 0:
-            unit = self.model.get_unit(sync_standby_names[0])
-            return self.charm._get_unit_ip(unit, self._relation.name)
-        return self.charm._get_unit_ip(self.charm.unit, self._relation.name)
+        if self._relation:
+            if len(sync_standby_names) > 0:
+                unit = self.model.get_unit(sync_standby_names[0])
+                return self.charm._get_unit_ip(unit, self._relation.name)
+            return self.charm._get_unit_ip(self.charm.unit, self._relation.name)
 
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
-        relation = self._relation
-        getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
-            relation,
-            app=relation.app,
-            unit=next(unit for unit in relation.units if unit.app == relation.app),
-        )
+        if relation := self._relation:
+            getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
+                relation,
+                app=relation.app,
+                unit=next(unit for unit in relation.units if unit.app == relation.app),
+            )
 
     def _reinitialise_pgdata(self) -> None:
         """Reinitialise the data folder."""
@@ -769,7 +770,8 @@ class PostgreSQLAsyncReplication(Object):
 
     def _update_internal_secret(self) -> bool:
         # Update the secrets between the clusters.
-        relation = self._relation
+        if not (relation := self._relation):
+            return True
         primary_cluster_info = relation.data[relation.app].get("primary-cluster-data")
         secret_id = (
             None
@@ -793,7 +795,8 @@ class PostgreSQLAsyncReplication(Object):
         system_identifier: str | None = None,
     ) -> None:
         """Update the primary cluster data."""
-        async_relation = self._relation
+        if not (async_relation := self._relation):
+            return
 
         if promoted_cluster_counter is not None:
             for relation in [async_relation, self.charm._peers]:
@@ -805,8 +808,7 @@ class PostgreSQLAsyncReplication(Object):
         primary_cluster_data = {"endpoint": self._primary_cluster_endpoint}
 
         # Retrieve the secrets that will be shared between the clusters.
-        if async_relation.name == REPLICATION_OFFER_RELATION:
-            secret = self._get_secret()
+        if async_relation.name == REPLICATION_OFFER_RELATION and (secret := self._get_secret()):
             secret.grant(async_relation)
             primary_cluster_data["secret-id"] = secret.id
 

@@ -208,7 +208,7 @@ class PostgreSQLProvider(Object):
             else:
                 logger.info("Stale relation user detected: %s", user)
 
-    def update_endpoints(self, event: DatabaseRequestedEvent = None) -> None:  # noqa: C901
+    def update_endpoints(self, event: DatabaseRequestedEvent | None = None) -> None:  # noqa: C901
         """Set the read/write and read-only endpoints."""
         if not self.charm.unit.is_leader():
             return
@@ -224,7 +224,9 @@ class PostgreSQLProvider(Object):
         if not rel_data:
             return
 
-        secret_data = self.database_provides.fetch_my_relation_data(relations_ids, ["password"])
+        secret_data = (
+            self.database_provides.fetch_my_relation_data(relations_ids, ["password"]) or {}
+        )
 
         # Get cluster status
         online_members = self.charm._patroni.online_cluster_members()
@@ -257,9 +259,10 @@ class PostgreSQLProvider(Object):
                 ro_hosts = primary_unit_ip
 
         tls = "True" if self.charm.is_tls_enabled else "False"
+        ca = None
         if tls == "True":
             _, ca, _ = self.charm.tls.get_client_tls_files()
-        else:
+        if not ca:
             ca = ""
 
         for relation_id in rel_data:
