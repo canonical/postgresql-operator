@@ -3,19 +3,17 @@ resource "juju_application" "machine_postgresql" {
   model = var.juju_model_name
 
   charm {
-    name     = "postgresql"
+    name     = var.charm_name
     channel  = var.channel
     revision = var.revision
     base     = var.base
   }
 
-  storage_directives = {
-    pgdata = var.storage_size
-  }
-
-  units       = var.units
-  constraints = var.constraints
-  config      = var.config
+  machines           = var.machine != null ? [var.machine] : null
+  units              = var.machine == null ? var.units : null
+  config             = var.config
+  constraints        = var.constraints
+  storage_directives = var.storage
 
   dynamic "expose" {
     for_each = var.enable_expose ? [1] : []
