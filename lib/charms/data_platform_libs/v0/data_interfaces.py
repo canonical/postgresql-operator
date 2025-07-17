@@ -331,7 +331,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 48
+LIBPATCH = 49
 
 PYDEPS = ["ops>=2.0.0"]
 
@@ -3527,6 +3527,11 @@ class KafkaRequirerData(RequirerData):
         self.consumer_group_prefix = consumer_group_prefix or ""
         self.mtls_cert = mtls_cert
 
+    @staticmethod
+    def is_topic_value_acceptable(topic_value: str) -> bool:
+        """Check whether the given Kafka topic value is acceptable."""
+        return "*" not in topic_value[:3]
+
     @property
     def topic(self):
         """Topic to use in Kafka."""
@@ -3534,9 +3539,8 @@ class KafkaRequirerData(RequirerData):
 
     @topic.setter
     def topic(self, value):
-        # Avoid wildcards
-        if value == "*":
-            raise ValueError(f"Error on topic '{value}', cannot be a wildcard.")
+        if not self.is_topic_value_acceptable(value):
+            raise ValueError(f"Error on topic '{value}', unacceptable value.")
         self._topic = value
 
     def set_mtls_cert(self, relation_id: int, mtls_cert: str) -> None:
