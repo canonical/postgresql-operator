@@ -15,10 +15,15 @@ and [deployment tutorial](https://charmhub.io/postgresql/docs/h-deploy-terraform
 
 ## Usage
 
-Users should ensure that Juju model has been created to deploy into: `juju add-model welcome`.
+Users should ensure that Juju model has been created to deploy into:
+```
+juju add-model welcome
+```
 
-To deploy this module, run `terraform apply -var="juju_model_name=welcome" -auto-approve`.
-This would deploy Charmed PostgreSQL modules in the defined model `welcome`.
+To deploy Charmed PostgreSQL into the model `welcome`, run:
+```
+terraform apply -var="juju_model_name=welcome" -auto-approve
+```
 
 By default, this Terraform module will deploy PostgreSQL with `1` unit only.
 To configure the module to deploy `3` units, run:
