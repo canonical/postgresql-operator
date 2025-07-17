@@ -1,9 +1,9 @@
 # Alert rules
 
 This page contains a markdown version of the alert rules described in the `postgresql-operator` repository.  The following file(s) are the source of truth:
-* [`src/prometheus_alert_rules/postgresql_rules.yaml`](https://github.com/canonical/postgresql-operator/blob/main/src/prometheus_alert_rules/postgresql_rules.yaml)
-* [`src/prometheus_alert_rules/pgbouncer_rules.yaml`](https://github.com/canonical/postgresql-operator/blob/main/src/prometheus_alert_rules/pgbouncer_rules.yaml)
-* [`src/prometheus_alert_rules/patroni_rules.yaml`](https://github.com/canonical/postgresql-operator/blob/main/src/prometheus_alert_rules/patroni_rules.yaml)
+* [`src/prometheus_alert_rules/postgresql_rules.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/src/prometheus_alert_rules/postgresql_rules.yaml)
+* [`src/prometheus_alert_rules/pgbouncer_rules.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/src/prometheus_alert_rules/pgbouncer_rules.yaml)
+* [`src/prometheus_alert_rules/patroni_rules.yaml`](https://github.com/canonical/postgresql-operator/blob/16/edge/src/prometheus_alert_rules/patroni_rules.yaml)
 
 > This documentation describes the latest alert rule expressions. See the YAML file(s) on listed above if you require an older version.
 

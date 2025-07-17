@@ -2,7 +2,7 @@
 
 Charmed PostgreSQL is shipped in following [tracks](https://documentation.ubuntu.com/juju/3.6/reference/charm/#track): 
 
-* [PostgreSQL 16] (channel `16/edge`)
+* [PostgreSQL 16] (channel `16/stable`)
 * [PostgreSQL 14] (channel `14/stable`)
 * [Legacy PostgreSQL charm] (channel `latest/stable`) -> **deprecated**
 

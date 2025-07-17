@@ -129,7 +129,7 @@ welcome  aws-us-east-1  aws/us-east-1  3.5.4    unsupported  13:33:05+02:00
 
 App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
 data-integrator           active      1  data-integrator  latest/stable   41  no       
-postgresql       14.12    active      1  postgresql       14/stable      468  no       
+postgresql       16.19    active      1  postgresql       16/stable      843  no       
 
 Unit                Workload  Agent  Machine  Public address  Ports     Message
 data-integrator/0*  active    idle   1        50.19.16.57               

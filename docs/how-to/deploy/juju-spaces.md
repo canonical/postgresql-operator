@@ -27,7 +27,7 @@ peers     2         10.10.10.0/24
 
 The space `alpha` is default and cannot be removed. To deploy Charmed PostgreSQL Operator using the spaces:
 ```text
-juju deploy postgresql --channel 16/edge \
+juju deploy postgresql --channel 16/stable \
   --constraints spaces=client,peers \
   --bind "database-peers=peers database=client"
 ```
