@@ -293,6 +293,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
         self.framework.observe(self.on.collect_unit_status, self._reconcile_refresh_status)
+        self.framework.observe(self.on.logs_storage_attached, self._on_storage_attached)
+        self.framework.observe(self.on.data_storage_attached, self._on_storage_attached)
+        self.framework.observe(self.on.archive_storage_attached, self._on_storage_attached)
+        self.framework.observe(self.on.temp_storage_attached, self._on_storage_attached)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
         self._certs_path = "/usr/local/share/ca-certificates"
@@ -2130,6 +2134,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 str(e),
             )
             raise
+
+    def _on_storage_attached(self, _) -> bool:
+        """Check attached storages."""
+        logger.debug("Checking storages")
+        storages = [
+            "/var/snap/charmed-postgresql/common/data/archive",
+            "/var/snap/charmed-postgresql/common/data/logs",
+            "/var/snap/charmed-postgresql/common/data/temp",
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql",
+        ]
+        for storage in storages:
+            try:
+                subprocess.check_call(["/usr/bin/mountpoint", "-q", storage])  # noqa: S603
+            except subprocess.CalledProcessError:
+                logger.error(f"Storage is not attached: {storage}. Continue testing... ")
+        return
 
     def _is_storage_attached(self) -> bool:
         """Returns if storage is attached."""
