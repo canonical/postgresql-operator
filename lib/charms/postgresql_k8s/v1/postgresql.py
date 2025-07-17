@@ -1107,6 +1107,7 @@ BEGIN
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_STATS};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_READ};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DML};',
+        'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_BACKUP};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_DBA};',
         'GRANT CONNECT ON DATABASE ' || database || ' TO {ROLE_ADMIN};',
         'GRANT ' || admin_user || ' TO {ROLE_ADMIN} WITH INHERIT FALSE;',
