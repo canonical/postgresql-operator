@@ -899,11 +899,7 @@ class PostgreSQL:
                 self.set_up_predefined_catalog_roles_function()
 
                 # Create database function and event trigger to identify users created by PgBouncer.
-                cursor.execute(
-                    "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
-                )
-                if cursor.fetchone() is None:
-                    cursor.execute("""
+                cursor.execute("""
 CREATE OR REPLACE FUNCTION update_pg_hba()
     RETURNS event_trigger
     LANGUAGE plpgsql
@@ -970,13 +966,13 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
         END;
     $$ SECURITY DEFINER;
                     """)
-                    cursor.execute("""
+                cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_create_schema
     ON ddl_command_end
     WHEN TAG IN ('CREATE SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
                     """)
-                    cursor.execute("""
+                cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
     ON ddl_command_end
     WHEN TAG IN ('DROP SCHEMA')
