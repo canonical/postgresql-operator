@@ -113,6 +113,14 @@ class PostgreSQLBaseError(Exception):
     message = None
 
 
+class PostgreSQLUndefinedHostError(PostgreSQLBaseError):
+    """Exception when host is not set."""
+
+
+class PostgreSQLUndefinedPasswordError(PostgreSQLBaseError):
+    """Exception when password is not set."""
+
+
 class PostgreSQLDatabasesSetupError(PostgreSQLBaseError):
     """Exception raised when the databases setup fails."""
 
@@ -166,10 +174,10 @@ class PostgreSQL:
 
     def __init__(
         self,
-        primary_host: str,
-        current_host: str,
+        primary_host: Optional[str],
+        current_host: Optional[str],
         user: str,
-        password: str,
+        password: Optional[str],
         database: str,
         system_users: Optional[List[str]] = None,
     ):
@@ -214,6 +222,10 @@ class PostgreSQL:
              psycopg2 connection object.
         """
         host = database_host if database_host is not None else self.primary_host
+        if not host:
+            raise PostgreSQLUndefinedHostError("Host not set")
+        if not self.password:
+            raise PostgreSQLUndefinedPasswordError("Password not set")
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
             f"password='{self.password}' connect_timeout=1"

@@ -16,10 +16,10 @@ from charms.postgresql_k8s.v1.postgresql import (
     ACCESS_GROUPS,
     INVALID_DATABASE_NAME_BLOCKING_MESSAGE,
     INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
+    PostgreSQLBaseError,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLDeleteUserError,
-    PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
 from ops.charm import RelationBrokenEvent
@@ -134,11 +134,7 @@ class PostgreSQLProvider(Object):
             self._update_unit_status(event.relation)
 
             self.charm.update_config()
-        except (
-            PostgreSQLCreateDatabaseError,
-            PostgreSQLCreateUserError,
-            PostgreSQLGetPostgreSQLVersionError,
-        ) as e:
+        except PostgreSQLBaseError as e:
             self.charm.set_unit_status(
                 BlockedStatus(
                     e.message

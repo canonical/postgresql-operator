@@ -72,6 +72,9 @@ class ClusterTopologyObserver(Object):
                 return
             except OSError:
                 pass
+        if not self._charm._patroni.unit_ip:
+            logging.info("Cannot start cluster topology observer process: No IP set")
+            return
 
         logging.info("Starting cluster topology observer process")
 

@@ -85,7 +85,7 @@ def test_are_backup_settings_ok(harness):
     # Test when all required parameters are provided.
     with patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters:
         _retrieve_s3_parameters.return_value = ["bucket", "access-key", "secret-key"], []
-        assert harness.charm.backup._are_backup_settings_ok() == (True, None)
+        assert harness.charm.backup._are_backup_settings_ok() == (True, "")
 
 
 def test_can_initialise_stanza(harness):
@@ -264,7 +264,7 @@ def test_can_use_s3_repository(harness):
             pgbackrest_info_same_cluster_backup_output,
             same_instance_system_identifier_output,
         ]
-        assert harness.charm.backup.can_use_s3_repository() == (True, None)
+        assert harness.charm.backup.can_use_s3_repository() == (True, "")
 
         # Empty db
         _execute_command.side_effect = None

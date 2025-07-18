@@ -118,7 +118,7 @@ class PostgreSQLBackups(Object):
             ),
         )
 
-    def _are_backup_settings_ok(self) -> tuple[bool, str | None]:
+    def _are_backup_settings_ok(self) -> tuple[bool, str]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
             return (
@@ -130,7 +130,7 @@ class PostgreSQLBackups(Object):
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
-        return True, None
+        return True, ""
 
     @property
     def _can_initialise_stanza(self) -> bool:
@@ -267,7 +267,8 @@ class PostgreSQLBackups(Object):
         except ValueError as e:
             logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
             raise e
-        bucket = s3.Bucket(bucket_name)
+        # Boto3 doesn't have typedefs
+        bucket = s3.Bucket(bucket_name)  # type: ignore
         try:
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
@@ -1141,7 +1142,7 @@ Stderr:
         if backup_type == "full":
             return datetime.strftime(datetime.now(), "%Y%m%d-%H%M%SF")
         if backup_type == "differential":
-            backups = self._list_backups(show_failed=False, parse=False).keys()
+            backups = list(self._list_backups(show_failed=False, parse=False).keys())
             last_full_backup = None
             for label in backups[::-1]:
                 if label.endswith("F"):
@@ -1152,12 +1153,14 @@ Stderr:
                 raise TypeError("Differential backup requested but no previous full backup")
             return f"{last_full_backup}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SD')}"
         if backup_type == "incremental":
-            backups = self._list_backups(show_failed=False, parse=False).keys()
+            backups = list(self._list_backups(show_failed=False, parse=False).keys())
             if not backups:
                 raise TypeError("Incremental backup requested but no previous successful backup")
             return f"{backups[-1]}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SI')}"
+        else:
+            raise Exception("Invalid backup type")
 
-    def _fetch_backup_from_id(self, backup_id: str) -> str:
+    def _fetch_backup_from_id(self, backup_id: str) -> str | None:
         """Fetches backup's pgbackrest label from backup id."""
         timestamp = f"{datetime.strftime(datetime.strptime(backup_id, '%Y-%m-%dT%H:%M:%SZ'), '%Y%m%d-%H%M%S')}"
         backups = self._list_backups(show_failed=False, parse=False).keys()
@@ -1375,7 +1378,8 @@ Stderr:
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            bucket = s3.Bucket(bucket_name)
+            # Boto3 doesn't have typedefs
+            bucket = s3.Bucket(bucket_name)  # type: ignore
 
             with tempfile.NamedTemporaryFile() as temp_file:
                 temp_file.write(content.encode("utf-8"))
@@ -1408,7 +1412,8 @@ Stderr:
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            bucket = s3.Bucket(bucket_name)
+            # Boto3 doesn't have typedefs
+            bucket = s3.Bucket(bucket_name)  # type: ignore
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
                 return buf.getvalue().decode("utf-8")
