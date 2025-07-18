@@ -137,18 +137,7 @@ def test_get_patroni_health(peers_ips, patroni):
 
 
 def test_get_postgresql_version(peers_ips, patroni):
-    with patch("charm.snap.SnapClient") as _snap_client:
-        # TODO test a real implementation
-        _get_installed_snaps = _snap_client.return_value.get_installed_snaps
-        _get_installed_snaps.return_value = [
-            {"name": "something"},
-            {"name": "charmed-postgresql", "version": "16.6"},
-        ]
-        version = patroni.get_postgresql_version()
-
-        assert version == "16.6"
-        _snap_client.assert_called_once_with()
-        _get_installed_snaps.assert_called_once_with()
+    assert patroni.get_postgresql_version() == "16.9"
 
 
 def test_dict_to_hba_string(harness, patroni):

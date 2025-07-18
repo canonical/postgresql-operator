@@ -24,6 +24,7 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Tuple
 
 import psycopg2
+from ops import ConfigData
 from psycopg2.sql import SQL, Identifier, Literal
 
 from constants import BACKUP_USER, SYSTEM_USERS
@@ -1315,7 +1316,7 @@ $$ LANGUAGE plpgsql security definer;"""
 
     @staticmethod
     def build_postgresql_parameters(
-        config_options: dict, available_memory: int, limit_memory: Optional[int] = None
+        config_options: ConfigData, available_memory: int, limit_memory: Optional[int] = None
     ) -> Optional[dict]:
         """Builds the PostgreSQL parameters.
 

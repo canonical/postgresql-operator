@@ -15,9 +15,11 @@ from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
 
-import boto3 as boto3
-import botocore
-from botocore.exceptions import ClientError, ParamValidationError, SSLError
+from boto3.session import Session
+from botocore.client import Config
+from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidationError, SSLError
+from botocore.loaders import create_loader
+from botocore.regions import EndpointResolver
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     S3Requirer,
@@ -100,7 +102,7 @@ class PostgreSQLBackups(Object):
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
-        session = boto3.session.Session(
+        session = Session(
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
             region_name=s3_parameters["region"],
@@ -109,7 +111,7 @@ class PostgreSQLBackups(Object):
             "s3",
             endpoint_url=self._construct_endpoint(s3_parameters),
             verify=(self._tls_ca_chain_filename or None),
-            config=botocore.client.Config(
+            config=Config(
                 # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
                 request_checksum_calculation="when_required",
                 response_checksum_validation="when_required",
@@ -164,7 +166,7 @@ class PostgreSQLBackups(Object):
 
         return self._are_backup_settings_ok()
 
-    def can_use_s3_repository(self) -> tuple[bool, str | None]:
+    def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
         # Check model uuid
         s3_parameters, _ = self._retrieve_s3_parameters()
@@ -223,7 +225,7 @@ class PostgreSQLBackups(Object):
                 )
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
-        return True, None
+        return True, ""
 
     def _change_connectivity_to_database(self, connectivity: bool) -> None:
         """Enable or disable the connectivity to the database."""
@@ -239,11 +241,11 @@ class PostgreSQLBackups(Object):
         endpoint = s3_parameters["endpoint"]
 
         # Load endpoints data.
-        loader = botocore.loaders.create_loader()
+        loader = create_loader()
         data = loader.load_data("endpoints")
 
         # Construct the endpoint using the region.
-        resolver = botocore.regions.EndpointResolver(data)
+        resolver = EndpointResolver(data)
         endpoint_data = resolver.construct_endpoint("s3", s3_parameters["region"])
 
         # Use the built endpoint if it is an AWS endpoint.
@@ -270,7 +272,7 @@ class PostgreSQLBackups(Object):
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
             exists = True
-        except botocore.exceptions.ConnectTimeoutError as e:
+        except ConnectTimeoutError as e:
             # Re-raise the error if the connection timeouts, so the user has the possibility to
             # fix network issues and call juju resolve to re-trigger the hook that calls
             # this method.
@@ -1257,7 +1259,7 @@ Stderr:
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
-            process_max=max(os.cpu_count() - 2, 1),
+            process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
@@ -1296,7 +1298,7 @@ Stderr:
 
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
-        s3_parameters.setdefault("region")
+        s3_parameters.setdefault("region", "")
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
         s3_parameters.setdefault("delete-older-than-days", "9999999")
@@ -1410,7 +1412,7 @@ Stderr:
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
                 return buf.getvalue().decode("utf-8")
-        except botocore.exceptions.ClientError as e:
+        except ClientError as e:
             if e.response["Error"]["Code"] == "404":
                 logger.info(
                     f"No such object to read from S3 bucket={bucket_name}, path={processed_s3_path}"
