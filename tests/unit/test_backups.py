@@ -4,7 +4,7 @@ from os import cpu_count
 from subprocess import CompletedProcess, TimeoutExpired
 from unittest.mock import MagicMock, PropertyMock, call, mock_open, patch
 
-import botocore as botocore
+import botocore
 import pytest
 from boto3.exceptions import S3UploadFailedError
 from botocore.exceptions import ClientError
@@ -311,7 +311,7 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
         ) as _tls_ca_chain_filename,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
-        patch("backups.botocore.client.Config") as _config,
+        patch("backups.Config") as _config,
     ):
         # Test when there are missing S3 parameters.
         _retrieve_s3_parameters.return_value = ([], ["bucket", "access-key", "secret-key"])
@@ -1920,7 +1920,7 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
         patch("tempfile.NamedTemporaryFile") as _named_temporary_file,
         patch("charm.PostgreSQLBackups._construct_endpoint") as _construct_endpoint,
         patch("boto3.session.Session.resource") as _resource,
-        patch("backups.botocore.client.Config") as _config,
+        patch("backups.Config") as _config,
         patch(
             "charm.PostgreSQLBackups._tls_ca_chain_filename",
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
