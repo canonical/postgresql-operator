@@ -611,15 +611,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
-        logger.debug("Init class PostgreSQL")
-        return PostgreSQL(
-            primary_host=self.primary_endpoint,
-            current_host=self._unit_ip,
-            user=USER,
-            password=self.get_secret(APP_SCOPE, f"{USER}-password"),
-            database=DATABASE_DEFAULT_NAME,
-            system_users=SYSTEM_USERS,
-        )
+        password = str(self.get_secret(APP_SCOPE, f"{USER}-password"))
+        if self._postgresql is None or self._postgresql.primary_host is None:
+            logger.debug("Init class PostgreSQL")
+            self._postgresql = PostgreSQL(
+                primary_host=self.primary_endpoint,
+                current_host=self._unit_ip,
+                user=USER,
+                password=password,
+                database=DATABASE_DEFAULT_NAME,
+                system_users=SYSTEM_USERS,
+            )
+        else:
+            self._postgresql.password = password
+        return self._postgresql
 
     @property
     def primary_endpoint(self) -> str | None:
