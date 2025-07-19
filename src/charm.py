@@ -2431,7 +2431,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _handle_postgresql_restart_need(self) -> None:
         """Handle PostgreSQL restart need based on the TLS configuration and configuration changes."""
         if self._can_connect_to_postgresql:
-            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled()
+            restart_postgresql = self.is_tls_enabled != self.postgresql.is_tls_enabled(
+                check_current_host=True
+            )
         else:
             restart_postgresql = False
         try:
