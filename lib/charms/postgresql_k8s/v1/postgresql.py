@@ -83,11 +83,17 @@ for dependencies in REQUIRED_PLUGINS.values():
 logger = logging.getLogger(__name__)
 
 
-class PostgreSQLAssignGroupError(Exception):
+class PostgreSQLBaseError(Exception):
+    """Base lib exception."""
+
+    message = None
+
+
+class PostgreSQLAssignGroupError(PostgreSQLBaseError):
     """Exception raised when assigning to a group fails."""
 
 
-class PostgreSQLCreateDatabaseError(Exception):
+class PostgreSQLCreateDatabaseError(PostgreSQLBaseError):
     """Exception raised when creating a database fails."""
 
     def __init__(self, message: Optional[str] = None):
@@ -95,22 +101,16 @@ class PostgreSQLCreateDatabaseError(Exception):
         self.message = message
 
 
-class PostgreSQLCreateGroupError(Exception):
+class PostgreSQLCreateGroupError(PostgreSQLBaseError):
     """Exception raised when creating a group fails."""
 
 
-class PostgreSQLCreateUserError(Exception):
+class PostgreSQLCreateUserError(PostgreSQLBaseError):
     """Exception raised when creating a user fails."""
 
     def __init__(self, message: Optional[str] = None):
         super().__init__(message)
         self.message = message
-
-
-class PostgreSQLBaseError(Exception):
-    """Base lib exception."""
-
-    message = None
 
 
 class PostgreSQLUndefinedHostError(PostgreSQLBaseError):

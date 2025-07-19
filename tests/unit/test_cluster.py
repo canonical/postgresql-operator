@@ -685,7 +685,7 @@ def test_update_patroni_restart_condition(patroni, new_restart_condition):
 def test_remove_raft_member(patroni):
     with patch("cluster.TcpUtility") as _tcp_utility:
         # Member already removed
-        _tcp_utility.return_value.executeCommand.return_value = ""
+        _tcp_utility.return_value.executeCommand.return_value = "Response message"
 
         patroni.remove_raft_member("1.2.3.4")
 

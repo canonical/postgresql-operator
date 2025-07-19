@@ -2291,6 +2291,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     @property
     def _can_connect_to_postgresql(self) -> bool:
+        if not self.postgresql.password or not self.postgresql.current_host:
+            return False
         try:
             for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
                 with attempt:

@@ -12,14 +12,16 @@ from constants import PEER
 
 @pytest.fixture(autouse=True)
 def harness():
-    harness = Harness(PostgresqlOperatorCharm)
+    with patch("relations.tls.socket") as _socket:
+        _socket.getfqdn.return_value = "fqdn"
+        harness = Harness(PostgresqlOperatorCharm)
 
-    # Set up the initial relation and hooks.
-    peer_rel_id = harness.add_relation(PEER, "postgresql")
-    harness.add_relation_unit(peer_rel_id, "postgresql/0")
-    harness.begin()
-    yield harness
-    harness.cleanup()
+        # Set up the initial relation and hooks.
+        peer_rel_id = harness.add_relation(PEER, "postgresql")
+        harness.add_relation_unit(peer_rel_id, "postgresql/0")
+        harness.begin()
+        yield harness
+        harness.cleanup()
 
 
 def test_generate_internal_peer_cert(harness):
@@ -33,13 +35,12 @@ def test_generate_internal_peer_cert(harness):
         ) as _generate_certificate,
         patch("relations.tls.PrivateKey") as _private_key,
         patch("relations.tls.Certificate") as _certificate,
-        patch("relations.tls.socket") as _socket,
         patch("charm.PostgresqlOperatorCharm.set_secret") as _set_secret,
+        patch("charm.PostgresqlOperatorCharm.get_secret", return_value="secret value"),
         patch(
             "charm.PostgresqlOperatorCharm.push_tls_files_to_workload"
         ) as _push_tls_files_to_workload,
     ):
-        _socket.getfqdn.return_value = "fqdn"
         _private_key.from_string.return_value = sentinel.ca_key
         _certificate.from_string.return_value = sentinel.ca_cert
 
