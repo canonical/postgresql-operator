@@ -60,11 +60,12 @@ test123=> SELECT * FROM pg_roles;
 Charmed PostgreSQL 16 also introduces catalogue/database level roles, with permissions tied to each database that's created. Example for a database named `test`:
 
 ```text
-test123=> SELECT * FROM pg_roles where rolname like 'test_%';;
-          rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
-----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
- test_owner                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16479
- test_admin                 | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16480
+test123=> SELECT * FROM pg_roles WHERE rolname LIKE 'charmed_test_%';
+      rolname       | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+--------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+ charmed_test_owner | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16393
+ charmed_test_admin | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16394
+ charmed_test_dml   | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16396
 ```
 
 The `charmed_<database-name>_admin` role is assigned to each relation user (explained in the next section) with access to the specific database. When that user connects to the database, it's auto-escalated to the `charmed_<database-name>_owner` user, which will own every object inside the database, simplifying the permissions to perform operations on those objects when a new user requests access to that same database.
