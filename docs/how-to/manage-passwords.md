@@ -30,3 +30,5 @@ To set a manual password for another user:
 juju run postgresql/leader set-password username=<username> password=<password>
 ```
 
+Where `<username>` can be any of the system users: `operator`, `replication`, `rewind`, `monitoring`, `backup`, or `ldap`.
+
