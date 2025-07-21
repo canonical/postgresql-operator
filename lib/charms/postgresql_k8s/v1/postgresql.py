@@ -965,14 +965,18 @@ CREATE OR REPLACE FUNCTION update_pg_hba()
           END IF;
         END;
     $$ SECURITY DEFINER;
-                    """)
-                cursor.execute("""
+                """)
+                cursor.execute(
+                    "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
+                )
+                if cursor.fetchone() is None:
+                    cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_create_schema
     ON ddl_command_end
     WHEN TAG IN ('CREATE SCHEMA')
     EXECUTE FUNCTION update_pg_hba();
                     """)
-                cursor.execute("""
+                    cursor.execute("""
 CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
     ON ddl_command_end
     WHEN TAG IN ('DROP SCHEMA')
