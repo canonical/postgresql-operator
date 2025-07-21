@@ -1,6 +1,7 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
+from asyncio import gather
 
 import pytest
 from pytest_operator.plugin import OpsTest
@@ -26,22 +27,16 @@ TIMEOUT = 25 * 60
 @pytest.mark.abort_on_fail
 async def test_deploy_stable(ops_test: OpsTest) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
-    await ops_test.juju(
-        "deploy",
-        DATABASE_APP_NAME,
-        "-n",
-        3,
-        # TODO move to stable once we release refresh v3 to stable
-        "--channel",
-        "16/edge",
-        "--base",
-        "ubuntu@24.04",
-    )
-    await ops_test.model.deploy(
-        APPLICATION_NAME,
-        num_units=1,
-        channel="latest/edge",
-        config={"sleep_interval": 500},
+    await gather(
+        ops_test.model.deploy(
+            DATABASE_APP_NAME, num_units=3, channel="16/stable", config={"profile": "testing"}
+        ),
+        ops_test.model.deploy(
+            APPLICATION_NAME,
+            num_units=1,
+            channel="latest/edge",
+            config={"sleep_interval": 500},
+        ),
     )
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
