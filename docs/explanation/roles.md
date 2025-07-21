@@ -54,6 +54,9 @@ test123=> SELECT * FROM pg_roles;
  charmed_read                | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16388
  charmed_dml                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16390
  charmed_backup              | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16392
+ charmed_dba                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16393
+ charmed_admin               | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16394
+ charmed_databases_owner     | f        | t          | f             | t           | t           | f              |           -1 | ********    |               | f            |           | 16395
 ...
 ```
 
@@ -63,9 +66,9 @@ Charmed PostgreSQL 16 also introduces catalogue/database level roles, with permi
 test123=> SELECT * FROM pg_roles WHERE rolname LIKE 'charmed_test_%';
       rolname       | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
 --------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
- charmed_test_owner | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16393
- charmed_test_admin | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16394
- charmed_test_dml   | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16396
+ charmed_test_owner | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16396
+ charmed_test_admin | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16397
+ charmed_test_dml   | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16398
 ```
 
 The `charmed_<database-name>_admin` role is assigned to each relation user (explained in the next section) with access to the specific database. When that user connects to the database, it's auto-escalated to the `charmed_<database-name>_owner` user, which will own every object inside the database, simplifying the permissions to perform operations on those objects when a new user requests access to that same database.
