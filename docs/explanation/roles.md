@@ -44,6 +44,8 @@ Charmed PostgreSQL 16 introduces the following instance-level predefined roles:
 * `charmed_dba` (allowed to escalate to any other user, including the superuser `operator`)
 * `charmed_admin` (inherit from `charmed_dml` and allowed to escalate to the database-specific `charmed_<database-name>_owner` role, which is explained later in this document)
 * `charmed_databases_owner` (allowed to create databases; it can be requested through the CREATEDB extra user role)
+ 
+Currently, `charmed_backup` and `charmed_dba` cannot be requested through the relation as extra user roles.
 
 ```text
 test123=> SELECT * FROM pg_roles;
