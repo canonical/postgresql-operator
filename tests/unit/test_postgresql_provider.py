@@ -109,7 +109,7 @@ def test_on_database_requested(harness):
         ) as _primary_endpoint,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch(
-            "charm.PostgreSQLProvider.generate_user_hash",
+            "charm.PostgresqlOperatorCharm.generate_user_hash",
             new_callable=PropertyMock,
             return_value="relhash",
         ),

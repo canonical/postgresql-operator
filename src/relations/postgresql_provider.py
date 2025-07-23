@@ -5,7 +5,6 @@
 
 import logging
 import typing
-from hashlib import shake_128
 
 from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
@@ -65,16 +64,6 @@ class PostgreSQLProvider(Object):
             self.database_provides.on.database_requested, self._on_database_requested
         )
 
-    @property
-    def generate_user_hash(self) -> str:
-        """Generate expected user and database hash."""
-        user_db_pairs = {}
-        for relation in self.model.relations[self.relation_name]:
-            if database := self.database_provides.fetch_relation_field(relation.id, "database"):
-                user = f"relation-{relation.id}"
-                user_db_pairs[user] = database
-        return shake_128(str(user_db_pairs).encode()).hexdigest(16)
-
     @staticmethod
     def _sanitize_extra_roles(extra_roles: str | None) -> list[str]:
         """Standardize and sanitize user extra-roles."""
@@ -109,11 +98,13 @@ class PostgreSQLProvider(Object):
             if (
                 key != self.charm.app
                 and key != self.charm.unit
-                and self.charm._peers.data[key].get("user_hash", "") != self.generate_user_hash
+                and self.charm._peers.data[key].get("user_hash", "")
+                != self.charm.generate_user_hash
             ):
                 logger.debug("Not all units have synced configuration")
                 event.defer()
                 return
+
         # Retrieve the database name and extra user roles using the charm library.
         database = event.database or ""
 
