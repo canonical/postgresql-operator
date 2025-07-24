@@ -105,7 +105,7 @@ async def test_pg_hba(ops_test: OpsTest, charm):
             if connection:
                 connection.close()
 
-        sleep(60)
+        sleep(90)
 
         for unit in ops_test.model.applications[DATABASE_APP_NAME].units:
             try:
