@@ -2633,3 +2633,27 @@ def test_handle_processes_failures(harness):
         _restart_patroni.assert_called_once_with()
         assert not _rename.called
         _restart_patroni.reset_mock()
+
+
+def test_on_databases_change(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+    ):
+        harness.charm._on_databases_change(Mock())
+
+        _update_config.assert_called_once_with()
+        assert "pg_hba_needs_update_timestamp" in harness.charm.unit_peer_data
+
+
+def test_generate_user_hash(harness):
+    with harness.hooks_disabled():
+        rel_id = harness.add_relation("database", "application")
+        harness.update_relation_data(rel_id, "application", {"database": "test_db"})
+    with (
+        patch("charm.shake_128") as _shake_128,
+    ):
+        _shake_128.return_value.hexdigest.return_value = sentinel.hash
+
+        assert harness.charm.generate_user_hash == sentinel.hash
+
+        _shake_128.assert_called_once_with(b"{'relation_id_2': 'test_db'}")
