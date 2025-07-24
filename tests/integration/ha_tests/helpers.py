@@ -920,7 +920,9 @@ def get_storage_ids(ops_test, unit_name):
     https://github.com/juju/python-libjuju/issues/694
     """
     storage_ids = []
-    proc = subprocess.check_output(f"juju storage --model={ops_test.controller_name}:{ops_test.model.info.name}".split())
+    proc = subprocess.check_output(
+        f"juju storage --model={ops_test.controller_name}:{ops_test.model.info.name}".split()
+    )
     proc = proc.decode("utf-8")
     for line in proc.splitlines():
         if "Storage" in line:
