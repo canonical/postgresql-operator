@@ -23,7 +23,7 @@ DATABASE_APP_CONFIG = {"profile": "testing"}
 
 TESTING_DATABASE = "testdb"
 
-TIMEOUT = 20 * 60
+TIMEOUT = 10 * 60
 
 
 @pytest.mark.abort_on_fail
@@ -79,7 +79,7 @@ async def test_deploy(ops_test: OpsTest, charm):
         # There can be error spikes during PostgreSQL deployment, that are not related to Logical Replication
         raise_on_error=False,
     )
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval="60s"):
         await gather(
             ops_test.model.integrate(DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME),
             ops_test.model.integrate(SECOND_DATABASE_APP_NAME, SECOND_DATA_INTEGRATOR_APP_NAME),
