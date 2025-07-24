@@ -1011,12 +1011,18 @@ class Patroni:
         Args:
             slots: dictionary of slots in the {slot: database} format.
         """
-        current_config = requests.get(
-            f"{self._patroni_url}/config",
-            verify=self.verify,
-            timeout=PATRONI_TIMEOUT,
-            auth=self._patroni_auth,
-        )
+        for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3), reraise=True):
+            with attempt:
+                current_config = requests.get(
+                    f"{self._patroni_url}/config",
+                    verify=self.verify,
+                    timeout=PATRONI_TIMEOUT,
+                    auth=self._patroni_auth,
+                )
+                if current_config.status_code != 200:
+                    raise Exception(
+                        f"Failed to get current Patroni config: {current_config.status_code} {current_config.text}"
+                    )
         slots_patch: dict[str, dict[str, str] | None] = dict.fromkeys(
             current_config.json().get("slots", ())
         )
