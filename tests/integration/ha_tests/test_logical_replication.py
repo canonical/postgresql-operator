@@ -23,6 +23,7 @@ DATABASE_APP_CONFIG = {"profile": "testing"}
 
 TESTING_DATABASE = "testdb"
 
+FAST_INTERVAL = "60s"
 TIMEOUT = 10 * 60
 
 
@@ -79,7 +80,7 @@ async def test_deploy(ops_test: OpsTest, charm):
         # There can be error spikes during PostgreSQL deployment, that are not related to Logical Replication
         raise_on_error=False,
     )
-    async with ops_test.fast_forward(fast_interval="60s"):
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await gather(
             ops_test.model.integrate(DATABASE_APP_NAME, DATA_INTEGRATOR_APP_NAME),
             ops_test.model.integrate(SECOND_DATABASE_APP_NAME, SECOND_DATA_INTEGRATOR_APP_NAME),
@@ -135,7 +136,7 @@ async def test_resolve_errors(ops_test: OpsTest):
         _create_test_table(ops_test, THIRD_DATA_INTEGRATOR_APP_NAME, "test_table2"),
     )
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active")
 
 
@@ -166,7 +167,7 @@ async def test_switchover(ops_test: OpsTest):
     action = await subscriber_candidate.run_action("promote-to-primary", scope="unit", force=True)
     await action.wait()
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
 
@@ -192,7 +193,7 @@ async def test_pg3_extend_subscription(ops_test: OpsTest):
     })
     await ops_test.model.applications[THIRD_DATABASE_APP_NAME].set_config(pg3_config)
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
     await gather(
@@ -211,7 +212,7 @@ async def test_pg2_change_subscription(ops_test: OpsTest):
     })
     await ops_test.model.applications[SECOND_DATABASE_APP_NAME].set_config(pg2_config)
 
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
     await gather(
@@ -274,7 +275,7 @@ async def test_pg2_resolve_dynamic_error(ops_test: OpsTest):
     ):
         connection.autocommit = True
         cursor.execute("DELETE FROM test_table;")
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
     await _check_test_data(ops_test, SECOND_DATA_INTEGRATOR_APP_NAME, "fourth")
 
@@ -283,7 +284,7 @@ async def test_pg2_resolve_dynamic_error(ops_test: OpsTest):
 async def test_pg2_remove(ops_test: OpsTest):
     await ops_test.model.remove_application(SECOND_DATA_INTEGRATOR_APP_NAME, block_until_done=True)
     await ops_test.model.remove_application(SECOND_DATABASE_APP_NAME, block_until_done=True)
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active", timeout=1000)
     connection_string = await build_connection_string(
         ops_test,
@@ -316,7 +317,7 @@ async def test_pg3_remove_relation(ops_test: OpsTest):
         f"{DATABASE_APP_NAME}:logical-replication-offer",
         f"{THIRD_DATABASE_APP_NAME}:logical-replication",
     )
-    async with ops_test.fast_forward():
+    async with ops_test.fast_forward(fast_interval=FAST_INTERVAL):
         await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
     connection_string = await build_connection_string(
         ops_test,
