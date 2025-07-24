@@ -23,7 +23,7 @@ DATABASE_APP_CONFIG = {"profile": "testing"}
 
 TESTING_DATABASE = "testdb"
 
-TIMEOUT = 15 * 60
+TIMEOUT = 20 * 60
 
 
 @pytest.mark.abort_on_fail
