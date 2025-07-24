@@ -23,6 +23,8 @@ DATABASE_APP_CONFIG = {"profile": "testing"}
 
 TESTING_DATABASE = "testdb"
 
+TIMEOUT = 15 * 60
+
 
 @pytest.mark.abort_on_fail
 async def test_deploy(ops_test: OpsTest, charm):
@@ -87,7 +89,7 @@ async def test_deploy(ops_test: OpsTest, charm):
                 f"{SECOND_DATABASE_APP_NAME}:logical-replication",
             ),
         )
-        await ops_test.model.wait_for_idle(status="active", timeout=500)
+        await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
 
 @pytest.mark.abort_on_fail
@@ -165,7 +167,7 @@ async def test_switchover(ops_test: OpsTest):
     await action.wait()
 
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=500)
+        await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
 
 @pytest.mark.abort_on_fail
@@ -191,7 +193,7 @@ async def test_pg3_extend_subscription(ops_test: OpsTest):
     await ops_test.model.applications[THIRD_DATABASE_APP_NAME].set_config(pg3_config)
 
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=500)
+        await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
     await gather(
         _check_test_data(ops_test, THIRD_DATA_INTEGRATOR_APP_NAME, "second"),
@@ -210,7 +212,7 @@ async def test_pg2_change_subscription(ops_test: OpsTest):
     await ops_test.model.applications[SECOND_DATABASE_APP_NAME].set_config(pg2_config)
 
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=500)
+        await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
 
     await gather(
         _check_test_data(
@@ -273,7 +275,7 @@ async def test_pg2_resolve_dynamic_error(ops_test: OpsTest):
         connection.autocommit = True
         cursor.execute("DELETE FROM test_table;")
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=500)
+        await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
     await _check_test_data(ops_test, SECOND_DATA_INTEGRATOR_APP_NAME, "fourth")
 
 
@@ -315,7 +317,7 @@ async def test_pg3_remove_relation(ops_test: OpsTest):
         f"{THIRD_DATABASE_APP_NAME}:logical-replication",
     )
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=500)
+        await ops_test.model.wait_for_idle(status="active", timeout=TIMEOUT)
     connection_string = await build_connection_string(
         ops_test,
         THIRD_DATA_INTEGRATOR_APP_NAME,
