@@ -9,7 +9,7 @@ This guide will show you how to establish and change the amount of juju units us
 To deploy PostgreSQL with multiple replicas, specify the number of desired units with the `-n` option.
 
 ```text
-juju deploy postgresql --channel 14/stable -n <number_of_replicas>
+juju deploy postgresql --channel 16/stable -n <number_of_replicas>
 ```
 
 It is recommended to use an odd number to prevent a [split-brain](https://en.wikipedia.org/wiki/Split-brain_(computing)) scenario.

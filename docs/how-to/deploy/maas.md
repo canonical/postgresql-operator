@@ -121,7 +121,7 @@ Model       Controller       Cloud/Region        Version  SLA          Timestamp
 postgresql  maas-controller  maas-cloud/default  3.1.8    unsupported  12:50:26+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  14.10    active      1  postgresql  14/stable  363  no       Primary
+postgresql  16.9     active      1  postgresql  16/stable  843  no       Primary
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 postgresql/0*  active    idle   0        10.10.10.5      5432/tcp  Primary

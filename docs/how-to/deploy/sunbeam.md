@@ -40,7 +40,7 @@ To summarise, the relevant sections are:
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
 ```text
 juju add-model postgresql
-juju deploy postgresql --channel 16/edge --base ubuntu@22.04 -n 3
+juju deploy postgresql --channel 16/stable --base ubuntu@22.04 -n 3
 ```
 
 Sample output of `juju status --watch 1s`:
@@ -49,7 +49,7 @@ Model       Controller     Cloud/Region       Version  SLA          Timestamp
 postgresql  my-controller  sunbeam/RegionOne  3.5.4    unsupported  19:42:44Z
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  16    active      3  postgresql     16/edge    468  no       
+postgresql  16.9     active      3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address   Ports     Message
 postgresql/0*  active    idle   0        192.168.122.211  5432/tcp  Primary
