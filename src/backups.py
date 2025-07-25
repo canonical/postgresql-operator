@@ -43,6 +43,11 @@ from constants import (
     POSTGRESQL_DATA_PATH,
     UNIT_SCOPE,
 )
+from relations.async_replication import REPLICATION_CONSUMER_RELATION, REPLICATION_OFFER_RELATION
+from relations.logical_replication import (
+    LOGICAL_REPLICATION_OFFER_RELATION,
+    LOGICAL_REPLICATION_RELATION,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1209,6 +1214,29 @@ Stderr:
         if self.charm.app.planned_units() > 1:
             error_message = (
                 "Unit cannot restore backup as there are more than one unit in the cluster"
+            )
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return False
+
+        logger.info("Checking that cluster does not have an active async replication relation")
+        for relation in [
+            self.model.get_relation(REPLICATION_CONSUMER_RELATION),
+            self.model.get_relation(REPLICATION_OFFER_RELATION),
+        ]:
+            if not relation:
+                continue
+            error_message = "Unit cannot restore backup with an active async replication relation"
+            logger.error(f"Restore failed: {error_message}")
+            event.fail(error_message)
+            return False
+
+        logger.info("Checking that cluster does not have an active logical replication relation")
+        if self.model.get_relation(LOGICAL_REPLICATION_RELATION) or len(
+            self.model.relations.get(LOGICAL_REPLICATION_OFFER_RELATION, ())
+        ):
+            error_message = (
+                "Unit cannot restore backup with an active logical replication connection"
             )
             logger.error(f"Restore failed: {error_message}")
             event.fail(error_message)
