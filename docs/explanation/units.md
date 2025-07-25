@@ -26,7 +26,7 @@ Model       Controller  Cloud/Region         Version  SLA          Timestamp
 postgresql  lxd         localhost/localhost  3.6.5    unsupported  13:04:15+02:00
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  16.19    active      3  postgresql  16/stable  843  no       
+postgresql  16.9     active      3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address  Ports     Message
 postgresql/0*  active    idle   0        10.189.210.53   5432/tcp  Primary <<<<<<<<<<<<<<

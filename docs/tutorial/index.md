@@ -37,7 +37,7 @@ Install Multipass on your machine via the [snap store](https://snapcraft.io/mult
 :host: my-pc
 ```
 
-Spin up a new VM called using [`multipass launch`](https://multipass.run/docs/launch-command). We will call it `my-vm`, and use the [charm-dev](https://github.com/canonical/multipass-blueprints/blob/main/v1/charm-dev.yaml) cloud-init configuration, which will install some necessary software for us.
+Spin up a new VM using [`multipass launch`](https://multipass.run/docs/launch-command). We will call it `my-vm`, and use the [charm-dev](https://github.com/canonical/multipass-blueprints/blob/main/v1/charm-dev.yaml) cloud-init configuration, which will install some necessary software for us.
 
 ```{terminal}
 :input: multipass launch --cpus 4 --memory 8G --disk 50G --name my-vm charm-dev
@@ -346,7 +346,7 @@ To enable high availability in a production environment, replicas should be host
 
 ### Add units
 
-Currently, your deployment has only one Juju unit, known in juju as the **leader unit**. You can think of this as the database's **primary instance**. For each cluster replica, a new Juju unit is created. 
+Currently, your deployment has only one Juju unit, known in juju as the **leader unit**. For each cluster replica, a new Juju unit is created. 
 
 All units are members of the same database cluster.
 

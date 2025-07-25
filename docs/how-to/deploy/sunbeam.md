@@ -49,7 +49,7 @@ Model       Controller     Cloud/Region       Version  SLA          Timestamp
 postgresql  my-controller  sunbeam/RegionOne  3.5.4    unsupported  19:42:44Z
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  16.19    active      3  postgresql  16/stable  843  no       
+postgresql  16.9     active      3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address   Ports     Message
 postgresql/0*  active    idle   0        192.168.122.211  5432/tcp  Primary

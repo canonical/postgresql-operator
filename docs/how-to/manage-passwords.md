@@ -37,7 +37,7 @@ juju config postgresql system-users=<secret_URI>
 ```
 
 ```{tip}
-Note that `<secret_URI>` includes the `secret:` prefix.
+Note that `<secret_URI>` includes the the scheme (`secret:`).
 ```
 
 When the `system-users` config option is set, the charm will:

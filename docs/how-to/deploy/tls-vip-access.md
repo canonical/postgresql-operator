@@ -85,7 +85,7 @@ App                       Version  Status  Scale  Charm                     Chan
 data-integrator                    active      3  data-integrator           latest/stable   78  no       
 hacluster                 2.1.2    active      3  hacluster                 2.4/stable     131  no       Unit is ready and clustered
 pgbouncer                 1.21.0   active      3  pgbouncer                 1/stable       396  no       VIP: 10.78.217.100
-postgresql                16.19    active      3  postgresql                16/stable      843  no       
+postgresql                16.9     active      3  postgresql                16/stable      843  no       
 self-signed-certificates           active      1  self-signed-certificates  latest/stable  155  no       
 
 Unit                         Workload  Agent  Machine  Public address  Ports     Message
