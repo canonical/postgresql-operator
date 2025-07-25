@@ -236,7 +236,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
     await ops_test.model.deploy(
         APPLICATION_APP_NAME,
         application_name=another_application_app_name,
-        channel="edge",
+        channel="latest/edge",
         base=CHARM_BASE,
     )
     await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
@@ -465,15 +465,20 @@ async def test_relation_with_no_database_name(ops_test: OpsTest):
 
 async def test_invalid_extra_user_roles(ops_test: OpsTest):
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
+        # Base is ignored
+        await ops_test.model.deploy(
+            DATA_INTEGRATOR_APP_NAME, channel="latest/edge", series="noble"
+        )
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
 
         another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
         data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
+        # Base is ignored
         await ops_test.model.deploy(
             DATA_INTEGRATOR_APP_NAME,
             application_name=another_data_integrator_app_name,
-            base=CHARM_BASE,
+            channel="latest/edge",
+            series="noble",
         )
         await ops_test.model.wait_for_idle(
             apps=[another_data_integrator_app_name], status="blocked"
