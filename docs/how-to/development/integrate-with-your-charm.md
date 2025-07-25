@@ -14,7 +14,7 @@ Legacy charm details are described [here](/explanation/legacy-charm).
 
 **For an introduction** to the concepts of Juju integrations, see [Juju | Integration](https://documentation.ubuntu.com/juju/3.6/reference/relation/).
 
-**For a detailed tutorial** about integrating your charm with the PostgreSQL charm, refer to [Juju | Integrate your charm with PostgreSQL](https://juju.is/docs/sdk/integrate-your-charm-with-postgresql). 
+**For a detailed tutorial** about integrating your charm with the PostgreSQL charm, refer to [Ops | Integrate your charm with PostgreSQL](https://juju.is/docs/sdk/integrate-your-charm-with-postgresql). 
 
 **For some practical examples**, take a look at the following:
 * [postgresql-test-app](https://github.com/canonical/postgresql-test-app) GitHub repository
