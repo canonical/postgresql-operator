@@ -6,12 +6,15 @@
 import logging
 import os
 import subprocess
+from typing import TYPE_CHECKING
 
-from ops.charm import CharmBase
 from ops.framework import Object
 from ops.model import ActiveStatus
 
 from constants import PGBACKREST_LOGROTATE_FILE
+
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 
 logger = logging.getLogger(__name__)
 
@@ -22,7 +25,7 @@ LOG_FILE_PATH = "/var/log/rotate_logs.log"
 class RotateLogs(Object):
     """Rotate logs every minute."""
 
-    def __init__(self, charm: CharmBase):
+    def __init__(self, charm: "PostgresqlOperatorCharm"):
         super().__init__(charm, "rotate-logs")
         self._charm = charm
 
