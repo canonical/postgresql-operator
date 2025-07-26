@@ -11,7 +11,7 @@ import pytest
 PG_NAME = "postgresql"
 APP_NAME = "postgresql-test-app"
 ISOLATED_APP_NAME = "isolated-app"
-SLEEP_TIME = 20
+SLEEP_TIME = 30
 TIMEOUT = 60 * 15
 
 
@@ -54,7 +54,7 @@ def test_integrate_with_spaces(juju: jubilant.Juju):
     sleep(SLEEP_TIME)
     # Wait for the relation to be established
     logger.info("Waiting for relation to be established")
-    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=SLEEP_TIME)
+    juju.wait(lambda status: jubilant.all_active(status, PG_NAME, APP_NAME), delay=SLEEP_TIME)
 
     status = juju.status()
 

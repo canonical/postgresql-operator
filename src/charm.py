@@ -1761,6 +1761,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
+        # Flag to know if triggers need to be removed after refresh
+        self._peers.data[self.app]["refresh_remove_trigger"] = "True"
 
         # Clear unit data if this unit became a replica after a failover/switchover.
         self._update_relation_endpoints()
@@ -1917,6 +1919,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+        if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
+            self.postgresql.drop_hba_triggers()
+            self.app_peer_data["refresh_remove_trigger"] = "True"
 
     def _was_restore_successful(self) -> bool:
         if self.is_cluster_restoring_to_time and all(self.is_pitr_failed()):
