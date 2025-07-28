@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 
 import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import APPLICATION_NAME, CHARM_BASE, db_connect, scale_application
+from ..helpers import (
+    APPLICATION_NAME,
+    CHARM_BASE,
+    DATABASE_APP_NAME,
+    db_connect,
+    scale_application,
+)
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -46,7 +53,12 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
 
     if wait_for_apps:
         async with ops_test.fast_forward():
-            await ops_test.model.wait_for_idle(status="active", timeout=1500)
+            await asyncio.gather(
+                ops_test.model.wait_for_idle(
+                    apps=[DATABASE_APP_NAME], status="active", timeout=1500
+                ),
+                ops_test.model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked"),
+            )
 
 
 async def test_reelection(ops_test: OpsTest, continuous_writes, primary_start_timeout) -> None:

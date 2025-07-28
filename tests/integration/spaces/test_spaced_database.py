@@ -18,6 +18,10 @@ TIMEOUT = 60 * 15
 logger = logging.getLogger(__name__)
 
 
+def database_active(status: jubilant.Status, app_name=PG_NAME) -> bool:
+    return jubilant.all_active(status, app_name)
+
+
 def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
     """Deploy the charm with the LXD spaces."""
     # Deploy the charm with the LXD spaces
@@ -39,11 +43,12 @@ def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
     )
     # Wait for the deployment to complete
     juju.wait(
-        lambda status: jubilant.all_active(status),
+        lambda status: database_active(status),
         timeout=TIMEOUT,
         delay=10,
         successes=3,
     )
+    juju.wait(lambda status: status.apps[APP_NAME].is_blocked, timeout=600)
 
 
 def test_integrate_with_spaces(juju: jubilant.Juju):
@@ -82,7 +87,7 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
         constraints={"spaces": "isolated"},
         bind={"database": "isolated"},
     )
-    juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_active, timeout=600)
+    juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_blocked, timeout=600)
 
     # Relate the database to the application
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")

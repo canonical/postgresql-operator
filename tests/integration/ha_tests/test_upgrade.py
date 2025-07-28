@@ -1,6 +1,6 @@
 # Copyright 2023 Canonical Ltd.
 # See LICENSE file for licensing details.
-
+import asyncio
 import logging
 import platform
 import shutil
@@ -47,8 +47,9 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
     )
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME, APPLICATION_NAME], status="active", timeout=1500
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500),
+            ops_test.model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked"),
         )
     assert len(ops_test.model.applications[DATABASE_APP_NAME].units) == 3
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # Copyright 2024 Canonical Ltd.
 # See LICENSE file for licensing details.
+import asyncio
 import logging
 from asyncio import exceptions, gather, sleep
 from copy import deepcopy
@@ -50,7 +51,10 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             ),
         )
 
-        await ops_test.model.wait_for_idle(status="active", timeout=1500)
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1500),
+            ops_test.model.wait_for_idle(apps=[APPLICATION_NAME], status="blocked"),
+        )
 
 
 @pytest.mark.parametrize(
