@@ -18,7 +18,7 @@ This guide assumes you have:
 
 ## Install and bootstrap Sunbeam
 
-Follow the official OpenStack guide: [Single-node deployment][Single-node guided]. 
+Follow the [official OpenStack installation guide][Single-node guided].
 
 Pay attention to the `Caution` and `Note` sections - the `/etc/hosts` will require a [manual {spellexception}`fqdn` fix](https://github.com/canonical/multipass/issues/3277#issuecomment-2471434029).
 
@@ -28,7 +28,7 @@ Follow the official [Images Sync] guide to enable auto-sync and wait for the ima
 
 ## Set up Juju inside an OpenStack bastion
 
-Follow the MicroStack guide [Manage workloads with Juju] from the beginning, and stop after the section "Create a Juju controller". 
+Follow the OpenStack guide [Manage workloads with Juju] from the beginning, and stop after the section "Create a Juju controller". 
 
 To summarise, the relevant sections are:
 * Set up the bastion
@@ -40,7 +40,7 @@ To summarise, the relevant sections are:
 Add a model if you don't have one already, and deploy a PostgreSQL cluster. Use the `-n` flag to specify number of units.
 ```text
 juju add-model postgresql
-juju deploy postgresql --channel 16/edge --base ubuntu@22.04 -n 3
+juju deploy postgresql --channel 16/stable --base ubuntu@22.04 -n 3
 ```
 
 Sample output of `juju status --watch 1s`:
@@ -49,7 +49,7 @@ Model       Controller     Cloud/Region       Version  SLA          Timestamp
 postgresql  my-controller  sunbeam/RegionOne  3.5.4    unsupported  19:42:44Z
 
 App         Version  Status  Scale  Charm       Channel    Rev  Exposed  Message
-postgresql  16    active      3  postgresql     16/edge    468  no       
+postgresql  16.9     active      3  postgresql  16/stable  843  no       
 
 Unit           Workload  Agent  Machine  Public address   Ports     Message
 postgresql/0*  active    idle   0        192.168.122.211  5432/tcp  Primary
@@ -82,8 +82,8 @@ The image below is an example of the OpenStack dashboard view (bastion + juju co
 
 <!-- LABELS-->
 [Tutorial]: /tutorial/index
-[Single-node guided]: https://microstack.run/docs/single-node-guided
-[Accessing the OpenStack dashboard]: https://microstack.run/docs/dashboard
-[Images Sync]: https://microstack.run/docs/images
-[Manage workloads with Juju]: https://microstack.run/docs/juju-workloads
+[Single-node guided]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/install/install-canonical-openstack-using-the-manual-bare-metal-provider/
+[Accessing the OpenStack dashboard]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/misc/using-the-openstack-dashboard/
+[Images Sync]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/features/images-sync/
+[Manage workloads with Juju]: https://canonical-openstack.readthedocs-hosted.com/en/latest/how-to/misc/manage-workloads-with-juju/
 

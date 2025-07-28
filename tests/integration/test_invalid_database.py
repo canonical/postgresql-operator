@@ -62,7 +62,7 @@ def test_deploy(juju: jubilant.Juju, charm) -> None:
     juju.wait(lambda status: data_integrator_blocked(status), timeout=TIMEOUT)
 
 
-def test_database(juju: jubilant.Juju, predefined_roles, predefined_roles_combinations) -> None:
+def test_database(juju: jubilant.Juju, predefined_roles) -> None:
     """Check that an invalid database name makes the database charm block."""
     del predefined_roles[""]
     invalid_database_names = [

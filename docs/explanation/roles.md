@@ -2,7 +2,7 @@
 
 There are several definitions of roles in Charmed PostgreSQL:
 * Predefined PostgreSQL roles
-* Instance level DB/relation-specific roles
+* Instance-level DB/relation-specific roles
   *  LDAP-specific roles 
 * Extra user roles relation flag
 
@@ -35,13 +35,17 @@ test123=> SELECT * FROM pg_roles;
 
 ## Charmed PostgreSQL 16 roles
 
-Charmed PostgreSQL 16 introduces the following instance level predefined roles:
+Charmed PostgreSQL 16 introduces the following instance-level predefined roles:
 
 * `charmed_stats` (inherit from pg_monitor)
-* `charmed_read` (inherit from pg_read_all_data)
-* `charmed_dml` (inherit from pg_write_all_data)
-* `charmed_backup` (inherit from pg_checkpoint)
+* `charmed_read` (inherit from pg_read_all_data and `charmed_stats`)
+* `charmed_dml` (inherit from pg_write_all_data and `charmed_read`)
+* `charmed_backup` (inherit from pg_checkpoint and `charmed_stats`)
 * `charmed_dba` (allowed to escalate to any other user, including the superuser `operator`)
+* `charmed_admin` (inherit from `charmed_dml` and allowed to escalate to the database-specific `charmed_<database-name>_owner` role, which is explained later in this document)
+* `charmed_databases_owner` (allowed to create databases; it can be requested through the CREATEDB extra user role)
+ 
+Currently, `charmed_backup` and `charmed_dba` cannot be requested through the relation as extra user roles.
 
 ```text
 test123=> SELECT * FROM pg_roles;
@@ -52,25 +56,30 @@ test123=> SELECT * FROM pg_roles;
  charmed_read                | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16388
  charmed_dml                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16390
  charmed_backup              | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16392
+ charmed_dba                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16393
+ charmed_admin               | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16394
+ charmed_databases_owner     | f        | t          | f             | t           | t           | f              |           -1 | ********    |               | f            |           | 16395
 ...
 ```
 
 Charmed PostgreSQL 16 also introduces catalogue/database level roles, with permissions tied to each database that's created. Example for a database named `test`:
 
 ```text
-test123=> SELECT * FROM pg_roles where rolname like 'test_%';;
-          rolname           | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
-----------------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
- test_owner                 | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16479
- test_admin                 | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16480
+test123=> SELECT * FROM pg_roles WHERE rolname LIKE 'charmed_test_%';
+      rolname       | rolsuper | rolinherit | rolcreaterole | rolcreatedb | rolcanlogin | rolreplication | rolconnlimit | rolpassword | rolvaliduntil | rolbypassrls | rolconfig |  oid  
+--------------------+----------+------------+---------------+-------------+-------------+----------------+--------------+-------------+---------------+--------------+-----------+-------
+ charmed_test_owner | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16396
+ charmed_test_admin | f        | f          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16397
+ charmed_test_dml   | f        | t          | f             | f           | f           | f              |           -1 | ********    |               | f            |           | 16398
 ```
 
-The `*_admin` role is assigned to each relation user (explained in the next section) with access to the specific database. When that user connects to the database, it's auto-escalated to the `*_owner` user, which will own every object inside the database, simplifying the permissions to perform operations on those objects when a new user requests access to that same database.
+The `charmed_<database-name>_admin` role is assigned to each relation user (explained in the next section) with access to the specific database. When that user connects to the database, it's auto-escalated to the `charmed_<database-name>_owner` user, which will own every object inside the database, simplifying the permissions to perform operations on those objects when a new user requests access to that same database.
 
-<!--TODO: are the next two sections also relevant for 16?-->
-### Relation specific roles
+There is also a `charmed_<database-name>_dml` role that is assigned to each relation user to still allow them to read and write to the database objects even if the mechanism to auto-escalate the relation user to the `charmed_<database-name>_owner` role doesn't work.
 
-For each application/relation the dedicated user is been created (with matching role and all all resources ownership). The resources ownership is being updated on each re-relation for new users/roles regeneration. Example of simple application relation to PostgreSQL and creating table:
+### Relation-specific roles
+
+For each application/relation, the dedicated user has been created:
 
 ```text
 postgres=# SELECT * FROM pg_roles;
@@ -85,17 +94,9 @@ postgres=# SELECT * FROM pg_user;
 ----------------------------+----------+-------------+----------+---------+--------------+----------+----------+-----------
  ...
  relation_id_12             |    16416 | t           | f        | f       | f            | ******** |          | 
-...
-
-mydb=# \d+
-             List of relations
- Schema |  Name   | Type  |     Owner      | ...
---------+---------+-------+----------------+ ...
- public | mytable | table | relation_id_12 | ...
-
 ```
 
-When the same application is being related through PgBouncer, the extra users/roles created following the same logic as above:
+When the same application is being related through PgBouncer, the extra users/roles are created following the same logic as above:
 
 ```text
 postgres=# SELECT * FROM pg_roles;
@@ -114,19 +115,12 @@ postgres=# SELECT * FROM pg_user;
  relation-14                |    16403 | f           | t        | f       | f            | ******** |          | 
  pgbouncer_auth_relation_14 |    16410 | f           | t        | f       | f            | ******** |          | 
  relation_id_13             |    16417 | t           | f        | f       | f            | ******** |          | 
-...
-
-mydb=# \d+
-               List of relations
- Schema |  Name   | Type  |     Owner      | ... 
---------+---------+-------+----------------+ ...
- public | mytable | table | relation_id_13 | ...
 ```
 
-In this case there several records created to:
+In this case, there are  several records created to:
  * `relation_id_13` - for relation between Application and PgBouncer
  * `relation-14` - for relation between PgBouncer and PostgreSQL
- * `pgbouncer_auth_relation_14` - to authenticate end-users which connects PgBouncer
+ * `pgbouncer_auth_relation_14` - to authenticate end-users, which connects PgBouncer
 
 ### Charmed PostgreSQL LDAP roles
 
