@@ -55,7 +55,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
                 base=CHARM_BASE,
-                channel="edge",
+                channel="latest/edge",
             ),
             ops_test.model.deploy(
                 charm,
@@ -73,7 +73,9 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
             ),
         )
 
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, ANOTHER_DATABASE_APP_NAME], status="active", timeout=3000
+        )
 
 
 async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):

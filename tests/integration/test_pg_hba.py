@@ -98,9 +98,6 @@ async def test_pg_hba(ops_test: OpsTest, charm):
                 )
                 cursor.execute(f"CREATE DATABASE {SECOND_DATABASE};")
                 cursor.execute(
-                    f"GRANT CONNECT ON DATABASE {FIRST_DATABASE} TO {FIRST_RELATION_USER};"
-                )
-                cursor.execute(
                     f"GRANT CONNECT ON DATABASE {SECOND_DATABASE} TO {SECOND_RELATION_USER};"
                 )
                 cursor.execute("CREATE SCHEMA test;")
