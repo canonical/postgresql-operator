@@ -33,6 +33,7 @@ APPLICATION_APP_NAME = "postgresql-test-app"
 DATABASE_APP_NAME = "database"
 ANOTHER_DATABASE_APP_NAME = "another-database"
 DATA_INTEGRATOR_APP_NAME = "data-integrator"
+DATABASE_APP_NAMES = [DATABASE_APP_NAME, ANOTHER_DATABASE_APP_NAME]
 APP_NAMES = [APPLICATION_APP_NAME, DATABASE_APP_NAME, ANOTHER_DATABASE_APP_NAME]
 DATABASE_APP_METADATA = yaml.safe_load(Path("./metadata.yaml").read_text())
 FIRST_DATABASE_RELATION_NAME = "database"
@@ -73,7 +74,10 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
             ),
         )
 
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(apps=DATABASE_APP_NAMES, status="active", timeout=3000),
+            ops_test.model.wait_for_idle(apps=[APPLICATION_APP_NAME], status="blocked"),
+        )
 
 
 async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
@@ -239,7 +243,10 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         channel="latest/edge",
         base=CHARM_BASE,
     )
-    await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
+    await asyncio.gather(
+        ops_test.model.wait_for_idle(apps=DATABASE_APP_NAME, status="active"),
+        ops_test.model.wait_for_idle(apps=[another_application_app_name], status="blocked"),
+    )
 
     # Relate the new application with the database
     # and wait for them exchanging some connection data.
@@ -440,8 +447,11 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             f"{DATABASE_APP_NAME}:database",
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
-        await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=1000, idle_period=30
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(
+                apps=[DATABASE_APP_NAME], status="active", timeout=1000, idle_period=30
+            ),
+            ops_test.model.wait_for_idle(apps=[APPLICATION_APP_NAME], status="blocked"),
         )
         with pytest.raises(psycopg2.OperationalError):
             psycopg2.connect(primary_connection_string)
@@ -460,7 +470,12 @@ async def test_relation_with_no_database_name(ops_test: OpsTest):
         await ops_test.model.applications[DATABASE_APP_NAME].remove_relation(
             f"{DATABASE_APP_NAME}", f"{APPLICATION_APP_NAME}:{NO_DATABASE_RELATION_NAME}"
         )
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", raise_on_blocked=True)
+        await asyncio.gather(
+            ops_test.model.wait_for_idle(
+                apps=DATABASE_APP_NAMES, status="active", raise_on_blocked=True
+            ),
+            await ops_test.model.wait_for_idle(apps=[APPLICATION_APP_NAME], status="blocked"),
+        )
 
 
 async def test_invalid_extra_user_roles(ops_test: OpsTest):
