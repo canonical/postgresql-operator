@@ -1,6 +1,14 @@
 variable "juju_model_name" {
   description = "Juju model name"
   type        = string
+  default     = null
+}
+
+variable "charm_name" {
+  description = "Name of the charm on https://charmhub.io"
+  type        = string
+  default     = "postgresql"
+  nullable    = false
 }
 
 variable "app_name" {
@@ -39,10 +47,10 @@ variable "constraints" {
   default     = "arch=amd64"
 }
 
-variable "storage_size" {
-  description = "Storage size"
-  type        = string
-  default     = "10G"
+variable "storage" {
+  description = "Storage directive"
+  type        = map(string)
+  default     = {}
 }
 
 variable "config" {
@@ -52,7 +60,13 @@ variable "config" {
 }
 
 variable "enable_expose" {
+  description = "Whether to expose the application"
   type        = bool
   default     = true
-  description = "Whether to expose the application"
+}
+
+variable "machine" {
+  description = "Target Juju machine to deploy on"
+  type        = string
+  default     = null
 }
