@@ -78,7 +78,7 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     juju.deploy(
         APP_NAME,
         app=ISOLATED_APP_NAME,
-        channel="latest/beta",
+        channel="latest/edge",
         constraints={"spaces": "isolated"},
         bind={"database": "isolated"},
     )
