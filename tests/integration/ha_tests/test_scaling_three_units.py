@@ -50,6 +50,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             ),
         )
 
+        await ops_test.model.relate(f"{DATABASE_APP_NAME}:database", "{APPLICATION_NAME}:database")
         await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
 
