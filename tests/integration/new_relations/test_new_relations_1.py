@@ -244,7 +244,7 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         base=CHARM_BASE,
     )
     await asyncio.gather(
-        ops_test.model.wait_for_idle(apps=DATABASE_APP_NAME, status="active"),
+        ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active"),
         ops_test.model.wait_for_idle(apps=[another_application_app_name], status="blocked"),
     )
 
@@ -447,11 +447,8 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
             f"{DATABASE_APP_NAME}:database",
             f"{APPLICATION_APP_NAME}:{FIRST_DATABASE_RELATION_NAME}",
         )
-        await asyncio.gather(
-            ops_test.model.wait_for_idle(
-                apps=[DATABASE_APP_NAME], status="active", timeout=1000, idle_period=30
-            ),
-            ops_test.model.wait_for_idle(apps=[APPLICATION_APP_NAME], status="blocked"),
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME], status="active", timeout=1000, idle_period=30
         )
         with pytest.raises(psycopg2.OperationalError):
             psycopg2.connect(primary_connection_string)
