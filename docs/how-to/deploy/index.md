@@ -29,7 +29,7 @@ juju deploy postgresql --channel 16/stable -n <number_of_replicas>
 > See also: [`juju deploy` command](https://canonical-juju.readthedocs-hosted.com/en/latest/user/reference/juju-cli/list-of-juju-cli-commands/deploy/)
 
 **To deploy with `terraform juju`**, follow the guide [How to deploy using Terraform].
-> See also: [Terraform Provider for Juju documentation](https://canonical-terraform-provider-juju.readthedocs-hosted.com/en/latest/)
+> See also: [Terraform Provider for Juju documentation](https://canonical-terraform-provider-juju.readthedocs-hosted.com/latest/)
 
 If you are not sure where to start or would like a more guided walkthrough for setting up your environment, see the [Charmed PostgreSQL tutorial][Tutorial].
 
