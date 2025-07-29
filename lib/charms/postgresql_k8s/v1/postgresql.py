@@ -1347,6 +1347,9 @@ $$ LANGUAGE plpgsql security definer;"""
                     cursor.execute(
                         SQL("DROP EVENT TRIGGER IF EXISTS update_pg_hba_on_create_schema;")
                     )
+                    cursor.execute(
+                        SQL("DROP EVENT TRIGGER IF EXISTS update_pg_hba_on_drop_schema;")
+                    )
             except psycopg2.Error as e:
                 logger.warning(f"Failed to remove hba trigger for {database}: {e}")
             finally:

@@ -241,7 +241,6 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
         channel="latest/edge",
         base=CHARM_BASE,
     )
-    await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
 
     # Relate the new application with the database
     # and wait for them exchanging some connection data.
