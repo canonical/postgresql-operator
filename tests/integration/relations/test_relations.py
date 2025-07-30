@@ -37,7 +37,7 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 application_name=DATABASE_APP_NAME,
                 num_units=1,
                 base=CHARM_BASE,
-                channel="edge",
+                channel="latest/edge",
             ),
             ops_test.model.deploy(
                 charm,
@@ -55,11 +55,11 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 application_name=DB_APP_NAME,
                 num_units=1,
                 base=CHARM_BASE,
-                channel="edge",
+                channel="latest/edge",
             ),
         )
 
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
+        await ops_test.model.wait_for_idle(apps=[APP_NAME], status="active", timeout=3000)
 
 
 async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest):
@@ -78,6 +78,7 @@ async def test_legacy_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
     )
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
+            apps=[APP_NAME],
             status="active",
             timeout=1500,
             raise_on_error=False,
@@ -117,7 +118,9 @@ async def test_modern_endpoint_with_multiple_related_endpoints(ops_test: OpsTest
         f"{DB_APP_NAME}:{DB_RELATION}", f"{APP_NAME}:{DB_RELATION}"
     )
     async with ops_test.fast_forward():
-        await ops_test.model.wait_for_idle(status="active", timeout=3000, raise_on_error=False)
+        await ops_test.model.wait_for_idle(
+            apps=[APP_NAME], status="active", timeout=3000, raise_on_error=False
+        )
 
     modern_interface_connect = await build_connection_string(
         ops_test, DATABASE_APP_NAME, FIRST_DATABASE_RELATION

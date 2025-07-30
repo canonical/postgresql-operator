@@ -209,9 +209,7 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
     )
 
     await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME, APPLICATION_NAME, f"{APPLICATION_NAME}2"],
-        status="active",
-        timeout=1000,
+        apps=[APPLICATION_NAME, f"{APPLICATION_NAME}2"], status="blocked", timeout=1000
     )
 
     await asyncio.gather(
@@ -242,11 +240,7 @@ async def test_roles_blocking(ops_test: OpsTest, charm: str) -> None:
         f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"
     )
 
-    await ops_test.model.wait_for_idle(
-        apps=[DATABASE_APP_NAME],
-        status="active",
-        timeout=1000,
-    )
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 
 
 async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
@@ -255,9 +249,7 @@ async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
         ops_test.model.applications[f"{APPLICATION_NAME}2"].set_config({"legacy_roles": "False"}),
     )
     await ops_test.model.wait_for_idle(
-        apps=[APPLICATION_NAME, f"{APPLICATION_NAME}2"],
-        status="active",
-        timeout=1000,
+        apps=[APPLICATION_NAME, f"{APPLICATION_NAME}2"], status="blocked", timeout=1000
     )
 
     await asyncio.gather(
@@ -287,6 +279,8 @@ async def test_extensions_blocking(ops_test: OpsTest, charm: str) -> None:
     await ops_test.model.applications[DATABASE_APP_NAME].destroy_relation(
         f"{DATABASE_APP_NAME}:db", f"{APPLICATION_NAME}2:db"
     )
+
+    await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=1000)
 
 
 @markers.juju2

@@ -12,6 +12,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 from .. import markers
 from ..helpers import (
     CHARM_BASE,
+    DATABASE_APP_NAME,
     db_connect,
     get_machine_from_unit,
     get_password,
@@ -91,6 +92,7 @@ async def test_build_and_deploy(ops_test: OpsTest, charm) -> None:
             )
 
     if wait_for_apps:
+        await ops_test.model.relate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
         async with ops_test.fast_forward():
             await ops_test.model.wait_for_idle(status="active", timeout=1500)
 
