@@ -35,7 +35,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 53
+LIBPATCH = 55
 
 # Groups to distinguish HBA access
 ACCESS_GROUP_IDENTITY = "identity_access"
@@ -267,7 +267,8 @@ class PostgreSQL:
             raise PostgreSQLCreateDatabaseError() from e
 
         # Enable preset extensions
-        self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
+        if plugins:
+            self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
 
     def create_user(
         self,
@@ -782,83 +783,6 @@ END; $$;"""
         connection = None
         cursor = None
         try:
-            with self._connect_to_database(
-                database="template1"
-            ) as connection, connection.cursor() as cursor:
-                # Create database function and event trigger to identify users created by PgBouncer.
-                cursor.execute(
-                    "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
-                )
-                if cursor.fetchone() is None:
-                    cursor.execute("""
-CREATE OR REPLACE FUNCTION update_pg_hba()
-    RETURNS event_trigger
-    LANGUAGE plpgsql
-    AS $$
-        DECLARE
-          hba_file TEXT;
-          copy_command TEXT;
-          connection_type TEXT;
-          rec record;
-          insert_value TEXT;
-          changes INTEGER = 0;
-        BEGIN
-          -- Don't execute on replicas.
-          IF NOT pg_is_in_recovery() THEN
-            -- Load the current authorisation rules.
-            DROP TABLE IF EXISTS pg_hba;
-            CREATE TEMPORARY TABLE pg_hba (lines TEXT);
-            SELECT setting INTO hba_file FROM pg_settings WHERE name = 'hba_file';
-            IF hba_file IS NOT NULL THEN
-                copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
-                EXECUTE copy_command;
-                -- Build a list of the relation users and the databases they can access.
-                DROP TABLE IF EXISTS relation_users;
-                CREATE TEMPORARY TABLE relation_users AS
-                  SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename NOT IN ('backup', 'monitoring', 'operator', 'postgres', 'replication', 'rewind')) AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
-                IF (SELECT COUNT(lines) FROM pg_hba WHERE lines LIKE 'hostssl %') > 0 THEN
-                  connection_type := 'hostssl';
-                ELSE
-                  connection_type := 'host';
-                END IF;
-                -- Add the new users to the pg_hba file.
-                FOR rec IN SELECT * FROM relation_users
-                LOOP
-                  insert_value := connection_type || ' ' || rec.databases || ' ' || rec.user || ' 0.0.0.0/0 md5';
-                  IF (SELECT COUNT(lines) FROM pg_hba WHERE lines = insert_value) = 0 THEN
-                    INSERT INTO pg_hba (lines) VALUES (insert_value);
-                    changes := changes + 1;
-                  END IF;
-                END LOOP;
-                -- Remove users that don't exist anymore from the pg_hba file.
-                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
-                LOOP
-                  DELETE FROM pg_hba WHERE lines = rec.lines;
-                  changes := changes + 1;
-                END LOOP;
-                -- Apply the changes to the pg_hba file.
-                IF changes > 0 THEN
-                  copy_command='COPY pg_hba TO ''' || hba_file || '''' ;
-                  EXECUTE copy_command;
-                  PERFORM pg_reload_conf();
-                END IF;
-            END IF;
-          END IF;
-        END;
-    $$;
-                    """)
-                    cursor.execute("""
-CREATE EVENT TRIGGER update_pg_hba_on_create_schema
-    ON ddl_command_end
-    WHEN TAG IN ('CREATE SCHEMA')
-    EXECUTE FUNCTION update_pg_hba();
-                    """)
-                    cursor.execute("""
-CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
-    ON ddl_command_end
-    WHEN TAG IN ('DROP SCHEMA')
-    EXECUTE FUNCTION update_pg_hba();
-                    """)
             with self._connect_to_database() as connection, connection.cursor() as cursor:
                 cursor.execute("SELECT TRUE FROM pg_roles WHERE rolname='admin';")
                 if cursor.fetchone() is None:
