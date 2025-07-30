@@ -2,14 +2,12 @@
 # Copyright 2025 Canonical Ltd.
 # See LICENSE file for licensing details.
 import logging
+from time import sleep
 
 import jubilant
 import psycopg2
 import pytest as pytest
-from psycopg2.sql import (
-    SQL,
-    Identifier,
-)
+from psycopg2.sql import SQL, Identifier
 
 from .helpers import (
     DATA_INTEGRATOR_APP_NAME,
@@ -144,17 +142,7 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
         if connection is not None:
             connection.close()
 
-    # Create a schema in the other database to update the pg_hba rules immediately.
-    connection = None
-    try:
-        with db_connect(host, operator_password, database=OTHER_DATABASE_NAME) as connection:
-            connection.autocommit = True
-            with connection.cursor() as cursor:
-                logger.info(f"Creating schema in database {OTHER_DATABASE_NAME}")
-                cursor.execute(f'CREATE SCHEMA "{OTHER_DATABASE_NAME}";')
-    finally:
-        if connection is not None:
-            connection.close()
+    sleep(90)
 
     data_integrator_apps = [
         app for app in juju.status().apps if app.startswith(DATA_INTEGRATOR_APP_NAME)
@@ -239,6 +227,9 @@ def test_operations(juju: jubilant.Juju, predefined_roles) -> None:  # noqa: C90
         logger.info(
             f"User is {user}, database is {database}, extra user roles are '{extra_user_roles}'"
         )
+
+        sleep(90)
+
         attributes = roles_attributes(predefined_roles, extra_user_roles)
         logger.info(f"Attributes for user {user}: '{attributes}'")
         message_prefix = f"Checking that {user} user ({'with extra user roles: ' + extra_user_roles.replace(',', ', ') if extra_user_roles else 'without extra user roles'})"

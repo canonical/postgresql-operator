@@ -898,91 +898,6 @@ class PostgreSQL:
                 self.set_up_login_hook_function()
                 self.set_up_predefined_catalog_roles_function()
 
-                # Create database function and event trigger to identify users created by PgBouncer.
-                cursor.execute("""
-CREATE OR REPLACE FUNCTION update_pg_hba()
-    RETURNS event_trigger
-    LANGUAGE plpgsql
-    AS $$
-        DECLARE
-          temp_schema TEXT;
-          hba_file TEXT;
-          copy_command TEXT;
-          connection_type TEXT;
-          rec record;
-          insert_value TEXT;
-          changes INTEGER = 0;
-        BEGIN
-          -- Don't execute on replicas.
-          IF NOT pg_is_in_recovery() THEN
-            -- Load the current authorisation rules.
-            SELECT nspname INTO temp_schema FROM pg_namespace WHERE  oid = pg_my_temp_schema();
-            IF temp_schema != '' THEN
-                PERFORM TRUE FROM pg_tables WHERE schemaname = temp_schema AND tablename = 'pg_hba';
-                IF FOUND THEN
-                    DROP TABLE pg_hba;
-                END IF;
-                PERFORM TRUE FROM pg_tables WHERE schemaname = temp_schema AND tablename = 'relation_users';
-                IF FOUND THEN
-                    DROP TABLE relation_users;
-                END IF;
-            END IF;
-            CREATE TEMPORARY TABLE pg_hba (lines TEXT);
-            SELECT setting INTO hba_file FROM pg_settings WHERE name = 'hba_file';
-            IF hba_file IS NOT NULL THEN
-                copy_command='COPY pg_hba FROM ''' || hba_file || '''' ;
-                EXECUTE copy_command;
-                -- Build a list of the relation users and the databases they can access.
-                CREATE TEMPORARY TABLE relation_users AS
-                  SELECT t.user, STRING_AGG(DISTINCT t.database, ',') AS databases FROM( SELECT u.usename AS user, CASE WHEN u.usesuper THEN 'all' ELSE d.datname END AS database FROM ( SELECT usename, usesuper FROM pg_catalog.pg_user WHERE usename NOT IN ('backup', 'monitoring', 'operator', 'postgres', 'replication', 'rewind')) AS u JOIN ( SELECT datname FROM pg_catalog.pg_database WHERE NOT datistemplate ) AS d ON has_database_privilege(u.usename, d.datname, 'CONNECT') ) AS t GROUP BY 1;
-                IF (SELECT COUNT(lines) FROM pg_hba WHERE lines LIKE 'hostssl %') > 0 THEN
-                  connection_type := 'hostssl';
-                ELSE
-                  connection_type := 'host';
-                END IF;
-                -- Add the new users to the pg_hba file.
-                FOR rec IN SELECT * FROM relation_users
-                LOOP
-                  insert_value := connection_type || ' ' || rec.databases || ' ' || rec.user || ' 0.0.0.0/0 md5';
-                  IF (SELECT COUNT(lines) FROM pg_hba WHERE lines = insert_value) = 0 THEN
-                    INSERT INTO pg_hba (lines) VALUES (insert_value);
-                    changes := changes + 1;
-                  END IF;
-                END LOOP;
-                -- Remove users that don't exist anymore from the pg_hba file.
-                FOR rec IN SELECT h.lines FROM pg_hba AS h LEFT JOIN relation_users AS r ON SPLIT_PART(h.lines, ' ', 3) = r.user WHERE r.user IS NULL AND (SPLIT_PART(h.lines, ' ', 3) LIKE 'relation_id_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE 'pgbouncer_auth_relation_%' OR SPLIT_PART(h.lines, ' ', 3) LIKE '%_user_%_%')
-                LOOP
-                  DELETE FROM pg_hba WHERE lines = rec.lines;
-                  changes := changes + 1;
-                END LOOP;
-                -- Apply the changes to the pg_hba file.
-                IF changes > 0 THEN
-                  copy_command='COPY pg_hba TO ''' || hba_file || '''' ;
-                  EXECUTE copy_command;
-                  PERFORM pg_reload_conf();
-                END IF;
-            END IF;
-          END IF;
-        END;
-    $$ SECURITY DEFINER;
-                """)
-                cursor.execute(
-                    "SELECT TRUE FROM pg_event_trigger WHERE evtname = 'update_pg_hba_on_create_schema';"
-                )
-                if cursor.fetchone() is None:
-                    cursor.execute("""
-CREATE EVENT TRIGGER update_pg_hba_on_create_schema
-    ON ddl_command_end
-    WHEN TAG IN ('CREATE SCHEMA')
-    EXECUTE FUNCTION update_pg_hba();
-                    """)
-                    cursor.execute("""
-CREATE EVENT TRIGGER update_pg_hba_on_drop_schema
-    ON ddl_command_end
-    WHEN TAG IN ('DROP SCHEMA')
-    EXECUTE FUNCTION update_pg_hba();
-                    """)
-
             connection.close()
             connection = None
 
@@ -1403,3 +1318,40 @@ $$ LANGUAGE plpgsql security definer;"""
         finally:
             if connection:
                 connection.close()
+
+    def drop_hba_triggers(self) -> None:
+        """Drop pg_hba triggers on schema change."""
+        try:
+            with self._connect_to_database() as connection, connection.cursor() as cursor:
+                cursor.execute(
+                    SQL(
+                        "SELECT datname FROM pg_database WHERE datname <> 'template0' AND datname <>'postgres';"
+                    )
+                )
+                databases = [row[0] for row in cursor.fetchall()]
+        except psycopg2.Error as e:
+            logger.warning(f"Failed to get databases when removing hba trigger: {e}")
+            return
+        finally:
+            if connection:
+                connection.close()
+
+            # Existing objects need to be reassigned in each database
+            # before the user can be deleted.
+
+        for database in databases:
+            try:
+                with self._connect_to_database(
+                    database
+                ) as connection, connection.cursor() as cursor:
+                    cursor.execute(
+                        SQL("DROP EVENT TRIGGER IF EXISTS update_pg_hba_on_create_schema;")
+                    )
+                    cursor.execute(
+                        SQL("DROP EVENT TRIGGER IF EXISTS update_pg_hba_on_drop_schema;")
+                    )
+            except psycopg2.Error as e:
+                logger.warning(f"Failed to remove hba trigger for {database}: {e}")
+            finally:
+                if connection:
+                    connection.close()
