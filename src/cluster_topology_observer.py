@@ -7,6 +7,8 @@ import logging
 import os
 import signal
 import subprocess
+from pathlib import Path
+from sys import version_info
 from typing import TYPE_CHECKING
 
 from ops import ActiveStatus, CharmEvents, EventBase, EventSource, Object
@@ -23,10 +25,6 @@ class ClusterTopologyChangeEvent(EventBase):
     """A custom event for cluster topology changes."""
 
 
-class AuthorisationRulesChangeEvent(EventBase):
-    """A custom event for authorisation rules changes."""
-
-
 class DatabasesChangeEvent(EventBase):
     """A custom event for databases changes."""
 
@@ -37,7 +35,6 @@ class ClusterTopologyChangeCharmEvents(CharmEvents):
     Includes :class:`ClusterTopologyChangeEvent` in those that can be handled.
     """
 
-    authorisation_rules_change = EventSource(AuthorisationRulesChangeEvent)
     cluster_topology_change = EventSource(ClusterTopologyChangeEvent)
     databases_change = EventSource(DatabasesChangeEvent)
 
@@ -83,6 +80,20 @@ class ClusterTopologyObserver(Object):
         new_env = os.environ.copy()
         if "JUJU_CONTEXT_ID" in new_env:
             new_env.pop("JUJU_CONTEXT_ID")
+        # Generate the venv path based on the existing lib path
+        for loc in new_env["PYTHONPATH"].split(":"):
+            path = Path(loc)
+            venv_path = (
+                path
+                / ".."
+                / "venv"
+                / "lib"
+                / f"python{version_info.major}.{version_info.minor}"
+                / "site-packages"
+            )
+            if path.stem == "lib":
+                new_env["PYTHONPATH"] = f"{venv_path.resolve()}:{new_env['PYTHONPATH']}"
+                break
 
         urls = [self._charm._patroni._patroni_url] + [
             self._charm._patroni._patroni_url.replace(self._charm._patroni.unit_ip, peer)

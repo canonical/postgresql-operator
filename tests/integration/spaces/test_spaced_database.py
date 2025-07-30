@@ -6,12 +6,11 @@ import logging
 from time import sleep
 
 import jubilant
-import pytest
 
 PG_NAME = "postgresql"
 APP_NAME = "postgresql-test-app"
 ISOLATED_APP_NAME = "isolated-app"
-SLEEP_TIME = 20
+SLEEP_TIME = 30
 TIMEOUT = 60 * 15
 
 
@@ -39,7 +38,7 @@ def test_deploy(juju: jubilant.Juju, lxd_spaces, charm):
     )
     # Wait for the deployment to complete
     juju.wait(
-        lambda status: jubilant.all_active(status),
+        lambda status: jubilant.all_active(status, PG_NAME),
         timeout=TIMEOUT,
         delay=10,
         successes=3,
@@ -54,7 +53,11 @@ def test_integrate_with_spaces(juju: jubilant.Juju):
     sleep(SLEEP_TIME)
     # Wait for the relation to be established
     logger.info("Waiting for relation to be established")
-    juju.wait(lambda status: status.apps[PG_NAME].is_active, delay=SLEEP_TIME)
+    juju.wait(
+        lambda status: jubilant.all_active(status, PG_NAME, APP_NAME),
+        delay=SLEEP_TIME,
+        timeout=TIMEOUT,
+    )
 
     status = juju.status()
 
@@ -78,18 +81,20 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     juju.deploy(
         APP_NAME,
         app=ISOLATED_APP_NAME,
-        channel="latest/beta",
+        channel="latest/edge",
         constraints={"spaces": "isolated"},
         bind={"database": "isolated"},
     )
-    juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_active, timeout=600)
+    juju.wait(lambda status: status.apps[ISOLATED_APP_NAME].is_blocked, timeout=600)
 
     # Relate the database to the application
     juju.integrate(PG_NAME, f"{ISOLATED_APP_NAME}:database")
     sleep(SLEEP_TIME)
     # Wait for the relation to be established
     juju.wait(
-        lambda status: jubilant.all_active(status, PG_NAME, ISOLATED_APP_NAME), delay=SLEEP_TIME
+        lambda status: jubilant.all_active(status, PG_NAME, ISOLATED_APP_NAME),
+        delay=SLEEP_TIME,
+        timeout=TIMEOUT,
     )
 
     status = juju.status()
@@ -98,5 +103,6 @@ def test_integrate_with_isolated_space(juju: jubilant.Juju):
     logger.info("Flush default routes on client")
     juju.exec("sudo ip route flush default", unit=unit)
 
-    with pytest.raises(jubilant.TaskError):
-        juju.run(unit, "start-continuous-writes")
+    task = juju.run(unit, "start-continuous-writes")
+
+    assert task.results == {"result": "False"}

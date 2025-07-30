@@ -786,6 +786,7 @@ def test_on_update_status(harness):
         ) as _can_use_s3_repository,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
         patch("charm.PostgresqlOperatorCharm.log_pitr_last_transaction_time"),
+        patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test before the cluster is initialised.
@@ -840,7 +841,8 @@ def test_on_update_status(harness):
             )
         harness.charm.on.update_status.emit()
         _restart_patroni.assert_called_once()
-        _start_observer.assert_called_once()
+        _start_observer.assert_called_once_with()
+        _drop_hba_triggers.assert_called_once_with()
 
 
 def test_on_update_status_after_restore_operation(harness):
@@ -871,6 +873,7 @@ def test_on_update_status_after_restore_operation(harness):
         patch(
             "charm.PostgresqlOperatorCharm.enable_disable_extensions"
         ) as _enable_disable_extensions,
+        patch("charm.PostgreSQL.drop_hba_triggers") as _drop_hba_triggers,
     ):
         _get_current_timeline.return_value = "2"
         rel_id = harness.model.get_relation(PEER).id
@@ -880,7 +883,11 @@ def test_on_update_status_after_restore_operation(harness):
             harness.update_relation_data(
                 rel_id,
                 harness.charm.app.name,
-                {"cluster_initialised": "True", "restoring-backup": "20230101-090000F"},
+                {
+                    "cluster_initialised": "True",
+                    "restoring-backup": "20230101-090000F",
+                    "refresh_remove_trigger": "True",
+                },
             )
         _get_member_status.return_value = "failed"
         harness.charm.on.update_status.emit()
@@ -909,6 +916,7 @@ def test_on_update_status_after_restore_operation(harness):
         assert harness.get_relation_data(rel_id, harness.charm.app) == {
             "cluster_initialised": "True",
             "restoring-backup": "20230101-090000F",
+            "refresh_remove_trigger": "True",
         }
 
         # Test when the restore operation finished successfully.
@@ -926,7 +934,8 @@ def test_on_update_status_after_restore_operation(harness):
 
         # Assert that the backup id is not in the application relation databag anymore.
         assert harness.get_relation_data(rel_id, harness.charm.app) == {
-            "cluster_initialised": "True"
+            "cluster_initialised": "True",
+            "refresh_remove_trigger": "True",
         }
 
         # Test when it's not possible to use the configured S3 repository.
@@ -946,7 +955,9 @@ def test_on_update_status_after_restore_operation(harness):
         assert harness.get_relation_data(rel_id, harness.charm.app) == {
             "cluster_initialised": "True",
             "s3-initialization-block-message": "fake validation message",
+            "refresh_remove_trigger": "True",
         }
+        assert not _drop_hba_triggers.called
 
 
 def test_install_snap_package(harness):
@@ -2634,3 +2645,27 @@ def test_handle_processes_failures(harness):
         _restart_patroni.assert_called_once_with()
         assert not _rename.called
         _restart_patroni.reset_mock()
+
+
+def test_on_databases_change(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+    ):
+        harness.charm._on_databases_change(Mock())
+
+        _update_config.assert_called_once_with()
+        assert "pg_hba_needs_update_timestamp" in harness.charm.unit_peer_data
+
+
+def test_generate_user_hash(harness):
+    with harness.hooks_disabled():
+        rel_id = harness.add_relation("database", "application")
+        harness.update_relation_data(rel_id, "application", {"database": "test_db"})
+    with (
+        patch("charm.shake_128") as _shake_128,
+    ):
+        _shake_128.return_value.hexdigest.return_value = sentinel.hash
+
+        assert harness.charm.generate_user_hash == sentinel.hash
+
+        _shake_128.assert_called_once_with(b"{'relation_id_2': 'test_db'}")
