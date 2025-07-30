@@ -182,7 +182,7 @@ welcome  azure       azure/centralus  3.6-rc1.1  unsupported  12:56:16+02:00
 
 App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
 data-integrator           active      1  data-integrator  latest/stable   41  no       
-postgresql       14.12    active      1  postgresql       14/stable      468  no       
+postgresql       16.9     active      1  postgresql       16/stable      843  no       
 
 Unit                Workload  Agent  Machine  Public address  Ports     Message
 data-integrator/0*  active    idle   1        172.170.35.131            
@@ -256,7 +256,7 @@ welcome  azure       azure/centralus  3.6-rc1.1  unsupported  13:11:26+02:00
 
 App              Version  Status  Scale  Charm            Channel        Rev  Exposed  Message
 data-integrator           active      1  data-integrator  latest/stable   41  no       
-postgresql       14.12    active      1  postgresql       14/stable      468  yes       
+postgresql       16.9     active      1  postgresql       16/stable      843  yes       
 
 Unit                Workload  Agent  Machine  Public address  Ports     Message
 data-integrator/0*  active    idle   1        172.170.35.131            

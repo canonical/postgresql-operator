@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from hashlib import shake_128
 from pathlib import Path
 from typing import Literal, get_args
 from urllib.parse import urlparse
@@ -280,9 +281,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._observer = ClusterTopologyObserver(self, "/usr/bin/juju-exec")
         self._rotate_logs = RotateLogs(self)
-        self.framework.observe(
-            self.on.authorisation_rules_change, self._on_authorisation_rules_change
-        )
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
         self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
@@ -443,17 +441,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             new_refresh_unit_status = self.refresh.unit_status_lower_priority().message
         path.write_text(json.dumps(new_refresh_unit_status))
 
-    def _on_authorisation_rules_change(self, _):
-        """Handle authorisation rules change event."""
-        timestamp = datetime.now()
-        self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
-        logger.debug(f"authorisation rules changed at {timestamp}")
-
     def _on_databases_change(self, _):
         """Handle databases change event."""
         self.update_config()
         logger.debug("databases changed")
-        self._on_authorisation_rules_change(None)
+        timestamp = datetime.now()
+        self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
+        logger.debug(f"authorisation rules changed at {timestamp}")
 
     def patroni_scrape_config(self) -> list[dict]:
         """Generates scrape config for the Patroni metrics endpoint."""
@@ -1775,6 +1769,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Set the flag to enable the replicas to start the Patroni service.
         self._peers.data[self.app]["cluster_initialised"] = "True"
+        # Flag to know if triggers need to be removed after refresh
+        self._peers.data[self.app]["refresh_remove_trigger"] = "True"
 
         # Clear unit data if this unit became a replica after a failover/switchover.
         self._update_relation_endpoints()
@@ -1933,6 +1929,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Restart topology observer if it is gone
         self._observer.start_observer()
+
+        if self.unit.is_leader() and "refresh_remove_trigger" not in self.app_peer_data:
+            self.postgresql.drop_hba_triggers()
+            self.app_peer_data["refresh_remove_trigger"] = "True"
 
     def _was_restore_successful(self) -> bool:
         if self.is_cluster_restoring_to_time and all(self.is_pitr_failed()):
@@ -2394,6 +2394,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._restart_metrics_service(postgres_snap)
         self._restart_ldap_sync_service(postgres_snap)
 
+        self.unit_peer_data.update({"user_hash": self.generate_user_hash})
+        if self.unit.is_leader():
+            self.app_peer_data.update({"user_hash": self.generate_user_hash})
         return True
 
     def _validate_config_options(self) -> None:
@@ -2503,10 +2506,33 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     REPLICATION_USER: "all",
                     REWIND_USER: "all",
                 })
+
+            # Copy relations users directly instead of waiting for them to be created
+            for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
+                user = f"relation-{relation.id}"
+                if user not in user_database_map and (
+                    database
+                    := self.postgresql_client_relation.database_provides.fetch_relation_field(
+                        relation.id, "database"
+                    )
+                ):
+                    user_database_map[user] = database
             return user_database_map
         except PostgreSQLListUsersError:
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
+
+    @property
+    def generate_user_hash(self) -> str:
+        """Generate expected user and database hash."""
+        user_db_pairs = {}
+        for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
+            if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
+                relation.id, "database"
+            ):
+                user = f"relation_id_{relation.id}"
+                user_db_pairs[user] = database
+        return shake_128(str(user_db_pairs).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None
