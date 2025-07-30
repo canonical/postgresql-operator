@@ -109,7 +109,7 @@ If password rotation is required for users used in relations, the relation must 
 
 ### Extra user roles
 
-When an application charm requests a new user through the relation/integration, it can specify that the user should be part of a predefined role to give them additional permissions. Please check "[Charm Roles explanations](/explanation/roles)" for the list of available roles.
+When an application charm requests a new user through the relation/integration, it can specify that the user should be part of a predefined role to give them additional permissions. Please check [](/explanation/roles) for the list of available roles.
 
 ## Identity users
 
