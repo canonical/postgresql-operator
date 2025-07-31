@@ -50,7 +50,7 @@ def test_can_promote_cluster():
         _handle_forceful_promotion=MagicMock(return_value=False),
     ):
         mock_charm._patroni = MagicMock()
-        mock_charm._patroni.get_standby_leader.return_value = "unit-name"
+        mock_charm._patroni.get_standby_leader.return_value = "postgresql/1"
         mock_charm._patroni.promote_standby_cluster.return_value = None
         mock_charm.app.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
         mock_charm._peers = MagicMock()
