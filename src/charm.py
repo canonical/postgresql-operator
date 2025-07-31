@@ -2458,9 +2458,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
         try:
-            for user in self.postgresql.list_users_from_relation(
-                current_host=self.is_connectivity_enabled
-            ):
+            for user in self.postgresql.list_users(current_host=self.is_connectivity_enabled):
+                if user in (
+                    "backup",
+                    "monitoring",
+                    "operator",
+                    "postgres",
+                    "replication",
+                    "rewind",
+                ):
+                    continue
                 user_database_map[user] = ",".join(
                     self.postgresql.list_accessible_databases_for_user(
                         user, current_host=self.is_connectivity_enabled
