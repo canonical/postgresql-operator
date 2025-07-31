@@ -15,6 +15,7 @@ on:
       - '**.md'
       - .github/renovate.json5
       - 'docs/**'
+      - 'terraform/**'
   schedule:
     - cron: '53 0 * * *'  # Daily at 00:53 UTC
   # Triggered on push to branch "main" by .github/workflows/release.yaml
@@ -27,7 +28,7 @@ on:
 jobs:
   lint:
     name: Lint
-    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v32.1.0
+    uses: canonical/data-platform-workflows/.github/workflows/lint.yaml@v32.2.1
 
   unit-test:
     name: Unit test charm
@@ -49,7 +50,7 @@ jobs:
 
   build:
     name: Build charm
-    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v32.1.0
+    uses: canonical/data-platform-workflows/.github/workflows/build_charm.yaml@v32.2.1
 
   integration-test:
     name: Integration test charm
