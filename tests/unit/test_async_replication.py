@@ -51,7 +51,7 @@ def test_can_promote_cluster():
     ):
         mock_charm._patroni = MagicMock()
         mock_charm._patroni.get_standby_leader.return_value = "unit-name"
-        mock_charm._patroni.promote_standby_cluster.return_value = True
+        mock_charm._patroni.promote_standby_cluster.return_value = None
         mock_charm.app.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
         mock_charm._peers = MagicMock()
         mock_charm._peers.data = {mock_charm.app: mock_peers_data}
