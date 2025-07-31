@@ -6,6 +6,7 @@ from unittest.mock import MagicMock, PropertyMock, patch
 import pytest
 from ops.model import WaitingStatus
 from tenacity import RetryError
+from ops import Application 
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
@@ -49,7 +50,7 @@ def test_can_promote_cluster():
         _handle_forceful_promotion=MagicMock(return_value=False),
     ):
         mock_charm._patroni = MagicMock()
-        mock_charm._patroni.get_standby_leader.return_value = "standby-leader"
+        mock_charm._patroni.get_standby_leader.return_value = "unit-name"
         mock_charm._patroni.promote_standby_cluster.return_value = True
         mock_charm.app.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
         mock_charm._peers = MagicMock()
@@ -508,7 +509,8 @@ def test_on_create_replication():
     mock_event = MagicMock()
     relation = PostgreSQLAsyncReplication(mock_charm)
 
-    relation._get_primary_cluster = MagicMock(return_value=True)
+    mock_application = MagicMock(spec=Application)
+    relation._get_primary_cluster = MagicMock(return_value=mock_application)
 
     result = relation._on_create_replication(mock_event)
 
@@ -593,13 +595,14 @@ def test_promote_to_primary():
     mock_charm = MagicMock()
     mock_event = MagicMock()
     mock_relation = MagicMock()
+    mock_app = MagicMock(spec=Application)
     mock_relation.status = MagicMock()
     mock_relation.status.message = READ_ONLY_MODE_BLOCKING_MESSAGE
 
     relation = PostgreSQLAsyncReplication(mock_charm)
     relation._get_primary_cluster = MagicMock(return_value=None)
 
-    type(relation).app = PropertyMock(return_value=mock_relation)
+    type(relation).app = PropertyMock(return_value=mock_app)
     relation._handle_replication_change = MagicMock(return_value=False)
 
     result = relation.promote_to_primary(mock_event)
