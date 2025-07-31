@@ -1,3 +1,7 @@
+---
+relatedlinks: "[Charmhub](https://charmhub.io/postgresql?channel=14/stable)"
+---
+
 # Charmed PostgreSQL documentation
 
 Charmed PostgreSQL is an open-source software operator designed to deploy and operate object-relational databases on IAAS/VM. It packages the powerful database management system [PostgreSQL](https://www.postgresql.org/) into a charmed operator for deployment with [Juju](https://juju.is/docs/juju).
