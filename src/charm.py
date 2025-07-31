@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from hashlib import shake_128
 from pathlib import Path
 from typing import Literal, get_args
 from urllib.parse import urlparse
@@ -185,10 +186,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
         self._observer = ClusterTopologyObserver(self, run_cmd)
         self._rotate_logs = RotateLogs(self)
-        self.framework.observe(
-            self.on.authorisation_rules_change, self._on_authorisation_rules_change
-        )
         self.framework.observe(self.on.cluster_topology_change, self._on_cluster_topology_change)
+        self.framework.observe(self.on.databases_change, self._on_databases_change)
         self.framework.observe(self.on.install, self._on_install)
         self.framework.observe(self.on.leader_elected, self._on_leader_elected)
         self.framework.observe(self.on.config_changed, self._on_config_changed)
@@ -239,8 +238,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
         self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
 
-    def _on_authorisation_rules_change(self, _):
-        """Handle authorisation rules change event."""
+    def _on_databases_change(self, _):
+        """Handle databases change event."""
+        self.update_config()
+        logger.debug("databases changed")
         timestamp = datetime.now()
         self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
         logger.debug(f"authorisation rules changed at {timestamp}")
@@ -2072,6 +2073,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self._restart_metrics_service(postgres_snap)
         self._restart_ldap_sync_service(postgres_snap)
 
+        self.unit_peer_data.update({"user_hash": self.generate_user_hash})
+        if self.unit.is_leader():
+            self.app_peer_data.update({"user_hash": self.generate_user_hash})
         return True
 
     def _validate_config_options(self) -> None:
@@ -2190,10 +2194,33 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     REPLICATION_USER: "all",
                     REWIND_USER: "all",
                 })
+
+            # Copy relations users directly instead of waiting for them to be created
+            for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
+                user = f"relation-{relation.id}"
+                if user not in user_database_map and (
+                    database
+                    := self.postgresql_client_relation.database_provides.fetch_relation_field(
+                        relation.id, "database"
+                    )
+                ):
+                    user_database_map[user] = database
             return user_database_map
         except PostgreSQLListUsersError:
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
+
+    @property
+    def generate_user_hash(self) -> str:
+        """Generate expected user and database hash."""
+        user_db_pairs = {}
+        for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
+            if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
+                relation.id, "database"
+            ):
+                user = f"relation_id_{relation.id}"
+                user_db_pairs[user] = database
+        return shake_128(str(user_db_pairs).encode()).hexdigest(16)
 
     def override_patroni_restart_condition(
         self, new_condition: str, repeat_cause: str | None

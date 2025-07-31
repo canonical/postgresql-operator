@@ -43,6 +43,7 @@ async def test_deploy_latest(ops_test: OpsTest) -> None:
         num_units=1,
         channel="latest/edge",
     )
+    await ops_test.model.relate(DATABASE_APP_NAME, f"{APPLICATION_NAME}:database")
     logger.info("Wait for applications to become active")
     async with ops_test.fast_forward():
         await ops_test.model.wait_for_idle(
