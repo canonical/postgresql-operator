@@ -4,9 +4,9 @@
 from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
+from ops import Application
 from ops.model import WaitingStatus
 from tenacity import RetryError
-from ops import Application 
 
 from src.relations.async_replication import (
     READ_ONLY_MODE_BLOCKING_MESSAGE,
