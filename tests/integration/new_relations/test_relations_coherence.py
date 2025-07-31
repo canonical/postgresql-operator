@@ -4,7 +4,7 @@
 import logging
 import secrets
 import string
-from asyncio import gather
+from asyncio import gather, sleep
 
 import psycopg2
 import pytest
