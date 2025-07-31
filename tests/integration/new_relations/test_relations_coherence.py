@@ -4,7 +4,7 @@
 import logging
 import secrets
 import string
-from asyncio import gather, sleep
+from asyncio import gather
 
 import psycopg2
 import pytest
@@ -44,8 +44,6 @@ async def test_relations(ops_test: OpsTest, charm):
         })
         await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=1500)
-
-        await sleep(90)  # Wait for pg_hba.conf to be updated.
 
         connection_string = await build_connection_string(
             ops_test,
