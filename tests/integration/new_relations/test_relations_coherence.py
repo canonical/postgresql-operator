@@ -45,6 +45,8 @@ async def test_relations(ops_test: OpsTest, charm):
         await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
         await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=1500)
 
+        await sleep(60)
+
         connection_string = await build_connection_string(
             ops_test,
             DATA_INTEGRATOR_APP_NAME,
