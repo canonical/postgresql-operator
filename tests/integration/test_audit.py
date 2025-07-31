@@ -3,6 +3,7 @@
 # See LICENSE file for licensing details.
 import asyncio
 import logging
+from asyncio import sleep
 
 import psycopg2 as psycopg2
 import pytest as pytest
@@ -33,6 +34,8 @@ async def test_audit_plugin(ops_test: OpsTest, charm) -> None:
         await ops_test.model.wait_for_idle(
             apps=[APPLICATION_NAME, DATABASE_APP_NAME], status="active"
         )
+
+    await sleep(60)
 
     logger.info("Checking that the audit plugin is enabled")
     connection_string = await build_connection_string(
