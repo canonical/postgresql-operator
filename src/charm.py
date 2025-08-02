@@ -2507,11 +2507,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "rewind",
                 ):
                     continue
-                user_database_map[user] = ",".join(
+                if databases := ",".join(
                     self.postgresql.list_accessible_databases_for_user(
                         user, current_host=self.is_connectivity_enabled
                     )
-                )
+                ):
+                    user_database_map[user] = databases
+                else:
+                    logger.debug(f"User {user} has no databases to connect to")
+                # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
+                if any(True for relation in self.client_relations if relation.name == "db-admin"):
+                    user_database_map["landscape"] = "all"
             if self.postgresql.list_access_groups(
                 current_host=self.is_connectivity_enabled
             ) != set(ACCESS_GROUPS):
