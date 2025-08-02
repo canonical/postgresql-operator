@@ -2512,9 +2512,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         user, current_host=self.is_connectivity_enabled
                     )
                 )
-                # Add "landscape" superuser by default to the list when the "db-admin" relation is present.
-                if any(True for relation in self.client_relations if relation.name == "db-admin"):
-                    user_database_map["landscape"] = "all"
             if self.postgresql.list_access_groups(
                 current_host=self.is_connectivity_enabled
             ) != set(ACCESS_GROUPS):
