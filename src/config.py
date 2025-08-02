@@ -176,9 +176,9 @@ class CharmConfig(BaseConfigModel):
     response_exit_on_error: bool | None = Field(default=None)
     response_extra_float_digits: float | None = Field(ge=-15, le=3, default=None)
     response_gin_fuzzy_search_limit: int | None = Field(ge=0, le=2147483647, default=None)
-    response_lc_monetary: Literal[tuple(SNAP_LOCALES)] | None = Field(default=None)
-    response_lc_numeric: Literal[tuple(SNAP_LOCALES)] | None = Field(default=None)
-    response_lc_time: Literal[tuple(SNAP_LOCALES)] | None = Field(default=None)
+    response_lc_monetary: SNAP_LOCALES | None = Field(default=None)
+    response_lc_numeric: SNAP_LOCALES | None = Field(default=None)
+    response_lc_time: SNAP_LOCALES | None = Field(default=None)
     session_idle_in_transaction_session_timeout: int | None = Field(
         ge=0, le=2147483647, default=None
     )

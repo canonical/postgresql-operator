@@ -321,8 +321,10 @@ class PostgreSQLLogicalReplication(Object):
             return
 
         if (
-            relation := self.model.get_relation(LOGICAL_REPLICATION_RELATION)
-        ) and event.secret.label.startswith(SECRET_LABEL):
+            (relation := self.model.get_relation(LOGICAL_REPLICATION_RELATION))
+            and event.secret.label
+            and event.secret.label.startswith(SECRET_LABEL)
+        ):
             logger.info("Logical replication secret changed, updating subscriptions")
             secret_content = self.model.get_secret(
                 id=relation.data[relation.app]["secret-id"], label=SECRET_LABEL

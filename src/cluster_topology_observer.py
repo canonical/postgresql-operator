@@ -9,11 +9,12 @@ import signal
 import subprocess
 from pathlib import Path
 from sys import version_info
+from typing import TYPE_CHECKING
 
-from ops.charm import CharmBase, CharmEvents
-from ops.framework import EventBase, EventSource, Object
-from ops.model import ActiveStatus
+from ops import ActiveStatus, CharmEvents, EventBase, EventSource, Object
 
+if TYPE_CHECKING:
+    from charm import PostgresqlOperatorCharm
 logger = logging.getLogger(__name__)
 
 # File path for the spawned cluster topology observer process to write logs.
@@ -44,7 +45,7 @@ class ClusterTopologyObserver(Object):
     Observed cluster topology changes cause :class"`ClusterTopologyChangeEvent` to be emitted.
     """
 
-    def __init__(self, charm: CharmBase, run_cmd: str):
+    def __init__(self, charm: "PostgresqlOperatorCharm", run_cmd: str) -> None:
         """Constructor for ClusterTopologyObserver.
 
         Args:
@@ -56,7 +57,7 @@ class ClusterTopologyObserver(Object):
         self._charm = charm
         self._run_cmd = run_cmd
 
-    def start_observer(self):
+    def start_observer(self) -> None:
         """Start the cluster topology observer running in a new process."""
         if not isinstance(self._charm.unit.status, ActiveStatus) or self._charm._peers is None:
             return
@@ -68,6 +69,9 @@ class ClusterTopologyObserver(Object):
                 return
             except OSError:
                 pass
+        if not self._charm._patroni.unit_ip:
+            logging.info("Cannot start cluster topology observer process: No IP set")
+            return
 
         logging.info("Starting cluster topology observer process")
 
@@ -123,12 +127,13 @@ class ClusterTopologyObserver(Object):
         ):
             return
 
-        observer_pid = int(self._charm._peers.data[self._charm.unit].get("observer-pid"))
+        if stored_pid := self._charm._peers.data[self._charm.unit].get("observer-pid"):
+            observer_pid = int(stored_pid)
 
-        try:
-            os.kill(observer_pid, signal.SIGINT)
-            msg = "Stopped running cluster topology observer process with PID {}"
-            logging.info(msg.format(observer_pid))
-            self._charm._peers.data[self._charm.unit].update({"observer-pid": ""})
-        except OSError:
-            pass
+            try:
+                os.kill(observer_pid, signal.SIGINT)
+                msg = "Stopped running cluster topology observer process with PID {}"
+                logging.info(msg.format(observer_pid))
+                self._charm._peers.data[self._charm.unit].update({"observer-pid": ""})
+            except OSError:
+                pass

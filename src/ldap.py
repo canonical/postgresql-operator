@@ -33,7 +33,7 @@ class PostgreSQLLDAP(Object):
         self.framework.observe(self.ldap.on.ldap_unavailable, self._on_ldap_unavailable)
 
     @property
-    def _relation(self) -> Relation:
+    def _relation(self) -> Relation | None:
         """Return the relation object."""
         return self.model.get_relation(self.relation_name)
 

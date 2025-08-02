@@ -7,6 +7,7 @@
 import glob
 import logging
 import os
+import pathlib
 import pwd
 import re
 import shutil
@@ -17,15 +18,17 @@ from pathlib import Path
 from ssl import CERT_NONE, create_default_context
 from typing import TYPE_CHECKING, Any, TypedDict
 
-import charm_refresh
 import psutil
 import requests
+import tomli
 from charms.operator_libs_linux.v2 import snap
 from httpx import AsyncClient, BasicAuth, HTTPError
 from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
+from requests.auth import HTTPBasicAuth
 from tenacity import (
+    Future,
     RetryError,
     Retrying,
     retry,
@@ -129,16 +132,16 @@ class Patroni:
     def __init__(
         self,
         charm: "PostgresqlOperatorCharm",
-        unit_ip: str,
+        unit_ip: str | None,
         cluster_name: str,
         member_name: str,
         planned_units: int,
         peers_ips: set[str],
-        superuser_password: str,
-        replication_password: str,
-        rewind_password: str,
-        raft_password: str,
-        patroni_password: str,
+        superuser_password: str | None,
+        replication_password: str | None,
+        rewind_password: str | None,
+        raft_password: str | None,
+        patroni_password: str | None,
     ):
         """Initialize the Patroni class.
 
@@ -172,12 +175,24 @@ class Patroni:
         self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}"
 
     @property
-    def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
-        return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
+    def _are_passwords_set(self) -> bool:
+        return all([
+            self.superuser_password,
+            self.replication_password,
+            self.rewind_password,
+            self.raft_password,
+            self.patroni_password,
+        ])
 
     @property
-    def _patroni_async_auth(self) -> BasicAuth:
-        return BasicAuth("patroni", password=self.patroni_password)
+    def _patroni_auth(self) -> HTTPBasicAuth | None:
+        if self.patroni_password:
+            return HTTPBasicAuth("patroni", self.patroni_password)
+
+    @property
+    def _patroni_async_auth(self) -> BasicAuth | None:
+        if self.patroni_password:
+            return BasicAuth("patroni", password=self.patroni_password)
 
     @property
     def _patroni_url(self) -> str:
@@ -244,10 +259,8 @@ class Patroni:
 
     def get_postgresql_version(self) -> str:
         """Return the PostgreSQL version from the system."""
-        client = snap.SnapClient()
-        for snp in client.get_installed_snaps():
-            if snp["name"] == charm_refresh.snap_name():
-                return snp["version"]
+        with pathlib.Path("refresh_versions.toml").open("rb") as file:
+            return tomli.load(file)["workload"]
 
     @property
     def cached_cluster_status(self):
@@ -262,7 +275,9 @@ class Patroni:
         ):
             logger.debug("Patroni cluster members: %s", response["members"])
             return response["members"]
-        raise RetryError(last_attempt=Exception("Unable to reach any units"))
+        raise RetryError(
+            last_attempt=Future.construct(1, Exception("Unable to reach any units"), True)
+        )
 
     def get_member_ip(self, member_name: str) -> str | None:
         """Get cluster member IP address.
@@ -300,7 +315,9 @@ class Patroni:
                     return member["state"]
         return ""
 
-    async def _httpx_get_request(self, url: str, verify: bool = True):
+    async def _httpx_get_request(self, url: str, verify: bool = True) -> dict[str, Any] | None:
+        if not self._patroni_async_auth:
+            return None
         ssl_ctx = create_default_context()
         if verify:
             with suppress(FileNotFoundError):
@@ -316,7 +333,9 @@ class Patroni:
             except (HTTPError, ValueError):
                 return None
 
-    async def _async_get_request(self, uri: str, endpoints: list[str], verify: bool = True):
+    async def _async_get_request(
+        self, uri: str, endpoints: list[str], verify: bool = True
+    ) -> dict[str, Any] | None:
         tasks = [
             create_task(self._httpx_get_request(f"https://{ip}:8008{uri}", verify))
             for ip in endpoints
@@ -328,10 +347,16 @@ class Patroni:
                 await wait(tasks)
                 return result
 
-    def parallel_patroni_get_request(self, uri: str, endpoints: list[str] | None = None) -> dict:
+    def parallel_patroni_get_request(
+        self, uri: str, endpoints: list[str] | None = None
+    ) -> dict[str, Any] | None:
         """Call all possible patroni endpoints in parallel."""
         if not endpoints:
-            endpoints = (self.unit_ip, *self.peers_ips)
+            endpoints = []
+            if self.unit_ip:
+                endpoints.append(self.unit_ip)
+            for peer_ip in self.peers_ips:
+                endpoints.append(peer_ip)
             verify = True
         else:
             # TODO we don't know the other cluster's ca
@@ -437,7 +462,7 @@ class Patroni:
                     auth=self._patroni_auth,
                 )
 
-                return r.json()
+        return r.json()
 
     @property
     def is_creating_backup(self) -> bool:
@@ -456,10 +481,16 @@ class Patroni:
 
     def is_replication_healthy(self) -> bool:
         """Return whether the replication is healthy."""
+        if not self.unit_ip:
+            logger.debug("Failed replication check no IP set")
+            return False
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
                     primary = self.get_primary()
+                    if not primary:
+                        logger.debug("Failed replication check no primary reported")
+                        raise Exception
                     primary_ip = self.get_member_ip(primary)
                     members_ips = {self.unit_ip}
                     members_ips.update(self.peers_ips)
@@ -640,6 +671,10 @@ class Patroni:
             user_databases_map: map of databases to be accessible by each user.
             slots: replication slots (keys) with assigned database name (values).
         """
+        if not self._are_passwords_set:
+            logger.warning("Passwords are not yet generated by the leader")
+            return
+
         # Open the template patroni.yml file.
         with open("templates/patroni.yml.j2") as file:
             template = Template(file.read())
@@ -720,7 +755,8 @@ class Patroni:
         try:
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
-            return selected_snap.logs(services=["patroni"], num_lines=num_lines)
+            # Lib definition of num_lines only allows int
+            return selected_snap.logs(services=["patroni"], num_lines=num_lines)  # pyright: ignore
         except snap.SnapError as e:
             error_message = "Failed to get logs from patroni snap service"
             logger.exception(error_message, exc_info=e)
@@ -811,6 +847,9 @@ class Patroni:
         except UtilityException:
             logger.warning("Has raft quorum: Cannot connect to raft cluster")
             return False
+        if not raft_status:
+            logger.warning("Has raft quorum: No status reported")
+            return False
         return raft_status["has_quorum"]
 
     def remove_raft_data(self) -> None:
@@ -898,6 +937,9 @@ class Patroni:
         except UtilityException:
             logger.warning("Remove raft member: Cannot connect to raft cluster")
             raise RemoveRaftMemberFailedError() from None
+        if not raft_status:
+            logger.warning("Remove raft member: No raft status")
+            raise RemoveRaftMemberFailedError() from None
 
         # Check whether the member is still part of the raft cluster.
         if not member_ip or f"partner_node_status_server_{member_ip}:2222" not in raft_status:
@@ -931,7 +973,7 @@ class Patroni:
             logger.debug("Remove raft member: Remove call failed")
             raise RemoveRaftMemberFailedError() from None
 
-        if not result.startswith("SUCCESS"):
+        if not result or not result.startswith("SUCCESS"):
             logger.debug(f"Remove raft member: Remove call not successful with {result}")
             raise RemoveRaftMemberFailedError()
 

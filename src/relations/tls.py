@@ -44,26 +44,31 @@ class RefreshTLSCertificatesEvent(EventBase):
     """Event for refreshing TLS certificates."""
 
 
+class TlsError(Exception):
+    """TLS implementation internal exception."""
+
+
 class TLS(Object):
     """In this class we manage certificates relation."""
 
     refresh_tls_certificates_event = EventSource(RefreshTLSCertificatesEvent)
 
-    def _get_client_addrs(self):
-        client_addrs = {
-            self.charm.unit_peer_data.get("database-address"),
-        }
-        client_addrs -= {None}
+    def _get_client_addrs(self) -> set[str]:
+        client_addrs = set()
+        if addr := self.charm.unit_peer_data.get("database-address"):
+            client_addrs.add(addr)
         return client_addrs
 
-    def _get_peer_addrs(self):
-        peer_addrs = {
-            self.charm.unit_peer_data.get("database-peers-address"),
-            self.charm.unit_peer_data.get("replication-address"),
-            self.charm.unit_peer_data.get("replication-offer-address"),
-            self.charm.unit_peer_data.get("private-address"),
-        }
-        peer_addrs -= {None}
+    def _get_peer_addrs(self) -> set[str]:
+        peer_addrs = set()
+        if addr := self.charm.unit_peer_data.get("database-peers-address"):
+            peer_addrs.add(addr)
+        if addr := self.charm.unit_peer_data.get("replication-address"):
+            peer_addrs.add(addr)
+        if addr := self.charm.unit_peer_data.get("replication-offer-address"):
+            peer_addrs.add(addr)
+        if addr := self.charm.unit_peer_data.get("private-address"):
+            peer_addrs.add(addr)
         return peer_addrs
 
     def _get_common_name(self):
@@ -83,6 +88,9 @@ class TLS(Object):
             common_name = self.host
             client_addresses = set()
             peer_addresses = set()
+        self.common_hosts = {self.host}
+        if fqdn := socket.getfqdn():
+            self.common_hosts.add(fqdn)
 
         self.client_certificate = TLSCertificatesRequiresV4(
             self.charm,
@@ -92,8 +100,7 @@ class TLS(Object):
                     common_name=common_name,
                     sans_ip=frozenset(client_addresses),
                     sans_dns=frozenset({
-                        self.host,
-                        socket.getfqdn(),
+                        *self.common_hosts,
                         # IP address need to be part of the DNS SANs list due to
                         # https://github.com/pgbackrest/pgbackrest/issues/1977.
                         *client_addresses,
@@ -110,8 +117,7 @@ class TLS(Object):
                     common_name=common_name,
                     sans_ip=frozenset(self._get_peer_addrs()),
                     sans_dns=frozenset({
-                        self.host,
-                        socket.getfqdn(),
+                        *self.common_hosts,
                         # IP address need to be part of the DNS SANs list due to
                         # https://github.com/pgbackrest/pgbackrest/issues/1977.
                         *peer_addresses,
@@ -160,7 +166,7 @@ class TLS(Object):
             event.defer()
             return
 
-    def get_client_tls_files(self) -> (str | None, str | None, str | None):
+    def get_client_tls_files(self) -> tuple[str | None, str | None, str | None]:
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
@@ -179,7 +185,7 @@ class TLS(Object):
             ca_file = str(certs[0].ca)
         return key, ca_file, cert
 
-    def get_peer_tls_files(self) -> (str, str, str):
+    def get_peer_tls_files(self) -> tuple[str | None, str | None, str | None]:
         """Prepare TLS files in special PostgreSQL way.
 
         PostgreSQL needs three files:
@@ -206,9 +212,8 @@ class TLS(Object):
         """Get bundled CA certs."""
         certs, _ = self.peer_certificate.get_assigned_certificates()
         operator_ca = str(certs[0].ca) if certs else ""
-        if not (old_operator_ca := self.charm.get_secret(UNIT_SCOPE, "old-ca")):
-            old_operator_ca = ""
-        internal_ca = self.charm.get_secret(APP_SCOPE, "internal-ca")
+        old_operator_ca = self.charm.get_secret(UNIT_SCOPE, "old-ca") or ""
+        internal_ca = self.charm.get_secret(APP_SCOPE, "internal-ca") or ""
         return "\n".join((operator_ca, old_operator_ca, internal_ca))
 
     def generate_internal_peer_ca(self) -> None:
@@ -225,16 +230,19 @@ class TLS(Object):
 
     def generate_internal_peer_cert(self) -> None:
         """Generate internal peer certificate using the tls lib."""
-        ca_key = PrivateKey.from_string(self.charm.get_secret(APP_SCOPE, "internal-ca-key"))
-        ca = Certificate.from_string(self.charm.get_secret(APP_SCOPE, "internal-ca"))
+        if not (ca_key_secret := self.charm.get_secret(APP_SCOPE, "internal-ca-key")):
+            raise TlsError("No CA key content.")
+        ca_key = PrivateKey.from_string(ca_key_secret)
+        if not (ca_secret := self.charm.get_secret(APP_SCOPE, "internal-ca")):
+            raise TlsError("No CA cert content.")
+        ca = Certificate.from_string(ca_secret)
         private_key = generate_private_key()
         csr = generate_csr(
             private_key,
             common_name=self._get_common_name(),
             sans_ip=frozenset(self._get_peer_addrs()),
             sans_dns=frozenset({
-                self.host,
-                socket.getfqdn(),
+                *self.common_hosts,
                 # IP address need to be part of the DNS SANs list due to
                 # https://github.com/pgbackrest/pgbackrest/issues/1977.
                 *self._get_peer_addrs(),
