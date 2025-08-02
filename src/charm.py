@@ -1332,7 +1332,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.info("Cluster topology changed")
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            self.set_unit_status(ActiveStatus())
+            self._set_primary_status_message()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
