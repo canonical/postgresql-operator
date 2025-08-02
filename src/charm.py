@@ -220,7 +220,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
     def refresh_snap(
         self, *, snap_name: str, snap_revision: str, refresh: charm_refresh.Machines
     ) -> None:
-        # Update the configuration.
+        logger.debug("Update Patroni config on snap refresh")
         self._charm.set_unit_status(MaintenanceStatus("updating configuration"), refresh=refresh)
         self._charm.update_config(refresh=refresh)
         self._charm.updated_synchronous_node_count()
@@ -444,8 +444,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def _on_databases_change(self, _):
         """Handle databases change event."""
+        logger.debug("Update Patroni config on databases changed")
         self.update_config()
-        logger.debug("databases changed")
         timestamp = datetime.now()
         self._peers.data[self.unit].update({"pg_hba_needs_update_timestamp": str(timestamp)})
         logger.debug(f"authorisation rules changed at {timestamp}")
@@ -711,8 +711,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 event.defer()
                 return
 
-            # Update the list of the current members.
+            logger.debug("Update the list of the current members")
             self._remove_from_members_ips(member_ip)
+            logger.debug("Update Patroni config on peed relation departure")
             self.update_config()
 
             if self.primary_endpoint:
@@ -893,7 +894,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Update the list of the cluster members in the replicas to make them know each other.
         try:
-            # Update the members of the cluster in the Patroni configuration on this unit.
+            logger.debug("Update the members of the cluster in Patroni on this unit")
             self.update_config()
         except RetryError:
             self.set_unit_status(BlockedStatus("failed to update cluster members on member"))
@@ -1056,7 +1057,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             for member in self._hosts - self._patroni.cluster_members:
                 logger.debug("Adding %s to cluster", member)
                 self.add_cluster_member(member)
-            self._patroni.update_synchronous_node_count()
         except NotReadyError:
             logger.info("Deferring reconfigure: another member doing sync right now")
             event.defer()
@@ -1082,7 +1082,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # It should be updated in each other member.
         self._add_to_members_ips(member_ip)
 
-        # Update Patroni configuration file.
+        logger.debug("Update Patroni config on add cluster member")
         try:
             self.update_config()
         except RetryError:
@@ -1391,6 +1391,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
             self.tls.generate_internal_peer_cert()
+        logger.debug("Update Patroni config on leader elected")
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1435,10 +1436,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         try:
             self._validate_config_options()
-            # update config on every run
+            logger.debug("Update Patroni config on config changed")
             self.update_config()
-        except psycopg2.OperationalError:
-            logger.debug("Defer on_config_changed: Cannot connect to database")
+        except psycopg2.OperationalError as e:
+            logger.debug(f"Defer on_config_changed: Cannot connect to database ({e})")
             event.defer()
             return
         except ValueError as e:
@@ -1607,8 +1608,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         logger.debug("Bootstrap the cluster in the leader unit")
-        self._start_primary(event)
-        self._restart_services_after_reboot()
+        self._start_primary(event)  # start Patroni
+        self._restart_services_after_reboot()  # start Patroni #2
 
     def _restart_services_after_reboot(self):
         """Restart the Patroni and pgBackRest after a reboot."""
@@ -1623,7 +1624,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             snap_password = postgres_snap.get("exporter.password")
         except snap.SnapError:
-            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
+            logger.warning("Early exit: skipping exporter setup (no configuration set)")
             return None
 
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
@@ -1881,6 +1882,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Update and reload Patroni configuration in this unit to use the new password.
         # Other units Patroni configuration will be reloaded in the peer relation changed event.
+        logger.debug("Update Patroni config on admin password update")
         self.update_config()
 
     def _on_promote_to_primary(self, event: ActionEvent) -> None:
@@ -1930,6 +1932,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self._patroni.member_started and self._patroni.is_member_isolated:
             self._patroni.restart_patroni()
+            self._observer.start_observer()
             return
 
         # Update the sync-standby endpoint in the async replication data.
@@ -2062,6 +2065,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             try:
                 logger.info("restarted PostgreSQL because it was not running")
                 self._patroni.restart_patroni()
+                self._observer.start_observer()
                 return True
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
@@ -2095,10 +2099,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     danger_state = " (degraded)"
                 unit_status = "Standby" if self.is_standby_leader else "Primary"
                 unit_status = unit_status + danger_state
-                logger.debug(f"Set ActiveStatus({unit_status})")
                 self.set_unit_status(ActiveStatus(f"{unit_status}"))
             elif self._patroni.member_started:
-                logger.debug("Set ActiveStatus()")
                 self.set_unit_status(ActiveStatus())
         except (RetryError, ConnectionError) as e:
             logger.error(f"failed to get primary with error {e}")
@@ -2216,6 +2218,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         )
 
         try:
+            logger.debug("Update Patroni config on push tls files to workload")
             return self.update_config()
         except Exception:
             logger.exception("TLS files failed to push. Error in config update")
@@ -2230,6 +2233,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             subprocess.check_call([UPDATE_CERTS_BIN_PATH])  # noqa: S603
 
         try:
+            logger.debug("Update Patroni config on push CA file into workload")
             return self.update_config()
         except Exception:
             logger.exception("CA file failed to push. Error in config update")
@@ -2243,6 +2247,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         subprocess.check_call([UPDATE_CERTS_BIN_PATH])  # noqa: S603
 
         try:
+            logger.debug("Update Patroni config on clean CA file from workload")
             return self.update_config()
         except Exception:
             logger.exception("CA file failed to clean. Error in config update")
@@ -2355,6 +2360,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             slots=replication_slots or None,
         )
         if no_peers:
+            logger.debug("Early exit update_config: no peers")
             return True
 
         if not self._is_workload_running:
@@ -2391,6 +2397,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else max(4 * os.cpu_count(), 100)
         )
 
+        logger.debug("Bulk update parameters controller by patroni")
         self._patroni.bulk_update_parameters_controller_by_patroni({
             "max_connections": max_connections,
             "max_prepared_transactions": self.config.memory_max_prepared_transactions,
@@ -2461,7 +2468,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error(f"Reload patroni call failed! error: {e!s}")
 
         restart_pending = self._patroni.is_restart_pending()
-        logger.debug(f"Checking if restart pending: {restart_postgresql} or {restart_pending}")
+        logger.debug(
+            f"Checking if restart pending: TLS={restart_postgresql} or API={restart_pending}"
+        )
         restart_postgresql = restart_postgresql or restart_pending
 
         self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})

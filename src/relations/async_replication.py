@@ -251,8 +251,9 @@ class PostgreSQLAsyncReplication(Object):
             or self.charm._peers.data[self.charm.unit].get("unit-promoted-cluster-counter")
             == self._get_highest_promoted_cluster_counter_value()
         ):
-            logger.debug(f"Partner addresses: {self.charm._peer_members_ips}")
-            return self.charm._peer_members_ips
+            sorted_partners = sorted(self.charm._peer_members_ips)
+            logger.debug(f"Partner addresses: {sorted_partners}")
+            return sorted_partners
 
         logger.debug("Partner addresses: []")
         return []
@@ -653,6 +654,9 @@ class PostgreSQLAsyncReplication(Object):
     def _re_emit_async_relation_changed_event(self) -> None:
         """Re-emit the async relation changed event."""
         relation = self._relation
+        logger.debug("Emitting async relation changed event")
+        test = next(unit for unit in relation.units if unit.app == relation.app)
+        logger.debug(f"Event details: relation={relation} unit={test} relation.app={relation.app}")
         getattr(self.charm.on, f"{relation.name.replace('-', '_')}_relation_changed").emit(
             relation,
             app=relation.app,

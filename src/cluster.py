@@ -197,7 +197,7 @@ class Patroni:
 
     def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""
-        # Render the configuration files and start the cluster.
+        logger.debug("bootstrap_cluster: render the configuration files and start Patroni")
         self.configure_patroni_on_unit()
         return self.start_patroni()
 
@@ -696,7 +696,7 @@ class Patroni:
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers
             else [],
-            peers_ips=self.peers_ips if not no_peers else set(),
+            peers_ips=sorted(self.peers_ips) if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
@@ -1005,7 +1005,7 @@ class Patroni:
             Whether the service restarted successfully.
         """
         try:
-            logger.debug("Re-starting Patroni...")
+            logger.debug("Restarting Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.restart(services=["patroni"])
@@ -1018,7 +1018,7 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
-        logger.debug("Starting PostgreSQL...")
+        logger.debug("Restarting PostgreSQL...")
         r = requests.post(
             f"{self._patroni_url}/restart",
             verify=self.verify,
@@ -1072,6 +1072,11 @@ class Patroni:
                     timeout=PATRONI_TIMEOUT,
                     auth=self._patroni_auth,
                 )
+                logger.debug(
+                    "API ensure_slots_controller_by_patroni: %s (%s)",
+                    current_config,
+                    current_config.elapsed.total_seconds(),
+                )
                 if current_config.status_code != 200:
                     raise Exception(
                         f"Failed to get current Patroni config: {current_config.status_code} {current_config.text}"
@@ -1085,12 +1090,17 @@ class Patroni:
                 "plugin": "pgoutput",
                 "type": "logical",
             }
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"slots": slots_patch},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
+        )
+        logger.debug(
+            "API ensure_slots_controller_by_patroni: %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
         )
 
     @property
