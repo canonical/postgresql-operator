@@ -2958,7 +2958,7 @@ def test_relations_user_databases_map(harness):
         assert harness.charm.relations_user_databases_map == {}
 
         # Test when there are relation users in the database.
-        _postgresql.list_users_from_relation.return_value = {"user1", "user2"}
+        _postgresql.list_users.return_value = ["user1", "user2"]
         _postgresql.list_accessible_databases_for_user.side_effect = [{"db1", "db2"}, {"db3"}]
         assert harness.charm.relations_user_databases_map == {"user1": "db1,db2", "user2": "db3"}
 
