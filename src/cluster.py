@@ -16,6 +16,7 @@ from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
 from pathlib import Path
 from ssl import CERT_NONE, create_default_context
+from time import sleep
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import psutil
@@ -466,18 +467,32 @@ class Patroni:
 
     def is_restart_pending(self) -> bool:
         """Returns whether the Patroni/PostgreSQL restart pending."""
-        patroni_status = requests.get(
+        pending_restart = self._get_patroni_restart_pending()
+        if pending_restart:
+            # The current Patroni 3.2.2 has wired behaviour: it temporary flag pending_restart=True
+            # on any changes to REST API, which is gone within a second but long enough to be
+            # cougth by charm. Sleep 2 seconds as a protection here until Patroni 3.3.0 upgrade.
+            # Repeat the request to make sure pending_restart flag is still here
+            logger.debug("Enduring restart is pending (to avoid unnecessary rolling restarts)")
+            sleep(2)
+            pending_restart = self._get_patroni_restart_pending()
+
+        return pending_restart
+
+    def _get_patroni_restart_pending(self) -> bool:
+        """Returns whether the Patroni flag pending_restart on REST API."""
+        r = requests.get(
             f"{self._patroni_url}/patroni",
             verify=self.verify,
             timeout=API_REQUEST_TIMEOUT,
             auth=self._patroni_auth,
         )
-        try:
-            pending_restart = patroni_status.json()["pending_restart"]
-        except KeyError:
-            pending_restart = False
-            pass
-        logger.debug(f"Patroni API is_restart_pending: {pending_restart}")
+        pending_restart = r.json().get("pending_restart", False)
+        logger.debug(
+            f"API _get_patroni_restart_pending ({pending_restart}): %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
+        )
 
         return pending_restart
 
@@ -1083,7 +1098,7 @@ class Patroni:
                         f"Failed to get current Patroni config: {current_config.status_code} {current_config.text}"
                     )
         slots_patch: dict[str, dict[str, str] | None] = dict.fromkeys(
-            current_config.json().get("slots", ())
+            current_config.json().get("slots", ()) or {}
         )
         for slot, database in slots.items():
             slots_patch[slot] = {
