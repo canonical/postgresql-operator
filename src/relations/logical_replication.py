@@ -108,8 +108,8 @@ class PostgreSQLLogicalReplication(Object):
         )
         secret.grant(event.relation)
 
-        self._save_published_resources_info(str(event.relation.id), secret.id, {})
-        event.relation.data[self.model.app]["secret-id"] = secret.id
+        self._save_published_resources_info(str(event.relation.id), secret.id, {})  # type: ignore
+        event.relation.data[self.model.app]["secret-id"] = secret.id  # type: ignore
 
     def _on_offer_relation_changed(self, event: RelationChangedEvent) -> None:
         if not self.charm.unit.is_leader():
@@ -401,7 +401,7 @@ class PostgreSQLLogicalReplication(Object):
             self.charm.config.logical_replication_subscription_request or "{}"
         )
         subscriptions = self._subscriptions_info()
-        relation.data[self.model.app]["subscription-request"] = (
+        relation.data[self.model.app]["subscription-request"] = (  # type: ignore
             self.charm.config.logical_replication_subscription_request
         )
         for database, subscription in subscriptions.copy().items():
@@ -583,10 +583,10 @@ class PostgreSQLLogicalReplication(Object):
                 )
                 self.charm.postgresql.alter_publication(database, publication_name, tables)
                 publications[database]["tables"] = tables
-            self._save_published_resources_info(str(relation.id), secret.id, publications)
+            self._save_published_resources_info(str(relation.id), secret.id, publications)  # type: ignore
             relation.data[self.model.app]["publications"] = json.dumps(publications)
 
-        self._save_published_resources_info(str(relation.id), secret.id, publications)
+        self._save_published_resources_info(str(relation.id), secret.id, publications)  # type: ignore
         relation.data[self.model.app].update({
             "errors": json.dumps(errors),
             "publications": json.dumps(publications),
@@ -653,7 +653,7 @@ class PostgreSQLLogicalReplication(Object):
                 logger.debug(
                     f"Updating secret for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation_id}"
                 )
-                content["primary"] = primary
+                content["primary"] = primary  # type: ignore
                 secret.set_content(content)
             return secret
         except SecretNotFoundError:
@@ -663,7 +663,7 @@ class PostgreSQLLogicalReplication(Object):
         username, password = self._create_user(relation_id)
         return self.charm.model.app.add_secret(
             content={
-                "primary": primary,
+                "primary": primary,  # type: ignore
                 "username": username,
                 "password": password,
             },
