@@ -64,6 +64,10 @@ if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
 
 
+class AsyncReplicationError(Exception):
+    """Exception class for Async replication."""
+
+
 class PostgreSQLAsyncReplication(Object):
     """Defines the async-replication management logic."""
 
@@ -116,9 +120,16 @@ class PostgreSQLAsyncReplication(Object):
     @property
     def _unit_ip(self) -> str:
         """Return this unit IP address for the replication relation."""
-        if self._relation.name == REPLICATION_OFFER_RELATION:  # type: ignore
-            return self.charm._replication_offer_ip  # type: ignore
-        return self.charm._replication_consumer_ip  # type: ignore
+        if not self._relation:
+            raise AsyncReplicationError("No relation to get IP for")
+
+        if self._relation.name == REPLICATION_OFFER_RELATION:
+            ip = self.charm._replication_offer_ip
+        ip = self.charm._replication_consumer_ip
+
+        if not ip:
+            raise AsyncReplicationError(f"No IP set for {self._relation.name}")
+        return ip
 
     def _can_promote_cluster(self, event: ActionEvent) -> bool:
         """Check if the cluster can be promoted."""
@@ -185,15 +196,17 @@ class PostgreSQLAsyncReplication(Object):
 
     def _configure_standby_cluster(self, event: RelationChangedEvent) -> bool:
         """Configure the standby cluster."""
-        relation = self._relation
-        if relation.name == REPLICATION_CONSUMER_RELATION and not self._update_internal_secret():  # type: ignore
+        if not (relation := self._relation):
+            raise AsyncReplicationError("No relation in configure standby cluster")
+
+        if relation.name == REPLICATION_CONSUMER_RELATION and not self._update_internal_secret():
             logger.debug("Secret not found, deferring event")
             event.defer()
             return False
         system_identifier, error = self.get_system_identifier()
         if error is not None:
             raise Exception(error)
-        if system_identifier != relation.data[relation.app].get("system-id"):  # type: ignore
+        if system_identifier != relation.data[relation.app].get("system-id"):
             # Store current data in a tar.gz file.
             logger.info("Creating backup of data folder")
             filename = f"{POSTGRESQL_DATA_PATH}-{str(datetime.now()).replace(' ', '-').replace(':', '-')}.tar.gz"
@@ -205,13 +218,15 @@ class PostgreSQLAsyncReplication(Object):
 
     def get_all_primary_cluster_endpoints(self) -> list[str]:
         """Return all the primary cluster endpoints from the standby cluster."""
-        relation = self._relation
+        if not (relation := self._relation):
+            raise AsyncReplicationError("No relation in get all primary endpoints")
+
         primary_cluster = self._get_primary_cluster()
         # List the primary endpoints only for the standby cluster.
         if relation is None or primary_cluster is None or self.charm.app == primary_cluster:
             return []
-        return [  # type: ignore
-            relation.data[unit].get("unit-address")
+        return [
+            relation.data[unit]["unit-address"]
             for relation in [
                 self.model.get_relation(REPLICATION_OFFER_RELATION),
                 self.model.get_relation(REPLICATION_CONSUMER_RELATION),
@@ -248,9 +263,9 @@ class PostgreSQLAsyncReplication(Object):
             or not self.charm.unit.is_leader()
             or self.charm.unit_peer_data.get("unit-promoted-cluster-counter")
             == self._get_highest_promoted_cluster_counter_value()
-        ):
-            logger.debug(f"Partner addresses: {self.charm._peer_members_ips}")
-            return self.charm._peer_members_ips  # type: ignore
+        ) and (peer_members := self.charm._peer_members_ips):
+            logger.debug(f"Partner addresses: {peer_members}")
+            return list(peer_members)
 
         logger.debug("Partner addresses: []")
         return []
@@ -314,13 +329,15 @@ class PostgreSQLAsyncReplication(Object):
 
     def get_standby_endpoints(self) -> list[str]:
         """Return the standby endpoints."""
-        relation = self._relation
+        if not (relation := self._relation):
+            return []
+
         primary_cluster = self._get_primary_cluster()
         # List the standby endpoints only for the primary cluster.
         if relation is None or primary_cluster is None or self.charm.app != primary_cluster:
             return []
-        return [  # type: ignore
-            relation.data[unit].get("unit-address")
+        return [
+            relation.data[unit]["unit-address"]
             for relation in [
                 self.model.get_relation(REPLICATION_OFFER_RELATION),
                 self.model.get_relation(REPLICATION_CONSUMER_RELATION),
