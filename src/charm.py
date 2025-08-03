@@ -862,9 +862,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Split of to reduce complexity."""
         # Prevents the cluster to be reconfigured before it's bootstrapped in the leader.
         logger.debug(f"Calling on_peer_relation_changed, event: '{event}'")
-        if hasattr(event, "unit") and event.unit is None:
-            logger.debug(f"Early exit on_peer_relation_changed: event to itself ({event.unit})")
-            return False
 
         if not self.is_cluster_initialised:
             logger.debug("Early exit on_peer_relation_changed: cluster not initialized")
@@ -883,7 +880,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Don't update this member before it's part of the members list.
         if self._unit_ip not in self.members_ips:
-            logger.debug("Early exit on_peer_relation_changed: Unit not in the members list")
+            logger.debug(
+                "Early exit on_peer_relation_changed: Unit not in the members list {self.members_ips}"
+            )
             return False
         return True
 
@@ -2357,7 +2356,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
-            slots=replication_slots or None,
+            slots=replication_slots,
         )
         if no_peers:
             logger.debug("Early exit update_config: no peers")

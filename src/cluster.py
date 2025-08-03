@@ -15,6 +15,7 @@ from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
 from pathlib import Path
 from ssl import CERT_NONE, create_default_context
+from time import sleep
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import charm_refresh
@@ -442,6 +443,10 @@ class Patroni:
 
     def is_restart_pending(self) -> bool:
         """Returns whether the Patroni/PostgreSQL restart pending."""
+        # The current Patroni 3.2.2 has wired behaviour: it temporary flag pending_restart=True
+        # on any changes to REST API, which is gone within a second but long enough to be
+        # cougth by charm. Sleep 2 seconds as a protection here until Patroni 3.3.0 upgrade
+        sleep(2)
         r = requests.get(
             f"{self._patroni_url}/patroni",
             verify=self.verify,
@@ -1082,7 +1087,7 @@ class Patroni:
                         f"Failed to get current Patroni config: {current_config.status_code} {current_config.text}"
                     )
         slots_patch: dict[str, dict[str, str] | None] = dict.fromkeys(
-            current_config.json().get("slots", ())
+            current_config.json().get("slots", ()) or {}
         )
         for slot, database in slots.items():
             slots_patch[slot] = {
