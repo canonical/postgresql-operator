@@ -1185,7 +1185,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots=None,
+            slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1216,7 +1216,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots=None,
+            slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
