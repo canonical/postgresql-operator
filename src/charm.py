@@ -2158,9 +2158,21 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @property
     def relations_user_databases_map(self) -> dict:
         """Returns a user->databases map for all relations."""
-        if not self.is_cluster_initialised or not self._patroni.member_started:
-            return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
         user_database_map = {}
+        # Copy relations users directly instead of waiting for them to be created
+        for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
+            user = f"relation-{relation.id}"
+            if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
+                relation.id, "database"
+            ):
+                user_database_map[user] = database
+        if not self.is_cluster_initialised or not self._patroni.member_started:
+            user_database_map.update({
+                USER: "all",
+                REPLICATION_USER: "all",
+                REWIND_USER: "all",
+            })
+            return user_database_map
         try:
             for user in self.postgresql.list_users(current_host=self.is_connectivity_enabled):
                 if user in (
@@ -2201,17 +2213,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     REPLICATION_USER: "all",
                     REWIND_USER: "all",
                 })
-
-            # Copy relations users directly instead of waiting for them to be created
-            for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-                user = f"relation-{relation.id}"
-                if user not in user_database_map and (
-                    database
-                    := self.postgresql_client_relation.database_provides.fetch_relation_field(
-                        relation.id, "database"
-                    )
-                ):
-                    user_database_map[user] = database
             return user_database_map
         except PostgreSQLListUsersError:
             logger.debug("relations_user_databases_map: Unable to get users")
