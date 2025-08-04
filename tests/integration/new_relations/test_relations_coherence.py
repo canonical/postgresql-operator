@@ -4,6 +4,7 @@
 import logging
 import secrets
 import string
+from asyncio import gather
 
 import psycopg2
 import pytest
@@ -26,23 +27,23 @@ FIRST_DATABASE_RELATION_NAME = "database"
 async def test_relations(ops_test: OpsTest, charm):
     """Test that check relation data."""
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(
-            charm,
-            application_name=DATABASE_APP_NAME,
-            num_units=1,
-            base=CHARM_BASE,
-            config={"profile": "testing"},
+        await gather(
+            ops_test.model.deploy(
+                charm,
+                application_name=DATABASE_APP_NAME,
+                num_units=1,
+                base=CHARM_BASE,
+                config={"profile": "testing"},
+            ),
+            # Creating first time relation with user role
+            # Base is ignored
+            ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, series="jammy"),
         )
-        await ops_test.model.wait_for_idle(apps=[DATABASE_APP_NAME], status="active", timeout=3000)
-
-        # Creating first time relation with user role
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
         })
-        await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.add_relation(DATA_INTEGRATOR_APP_NAME, DATABASE_APP_NAME)
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active")
+        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=1500)
 
         connection_string = await build_connection_string(
             ops_test,

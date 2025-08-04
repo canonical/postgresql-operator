@@ -21,3 +21,4 @@ We will soon publish a migration guide with instructions on how to change from P
 
 Perform a minor upgrade <perform-a-minor-upgrade>
 Perform a minor rollback <perform-a-minor-rollback>
+```

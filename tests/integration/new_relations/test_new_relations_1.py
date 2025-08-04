@@ -58,7 +58,8 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
                 application_name=APPLICATION_APP_NAME,
                 num_units=2,
                 base=CHARM_BASE,
-                channel="edge",
+                channel="latest/edge",
+                config={"extra_user_roles": "CREATEDB,CREATEROLE"},
             ),
             ops_test.model.deploy(
                 charm,
@@ -76,7 +77,9 @@ async def test_deploy_charms(ops_test: OpsTest, charm):
             ),
         )
 
-        await ops_test.model.wait_for_idle(apps=APP_NAMES, status="active", timeout=3000)
+        await ops_test.model.wait_for_idle(
+            apps=[DATABASE_APP_NAME, ANOTHER_DATABASE_APP_NAME], status="active", timeout=3000
+        )
 
 
 async def test_primary_read_only_endpoint_in_standalone_cluster(ops_test: OpsTest):
@@ -261,10 +264,9 @@ async def test_two_applications_doesnt_share_the_same_relation_data(ops_test: Op
     await ops_test.model.deploy(
         APPLICATION_APP_NAME,
         application_name=another_application_app_name,
-        channel="edge",
+        channel="latest/edge",
         base=CHARM_BASE,
     )
-    await ops_test.model.wait_for_idle(apps=all_app_names, status="active")
 
     # Relate the new application with the database
     # and wait for them exchanging some connection data.
@@ -490,7 +492,11 @@ async def test_admin_role(ops_test: OpsTest):
     all_app_names = [DATA_INTEGRATOR_APP_NAME]
     all_app_names.extend(APP_NAMES)
     async with ops_test.fast_forward():
-        await ops_test.model.deploy(DATA_INTEGRATOR_APP_NAME, base=CHARM_BASE)
+        await ops_test.model.deploy(
+            DATA_INTEGRATOR_APP_NAME,
+            channel="latest/edge",
+            series="jammy",
+        )
         await ops_test.model.wait_for_idle(apps=[DATA_INTEGRATOR_APP_NAME], status="blocked")
         await ops_test.model.applications[DATA_INTEGRATOR_APP_NAME].set_config({
             "database-name": DATA_INTEGRATOR_APP_NAME.replace("-", "_"),
@@ -579,10 +585,12 @@ async def test_invalid_extra_user_roles(ops_test: OpsTest):
 
         another_data_integrator_app_name = f"another-{DATA_INTEGRATOR_APP_NAME}"
         data_integrator_apps_names = [DATA_INTEGRATOR_APP_NAME, another_data_integrator_app_name]
+        # Base is ignored
         await ops_test.model.deploy(
             DATA_INTEGRATOR_APP_NAME,
             application_name=another_data_integrator_app_name,
-            base=CHARM_BASE,
+            channel="latest/edge",
+            series="jammy",
         )
         await ops_test.model.wait_for_idle(
             apps=[another_data_integrator_app_name], status="blocked"

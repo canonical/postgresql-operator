@@ -22,9 +22,9 @@ Note that:
 
 Charmed PostgreSQL doesn't provide manual failover due to lack of data safety guarantees.
 
-Advanced users can still execute it using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers). The same time Charmed PostgreSQL allows the cluster recovery using the full PostgreSQL/Patroni/Raft cluster re-initialization.
+Advanced users can still execute it using [patronictl](/reference/troubleshooting/cli-helpers) and [Patroni REST API](/reference/troubleshooting/cli-helpers). The same time Charmed PostgreSQL allows the cluster recovery using the full PostgreSQL/Patroni/Raft cluster re-initialisation.
 
-## Raft re-initialization
+## Raft re-initialisation
 
 ```{caution}
 This is the worst possible recovery case scenario when Primary and ALL Sync Standby units lost simultaneously and their data cannot be recovered from the disc. 
@@ -34,17 +34,17 @@ In this case, Patroni cannot perform automatic failover for the only available R
 A manual failover procedure cannot guarantee the latest SQL transactions' availability on the replica unit(s) due to the [lag distance](/explanation/units) to the primary. Additionally, Raft cluster consensus is not possible when one unit is left in a three-unit cluster. 
 ```
 
-The command to re-initialize the Raft cluster should be executed when charm is ready:
+The command to re-initialise the Raft cluster should be executed when charm is ready:
 * the last Juju unit is available in Juju application
 * the last unit was has detected Raft majority lost, status: `Raft majority loss, run: promote-to-primary`
 
-To re-initialize Raft and fix the Partition/PostgreSQL cluster (when requested):
+To re-initialise Raft and fix the Partition/PostgreSQL cluster (when requested):
 
 ```text
 juju run postgresql/x promote-to-primary scope=unit force=true
 ```
 
-<details><summary>Example of Raft re-initialization</summary>
+<details><summary>Example of Raft re-initialisation</summary>
 
 Deploy PostgreSQL 3 units:
 
@@ -108,7 +108,7 @@ Machine  State    Address         Inst id        Base          AZ  Message
 
 At this stage it is recommended to restore the lost nodes, they will rejoin the cluster automatically once Juju detects their availability.
 
-To start Raft re-initialization, remove DEAD machines as a signal to charm that they cannot be restored/started and no risks for split-brain:
+To start Raft re-initialisation, remove DEAD machines as a signal to charm that they cannot be restored/started and no risks for split-brain:
 
 ```text
 > juju remove-machine --force 0 
@@ -136,7 +136,7 @@ postgresql/1*  blocked   executing  1        10.189.210.166  5432/tcp  Raft majo
 ...
 ```
 
-Start Raft re-initialization:
+Start Raft re-initialisation:
 
 ```text
 > juju run postgresql/1 promote-to-primary scope=unit force=true
