@@ -2678,3 +2678,59 @@ def test_generate_user_hash(harness):
         assert harness.charm.generate_user_hash == sentinel.hash
 
         _shake_128.assert_called_once_with(b"{'relation_id_2': 'test_db'}")
+
+
+def test_relations_user_databases_map(harness):
+    with (
+        patch("charm.PostgresqlOperatorCharm.postgresql") as _postgresql,
+        patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.is_cluster_initialised", new_callable=PropertyMock
+        ) as _is_cluster_initialised,
+    ):
+        # Initial empty results from the functions used in the property that's being tested.
+        _postgresql.list_users_from_relation.return_value = set()
+        _postgresql.list_accessible_databases_for_user.return_value = set()
+        _postgresql.list_access_groups.return_value = {
+            "identity_access",
+            "internal_access",
+            "relation_access",
+        }
+
+        # Test when the cluster isn't initialised yet.
+        _is_cluster_initialised.return_value = False
+        _member_started.return_value = True
+        assert harness.charm.relations_user_databases_map == {
+            "operator": "all",
+            "replication": "all",
+            "rewind": "all",
+        }
+
+        # Test when the cluster is initialised but the cluster member hasn't started yet.
+        _is_cluster_initialised.return_value = True
+        _member_started.return_value = False
+        assert harness.charm.relations_user_databases_map == {
+            "operator": "all",
+            "replication": "all",
+            "rewind": "all",
+        }
+
+        # Test when there are no relation users in the database.
+        _member_started.return_value = True
+        assert harness.charm.relations_user_databases_map == {}
+
+        # Test when there are relation users in the database.
+        _postgresql.list_users.return_value = ["user1", "user2"]
+        _postgresql.list_accessible_databases_for_user.side_effect = [["db1", "db2"], ["db3"]]
+        assert harness.charm.relations_user_databases_map == {"user1": "db1,db2", "user2": "db3"}
+
+        # Test when the access groups where not created yet.
+        _postgresql.list_accessible_databases_for_user.side_effect = [["db1", "db2"], ["db3"]]
+        _postgresql.list_access_groups.return_value = set()
+        assert harness.charm.relations_user_databases_map == {
+            "user1": "db1,db2",
+            "user2": "db3",
+            "operator": "all",
+            "replication": "all",
+            "rewind": "all",
+        }
