@@ -2505,6 +2505,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     "postgres",
                     "replication",
                     "rewind",
+                    "charmed_databases_owner",
                 ):
                     continue
                 if databases := ",".join(
