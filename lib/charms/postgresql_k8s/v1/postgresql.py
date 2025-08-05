@@ -348,7 +348,8 @@ class PostgreSQL:
             raise PostgreSQLCreateDatabaseError() from e
 
         # Enable preset extensions
-        self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
+        if plugins:
+            self.enable_disable_extensions(dict.fromkeys(plugins, True), database)
 
     def create_user(
         self,
