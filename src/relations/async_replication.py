@@ -125,7 +125,8 @@ class PostgreSQLAsyncReplication(Object):
 
         if self._relation.name == REPLICATION_OFFER_RELATION:
             ip = self.charm._replication_offer_ip
-        ip = self.charm._replication_consumer_ip
+        else:
+            ip = self.charm._replication_consumer_ip
 
         if not ip:
             raise AsyncReplicationError(f"No IP set for {self._relation.name}")
