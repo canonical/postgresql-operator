@@ -13,3 +13,13 @@ Under the hood, it uses the publication and subscriptions mechanisms from the [P
 
 * [](/how-to/logical-replication/set-up-clusters)
 * [](/how-to/logical-replication/re-enable)
+
+
+```{toctree}
+:titlesonly:
+:maxdepth: 2
+:glob:
+:hidden:
+
+Set up two clusters <set-up-clusters>
+Re-enable logical replication <re-enable>
