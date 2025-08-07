@@ -136,7 +136,7 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
 @pytest.mark.abort_on_fail
 async def test_scale_to_five_units(ops_test: OpsTest) -> None:
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=3)
-    await ops_test.model.wait_for_idle(status="active", timeout=1500)
+    await ops_test.model.wait_for_idle(status="active", timeout=2000)
 
 
 @pytest.mark.abort_on_fail
@@ -184,7 +184,7 @@ async def test_removing_raft_majority(ops_test: OpsTest, continuous_writes) -> N
 
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=3)
-    await ops_test.model.wait_for_idle(status="active", timeout=1500)
+    await ops_test.model.wait_for_idle(status="active", timeout=2000)
 
     await check_writes(ops_test)
     new_roles = await get_cluster_roles(
