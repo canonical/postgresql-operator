@@ -147,6 +147,8 @@ testdb=> select * from asd2;
 (1 row)
 ```
 
+And the same table, or even different tables, can be replicated to multiple clusters at the same time. For example, you can replicate the `asd` table from the first cluster to both a second and a third clusters, or you can replicate it only to the second cluster and replicate a different table to the third cluster.
+
 If the relation between the PostgreSQL clusters is broken, the data will be kept in both clusters, but the replication will stop. You can re-enable logical replication by following the steps from [](/how-to/logical-replication/re-enable).
 
 The same will happen for that specific table if you change the table in the `logical_replication_subscription_request` config option to a different table or remove it completely. If one or more tables other than the current one are specified, the replication will continue for those tables, but the current table will not be replicated any more.
