@@ -15,7 +15,7 @@ CREATE TABLE
 
 Then, integrate the clusters again:
 ```sh
-juju relate postgresql1:logical-replication-offer postgresql2:logical-replication
+juju integrate postgresql1:logical-replication-offer postgresql2:logical-replication
 ```
 
 And you'll be able to see the data replicated from the first cluster to the second:
