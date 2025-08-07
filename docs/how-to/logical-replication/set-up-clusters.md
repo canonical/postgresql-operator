@@ -112,3 +112,5 @@ testdb=> select * from asd;
 ```
 
 You can then add more data to the table in the first cluster, and it will be replicated to the second cluster automatically.
+
+If the relation between the PostgreSQL clusters is broken, the data will be kept in both clusters, but the replication will stop. You can re-enable logical replication by following the steps from [](/how-to/logical-replication/re-enable).
