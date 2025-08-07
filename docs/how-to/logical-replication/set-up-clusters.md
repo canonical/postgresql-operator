@@ -1,5 +1,15 @@
 # How to set up clusters for logical replication
 
+```{caution}
+This feature is only available for revision 863 or higher, which is not yet in the stable track.
+```
+
+Start by deploying two PostgreSQL clusters:
+```sh
+juju deploy postgresql --channel 16/edge postgresql1
+juju deploy postgresql --channel 16/edge postgresql2
+```
+
 For testing purposes, you can deploy two applications of the [data integrator charm](https://charmhub.io/data-integrator) and then relate them to the two PostgreSQL clusters you want to replicate data between.
 ```sh
 juju deploy data-integrator di1 --config database-name=testdb
