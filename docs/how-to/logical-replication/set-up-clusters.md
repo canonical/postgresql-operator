@@ -10,13 +10,13 @@ juju deploy postgresql --channel 16/edge postgresql1
 juju deploy postgresql --channel 16/edge postgresql2
 ```
 
-For testing purposes, you can deploy two applications of the [data integrator charm](https://charmhub.io/data-integrator) and then relate them to the two PostgreSQL clusters you want to replicate data between.
+For testing purposes, you can deploy two applications of the [data integrator charm](https://charmhub.io/data-integrator) and then integrate them to the two PostgreSQL clusters you want to replicate data between.
 ```sh
 juju deploy data-integrator di1 --config database-name=testdb
 juju deploy data-integrator di2 --config database-name=testdb
 
-juju relate postgresql1 di1
-juju relate postgresql2 di2
+juju integrate postgresql1 di1
+juju integrate postgresql2 di2
 ```
 
 Then, integrate both PostgreSQL clusters:
