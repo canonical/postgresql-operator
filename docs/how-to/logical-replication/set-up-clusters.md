@@ -113,6 +113,40 @@ testdb=> select * from asd;
 
 You can then add more data to the table in the first cluster, and it will be replicated to the second cluster automatically.
 
+It's also possible to replicate tables in the other direction, from the second cluster to the first, while keeping the replication from the first cluster to the second. To do that, you need to also integrate the clusters in the opposite direction:
+```sh
+psql postgresql://relation-9:FHZbyAPGQjbDpj65@10.166.227.109:5432/testdb
+psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
+Type "help" for help.
+
+testdb=> create table asd2 (message int); insert into asd2 values (123);
+CREATE TABLE
+INSERT 0 1
+testdb=> \q
+
+psql postgresql://relation-8:G7Qu77SU0qeadnhn@10.166.227.78:5432/testdb
+psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
+Type "help" for help.
+
+testdb=> create table asd2 (message int);
+CREATE TABLE
+testdb=> \q
+
+juju integrate postgresql1:logical-replication postgresql2:logical-replication-offer
+
+juju config postgresql1 logical_replication_subscription_request='{"testdb": ["public.asd2"]}'
+
+psql postgresql://relation-8:G7Qu77SU0qeadnhn@10.166.227.78:5432/testdb
+psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
+Type "help" for help.
+
+testdb=> select * from asd2;
+ message
+---------
+     123
+(1 row)
+```
+
 If the relation between the PostgreSQL clusters is broken, the data will be kept in both clusters, but the replication will stop. You can re-enable logical replication by following the steps from [](/how-to/logical-replication/re-enable).
 
 The same will happen for that specific table if you change the table in the `logical_replication_subscription_request` config option to a different table or remove it completely. If one or more tables other than the current one are specified, the replication will continue for those tables, but the current table will not be replicated any more.
