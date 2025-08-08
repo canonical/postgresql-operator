@@ -2,6 +2,18 @@
 
 This hands-on tutorial aims to help you learn how to deploy Charmed PostgreSQL on machines and become familiar with its available operations.
 
+Download [this config](_conf/test-a.conf)
+
+
+```{literalinclude} /tutorial/_conf/test-a.conf
+    :language: bash
+    :start-after: [docs:setup-s3]
+    :end-before: [docs:setup-s3-end]
+    :dedent: 4
+```
+
+
+
 ## Prerequisites
 
 While this tutorial intends to guide you as you deploy Charmed PostgreSQL for the first time, it will be most beneficial if:
