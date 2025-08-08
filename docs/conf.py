@@ -176,7 +176,9 @@ html_theme_options = {
 
 # Template and asset locations
 
-#html_static_path = ["_static"]
+html_static_path = ["_static"]
+html_extra_path = ["_extra"]
+
 #templates_path = ["_templates"]
 
 
