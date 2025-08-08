@@ -123,7 +123,6 @@ This section is for charm developers looking to support PostgreSQL integrations 
 ```{toctree}
 :titlesonly:
 :maxdepth: 2
-:glob:
 :hidden:
 
 Deploy <deploy/index>
@@ -137,8 +136,9 @@ Enable LDAP <enable-ldap>
 Enable plugins/extensions <enable-plugins-extensions/index>
 Back up and restore <back-up-and-restore/index>
 Monitoring (COS) <monitoring-cos/index>
-Upgrade <upgrade/index>
+Upgrade (refresh) <upgrade/index>
 Cross-regional async replication <cross-regional-async-replication/index>
 Logical replication <logical-replication/index>
 Development <development/index>
+```
 
