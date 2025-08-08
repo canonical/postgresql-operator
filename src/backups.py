@@ -15,9 +15,11 @@ from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
 
-import boto3 as boto3
-import botocore
-from botocore.exceptions import ClientError, ParamValidationError, SSLError
+from boto3.session import Session
+from botocore.client import Config
+from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidationError, SSLError
+from botocore.loaders import create_loader
+from botocore.regions import EndpointResolver
 from charms.data_platform_libs.v0.s3 import (
     CredentialsChangedEvent,
     S3Requirer,
@@ -105,7 +107,7 @@ class PostgreSQLBackups(Object):
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
-        session = boto3.session.Session(
+        session = Session(
             aws_access_key_id=s3_parameters["access-key"],
             aws_secret_access_key=s3_parameters["secret-key"],
             region_name=s3_parameters["region"],
@@ -114,14 +116,14 @@ class PostgreSQLBackups(Object):
             "s3",
             endpoint_url=self._construct_endpoint(s3_parameters),
             verify=(self._tls_ca_chain_filename or None),
-            config=botocore.client.Config(
+            config=Config(
                 # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
                 request_checksum_calculation="when_required",
                 response_checksum_validation="when_required",
             ),
         )
 
-    def _are_backup_settings_ok(self) -> tuple[bool, str | None]:
+    def _are_backup_settings_ok(self) -> tuple[bool, str]:
         """Validates whether backup settings are OK."""
         if self.model.get_relation(self.relation_name) is None:
             return (
@@ -133,7 +135,7 @@ class PostgreSQLBackups(Object):
         if missing_parameters:
             return False, f"Missing S3 parameters: {missing_parameters}"
 
-        return True, None
+        return True, ""
 
     @property
     def _can_initialise_stanza(self) -> bool:
@@ -169,7 +171,7 @@ class PostgreSQLBackups(Object):
 
         return self._are_backup_settings_ok()
 
-    def can_use_s3_repository(self) -> tuple[bool, str | None]:
+    def can_use_s3_repository(self) -> tuple[bool, str]:
         """Returns whether the charm was configured to use another cluster repository."""
         # Check model uuid
         s3_parameters, _ = self._retrieve_s3_parameters()
@@ -228,7 +230,7 @@ class PostgreSQLBackups(Object):
                 )
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
-        return True, None
+        return True, ""
 
     def _change_connectivity_to_database(self, connectivity: bool) -> None:
         """Enable or disable the connectivity to the database."""
@@ -244,11 +246,11 @@ class PostgreSQLBackups(Object):
         endpoint = s3_parameters["endpoint"]
 
         # Load endpoints data.
-        loader = botocore.loaders.create_loader()
+        loader = create_loader()
         data = loader.load_data("endpoints")
 
         # Construct the endpoint using the region.
-        resolver = botocore.regions.EndpointResolver(data)
+        resolver = EndpointResolver(data)
         endpoint_data = resolver.construct_endpoint("s3", s3_parameters["region"])
 
         # Use the built endpoint if it is an AWS endpoint.
@@ -270,12 +272,13 @@ class PostgreSQLBackups(Object):
         except ValueError as e:
             logger.exception("Failed to create a session '%s' in region=%s.", bucket_name, region)
             raise e
-        bucket = s3.Bucket(bucket_name)
+        # Boto3 doesn't have typedefs
+        bucket = s3.Bucket(bucket_name)  # type: ignore
         try:
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
             exists = True
-        except botocore.exceptions.ConnectTimeoutError as e:
+        except ConnectTimeoutError as e:
             # Re-raise the error if the connection timeouts, so the user has the possibility to
             # fix network issues and call juju resolve to re-trigger the hook that calls
             # this method.
@@ -1144,7 +1147,7 @@ Stderr:
         if backup_type == "full":
             return datetime.strftime(datetime.now(), "%Y%m%d-%H%M%SF")
         if backup_type == "differential":
-            backups = self._list_backups(show_failed=False, parse=False).keys()
+            backups = list(self._list_backups(show_failed=False, parse=False).keys())
             last_full_backup = None
             for label in backups[::-1]:
                 if label.endswith("F"):
@@ -1155,12 +1158,14 @@ Stderr:
                 raise TypeError("Differential backup requested but no previous full backup")
             return f"{last_full_backup}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SD')}"
         if backup_type == "incremental":
-            backups = self._list_backups(show_failed=False, parse=False).keys()
+            backups = list(self._list_backups(show_failed=False, parse=False).keys())
             if not backups:
                 raise TypeError("Incremental backup requested but no previous successful backup")
             return f"{backups[-1]}_{datetime.strftime(datetime.now(), '%Y%m%d-%H%M%SI')}"
+        else:
+            raise Exception("Invalid backup type")
 
-    def _fetch_backup_from_id(self, backup_id: str) -> str:
+    def _fetch_backup_from_id(self, backup_id: str) -> str | None:
         """Fetches backup's pgbackrest label from backup id."""
         timestamp = f"{datetime.strftime(datetime.strptime(backup_id, '%Y-%m-%dT%H:%M:%SZ'), '%Y%m%d-%H%M%S')}"
         backups = self._list_backups(show_failed=False, parse=False).keys()
@@ -1285,7 +1290,7 @@ Stderr:
             storage_path=self.charm._storage_path,
             user=BACKUP_USER,
             retention_full=s3_parameters["delete-older-than-days"],
-            process_max=max(os.cpu_count() - 2, 1),
+            process_max=max(self.charm.cpu_count - 2, 1),
         )
         # Render pgBackRest config file.
         self.charm._patroni.render_file(f"{PGBACKREST_CONF_PATH}/pgbackrest.conf", rendered, 0o640)
@@ -1324,7 +1329,8 @@ Stderr:
 
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
-        s3_parameters.setdefault("region")
+        # Existing behaviour is none not a str
+        s3_parameters.setdefault("region", None)  # type: ignore
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
         s3_parameters.setdefault("delete-older-than-days", "9999999")
@@ -1401,7 +1407,8 @@ Stderr:
         try:
             logger.info(f"Uploading content to bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            bucket = s3.Bucket(bucket_name)
+            # Boto3 doesn't have typedefs
+            bucket = s3.Bucket(bucket_name)  # type: ignore
 
             with tempfile.NamedTemporaryFile() as temp_file:
                 temp_file.write(content.encode("utf-8"))
@@ -1434,11 +1441,12 @@ Stderr:
         try:
             logger.info(f"Reading content from bucket={bucket_name}, path={processed_s3_path}")
             s3 = self._get_s3_session_resource(s3_parameters)
-            bucket = s3.Bucket(bucket_name)
+            # Boto3 doesn't have typedefs
+            bucket = s3.Bucket(bucket_name)  # type: ignore
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
                 return buf.getvalue().decode("utf-8")
-        except botocore.exceptions.ClientError as e:
+        except ClientError as e:
             if e.response["Error"]["Code"] == "404":
                 logger.info(
                     f"No such object to read from S3 bucket={bucket_name}, path={processed_s3_path}"

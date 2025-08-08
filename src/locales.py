@@ -3,7 +3,9 @@
 
 """List of locales available in the snap."""
 
-SNAP_LOCALES = [
+from typing import Literal
+
+SNAP_LOCALES = Literal[
     "C",
     "aa_DJ",
     "aa_DJ.utf8",

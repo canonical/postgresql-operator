@@ -24,9 +24,9 @@ from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Tuple
 
 import psycopg2
-from psycopg2.sql import SQL, Identifier, Literal
-
 from constants import BACKUP_USER, SYSTEM_USERS
+from ops import ConfigData
+from psycopg2.sql import SQL, Identifier, Literal
 
 # The unique Charmhub library identifier, never change it
 LIBID = "24ee217a54e840a598ff21a079c3e678"
@@ -82,11 +82,17 @@ for dependencies in REQUIRED_PLUGINS.values():
 logger = logging.getLogger(__name__)
 
 
-class PostgreSQLAssignGroupError(Exception):
+class PostgreSQLBaseError(Exception):
+    """Base lib exception."""
+
+    message = None
+
+
+class PostgreSQLAssignGroupError(PostgreSQLBaseError):
     """Exception raised when assigning to a group fails."""
 
 
-class PostgreSQLCreateDatabaseError(Exception):
+class PostgreSQLCreateDatabaseError(PostgreSQLBaseError):
     """Exception raised when creating a database fails."""
 
     def __init__(self, message: Optional[str] = None):
@@ -94,11 +100,11 @@ class PostgreSQLCreateDatabaseError(Exception):
         self.message = message
 
 
-class PostgreSQLCreateGroupError(Exception):
+class PostgreSQLCreateGroupError(PostgreSQLBaseError):
     """Exception raised when creating a group fails."""
 
 
-class PostgreSQLCreateUserError(Exception):
+class PostgreSQLCreateUserError(PostgreSQLBaseError):
     """Exception raised when creating a user fails."""
 
     def __init__(self, message: Optional[str] = None):
@@ -106,99 +112,107 @@ class PostgreSQLCreateUserError(Exception):
         self.message = message
 
 
-class PostgreSQLDatabasesSetupError(Exception):
+class PostgreSQLUndefinedHostError(PostgreSQLBaseError):
+    """Exception when host is not set."""
+
+
+class PostgreSQLUndefinedPasswordError(PostgreSQLBaseError):
+    """Exception when password is not set."""
+
+
+class PostgreSQLDatabasesSetupError(PostgreSQLBaseError):
     """Exception raised when the databases setup fails."""
 
 
-class PostgreSQLDeleteUserError(Exception):
+class PostgreSQLDeleteUserError(PostgreSQLBaseError):
     """Exception raised when deleting a user fails."""
 
 
-class PostgreSQLEnableDisableExtensionError(Exception):
+class PostgreSQLEnableDisableExtensionError(PostgreSQLBaseError):
     """Exception raised when enabling/disabling an extension fails."""
 
 
-class PostgreSQLGetLastArchivedWALError(Exception):
+class PostgreSQLGetLastArchivedWALError(PostgreSQLBaseError):
     """Exception raised when retrieving last archived WAL fails."""
 
 
-class PostgreSQLGetCurrentTimelineError(Exception):
+class PostgreSQLGetCurrentTimelineError(PostgreSQLBaseError):
     """Exception raised when retrieving current timeline id for the PostgreSQL unit fails."""
 
 
-class PostgreSQLGetPostgreSQLVersionError(Exception):
+class PostgreSQLGetPostgreSQLVersionError(PostgreSQLBaseError):
     """Exception raised when retrieving PostgreSQL version fails."""
 
 
-class PostgreSQLListAccessibleDatabasesForUserError(Exception):
+class PostgreSQLListAccessibleDatabasesForUserError(PostgreSQLBaseError):
     """Exception raised when retrieving the accessible databases for a user fails."""
 
 
-class PostgreSQLListGroupsError(Exception):
+class PostgreSQLListGroupsError(PostgreSQLBaseError):
     """Exception raised when retrieving PostgreSQL groups list fails."""
 
 
-class PostgreSQLListUsersError(Exception):
+class PostgreSQLListUsersError(PostgreSQLBaseError):
     """Exception raised when retrieving PostgreSQL users list fails."""
 
 
-class PostgreSQLUpdateUserPasswordError(Exception):
+class PostgreSQLUpdateUserPasswordError(PostgreSQLBaseError):
     """Exception raised when updating a user password fails."""
 
 
-class PostgreSQLDatabaseExistsError(Exception):
-    """Exception raised during database existence check."""
-
-
-class PostgreSQLTableExistsError(Exception):
-    """Exception raised during table existence check."""
-
-
-class PostgreSQLIsTableEmptyError(Exception):
-    """Exception raised during table emptiness check."""
-
-
-class PostgreSQLCreatePublicationError(Exception):
-    """Exception raised when creating PostgreSQL publication."""
-
-
-class PostgreSQLPublicationExistsError(Exception):
-    """Exception raised during PostgreSQL publication existence check."""
-
-
-class PostgreSQLAlterPublicationError(Exception):
-    """Exception raised when altering PostgreSQL publication."""
-
-
-class PostgreSQLDropPublicationError(Exception):
-    """Exception raised when dropping PostgreSQL publication."""
-
-
-class PostgreSQLCreateSubscriptionError(Exception):
-    """Exception raised when creating PostgreSQL subscription."""
-
-
-class PostgreSQLSubscriptionExistsError(Exception):
-    """Exception raised during PostgreSQL subscription existence check."""
-
-
-class PostgreSQLUpdateSubscriptionError(Exception):
-    """Exception raised when updating PostgreSQL subscription."""
-
-
-class PostgreSQLRefreshSubscriptionError(Exception):
-    """Exception raised when refreshing PostgreSQL subscription."""
-
-
-class PostgreSQLDropSubscriptionError(Exception):
-    """Exception raised when dropping PostgreSQL subscription."""
-
-
-class PostgreSQLCreatePredefinedRolesError(Exception):
+class PostgreSQLCreatePredefinedRolesError(PostgreSQLBaseError):
     """Exception raised when creating predefined roles."""
 
 
-class PostgreSQLGrantDatabasePrivilegesToUserError(Exception):
+class PostgreSQLDatabaseExistsError(PostgreSQLBaseError):
+    """Exception raised during database existence check."""
+
+
+class PostgreSQLTableExistsError(PostgreSQLBaseError):
+    """Exception raised during table existence check."""
+
+
+class PostgreSQLIsTableEmptyError(PostgreSQLBaseError):
+    """Exception raised during table emptiness check."""
+
+
+class PostgreSQLCreatePublicationError(PostgreSQLBaseError):
+    """Exception raised when creating PostgreSQL publication."""
+
+
+class PostgreSQLPublicationExistsError(PostgreSQLBaseError):
+    """Exception raised during PostgreSQL publication existence check."""
+
+
+class PostgreSQLAlterPublicationError(PostgreSQLBaseError):
+    """Exception raised when altering PostgreSQL publication."""
+
+
+class PostgreSQLDropPublicationError(PostgreSQLBaseError):
+    """Exception raised when dropping PostgreSQL publication."""
+
+
+class PostgreSQLCreateSubscriptionError(PostgreSQLBaseError):
+    """Exception raised when creating PostgreSQL subscription."""
+
+
+class PostgreSQLSubscriptionExistsError(PostgreSQLBaseError):
+    """Exception raised during PostgreSQL subscription existence check."""
+
+
+class PostgreSQLUpdateSubscriptionError(PostgreSQLBaseError):
+    """Exception raised when updating PostgreSQL subscription."""
+
+
+class PostgreSQLRefreshSubscriptionError(PostgreSQLBaseError):
+    """Exception raised when refreshing PostgreSQL subscription."""
+
+
+class PostgreSQLDropSubscriptionError(PostgreSQLBaseError):
+    """Exception raised when dropping PostgreSQL subscription."""
+
+
+class PostgreSQLGrantDatabasePrivilegesToUserError(PostgreSQLBaseError):
     """Exception raised when granting database privileges to user."""
 
 
@@ -207,10 +221,10 @@ class PostgreSQL:
 
     def __init__(
         self,
-        primary_host: str,
-        current_host: str,
+        primary_host: Optional[str],
+        current_host: Optional[str],
         user: str,
-        password: str,
+        password: Optional[str],
         database: str,
         system_users: Optional[List[str]] = None,
     ):
@@ -255,6 +269,10 @@ class PostgreSQL:
              psycopg2 connection object.
         """
         host = database_host if database_host is not None else self.primary_host
+        if not host:
+            raise PostgreSQLUndefinedHostError("Host not set")
+        if not self.password:
+            raise PostgreSQLUndefinedPasswordError("Password not set")
         connection = psycopg2.connect(
             f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
             f"password='{self.password}' connect_timeout=1"
@@ -358,7 +376,11 @@ class PostgreSQL:
             # Separate roles and privileges from the provided extra user roles.
             roles = privileges = None
             if extra_user_roles:
-                if len(extra_user_roles) > 2 and sorted(extra_user_roles) != [ROLE_ADMIN, "createdb", ACCESS_GROUP_RELATION]:
+                if len(extra_user_roles) > 2 and sorted(extra_user_roles) != [
+                    ROLE_ADMIN,
+                    "createdb",
+                    ACCESS_GROUP_RELATION,
+                ]:
                     extra_user_roles.remove(ACCESS_GROUP_RELATION)
                     logger.error(
                         "Invalid extra user roles: "
@@ -367,7 +389,17 @@ class PostgreSQL:
                     )
                     raise PostgreSQLCreateUserError(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
                 valid_privileges, valid_roles = self.list_valid_privileges_and_roles()
-                roles = [role for role in extra_user_roles if (user == BACKUP_USER or user in SYSTEM_USERS or role in valid_roles or role == ACCESS_GROUP_RELATION or role == "createdb")]
+                roles = [
+                    role
+                    for role in extra_user_roles
+                    if (
+                        user == BACKUP_USER
+                        or user in SYSTEM_USERS
+                        or role in valid_roles
+                        or role == ACCESS_GROUP_RELATION
+                        or role == "createdb"
+                    )
+                ]
                 if "createdb" in extra_user_roles:
                     extra_user_roles.remove("createdb")
                     roles.remove("createdb")
@@ -394,22 +426,43 @@ class PostgreSQL:
                     user_definition = "ALTER ROLE {} "
                 else:
                     user_definition = "CREATE ROLE {} "
-                user_definition += (
-                    f"WITH LOGIN{' SUPERUSER' if admin else ''}{' REPLICATION' if replication else ''} ENCRYPTED PASSWORD '{password}'"
-                )
+                user_definition += f"WITH LOGIN{' SUPERUSER' if admin else ''}{' REPLICATION' if replication else ''} ENCRYPTED PASSWORD '{password}'"
                 connect_statements = []
                 if database:
-                    if roles is not None and not any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]):
-                        user_definition += f' IN ROLE "charmed_{database}_admin", "charmed_{database}_dml"'
+                    if roles is not None and not any(
+                        True
+                        for role in roles
+                        if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA]
+                    ):
+                        user_definition += (
+                            f' IN ROLE "charmed_{database}_admin", "charmed_{database}_dml"'
+                        )
                     else:
-                        connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
-                            Identifier(database), Identifier(user)
-                        ))
-                if roles is not None and any(True for role in roles if role in [ROLE_STATS, ROLE_READ, ROLE_DML, ROLE_BACKUP, ROLE_DBA, ROLE_ADMIN, ROLE_DATABASES_OWNER]):
+                        connect_statements.append(
+                            SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                                Identifier(database), Identifier(user)
+                            )
+                        )
+                if roles is not None and any(
+                    True
+                    for role in roles
+                    if role
+                    in [
+                        ROLE_STATS,
+                        ROLE_READ,
+                        ROLE_DML,
+                        ROLE_BACKUP,
+                        ROLE_DBA,
+                        ROLE_ADMIN,
+                        ROLE_DATABASES_OWNER,
+                    ]
+                ):
                     for system_database in ["postgres", "template1"]:
-                        connect_statements.append(SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
-                            Identifier(system_database), Identifier(user)
-                        ))
+                        connect_statements.append(
+                            SQL("GRANT CONNECT ON DATABASE {} TO {};").format(
+                                Identifier(system_database), Identifier(user)
+                            )
+                        )
                 if can_create_database:
                     user_definition += " CREATEDB"
                 if privileges:
@@ -470,7 +523,7 @@ class PostgreSQL:
             ],
             ROLE_ADMIN: [
                 f"CREATE ROLE {ROLE_ADMIN} NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOLOGIN IN ROLE {ROLE_DML}",
-            ]
+            ],
         }
 
         try:
@@ -961,7 +1014,6 @@ class PostgreSQL:
             cursor.execute("SELECT rolname FROM pg_roles;")
             return {role[0] for role in cursor.fetchall() if role[0]}
 
-
     def list_valid_privileges_and_roles(self) -> Tuple[Set[str], Set[str]]:
         """Returns two sets with valid privileges and roles.
 
@@ -1208,14 +1260,16 @@ $$ LANGUAGE plpgsql security definer;"""
         try:
             for database in self._get_existing_databases():
                 with self._connect_to_database(
-                        database=database
+                    database=database
                 ) as connection, connection.cursor() as cursor:
                     cursor.execute(SQL(function_creation_statement))
                     cursor.execute(
                         SQL("ALTER FUNCTION set_up_predefined_catalog_roles OWNER TO operator;")
                     )
                     cursor.execute(
-                        SQL("REVOKE EXECUTE ON FUNCTION set_up_predefined_catalog_roles FROM PUBLIC;")
+                        SQL(
+                            "REVOKE EXECUTE ON FUNCTION set_up_predefined_catalog_roles FROM PUBLIC;"
+                        )
                     )
                     cursor.execute(
                         SQL(
@@ -1223,9 +1277,9 @@ $$ LANGUAGE plpgsql security definer;"""
                         ).format(Identifier(ROLE_DATABASES_OWNER))
                     )
                     cursor.execute(
-                        SQL(
-                            "REVOKE CREATE ON DATABASE {} FROM {};"
-                        ).format(Identifier("template1"), Identifier(ROLE_DATABASES_OWNER))
+                        SQL("REVOKE CREATE ON DATABASE {} FROM {};").format(
+                            Identifier("template1"), Identifier(ROLE_DATABASES_OWNER)
+                        )
                     )
         except psycopg2.Error as e:
             logger.error(f"Failed to set up predefined catalog roles function: {e}")
@@ -1571,7 +1625,7 @@ $$ LANGUAGE plpgsql security definer;"""
 
     @staticmethod
     def build_postgresql_parameters(
-        config_options: dict, available_memory: int, limit_memory: Optional[int] = None
+        config_options: ConfigData, available_memory: int, limit_memory: Optional[int] = None
     ) -> Optional[dict]:
         """Builds the PostgreSQL parameters.
 

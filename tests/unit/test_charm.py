@@ -19,7 +19,7 @@ from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLEnableDisableExtensionError,
 )
-from ops import Unit
+from ops import RelationEvent, Unit
 from ops.framework import EventBase
 from ops.model import (
     ActiveStatus,
@@ -1492,8 +1492,9 @@ def test_reconfigure_cluster(harness):
     ):
         rel_id = harness.model.get_relation(PEER).id
         # Test when no change is needed in the member IP.
-        mock_event = Mock()
+        mock_event = MagicMock(spec=RelationEvent)
         mock_event.unit = harness.charm.unit
+        mock_event.relation = Mock()
         mock_event.relation.data = {mock_event.unit: {}}
         assert harness.charm._reconfigure_cluster(mock_event)
         _remove_raft_member.assert_not_called()
