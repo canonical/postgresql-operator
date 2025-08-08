@@ -1,45 +1,34 @@
 # Upgrade (refresh)
 
-Charmed PostgreSQL supports minor in-place {term}`upgrades <upgrade>` via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command:
+A charm **refresh** is any change to the version of a charm, and/or its {term}`workload`. 
 
-```{admonition} Please keep in mind: 
-:class: caution
+Charmed PostgreSQL supports minor in-place {term}`upgrades <upgrade>` via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
 
-* This charm **can only be upgraded to a higher version**. It cannot be {term}`downgraded <downgrade>` to a lower version.
-* This charm **only supports minor version upgrades**, e.g. 16.9 --> 16.10.
-* If anything goes wrong during the refresh process, the best option is usually to perorm a {term}`rollback`.
+## Supported refresh types
+
+This charm **can only be upgraded to a higher version**. It cannot be {term}`downgraded <downgrade>` to a lower version.
+
+The charm version can only be lowered in the case of an ongoing refresh that needs to {term}`roll back <rollback>` to its {term}`original version` due to a failure.
+
+```{seealso}
+* [How to perform a minor upgrade](/how-to/upgrade/minor-upgrade)
+* [How to perform a minor rollback](/how-to/upgrade/minor-rollback)
 ```
 
-Guides:
+## Supported versions
+
+This charm **only supports minor version upgrades**, e.g. 16.9 --> 16.10.
+
+[Contact us](/reference/contacts) if you want to migrate from Charmed PostgreSQL 14 to 16
+
+```{seealso}
+* [Charmed PostgreSQL 16 versions](/reference/releases)
+```
 
 ```{toctree}
 :titlesonly:
+:hidden:
 
 Perform a minor upgrade <minor-upgrade>
 Perform a minor rollback <minor-rollback>
-```
-
-## Glossary
-
-This is a simplified summary of refresh terminology. 
-
-For a more detailed glossary, see the [charm refresh  developer documentation](https://canonical-charm-refresh.readthedocs-hosted.com/latest/glossary/). 
-
-```{glossary}
-refresh
-    `juju refresh` to a different workload and/or charm version.
-
-    Note: *rollback*, *upgrade*, and *downgrade* are specific types of refresh.
-
-upgrade
-    `juju refresh` to a higher workload and/or charm version.
-
-downgrade
-    `juju refresh` to a lower workload and/or charm version.
-
-rollback
-    `juju refresh` to the original workload and charm version while a refresh is in progress.
-
-workload
-    A software component that the charm operates. E.g. PostgreSQL.
 ```
