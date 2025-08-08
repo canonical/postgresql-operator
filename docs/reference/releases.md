@@ -40,24 +40,24 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 ### Release 552-553
 
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[553] | ![check] |          |  ![check]  |
-|[552] |          | ![check] |  ![check]  |
+| Revision | amd64 | arm64 | Ubuntu 22.04 LTS | Snap revision |
+|:--------:|:-----:|:-----:|:-----:|:-----:|
+|[553] | ![check] |          |  ![check]  | 143 |
+|[552] |          | ![check] |  ![check]  | 142 |
 
 <details>
 <summary>Older releases</summary>
 
-| Revision | amd64 | arm64 | Ubuntu 22.04 LTS
-|:--------:|:-----:|:-----:|:-----:|
-|[468] |![check]  |          | ![check] |
-|[467] |          | ![check] | ![check] |
-|[430] |          | ![check] | ![check] |
-|[429] |![check]  |          | ![check] |
-|[363] |![check]  |          | ![check] |          
-|[351] |![check]  |          | ![check] |         
-|[336] |![check]  |          | ![check] |       
-|[288] |![check]  |          | ![check] |       
+| Revision | amd64 | arm64 | Ubuntu 22.04 LTS | Snap revision |
+|:--------:|:-----:|:-----:|:-----:|:-----:|
+|[468] |![check]  |          | ![check] | 120 |
+|[467] |          | ![check] | ![check] | 121 |
+|[430] |          | ![check] | ![check] | 114 |
+|[429] |![check]  |          | ![check] | 115 |
+|[363] |![check]  |          | ![check] | 96 |      
+|[351] |![check]  |          | ![check] | 89 |      
+|[336] |![check]  |          | ![check] | 85 |    
+|[288] |![check]  |          | ![check] | 31 |    
 
 </details>
 
