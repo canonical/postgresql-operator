@@ -459,11 +459,16 @@ class Patroni:
             for member in r.json()["members"]
         )
 
-    def is_replication_healthy(self) -> bool:
+    def is_replication_healthy(self, majority_check: bool = False) -> bool:
         """Return whether the replication is healthy."""
+        expected_healthy_replicas_count = self.planned_units - 1
+        if majority_check:
+            expected_healthy_replicas_count = self.planned_units // 2
         try:
             for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
                 with attempt:
+                    healthy_primary = False
+                    healthy_replicas_count = 0
                     primary = self.get_primary()
                     primary_ip = self.get_member_ip(primary)
                     members_ips = {self.unit_ip}
@@ -481,7 +486,16 @@ class Patroni:
                             logger.debug(
                                 f"Failed replication check for {members_ip} with code {member_status.status_code}"
                             )
-                            raise Exception
+                            continue
+                        if members_ip == primary_ip:
+                            healthy_primary = True
+                        else:
+                            healthy_replicas_count += 1
+                    if (
+                        not healthy_primary
+                        or healthy_replicas_count < expected_healthy_replicas_count
+                    ):
+                        raise Exception
         except RetryError:
             logger.exception("replication is not healthy")
             return False
@@ -1007,6 +1021,12 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
+
+        if not self.is_replication_healthy(majority_check=True):
+            logger.debug("skipping reinitialize PostgreSQL, because of lack of healthy majority")
+            raise Exception
+
+        logger.debug("reinitialize PostgreSQL")
         requests.post(
             f"{self._patroni_url}/reinitialize",
             verify=self.verify,
