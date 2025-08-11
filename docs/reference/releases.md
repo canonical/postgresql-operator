@@ -1,22 +1,14 @@
 # Releases
 
-This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release.
+Charmed PostgreSQL 16 supports all [features listed in PostgreSQL 14](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/reference/releases/#dependencies-and-supported-features).
+
+| Release | PostgreSQL version | Minimum Juju version | 
+|:---:|:---:|:---:|
+| [843, 844] | 16.9  | 3.6+  |
 
 To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk).
 
 To see all releases and commits, check the [Charmed PostgreSQL Releases page on GitHub](https://github.com/canonical/postgresql-operator/releases).
-
-## Dependencies and supported features
-
-For a given release, this table shows:
-* The PostgreSQL version packaged inside.
-* The minimum Juju 3 version required to reliably operate **all** features of the release
-* Support for specific features
-
-| Release | PostgreSQL version | Minimum Juju version | [TLS encryption](/how-to/enable-tls) | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/index) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-| [843, 844] | 16.9  | 3.6+  | ![check] | ![check] | ![check] | ![check] | ![check] |
-
 
 ## Architecture and base
 

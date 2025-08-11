@@ -1,8 +1,8 @@
-## Glossary
+# Glossary
 
 Common terminology in the context of Charmed PostgreSQL.
 
-### Refresh
+### Upgrades (refresh)
 
 This is a simplified summary of refresh terminology. 
 
