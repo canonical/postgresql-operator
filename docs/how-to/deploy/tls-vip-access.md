@@ -14,7 +14,7 @@ The basic requirements to follow along with this example setup are the following
 
 * A fully deployed and running Juju machine environment
   * See the [PostgreSQL Tutorial](/tutorial/index) for a quick setup with Multipass
-  * See the official [Juju deployment guide](https://juju.is/docs/juju/tutorial#deploy) for more details
+  * See the official [Juju deployment guide](https://juju.is/docs/juju/tutorial) for more details
 * A spare virtual IP address for [`hacluster`](https://discourse.charmhub.io/t/pgbouncer-how-to-externally-access/15741)
   * See the PgBouncer guide: [How to use a VIP to connect to PgBouncer](https://charmhub.io/pgbouncer/docs/h-external-access?channel=1/stable)
 * DNS record pointing to VIP above (`my-tls-example-db.local` is used as an example here)

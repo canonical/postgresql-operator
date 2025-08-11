@@ -28,7 +28,7 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
   * All replicas are now [synchronous units]
   * Switchover the primary unit via `promote-to-primary scope=unit`
   * Raft re-init helper: `promote-to-primary scope=unit force=yes`
-* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords](/how-to/manage-passwords)
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret) for charm [internal passwords](/how-to/manage-passwords)
 * [Timescale Community Edition]
 * [Extended COS integration]
   * [Profiling via Parca]
