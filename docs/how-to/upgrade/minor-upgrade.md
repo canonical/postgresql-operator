@@ -77,7 +77,7 @@ Units will be refreshed one by one based on role: first the `replica` units, the
 If there are any version incompatibilities in charm revisions, dependencies, or any other unexpected failure in the upgrade process, the process will halt and enter a failure state.
 
 ```{attention}
-Only trigger a rollback if the refresh has expicitly failed and cannot continue. <!--TODO: examples + clarify if you can rollback when refresh is healthy but paused waiting for resume-refresh -->
+Only trigger a rollback if the refresh has explicitly failed and cannot continue. <!--TODO: examples + clarify if you can rollback when refresh is healthy but paused waiting for resume-refresh -->
 ```
 
 ## Resume refresh
