@@ -15,7 +15,7 @@ For a given release, this table shows:
 
 | Release | PostgreSQL version | Minimum Juju version | [TLS encryption](/how-to/enable-tls) | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/index) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|   |   |   | ![check] | ![check] | ![check] | ![check] | ![check] |
+| [843, 844] | 16.9  | 3.6+  | ![check] | ![check] | ![check] | ![check] | ![check] |
 
 
 ## Architecture and base
@@ -34,6 +34,8 @@ Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info
 
 For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
 
+<!-- LINKS -->
+[843, 844]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
 
 <!--BADGES-->
 [check]: https://img.icons8.com/color/20/checkmark--v1.png
