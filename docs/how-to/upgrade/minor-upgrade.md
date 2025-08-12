@@ -44,7 +44,9 @@ This will ensure minimal service disruption, if any.
 (pre-refresh-check)=
 ## Pre-refresh check
 
-The `pre-refresh-check` action will check that a refresh is possible and will switch the primary, if necessary, for a safe upgrade process. 
+The `pre-refresh-check` action checks that a refresh is possible and will switch the primary, if necessary, for a safe upgrade process.
+
+This check happens automatically when you run `juju refresh`, but we recommend running it manually before scheduling a maintenance window for the refresh operation.
 
 Run a pre-refresh check against the leader unit:
 
