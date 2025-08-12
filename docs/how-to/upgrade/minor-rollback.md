@@ -14,7 +14,7 @@ Only trigger a rollback if the refresh has explicitly failed and cannot continue
 
 ## Initiate rollback
 
-Perform a rollback with the command obtained from the [pre-refresh check](pre-refresh check) that was performed before initiating the refresh process.
+Perform a rollback with the command obtained from the [pre-refresh check](pre-refresh check) that was performed before initiating the refresh process. You can also find it in the [Juju logs](https://documentation.ubuntu.com/juju/3.6/howto/manage-logs/#view-the-log-files).
 
 <!--TODO: example-->
 
