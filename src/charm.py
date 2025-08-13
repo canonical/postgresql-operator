@@ -623,15 +623,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Force a retry if there is no primary or the member that was
             # returned is not in the list of the current cluster members
             # (like when the cluster was not updated yet after a failed switchover).
-            if not primary_endpoint or primary_endpoint not in self._units_ips:
-                # TODO figure out why peer data is not available
-                if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
-                    logger.warning(
-                        "Possibly incomplete peer data: Will not map primary IP to unit IP"
-                    )
-                    return primary_endpoint
-                logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
+            if not primary_endpoint:
+                logger.warning(f"Missing primary IP for {primary}")
                 primary_endpoint = None
+            elif primary_endpoint not in self._units_ips:
+                if len(self._peers.units) == 0:
+                    logger.info(f"The unit didn't join {PEER} relation? Using {primary_endpoint}")
+                elif len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                    logger.warning(f"Possibly incomplete peer data, keep using {primary_endpoint}")
+                else:
+                    logger.debug("Early exit primary_endpoint: Primary IP not in cached peer list")
+                    primary_endpoint = None
         except RetryError:
             return None
         else:
