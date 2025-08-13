@@ -88,7 +88,7 @@ async def test_upgrade_from_edge(ops_test: OpsTest, continuous_writes, charm) ->
     try:
         # Blocked status is expected due to:
         # (on PR) compatibility checks (on PR charm revision is '16/1.25.0+dirty...')
-        # (non-PR) the first unit upgraded and paused (pause_after_unit_refresh=first)
+        # (non-PR) the first unit upgraded and paused (pause-after-unit-refresh=first)
         await ops_test.model.block_until(lambda: application.status == "blocked", timeout=60 * 3)
 
         logger.info("Wait for refresh to block as paused or incompatible")
