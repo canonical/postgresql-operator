@@ -28,9 +28,9 @@ pre-refresh-check:
 force-refresh-start:
   description: |
     Potential of data loss and downtime
-    
+
     Force refresh of first unit
-    
+
     Must run with at least one of the parameters `=false`
   params:
     check-compatibility:
@@ -38,42 +38,42 @@ force-refresh-start:
       default: true
       description: |
         Potential of data loss and downtime
-        
+
         If `false`, force refresh if new version of PostgreSQL and/or charm is not compatible with previous version
     run-pre-refresh-checks:
       type: boolean
       default: true
       description: |
         Potential of data loss and downtime
-        
+
         If `false`, force refresh if app is unhealthy or not ready to refresh (and unit status shows "Pre-refresh check failed")
     check-workload-container:
       type: boolean
       default: true
       description: |
         Potential of data loss and downtime during and after refresh
-        
+
         If `false`, allow refresh to PostgreSQL container version that has not been validated to work with the charm revision
   additionalProperties: false
 resume-refresh:
   description: |
     Refresh next unit(s) (after you have manually verified that refreshed units are healthy)
-    
-    If the `pause_after_unit_refresh` config is set to `all`, this action will refresh the next unit.
-    
-    If `pause_after_unit_refresh` is set to `first`, this action will refresh all remaining units.
+
+    If the `pause-after-unit-refresh` config is set to `all`, this action will refresh the next unit.
+
+    If `pause-after-unit-refresh` is set to `first`, this action will refresh all remaining units.
     Exception: if automatic health checks fail after a unit has refreshed, the refresh will pause.
-    
-    If `pause_after_unit_refresh` is set to `none`, this action will have no effect unless it is called with `check-health-of-refreshed-units` as `false`.
+
+    If `pause-after-unit-refresh` is set to `none`, this action will have no effect unless it is called with `check-health-of-refreshed-units` as `false`.
   params:
     check-health-of-refreshed-units:
       type: boolean
       default: true
       description: |
         Potential of data loss and downtime
-        
+
         If `false`, force refresh (of next unit) if 1 or more refreshed units are unhealthy
-        
+
         Warning: if first unit to refresh is unhealthy, consider running `force-refresh-start` action on that unit instead of using this parameter.
         If first unit to refresh is unhealthy because compatibility checks, pre-refresh checks, or workload container checks are failing, this parameter is more destructive than the `force-refresh-start` action.
   additionalProperties: false
