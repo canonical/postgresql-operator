@@ -213,7 +213,7 @@ class Patroni:
 
     def bootstrap_cluster(self) -> bool:
         """Bootstrap a PostgreSQL cluster using Patroni."""
-        # Render the configuration files and start the cluster.
+        logger.debug("bootstrap_cluster: render the configuration files and start Patroni")
         self.configure_patroni_on_unit()
         return self.start_patroni()
 
@@ -603,7 +603,9 @@ class Patroni:
                         auth=self._patroni_auth,
                     )
                     logger.debug(
-                        "API is_member_isolated: %s (%s)", r["members"], r.elapsed.total_seconds()
+                        "API is_member_isolated: %s (%s)",
+                        r.json()["members"],
+                        r.elapsed.total_seconds(),
                     )
         except RetryError:
             # Return False if it was not possible to get the cluster info. Try again later.
@@ -850,7 +852,7 @@ class Patroni:
 
     def switchover(self, candidate: str | None = None) -> None:
         """Trigger a switchover."""
-        # Try to trigger the switchover.
+        logger.debug("Triggering the switchover to {candidate}")
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 current_primary = self.get_primary()
@@ -1009,6 +1011,7 @@ class Patroni:
 
             # Leader doesn't always trigger when changing it's own peer data.
             if self.charm.unit.is_leader():
+                logger.debug("Emitting peer_relation_changed on leader")
                 self.charm.on[PEER].relation_changed.emit(
                     unit=self.charm.unit,
                     app=self.charm.app,
