@@ -1637,7 +1637,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             snap_password = postgres_snap.get("exporter.password")
         except snap.SnapError:
-            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
+            logger.warning("Early exit: skipping exporter setup (no configuration set)")
             return None
 
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
