@@ -274,7 +274,7 @@ class Patroni:
         if response := self.parallel_patroni_get_request(
             f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
         ):
-            logger.debug("Patroni cluster members: %s", response["members"])
+            logger.debug("API cluster_status: %s", response["members"])
             return response["members"]
         raise RetryError(
             last_attempt=Future.construct(1, Exception("Unable to reach any units"), True)
@@ -462,6 +462,7 @@ class Patroni:
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
                 )
+                logger.debug("API get_patroni_health: %s (%s)", r, r.elapsed.total_seconds())
 
         return r.json()
 
@@ -529,15 +530,20 @@ class Patroni:
                     for members_ip in members_ips:
                         endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
-                        member_status = requests.get(
+                        r = requests.get(
                             f"{url}/{endpoint}",
                             verify=self.verify,
                             auth=self._patroni_auth,
                             timeout=PATRONI_TIMEOUT,
                         )
-                        if member_status.status_code != 200:
+                        logger.debug(
+                            "API is_replication_healthy: %s (%s)",
+                            r,
+                            r.elapsed.total_seconds(),
+                        )
+                        if r.status_code != 200:
                             logger.debug(
-                                f"Failed replication check for {members_ip} with code {member_status.status_code}"
+                                f"Failed replication check for {members_ip} with code {r.status_code}"
                             )
                             raise Exception
         except RetryError:
@@ -590,17 +596,22 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    cluster_status = requests.get(
+                    r = requests.get(
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                         verify=self.verify,
                         timeout=API_REQUEST_TIMEOUT,
                         auth=self._patroni_auth,
                     )
+                    logger.debug(
+                        "API is_member_isolated: %s (%s)",
+                        r.json()["members"],
+                        r.elapsed.total_seconds(),
+                    )
         except RetryError:
             # Return False if it was not possible to get the cluster info. Try again later.
             return False
 
-        return len(cluster_status.json()["members"]) == 0
+        return len(r.json()["members"]) == 0
 
     def online_cluster_members(self) -> list[ClusterMember]:
         """Return list of online cluster members."""
@@ -631,15 +642,21 @@ class Patroni:
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug(
+            "API promote_standby_cluster: %s (%s)",
+            config_response,
+            config_response.elapsed.total_seconds(),
+        )
         if "standby_cluster" not in config_response.json():
             raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"standby_cluster": None},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API promote_standby_cluster patch: %s (%s)", r, r.elapsed.total_seconds())
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 if self.get_primary() is None:
@@ -848,6 +865,7 @@ class Patroni:
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
                 )
+                logger.debug("API switchover: %s (%s)", r, r.elapsed.total_seconds())
 
         # Check whether the switchover was unsuccessful.
         if r.status_code != 200:
@@ -1014,12 +1032,14 @@ class Patroni:
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(
+        logger.debug("Reloading Patroni configuration...")
+        r = requests.post(
             f"{self._patroni_url}/reload",
             verify=self.verify,
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API reload_patroni_configuration: %s (%s)", r, r.elapsed.total_seconds())
 
     def is_patroni_running(self) -> bool:
         """Check if the Patroni service is running."""
@@ -1050,22 +1070,26 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
-        requests.post(
+        logger.debug("Restarting PostgreSQL...")
+        r = requests.post(
             f"{self._patroni_url}/restart",
             verify=self.verify,
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API restart_postgresql: %s (%s)", r, r.elapsed.total_seconds())
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
-        requests.post(
+        logger.debug("Reinitializing PostgreSQL...")
+        r = requests.post(
             f"{self._patroni_url}/reinitialize",
             verify=self.verify,
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API reinitialize_postgresql: %s (%s)", r, r.elapsed.total_seconds())
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def bulk_update_parameters_controller_by_patroni(self, parameters: dict[str, Any]) -> None:
@@ -1073,12 +1097,17 @@ class Patroni:
 
         For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
         """
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"postgresql": {"parameters": parameters}},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
+        )
+        logger.debug(
+            "API bulk_update_parameters_controller_by_patroni: %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
         )
 
     def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
@@ -1095,6 +1124,11 @@ class Patroni:
                     timeout=PATRONI_TIMEOUT,
                     auth=self._patroni_auth,
                 )
+                logger.debug(
+                    "API ensure_slots_controller_by_patroni: %s (%s)",
+                    current_config,
+                    current_config.elapsed.total_seconds(),
+                )
                 if current_config.status_code != 200:
                     raise Exception(
                         f"Failed to get current Patroni config: {current_config.status_code} {current_config.text}"
@@ -1108,12 +1142,17 @@ class Patroni:
                 "plugin": "pgoutput",
                 "type": "logical",
             }
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"slots": slots_patch},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
+        )
+        logger.debug(
+            "API ensure_slots_controller_by_patroni: %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
         )
 
     @property
@@ -1141,6 +1180,9 @@ class Patroni:
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
+                )
+                logger.debug(
+                    "API update_synchronous_node_count: %s (%s)", r, r.elapsed.total_seconds()
                 )
 
                 # Check whether the update was unsuccessful.

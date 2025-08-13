@@ -177,7 +177,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Lowest unit number is last to refresh
         last_unit_to_refresh = sorted(all_units, key=unit_number)[0].replace("/", "-")
         if self._charm._patroni.get_primary() == last_unit_to_refresh:
-            logging.info(
+            logger.info(
                 f"Unit {last_unit_to_refresh} was already primary during pre-refresh check"
             )
         else:
@@ -187,7 +187,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
             else:
-                logging.info(
+                logger.info(
                     f"Switched primary to unit {last_unit_to_refresh} during pre-refresh check"
                 )
 
@@ -628,7 +628,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns an instance of the object used to interact with the database."""
         password = str(self.get_secret(APP_SCOPE, f"{USER}-password"))
         if self._postgresql is None or self._postgresql.primary_host is None:
-            logger.debug("Init class PostgreSQL")
             self._postgresql = PostgreSQL(
                 primary_host=self.primary_endpoint,
                 current_host=self._unit_ip,
@@ -2491,7 +2490,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.error(f"Reload patroni call failed! error: {e!s}")
 
         restart_pending = self._patroni.is_restart_pending()
-        logger.debug(f"Checking if restart pending: {restart_postgresql} or {restart_pending}")
+        logger.debug(
+            f"Checking if restart pending: TLS={restart_postgresql} or API={restart_pending}"
+        )
         restart_postgresql = restart_postgresql or restart_pending
 
         self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
