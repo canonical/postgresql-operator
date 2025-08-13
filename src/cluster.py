@@ -745,7 +745,7 @@ class Patroni:
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers
             else [],
-            peers_ips=self.peers_ips if not no_peers else set(),
+            peers_ips=sorted(self.peers_ips) if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,

@@ -265,8 +265,9 @@ class PostgreSQLAsyncReplication(Object):
             or self.charm.unit_peer_data.get("unit-promoted-cluster-counter")
             == self._get_highest_promoted_cluster_counter_value()
         ) and (peer_members := self.charm._peer_members_ips):
-            logger.debug(f"Partner addresses: {peer_members}")
-            return list(peer_members)
+            sorted_partners = sorted(peer_members)
+            logger.debug(f"Partner addresses: {sorted_partners}")
+            return list(sorted_partners)
 
         logger.debug("Partner addresses: []")
         return []
