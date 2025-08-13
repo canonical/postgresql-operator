@@ -1943,6 +1943,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self._patroni.member_started and self._patroni.is_member_isolated:
             self._patroni.restart_patroni()
+            self._observer.start_observer()
             return
 
         # Update the sync-standby endpoint in the async replication data.
@@ -2072,8 +2073,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.info("PostgreSQL data directory was not empty. Moved pg_wal")
                 return True
             try:
-                self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")
+                self._patroni.restart_patroni()
+                self._observer.start_observer()
                 return True
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
