@@ -271,7 +271,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         config = {
             config_option: value for config_option, value in config.items() if value is not None
         }
-        return self.config_type(**config)
+        return self.config_type(**config)  # type: ignore
 
     def __init__(self, *args):
         super().__init__(*args)
