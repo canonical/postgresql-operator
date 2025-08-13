@@ -115,5 +115,5 @@ When an application charm requests a new user through the relation/integration, 
 
 The operator considers Identity users all those that are automatically created when the LDAP integration is enabled, or in other words, the [GLAuth](https://charmhub.io/glauth-k8s) charm is related/integrated.
 
-When synchronised from the LDAP server, these users do not have any permissions by default, so the LDAP group they belonged to must be mapped to a PostgreSQL pre-defined authorisation role by using the `ldap_map` configuration option.
+When synchronised from the LDAP server, these users do not have any permissions by default, so the LDAP group they belonged to must be mapped to a PostgreSQL pre-defined authorisation role by using the `ldap-map` configuration option.
 

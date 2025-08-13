@@ -8,7 +8,7 @@ Charmed PostgreSQL separates TimescaleDB editions for different [Charmhub tracks
 
 To enable TimescaleDB plugin/extension simply run:
 ```text
-juju config postgresql plugin_timescaledb_enable=true
+juju config postgresql plugin-timescaledb-enable=true
 ```
 The plugin has been enabled on all units once the config-change event finished and all units reports idle:
 ```text
@@ -31,7 +31,7 @@ postgresql/6   active    idle   6        10.189.210.150  5432/tcp
 To disable it explicitly, simply run:
 
 ```text
-juju config postgresql plugin_timescaledb_enable=false
+juju config postgresql plugin-timescaledb-enable=false
 ```
 
 The plugin has been disabled on all units once the config-change event finished and all units reports idle (same example as above).
@@ -47,7 +47,7 @@ postgresql/3*  blocked   idle   3        10.189.210.124  5432/tcp  Cannot disabl
 
 Another option is to reset the manually enabled config option (as it is disabled by default):
 ```text
-juju config postgresql --reset plugin_timescaledb_enable
+juju config postgresql --reset plugin-timescaledb-enable
 ```
 
 ## Test TimescaleDB status:

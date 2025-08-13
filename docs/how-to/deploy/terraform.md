@@ -54,8 +54,8 @@ resource "juju_application" "machine_postgresql" {
   }
 
   config = {
-    plugin_hstore_enable  = true
-    plugin_pg_trgm_enable = true
+    plugin-hstore-enable  = true
+    plugin-pg-trgm-enable = true
   }
 
   units = 1
@@ -121,8 +121,8 @@ Terraform will perform the following actions:
   # juju_application.machine_postgresql will be destroyed
   - resource "juju_application" "machine_postgresql" {
       - config      = {
-          - "plugin_hstore_enable"  = "true"
-          - "plugin_pg_trgm_enable" = "true"
+          - "plugin-hstore-enable"  = "true"
+          - "plugin-pg-trgm-enable" = "true"
         } -> null
       - constraints = "arch=amd64" -> null
       - id          = "my-model:postgresql" -> null

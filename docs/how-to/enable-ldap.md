@@ -110,7 +110,7 @@ juju integrate postgresql:receive-ca-cert send-ca-cert
 To have LDAP users available in PostgreSQL, provide a comma separated list of LDAP groups to already created PostgreSQL authorisation groups. To create those groups before hand, refer to the [Data Integrator charm](https://charmhub.io/data-integrator).
 
 ```text
-juju config postgresql ldap_map="<ldap_group>=<psql_group>"
+juju config postgresql ldap-map="<ldap_group>=<psql_group>"
 ```
 
 ## Disable LDAP
