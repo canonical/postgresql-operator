@@ -10,7 +10,7 @@ The refresh process boils down to:
 Once in the refresh is in progress, the UI will clearly indicate what is happening to each unit, and what actions are required from the user to continue the process or roll back in case of a problem.
 
 ```{seealso}
-* [How to perform a minor rollback](/how-to/upgrade/minor-rollback)
+* [How to perform a minor rollback](/how-to/refresh/minor-rollback)
 * [All Charmed PostgreSQL minor versions](/reference/releases)
 * [](/how-to/back-up-and-restore/create-a-backup)
 * [Developer docs for charm-refresh](https://canonical-charm-refresh.readthedocs-hosted.com/latest/)

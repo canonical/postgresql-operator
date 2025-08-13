@@ -43,8 +43,8 @@ Other deployment scenarios and configurations:
 * [Enable tracing] with Tempo
 * [Enable profiling] with Parca
 
-## Upgrades
-* [How to upgrade]
+## Refresh (upgrade)
+* [How to refresh]
     * [Perform a minor upgrade]
     * [Perform a minor rollback]
 
@@ -101,9 +101,9 @@ This section is for charm developers looking to support PostgreSQL integrations 
 [Enable tracing]: /how-to/monitoring-cos/enable-tracing
 [Enable profiling]: /how-to/monitoring-cos/enable-profiling
 
-[How to upgrade]: /how-to/upgrade/index
-[Perform a minor upgrade]: /how-to/upgrade/minor-upgrade
-[Perform a minor rollback]: /how-to/upgrade/minor-rollback
+[How to upgrade]: /how-to/refresh/index
+[Perform a minor upgrade]: /how-to/refresh/minor-upgrade
+[Perform a minor rollback]: /how-to/refresh/minor-rollback
 
 [Cross-regional async replication]: /how-to/cross-regional-async-replication/index
 [Set up clusters]: /how-to/cross-regional-async-replication/set-up-clusters

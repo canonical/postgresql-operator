@@ -1,4 +1,4 @@
-# Upgrade (refresh)
+# Refresh (upgrade)
 
 A charm **refresh** is any change to the version of a charm, and/or its {term}`workload`. 
 
@@ -11,8 +11,8 @@ This charm **can only be upgraded to a higher version**. It cannot be {term}`dow
 The charm version can only be lowered in the case of an ongoing refresh that needs to {term}`roll back <rollback>` to its {term}`original version` due to a failure.
 
 ```{seealso}
-* [How to perform a minor upgrade](/how-to/upgrade/minor-upgrade)
-* [How to perform a minor rollback](/how-to/upgrade/minor-rollback)
+* [How to perform a minor upgrade](/how-to/refresh/minor-upgrade)
+* [How to perform a minor rollback](/how-to/refresh/minor-rollback)
 ```
 
 ## Supported versions
