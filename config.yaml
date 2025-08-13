@@ -7,37 +7,31 @@ options:
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
     type: string
-    default: "all"
   connection-authentication-timeout:
     description: |
       Sets the maximum allowed time to complete client authentication.
       Allowed values are: from 1 to 600.
     type: int
-    default: 60
   connection-statement-timeout:
     description: |
       Sets the maximum allowed duration of any statement.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 0
   cpu-parallel-leader-participation:
     description: |
       Controls whether Gather and Gather Merge also run subplans.
     type: boolean
-    default: true
   durability-synchronous-commit:
     description: |
       Sets the current transactions synchronization level. This charm allows only the
       “on”, “remote_apply” and “remote_write” values to avoid data loss if the primary
       crashes and there are replicas.
     type: string
-    default: "on"
   durability-wal-keep-size:
     description: |
       Sets the minimum size of the WAL file to be kept for the replication.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 4096
   experimental-max-connections:
     type: int
     description: |
@@ -49,7 +43,6 @@ options:
       Allowed values start with “pg_catalog.” followed by a language name, like
       “pg_catalog.english”.
     type: string
-    default: "pg_catalog.simple"
   instance-max-locks-per-transaction:
     description: |
       Specifies the maximum amount of memory to be used by maintenance operations,
@@ -57,18 +50,15 @@ options:
       If this value is specified without units, it is taken as kilobytes.
       Allowed values are: from 64 to 2147483647.
     type: int
-    default: 64
   instance-password-encryption:
     description: |
       Determines the algorithm to use to encrypt the password.
       Allowed values are: “md5” and “scram-sha-256”.
     type: string
-    default: "scram-sha-256"
   instance-synchronize-seqscans:
     description: |
       Enable synchronized sequential scans.
     type: boolean
-    default: true
   ldap-map:
     description: |
       List of mapped LDAP group names to PostgreSQL group names, separated by commas.
@@ -80,62 +70,52 @@ options:
       The LDAP search filter to match users with.
       Example: (|(uid=$username)(email=$username))
     type: string
-    default: "(uid=$username)"
   logging-client-min-messages:
     description: |
       Sets the message levels that are sent to the client.
       Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
       Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
     type: string
-    default: "notice"
   logging-log-connections:
     description: |
       Logs each successful connection.
     type: boolean
-    default: true
   logging-log-disconnections:
     description: |
       Logs end of a session, including duration.
     type: boolean
-    default: true
   logging-log-lock-waits:
     description: |
       Logs long lock waits.
     type: boolean
-    default: false
   logging-log-min-duration-statement:
     description: |
       Sets the minimum running time (milliseconds) above which statements will be logged.
       Allowed values are: from -1 to 2147483647 (-1 disables logging
       statement durations).
     type: int
-    default: -1
   logging-track-functions:
     description: |
       Collects function-level statistics on database activity.
       Allowed values are one of 'none', 'pl', 'all'.
       Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
     type: string
-    default: "none"
   logical-replication-subscription-request:
     description: |
       Set of databases corresponding to list of tables with schema notation in JSON format, which will be requested from
       publiblisher cluster to subscribe on via logical replication.
       Example: {"<database>": ["<schema>.<table>", ...], ...}
     type: string
-    default: "{}"
   memory-maintenance-work-mem:
     description: |
       Sets the maximum memory (KB) to be used for maintenance operations.
       Allowed values are: from 1024 to 2147483647.
     type: int
-    default: 65536
   memory-max-prepared-transactions:
     description: |
       Sets the maximum number of simultaneously prepared transactions.
       Allowed values are: from 0 to 262143.
     type: int
-    default: 0
   memory-shared-buffers:
     description: |
       Sets the number of shared memory buffers (8 kB) used by the server. This charm allows
@@ -148,248 +128,203 @@ options:
       Sets the maximum number of temporary buffers (8 kB) used by each session.
       Allowed values are: from 100 to 1073741823.
     type: int
-    default: 1024
   memory-work-mem:
     description: |
       Sets the maximum memory (KB) to be used for query workspaces.
       Allowed values are: from 64 to 2147483647.
     type: int
-    default: 4096
   optimizer-constraint-exclusion:
     description: |
       Enables the planner to use constraints to optimize queries.
       Allowed values are: “on”, “off” and “partition”.
     type: string
-    default: "partition"
   optimizer-cpu-index-tuple-cost:
     description: |
       Sets the planner's estimate of the cost of processing each index entry during an index scan.
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 0.005
   optimizer-cpu-operator-cost:
     description: |
       Sets the planner's estimate of the cost of processing each operator or function call.
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 0.0025
   optimizer-cpu-tuple-cost:
     description: |
       Sets the planner's estimate of the cost of processing each tuple (row).
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 0.01
   optimizer-cursor-tuple-fraction:
     description: |
       Sets the planner's estimate of the fraction of a cursor's rows that will be retrieved.
       Allowed values are: from 0 to 1.
     type: float
-    default: 0.1
   optimizer-default-statistics-target:
     description: |
       Sets the default statistics target. Allowed values are: from 1 to 10000.
     type: int
-    default: 100
   optimizer-enable-async-append:
     description: |
       Enables the planner's use of async append plans.
     type: boolean
-    default: true
   optimizer-enable-bitmapscan:
     description: |
       Enables the planner's use of bitmap-scan plans.
     type: boolean
-    default: true
   optimizer-enable-gathermerge:
     description: |
       Enables the planner's use of gather merge plans.
     type: boolean
-    default: true
   optimizer-enable-hashagg:
     description: |
       Enables the planner's use of hashed aggregation plans.
     type: boolean
-    default: true
   optimizer-enable-hashjoin:
     description: |
       Enables the planner's use of hash join plans.
     type: boolean
-    default: true
   optimizer-enable-incremental-sort:
     description: |
       Enables the planner's use of incremental sort steps.
     type: boolean
-    default: true
   optimizer-enable-indexonlyscan:
     description: |
       Enables the planner's use of index-only-scan plans.
     type: boolean
-    default: true
   optimizer-enable-indexscan:
     description: |
       Enables the planner's use of index-scan plans.
     type: boolean
-    default: true
   optimizer-enable-material:
     description: |
       Enables the planner's use of materialization.
     type: boolean
-    default: true
   optimizer-enable-memoize:
     description: |
       Enables the planner's use of memoization.
     type: boolean
-    default: true
   optimizer-enable-mergejoin:
     description: |
       Enables the planner's use of merge join plans.
     type: boolean
-    default: true
   optimizer-enable-nestloop:
     description: |
       Enables the planner's use of nested-loop join plans.
     type: boolean
-    default: true
   optimizer-enable-parallel-append:
     description: |
       Enables the planner's use of parallel append plans.
     type: boolean
-    default: true
   optimizer-enable-parallel-hash:
     description: |
       Enables the planner's use of parallel hash plans.
     type: boolean
-    default: true
   optimizer-enable-partition-pruning:
     description: |
       Enables plan-time and execution-time partition pruning.
     type: boolean
-    default: true
   optimizer-enable-partitionwise-aggregate:
     description: |
       Enables partitionwise aggregation and grouping.
     type: boolean
-    default: false
   optimizer-enable-partitionwise-join:
     description: |
       Enables partitionwise join.
     type: boolean
-    default: false
   optimizer-enable-seqscan:
     description: |
       Enables the planner's use of sequential-scan plans.
     type: boolean
-    default: true
   optimizer-enable-sort:
     description: |
       Enables the planner's use of explicit sort steps.
     type: boolean
-    default: true
   optimizer-enable-tidscan:
     description: |
       Enables the planner's use of TID scan plans.
     type: boolean
-    default: true
   optimizer-from-collapse-limit:
     description: |
       Sets the FROM-list size beyond which subqueries are not collapsed.
       Allowed values are: from 1 to 2147483647.
     type: int
-    default: 8
   optimizer-geqo:
     description: |
       Enables genetic query optimization.
     type: boolean
-    default: true
   optimizer-geqo-effort:
     description: |
       GEQO: effort is used to set the default for other GEQO parameters.
       Allowed values are: from 1 to 10.
     type: int
-    default: 5
   optimizer-geqo-generations:
     description: |
       GEQO: number of iterations of the algorithm.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 0
   optimizer-geqo-pool-size:
     description: |
       GEQO: number of individuals in the population.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 0
   optimizer-geqo-seed:
     description: |
       GEQO: seed for random path selection.
       Allowed values are: from 0 to 1.
     type: float
-    default: 0.0
   optimizer-geqo-selection-bias:
     description: |
       GEQO: selective pressure within the population.
       Allowed values are: from 1.5 to 2.
     type: float
-    default: 2.0
   optimizer-geqo-threshold:
     description: |
       Sets the threshold of FROM items beyond which GEQO is used.
       Allowed values are: from 2 to 2147483647.
     type: int
-    default: 12
   optimizer-jit:
     description: |
       Allow JIT compilation.
     type: boolean
-    default: true
   optimizer-jit-above-cost:
     description: |
       Perform JIT compilation if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 100000.0
   optimizer-jit-inline-above-cost:
     description: |
       Perform JIT inlining if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 500000.0
   optimizer-jit-optimize-above-cost:
     description: |
       Optimize JIT-compiled functions if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
-    default: 500000.0
   optimizer-join-collapse-limit:
     description: |
       Sets the FROM-list size beyond which JOIN constructs are not flattened.
       Allowed values are: from 1 to 2147483647.
     type: int
-    default: 8
   optimizer-min-parallel-index-scan-size:
     description: |
       Sets the minimum amount of index data for a parallel scan.
       Allowed values are: from 0 to 715827882.
     type: int
-    default: 64
   optimizer-min-parallel-table-scan-size:
     description: |
       Sets the minimum amount of table data for a parallel scan.
       Allowed values are: from 0 to 715827882.
     type: int
-    default: 1024
   optimizer-parallel-setup-cost:
     description: |
       Sets the planner's estimate of the cost of starting up worker processes for parallel query.
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 1000.0
   optimizer-parallel-tuple-cost:
     description: |
       Sets the planner's estimate of the cost of passing each tuple (row) from worker to leader backend.
       Allowed values are: from 0 to 1.80E+308.
     type: float
-    default: 0.1
   pause-after-unit-refresh:
     description: |
       Wait for manual confirmation to resume refresh after these units refresh
@@ -397,211 +332,159 @@ options:
     type: string
     default: first
   plugin-address-standardizer-data-us-enable:
-    default: false
     type: boolean
     description: Enable address_standardizer_data_us extension
   plugin-address-standardizer-enable:
-    default: false
     type: boolean
     description: Enable address_standardizer extension
   plugin-audit-enable:
-    default: true
     type: boolean
     description: Enable pgAudit extension
   plugin-bloom-enable:
-    default: false
     type: boolean
     description: Enable bloom extension
   plugin-bool-plperl-enable:
-    default: false
     type: boolean
     description: Enable bool_plperl extension
   plugin-btree-gin-enable:
-    default: false
     type: boolean
     description: Enable btree_gin extension
   plugin-btree-gist-enable:
-    default: false
     type: boolean
     description: Enable btree_gist extension
   plugin-citext-enable:
-    default: false
     type: boolean
     description: Enable citext extension
   plugin-cube-enable:
-    default: false
     type: boolean
     description: Enable cube extension
   plugin-debversion-enable:
-    default: false
     type: boolean
     description: Enable debversion extension
   plugin-dict-int-enable:
-    default: false
     type: boolean
     description: Enable dict_int extension
   plugin-dict-xsyn-enable:
-    default: false
     type: boolean
     description: Enable dict_xsyn extension
   plugin-earthdistance-enable:
-    default: false
     type: boolean
     description: Enable earthdistance extension
   plugin-fuzzystrmatch-enable:
-    default: false
     type: boolean
     description: Enable fuzzystrmatch extension
   plugin-hll-enable:
-    default: false
     type: boolean
     description: Enable hll extension
   plugin-hstore-enable:
-    default: false
     type: boolean
     description: Enable hstore extension
   plugin-hypopg-enable:
-    default: false
     type: boolean
     description: Enable hypopg extension
   plugin-icu-ext-enable:
-    default: false
     type: boolean
     description: Enable icu_ext extension
   plugin-intarray-enable:
-    default: false
     type: boolean
     description: Enable intarray extension
   plugin-ip4r-enable:
-    default: false
     type: boolean
     description: Enable ip4r extension
   plugin-isn-enable:
-    default: false
     type: boolean
     description: Enable isn extension
   plugin-jsonb-plperl-enable:
-    default: false
     type: boolean
     description: Enable jsonb_plperl extension
   plugin-lo-enable:
-    default: false
     type: boolean
     description: Enable lo extension
   plugin-ltree-enable:
-    default: false
     type: boolean
     description: Enable ltree extension
   plugin-old-snapshot-enable:
-    default: false
     type: boolean
     description: Enable old_snapshot extension
   plugin-orafce-enable:
-    default: false
     type: boolean
     description: Enable orafce extension
   plugin-pg-freespacemap-enable:
-    default: false
     type: boolean
     description: Enable pg_freespacemap extension
   plugin-pg-similarity-enable:
-    default: false
     type: boolean
     description: Enable pg_similarity extension
   plugin-pg-trgm-enable:
-    default: false
     type: boolean
     description: Enable pg_trgm extension
   plugin-pg-visibility-enable:
-    default: false
     type: boolean
     description: Enable pg_visibility extension
   plugin-pgrowlocks-enable:
-    default: false
     type: boolean
     description: Enable pgrowlocks extension
   plugin-pgstattuple-enable:
-    default: false
     type: boolean
     description: Enable pgstattuple extension
   plugin-plperl-enable:
-    default: false
     type: boolean
     description: Enable plperl extension
   plugin-plpython3u-enable:
-    default: false
     type: boolean
     description: Enable PL/Python extension
   plugin-pltcl-enable:
-    default: false
     type: boolean
     description: Enable pltcl extension
   plugin-postgis-enable:
-    default: false
     type: boolean
     description: Enable postgis extension
   plugin-postgis-raster-enable:
-    default: false
     type: boolean
     description: Enable postgis_raster extension
   plugin-postgis-tiger-geocoder-enable:
-    default: false
     type: boolean
     description: Enable postgis_tiger_geocoder extension
   plugin-postgis-topology-enable:
-    default: false
     type: boolean
     description: Enable postgis_topology extension
   plugin-prefix-enable:
-    default: false
     type: boolean
     description: Enable prefix extension
   plugin-rdkit-enable:
-    default: false
     type: boolean
     description: Enable rdkit extension
   plugin-seg-enable:
-    default: false
     type: boolean
     description: Enable seg extension
   plugin-spi-enable:
-    default: false
     type: boolean
     description: Enable spi extension
   plugin-tablefunc-enable:
-    default: false
     type: boolean
     description: Enable tablefunc extension
   plugin-tcn-enable:
-    default: false
     type: boolean
     description: Enable tcn extension
   plugin-tds-fdw-enable:
-    default: false
     type: boolean
     description: Enable tds_fdw extension
   plugin-timescaledb-enable:
-    default: false
     type: boolean
     description: Enable timescaledb extension
   plugin-tsm-system-rows-enable:
-    default: false
     type: boolean
     description: Enable tsm_system_rows extension
   plugin-tsm-system-time-enable:
-    default: false
     type: boolean
     description: Enable tsm_system_time extension
   plugin-unaccent-enable:
-    default: false
     type: boolean
     description: Enable unaccent extension
   plugin-uuid-ossp-enable:
-    default: false
     type: boolean
     description: Enable uuid_ossp extension
   plugin-vector-enable:
-    default: false
     type: boolean
     description: Enable pgvector extension
   profile:
@@ -622,31 +505,26 @@ options:
     description: |
       Enable input of NULL elements in arrays.
     type: boolean
-    default: true
   request-backslash-quote:
     description: |
       Sets whether "\'" is allowed in string literals.
       Allowed values are "safe_encoding" and "on" and "off".
       Safe_encoding is allow only if client encoding does not allow ASCII \ within a multibyte character.
     type: string
-    default: "safe_encoding"
   request-date-style:
     description: |
       Sets the display format for date and time values. Allowed formats are explained
       in https://www.postgresql.org/docs/14/runtime-config-client.html#GUC-DATESTYLE.
     type: string
-    default: "ISO, MDY"
   request-deadlock-timeout:
     description: |
       Sets the time to wait on a lock before checking for deadlock.
       Allowed values are: from 1 to 2147483647.
     type: int
-    default: 1000
   request-default-transaction-deferrable:
     description: |
       Sets the default deferrable status of new transactions.
     type: boolean
-    default: false
   request-default-transaction-isolation:
     description: |
       Sets the transaction isolation level of each new transaction.
@@ -657,135 +535,112 @@ options:
       Serializable is all statements of the current transaction can only see rows committed before the first 
       query or data-modification statement was executed in this transaction.
     type: string
-    default: "read committed"
   request-default-transaction-read-only:
     description: |
       Sets the default read-only status of new transactions.
     type: boolean
-    default: false
   request-escape-string-warning:
     description: |
       Warn about backslash escapes in ordinary string literals.
     type: boolean
-    default: true
   request-lock-timeout:
     description: |
       Sets the maximum allowed duration of any wait for a lock.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 0
   request-standard-conforming-strings:
     description: |
       Causes ... strings to treat backslashes literally.
     type: boolean
-    default: true
   request-time-zone:
     description: |
       Sets the time zone for displaying and interpreting time stamps.
       Allowed values are the ones from IANA time zone data, a time zone abbreviation
       like PST and POSIX-style time zone specifications.
     type: string
-    default: "UTC"
   request-track-activity-query-size:
     description: |
       Sets the size reserved for pg_stat_activity.query, in bytes.
       Allowed values are: from 100 to 1048576.
     type: int
-    default: 1024
   request-transform-null-equals:
     description: |
       Treats "expr=NULL" as "expr IS NULL"
     type: boolean
-    default: false
   request-xmlbinary:
     description: |
       Sets how binary values are to be encoded in XML.
       Allowed values are one of 'base64', 'hex'.
     type: string
-    default: "base64"
   request-xmloption:
     description: |
       Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
       Allowed values are one of 'content', 'document'.
     type: string
-    default: "content"
   response-bytea-output:
     description: |
       Sets the output format for bytes.
       Allowed values are: “escape” and “hex”.
     type: string
-    default: "hex"
   response-exit-on-error:
     description: |
       Terminate session on any error.
     type: boolean
-    default: false
   response-extra-float-digits:
     description: |
       Sets the number of digits displayed for floating-point values.
       Allowed values are: from -15 to 3.
     type: int
-    default: 1
   response-gin-fuzzy-search-limit:
     description: |
       Sets the maximum allowed result for exact search by GIN.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 0
   response-lc-monetary:
     description: |
       Sets the locale for formatting monetary amounts.
       Allowed values are the locales available in the unit.
     type: string
-    default: "C"
   response-lc-numeric:
     description: |
       Sets the locale for formatting numbers.
       Allowed values are the locales available in the unit.
     type: string
-    default: "C"
   response-lc-time:
     description: |
       Sets the locale for formatting date and time values.
       Allowed values are the locales available in the unit.
     type: string
-    default: "C"
   session-idle-in-transaction-session-timeout:
     description: |
       Sets the maximum allowed idle time between queries, when in a transaction.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 0
   storage-bgwriter-lru-maxpages:
     description: |
       Background writer maximum number of LRU pages to flush per round.
       Allowed values are: from 0 to 1073741823.
     type: int
-    default: 100
   storage-bgwriter-lru-multiplier:
     description: |
       Multiple of the average buffer usage to free per round.
       Allowed values are: from 0 to 10.
     type: float
-    default: 2.0
   storage-default-table-access-method:
     description: |
       Sets the default table access method for new tables.
       These entries can be created using the CREATE ACCESS METHOD SQL command.
     type: string
-    default: "heap"
   storage-gin-pending-list-limit:
     description: |
       Sets the maximum size of the pending list for GIN index.
       Allowed values are: from 64 to 2147483647.
     type: int
-    default: 4096
   storage-old-snapshot-threshold:
     description: |
       Time before a snapshot is too old to read pages changed after the snapshot was taken.
       Allowed values are: from -1 to 86400.
     type: int
-    default: -1
   system-users:
     type: secret
     description: |
@@ -800,129 +655,108 @@ options:
       deciding whether to trigger a VACUUM. The default, 0.1, means 10% of table size.
       Allowed values are: from 0 to 100.
     type: float
-    default: 0.1
   vacuum-autovacuum-analyze-threshold:
     description: |
       Sets the minimum number of inserted, updated or deleted tuples needed to trigger
       an ANALYZE in any one table. Allowed values are: from 0 to 2147483647.
     type: int
-    default: 50
   vacuum-autovacuum-freeze-max-age:
     description: |
       Maximum age (in transactions) before triggering autovacuum on a table to prevent
       transaction ID wraparound. Allowed values are: from 100000 to 2000000000.
     type: int
-    default: 200000000
   vacuum-autovacuum-naptime:
     description: |
       Time to sleep between autovacuum runs.
       Allowed values are: from 1 to 2147483.
     type: int
-    default: 60
   vacuum-autovacuum-vacuum-cost-delay:
     description: |
       Sets cost delay value (milliseconds) that will be used in automatic VACUUM operations.
       Allowed values are: from -1 to 100 (-1 tells PostgreSQL to use the regular
       vacuum_cost_delay value).
     type: float
-    default: 2.0
   vacuum-autovacuum-vacuum-cost-limit:
     description: |
       Vacuum cost amount available before napping, for autovacuum.
       Allowed values are: from -1 to 10000.
     type: int
-    default: -1
   vacuum-autovacuum-vacuum-insert-scale-factor:
     description: |
       Number of tuple inserts prior to vacuum as a fraction of reltuples.
       Allowed values are: from 0 to 100.
     type: float
-    default: 0.2
   vacuum-autovacuum-vacuum-insert-threshold:
     description: |
       Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.
       Allowed values are: from -1 to 2147483647.
     type: int
-    default: 1000
   vacuum-autovacuum-vacuum-scale-factor:
     description: |
       Specifies a fraction of the table size to add to autovacuum_vacuum_threshold when
       deciding whether to trigger a VACUUM. The default, 0.2, means 20% of table size.
       Allowed values are: from 0 to 100.
     type: float
-    default: 0.2
   vacuum-autovacuum-vacuum-threshold:
     description: |
       Minimum number of tuple updates or deletes prior to vacuum.
       Allowed values are: from 0 to 2147483647.
     type: int
-    default: 50
   vacuum-vacuum-cost-delay:
     description: |
       Vacuum cost delay in milliseconds.
       Allowed values are: from 0 to 100.
     type: float
-    default: 0.0
   vacuum-vacuum-cost-limit:
     description: |
       Vacuum cost amount available before napping.
       Allowed values are: from 1 to 10000.
     type: int
-    default: 200
   vacuum-vacuum-cost-page-dirty:
     description: |
       Vacuum cost for a page dirtied by vacuum.
       Allowed values are: from 0 to 10000.
     type: int
-    default: 20
   vacuum-vacuum-cost-page-hit:
     description: |
       Vacuum cost for a page found in the buffer cache.
       Allowed values are: from 0 to 10000.
     type: int
-    default: 1
   vacuum-vacuum-cost-page-miss:
     description: |
       Vacuum cost for a page not found in the buffer cache.
       Allowed values are: from 0 to 10000.
     type: int
-    default: 2
   vacuum-vacuum-failsafe-age:
     description: |
       Age at which VACUUM should trigger failsafe to avoid a wraparound outage.
       Allowed values are: from 0 to 2100000000.
     type: int
-    default: 1600000000
   vacuum-vacuum-freeze-min-age:
     description: |
       Minimum age at which VACUUM should freeze a table row.
       Allowed values are: from 0 to 1000000000.
     type: int
-    default: 50000000
   vacuum-vacuum-freeze-table-age:
     description: |
       Age (in transactions) at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
-    default: 150000000
   vacuum-vacuum-multixact-failsafe-age:
     description: |
       Multixact age at which VACUUM should trigger failsafe to avoid a wraparound outage.
       Allowed values are: from 0 to 2100000000.
     type: int
-    default: 1600000000
   vacuum-vacuum-multixact-freeze-min-age:
     description: |
       Minimum age at which VACUUM should freeze a MultiXactId in a table row.
       Allowed values are: from 0 to 1000000000.
     type: int
-    default: 5000000
   vacuum-vacuum-multixact-freeze-table-age:
     description: |
       Multixact age at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
-    default: 150000000
 
   # Deprecated options
   synchronous_node_count:
@@ -932,6 +766,7 @@ options:
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
     type: string
+    default: all
   connection_authentication_timeout:
     description: |
       Deprecated: Use connection-authentication-timeout instead.
@@ -939,6 +774,7 @@ options:
       Sets the maximum allowed time to complete client authentication.
       Allowed values are: from 1 to 600.
     type: int
+    default: 60
   connection_statement_timeout:
     description: |
       Deprecated: Use connection-statement-timeout instead.
@@ -946,12 +782,14 @@ options:
       Sets the maximum allowed duration of any statement.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 0
   cpu_parallel_leader_participation:
     description: |
       Deprecated: Use cpu-parallel-leader-participation instead.
 
       Controls whether Gather and Gather Merge also run subplans.
     type: boolean
+    default: true
   durability_synchronous_commit:
     description: |
       Deprecated: Use durability-synchronous-commit instead.
@@ -960,6 +798,7 @@ options:
       “on”, “remote_apply” and “remote_write” values to avoid data loss if the primary
       crashes and there are replicas.
     type: string
+    default: on
   durability_wal_keep_size:
     description: |
       Deprecated: Use durability-wal-keep-size instead.
@@ -967,6 +806,7 @@ options:
       Sets the minimum size of the WAL file to be kept for the replication.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 4096
   experimental_max_connections:
     type: int
     description: |
@@ -982,6 +822,7 @@ options:
       Allowed values start with “pg_catalog.” followed by a language name, like
       “pg_catalog.english”.
     type: string
+    default: pg_catalog.simple
   instance_max_locks_per_transaction:
     description: |
       Deprecated: Use instance-max-locks-per-transaction instead.
@@ -991,6 +832,7 @@ options:
       If this value is specified without units, it is taken as kilobytes.
       Allowed values are: from 64 to 2147483647.
     type: int
+    default: 64
   instance_password_encryption:
     description: |
       Deprecated: Use instance-password-encryption instead.
@@ -998,12 +840,14 @@ options:
       Determines the algorithm to use to encrypt the password.
       Allowed values are: “md5” and “scram-sha-256”.
     type: string
+    default: scram-sha-256
   instance_synchronize_seqscans:
     description: |
       Deprecated: Use instance-synchronize-seqscans instead.
 
       Enable synchronized sequential scans.
     type: boolean
+    default: true
   ldap_map:
     description: |
       Deprecated: Use ldap-map instead.
@@ -1019,6 +863,7 @@ options:
       The LDAP search filter to match users with.
       Example: (|(uid=$username)(email=$username))
     type: string
+    default: (uid=$username)
   logging_client_min_messages:
     description: |
       Deprecated: Use logging-client-min-messages instead.
@@ -1027,24 +872,28 @@ options:
       Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
       Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
     type: string
+    default: notice
   logging_log_connections:
     description: |
       Deprecated: Use logging-log-connections instead.
 
       Logs each successful connection.
     type: boolean
+    default: true
   logging_log_disconnections:
     description: |
       Deprecated: Use logging-log-disconnections instead.
 
       Logs end of a session, including duration.
     type: boolean
+    default: true
   logging_log_lock_waits:
     description: |
       Deprecated: Use logging-log-lock-waits instead.
 
       Logs long lock waits.
     type: boolean
+    default: false
   logging_log_min_duration_statement:
     description: |
       Deprecated: Use logging-log-min-duration-statement instead.
@@ -1053,6 +902,7 @@ options:
       Allowed values are: from -1 to 2147483647 (-1 disables logging
       statement durations).
     type: int
+    default: -1
   logging_track_functions:
     description: |
       Deprecated: Use logging-track-functions instead.
@@ -1061,6 +911,7 @@ options:
       Allowed values are one of 'none', 'pl', 'all'.
       Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
     type: string
+    default: none
   logical_replication_subscription_request:
     description: |
       Deprecated: Use logical-replication-subscription-request instead.
@@ -1069,6 +920,7 @@ options:
       publiblisher cluster to subscribe on via logical replication.
       Example: {"<database>": ["<schema>.<table>", ...], ...}
     type: string
+    default: '{}'
   memory_maintenance_work_mem:
     description: |
       Deprecated: Use memory-maintenance-work-mem instead.
@@ -1076,6 +928,7 @@ options:
       Sets the maximum memory (KB) to be used for maintenance operations.
       Allowed values are: from 1024 to 2147483647.
     type: int
+    default: 65536
   memory_max_prepared_transactions:
     description: |
       Deprecated: Use memory-max-prepared-transactions instead.
@@ -1083,6 +936,7 @@ options:
       Sets the maximum number of simultaneously prepared transactions.
       Allowed values are: from 0 to 262143.
     type: int
+    default: 0
   memory_shared_buffers:
     description: |
       Deprecated: Use memory-shared-buffers instead.
@@ -1099,6 +953,7 @@ options:
       Sets the maximum number of temporary buffers (8 kB) used by each session.
       Allowed values are: from 100 to 1073741823.
     type: int
+    default: 1024
   memory_work_mem:
     description: |
       Deprecated: Use memory-work-mem instead.
@@ -1106,6 +961,7 @@ options:
       Sets the maximum memory (KB) to be used for query workspaces.
       Allowed values are: from 64 to 2147483647.
     type: int
+    default: 4096
   optimizer_constraint_exclusion:
     description: |
       Deprecated: Use optimizer-constraint-exclusion instead.
@@ -1113,6 +969,7 @@ options:
       Enables the planner to use constraints to optimize queries.
       Allowed values are: “on”, “off” and “partition”.
     type: string
+    default: partition
   optimizer_cpu_index_tuple_cost:
     description: |
       Deprecated: Use optimizer-cpu-index-tuple-cost instead.
@@ -1120,6 +977,7 @@ options:
       Sets the planner's estimate of the cost of processing each index entry during an index scan.
       Allowed values are: from 0 to 1.80E+308.
     type: float
+    default: 0.005
   optimizer_cpu_operator_cost:
     description: |
       Deprecated: Use optimizer-cpu-operator-cost instead.
@@ -1127,6 +985,7 @@ options:
       Sets the planner's estimate of the cost of processing each operator or function call.
       Allowed values are: from 0 to 1.80E+308.
     type: float
+    default: 0.0025
   optimizer_cpu_tuple_cost:
     description: |
       Deprecated: Use optimizer-cpu-tuple-cost instead.
@@ -1134,6 +993,7 @@ options:
       Sets the planner's estimate of the cost of processing each tuple (row).
       Allowed values are: from 0 to 1.80E+308.
     type: float
+    default: 0.01
   optimizer_cursor_tuple_fraction:
     description: |
       Deprecated: Use optimizer-cursor-tuple-fraction instead.
@@ -1141,132 +1001,154 @@ options:
       Sets the planner's estimate of the fraction of a cursor's rows that will be retrieved.
       Allowed values are: from 0 to 1.
     type: float
+    default: 0.1
   optimizer_default_statistics_target:
     description: |
       Deprecated: Use optimizer-default-statistics-target instead.
 
       Sets the default statistics target. Allowed values are: from 1 to 10000.
     type: int
+    default: 100
   optimizer_enable_async_append:
     description: |
       Deprecated: Use optimizer-enable-async-append instead.
 
       Enables the planner's use of async append plans.
     type: boolean
+    default: true
   optimizer_enable_bitmapscan:
     description: |
       Deprecated: Use optimizer-enable-bitmapscan instead.
 
       Enables the planner's use of bitmap-scan plans.
     type: boolean
+    default: true
   optimizer_enable_gathermerge:
     description: |
       Deprecated: Use optimizer-enable-gathermerge instead.
 
       Enables the planner's use of gather merge plans.
     type: boolean
+    default: true
   optimizer_enable_hashagg:
     description: |
       Deprecated: Use optimizer-enable-hashagg instead.
 
       Enables the planner's use of hashed aggregation plans.
     type: boolean
+    default: true
   optimizer_enable_hashjoin:
     description: |
       Deprecated: Use optimizer-enable-hashjoin instead.
 
       Enables the planner's use of hash join plans.
     type: boolean
+    default: true
   optimizer_enable_incremental_sort:
     description: |
       Deprecated: Use optimizer-enable-incremental-sort instead.
 
       Enables the planner's use of incremental sort steps.
     type: boolean
+    default: true
   optimizer_enable_indexonlyscan:
     description: |
       Deprecated: Use optimizer-enable-indexonlyscan instead.
 
       Enables the planner's use of index-only-scan plans.
     type: boolean
+    default: true
   optimizer_enable_indexscan:
     description: |
       Deprecated: Use optimizer-enable-indexscan instead.
 
       Enables the planner's use of index-scan plans.
     type: boolean
+    default: true
   optimizer_enable_material:
     description: |
       Deprecated: Use optimizer-enable-material instead.
 
       Enables the planner's use of materialization.
     type: boolean
+    default: true
   optimizer_enable_memoize:
     description: |
       Deprecated: Use optimizer-enable-memoize instead.
 
       Enables the planner's use of memoization.
     type: boolean
+    default: true
   optimizer_enable_mergejoin:
     description: |
       Deprecated: Use optimizer-enable-mergejoin instead.
 
       Enables the planner's use of merge join plans.
     type: boolean
+    default: true
   optimizer_enable_nestloop:
     description: |
       Deprecated: Use optimizer-enable-nestloop instead.
 
       Enables the planner's use of nested-loop join plans.
     type: boolean
+    default: true
   optimizer_enable_parallel_append:
     description: |
       Deprecated: Use optimizer-enable-parallel-append instead.
 
       Enables the planner's use of parallel append plans.
     type: boolean
+    default: true
   optimizer_enable_parallel_hash:
     description: |
       Deprecated: Use optimizer-enable-parallel-hash instead.
 
       Enables the planner's use of parallel hash plans.
     type: boolean
+    default: true
   optimizer_enable_partition_pruning:
     description: |
       Deprecated: Use optimizer-enable-partition-pruning instead.
 
       Enables plan-time and execution-time partition pruning.
     type: boolean
+    default: true
   optimizer_enable_partitionwise_aggregate:
     description: |
       Deprecated: Use optimizer-enable-partitionwise-aggregate instead.
 
       Enables partitionwise aggregation and grouping.
     type: boolean
+    default: false
   optimizer_enable_partitionwise_join:
     description: |
       Deprecated: Use optimizer-enable-partitionwise-join instead.
 
       Enables partitionwise join.
     type: boolean
+    default: false
   optimizer_enable_seqscan:
     description: |
       Deprecated: Use optimizer-enable-seqscan instead.
 
       Enables the planner's use of sequential-scan plans.
     type: boolean
+    default: true
   optimizer_enable_sort:
     description: |
       Deprecated: Use optimizer-enable-sort instead.
 
       Enables the planner's use of explicit sort steps.
     type: boolean
+    default: true
   optimizer_enable_tidscan:
     description: |
       Deprecated: Use optimizer-enable-tidscan instead.
 
       Enables the planner's use of TID scan plans.
     type: boolean
+    default: true
   optimizer_from_collapse_limit:
     description: |
       Deprecated: Use optimizer-from-collapse-limit instead.
@@ -1274,12 +1156,14 @@ options:
       Sets the FROM-list size beyond which subqueries are not collapsed.
       Allowed values are: from 1 to 2147483647.
     type: int
+    default: 8
   optimizer_geqo:
     description: |
       Deprecated: Use optimizer-geqo instead.
 
       Enables genetic query optimization.
     type: boolean
+    default: true
   optimizer_geqo_effort:
     description: |
       Deprecated: Use optimizer-geqo-effort instead.
@@ -1287,6 +1171,7 @@ options:
       GEQO: effort is used to set the default for other GEQO parameters.
       Allowed values are: from 1 to 10.
     type: int
+    default: 5
   optimizer_geqo_generations:
     description: |
       Deprecated: Use optimizer-geqo-generations instead.
@@ -1294,6 +1179,7 @@ options:
       GEQO: number of iterations of the algorithm.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 0
   optimizer_geqo_pool_size:
     description: |
       Deprecated: Use optimizer-geqo-pool-size instead.
@@ -1301,6 +1187,7 @@ options:
       GEQO: number of individuals in the population.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 0
   optimizer_geqo_seed:
     description: |
       Deprecated: Use optimizer-geqo-seed instead.
@@ -1308,6 +1195,7 @@ options:
       GEQO: seed for random path selection.
       Allowed values are: from 0 to 1.
     type: float
+    default: 0.0
   optimizer_geqo_selection_bias:
     description: |
       Deprecated: Use optimizer-geqo-selection-bias instead.
@@ -1315,6 +1203,7 @@ options:
       GEQO: selective pressure within the population.
       Allowed values are: from 1.5 to 2.
     type: float
+    default: 2.0
   optimizer_geqo_threshold:
     description: |
       Deprecated: Use optimizer-geqo-threshold instead.
@@ -1322,12 +1211,14 @@ options:
       Sets the threshold of FROM items beyond which GEQO is used.
       Allowed values are: from 2 to 2147483647.
     type: int
+    default: 12
   optimizer_jit:
     description: |
       Deprecated: Use optimizer-jit instead.
 
       Allow JIT compilation.
     type: boolean
+    default: true
   optimizer_jit_above_cost:
     description: |
       Deprecated: Use optimizer-jit-above-cost instead.
@@ -1335,6 +1226,7 @@ options:
       Perform JIT compilation if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
+    default: 100000.0
   optimizer_jit_inline_above_cost:
     description: |
       Deprecated: Use optimizer-jit-inline-above-cost instead.
@@ -1342,6 +1234,7 @@ options:
       Perform JIT inlining if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
+    default: 500000.0
   optimizer_jit_optimize_above_cost:
     description: |
       Deprecated: Use optimizer-jit-optimize-above-cost instead.
@@ -1349,6 +1242,7 @@ options:
       Optimize JIT-compiled functions if query is more expensive.
       Allowed values are: from -1 to 1.80E+308.
     type: float
+    default: 500000.0
   optimizer_join_collapse_limit:
     description: |
       Deprecated: Use optimizer-join-collapse-limit instead.
@@ -1356,6 +1250,7 @@ options:
       Sets the FROM-list size beyond which JOIN constructs are not flattened.
       Allowed values are: from 1 to 2147483647.
     type: int
+    default: 8
   optimizer_min_parallel_index_scan_size:
     description: |
       Deprecated: Use optimizer-min-parallel-index-scan-size instead.
@@ -1363,6 +1258,7 @@ options:
       Sets the minimum amount of index data for a parallel scan.
       Allowed values are: from 0 to 715827882.
     type: int
+    default: 64
   optimizer_min_parallel_table_scan_size:
     description: |
       Deprecated: Use optimizer-min-parallel-table-scan-size instead.
@@ -1370,6 +1266,7 @@ options:
       Sets the minimum amount of table data for a parallel scan.
       Allowed values are: from 0 to 715827882.
     type: int
+    default: 1024
   optimizer_parallel_setup_cost:
     description: |
       Deprecated: Use optimizer-parallel-setup-cost instead.
@@ -1377,6 +1274,7 @@ options:
       Sets the planner's estimate of the cost of starting up worker processes for parallel query.
       Allowed values are: from 0 to 1.80E+308.
     type: float
+    default: 1000.0
   optimizer_parallel_tuple_cost:
     description: |
       Deprecated: Use optimizer-parallel-tuple-cost instead.
@@ -1384,313 +1282,366 @@ options:
       Sets the planner's estimate of the cost of passing each tuple (row) from worker to leader backend.
       Allowed values are: from 0 to 1.80E+308.
     type: float
+    default: 0.1
   plugin_address_standardizer_data_us_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-address-standardizer-data-us-enable instead.
 
       Enable address_standardizer_data_us extension
   plugin_address_standardizer_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-address-standardizer-enable instead.
 
       Enable address_standardizer extension
   plugin_audit_enable:
+    default: true
     type: boolean
     description: |
       Deprecated: Use plugin-audit-enable instead.
 
       Enable pgAudit extension
   plugin_bloom_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-bloom-enable instead.
 
       Enable bloom extension
   plugin_bool_plperl_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-bool-plperl-enable instead.
 
       Enable bool_plperl extension
   plugin_btree_gin_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-btree-gin-enable instead.
 
       Enable btree_gin extension
   plugin_btree_gist_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-btree-gist-enable instead.
 
       Enable btree_gist extension
   plugin_citext_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-citext-enable instead.
 
       Enable citext extension
   plugin_cube_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-cube-enable instead.
 
       Enable cube extension
   plugin_debversion_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-debversion-enable instead.
 
       Enable debversion extension
   plugin_dict_int_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-dict-int-enable instead.
 
       Enable dict_int extension
   plugin_dict_xsyn_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-dict-xsyn-enable instead.
 
       Enable dict_xsyn extension
   plugin_earthdistance_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-earthdistance-enable instead.
 
       Enable earthdistance extension
   plugin_fuzzystrmatch_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-fuzzystrmatch-enable instead.
 
       Enable fuzzystrmatch extension
   plugin_hll_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-hll-enable instead.
 
       Enable hll extension
   plugin_hstore_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-hstore-enable instead.
 
       Enable hstore extension
   plugin_hypopg_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-hypopg-enable instead.
 
       Enable hypopg extension
   plugin_icu_ext_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-icu-ext-enable instead.
 
       Enable icu_ext extension
   plugin_intarray_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-intarray-enable instead.
 
       Enable intarray extension
   plugin_ip4r_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-ip4r-enable instead.
 
       Enable ip4r extension
   plugin_isn_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-isn-enable instead.
 
       Enable isn extension
   plugin_jsonb_plperl_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-jsonb-plperl-enable instead.
 
       Enable jsonb_plperl extension
   plugin_lo_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-lo-enable instead.
 
       Enable lo extension
   plugin_ltree_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-ltree-enable instead.
 
       Enable ltree extension
   plugin_old_snapshot_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-old-snapshot-enable instead.
 
       Enable old_snapshot extension
   plugin_orafce_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-orafce-enable instead.
 
       Enable orafce extension
   plugin_pg_freespacemap_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pg-freespacemap-enable instead.
 
       Enable pg_freespacemap extension
   plugin_pg_similarity_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pg-similarity-enable instead.
 
       Enable pg_similarity extension
   plugin_pg_trgm_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pg-trgm-enable instead.
 
       Enable pg_trgm extension
   plugin_pg_visibility_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pg-visibility-enable instead.
 
       Enable pg_visibility extension
   plugin_pgrowlocks_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pgrowlocks-enable instead.
 
       Enable pgrowlocks extension
   plugin_pgstattuple_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pgstattuple-enable instead.
 
       Enable pgstattuple extension
   plugin_plperl_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-plperl-enable instead.
 
       Enable plperl extension
   plugin_plpython3u_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-plpython3u-enable instead.
 
       Enable PL/Python extension
   plugin_pltcl_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-pltcl-enable instead.
 
       Enable pltcl extension
   plugin_postgis_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-postgis-enable instead.
 
       Enable postgis extension
   plugin_postgis_raster_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-postgis-raster-enable instead.
 
       Enable postgis_raster extension
   plugin_postgis_tiger_geocoder_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-postgis-tiger-geocoder-enable instead.
 
       Enable postgis_tiger_geocoder extension
   plugin_postgis_topology_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-postgis-topology-enable instead.
 
       Enable postgis_topology extension
   plugin_prefix_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-prefix-enable instead.
 
       Enable prefix extension
   plugin_rdkit_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-rdkit-enable instead.
 
       Enable rdkit extension
   plugin_seg_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-seg-enable instead.
 
       Enable seg extension
   plugin_spi_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-spi-enable instead.
 
       Enable spi extension
   plugin_tablefunc_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-tablefunc-enable instead.
 
       Enable tablefunc extension
   plugin_tcn_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-tcn-enable instead.
 
       Enable tcn extension
   plugin_tds_fdw_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-tds-fdw-enable instead.
 
       Enable tds_fdw extension
   plugin_timescaledb_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-timescaledb-enable instead.
 
       Enable timescaledb extension
   plugin_tsm_system_rows_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-tsm-system-rows-enable instead.
 
       Enable tsm_system_rows extension
   plugin_tsm_system_time_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-tsm-system-time-enable instead.
 
       Enable tsm_system_time extension
   plugin_unaccent_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-unaccent-enable instead.
 
       Enable unaccent extension
   plugin_uuid_ossp_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-uuid-ossp-enable instead.
 
       Enable uuid_ossp extension
   plugin_vector_enable:
+    default: false
     type: boolean
     description: |
       Deprecated: Use plugin-vector-enable instead.
@@ -1710,6 +1661,7 @@ options:
 
       Enable input of NULL elements in arrays.
     type: boolean
+    default: true
   request_backslash_quote:
     description: |
       Deprecated: Use request-backslash-quote instead.
@@ -1718,6 +1670,7 @@ options:
       Allowed values are "safe_encoding" and "on" and "off".
       Safe_encoding is allow only if client encoding does not allow ASCII \ within a multibyte character.
     type: string
+    default: safe_encoding
   request_date_style:
     description: |
       Deprecated: Use request-date-style instead.
@@ -1725,6 +1678,7 @@ options:
       Sets the display format for date and time values. Allowed formats are explained
       in https://www.postgresql.org/docs/14/runtime-config-client.html#GUC-DATESTYLE.
     type: string
+    default: ISO, MDY
   request_deadlock_timeout:
     description: |
       Deprecated: Use request-deadlock-timeout instead.
@@ -1732,12 +1686,14 @@ options:
       Sets the time to wait on a lock before checking for deadlock.
       Allowed values are: from 1 to 2147483647.
     type: int
+    default: 1000
   request_default_transaction_deferrable:
     description: |
       Deprecated: Use request-default-transaction-deferrable instead.
 
       Sets the default deferrable status of new transactions.
     type: boolean
+    default: false
   request_default_transaction_isolation:
     description: |
       Deprecated: Use request-default-transaction-isolation instead.
@@ -1750,18 +1706,21 @@ options:
       Serializable is all statements of the current transaction can only see rows committed before the first 
       query or data-modification statement was executed in this transaction.
     type: string
+    default: read committed
   request_default_transaction_read_only:
     description: |
       Deprecated: Use request-default-transaction-read-only instead.
 
       Sets the default read-only status of new transactions.
     type: boolean
+    default: false
   request_escape_string_warning:
     description: |
       Deprecated: Use request-escape-string-warning instead.
 
       Warn about backslash escapes in ordinary string literals.
     type: boolean
+    default: true
   request_lock_timeout:
     description: |
       Deprecated: Use request-lock-timeout instead.
@@ -1769,12 +1728,14 @@ options:
       Sets the maximum allowed duration of any wait for a lock.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 0
   request_standard_conforming_strings:
     description: |
       Deprecated: Use request-standard-conforming-strings instead.
 
       Causes ... strings to treat backslashes literally.
     type: boolean
+    default: true
   request_time_zone:
     description: |
       Deprecated: Use request-time-zone instead.
@@ -1783,6 +1744,7 @@ options:
       Allowed values are the ones from IANA time zone data, a time zone abbreviation
       like PST and POSIX-style time zone specifications.
     type: string
+    default: UTC
   request_track_activity_query_size:
     description: |
       Deprecated: Use request-track-activity-query-size instead.
@@ -1790,12 +1752,14 @@ options:
       Sets the size reserved for pg_stat_activity.query, in bytes.
       Allowed values are: from 100 to 1048576.
     type: int
+    default: 1024
   request_transform_null_equals:
     description: |
       Deprecated: Use request-transform-null-equals instead.
 
       Treats "expr=NULL" as "expr IS NULL"
     type: boolean
+    default: false
   request_xmlbinary:
     description: |
       Deprecated: Use request-xmlbinary instead.
@@ -1803,6 +1767,7 @@ options:
       Sets how binary values are to be encoded in XML.
       Allowed values are one of 'base64', 'hex'.
     type: string
+    default: base64
   request_xmloption:
     description: |
       Deprecated: Use request-xmloption instead.
@@ -1810,6 +1775,7 @@ options:
       Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
       Allowed values are one of 'content', 'document'.
     type: string
+    default: content
   response_bytea_output:
     description: |
       Deprecated: Use response-bytea-output instead.
@@ -1817,12 +1783,14 @@ options:
       Sets the output format for bytes.
       Allowed values are: “escape” and “hex”.
     type: string
+    default: hex
   response_exit_on_error:
     description: |
       Deprecated: Use response-exit-on-error instead.
 
       Terminate session on any error.
     type: boolean
+    default: false
   response_extra_float_digits:
     description: |
       Deprecated: Use response-extra-float-digits instead.
@@ -1830,6 +1798,7 @@ options:
       Sets the number of digits displayed for floating-point values.
       Allowed values are: from -15 to 3.
     type: int
+    default: 1
   response_gin_fuzzy_search_limit:
     description: |
       Deprecated: Use response-gin-fuzzy-search-limit instead.
@@ -1837,6 +1806,7 @@ options:
       Sets the maximum allowed result for exact search by GIN.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 0
   response_lc_monetary:
     description: |
       Deprecated: Use response-lc-monetary instead.
@@ -1844,6 +1814,7 @@ options:
       Sets the locale for formatting monetary amounts.
       Allowed values are the locales available in the unit.
     type: string
+    default: C
   response_lc_numeric:
     description: |
       Deprecated: Use response-lc-numeric instead.
@@ -1851,6 +1822,7 @@ options:
       Sets the locale for formatting numbers.
       Allowed values are the locales available in the unit.
     type: string
+    default: C
   response_lc_time:
     description: |
       Deprecated: Use response-lc-time instead.
@@ -1858,6 +1830,7 @@ options:
       Sets the locale for formatting date and time values.
       Allowed values are the locales available in the unit.
     type: string
+    default: C
   session_idle_in_transaction_session_timeout:
     description: |
       Deprecated: Use session-idle-in-transaction-session-timeout instead.
@@ -1865,6 +1838,7 @@ options:
       Sets the maximum allowed idle time between queries, when in a transaction.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 0
   storage_bgwriter_lru_maxpages:
     description: |
       Deprecated: Use storage-bgwriter-lru-maxpages instead.
@@ -1872,6 +1846,7 @@ options:
       Background writer maximum number of LRU pages to flush per round.
       Allowed values are: from 0 to 1073741823.
     type: int
+    default: 100
   storage_bgwriter_lru_multiplier:
     description: |
       Deprecated: Use storage-bgwriter-lru-multiplier instead.
@@ -1879,6 +1854,7 @@ options:
       Multiple of the average buffer usage to free per round.
       Allowed values are: from 0 to 10.
     type: float
+    default: 2.0
   storage_default_table_access_method:
     description: |
       Deprecated: Use storage-default-table-access-method instead.
@@ -1886,6 +1862,7 @@ options:
       Sets the default table access method for new tables.
       These entries can be created using the CREATE ACCESS METHOD SQL command.
     type: string
+    default: heap
   storage_gin_pending_list_limit:
     description: |
       Deprecated: Use storage-gin-pending-list-limit instead.
@@ -1893,6 +1870,7 @@ options:
       Sets the maximum size of the pending list for GIN index.
       Allowed values are: from 64 to 2147483647.
     type: int
+    default: 4096
   storage_old_snapshot_threshold:
     description: |
       Deprecated: Use storage-old-snapshot-threshold instead.
@@ -1900,6 +1878,7 @@ options:
       Time before a snapshot is too old to read pages changed after the snapshot was taken.
       Allowed values are: from -1 to 86400.
     type: int
+    default: -1
   vacuum_autovacuum_analyze_scale_factor:
     description: |
       Deprecated: Use vacuum-autovacuum-analyze-scale-factor instead.
@@ -1908,6 +1887,7 @@ options:
       deciding whether to trigger a VACUUM. The default, 0.1, means 10% of table size.
       Allowed values are: from 0 to 100.
     type: float
+    default: 0.1
   vacuum_autovacuum_analyze_threshold:
     description: |
       Deprecated: Use vacuum-autovacuum-analyze-threshold instead.
@@ -1915,6 +1895,7 @@ options:
       Sets the minimum number of inserted, updated or deleted tuples needed to trigger
       an ANALYZE in any one table. Allowed values are: from 0 to 2147483647.
     type: int
+    default: 50
   vacuum_autovacuum_freeze_max_age:
     description: |
       Deprecated: Use vacuum-autovacuum-freeze-max-age instead.
@@ -1922,6 +1903,7 @@ options:
       Maximum age (in transactions) before triggering autovacuum on a table to prevent
       transaction ID wraparound. Allowed values are: from 100000 to 2000000000.
     type: int
+    default: 200000000
   vacuum_autovacuum_naptime:
     description: |
       Deprecated: Use vacuum-autovacuum-naptime instead.
@@ -1929,6 +1911,7 @@ options:
       Time to sleep between autovacuum runs.
       Allowed values are: from 1 to 2147483.
     type: int
+    default: 60
   vacuum_autovacuum_vacuum_cost_delay:
     description: |
       Deprecated: Use vacuum-autovacuum-vacuum-cost-delay instead.
@@ -1937,6 +1920,7 @@ options:
       Allowed values are: from -1 to 100 (-1 tells PostgreSQL to use the regular
       vacuum_cost_delay value).
     type: float
+    default: 2.0
   vacuum_autovacuum_vacuum_cost_limit:
     description: |
       Deprecated: Use vacuum-autovacuum-vacuum-cost-limit instead.
@@ -1944,6 +1928,7 @@ options:
       Vacuum cost amount available before napping, for autovacuum.
       Allowed values are: from -1 to 10000.
     type: int
+    default: -1
   vacuum_autovacuum_vacuum_insert_scale_factor:
     description: |
       Deprecated: Use vacuum-autovacuum-vacuum-insert-scale-factor instead.
@@ -1951,6 +1936,7 @@ options:
       Number of tuple inserts prior to vacuum as a fraction of reltuples.
       Allowed values are: from 0 to 100.
     type: float
+    default: 0.2
   vacuum_autovacuum_vacuum_insert_threshold:
     description: |
       Deprecated: Use vacuum-autovacuum-vacuum-insert-threshold instead.
@@ -1958,6 +1944,7 @@ options:
       Minimum number of tuple inserts prior to vacuum, or -1 to disable insert vacuums.
       Allowed values are: from -1 to 2147483647.
     type: int
+    default: 1000
   vacuum_autovacuum_vacuum_scale_factor:
     description: |
       Deprecated: Use vacuum-autovacuum-vacuum-scale-factor instead.
@@ -1966,6 +1953,7 @@ options:
       deciding whether to trigger a VACUUM. The default, 0.2, means 20% of table size.
       Allowed values are: from 0 to 100.
     type: float
+    default: 0.2
   vacuum_autovacuum_vacuum_threshold:
     description: |
       Deprecated: Use vacuum-autovacuum-vacuum-threshold instead.
@@ -1973,6 +1961,7 @@ options:
       Minimum number of tuple updates or deletes prior to vacuum.
       Allowed values are: from 0 to 2147483647.
     type: int
+    default: 50
   vacuum_vacuum_cost_delay:
     description: |
       Deprecated: Use vacuum-vacuum-cost-delay instead.
@@ -1980,6 +1969,7 @@ options:
       Vacuum cost delay in milliseconds.
       Allowed values are: from 0 to 100.
     type: float
+    default: 0.0
   vacuum_vacuum_cost_limit:
     description: |
       Deprecated: Use vacuum-vacuum-cost-limit instead.
@@ -1987,6 +1977,7 @@ options:
       Vacuum cost amount available before napping.
       Allowed values are: from 1 to 10000.
     type: int
+    default: 200
   vacuum_vacuum_cost_page_dirty:
     description: |
       Deprecated: Use vacuum-vacuum-cost-page-dirty instead.
@@ -1994,6 +1985,7 @@ options:
       Vacuum cost for a page dirtied by vacuum.
       Allowed values are: from 0 to 10000.
     type: int
+    default: 20
   vacuum_vacuum_cost_page_hit:
     description: |
       Deprecated: Use vacuum-vacuum-cost-page-hit instead.
@@ -2001,6 +1993,7 @@ options:
       Vacuum cost for a page found in the buffer cache.
       Allowed values are: from 0 to 10000.
     type: int
+    default: 1
   vacuum_vacuum_cost_page_miss:
     description: |
       Deprecated: Use vacuum-vacuum-cost-page-miss instead.
@@ -2008,6 +2001,7 @@ options:
       Vacuum cost for a page not found in the buffer cache.
       Allowed values are: from 0 to 10000.
     type: int
+    default: 2
   vacuum_vacuum_failsafe_age:
     description: |
       Deprecated: Use vacuum-vacuum-failsafe-age instead.
@@ -2015,6 +2009,7 @@ options:
       Age at which VACUUM should trigger failsafe to avoid a wraparound outage.
       Allowed values are: from 0 to 2100000000.
     type: int
+    default: 1600000000
   vacuum_vacuum_freeze_min_age:
     description: |
       Deprecated: Use vacuum-vacuum-freeze-min-age instead.
@@ -2022,6 +2017,7 @@ options:
       Minimum age at which VACUUM should freeze a table row.
       Allowed values are: from 0 to 1000000000.
     type: int
+    default: 50000000
   vacuum_vacuum_freeze_table_age:
     description: |
       Deprecated: Use vacuum-vacuum-freeze-table-age instead.
@@ -2029,6 +2025,7 @@ options:
       Age (in transactions) at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
+    default: 150000000
   vacuum_vacuum_multixact_failsafe_age:
     description: |
       Deprecated: Use vacuum-vacuum-multixact-failsafe-age instead.
@@ -2036,6 +2033,7 @@ options:
       Multixact age at which VACUUM should trigger failsafe to avoid a wraparound outage.
       Allowed values are: from 0 to 2100000000.
     type: int
+    default: 1600000000
   vacuum_vacuum_multixact_freeze_min_age:
     description: |
       Deprecated: Use vacuum-vacuum-multixact-freeze-min-age instead.
@@ -2043,6 +2041,7 @@ options:
       Minimum age at which VACUUM should freeze a MultiXactId in a table row.
       Allowed values are: from 0 to 1000000000.
     type: int
+    default: 5000000
   vacuum_vacuum_multixact_freeze_table_age:
     description: |
       Deprecated: Use vacuum-vacuum-multixact-freeze-table-age instead.
@@ -2050,3 +2049,4 @@ options:
       Multixact age at which VACUUM should scan whole table to freeze tuples.
       Allowed values are: from 0 to 2000000000.
     type: int
+    default: 150000000
