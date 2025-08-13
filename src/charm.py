@@ -2090,11 +2090,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     danger_state = " (read-only)"
                 elif len(self._patroni.get_running_cluster_members()) < self.app.planned_units():
                     danger_state = " (degraded)"
-                self.set_unit_status(
-                    ActiveStatus(
-                        f"{'Standby' if self.is_standby_leader else 'Primary'}{danger_state}"
-                    )
-                )
+                unit_status = "Standby" if self.is_standby_leader else "Primary"
+                unit_status = unit_status + danger_state
+                self.set_unit_status(ActiveStatus(f"{unit_status}"))
             elif self._patroni.member_started:
                 self.set_unit_status(ActiveStatus())
         except (RetryError, ConnectionError) as e:
