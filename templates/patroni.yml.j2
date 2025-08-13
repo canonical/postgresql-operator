@@ -181,13 +181,13 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_admin 0.0.0.0/0 scram-sha-256
     - {{ 'hostssl' if enable_tls else 'host' }} all +charmed_databases_owner 0.0.0.0/0 scram-sha-256
     {%- if not connectivity %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} all all {{ self_ip }} {{ instance_password_encryption }}
     - {{ 'hostssl' if enable_tls else 'host' }} all all 0.0.0.0/0 reject
     {%- elif enable_ldap %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +identity_access 0.0.0.0/0 ldap {{ ldap_parameters }}
-    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 {{ instance_password_encryption }}
     {%-   for user, databases in user_databases_map.items() %}
-    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 {{ instance_password_encryption }}
     {%-   endfor %}
     {%- else %}
     - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
@@ -195,7 +195,7 @@ postgresql:
     {%-     if 'pgbouncer_auth_relation_' in user %}
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
     {%-     else %}
-    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 {{ instance_password_encryption }}
     {%-     endif %}
     {%-   endfor %}
     {%- endif %}
@@ -205,7 +205,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ endpoint }}/32 scram-sha-256
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
-    - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} replication replication {{ peer_ip }}/0 scram-sha-256
     {%- endfor %}
 
   pg_ident:

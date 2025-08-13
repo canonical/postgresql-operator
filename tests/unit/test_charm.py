@@ -1163,6 +1163,7 @@ def test_update_config(harness):
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
             slots=None,
+            instance_password_encryption="scram-sha-256",
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1194,6 +1195,7 @@ def test_update_config(harness):
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
             slots=None,
+            instance_password_encryption="scram-sha-256",
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()

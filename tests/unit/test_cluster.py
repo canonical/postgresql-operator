@@ -295,6 +295,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             new_callable=PropertyMock,
             return_value=["1.1.1.1", "192.168.0.1"],
         ),
+        #patch("charm.CharmConfig.instance_password_encryption", return_value="scram-sha-256")
     ):
         _get_postgresql_version.return_value = "16.6"
 
@@ -331,6 +332,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             synchronous_node_count=0,
             raft_password=raft_password,
             patroni_password=patroni_password,
+            instance_password_encryption="scram-sha-256",
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
