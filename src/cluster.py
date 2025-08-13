@@ -785,6 +785,7 @@ class Patroni:
             Whether the service started successfully.
         """
         try:
+            logger.debug("Starting Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
@@ -804,6 +805,7 @@ class Patroni:
             Multi-line logs string.
         """
         try:
+            logger.debug("Getting Patroni logs...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             # Lib definition of num_lines only allows int
@@ -840,6 +842,7 @@ class Patroni:
             Whether the service stopped successfully.
         """
         try:
+            logger.debug("Stopping Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.stop(services=["patroni"])
@@ -1058,6 +1061,7 @@ class Patroni:
             Whether the service restarted successfully.
         """
         try:
+            logger.debug("Restarting Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.restart(services=["patroni"])
