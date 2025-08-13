@@ -2299,12 +2299,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.postgresql.password or not self.postgresql.current_host:
             return False
         try:
-            for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
                     if not self.postgresql.get_postgresql_timezones():
+                        logger.debug("Cannot connect to database (CannotConnectError)")
                         raise CannotConnectError
         except RetryError:
-            logger.debug("Cannot connect to database")
+            logger.debug("Cannot connect to database (RetryError)")
             return False
         return True
 
