@@ -136,7 +136,7 @@ Enable LDAP <enable-ldap>
 Enable plugins/extensions <enable-plugins-extensions/index>
 Back up and restore <back-up-and-restore/index>
 Monitoring (COS) <monitoring-cos/index>
-Upgrade (refresh) <upgrade/index>
+Refresh (upgrade) <refresh/index>
 Cross-regional async replication <cross-regional-async-replication/index>
 Logical replication <logical-replication/index>
 Development <development/index>
