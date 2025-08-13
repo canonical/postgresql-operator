@@ -262,11 +262,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def config(self):
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
+            # Prefer value of option name with dash (-) and fallback to name with underscore (_)
             config_option: self.model.config.get(
-                # Prefer value of option name with dash (-) and fallback to name with underscore (_)
                 config_option.replace("_", "-"), self.model.config.get(config_option)
             )
-            for config_option in self.config_type.keys()
+            for config_option in self.config_type.keys()  # noqa: SIM118
         }
         config = {
             config_option: value for config_option, value in config.items() if value is not None
