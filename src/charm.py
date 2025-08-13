@@ -462,21 +462,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ]
 
     @property
-    def app_units(self) -> set[Unit]:
-        """The peer-related units in the application."""
-        if not self._peers:
-            return set()
-
-        return {self.unit, *self._peers.units}
-
-    def scoped_peer_data(self, scope: SCOPES) -> dict | None:
-        """Returns peer data based on scope."""
-        if scope == APP_SCOPE:
-            return self.app_peer_data
-        elif scope == UNIT_SCOPE:
-            return self.unit_peer_data
-
-    @property
     def app_peer_data(self) -> dict:
         """Application peer relation data object."""
         return self.all_peer_data.get(self.app, {})
