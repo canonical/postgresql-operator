@@ -766,7 +766,7 @@ options:
       Sets the number of synchronous nodes to be maintained in the cluster. Should be
       either "all", "majority" or a positive integer value.
     type: string
-    default: all
+    default: "all"
   connection_authentication_timeout:
     description: |
       Deprecated: Use connection-authentication-timeout instead.
@@ -798,7 +798,7 @@ options:
       “on”, “remote_apply” and “remote_write” values to avoid data loss if the primary
       crashes and there are replicas.
     type: string
-    default: on
+    default: "on"
   durability_wal_keep_size:
     description: |
       Deprecated: Use durability-wal-keep-size instead.
@@ -822,7 +822,7 @@ options:
       Allowed values start with “pg_catalog.” followed by a language name, like
       “pg_catalog.english”.
     type: string
-    default: pg_catalog.simple
+    default: "pg_catalog.simple"
   instance_max_locks_per_transaction:
     description: |
       Deprecated: Use instance-max-locks-per-transaction instead.
@@ -840,7 +840,7 @@ options:
       Determines the algorithm to use to encrypt the password.
       Allowed values are: “md5” and “scram-sha-256”.
     type: string
-    default: scram-sha-256
+    default: "scram-sha-256"
   instance_synchronize_seqscans:
     description: |
       Deprecated: Use instance-synchronize-seqscans instead.
@@ -863,7 +863,7 @@ options:
       The LDAP search filter to match users with.
       Example: (|(uid=$username)(email=$username))
     type: string
-    default: (uid=$username)
+    default: "(uid=$username)"
   logging_client_min_messages:
     description: |
       Deprecated: Use logging-client-min-messages instead.
@@ -872,7 +872,7 @@ options:
       Allowed values are one of 'debug5', 'debug4', 'debug3', 'debug2', 'debug1', 'log', 'notice', 'warning' or 'error'.
       Each level includes all the levels that follow it. The later the level, the fewer messages are sent.
     type: string
-    default: notice
+    default: "notice"
   logging_log_connections:
     description: |
       Deprecated: Use logging-log-connections instead.
@@ -911,7 +911,7 @@ options:
       Allowed values are one of 'none', 'pl', 'all'.
       Enables tracking of function call counts and time used. Specify pl to track only procedural-language functions
     type: string
-    default: none
+    default: "none"
   logical_replication_subscription_request:
     description: |
       Deprecated: Use logical-replication-subscription-request instead.
@@ -920,7 +920,7 @@ options:
       publiblisher cluster to subscribe on via logical replication.
       Example: {"<database>": ["<schema>.<table>", ...], ...}
     type: string
-    default: '{}'
+    default: "{}"
   memory_maintenance_work_mem:
     description: |
       Deprecated: Use memory-maintenance-work-mem instead.
@@ -969,7 +969,7 @@ options:
       Enables the planner to use constraints to optimize queries.
       Allowed values are: “on”, “off” and “partition”.
     type: string
-    default: partition
+    default: "partition"
   optimizer_cpu_index_tuple_cost:
     description: |
       Deprecated: Use optimizer-cpu-index-tuple-cost instead.
@@ -1670,7 +1670,7 @@ options:
       Allowed values are "safe_encoding" and "on" and "off".
       Safe_encoding is allow only if client encoding does not allow ASCII \ within a multibyte character.
     type: string
-    default: safe_encoding
+    default: "safe_encoding"
   request_date_style:
     description: |
       Deprecated: Use request-date-style instead.
@@ -1678,7 +1678,7 @@ options:
       Sets the display format for date and time values. Allowed formats are explained
       in https://www.postgresql.org/docs/14/runtime-config-client.html#GUC-DATESTYLE.
     type: string
-    default: ISO, MDY
+    default: "ISO, MDY"
   request_deadlock_timeout:
     description: |
       Deprecated: Use request-deadlock-timeout instead.
@@ -1706,7 +1706,7 @@ options:
       Serializable is all statements of the current transaction can only see rows committed before the first 
       query or data-modification statement was executed in this transaction.
     type: string
-    default: read committed
+    default: "read committed"
   request_default_transaction_read_only:
     description: |
       Deprecated: Use request-default-transaction-read-only instead.
@@ -1744,7 +1744,7 @@ options:
       Allowed values are the ones from IANA time zone data, a time zone abbreviation
       like PST and POSIX-style time zone specifications.
     type: string
-    default: UTC
+    default: "UTC"
   request_track_activity_query_size:
     description: |
       Deprecated: Use request-track-activity-query-size instead.
@@ -1767,7 +1767,7 @@ options:
       Sets how binary values are to be encoded in XML.
       Allowed values are one of 'base64', 'hex'.
     type: string
-    default: base64
+    default: "base64"
   request_xmloption:
     description: |
       Deprecated: Use request-xmloption instead.
@@ -1775,7 +1775,7 @@ options:
       Sets whether XML data in implicit parsing and serialization operations is to be considered as documents or content fragments.
       Allowed values are one of 'content', 'document'.
     type: string
-    default: content
+    default: "content"
   response_bytea_output:
     description: |
       Deprecated: Use response-bytea-output instead.
@@ -1783,7 +1783,7 @@ options:
       Sets the output format for bytes.
       Allowed values are: “escape” and “hex”.
     type: string
-    default: hex
+    default: "hex"
   response_exit_on_error:
     description: |
       Deprecated: Use response-exit-on-error instead.
@@ -1814,7 +1814,7 @@ options:
       Sets the locale for formatting monetary amounts.
       Allowed values are the locales available in the unit.
     type: string
-    default: C
+    default: "C"
   response_lc_numeric:
     description: |
       Deprecated: Use response-lc-numeric instead.
@@ -1822,7 +1822,7 @@ options:
       Sets the locale for formatting numbers.
       Allowed values are the locales available in the unit.
     type: string
-    default: C
+    default: "C"
   response_lc_time:
     description: |
       Deprecated: Use response-lc-time instead.
@@ -1830,7 +1830,7 @@ options:
       Sets the locale for formatting date and time values.
       Allowed values are the locales available in the unit.
     type: string
-    default: C
+    default: "C"
   session_idle_in_transaction_session_timeout:
     description: |
       Deprecated: Use session-idle-in-transaction-session-timeout instead.
@@ -1862,7 +1862,7 @@ options:
       Sets the default table access method for new tables.
       These entries can be created using the CREATE ACCESS METHOD SQL command.
     type: string
-    default: heap
+    default: "heap"
   storage_gin_pending_list_limit:
     description: |
       Deprecated: Use storage-gin-pending-list-limit instead.
