@@ -1,22 +1,17 @@
 # Perform a minor upgrade
 
-A minor upgrade is a {term}`refresh` from one workload version to a higher one within the same major version (e.g. PostgreSQL 14.12 --> PostgreSQL 14.15)
-
-The refresh process boils down to:
-* Running a pre-refresh check to ensure your deployment can undergo a safe upgrade process
-* Running the refresh command to initiate the process
-* Monitoring and following UI instructions
+A minor {term}`in-place` {term}`upgrade` is a {term}`refresh` from one {term}`workload` version to a higher one, within the same major version (e.g. PostgreSQL 14.12 --> PostgreSQL 14.15)
 
 Once in the refresh is in progress, the UI will clearly indicate what is happening to each unit, and what actions are required from the user to continue the process or roll back in case of a problem.
 
+If your upgrade has failed, see [How to perform a minor rollback](/how-to/refresh/minor-rollback)
+
 ```{seealso}
-* [How to perform a minor rollback](/how-to/refresh/minor-rollback)
+
 * [All Charmed PostgreSQL minor versions](/reference/releases)
-* [](/how-to/back-up-and-restore/create-a-backup)
 * [Developer docs for charm-refresh](https://canonical-charm-refresh.readthedocs-hosted.com/latest/)
     * [`pause_after_unit_refresh` documentation](https://canonical-charm-refresh.readthedocs-hosted.com/latest/user-experience/config/#pause-after-unit-refresh)
 ```
-
 
 ## Precautions
 
@@ -24,17 +19,21 @@ Below are some strongly recommended precautions before refreshing to ensure mini
 
 **Make sure to have a [backup](/how-to/back-up-and-restore/create-a-backup) of your data.**
 
-**Do not perform operations that modify your cluster while refreshing.**
+We recommend testing the integrity of your backup by performing a test [restore](/how-to/back-up-and-restore/restore-a-backup).
+
+**Avoid operations that modify your cluster while refreshing.**
 
 Concurrency with other operations is not supported, and it can lead the cluster to inconsistent states.
 
 ```{dropdown} Examples
 Avoid operations such as (but not limited to) the following:
 
-* Adding or removing units
+* Adding or removing units - unless it is necessary for recovery
 * Creating or destroying new relations
 * Changes in workload configuration
 * Upgrading other connected/related/integrated applications simultaneously
+
+[Contact us](/reference/contacts) if you have questions about performing operations during refresh.
 ```
 
 **Integrate with [Charmed PgBouncer](https://charmhub.io/pgbouncer).** 
@@ -44,9 +43,7 @@ This will ensure minimal service disruption, if any.
 (pre-refresh-check)=
 ## Pre-refresh check
 
-The `pre-refresh-check` action checks that a refresh is possible and will switch the primary, if necessary, for a safe upgrade process.
-
-This check happens automatically when you run `juju refresh`, but we recommend running it manually before scheduling a maintenance window for the refresh operation.
+The [`pre-refresh-check`](https://canonical-charm-refresh.readthedocs-hosted.com/latest/user-experience/actions/#pre-refresh-check) action checks that the application is healthy and ready to refresh (e.g. no other operations are running).   
 
 Run a pre-refresh check against the leader unit:
 
@@ -62,25 +59,20 @@ Copy down the rollback command from the action output in case a rollback is need
 
 ## Initiate refresh
 
-The following command will refresh the charm to the latest version in the channel you originally deployed your application from, e.g. `16/stable`:
+The following command will refresh the charm to the latest version in the channel you originally deployed your application from:
 
 ```shell
 juju refresh postgresql
 ```
 
-To refresh your charm to the latest version of a specific channel or track, use the `--channel` flag. For example:
+It is expected for the Juju agents to enter a temporary `failed` state. 
 
-```shell
-juju refresh postgresql --channel 16/edge
-```
-
-Units will be refreshed one by one based on role: first the `replica` units, then `sync-standby`, and lastly the `leader` unit. 
+Units will then be refreshed one by one based on role:
+1. `replica` units
+2. `sync-standby`
+3. `leader` unit.
 
 If there are any version incompatibilities in charm revisions, dependencies, or any other unexpected failure in the upgrade process, the process will halt and enter a failure state.
-
-```{attention}
-Only trigger a rollback if the refresh has explicitly failed and cannot continue. <!--TODO: examples + clarify if you can rollback when refresh is healthy but paused waiting for resume-refresh -->
-```
 
 ## Resume refresh
 

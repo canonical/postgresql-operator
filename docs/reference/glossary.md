@@ -28,4 +28,10 @@ workload
 
 original version
     Workload and/or charm version of all units before initiating a refresh process
+
+in-place
+    TODO
+    
+out-of-place
+    <!-- https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/is-this-for-you/ -->
 ```

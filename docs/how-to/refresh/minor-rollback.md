@@ -4,12 +4,6 @@ After running `juju refresh`, if there are any version incompatibilities in char
 
 Even if the underlying PostgreSQL cluster continues to work, it’s important to roll back the charm to the {term}`original version` so that an update can be attempted after further inspection of the failure.
 
-```{attention}
-Only trigger a rollback if the refresh has explicitly failed and cannot continue. Do not initiate a rollback while the refresh process is still running.
-
-<!--TODO: examples-->
-```
-
 ---
 
 ## Initiate rollback
