@@ -190,7 +190,7 @@ postgresql:
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 {{ instance_password_encryption }}
     {%-   endfor %}
     {%- else %}
-    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 scram-sha-256
+    - {{ 'hostssl' if enable_tls else 'host' }} all +internal_access 0.0.0.0/0 {{ instance_password_encryption }}
     {%-   for user, databases in user_databases_map.items() %}
     {%-     if 'pgbouncer_auth_relation_' in user %}
     - {{ 'hostssl' if enable_tls else 'host' }} {{ databases }} {{ user }} 0.0.0.0/0 md5
