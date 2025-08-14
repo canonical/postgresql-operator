@@ -29,7 +29,7 @@ Check all available Charmed PostgreSQL 16 versions in [](/reference/releases).
 * Major in-place {term}`downgrade` from PostgreSQL 16 to 14
 * Any refresh involving non-stable versions (e.g. 16/edge)
 
-The actions listed above must be performed as {term}`out of place` upgrades.
+The actions listed above must be performed as out of place upgrades.
 
 <!--TODO: When ready, point to 14-16 migration guide -->
 

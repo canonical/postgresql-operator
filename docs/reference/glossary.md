@@ -31,7 +31,9 @@ original version
 
 in-place
     TODO
-    
-out-of-place
-    <!-- https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/is-this-for-you/ -->
 ```
+
+<!-- 
+out-of-place
+https://canonical-charm-refresh.readthedocs-hosted.com/latest/add-to-charm/is-this-for-you/
+-->
