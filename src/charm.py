@@ -2366,7 +2366,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
             slots=replication_slots or None,
-            instance_password_encryption=self.config.instance_password_encryption,
         )
         if no_peers:
             return True

@@ -307,7 +307,6 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         raft_password = "fake-raft-password"
         patroni_password = "fake-patroni-password"
         postgresql_version = "16"
-        instance_password_encryption = "scram-sha-256"
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
@@ -332,7 +331,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             synchronous_node_count=0,
             raft_password=raft_password,
             patroni_password=patroni_password,
-            instance_password_encryption=instance_password_encryption,
+            instance_password_encryption="scram-sha-256",
         )
 
         # Setup a mock for the `open` method, set returned data to patroni.yml template.
@@ -342,9 +341,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):
             # Call the method.
-            patroni.render_patroni_yml_file(
-                instance_password_encryption=instance_password_encryption
-            )
+            patroni.render_patroni_yml_file()
 
         # Check the template is opened read-only in the call to open.
         assert mock.call_args_list[0][0] == ("templates/patroni.yml.j2",)
