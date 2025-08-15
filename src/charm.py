@@ -257,6 +257,22 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     on: "CharmEvents" = ClusterTopologyChangeCharmEvents()
     _postgresql: PostgreSQL | None = None
 
+    # Override data_models.py TypedCharmBase config
+    @property
+    def config(self):
+        """Return a config instance validated and parsed using the provided pydantic class."""
+        config = {
+            # Prefer value of option name with dash (-) and fallback to name with underscore (_)
+            config_option: self.model.config.get(
+                config_option.replace("_", "-"), self.model.config.get(config_option)
+            )
+            for config_option in self.config_type.keys()  # noqa: SIM118
+        }
+        config = {
+            config_option: value for config_option, value in config.items() if value is not None
+        }
+        return self.config_type(**config)  # type: ignore
+
     def __init__(self, *args):
         super().__init__(*args)
         # Show logger name (module name) in logs

@@ -28,7 +28,7 @@ PostgreSQL 16 is shipped in track `16` and is available for testing in the chann
   * All replicas are now [synchronous units]
   * Switchover the primary unit via `promote-to-primary scope=unit`
   * Raft re-init helper: `promote-to-primary scope=unit force=yes`
-* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) for charm [internal passwords]
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret) for charm [internal passwords]
 * [Timescale Community Edition]
 * [Extended COS integration]
   * [Profiling via Parca]
@@ -104,7 +104,7 @@ Learn more in the [legacy charm explanation page].
 [LDAP integration]: /how-to/enable-ldap
 [SoS report integration]: /reference/troubleshooting/sos-report
 [Recovery improvements]: /how-to/switchover-failover
-[synchronous units]: https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count
+[synchronous units]: https://charmhub.io/postgresql/configurations?channel=16/edge#synchronous-node-count
 [internal charm passwords]: /explanation/users
 [Timescale Community Edition]: /how-to/enable-plugins-extensions/enable-timescaledb
 [Extended COS integration]: /how-to/monitoring-cos/enable-monitoring
