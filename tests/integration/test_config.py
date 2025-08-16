@@ -48,6 +48,9 @@ async def test_config_parameters(ops_test: OpsTest, charm) -> None:
             "instance_max_locks_per_transaction": ["-1", "64"]
         },  # config option is between 64 and 2147483647
         {
+            "instance_password_encryption": [test_string, "md5"]
+        },  # config option is one of `md5` or `scram-sha-256`
+        {
             "instance_password_encryption": [test_string, "scram-sha-256"]
         },  # config option is one of `md5` or `scram-sha-256`
         {
