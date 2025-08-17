@@ -2535,7 +2535,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         user_database_map = {}
         # Copy relations users directly instead of waiting for them to be created
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            user = f"relation-{relation.id}"
+            user = self.postgresql_client_relation.database_provides.fetch_my_relation_field(
+                relation.id, "username"
+            )
             if user not in user_database_map and (
                 database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                     relation.id, "database"

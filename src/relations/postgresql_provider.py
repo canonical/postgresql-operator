@@ -21,15 +21,17 @@ from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLDeleteUserError,
     PostgreSQLListUsersError,
 )
-from ops.charm import RelationBrokenEvent
-from ops.framework import Object
-from ops.model import ActiveStatus, BlockedStatus, Relation
+from ops import ActiveStatus, BlockedStatus, ModelError, Object, Relation, RelationBrokenEvent
 
-from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT
+from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT, SYSTEM_USERS
 from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
 
+
+# Label not a secret
+NO_ACCESS_TO_SECRET_MSG = "Missing grant to requested entity secret"  # noqa: S105
+FORBIDDEN_USER_MSG = "Requesting a system username"
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -92,6 +94,21 @@ class PostgreSQLProvider(Object):
             )
             return
 
+        user = None
+        password = None
+        try:
+            if requested_entities := event.requested_entity_secret_content:
+                for key, val in requested_entities.items():
+                    user = key
+                    password = val
+                    break
+                if user in SYSTEM_USERS:
+                    self.charm.unit.status = BlockedStatus(FORBIDDEN_USER_MSG)
+                    return
+        except ModelError:
+            self.charm.unit.status = BlockedStatus(NO_ACCESS_TO_SECRET_MSG)
+            return
+
         self.charm.update_config()
         for key in self.charm.all_peer_data:
             # We skip the leader so we don't have to wait on the defer
@@ -114,12 +131,12 @@ class PostgreSQLProvider(Object):
 
         try:
             # Creates the user and the database for this specific relation.
-            user = f"relation-{event.relation.id}"
+            user = user or f"relation-{event.relation.id}"
+            password = password or new_password()
             plugins = self.charm.get_plugins()
 
             self.charm.postgresql.create_database(database, plugins=plugins)
 
-            password = new_password()
             self.charm.postgresql.create_user(
                 user, password, extra_user_roles=extra_user_roles, database=database
             )
@@ -216,7 +233,8 @@ class PostgreSQLProvider(Object):
             return
 
         secret_data = (
-            self.database_provides.fetch_my_relation_data(relations_ids, ["password"]) or {}
+            self.database_provides.fetch_my_relation_data(relations_ids, ["username", "password"])
+            or {}
         )
 
         # Get cluster status
@@ -257,8 +275,8 @@ class PostgreSQLProvider(Object):
             ca = ""
 
         for relation_id in rel_data:
-            user = f"relation-{relation_id}"
             database = rel_data[relation_id].get("database")
+            user = secret_data.get(relation_id, {}).get("username")
             password = secret_data.get(relation_id, {}).get("password")
             if not database or not password:
                 continue
@@ -312,6 +330,32 @@ class PostgreSQLProvider(Object):
             self.charm.is_blocked
             and "Failed to initialize relation" in self.charm.unit.status.message
         ):
+            self.charm.set_unit_status(ActiveStatus())
+        if self.charm.is_blocked and self.charm.unit.status.message in [
+            INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE,
+            NO_ACCESS_TO_SECRET_MSG,
+            FORBIDDEN_USER_MSG,
+        ]:
+            if self.check_for_invalid_extra_user_roles(relation.id):
+                self.charm.unit.status = BlockedStatus(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
+                return
+            for relation in self.charm.model.relations.get(self.relation_name, []):
+                try:
+                    if secret_uri := self.database_provides.fetch_relation_field(
+                        relation.id, "requested-entity-secret"
+                    ):
+                        content = self.framework.model.get_secret(id=secret_uri).get_content()
+                        for key in content:
+                            if key in SYSTEM_USERS:
+                                logger.warning(
+                                    f"Relation {relation.id} is still requesting a forbidden user"
+                                )
+                                self.charm.unit.status = BlockedStatus(FORBIDDEN_USER_MSG)
+                                return
+                except ModelError:
+                    logger.warning(f"Relation {relation.id} still cannot access the set secret")
+                    self.charm.unit.status = BlockedStatus(NO_ACCESS_TO_SECRET_MSG)
+                    return
             self.charm.set_unit_status(ActiveStatus())
 
     def check_for_invalid_extra_user_roles(self, relation_id: int) -> bool:
