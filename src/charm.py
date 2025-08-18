@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
 from traceback import extract_stack, format_list
@@ -259,7 +260,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     _postgresql: PostgreSQL | None = None
 
     # Override data_models.py TypedCharmBase config
-    @property
+    @cached_property
     def config(self):
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
@@ -478,7 +479,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             }
         ]
 
-    @property
+    @cached_property
     def app_units(self) -> set[Unit]:
         """The peer-related units in the application."""
         if not self._peers:
@@ -493,17 +494,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         elif scope == UNIT_SCOPE:
             return self.unit_peer_data
 
-    @property
+    @cached_property
     def app_peer_data(self) -> dict:
         """Application peer relation data object."""
         return self.all_peer_data.get(self.app, {})
 
-    @property
+    @cached_property
     def unit_peer_data(self) -> dict:
         """Unit peer relation data object."""
         return self.all_peer_data.get(self.unit, {})
 
-    @property
+    @cached_property
     def all_peer_data(self) -> dict:
         """Return all peer data if available."""
         if self._peers is None:
@@ -512,12 +513,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # RelationData has dict like API
         return self._peers.data  # type: ignore
 
-    @property
+    @cached_property
     def tracing_endpoint(self) -> str | None:
         """Otlp http endpoint for charm instrumentation."""
         return self._tracing_endpoint_config
 
-    @property
+    @cached_property
     def cpu_count(self) -> int:
         """Property with numbers of cpus."""
         if cpus := os.cpu_count():
@@ -599,32 +600,32 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return secret_content
 
-    @property
+    @cached_property
     def is_cluster_initialised(self) -> bool:
         """Returns whether the cluster is already initialised."""
         return "cluster_initialised" in self.app_peer_data
 
-    @property
+    @cached_property
     def is_cluster_restoring_backup(self) -> bool:
         """Returns whether the cluster is restoring a backup."""
         return "restoring-backup" in self.app_peer_data
 
-    @property
+    @cached_property
     def is_cluster_restoring_to_time(self) -> bool:
         """Returns whether the cluster is restoring a backup to a specific time."""
         return "restore-to-time" in self.app_peer_data
 
-    @property
+    @cached_property
     def is_unit_departing(self) -> bool:
         """Returns whether the unit is departing."""
         return "departing" in self.unit_peer_data
 
-    @property
+    @cached_property
     def is_unit_stopped(self) -> bool:
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    @property
+    @cached_property
     def postgresql(self) -> PostgreSQL:  # type: ignore
         """Returns an instance of the object used to interact with the database."""
         try:
@@ -640,7 +641,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except Exception:
             logger.exception("Failed to create postgresql property")
 
-    @property
+    @cached_property
     def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
         if not self._peers:
@@ -1127,7 +1128,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except KeyError:
             return None
 
-    @property
+    @cached_property
     def _hosts(self) -> set[str]:
         """List of the current Juju hosts.
 
@@ -1142,7 +1143,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 hosts.append(unit.name.replace("/", "-"))
         return set(hosts)
 
-    @property
+    @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
@@ -1159,37 +1160,37 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.get_secret(APP_SCOPE, PATRONI_PASSWORD_KEY),
         )
 
-    @property
+    @cached_property
     def is_connectivity_enabled(self) -> bool:
         """Return whether this unit can be connected externally."""
         return self.unit_peer_data.get("connectivity", "on") == "on"
 
-    @property
+    @cached_property
     def is_ldap_charm_related(self) -> bool:
         """Return whether this unit has an LDAP charm related."""
         return self.app_peer_data.get("ldap_enabled", "False") == "True"
 
-    @property
+    @cached_property
     def is_ldap_enabled(self) -> bool:
         """Return whether this unit has LDAP enabled."""
         return self.is_ldap_charm_related and self.is_cluster_initialised
 
-    @property
+    @cached_property
     def is_primary(self) -> bool:
         """Return whether this unit is the primary instance."""
         return self.unit.name == self._patroni.get_primary(unit_name_pattern=True)
 
-    @property
+    @cached_property
     def is_standby_leader(self) -> bool:
         """Return whether this unit is the standby leader instance."""
         return self.unit.name == self._patroni.get_standby_leader(unit_name_pattern=True)
 
-    @property
+    @cached_property
     def is_tls_enabled(self) -> bool:
         """Return whether TLS is enabled."""
         return all(self.tls.get_client_tls_files())
 
-    @property
+    @cached_property
     def _peer_members_ips(self) -> set[str]:
         """Fetch current list of peer members IPs.
 
@@ -1203,7 +1204,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             addresses.remove(current_unit_ip)
         return addresses
 
-    @property
+    @cached_property
     def _units_ips(self) -> set[str]:
         """Fetch current list of peers IPs.
 
@@ -1221,7 +1222,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     addresses.add(ip)
         return addresses
 
-    @property
+    @cached_property
     def members_ips(self) -> set[str]:
         """Returns the list of IPs addresses of the current members of the cluster."""
         if not self._peers:
@@ -1285,31 +1286,31 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 f"switchover failed with reason: {e} - an automatic failover will be triggered"
             )
 
-    @property
+    @cached_property
     def _unit_ip(self) -> str | None:
         """Current unit ip."""
         if binding := self.model.get_binding(PEER):
             return str(binding.network.bind_address)
 
-    @property
+    @cached_property
     def _database_ip(self) -> str | None:
         """Database endpoint address."""
         if binding := self.model.get_binding(DATABASE):
             return str(binding.network.bind_address)
 
-    @property
+    @cached_property
     def _replication_offer_ip(self) -> str | None:
         """Async replication offer endpoint address."""
         if binding := self.model.get_binding(REPLICATION_OFFER_RELATION):
             return str(binding.network.bind_address)
 
-    @property
+    @cached_property
     def _replication_consumer_ip(self) -> str | None:
         """Async replication consumer endpoint address."""
         if binding := self.model.get_binding(REPLICATION_CONSUMER_RELATION):
             return str(binding.network.bind_address)
 
-    @property
+    @cached_property
     def listen_ips(self) -> list[str]:
         """Return the IPs to listen on.
 
@@ -2143,7 +2144,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.get_secret(UNIT_SCOPE, "internal-cert"):
             self.tls.generate_internal_peer_cert()
 
-    @property
+    @cached_property
     def is_blocked(self) -> bool:
         """Returns whether the unit is in a blocked state."""
         return isinstance(self.unit.status, BlockedStatus)
@@ -2157,7 +2158,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """
         return self.get_secret(APP_SCOPE, USER_PASSWORD_KEY)
 
-    @property
+    @cached_property
     def _replication_password(self) -> str | None:
         """Get replication user password.
 
@@ -2213,7 +2214,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         except subprocess.CalledProcessError:
             return False
 
-    @property
+    @cached_property
     def _peers(self) -> Relation | None:
         """Fetch the peer relation.
 
@@ -2319,7 +2320,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # Start or stop the pgBackRest TLS server service when TLS certificate change.
         self.backup.start_stop_pgbackrest_service()
 
-    @property
+    @cached_property
     def _is_workload_running(self) -> bool:
         """Returns whether the workload is running (in an active state)."""
         snap_cache = snap.SnapCache()
@@ -2329,7 +2330,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return charmed_postgresql_snap.services["patroni"]["active"]
 
-    @property
+    @cached_property
     def _can_connect_to_postgresql(self) -> bool:
         if not self.postgresql.password or not self.postgresql.current_host:
             return False
@@ -2523,12 +2524,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         return 0
 
-    @property
+    @cached_property
     def client_relations(self) -> list[Relation]:
         """Return the list of established client relations."""
         return self.model.relations.get("database", [])
 
-    @property
+    @cached_property
     def relations_user_databases_map(self) -> dict:
         """Returns a user->databases map for all relations."""
         user_database_map = {}
@@ -2584,7 +2585,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
-    @property
+    @cached_property
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         user_db_pairs = {}
