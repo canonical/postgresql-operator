@@ -20,8 +20,6 @@ These refreshes are well-tested and should be preferred.
 +=============+============+============+============+
 | `843, 844`_ | 16.9       | TODO       | 16.9       |
 +-------------+------------+------------+------------+
-
-.. _843, 844: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
 ```
 
 ## Supported refreshes
@@ -39,8 +37,6 @@ These refreshes should be supported. If possible, use a [recommended refresh](#r
 |             |            +------------+------------+
 |             |            | TODO       | 16.10      |
 +-------------+------------+------------+------------+
-
-.. _843, 844: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
 ```
 
 ## Non-supported refreshes
@@ -53,6 +49,9 @@ These refreshes are not supported {term}`in-place`. In some of these cases, it m
 
 <!--TODO: When ready, point to 14-16 migration guide -->
 
+```{eval-rst}
+.. _843, 844: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
+```
 
 ```{toctree}
 :titlesonly:
