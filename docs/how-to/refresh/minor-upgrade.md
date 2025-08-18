@@ -10,7 +10,7 @@ If your upgrade has failed, see [Roll back an in-progress refresh](/how-to/refre
 
 * [All Charmed PostgreSQL minor versions](/reference/releases)
 * [Developer docs for charm-refresh](https://canonical-charm-refresh.readthedocs-hosted.com/latest/)
-    * [`pause_after_unit_refresh` documentation](https://canonical-charm-refresh.readthedocs-hosted.com/latest/user-experience/config/#pause-after-unit-refresh)
+    * [`pause-after-unit-refresh` documentation](https://canonical-charm-refresh.readthedocs-hosted.com/latest/user-experience/config/#pause-after-unit-refresh)
 ```
 
 ## Precautions
@@ -76,7 +76,7 @@ If there are any version incompatibilities in charm revisions, dependencies, or 
 
 ## Resume refresh
 
-If the [`pause_after_unit_refresh`](https://charmhub.io/postgresql/configurations?channel=16/edge#pause_after_unit_refresh) config option on your PostgreSQL application is set to `first` (default) or `all`, you'll need to monitor and manually resume the refresh when one or more units have finished refreshing individually.
+If the [`pause-after-unit-refresh`](https://charmhub.io/postgresql/configurations?channel=16/edge#pause-after-unit-refresh) config option on your PostgreSQL application is set to `first` (default) or `all`, you'll need to monitor and manually resume the refresh when one or more units have finished refreshing individually.
 
 When the refresh pauses and all units are in an idle state, check that they are healthy. <!-- TODO: how? -->
 

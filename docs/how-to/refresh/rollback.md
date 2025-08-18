@@ -14,7 +14,7 @@ Perform a rollback with the command obtained from the [pre-refresh check](pre-re
 
 ## Resume rollback
 
-If the [`pause_after_unit_refresh`](https://charmhub.io/postgresql/configurations?channel=16/edge#pause_after_unit_refresh) config option on your PostgreSQL application is set to `first` (default) or `all`, you'll need to monitor and manually resume the refresh when one or more units have finished refreshing individually.
+If the [`pause-after-unit-refresh`](https://charmhub.io/postgresql/configurations?channel=16/edge#pause-after-unit-refresh) config option on your PostgreSQL application is set to `first` (default) or `all`, you'll need to monitor and manually resume the refresh when one or more units have finished refreshing individually.
 
 When the refresh pauses and all units are in an idle state, check that they are healthy. <!-- TODO: how? -->
 
