@@ -18,6 +18,7 @@ import time
 from datetime import UTC, datetime
 from hashlib import shake_128
 from pathlib import Path
+from traceback import extract_stack, format_list
 from typing import Literal, get_args
 from urllib.parse import urlparse
 
@@ -624,22 +625,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return "stopped" in self.unit_peer_data
 
     @property
-    def postgresql(self) -> PostgreSQL:
+    def postgresql(self) -> PostgreSQL:  # type: ignore
         """Returns an instance of the object used to interact with the database."""
-        password = str(self.get_secret(APP_SCOPE, f"{USER}-password"))
-        if self._postgresql is None or self._postgresql.primary_host is None:
-            logger.debug("Init class PostgreSQL")
-            self._postgresql = PostgreSQL(
+        try:
+            logger.debug(f"Init class PostgreSQL: {format_list(extract_stack())}")
+            return PostgreSQL(
                 primary_host=self.primary_endpoint,
                 current_host=self._unit_ip,
                 user=USER,
-                password=password,
+                password=self.get_secret(APP_SCOPE, f"{USER}-password"),
                 database=DATABASE_DEFAULT_NAME,
                 system_users=SYSTEM_USERS,
             )
-        else:
-            self._postgresql.password = password
-        return self._postgresql
+        except Exception:
+            logger.exception("Failed to create postgresql property")
 
     @property
     def primary_endpoint(self) -> str | None:
