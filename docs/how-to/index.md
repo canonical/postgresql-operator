@@ -46,7 +46,7 @@ Other deployment scenarios and configurations:
 ## Refresh (upgrade)
 * [How to refresh]
     * [Perform a minor upgrade]
-    * [Perform a minor rollback]
+    * [Roll back an in-progress refresh]
 
 ## Cross-regional (cluster-cluster) async replication
 
@@ -103,7 +103,7 @@ This section is for charm developers looking to support PostgreSQL integrations 
 
 [How to upgrade]: /how-to/refresh/index
 [Perform a minor upgrade]: /how-to/refresh/minor-upgrade
-[Perform a minor rollback]: /how-to/refresh/minor-rollback
+[Roll back an in-progress refresh]: /how-to/refresh/rollback
 
 [Cross-regional async replication]: /how-to/cross-regional-async-replication/index
 [Set up clusters]: /how-to/cross-regional-async-replication/set-up-clusters

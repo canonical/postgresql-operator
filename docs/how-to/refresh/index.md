@@ -1,35 +1,55 @@
 # Refresh (upgrade)
 
-Charmed PostgreSQL supports minor {term}`in-place` {term}`refresh` via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
-
 ```{admonition} Emergency stop button
 :class: attention
-Use `juju config appname pause-after-unit-refresh=all` to halt an in-progress refresh
+Use `juju config appname pause-after-unit-refresh=all` to halt an in-progress refresh. Then, consider [rolling back](/how-to/refresh/rollback)
+```
+
+Charmed PostgreSQL supports minor {term}`in-place` {term}`refresh` via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
+
+## Recommended refreshes
+
+These refreshes are well-tested and should be preferred.
+
+```{eval-rst}
++-------------+------------+------------+------------+
+| .. centered:: From       | .. centered:: To        |
++-------------+------------+------------+------------+
+| Revision    | PostgreSQL | Revision   | PostgreSQL |
+|             | Version    |            | Version    |
++=============+============+============+============+
+| `843, 844`_ | 16.9       | TODO       | 16.9       |
++-------------+------------+------------+------------+
+
+.. _843, 844: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
 ```
 
 ## Supported refreshes
 
-**Minor in-place {term}`upgrade`** between stable releases. 
-E.g. PostgreSQL 16.9 is upgraded to 16.10
+These refreshes should be supported. If possible, use a [recommended refresh](#recommended-refreshes) instead.
 
-> See [How to perform a minor upgrade](/how-to/refresh/minor-upgrade)
+```{eval-rst}
++-------------+------------+------------+------------+
+| .. centered:: From       | .. centered:: To        |
++-------------+------------+------------+------------+
+| Revision    | PostgreSQL | Revision   | PostgreSQL |
+|             | Version    |            | Version    |
++=============+============+============+============+
+| `843, 844`_ | 16.9       | TODO       | 16.9       |
+|             |            +------------+------------+
+|             |            | TODO       | 16.10      |
++-------------+------------+------------+------------+
 
-**Minor in-place {term}`rollback`** between stable releases. 
-E.g. An upgrade from PostgreSQL 16.9 -> 16.10 fails, so a rollback is triggered to take all units from 16.10 back to 16.9.
-
-> See [How to perform a minor rollback](/how-to/refresh/minor-rollback)
-
-<!-- TODO: Add when new stable: * Minor in-place upgrade from Revision X to Y -->
-
-Check all available Charmed PostgreSQL 16 versions in [](/reference/releases).
+.. _843, 844: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
+```
 
 ## Non-supported refreshes
+These refreshes are not supported {term}`in-place`. In some of these cases, it may be possible to perform an out-of-place upgrade or downgrade.
+
 * Minor in-place {term}`downgrade` from PostgreSQL 16.10 to 16.9
 * Major in-place {term}`upgrade` from PostgreSQL 14 to 16
 * Major in-place {term}`downgrade` from PostgreSQL 16 to 14
-* Any refresh involving non-stable versions (e.g. 16/edge)
-
-The actions listed above must be performed as out of place upgrades.
+* Any refresh from or to a non-stable version (e.g. 16/edge)
 
 <!--TODO: When ready, point to 14-16 migration guide -->
 
@@ -39,5 +59,5 @@ The actions listed above must be performed as out of place upgrades.
 :hidden:
 
 Perform a minor upgrade <minor-upgrade>
-Perform a minor rollback <minor-rollback>
+Roll back an in-progress refresh <rollback>
 ```
