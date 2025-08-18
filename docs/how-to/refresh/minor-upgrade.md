@@ -4,7 +4,7 @@ A minor {term}`in-place` {term}`upgrade` is a {term}`refresh` from one {term}`wo
 
 Once in the refresh is in progress, the UI will clearly indicate what is happening to each unit, and what actions are required from the user to continue the process or roll back in case of a problem.
 
-If your upgrade has failed, see [How to perform a minor rollback](/how-to/refresh/minor-rollback)
+If your upgrade has failed, see [Roll back an in-progress refresh](/how-to/refresh/rollback)
 
 ```{seealso}
 
