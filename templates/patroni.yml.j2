@@ -101,7 +101,6 @@ bootstrap:
         set_user.block_log_statement: 'on'
         set_user.exit_on_error: 'on'
         set_user.superuser_allowlist: '+charmed_dba'
-    {%- if slots %}
     slots:
     {%- for slot, database in slots.items() %}
       {{slot}}:
@@ -109,7 +108,6 @@ bootstrap:
         plugin: pgoutput
         type: logical
     {%- endfor -%}
-    {% endif %}
 
   {%- if restoring_backup %}
   method: pgbackrest
@@ -202,7 +200,7 @@ postgresql:
     {%- endfor %}
     {%- for peer_ip in peers_ips %}
     - {{ 'hostssl' if enable_tls else 'host' }}     replication    replication    {{ peer_ip }}/0    md5
-    {% endfor %}
+    {%- endfor %}
   pg_ident:
   - operator _daemon_ backup
   authentication:
