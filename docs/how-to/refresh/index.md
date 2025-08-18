@@ -12,14 +12,14 @@ Charmed PostgreSQL supports minor {term}`in-place` {term}`refresh` via the [`juj
 These refreshes are well-tested and should be preferred.
 
 ```{eval-rst}
-+-------------+------------+------------+------------+
-| .. centered:: From       | .. centered:: To        |
-+-------------+------------+------------+------------+
-| Revision    | PostgreSQL | Revision   | PostgreSQL |
-|             | Version    |            | Version    |
-+=============+============+============+============+
-| `843, 844`_ | 16.9       | TODO       | 16.9       |
-+-------------+------------+------------+------------+
++-------------+------------+----------+-------------+------------+----------+
+| .. centered:: From                  | .. centered:: To                    |
++-------------+------------+----------+-------------+------------+----------+
+| Charm       | PostgreSQL | Snap     | Charm       | PostgreSQL | Snap     |
+| revision    | Version    | revision | revision    | Version    | revision |
++=============+============+==========+=============+============+==========+
+| `843, 844`_ | 16.9       | 201, 202 | TODO        | 16.9       | TODO     |
++-------------+------------+----------+-------------+------------+----------+
 ```
 
 ## Supported refreshes
@@ -27,16 +27,16 @@ These refreshes are well-tested and should be preferred.
 These refreshes should be supported. If possible, use a [recommended refresh](#recommended-refreshes) instead.
 
 ```{eval-rst}
-+-------------+------------+------------+------------+
-| .. centered:: From       | .. centered:: To        |
-+-------------+------------+------------+------------+
-| Revision    | PostgreSQL | Revision   | PostgreSQL |
-|             | Version    |            | Version    |
-+=============+============+============+============+
-| `843, 844`_ | 16.9       | TODO       | 16.9       |
-|             |            +------------+------------+
-|             |            | TODO       | 16.10      |
-+-------------+------------+------------+------------+
++-------------+------------+----------+-------------+------------+----------+
+| .. centered:: From                  | .. centered:: To                    |
++-------------+------------+----------+-------------+------------+----------+
+| Charm       | PostgreSQL | Snap     | Charm       | PostgreSQL | Snap     |
+| revision    | Version    | revision | revision    | Version    | revision |
++=============+============+==========+=============+============+==========+
+| `843, 844`_ | 16.9       | 201, 202 | TODO        | 16.9       | TODO     |
+|             |            |          +-------------+------------+----------+
+|             |            |          | TODO        | 16.10      | TODO     |
++-------------+------------+----------+-------------+------------+----------+
 ```
 
 ## Non-supported refreshes
