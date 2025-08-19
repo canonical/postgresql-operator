@@ -257,7 +257,12 @@ class PostgreSQLAsyncReplication(Object):
 
     def get_partner_addresses(self) -> list[str]:
         """Return the partner addresses."""
-        primary_cluster = self._get_primary_cluster()
+        try:
+            primary_cluster = self._get_primary_cluster()
+        except RetryError:
+            logger.debug("Handling get primary cluster RetryError on get_partner_addresses()")
+            primary_cluster = None
+
         if (
             primary_cluster is None
             or self.charm.app == primary_cluster
