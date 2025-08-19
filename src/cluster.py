@@ -195,7 +195,7 @@ class Patroni:
         if self.patroni_password:
             return BasicAuth("patroni", password=self.patroni_password)
 
-    @cached_property
+    @property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"https://{self.unit_ip}:8008"
@@ -465,7 +465,7 @@ class Patroni:
 
         return r.json()
 
-    @cached_property
+    @property
     def is_creating_backup(self) -> bool:
         """Returns whether a backup is being created."""
         # Request info from cluster endpoint (which returns the list of tags from each
@@ -516,7 +516,7 @@ class Patroni:
         logger.debug("replication is healthy")
         return True
 
-    @cached_property
+    @property
     def member_started(self) -> bool:
         """Has the member started Patroni and PostgreSQL.
 
@@ -533,7 +533,7 @@ class Patroni:
 
         return response["state"] in RUNNING_STATES
 
-    @cached_property
+    @property
     def member_inactive(self) -> bool:
         """Are Patroni and PostgreSQL in inactive state.
 
@@ -553,7 +553,7 @@ class Patroni:
             "restarting",
         ]
 
-    @cached_property
+    @property
     def is_member_isolated(self) -> bool:
         """Returns whether the unit is isolated from the cluster."""
         try:

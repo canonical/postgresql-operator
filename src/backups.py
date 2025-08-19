@@ -11,7 +11,6 @@ import shutil
 import tempfile
 import time
 from datetime import UTC, datetime
-from functools import cached_property
 from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
@@ -94,12 +93,12 @@ class PostgreSQLBackups(Object):
         self.framework.observe(self.charm.on.list_backups_action, self._on_list_backups_action)
         self.framework.observe(self.charm.on.restore_action, self._on_restore_action)
 
-    @cached_property
+    @property
     def stanza_name(self) -> str:
         """Stanza name, composed by model and cluster name."""
         return f"{self.model.name}.{self.charm.cluster_name}"
 
-    @cached_property
+    @property
     def _tls_ca_chain_filename(self) -> str:
         """Returns the path to the TLS CA chain file."""
         s3_parameters, _ = self._retrieve_s3_parameters()
@@ -138,7 +137,7 @@ class PostgreSQLBackups(Object):
 
         return True, ""
 
-    @cached_property
+    @property
     def _can_initialise_stanza(self) -> bool:
         """Validates whether this unit can initialise a stanza."""
         # Don't allow stanza initialisation if this unit hasn't started the database
@@ -730,7 +729,7 @@ class PostgreSQLBackups(Object):
             self.charm.update_config()
             break
 
-    @cached_property
+    @property
     def _is_primary_pgbackrest_service_running(self) -> bool:
         if not self.charm.primary_endpoint:
             logger.warning("Failed to contact pgBackRest TLS server: no primary endpoint")
