@@ -175,7 +175,7 @@ class Patroni:
         # TLS is enabled, otherwise True is set because it's the default value.
         self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_BUNDLE_FILE}"
 
-    @cached_property
+    @property
     def _are_passwords_set(self) -> bool:
         return all([
             self.superuser_password,

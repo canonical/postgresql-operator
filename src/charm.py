@@ -19,7 +19,6 @@ from datetime import UTC, datetime
 from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
-from traceback import extract_stack, format_list
 from typing import Literal, get_args
 from urllib.parse import urlparse
 
@@ -628,18 +627,15 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     @cached_property
     def postgresql(self) -> PostgreSQL:  # type: ignore
         """Returns an instance of the object used to interact with the database."""
-        try:
-            logger.debug(f"Init class PostgreSQL: {format_list(extract_stack())}")
-            return PostgreSQL(
-                primary_host=self.primary_endpoint,
-                current_host=self._unit_ip,
-                user=USER,
-                password=self.get_secret(APP_SCOPE, f"{USER}-password"),
-                database=DATABASE_DEFAULT_NAME,
-                system_users=SYSTEM_USERS,
-            )
-        except Exception:
-            logger.exception("Failed to create postgresql property")
+        logger.debug("Init class PostgreSQL")
+        return PostgreSQL(
+            primary_host=self.primary_endpoint,
+            current_host=self._unit_ip,
+            user=USER,
+            password=self.get_secret(APP_SCOPE, f"{USER}-password"),
+            database=DATABASE_DEFAULT_NAME,
+            system_users=SYSTEM_USERS,
+        )
 
     @cached_property
     def primary_endpoint(self) -> str | None:
