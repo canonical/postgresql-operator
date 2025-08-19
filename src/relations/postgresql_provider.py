@@ -19,7 +19,6 @@ from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLDeleteUserError,
-    PostgreSQLListUsersError,
 )
 from ops.charm import RelationBrokenEvent
 from ops.framework import Object
@@ -171,7 +170,8 @@ class PostgreSQLProvider(Object):
             database_users = {
                 user for user in self.charm.postgresql.list_users() if user.startswith("relation-")
             }
-        except PostgreSQLListUsersError:
+        except PostgreSQLBaseError as e:
+            logger.error("Early-exit, failed to oversee users: %r", e)
             return
 
         # Retrieve the users from the active relations.
