@@ -196,6 +196,7 @@ def test_is_creating_backup(peers_ips, patroni):
         assert patroni.is_creating_backup
 
         # Test when no member is creating a backup.
+        del patroni.cached_cluster_status
         _cluster_status.return_value = [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         assert not patroni.is_creating_backup
 
