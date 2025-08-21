@@ -1446,8 +1446,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if self.refresh is None:
-            logger.warning("Warning _on_config_changed: Refresh could be in progress")
-        elif self.refresh.in_progress:
+            logger.debug("Defer on_config_changed: Refresh could be in progress")
+            event.defer()
+            return
+        if self.refresh.in_progress:
             logger.debug("Defer on_config_changed: Refresh in progress")
             event.defer()
             return
@@ -1569,8 +1571,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Safeguard against starting while refreshing.
         if self.refresh is None:
-            logger.warning("Warning on_start: Refresh could be in progress")
-        elif self.refresh.in_progress:
+            logger.debug("Defer on_start: Refresh could be in progress")
+            event.defer()
+            return False
+        if self.refresh.in_progress:
             # TODO: we should probably start workload if scale up while refresh in progress
             logger.debug("Defer on_start: Refresh in progress")
             event.defer()
