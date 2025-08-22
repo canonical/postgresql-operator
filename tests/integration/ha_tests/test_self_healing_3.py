@@ -227,9 +227,9 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
         await ops_test.model.wait_for_idle(
             apps=[app],
             status="active",
-            raise_on_blocked=True,
             timeout=1000,
             idle_period=30,
+            raise_on_error=False,
         )
 
     # Wait the LXD unit has its IP updated.

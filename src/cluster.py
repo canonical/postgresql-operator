@@ -17,6 +17,7 @@ from contextlib import suppress
 from functools import cached_property
 from pathlib import Path
 from ssl import CERT_NONE, create_default_context
+from time import sleep
 from typing import TYPE_CHECKING, Any, TypedDict
 
 import psutil
@@ -274,7 +275,7 @@ class Patroni:
         if response := self.parallel_patroni_get_request(
             f"/{PATRONI_CLUSTER_STATUS_ENDPOINT}", alternative_endpoints
         ):
-            logger.debug("Patroni cluster members: %s", response["members"])
+            logger.debug("API cluster_status: %s", response["members"])
             return response["members"]
         raise RetryError(
             last_attempt=Future.construct(1, Exception("Unable to reach any units"), True)
@@ -462,8 +463,40 @@ class Patroni:
                     timeout=API_REQUEST_TIMEOUT,
                     auth=self._patroni_auth,
                 )
+                logger.debug("API get_patroni_health: %s (%s)", r, r.elapsed.total_seconds())
 
         return r.json()
+
+    def is_restart_pending(self) -> bool:
+        """Returns whether the Patroni/PostgreSQL restart pending."""
+        pending_restart = self._get_patroni_restart_pending()
+        if pending_restart:
+            # The current Patroni 3.2.2 has wired behaviour: it temporary flag pending_restart=True
+            # on any changes to REST API, which is gone within a second but long enough to be
+            # cougth by charm. Sleep 2 seconds as a protection here until Patroni 3.3.0 upgrade.
+            # Repeat the request to make sure pending_restart flag is still here
+            logger.debug("Enduring restart is pending (to avoid unnecessary rolling restarts)")
+            sleep(2)
+            pending_restart = self._get_patroni_restart_pending()
+
+        return pending_restart
+
+    def _get_patroni_restart_pending(self) -> bool:
+        """Returns whether the Patroni flag pending_restart on REST API."""
+        r = requests.get(
+            f"{self._patroni_url}/patroni",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
+        )
+        pending_restart = r.json().get("pending_restart", False)
+        logger.debug(
+            f"API _get_patroni_restart_pending ({pending_restart}): %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
+        )
+
+        return pending_restart
 
     @property
     def is_creating_backup(self) -> bool:
@@ -498,15 +531,20 @@ class Patroni:
                     for members_ip in members_ips:
                         endpoint = "leader" if members_ip == primary_ip else "replica?lag=16kB"
                         url = self._patroni_url.replace(self.unit_ip, members_ip)
-                        member_status = requests.get(
+                        r = requests.get(
                             f"{url}/{endpoint}",
                             verify=self.verify,
                             auth=self._patroni_auth,
                             timeout=PATRONI_TIMEOUT,
                         )
-                        if member_status.status_code != 200:
+                        logger.debug(
+                            "API is_replication_healthy: %s (%s)",
+                            r,
+                            r.elapsed.total_seconds(),
+                        )
+                        if r.status_code != 200:
                             logger.debug(
-                                f"Failed replication check for {members_ip} with code {member_status.status_code}"
+                                f"Failed replication check for {members_ip} with code {r.status_code}"
                             )
                             raise Exception
         except RetryError:
@@ -559,17 +597,22 @@ class Patroni:
         try:
             for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
-                    cluster_status = requests.get(
+                    r = requests.get(
                         f"{self._patroni_url}/{PATRONI_CLUSTER_STATUS_ENDPOINT}",
                         verify=self.verify,
                         timeout=API_REQUEST_TIMEOUT,
                         auth=self._patroni_auth,
                     )
+                    logger.debug(
+                        "API is_member_isolated: %s (%s)",
+                        r.json()["members"],
+                        r.elapsed.total_seconds(),
+                    )
         except RetryError:
             # Return False if it was not possible to get the cluster info. Try again later.
             return False
 
-        return len(cluster_status.json()["members"]) == 0
+        return len(r.json()["members"]) == 0
 
     def online_cluster_members(self) -> list[ClusterMember]:
         """Return list of online cluster members."""
@@ -600,15 +643,21 @@ class Patroni:
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug(
+            "API promote_standby_cluster: %s (%s)",
+            config_response,
+            config_response.elapsed.total_seconds(),
+        )
         if "standby_cluster" not in config_response.json():
             raise StandbyClusterAlreadyPromotedError("standby cluster is already promoted")
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"standby_cluster": None},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API promote_standby_cluster patch: %s (%s)", r, r.elapsed.total_seconds())
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 if self.get_primary() is None:
@@ -672,6 +721,7 @@ class Patroni:
             user_databases_map: map of databases to be accessible by each user.
             slots: replication slots (keys) with assigned database name (values).
         """
+        slots = slots or {}
         if not self._are_passwords_set:
             logger.warning("Passwords are not yet generated by the leader")
             return
@@ -696,7 +746,7 @@ class Patroni:
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers
             else [],
-            peers_ips=self.peers_ips if not no_peers else set(),
+            peers_ips=sorted(self.peers_ips) if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
@@ -736,6 +786,7 @@ class Patroni:
             Whether the service started successfully.
         """
         try:
+            logger.debug("Starting Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.start(services=["patroni"])
@@ -755,6 +806,7 @@ class Patroni:
             Multi-line logs string.
         """
         try:
+            logger.debug("Getting Patroni logs...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             # Lib definition of num_lines only allows int
@@ -791,6 +843,7 @@ class Patroni:
             Whether the service stopped successfully.
         """
         try:
+            logger.debug("Stopping Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.stop(services=["patroni"])
@@ -816,6 +869,7 @@ class Patroni:
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
                 )
+                logger.debug("API switchover: %s (%s)", r, r.elapsed.total_seconds())
 
         # Check whether the switchover was unsuccessful.
         if r.status_code != 200:
@@ -982,12 +1036,14 @@ class Patroni:
     @retry(stop=stop_after_attempt(20), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reload_patroni_configuration(self):
         """Reload Patroni configuration after it was changed."""
-        requests.post(
+        logger.debug("Reloading Patroni configuration...")
+        r = requests.post(
             f"{self._patroni_url}/reload",
             verify=self.verify,
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API reload_patroni_configuration: %s (%s)", r, r.elapsed.total_seconds())
 
     def is_patroni_running(self) -> bool:
         """Check if the Patroni service is running."""
@@ -1006,6 +1062,7 @@ class Patroni:
             Whether the service restarted successfully.
         """
         try:
+            logger.debug("Restarting Patroni...")
             cache = snap.SnapCache()
             selected_snap = cache["charmed-postgresql"]
             selected_snap.restart(services=["patroni"])
@@ -1018,22 +1075,26 @@ class Patroni:
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def restart_postgresql(self) -> None:
         """Restart PostgreSQL."""
-        requests.post(
+        logger.debug("Restarting PostgreSQL...")
+        r = requests.post(
             f"{self._patroni_url}/restart",
             verify=self.verify,
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API restart_postgresql: %s (%s)", r, r.elapsed.total_seconds())
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def reinitialize_postgresql(self) -> None:
         """Reinitialize PostgreSQL."""
-        requests.post(
+        logger.debug("Reinitializing PostgreSQL...")
+        r = requests.post(
             f"{self._patroni_url}/reinitialize",
             verify=self.verify,
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
+        logger.debug("API reinitialize_postgresql: %s (%s)", r, r.elapsed.total_seconds())
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=2, max=10))
     def bulk_update_parameters_controller_by_patroni(self, parameters: dict[str, Any]) -> None:
@@ -1041,12 +1102,17 @@ class Patroni:
 
         For more information, check https://patroni.readthedocs.io/en/latest/patroni_configuration.html#postgresql-parameters-controlled-by-patroni.
         """
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"postgresql": {"parameters": parameters}},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
+        )
+        logger.debug(
+            "API bulk_update_parameters_controller_by_patroni: %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
         )
 
     def ensure_slots_controller_by_patroni(self, slots: dict[str, str]) -> None:
@@ -1063,12 +1129,17 @@ class Patroni:
                     timeout=PATRONI_TIMEOUT,
                     auth=self._patroni_auth,
                 )
+                logger.debug(
+                    "API ensure_slots_controller_by_patroni: %s (%s)",
+                    current_config,
+                    current_config.elapsed.total_seconds(),
+                )
                 if current_config.status_code != 200:
                     raise Exception(
                         f"Failed to get current Patroni config: {current_config.status_code} {current_config.text}"
                     )
         slots_patch: dict[str, dict[str, str] | None] = dict.fromkeys(
-            current_config.json().get("slots", ())
+            current_config.json().get("slots") or {}
         )
         for slot, database in slots.items():
             slots_patch[slot] = {
@@ -1076,12 +1147,17 @@ class Patroni:
                 "plugin": "pgoutput",
                 "type": "logical",
             }
-        requests.patch(
+        r = requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
             json={"slots": slots_patch},
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
+        )
+        logger.debug(
+            "API ensure_slots_controller_by_patroni: %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
         )
 
     @cached_property
@@ -1109,6 +1185,9 @@ class Patroni:
                     verify=self.verify,
                     auth=self._patroni_auth,
                     timeout=PATRONI_TIMEOUT,
+                )
+                logger.debug(
+                    "API update_synchronous_node_count: %s (%s)", r, r.elapsed.total_seconds()
                 )
 
                 # Check whether the update was unsuccessful.

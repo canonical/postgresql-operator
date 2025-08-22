@@ -869,6 +869,7 @@ def test_on_update_status(harness):
 
         # Test call to restart when the member is isolated from the cluster.
         _set_primary_status_message.reset_mock()
+        _start_observer.reset_mock()
         _member_started.return_value = False
         _is_member_isolated.return_value = True
         with harness.hooks_disabled():
@@ -1191,7 +1192,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots=None,
+            slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1222,7 +1223,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots=None,
+            slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
@@ -1306,6 +1307,9 @@ def test_on_cluster_topology_change_clear_blocked(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
+        patch(
+            "charm.PostgresqlOperatorCharm._set_primary_status_message"
+        ) as _set_primary_status_message,
     ):
         harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
@@ -1313,7 +1317,7 @@ def test_on_cluster_topology_change_clear_blocked(harness):
 
         _update_relation_endpoints.assert_called_once_with()
         _primary_endpoint.assert_called_once_with()
-        assert isinstance(harness.model.unit.status, ActiveStatus)
+        _set_primary_status_message.assert_called_once_with()
 
 
 def test_validate_config_options(harness):
@@ -2088,6 +2092,8 @@ def test_handle_postgresql_restart_need(harness):
         patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock") as _restart,
         patch("charm.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch("charm.Patroni._get_patroni_restart_pending") as _get_patroni_restart_pending,
+        patch("cluster.sleep"),
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
@@ -2110,7 +2116,7 @@ def test_handle_postgresql_restart_need(harness):
 
             _is_tls_enabled.return_value = values[0]
             postgresql_mock.is_tls_enabled.return_value = values[1]
-            postgresql_mock.is_restart_pending = PropertyMock(return_value=values[2])
+            _get_patroni_restart_pending.return_value = values[2]
 
             harness.charm._handle_postgresql_restart_need()
             _reload_patroni_configuration.assert_called_once()
