@@ -104,7 +104,7 @@ Learn more in the [legacy charm explanation page].
 [LDAP integration]: /how-to/enable-ldap
 [SoS report integration]: /reference/troubleshooting/sos-report
 [Recovery improvements]: /how-to/switchover-failover
-[synchronous units]: https://charmhub.io/postgresql/configurations?channel=14/edge#synchronous_node_count
+[synchronous units]: https://charmhub.io/postgresql/configurations?channel=16/edge#synchronous-node-count
 [internal charm passwords]: /explanation/users
 [Timescale Community Edition]: /how-to/enable-plugins-extensions/enable-timescaledb
 [Extended COS integration]: /how-to/monitoring-cos/enable-monitoring

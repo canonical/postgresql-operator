@@ -4,13 +4,10 @@ A minor {term}`in-place` {term}`upgrade` is a {term}`refresh` from one {term}`wo
 
 Once in the refresh is in progress, the UI will clearly indicate what is happening to each unit, and what actions are required from the user to continue the process or roll back in case of a problem.
 
-If your upgrade has failed, see [How to perform a minor rollback](/how-to/refresh/minor-rollback)
+If your upgrade has failed, see [Roll back an in-progress refresh](/how-to/refresh/rollback)
 
 ```{seealso}
-
-* [All Charmed PostgreSQL minor versions](/reference/releases)
-* [Developer docs for charm-refresh](https://canonical-charm-refresh.readthedocs-hosted.com/latest/)
-    * [`pause_after_unit_refresh` documentation](https://canonical-charm-refresh.readthedocs-hosted.com/latest/user-experience/config/#pause-after-unit-refresh)
+[All Charmed PostgreSQL minor versions](/reference/releases)
 ```
 
 ## Precautions
@@ -76,7 +73,7 @@ If there are any version incompatibilities in charm revisions, dependencies, or 
 
 ## Resume refresh
 
-If the [`pause_after_unit_refresh`](https://charmhub.io/postgresql/configurations?channel=16/edge#pause_after_unit_refresh) config option on your PostgreSQL application is set to `first` (default) or `all`, you'll need to monitor and manually resume the refresh when one or more units have finished refreshing individually.
+If the [`pause-after-unit-refresh`](https://charmhub.io/postgresql/configurations?channel=16/edge#pause-after-unit-refresh) config option on your PostgreSQL application is set to `first` (default) or `all`, you'll need to monitor and manually resume the refresh when one or more units have finished refreshing individually.
 
 When the refresh pauses and all units are in an idle state, check that they are healthy. <!-- TODO: how? -->
 

@@ -62,6 +62,29 @@ def harness():
     harness.cleanup()
 
 
+def test_config_fallback(harness):
+    """Test that config options with dashes (-) override config options with underscores (_)."""
+    harness.disable_hooks()
+    charm: PostgresqlOperatorCharm = harness.charm
+
+    assert charm.config.connection_authentication_timeout == 60
+
+    harness.update_config({"connection_authentication_timeout": 50})
+    assert charm.config.connection_authentication_timeout == 50
+
+    harness.update_config({"connection-authentication-timeout": 90})
+    assert charm.config.connection_authentication_timeout == 90
+
+    harness.update_config(unset=["connection-authentication-timeout"])
+    assert charm.config.connection_authentication_timeout == 50
+
+    harness.update_config(unset=["connection_authentication_timeout"])
+    assert charm.config.connection_authentication_timeout == 60
+
+    harness.update_config({"connection-authentication-timeout": 120})
+    assert charm.config.connection_authentication_timeout == 120
+
+
 def test_on_install(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
