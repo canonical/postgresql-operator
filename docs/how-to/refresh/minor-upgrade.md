@@ -1,6 +1,6 @@
 # Perform a minor upgrade
 
-A minor {term}`in-place` {term}`upgrade` is a {term}`refresh` from one {term}`workload` version to a higher one, within the same major version (e.g. PostgreSQL 14.12 --> PostgreSQL 14.15)
+A minor in-place upgrade is a refresh from one {term}`workload` version to a higher one, within the same major version (e.g. PostgreSQL 14.12 --> PostgreSQL 14.15)
 
 Once in the refresh is in progress, the UI will clearly indicate what is happening to each unit, and what actions are required from the user to continue the process or roll back in case of a problem.
 

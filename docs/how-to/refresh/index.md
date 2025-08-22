@@ -5,7 +5,7 @@
 Use `juju config appname pause-after-unit-refresh=all` to halt an in-progress refresh. Then, consider [rolling back](/how-to/refresh/rollback)
 ```
 
-Charmed PostgreSQL supports minor {term}`in-place` {term}`refresh` via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
+Charmed PostgreSQL supports minor in-place refresh via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
 
 ## Recommended refreshes
 
@@ -40,7 +40,7 @@ These refreshes should be supported. If possible, use a [recommended refresh](#r
 ```
 
 ## Non-supported refreshes
-These refreshes are not supported {term}`in-place`. In some of these cases, it may be possible to perform an out-of-place upgrade or downgrade.
+These refreshes are not supported in-place. In some of these cases, it may be possible to perform an out-of-place upgrade or downgrade.
 
 * Minor in-place {term}`downgrade` from PostgreSQL 16.10 to 16.9
 * Major in-place {term}`upgrade` from PostgreSQL 14 to 16

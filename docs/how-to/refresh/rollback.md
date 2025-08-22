@@ -19,5 +19,3 @@ If the [`pause-after-unit-refresh`](https://charmhub.io/postgresql/configuration
 When the refresh pauses and all units are in an idle state, check that they are healthy. <!-- TODO: how? -->
 
 Then, to resume the rollback, run the `resume-refresh` action on the unit shown by the app status.
-
-<!-->
