@@ -45,6 +45,8 @@ def mocked_requests_get(*args, **kwargs):
         def json(self):
             return self.json_data
 
+        elapsed = Mock()
+
     data = {
         "http://server1/cluster": {
             "members": [{"name": "postgresql-0", "host": "1.1.1.1", "role": "leader", "lag": "1"}]
@@ -310,7 +312,11 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
-            template = Template(file.read())
+            contents = file.read()
+            template = Template(contents)
+            # Setup a mock for the `open` method, set returned data to patroni.yml template.
+            mock = mock_open(read_data=contents)
+
         expected_content = template.render(
             conf_path=PATRONI_CONF_PATH,
             data_path=POSTGRESQL_DATA_PATH,
@@ -318,7 +324,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
             partner_addrs=["2.2.2.2", "3.3.3.3"],
-            peers_ips=peers_ips,
+            peers_ips=sorted(peers_ips),
             scope=scope,
             self_ip=patroni.unit_ip,
             listen_ips=["1.1.1.1", "192.168.0.1"],
@@ -331,11 +337,9 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             synchronous_node_count=0,
             raft_password=raft_password,
             patroni_password=patroni_password,
+            instance_password_encryption="scram-sha-256",
+            slots={},
         )
-
-        # Setup a mock for the `open` method, set returned data to patroni.yml template.
-        with open("templates/patroni.yml.j2") as f:
-            mock = mock_open(read_data=f.read())
 
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):
