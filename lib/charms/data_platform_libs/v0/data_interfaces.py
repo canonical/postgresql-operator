@@ -3022,7 +3022,10 @@ class DatabaseRequestedEvent(DatabaseProvidesEvent):
         ):
             secret = self.framework.model.get_secret(id=secret_uri)
             if content := secret.get_content(refresh=True):
-                names = {key: val if val != "None" else None for key, val in content.items()}
+                if "entity-name" in content:
+                    names = {content["entity-name"]: content.get("password")}
+                else:
+                    logger.warning("Invalid requested-entity-secret: no entity name")
         return names
 
 
@@ -3559,13 +3562,11 @@ class DatabaseRequirerEventHandlers(RequirerEventHandlers):
             self.relation_data.requested_entity_name
             and not self.relation_data.requested_entity_secret
         ):
+            content = {"entity-name": self.relation_data.requested_entity_name}
+            if self.relation_data.requested_entity_password:
+                content["password"] = self.relation_data.requested_entity_password
             secret = self.charm.app.add_secret(
-                {
-                    self.relation_data.requested_entity_name: str(
-                        self.relation_data.requested_entity_password
-                    )
-                },
-                label=f"{self.model.uuid}-{event.relation.id}-requested-entity",
+                content, label=f"{self.model.uuid}-{event.relation.id}-requested-entity"
             )
             secret.grant(event.relation)
             if not secret.id:

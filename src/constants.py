@@ -66,6 +66,8 @@ SECRET_INTERNAL_LABEL = "internal-secret"  # noqa: S105
 SECRET_DELETED_LABEL = "None"  # noqa: S105
 SYSTEM_USERS_PASSWORD_CONFIG = "system-users"  # noqa: S105
 
+USERNAME_MAPPING_LABEL = "custom-usernames"
+
 APP_SCOPE = "app"
 UNIT_SCOPE = "unit"
 

@@ -3,6 +3,7 @@
 
 """Postgres client relation hooks & helpers."""
 
+import json
 import logging
 import typing
 
@@ -23,7 +24,7 @@ from charms.postgresql_k8s.v1.postgresql import (
 )
 from ops import ActiveStatus, BlockedStatus, ModelError, Object, Relation, RelationBrokenEvent
 
-from constants import ALL_CLIENT_RELATIONS, APP_SCOPE, DATABASE_PORT, SYSTEM_USERS
+from constants import APP_SCOPE, DATABASE_PORT, SYSTEM_USERS, USERNAME_MAPPING_LABEL
 from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)
@@ -77,6 +78,27 @@ class PostgreSQLProvider(Object):
         extra_roles_list = [role for role in extra_roles_list if role not in ACCESS_GROUPS]
         return extra_roles_list
 
+    def get_username_mapping(self) -> dict[str, str]:
+        """Get a mapping of custom usernames by a relation ID."""
+        if username_mapping := self.charm.get_secret(APP_SCOPE, USERNAME_MAPPING_LABEL):
+            return json.loads(username_mapping)
+        return {}
+
+    def update_username_mapping(self, relation_id: int, username: str | None) -> None:
+        """Update a mapping of custom usernames in the application peer secret."""
+        if username == f"relation-{relation_id}":
+            return
+
+        username_mapping = self.get_username_mapping()
+        if username and username_mapping.get(str(relation_id)) != username:
+            username_mapping[str(relation_id)] = username
+        elif not username and username_mapping.get(str(relation_id)):
+            del username_mapping[str(relation_id)]
+        else:
+            # Cache is up to date
+            return
+        self.charm.set_secret(APP_SCOPE, USERNAME_MAPPING_LABEL, json.dumps(username_mapping))
+
     def _on_database_requested(self, event: DatabaseRequestedEvent) -> None:
         """Generate password and handle user and database creation for the related application."""
         # Check for some conditions before trying to access the PostgreSQL instance.
@@ -109,6 +131,7 @@ class PostgreSQLProvider(Object):
             self.charm.unit.status = BlockedStatus(NO_ACCESS_TO_SECRET_MSG)
             return
 
+        self.update_username_mapping(event.relation.id, user)
         self.charm.update_config()
         for key in self.charm.all_peer_data:
             # We skip the leader so we don't have to wait on the defer
@@ -174,6 +197,7 @@ class PostgreSQLProvider(Object):
 
     def _on_relation_broken(self, event: RelationBrokenEvent) -> None:
         """Correctly update the status."""
+        self.update_username_mapping(event.relation.id, None)
         self._update_unit_status(event.relation)
 
     def oversee_users(self) -> None:
@@ -192,14 +216,8 @@ class PostgreSQLProvider(Object):
             return
 
         # Retrieve the users from the active relations.
-        relations = [
-            relation
-            for relation_name, relations_list in self.model.relations.items()
-            for relation in relations_list
-            if relation_name in ALL_CLIENT_RELATIONS
-        ]
         relation_users = set()
-        for relation in relations:
+        for relation in self.model.relations[self.relation_name]:
             username = f"relation-{relation.id}"
             relation_users.add(username)
 

@@ -746,6 +746,7 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -2701,7 +2702,7 @@ def test_generate_user_hash(harness):
 
         assert harness.charm.generate_user_hash == sentinel.hash
 
-        _shake_128.assert_called_once_with(b"{'relation_id_2': 'test_db'}")
+        _shake_128.assert_called_once_with(b"{'relation-2': 'test_db'}")
 
 
 def test_relations_user_databases_map(harness):
