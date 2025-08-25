@@ -265,7 +265,7 @@ class PostgreSQLBackups(Object):
             return
 
         bucket_name = s3_parameters["bucket"]
-        region = s3_parameters.get("region")
+        region = s3_parameters.get("region", "")
 
         try:
             s3 = self._get_s3_session_resource(s3_parameters)
@@ -1329,8 +1329,7 @@ Stderr:
 
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
-        # Existing behaviour is none not a str
-        s3_parameters.setdefault("region", None)  # type: ignore
+        s3_parameters.setdefault("region", "")
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
         s3_parameters.setdefault("delete-older-than-days", "9999999")
