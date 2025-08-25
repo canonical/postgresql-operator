@@ -196,7 +196,7 @@ class Patroni:
         if self.patroni_password:
             return BasicAuth("patroni", password=self.patroni_password)
 
-    @property
+    @cached_property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"https://{self.unit_ip}:8008"

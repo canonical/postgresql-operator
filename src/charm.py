@@ -369,7 +369,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
@@ -496,11 +496,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # RelationData has dict like API
         return self._peers.data  # type: ignore
-
-    @property
-    def tracing_endpoint(self) -> str | None:
-        """Otlp http endpoint for charm instrumentation."""
-        return self._tracing_endpoint_config
 
     @cached_property
     def cpu_count(self) -> int:
