@@ -259,7 +259,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     _postgresql: PostgreSQL | None = None
 
     # Override data_models.py TypedCharmBase config
-    @property
+    @cached_property
     def config(self):
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
@@ -369,7 +369,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
@@ -497,12 +497,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # RelationData has dict like API
         return self._peers.data  # type: ignore
 
-    @property
-    def tracing_endpoint(self) -> str | None:
-        """Otlp http endpoint for charm instrumentation."""
-        return self._tracing_endpoint_config
-
-    @property
+    @cached_property
     def cpu_count(self) -> int:
         """Property with numbers of cpus."""
         if cpus := os.cpu_count():
@@ -609,24 +604,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    @property
+    @cached_property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
-        password = str(self.get_secret(APP_SCOPE, f"{USER}-password"))
-        if self._postgresql is None or self._postgresql.primary_host is None:
-            self._postgresql = PostgreSQL(
-                primary_host=self.primary_endpoint,
-                current_host=self._unit_ip,
-                user=USER,
-                password=password,
-                database=DATABASE_DEFAULT_NAME,
-                system_users=SYSTEM_USERS,
-            )
-        else:
-            self._postgresql.password = password
-        return self._postgresql
+        return PostgreSQL(
+            primary_host=self.primary_endpoint,
+            current_host=self._unit_ip,
+            user=USER,
+            password=str(self.get_secret(APP_SCOPE, f"{USER}-password")),
+            database=DATABASE_DEFAULT_NAME,
+            system_users=SYSTEM_USERS,
+        )
 
-    @property
+    @cached_property
     def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
         if not self._peers:
@@ -1130,7 +1120,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 hosts.append(unit.name.replace("/", "-"))
         return set(hosts)
 
-    @property
+    @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
