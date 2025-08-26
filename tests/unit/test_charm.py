@@ -70,18 +70,23 @@ def test_config_fallback(harness):
     assert charm.config.connection_authentication_timeout == 60
 
     harness.update_config({"connection_authentication_timeout": 50})
+    del harness.charm.config
     assert charm.config.connection_authentication_timeout == 50
 
     harness.update_config({"connection-authentication-timeout": 90})
+    del harness.charm.config
     assert charm.config.connection_authentication_timeout == 90
 
     harness.update_config(unset=["connection-authentication-timeout"])
+    del harness.charm.config
     assert charm.config.connection_authentication_timeout == 50
 
     harness.update_config(unset=["connection_authentication_timeout"])
+    del harness.charm.config
     assert charm.config.connection_authentication_timeout == 60
 
     harness.update_config({"connection-authentication-timeout": 120})
+    del harness.charm.config
     assert charm.config.connection_authentication_timeout == 120
 
 
@@ -337,6 +342,7 @@ def test_check_extension_dependencies(harness):
         # Test when plugins dependencies exception caused
         config["plugin_address_standardizer_enable"] = True
         harness.update_config(config)
+        del harness.charm.config
         harness.charm.enable_disable_extensions()
         assert isinstance(harness.model.unit.status, BlockedStatus)
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
@@ -1342,6 +1348,7 @@ def test_validate_config_options(harness):
         # Test ldap_map exception
         with harness.hooks_disabled():
             harness.update_config({"ldap_map": "ldap_group="})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -1353,6 +1360,7 @@ def test_validate_config_options(harness):
         # Test request_date_style exception
         with harness.hooks_disabled():
             harness.update_config({"request_date_style": "ISO, TEST"})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -1364,6 +1372,7 @@ def test_validate_config_options(harness):
         # Test request_time_zone exception
         with harness.hooks_disabled():
             harness.update_config({"request_time_zone": "TEST_ZONE"})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -1375,6 +1384,7 @@ def test_validate_config_options(harness):
         # Test locales exception
         with harness.hooks_disabled():
             harness.update_config({"response_lc_monetary": "test_TEST"})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -2522,6 +2532,7 @@ def test_get_plugins(harness):
             "plugin_citext_enable": True,
             "plugin_spi_enable": True,
         })
+        del harness.charm.config
         assert harness.charm.get_plugins() == [
             "pgaudit",
             "citext",
@@ -2533,6 +2544,7 @@ def test_get_plugins(harness):
 
         # Test when the charm has the pgAudit plugin disabled.
         harness.update_config({"plugin_audit_enable": False})
+        del harness.charm.config
         assert harness.charm.get_plugins() == [
             "citext",
             "refint",

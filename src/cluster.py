@@ -14,6 +14,7 @@ import shutil
 import subprocess
 from asyncio import as_completed, create_task, run, wait
 from contextlib import suppress
+from functools import cached_property
 from pathlib import Path
 from ssl import CERT_NONE, create_default_context
 from time import sleep
@@ -185,17 +186,17 @@ class Patroni:
             self.patroni_password,
         ])
 
-    @property
+    @cached_property
     def _patroni_auth(self) -> HTTPBasicAuth | None:
         if self.patroni_password:
             return HTTPBasicAuth("patroni", self.patroni_password)
 
-    @property
+    @cached_property
     def _patroni_async_auth(self) -> BasicAuth | None:
         if self.patroni_password:
             return BasicAuth("patroni", password=self.patroni_password)
 
-    @property
+    @cached_property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"https://{self.unit_ip}:8008"
@@ -239,7 +240,7 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
-    @property
+    @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
@@ -263,7 +264,7 @@ class Patroni:
         with pathlib.Path("refresh_versions.toml").open("rb") as file:
             return tomli.load(file)["workload"]
 
-    @property
+    @cached_property
     def cached_cluster_status(self):
         """Cached cluster status."""
         return self.cluster_status()
@@ -447,7 +448,7 @@ class Patroni:
             member["role"] in ["leader", "standby_leader"] for member in members
         )
 
-    @property
+    @cached_property
     def cached_patroni_health(self) -> dict[str, str]:
         """Cached local unit health."""
         return self.get_patroni_health()
@@ -1159,7 +1160,7 @@ class Patroni:
             r.elapsed.total_seconds(),
         )
 
-    @property
+    @cached_property
     def _synchronous_node_count(self) -> int:
         planned_units = self.charm.app.planned_units()
         if self.charm.config.synchronous_node_count == "all":
