@@ -105,7 +105,9 @@ def microceph():
     )
 
     logger.info("Setting up microceph")
-    subprocess.run(["sudo", "snap", "install", "microceph", "--channel", "squid/stable"], check=True)
+    subprocess.run(
+        ["sudo", "snap", "install", "microceph", "--channel", "squid/stable"], check=True
+    )
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,1G,3"], check=True)
     subprocess.run(
