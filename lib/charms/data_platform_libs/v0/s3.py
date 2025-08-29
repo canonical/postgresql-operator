@@ -110,6 +110,7 @@ class ExampleRequirerCharm(CharmBase):
 ```
 
 """
+
 import json
 import logging
 from collections import namedtuple
@@ -137,7 +138,7 @@ LIBAPI = 0
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 5
+LIBPATCH = 6
 
 logger = logging.getLogger(__name__)
 
@@ -354,7 +355,7 @@ class S3Provider(Object):
                 updated_connection_data[configuration_option] = configuration_value
 
         relation.data[self.local_app].update(updated_connection_data)
-        logger.debug(f"Updated S3 connection info: {updated_connection_data}")
+        logger.debug("Updated S3 connection info.")
 
     @property
     def relations(self) -> List[Relation]:
@@ -721,7 +722,7 @@ class S3Requirer(Object):
                 updated_connection_data[configuration_option] = configuration_value
 
         relation.data[self.local_app].update(updated_connection_data)
-        logger.debug(f"Updated S3 credentials: {updated_connection_data}")
+        logger.debug("Updated S3 credentials.")
 
     def _load_relation_data(self, raw_relation_data: RelationDataContent) -> Dict[str, str]:
         """Loads relation data from the relation data bag.
