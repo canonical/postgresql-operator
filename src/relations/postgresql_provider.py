@@ -357,6 +357,7 @@ class PostgreSQLProvider(Object):
             if self.check_for_invalid_extra_user_roles(relation.id):
                 self.charm.unit.status = BlockedStatus(INVALID_EXTRA_USER_ROLE_BLOCKING_MESSAGE)
                 return
+            existing_users = self.charm.postgresql.list_users()
             for relation in self.charm.model.relations.get(self.relation_name, []):
                 try:
                     if secret_uri := self.database_provides.fetch_relation_field(
@@ -364,7 +365,7 @@ class PostgreSQLProvider(Object):
                     ):
                         content = self.framework.model.get_secret(id=secret_uri).get_content()
                         for key in content:
-                            if key in SYSTEM_USERS:
+                            if key in SYSTEM_USERS or key in existing_users:
                                 logger.warning(
                                     f"Relation {relation.id} is still requesting a forbidden user"
                                 )
