@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 # Label not a secret
 NO_ACCESS_TO_SECRET_MSG = "Missing grant to requested entity secret"  # noqa: S105
-FORBIDDEN_USER_MSG = "Requesting a system username"
+FORBIDDEN_USER_MSG = "Requesting an existing username"
 
 if typing.TYPE_CHECKING:
     from charm import PostgresqlOperatorCharm
@@ -123,7 +123,7 @@ class PostgreSQLProvider(Object):
                     user = key
                     password = val
                     break
-                if user in SYSTEM_USERS:
+                if user in SYSTEM_USERS or user in self.charm.postgresql.list_users():
                     self.charm.unit.status = BlockedStatus(FORBIDDEN_USER_MSG)
                     return
         except ModelError:
