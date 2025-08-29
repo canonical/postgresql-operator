@@ -2502,8 +2502,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns a user->databases map for all relations."""
         user_database_map = {}
         # Copy relations users directly instead of waiting for them to be created
+        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            user = f"relation-{relation.id}"
+            user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
             if user not in user_database_map and (
                 database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                     relation.id, "database"
@@ -2557,11 +2558,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         user_db_pairs = {}
+        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
             if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                 relation.id, "database"
             ):
-                user = f"relation_id_{relation.id}"
+                user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
                 user_db_pairs[user] = database
         return shake_128(str(user_db_pairs).encode()).hexdigest(16)
 
