@@ -651,8 +651,8 @@ class PostgreSQL:
         self,
         user: str,
         database: str,
-        schematables: list[str],
-        old_schematables: list[str] | None = None,
+        schematables: List[str],
+        old_schematables: Optional[List[str]] = None,
     ) -> None:
         """Grant CONNECT privilege on database and SELECT privilege on tables.
 
@@ -695,7 +695,7 @@ class PostgreSQL:
                 connection.close()
 
     def revoke_replication_privileges(
-        self, user: str, database: str, schematables: list[str]
+        self, user: str, database: str, schematables: List[str]
     ) -> None:
         """Revoke all privileges from tables and database.
 
@@ -1376,7 +1376,7 @@ $$ LANGUAGE plpgsql security definer;"""
             if connection:
                 connection.close()
 
-    def create_publication(self, db: str, name: str, schematables: list[str]) -> None:
+    def create_publication(self, db: str, name: str, schematables: List[str]) -> None:
         """Create PostgreSQL publication."""
         connection = None
         try:
@@ -1417,7 +1417,7 @@ $$ LANGUAGE plpgsql security definer;"""
             if connection:
                 connection.close()
 
-    def alter_publication(self, db: str, name: str, schematables: list[str]) -> None:
+    def alter_publication(self, db: str, name: str, schematables: List[str]) -> None:
         """Alter PostgreSQL publication."""
         connection = None
         try:
