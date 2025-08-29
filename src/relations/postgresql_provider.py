@@ -360,8 +360,13 @@ class PostgreSQLProvider(Object):
             existing_users = self.charm.postgresql.list_users()
             for relation in self.charm.model.relations.get(self.relation_name, []):
                 try:
-                    if secret_uri := self.database_provides.fetch_relation_field(
-                        relation.id, "requested-entity-secret"
+                    # Relation is not established and custom user was requested
+                    if not self.database_provides.fetch_my_relation_field(
+                        relation.id, "secret-user"
+                    ) and (
+                        secret_uri := self.database_provides.fetch_relation_field(
+                            relation.id, "requested-entity-secret"
+                        )
                     ):
                         content = self.framework.model.get_secret(id=secret_uri).get_content()
                         for key in content:
