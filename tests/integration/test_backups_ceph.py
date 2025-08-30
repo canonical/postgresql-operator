@@ -14,7 +14,6 @@ import botocore.exceptions
 import pytest
 from pytest_operator.plugin import OpsTest
 
-from . import markers
 from .helpers import (
     backup_operations,
 )
@@ -112,7 +111,9 @@ def microceph():
     )
 
     logger.info("Setting up microceph")
-    subprocess.run(["sudo", "snap", "install", "microceph", "--revision", "1169"], check=True)
+    subprocess.run(
+        ["sudo", "snap", "install", "microceph", "--channel", "squid/stable"], check=True
+    )
     subprocess.run(["sudo", "microceph", "cluster", "bootstrap"], check=True)
     subprocess.run(["sudo", "microceph", "disk", "add", "loop,1G,3"], check=True)
     subprocess.run(
@@ -190,7 +191,6 @@ def cloud_configs(microceph: ConnectionInformation):
     }
 
 
-@markers.amd64_only
 async def test_backup_ceph(ops_test: OpsTest, cloud_configs, cloud_credentials, charm) -> None:
     """Build and deploy two units of PostgreSQL in microceph, test backup and restore actions."""
     await backup_operations(
