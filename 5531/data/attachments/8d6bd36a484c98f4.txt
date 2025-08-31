@@ -1,0 +1,196 @@
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:540 starting continuous writes to the database
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:543 checking whether writes are increasing
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 2, 'testing.postgresql-2': 2}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 4, 'testing.postgresql-2': 4}
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:546 scaling out the clusters
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: 
+  postgresql/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary
+  postgresql/2 [idle] active: 
+  postgresql/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m integration.ha_tests.test_async_replication:test_async_replication.py:82 Destroying second model
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.9    unsupported  02:36:57Z
+
+App                  Version  Status  Scale  Charm                Channel      Rev  Exposed  Message
+data-integrator               active      1  data-integrator      latest/edge  230  no       
+postgresql                    active    2/3  postgresql                          0  no       Primary
+postgresql-test-app           active      1  postgresql-test-app  latest/edge  404  no       received database credentials of the first database
+
+Unit                    Workload  Agent       Machine  Public address  Ports     Message
+data-integrator/0*      active    idle        3        10.50.91.198              
+postgresql-test-app/0*  active    idle        4        10.50.91.123              received database credentials of the first database
+postgresql/0*           active    idle        0        10.50.91.117    5432/tcp  Primary
+postgresql/2            active    idle        2        10.50.91.133    5432/tcp  
+postgresql/3            waiting   allocating  5                                  waiting for machine
+
+Machine  State    Address       Inst id        Base          AZ               Message
+0        started  10.50.91.117  juju-89c25e-0  ubuntu@22.04  pkrvmccyg1gnepe  Running
+2        started  10.50.91.133  juju-89c25e-2  ubuntu@22.04  pkrvmccyg1gnepe  Running
+3        started  10.50.91.198  juju-89c25e-3  ubuntu@24.04  pkrvmccyg1gnepe  Running
+4        started  10.50.91.123  juju-89c25e-4  ubuntu@22.04  pkrvmccyg1gnepe  Running
+5        pending                pending        ubuntu@22.04                   Creating container
+
+Offer              Application  Charm       Rev  Connected  Endpoint           Interface         Role
+replication        postgresql   postgresql  0    0/0        replication        postgresql_async  requirer
+replication-offer  postgresql   postgresql  0    1/1        replication-offer  postgresql_async  provider
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-3: 01:32:52 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:32:52 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-data-integrator-0: 01:32:53 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-0: 01:34:29 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:34:29 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-0: 01:34:30 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-0: 01:36:56 ERROR unit.postgresql/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 494, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 325, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7f97514582b0>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.50.91.117', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f97514582b0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 571, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.50.91.117', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f97514582b0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+unit-postgresql-0: 01:37:42 ERROR unit.postgresql/0.juju-log database:4: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-1: 01:38:44 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:38:44 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-1: 01:38:45 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-2: 01:39:14 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:39:15 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-2: 01:39:15 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-4: 01:39:50 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:39:50 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-postgresql-test-app-0: 01:39:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-postgresql-1: 01:42:24 ERROR unit.postgresql/1.juju-log Failed to list PostgreSQL database users: connection to server at "10.50.91.128", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-1: 01:52:33 ERROR unit.postgresql/1.juju-log Failed to list PostgreSQL database users: connection to server at "10.50.91.128", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-2: 01:52:36 ERROR unit.postgresql/2.juju-log Failed to list PostgreSQL database users: connection to server at "10.50.91.133", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-postgresql-0: 02:00:17 ERROR unit.postgresql/0.juju-log database-peers:2: Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 494, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 325, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7fee8f37ed40>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.50.91.117', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fee8f37ed40>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/src/cluster.py", line 571, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-postgresql-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.50.91.117', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7fee8f37ed40>: Failed to establish a new connection: [Errno 111] Connection refused'))
+unit-postgresql-0: 02:35:45 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-test-app-0: 02:35:47 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-postgresql-2: 02:36:05 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+unit-data-integrator-0: 02:36:11 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-2: 02:36:27 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-3: 02:36:27 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-4: 02:36:27 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+machine-0: 02:36:27 ERROR juju.worker.dependency "log-sender" manifold worker returned unexpected error: sending log message: websocket: close 1005 (no status): websocket: close sent
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
