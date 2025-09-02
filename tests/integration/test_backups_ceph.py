@@ -12,9 +12,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from . import markers
-from .helpers import (
-    backup_operations,
-)
+from .helpers import backup_operations
 
 logger = logging.getLogger(__name__)
 
