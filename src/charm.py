@@ -1337,11 +1337,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
         # Install the charmed PostgreSQL snap.
-        try:
-            self._install_snap_package(revision=None)
-        except snap.SnapError:
-            self.set_unit_status(BlockedStatus("failed to install snap packages"))
-            return
+        self._install_snap_package(revision=None)
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]

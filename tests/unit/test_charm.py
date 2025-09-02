@@ -119,22 +119,6 @@ def test_on_install(harness):
         assert isinstance(harness.model.unit.status, WaitingStatus)
 
 
-def test_on_install_snap_failure(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
-        patch(
-            "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
-        ) as _is_storage_attached,
-    ):
-        # Mock the result of the call.
-        _install_snap_package.side_effect = snap.SnapError
-        # Trigger the hook.
-        harness.charm.on.install.emit()
-        # Assert that the needed calls were made.
-        _install_snap_package.assert_called_once()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
-
-
 def test_patroni_scrape_config(harness):
     result = harness.charm.patroni_scrape_config()
 
