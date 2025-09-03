@@ -1,22 +1,22 @@
+---
+relatedlinks: "[Charm&#32risk](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk)"
+---
+
 # Releases
 
-This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release.
+Charmed PostgreSQL 16 supports all [features listed in PostgreSQL 14](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/reference/releases/#dependencies-and-supported-features).
 
-To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk).
+| Release | PostgreSQL version | Minimum Juju version | 
+|:---:|:---:|:---:|
+| [843, 844] | 16.9  | 3.6+  |
 
-To see all releases and commits, check the [Charmed PostgreSQL Releases page on GitHub](https://github.com/canonical/postgresql-operator/releases).
+See all release notes on [GitHub](https://github.com/canonical/postgresql-operator/releases).
 
-## Dependencies and supported features
+## How to refresh (upgrade)
 
-For a given release, this table shows:
-* The PostgreSQL version packaged inside.
-* The minimum Juju 3 version required to reliably operate **all** features of the release
-* Support for specific features
+Charmed PostgreSQL supports **minor in-place upgrades**. See [](/how-to/refresh/index) for more information.
 
-| Release | PostgreSQL version | Minimum Juju version | [TLS encryption](/how-to/enable-tls) | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/index) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|   |   |   | ![check] | ![check] | ![check] | ![check] | ![check] |
-
+[Contact us](/reference/contacts) if you are interested in migrating from PostgreSQL 14 to 16.
 
 ## Architecture and base
 
@@ -24,16 +24,11 @@ Several [revisions](https://documentation.ubuntu.com/juju/3.6/reference/charm/#c
 
 If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.
 
-```{caution}
-If you deploy with the `--revision` flag, **you must make sure the revision matches your base and architecture**. 
+<!--TODO: Move to explanation -->
 
-Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
-```
 
-## Plugins/extensions
-
-For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
-
+<!-- LINKS -->
+[843, 844]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
 
 <!--BADGES-->
 [check]: https://img.icons8.com/color/20/checkmark--v1.png
