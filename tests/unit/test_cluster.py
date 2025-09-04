@@ -562,7 +562,7 @@ def test_configure_patroni_on_unit(peers_ips, patroni):
 
         _open.assert_called_once_with(CREATE_CLUSTER_CONF_PATH, "a")
         _chmod.assert_called_once_with(
-            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 488
+            "/var/snap/charmed-postgresql/common/var/lib/postgresql", 448
         )
 
 
