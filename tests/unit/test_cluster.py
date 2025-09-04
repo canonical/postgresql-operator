@@ -10,6 +10,7 @@ from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
+from single_kernel_postgresql.config.literals import REWIND_USER
 from tenacity import (
     RetryError,
     stop_after_delay,
@@ -29,7 +30,6 @@ from constants import (
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    REWIND_USER,
 )
 
 PATRONI_SERVICE = "patroni"
