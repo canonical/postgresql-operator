@@ -15,10 +15,6 @@ import psycopg2
 import pytest
 import tomli
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v1.postgresql import (
-    PostgreSQLCreateUserError,
-    PostgreSQLEnableDisableExtensionError,
-)
 from ops import RelationEvent, Unit
 from ops.framework import EventBase
 from ops.model import (
@@ -31,6 +27,10 @@ from ops.model import (
 )
 from ops.testing import Harness
 from psycopg2 import OperationalError
+from single_kernel_postgresql.utils.postgresql import (
+    PostgreSQLCreateUserError,
+    PostgreSQLEnableDisableExtensionError,
+)
 from tenacity import RetryError, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR
@@ -886,7 +886,7 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _handle_processes_failures,
         patch("charm.PostgreSQLBackups.can_use_s3_repository") as _can_use_s3_repository,
         patch(
-            "charms.postgresql_k8s.v1.postgresql.PostgreSQL.get_current_timeline"
+            "single_kernel_postgresql.utils.postgresql.PostgreSQL.get_current_timeline"
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm._setup_users") as _setup_users,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,

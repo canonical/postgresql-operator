@@ -11,7 +11,9 @@ from charms.data_platform_libs.v0.data_interfaces import (
     DatabaseProvides,
     DatabaseRequestedEvent,
 )
-from charms.postgresql_k8s.v1.postgresql import (
+from ops import ActiveStatus, BlockedStatus, ModelError, Object, Relation, RelationBrokenEvent
+from single_kernel_postgresql.config.literals import SYSTEM_USERS
+from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_RELATION,
     ACCESS_GROUPS,
     INVALID_DATABASE_NAME_BLOCKING_MESSAGE,
@@ -21,9 +23,8 @@ from charms.postgresql_k8s.v1.postgresql import (
     PostgreSQLCreateUserError,
     PostgreSQLDeleteUserError,
 )
-from ops import ActiveStatus, BlockedStatus, ModelError, Object, Relation, RelationBrokenEvent
 
-from constants import APP_SCOPE, DATABASE_PORT, SYSTEM_USERS, USERNAME_MAPPING_LABEL
+from constants import APP_SCOPE, DATABASE_PORT, USERNAME_MAPPING_LABEL
 from utils import label2name, new_password
 
 logger = logging.getLogger(__name__)

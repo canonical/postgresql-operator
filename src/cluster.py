@@ -29,6 +29,11 @@ from jinja2 import Template
 from ops import BlockedStatus
 from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
+from single_kernel_postgresql.config.literals import (
+    PEER,
+    REWIND_USER,
+    USER,
+)
 from tenacity import (
     Future,
     RetryError,
@@ -47,14 +52,11 @@ from constants import (
     PATRONI_CONF_PATH,
     PATRONI_LOGS_PATH,
     PATRONI_SERVICE_DEFAULT_PATH,
-    PEER,
     PGBACKREST_CONFIGURATION_FILE,
     POSTGRESQL_CONF_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    REWIND_USER,
     TLS_CA_BUNDLE_FILE,
-    USER,
 )
 from utils import label2name
 

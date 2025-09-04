@@ -30,21 +30,6 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v1.postgresql import (
-    ACCESS_GROUP_IDENTITY,
-    ACCESS_GROUPS,
-    REQUIRED_PLUGINS,
-    ROLE_BACKUP,
-    ROLE_STATS,
-    PostgreSQL,
-    PostgreSQLCreatePredefinedRolesError,
-    PostgreSQLCreateUserError,
-    PostgreSQLEnableDisableExtensionError,
-    PostgreSQLGetCurrentTimelineError,
-    PostgreSQLGrantDatabasePrivilegesToUserError,
-    PostgreSQLListUsersError,
-    PostgreSQLUpdateUserPasswordError,
-)
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import (
@@ -68,6 +53,30 @@ from ops import (
     WaitingStatus,
     main,
 )
+from single_kernel_postgresql.config.literals import (
+    BACKUP_USER,
+    MONITORING_USER,
+    PEER,
+    REPLICATION_USER,
+    REWIND_USER,
+    SYSTEM_USERS,
+    USER,
+)
+from single_kernel_postgresql.utils.postgresql import (
+    ACCESS_GROUP_IDENTITY,
+    ACCESS_GROUPS,
+    REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_STATS,
+    PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
+    PostgreSQLCreateUserError,
+    PostgreSQLEnableDisableExtensionError,
+    PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
+    PostgreSQLListUsersError,
+    PostgreSQLUpdateUserPasswordError,
+)
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
@@ -85,31 +94,25 @@ from cluster_topology_observer import (
 from config import CharmConfig
 from constants import (
     APP_SCOPE,
-    BACKUP_USER,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
-    MONITORING_USER,
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
-    PEER,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
-    REPLICATION_USER,
     REWIND_PASSWORD_KEY,
-    REWIND_USER,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
-    SYSTEM_USERS,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -117,7 +120,6 @@ from constants import (
     TRACING_PROTOCOL,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
-    USER,
     USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP

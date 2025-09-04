@@ -4,16 +4,16 @@
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
-from charms.postgresql_k8s.v1.postgresql import (
+from ops.framework import EventBase
+from ops.model import ActiveStatus, BlockedStatus
+from ops.testing import Harness
+from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.framework import EventBase
-from ops.model import ActiveStatus, BlockedStatus
-from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
 from constants import PEER

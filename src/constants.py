@@ -15,19 +15,13 @@ REPLICATION_OFFER_RELATION = "replication-offer"
 API_REQUEST_TIMEOUT = 5
 PATRONI_CLUSTER_STATUS_ENDPOINT = "cluster"
 BACKUP_USER = "backup"
-REPLICATION_USER = "replication"
-REWIND_USER = "rewind"
 TLS_KEY_FILE = "key.pem"
 TLS_CA_FILE = "ca.pem"
 TLS_CERT_FILE = "cert.pem"
 TLS_CA_BUNDLE_FILE = "peer_ca_bundle.pem"
-USER = "operator"
-MONITORING_USER = "monitoring"
 MONITORING_SNAP_SERVICE = "prometheus-postgres-exporter"
 PATRONI_SERVICE_NAME = "snap.charmed-postgresql.patroni.service"
 PATRONI_SERVICE_DEFAULT_PATH = f"/etc/systemd/system/{PATRONI_SERVICE_NAME}"
-# List of system usernames needed for correct work of the charm/workload.
-SYSTEM_USERS = [REPLICATION_USER, REWIND_USER, USER, MONITORING_USER]
 
 # Snap constants.
 PGBACKREST_EXECUTABLE = "charmed-postgresql.pgbackrest"
