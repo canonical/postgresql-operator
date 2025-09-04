@@ -1060,6 +1060,7 @@ class PostgreSQL:
             cursor = connection.cursor()
 
             if temp_location is not None:
+                # Fix permissions on the temporary tablespace location when a reboot happens and tmpfs is being used.
                 user = pwd.getpwnam("_daemon_")
                 os.chown(temp_location, uid=user.pw_uid, gid=user.pw_gid)
                 os.chmod(temp_location, 0o700)
