@@ -20,6 +20,8 @@ Any charm using this library should import the `psycopg2` or `psycopg2-binary` d
 """
 
 import logging
+import os
+import pwd
 from collections import OrderedDict
 from typing import Dict, List, Optional, Set, Tuple
 
@@ -1058,6 +1060,10 @@ class PostgreSQL:
             cursor = connection.cursor()
 
             if temp_location is not None:
+                user = pwd.getpwnam("_daemon_")
+                os.chown(temp_location, uid=user.pw_uid, gid=user.pw_gid)
+                os.chmod(temp_location, 0o700)
+
                 cursor.execute("SELECT TRUE FROM pg_tablespace WHERE spcname='temp';")
                 if cursor.fetchone() is None:
                     cursor.execute(f"CREATE TABLESPACE temp LOCATION '{temp_location}';")
