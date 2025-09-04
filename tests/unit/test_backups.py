@@ -1802,6 +1802,7 @@ def test_retrieve_s3_parameters(harness):
                 "bucket": "test-bucket",
                 "delete-older-than-days": "9999999",
                 "endpoint": "https://s3.amazonaws.com",
+                "region": "",
                 "path": "/",
                 "s3-uri-style": "host",
                 "secret-key": "test-secret-key",
