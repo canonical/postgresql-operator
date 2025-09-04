@@ -660,7 +660,7 @@ class PostgreSQLAsyncReplication(Object):
             ) from e
         os.mkdir(POSTGRESQL_DATA_PATH)
         # Expected permissions
-        os.chmod(POSTGRESQL_DATA_PATH, 0o750)  # noqa: S103
+        os.chmod(POSTGRESQL_DATA_PATH, 0o700)
         self.charm._patroni._change_owner(POSTGRESQL_DATA_PATH)
 
     @property
