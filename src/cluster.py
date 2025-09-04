@@ -227,7 +227,7 @@ class Patroni:
 
         # Expected permission
         # Replicas refuse to start with the default permissions
-        os.chmod(POSTGRESQL_DATA_PATH, 0o750)  # noqa: S103
+        os.chmod(POSTGRESQL_DATA_PATH, 0o700)  # noqa: S103
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
