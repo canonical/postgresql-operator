@@ -105,11 +105,13 @@ class PostgreSQLBackups(Object):
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
-        session = Session(
-            aws_access_key_id=s3_parameters["access-key"],
-            aws_secret_access_key=s3_parameters["secret-key"],
-            region_name=s3_parameters["region"],
-        )
+        kwargs = {
+            "aws_access_key_id": s3_parameters["access-key"],
+            "aws_secret_access_key": s3_parameters["secret-key"],
+        }
+        if "region" in s3_parameters:
+            kwargs["region_name"] = s3_parameters["region"]
+        session = Session(**kwargs)
         return session.resource(
             "s3",
             endpoint_url=self._construct_endpoint(s3_parameters),
@@ -1327,7 +1329,6 @@ Stderr:
 
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
-        s3_parameters.setdefault("region", "")
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
         s3_parameters.setdefault("delete-older-than-days", "9999999")
