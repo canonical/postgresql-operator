@@ -44,7 +44,6 @@ The following generated API references can be found on [Charmhub](https://charmh
 :hidden:
 
 Releases <releases>
-Versions <versions>
 System requirements <system-requirements>
 Software testing <software-testing>
 Performance and resources <performance-and-resources>
@@ -53,3 +52,4 @@ Plugins/extensions <plugins-extensions>
 Alert rules <alert-rules>
 Statuses <statuses>
 Contacts <contacts>
+```

@@ -8,15 +8,18 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 
 ## Dependencies and supported features
 
-For a given release, this table shows:
-* The PostgreSQL version packaged inside.
-* The minimum Juju 3 version required to reliably operate **all** features of the release
-* Support for specific features
+**PostgreSQL 16** comes with all features supported by PostgreSQL 14: TLS encryption, COS monitoring, upgrades, cross-regional async replication, LDAP, Point-in-time recovery, and [more](postgresql-14:reference/releases). 
 
-| Release | PostgreSQL version | Minimum Juju version | [TLS encryption](/how-to/enable-tls) | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/index) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
-|:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
-|   |   |   | ![check] | ![check] | ![check] | ![check] | ![check] |
+In addition, PostgreSQL 16 supports:
+* [Juju spaces](/how-to/deploy/juju-spaces)
+* [Juju storage](/how-to/deploy/juju-storage)
+* [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user)
 
+For more details, see the complete [release notes](https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0)
+
+| Charmhub revision</br>(amd, arm) | Snap revision</br>(amd, arm) | PostgreSQL version | Minimum Juju version |
+|:----------------------------:|:------------------------:|:------------------:|:--------------------:|
+|           [843, 844]         |         218, 219         |        16.9        |         3.6        | 
 
 ## Architecture and base
 
@@ -27,14 +30,18 @@ If you do not specify a revision on deploy time, Juju will automatically choose 
 ```{caution}
 If you deploy with the `--revision` flag, **you must make sure the revision matches your base and architecture**. 
 
-Check the tables below, or use [`juju info`](https://juju.is/docs/juju/juju-info).
+See: [`juju info`](https://juju.is/docs/juju/juju-info).
 ```
 
-## Plugins/extensions
-
-For a list of all plugins supported for each revision, see the reference page [Plugins/extensions](/reference/plugins-extensions).
-
-
-<!--BADGES-->
+<!--Links-->
 [check]: https://img.icons8.com/color/20/checkmark--v1.png
 
+[843, 844]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
+
+```{toctree}
+:titlesonly:
+:maxdepth: 2
+:hidden:
+
+Major version <major-release-announcement>
+```
