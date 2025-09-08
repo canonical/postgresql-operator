@@ -10,13 +10,15 @@ For more information about the modern charms and their differences to the legacy
 
 ## The default Charmhub track
 
-The [default track](https://docs.openstack.org/charm-guide/yoga/project/charm-delivery.html) was switched from the `latest/` to `14/` to ensure all new deployments use a modern codebase. See [this Discourse post]((https://discourse.charmhub.io/t/request-switch-default-track-from-latest-to-14-for-postgresql-k8s-charms/10314)) for more information about the switch.
+The [default track](https://docs.openstack.org/charm-guide/yoga/project/charm-delivery.html) was switched from the `latest/` to `14/` to ensure all new deployments use a modern codebase. See [this Discourse post](https://discourse.charmhub.io/t/request-switch-default-track-from-latest-to-14-for-postgresql-k8s-charms/10314) for more information about the switch.
 
 ## How to migrate from legacy to modern
 
-It is not possible to migrate from the legacy charm to the PostgreSQL 16 charm - this is only possible with PostgreSQL 14.
+It is not possible to quickly migrate from the legacy charm to the PostgreSQL 16 charm - this was only possible with {doc}`PostgreSQL 14 <postgresql-14:explanation/legacy-charm>`.
 
-Check the [PostgreSQL 14 documentation](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/explanation/legacy-charm/#how-to-migrate-from-legacy-to-modern-charm) for more information.
+To migrate from the legacy PostgreSQL charm to the modern PostgreSQL 16 charm, you must implement the modern `database` endpoint for the `postgresql_client` interface on your charm.  
+
+See: [](/how-to/development/integrate-with-your-charm)
 
 ## How to deploy the legacy PostgreSQL charm
 

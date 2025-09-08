@@ -4,7 +4,7 @@ Modern PostgreSQL charms are [Ops charms] released in the Charmhub channels `14/
 
 They provide the `database` endpoint for the `postgresql_client` interface.
 
-PostgreSQL 14 (track `14/`) provides `db` and `db-admin` endpoints for the legacy `pgsql` interface, and supports migration from the legacy charm.
+PostgreSQL 14 (track `14/`) additionally provides `db` and `db-admin` endpoints for the legacy `pgsql` interface, and supports migration from the legacy charm.
 
 PostgreSQL 16 (track `16/`) does not provide any legacy interfaces and does not support migration.
 
@@ -34,7 +34,7 @@ For detailed information about new features, improvements, and breaking changes,
 
 PostgreSQL 14 provides essential database features including deployment flexibility, backup and restore capabilities, monitoring integration, TLS support, and multi-architecture compatibility.
 
-For detailed information about PostgreSQL 14 features, see the [PostgreSQL 14 releases page](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/reference/releases/)
+For detailed information about PostgreSQL 14 features, see the {doc}`PostgreSQL 14 releases page <postgresql-14:reference/releases>`
 
 ## Choosing a version
 
@@ -69,14 +69,14 @@ In the legacy charm, the user could request roles by setting the `roles` field t
 
 The same functionality is provided via the modern `postgresql_client` using [extra-user-roles](/explanation/users). 
 
-For more information about migrating the new interface on PostgreSQL 14, see [How to integrate PostgreSQL with your charm](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/how-to/development/integrate-with-your-charm/).
+For more information about migrating the new interface on PostgreSQL 14, see {doc}`postgresql-14:how-to/development/integrate-with-your-charm`.
 
 ## Workload artifacts
 
 The legacy charm used to deploy PostgreSQL from APT/Debian packages,
 while the modern charm installs and operates PostgreSQL snap [charmed-postgresql](https://snapcraft.io/charmed-postgresql). 
 
-See: [](explanation/architecture).
+See: [](/explanation/architecture).
 
 <!-- Links -->
 
@@ -86,7 +86,7 @@ See: [](explanation/architecture).
 
 [Version 16 Release Notes]: /reference/version-16-release-notes
 [release notes]: /reference/releases
-[legacy charm explanation page]: /explanation/legacy-charm
+[legacy charm explanation page]: /explanation/charm-versions/legacy-charm
 
 [cross]: https://img.icons8.com/?size=16&id=CKkTANal1fTY&format=png&color=D00303
 [check]: https://img.icons8.com/color/20/checkmark--v1.png

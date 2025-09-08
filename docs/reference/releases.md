@@ -8,7 +8,7 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 
 ## Dependencies and supported features
 
-**PostgreSQL 16** comes with all features supported by PostgreSQL 14: TLS encryption, COS monitoring, upgrades, cross-regional async replication, LDAP, Point-in-time recovery, and [more](postgresql-14:reference/releases). 
+**PostgreSQL 16** comes with all features supported by PostgreSQL 14: TLS encryption, COS monitoring, upgrades, cross-regional async replication, LDAP, Point-in-time recovery, and {doc}`more <postgresql-14:reference/releases>`.
 
 In addition, PostgreSQL 16 supports:
 * [Juju spaces](/how-to/deploy/juju-spaces)
@@ -37,11 +37,3 @@ See: [`juju info`](https://juju.is/docs/juju/juju-info).
 [check]: https://img.icons8.com/color/20/checkmark--v1.png
 
 [843, 844]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
-
-```{toctree}
-:titlesonly:
-:maxdepth: 2
-:hidden:
-
-Major version <major-release-announcement>
-```
