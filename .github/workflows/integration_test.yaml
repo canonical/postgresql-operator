@@ -16,7 +16,7 @@ jobs:
     timeout-minutes: 5
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up environment
         run: |
           sudo snap install charmcraft --classic
@@ -84,10 +84,10 @@ jobs:
     needs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
-    timeout-minutes: 217  # Sum of steps `timeout-minutes` + 5
+    timeout-minutes: 219  # Sum of steps `timeout-minutes` + 5
     steps:
       - name: Free up disk space
-        timeout-minutes: 1
+        timeout-minutes: 3
         run: |
           printf '\nDisk usage before cleanup\n'
           df --human-readable
@@ -97,7 +97,7 @@ jobs:
           df --human-readable
       - name: Checkout
         timeout-minutes: 3
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Set up environment
         timeout-minutes: 5
         run: sudo snap install charmcraft --classic
@@ -108,7 +108,7 @@ jobs:
           go install github.com/snapcore/spread/cmd/spread@latest
       - name: Download packed charm(s)
         timeout-minutes: 5
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           pattern: ${{ inputs.artifact-prefix }}-*
           merge-multiple: true
@@ -207,19 +207,19 @@ jobs:
       # git push origin gh-pages-beta
       # )
       - name: Checkout GitHub pages branch
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           ref: gh-pages-beta
           path: repo/
       - name: Download default test results
         # Default test results in case the integration tests time out or runner set up fails
         # (So that Allure report will show "unknown"/"failed" test result, instead of omitting the test)
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: allure-default-results/
           name: allure-default-results-integration-test
       - name: Download test results
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: allure-results/
           pattern: allure-results-integration-test-*

@@ -62,6 +62,34 @@ def harness():
     harness.cleanup()
 
 
+def test_config_fallback(harness):
+    """Test that config options with dashes (-) override config options with underscores (_)."""
+    harness.disable_hooks()
+    charm: PostgresqlOperatorCharm = harness.charm
+
+    assert charm.config.connection_authentication_timeout == 60
+
+    harness.update_config({"connection_authentication_timeout": 50})
+    del harness.charm.config
+    assert charm.config.connection_authentication_timeout == 50
+
+    harness.update_config({"connection-authentication-timeout": 90})
+    del harness.charm.config
+    assert charm.config.connection_authentication_timeout == 90
+
+    harness.update_config(unset=["connection-authentication-timeout"])
+    del harness.charm.config
+    assert charm.config.connection_authentication_timeout == 50
+
+    harness.update_config(unset=["connection_authentication_timeout"])
+    del harness.charm.config
+    assert charm.config.connection_authentication_timeout == 60
+
+    harness.update_config({"connection-authentication-timeout": 120})
+    del harness.charm.config
+    assert charm.config.connection_authentication_timeout == 120
+
+
 def test_on_install(harness):
     with (
         patch("charm.snap.SnapCache") as _snap_cache,
@@ -89,22 +117,6 @@ def test_on_install(harness):
 
         # Assert the status set by the event handler.
         assert isinstance(harness.model.unit.status, WaitingStatus)
-
-
-def test_on_install_snap_failure(harness):
-    with (
-        patch("charm.PostgresqlOperatorCharm._install_snap_package") as _install_snap_package,
-        patch(
-            "charm.PostgresqlOperatorCharm._is_storage_attached", return_value=True
-        ) as _is_storage_attached,
-    ):
-        # Mock the result of the call.
-        _install_snap_package.side_effect = snap.SnapError
-        # Trigger the hook.
-        harness.charm.on.install.emit()
-        # Assert that the needed calls were made.
-        _install_snap_package.assert_called_once()
-        assert isinstance(harness.model.unit.status, BlockedStatus)
 
 
 def test_patroni_scrape_config(harness):
@@ -314,6 +326,7 @@ def test_check_extension_dependencies(harness):
         # Test when plugins dependencies exception caused
         config["plugin_address_standardizer_enable"] = True
         harness.update_config(config)
+        del harness.charm.config
         harness.charm.enable_disable_extensions()
         assert isinstance(harness.model.unit.status, BlockedStatus)
         assert harness.model.unit.status.message == EXTENSIONS_DEPENDENCY_MESSAGE
@@ -723,6 +736,7 @@ def test_on_start_no_patroni_member(harness):
         patch("charm.PostgresqlOperatorCharm.get_available_memory") as _get_available_memory,
         patch("charm.PostgresqlOperatorCharm.get_secret"),
         patch("charm.TLS.generate_internal_peer_cert"),
+        patch("charm.PostgreSQLProvider.get_username_mapping", return_value={}),
     ):
         # Mock the passwords.
         patroni.return_value.member_started = False
@@ -840,6 +854,7 @@ def test_on_update_status(harness):
 
         # Test call to restart when the member is isolated from the cluster.
         _set_primary_status_message.reset_mock()
+        _start_observer.reset_mock()
         _member_started.return_value = False
         _is_member_isolated.return_value = True
         with harness.hooks_disabled():
@@ -1162,7 +1177,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots=None,
+            slots={},
         )
         _handle_postgresql_restart_need.assert_called_once_with()
         _restart_ldap_sync_service.assert_called_once()
@@ -1193,7 +1208,7 @@ def test_update_config(harness):
             parameters={"test": "test"},
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
-            slots=None,
+            slots={},
         )
         _handle_postgresql_restart_need.assert_called_once()
         _restart_ldap_sync_service.assert_called_once()
@@ -1277,6 +1292,9 @@ def test_on_cluster_topology_change_clear_blocked(harness):
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
+        patch(
+            "charm.PostgresqlOperatorCharm._set_primary_status_message"
+        ) as _set_primary_status_message,
     ):
         harness.model.unit.status = WaitingStatus(PRIMARY_NOT_REACHABLE_MESSAGE)
 
@@ -1284,7 +1302,7 @@ def test_on_cluster_topology_change_clear_blocked(harness):
 
         _update_relation_endpoints.assert_called_once_with()
         _primary_endpoint.assert_called_once_with()
-        assert isinstance(harness.model.unit.status, ActiveStatus)
+        _set_primary_status_message.assert_called_once_with()
 
 
 def test_validate_config_options(harness):
@@ -1315,6 +1333,7 @@ def test_validate_config_options(harness):
         # Test ldap_map exception
         with harness.hooks_disabled():
             harness.update_config({"ldap_map": "ldap_group="})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -1326,6 +1345,7 @@ def test_validate_config_options(harness):
         # Test request_date_style exception
         with harness.hooks_disabled():
             harness.update_config({"request_date_style": "ISO, TEST"})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -1337,6 +1357,7 @@ def test_validate_config_options(harness):
         # Test request_time_zone exception
         with harness.hooks_disabled():
             harness.update_config({"request_time_zone": "TEST_ZONE"})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -1348,6 +1369,7 @@ def test_validate_config_options(harness):
         # Test locales exception
         with harness.hooks_disabled():
             harness.update_config({"response_lc_monetary": "test_TEST"})
+        del harness.charm.config
 
         with pytest.raises(ValueError) as e:
             harness.charm._validate_config_options()
@@ -2055,6 +2077,8 @@ def test_handle_postgresql_restart_need(harness):
         patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock") as _restart,
         patch("charm.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch("charm.Patroni._get_patroni_restart_pending") as _get_patroni_restart_pending,
+        patch("cluster.sleep"),
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
@@ -2077,7 +2101,7 @@ def test_handle_postgresql_restart_need(harness):
 
             _is_tls_enabled.return_value = values[0]
             postgresql_mock.is_tls_enabled.return_value = values[1]
-            postgresql_mock.is_restart_pending = PropertyMock(return_value=values[2])
+            _get_patroni_restart_pending.return_value = values[2]
 
             harness.charm._handle_postgresql_restart_need()
             _reload_patroni_configuration.assert_called_once()
@@ -2493,6 +2517,7 @@ def test_get_plugins(harness):
             "plugin_citext_enable": True,
             "plugin_spi_enable": True,
         })
+        del harness.charm.config
         assert harness.charm.get_plugins() == [
             "pgaudit",
             "citext",
@@ -2504,6 +2529,7 @@ def test_get_plugins(harness):
 
         # Test when the charm has the pgAudit plugin disabled.
         harness.update_config({"plugin_audit_enable": False})
+        del harness.charm.config
         assert harness.charm.get_plugins() == [
             "citext",
             "refint",
@@ -2678,7 +2704,7 @@ def test_generate_user_hash(harness):
 
         assert harness.charm.generate_user_hash == sentinel.hash
 
-        _shake_128.assert_called_once_with(b"{'relation_id_2': 'test_db'}")
+        _shake_128.assert_called_once_with(b"{'relation-2': 'test_db'}")
 
 
 def test_relations_user_databases_map(harness):

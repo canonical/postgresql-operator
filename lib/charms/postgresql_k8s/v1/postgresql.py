@@ -273,8 +273,11 @@ class PostgreSQL:
             raise PostgreSQLUndefinedHostError("Host not set")
         if not self.password:
             raise PostgreSQLUndefinedPasswordError("Password not set")
+
+        dbname = database if database else self.database
+        logger.debug(f"New DB connection: dbname='{dbname}' user='{self.user}' host='{host}' connect_timeout=1")
         connection = psycopg2.connect(
-            f"dbname='{database if database else self.database}' user='{self.user}' host='{host}'"
+            f"dbname='{dbname}' user='{self.user}' host='{host}'"
             f"password='{self.password}' connect_timeout=1"
         )
         connection.autocommit = True
@@ -648,8 +651,8 @@ class PostgreSQL:
         self,
         user: str,
         database: str,
-        schematables: list[str],
-        old_schematables: list[str] | None = None,
+        schematables: List[str],
+        old_schematables: Optional[List[str]] = None,
     ) -> None:
         """Grant CONNECT privilege on database and SELECT privilege on tables.
 
@@ -692,7 +695,7 @@ class PostgreSQL:
                 connection.close()
 
     def revoke_replication_privileges(
-        self, user: str, database: str, schematables: list[str]
+        self, user: str, database: str, schematables: List[str]
     ) -> None:
         """Revoke all privileges from tables and database.
 
@@ -1322,23 +1325,6 @@ $$ LANGUAGE plpgsql security definer;"""
             if connection is not None:
                 connection.close()
 
-    def is_restart_pending(self) -> bool:
-        """Query pg_settings for pending restart."""
-        connection = None
-        try:
-            with self._connect_to_database() as connection, connection.cursor() as cursor:
-                cursor.execute("SELECT COUNT(*) FROM pg_settings WHERE pending_restart=True;")
-                return cursor.fetchone()[0] > 0
-        except psycopg2.OperationalError:
-            logger.warning("Failed to connect to PostgreSQL.")
-            return False
-        except psycopg2.Error as e:
-            logger.error(f"Failed to check if restart is pending: {e}")
-            return False
-        finally:
-            if connection:
-                connection.close()
-
     def database_exists(self, db: str) -> bool:
         """Check whether specified database exists."""
         connection = None
@@ -1390,7 +1376,7 @@ $$ LANGUAGE plpgsql security definer;"""
             if connection:
                 connection.close()
 
-    def create_publication(self, db: str, name: str, schematables: list[str]) -> None:
+    def create_publication(self, db: str, name: str, schematables: List[str]) -> None:
         """Create PostgreSQL publication."""
         connection = None
         try:
@@ -1431,7 +1417,7 @@ $$ LANGUAGE plpgsql security definer;"""
             if connection:
                 connection.close()
 
-    def alter_publication(self, db: str, name: str, schematables: list[str]) -> None:
+    def alter_publication(self, db: str, name: str, schematables: List[str]) -> None:
         """Alter PostgreSQL publication."""
         connection = None
         try:

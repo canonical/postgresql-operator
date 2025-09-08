@@ -52,7 +52,7 @@ LIBAPI = 4
 
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
-LIBPATCH = 20
+LIBPATCH = 21
 
 PYDEPS = [
     "cryptography>=43.0.0",
@@ -1804,7 +1804,7 @@ class TLSCertificatesProvidesV4(Object):
         self, relation: Relation, unit_or_app: Union[Application, Unit]
     ) -> List[RequirerCertificateRequest]:
         try:
-            requirer_relation_data = _RequirerData.load(relation.data[unit_or_app])
+            requirer_relation_data = _RequirerData.load(relation.data.get(unit_or_app, {}))
         except DataValidationError:
             logger.debug("Invalid requirer relation data for %s", unit_or_app.name)
             return []

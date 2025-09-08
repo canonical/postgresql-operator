@@ -95,7 +95,7 @@ CREATE TABLE
 
 Configure the replication of that specific database and table (remember to specify the table schema; it's the `public` schema in this example):
 ```sh
-juju config postgresql2 logical_replication_subscription_request='{"testdb": ["public.asd"]}'
+juju config postgresql2 logical-replication-subscription-request='{"testdb": ["public.asd"]}'
 ```
 
 After a few seconds, you can check that the data has been replicated:
@@ -134,7 +134,7 @@ testdb=> \q
 
 juju integrate postgresql1:logical-replication postgresql2:logical-replication-offer
 
-juju config postgresql1 logical_replication_subscription_request='{"testdb": ["public.asd2"]}'
+juju config postgresql1 logical-replication-subscription-request='{"testdb": ["public.asd2"]}'
 
 psql postgresql://relation-8:G7Qu77SU0qeadnhn@10.166.227.78:5432/testdb
 psql (16.9 (Ubuntu 16.9-0ubuntu0.24.04.1))
@@ -151,4 +151,4 @@ And the same table, or even different tables, can be replicated to multiple clus
 
 If the relation between the PostgreSQL clusters is broken, the data will be kept in both clusters, but the replication will stop. You can re-enable logical replication by following the steps from [](/how-to/logical-replication/re-enable).
 
-The same will happen for that specific table if you change the table in the `logical_replication_subscription_request` config option to a different table or remove it completely. If one or more tables other than the current one are specified, the replication will continue for those tables, but the current table will not be replicated any more.
+The same will happen for that specific table if you change the table in the `logical-replication-subscription-request` config option to a different table or remove it completely. If one or more tables other than the current one are specified, the replication will continue for those tables, but the current table will not be replicated any more.
