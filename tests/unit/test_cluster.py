@@ -267,6 +267,11 @@ def test_is_replication_healthy(peers_ips, patroni):
         ]
         assert not patroni.is_replication_healthy()
 
+        # Test ignoring errors in case of raft encryption.
+        _get.side_effect = None
+        _get.return_value.status_code = 503
+        assert patroni.is_replication_healthy(True)
+
 
 def test_is_member_isolated(peers_ips, patroni):
     with (

@@ -157,6 +157,14 @@ class PostgreSQLUpgrade(DataUpgrade):
             self.set_unit_failed()
             return
 
+        raft_encryption = (
+            int(
+                json.loads(self.peer_relation.data[self.charm.app].get("dependencies", "{}"))
+                .get("charm", {})
+                .get("version", 0)
+            )
+            < 3
+        )
         self.charm._setup_exporter()
         self.charm.backup.start_stop_pgbackrest_service()
 
@@ -178,7 +186,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                         not self.charm._patroni.member_started
                         or self.charm.unit.name.replace("/", "-")
                         not in self.charm._patroni.cluster_members
-                        or not self.charm._patroni.is_replication_healthy()
+                        or not self.charm._patroni.is_replication_healthy(raft_encryption)
                     ):
                         logger.debug(
                             "Instance not yet back in the cluster."
