@@ -84,10 +84,10 @@ jobs:
     needs:
       - collect-integration-tests
     runs-on: ${{ matrix.job.runner }}
-    timeout-minutes: 219  # Sum of steps `timeout-minutes` + 5
+    timeout-minutes: 226  # Sum of steps `timeout-minutes` + 5
     steps:
       - name: Free up disk space
-        timeout-minutes: 3
+        timeout-minutes: 10
         run: |
           printf '\nDisk usage before cleanup\n'
           df --human-readable
