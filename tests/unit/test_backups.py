@@ -279,6 +279,17 @@ def test_can_use_s3_repository(harness):
             FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
         )
 
+        # Invalid system id
+        pgbackrest_info_same_cluster_backup_output = (
+            0,
+            f'[{{"db": [{{"system-id": "12345"}}], "name": "{harness.charm.backup.stanza_name}"}}]',
+            "",
+        )
+        assert harness.charm.backup.can_use_s3_repository() == (
+            False,
+            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+        )
+
 
 def test_construct_endpoint(harness):
     # Test with an AWS endpoint without region.

@@ -224,6 +224,9 @@ class PostgreSQLBackups(Object):
             system_identifier_from_stanza = (
                 str(stanza_dbs[0]["system-id"]) if len(stanza_dbs) else None
             )
+            if system_identifier_from_stanza == "invalid":
+                logger.error("Failed to get stanza system identifier")
+                return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
             if system_identifier_from_instance != system_identifier_from_stanza:
                 logger.debug(
                     f"can_use_s3_repository: incompatible system identifier s3={system_identifier_from_stanza}, local={system_identifier_from_instance}"
