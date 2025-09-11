@@ -44,7 +44,7 @@ def get_cloud_config(cloud: str) -> tuple[dict[str, str], dict[str, str]] | None
             "endpoint": "https://storage.googleapis.com",
             "bucket": "data-charms-testing",
             "path": f"/postgresql-k8s/{uuid.uuid1()}",
-            "region": "us-east-1",
+            "region": "",
         }, {
             "access-key": os.environ["GCP_ACCESS_KEY"],
             "secret-key": os.environ["GCP_SECRET_KEY"],
