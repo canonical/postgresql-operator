@@ -282,7 +282,7 @@ def test_can_use_s3_repository(harness):
         # Invalid system id
         pgbackrest_info_same_cluster_backup_output = (
             0,
-            f'[{{"db": [{{"system-id": "12345"}}], "name": "{harness.charm.backup.stanza_name}"}}]',
+            f'[{{"db": [{{"system-id": "[invalid]"}}], "name": "{harness.charm.backup.stanza_name}"}}]',
             "",
         )
         assert harness.charm.backup.can_use_s3_repository() == (
