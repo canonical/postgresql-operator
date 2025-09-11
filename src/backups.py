@@ -203,9 +203,12 @@ class PostgreSQLBackups(Object):
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
         for stanza in json.loads(stdout):
-            if stanza.get("name") != self.stanza_name:
+            if (stanza_name := stanza.get("name")) and stanza_name == "[invalid]":
+                logger.error("Invalid stanza name from s3")
+                return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+            if stanza_name != self.stanza_name:
                 logger.debug(
-                    f"can_use_s3_repository: incompatible stanza name s3={stanza.get('name', '')}, local={self.stanza_name}"
+                    f"can_use_s3_repository: incompatible stanza name s3={stanza_name or ''}, local={self.stanza_name}"
                 )
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
@@ -224,12 +227,6 @@ class PostgreSQLBackups(Object):
             system_identifier_from_stanza = (
                 str(stanza_dbs[0]["system-id"]) if len(stanza_dbs) else None
             )
-            logger.error(
-                f"!!!!!!!!!!!!!!!!!1{system_identifier_from_stanza}, {stanza_dbs[0]['system-id'] if len(stanza_dbs) else None}"
-            )
-            if system_identifier_from_stanza == "[invalid]":
-                logger.error("Failed to get stanza system identifier")
-                return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
             if system_identifier_from_instance != system_identifier_from_stanza:
                 logger.debug(
                     f"can_use_s3_repository: incompatible system identifier s3={system_identifier_from_stanza}, local={system_identifier_from_instance}"
