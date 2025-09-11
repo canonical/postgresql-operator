@@ -285,6 +285,10 @@ def test_can_use_s3_repository(harness):
             f'[{{"db": [{{"system-id": "[invalid]"}}], "name": "{harness.charm.backup.stanza_name}"}}]',
             "",
         )
+        _execute_command.side_effect = [
+            pgbackrest_info_same_cluster_backup_output,
+            other_instance_system_identifier_output,
+        ]
         assert harness.charm.backup.can_use_s3_repository() == (
             False,
             FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
