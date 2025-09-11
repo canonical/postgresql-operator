@@ -224,6 +224,9 @@ class PostgreSQLBackups(Object):
             system_identifier_from_stanza = (
                 str(stanza_dbs[0]["system-id"]) if len(stanza_dbs) else None
             )
+            logger.error(
+                f"!!!!!!!!!!!!!!!!!1{system_identifier_from_stanza}, {stanza_dbs[0]['system-id'] if len(stanza_dbs) else None}"
+            )
             if system_identifier_from_stanza == "[invalid]":
                 logger.error("Failed to get stanza system identifier")
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
