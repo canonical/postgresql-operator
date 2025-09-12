@@ -7,10 +7,7 @@ import logging
 import os
 import socket
 import subprocess
-import time
 
-import boto3
-import botocore.exceptions
 import pytest
 from pytest_operator.plugin import OpsTest
 

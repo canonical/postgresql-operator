@@ -240,6 +240,26 @@ def test_can_use_s3_repository(harness):
             "",
         )
 
+        # Invalid stanza name
+        pgbackrest_info_other_cluster_name_backup_output = (
+            0,
+            '[{"db": [{"system-id": "12345"}], "name": "[invalid]"}]',
+            "",
+        )
+        same_instance_system_identifier_output = (
+            0,
+            "Database system identifier:           12345",
+            "",
+        )
+        _execute_command.side_effect = [
+            pgbackrest_info_other_cluster_name_backup_output,
+            same_instance_system_identifier_output,
+        ]
+        assert harness.charm.backup.can_use_s3_repository() == (
+            False,
+            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+        )
+
         # Test when the cluster system id can be retrieved, but it's different from the stanza system id.
         pgbackrest_info_other_cluster_system_id_backup_output = (
             0,
