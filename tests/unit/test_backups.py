@@ -240,6 +240,26 @@ def test_can_use_s3_repository(harness):
             "",
         )
 
+        # Invalid stanza name
+        pgbackrest_info_other_cluster_name_backup_output = (
+            0,
+            '[{"db": [{"system-id": "12345"}], "name": "[invalid]"}]',
+            "",
+        )
+        same_instance_system_identifier_output = (
+            0,
+            "Database system identifier:           12345",
+            "",
+        )
+        _execute_command.side_effect = [
+            pgbackrest_info_other_cluster_name_backup_output,
+            same_instance_system_identifier_output,
+        ]
+        assert harness.charm.backup.can_use_s3_repository() == (
+            False,
+            FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE,
+        )
+
         # Test when the cluster system id can be retrieved, but it's different from the stanza system id.
         pgbackrest_info_other_cluster_system_id_backup_output = (
             0,
@@ -343,7 +363,7 @@ def test_create_bucket_if_not_exists(harness, tls_ca_chain_filename):
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
         ) as _tls_ca_chain_filename,
         patch("charm.PostgreSQLBackups._retrieve_s3_parameters") as _retrieve_s3_parameters,
-        patch("backups.botocore.client.Config") as _config,
+        patch("backups.Config") as _config,
     ):
         # Test when there are missing S3 parameters.
         _retrieve_s3_parameters.return_value = ([], ["bucket", "access-key", "secret-key"])
@@ -1835,7 +1855,6 @@ def test_retrieve_s3_parameters(harness):
                 "delete-older-than-days": "9999999",
                 "endpoint": "https://s3.amazonaws.com",
                 "path": "/",
-                "region": None,
                 "s3-uri-style": "host",
                 "secret-key": "test-secret-key",
             },
@@ -1962,7 +1981,7 @@ def test_upload_content_to_s3(harness, tls_ca_chain_filename):
         patch("tempfile.NamedTemporaryFile") as _named_temporary_file,
         patch("charm.PostgreSQLBackups._construct_endpoint") as _construct_endpoint,
         patch("boto3.session.Session.resource") as _resource,
-        patch("backups.botocore.client.Config") as _config,
+        patch("backups.Config") as _config,
         patch(
             "charm.PostgreSQLBackups._tls_ca_chain_filename",
             new_callable=PropertyMock(return_value=tls_ca_chain_filename),
