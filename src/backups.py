@@ -16,13 +16,12 @@ from io import BytesIO
 from pathlib import Path
 from subprocess import TimeoutExpired, run
 
-import boto3 as boto3
-import botocore
-from botocore.exceptions import ClientError, ParamValidationError, SSLError
-from charms.data_platform_libs.v0.s3 import (
-    CredentialsChangedEvent,
-    S3Requirer,
-)
+from boto3.session import Session
+from botocore.client import Config
+from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidationError, SSLError
+from botocore.loaders import create_loader
+from botocore.regions import EndpointResolver
+from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
 from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
@@ -101,16 +100,18 @@ class PostgreSQLBackups(Object):
         return ""
 
     def _get_s3_session_resource(self, s3_parameters: dict):
-        session = boto3.session.Session(
-            aws_access_key_id=s3_parameters["access-key"],
-            aws_secret_access_key=s3_parameters["secret-key"],
-            region_name=s3_parameters["region"],
-        )
+        kwargs = {
+            "aws_access_key_id": s3_parameters["access-key"],
+            "aws_secret_access_key": s3_parameters["secret-key"],
+        }
+        if "region" in s3_parameters:
+            kwargs["region_name"] = s3_parameters["region"]
+        session = Session(**kwargs)
         return session.resource(
             "s3",
             endpoint_url=self._construct_endpoint(s3_parameters),
             verify=(self._tls_ca_chain_filename or None),
-            config=botocore.client.Config(
+            config=Config(
                 # https://github.com/boto/boto3/issues/4400#issuecomment-2600742103
                 request_checksum_calculation="when_required",
                 response_checksum_validation="when_required",
@@ -208,7 +209,7 @@ class PostgreSQLBackups(Object):
 
         else:
             if return_code != 0:
-                logger.error(stderr)
+                logger.error(f"Failed to run pgbackrest: {stderr}")
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
         for stanza in json.loads(stdout):
@@ -255,12 +256,12 @@ class PostgreSQLBackups(Object):
         endpoint = s3_parameters["endpoint"]
 
         # Load endpoints data.
-        loader = botocore.loaders.create_loader()
+        loader = create_loader()
         data = loader.load_data("endpoints")
 
         # Construct the endpoint using the region.
-        resolver = botocore.regions.EndpointResolver(data)
-        endpoint_data = resolver.construct_endpoint("s3", s3_parameters["region"])
+        resolver = EndpointResolver(data)
+        endpoint_data = resolver.construct_endpoint("s3", s3_parameters.get("region"))
 
         # Use the built endpoint if it is an AWS endpoint.
         if endpoint_data and endpoint.endswith(endpoint_data["dnsSuffix"]):
@@ -274,7 +275,7 @@ class PostgreSQLBackups(Object):
             return
 
         bucket_name = s3_parameters["bucket"]
-        region = s3_parameters.get("region")
+        region = s3_parameters.get("region", "")
 
         try:
             s3 = self._get_s3_session_resource(s3_parameters)
@@ -286,7 +287,7 @@ class PostgreSQLBackups(Object):
             bucket.meta.client.head_bucket(Bucket=bucket_name)
             logger.info("Bucket %s exists.", bucket_name)
             exists = True
-        except botocore.exceptions.ConnectTimeoutError as e:
+        except ConnectTimeoutError as e:
             # Re-raise the error if the connection timeouts, so the user has the possibility to
             # fix network issues and call juju resolve to re-trigger the hook that calls
             # this method.
@@ -647,10 +648,10 @@ class PostgreSQLBackups(Object):
                         raise Exception(stderr)
         except TimeoutError as e:
             raise e
-        except Exception as e:
+        except Exception:
             # If the check command doesn't succeed, remove the stanza name
             # and rollback the configuration.
-            logger.exception(e)
+            logger.exception("Failed to initialise stanza:")
             self._s3_initialization_set_failure(FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE)
             return False
 
@@ -971,8 +972,8 @@ Stderr:
         else:
             try:
                 backup_id = list(self._list_backups(show_failed=True).keys())[-1]
-            except ListBackupsError as e:
-                logger.exception(e)
+            except ListBackupsError:
+                logger.exception(error_message)
                 error_message = "Failed to retrieve backup id"
                 logger.error(f"Backup failed: {error_message}")
                 event.fail(error_message)
@@ -1301,7 +1302,6 @@ Stderr:
 
         # Add some sensible defaults (as expected by the code) for missing optional parameters
         s3_parameters.setdefault("endpoint", "https://s3.amazonaws.com")
-        s3_parameters.setdefault("region")
         s3_parameters.setdefault("path", "")
         s3_parameters.setdefault("s3-uri-style", "host")
         s3_parameters.setdefault("delete-older-than-days", "9999999")
@@ -1419,7 +1419,7 @@ Stderr:
             with BytesIO() as buf:
                 bucket.download_fileobj(processed_s3_path, buf)
                 return buf.getvalue().decode("utf-8")
-        except botocore.exceptions.ClientError as e:
+        except ClientError as e:
             if e.response["Error"]["Code"] == "404":
                 logger.info(
                     f"No such object to read from S3 bucket={bucket_name}, path={processed_s3_path}"
