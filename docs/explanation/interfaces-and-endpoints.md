@@ -39,7 +39,7 @@ Find all details about default and extra DB user roles in "[Charm Users explanat
 ```{note}
 Legacy relations are deprecated and will be discontinued on future releases. Their usage should be avoided. 
 
-Check the legacy interfaces implementation limitations in [](/explanation/legacy-charm)"
+Check the legacy interfaces implementation limitations in [](/explanation/charm-versions/legacy-charm)"
 ```
 
 ### Legacy `pgsql` interface (`db` and `db-admin` endpoints):

@@ -2,17 +2,6 @@
 
 This guide describes database **data** migration only. To migrate charms on new juju interfaces, refer to the guide [How to integrate a database with my charm](/how-to/development/integrate-with-your-charm). 
 
-```{note}
-All commands are written for `juju >= v.3.0`
-
-If you are using an earlier version, be aware that:
-
- - `juju run` replaces `juju run-action --wait` in `juju v.2.9` 
- - `juju integrate` replaces `juju relate` and `juju add-relation` in `juju v.2.9`
-
-For more information, check the [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-0-0-22-oct-2022).
-```
-
 ## Do you need to migrate?
 
 A database migration is only required if the output of the following command is `latest/stable`:
@@ -26,7 +15,7 @@ This guide can be used to copy data between different installations of the same 
 
 ## Summary
 
-The legacy VM charm archived in the `latest/stable` channel, read more [here](/explanation/legacy-charm).
+The legacy VM charm archived in the `latest/stable` channel, read more [here](/explanation/charm-versions/legacy-charm).
 A minor difference in commands might be necessary for different revisions and/or Juju versions, but the general logic remains:
 
 * Deploy the modern charm nearby
@@ -43,9 +32,9 @@ Always test migration in a safe environment before performing it in production!
 
 ## Prerequisites
 
-- **[Your application is compatible](/explanation/legacy-charm) with Charmed PostgreSQL VM**
+- **Your application supports modern PostgreSQL interfaces**
+    - See: [](check-supported-interfaces)
 - A client machine with access to the deployed legacy charm
-- `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-0-0-22-oct-2022) for more information about key differences)
 - Enough storage in the cluster to support backup/restore of the databases.
 
 ## Obtain existing database credentials

@@ -2,15 +2,15 @@
 
 Charmed PostgreSQL can be integrated with any charmed application that supports its interfaces. This page provides some guidance and resources for charm developers to develop, integrate, and troubleshoot their charm so that it may connect with PostgreSQL.
 
+(check-supported-interfaces)=
 ## Check supported interfaces
 First, we recommend that you check [the supported interfaces](/explanation/interfaces-and-endpoints) of the current charm. You have the option to use modern (preferred) or legacy interfaces. 
 
 Most existing charms currently use [ops-lib-pgsql](https://github.com/canonical/ops-lib-pgsql) interface (legacy). For new charms, **Canonical recommends using [data-platform-libs](https://github.com/canonical/data-platform-libs).**
 
-Legacy charm details are described [here](/explanation/legacy-charm).
+Legacy charm details are described [here](/explanation/charm-versions/legacy-charm).
 
 ## Integrate your charm with PostgreSQL
-> See also: [Juju documentation | Integration](https://documentation.ubuntu.com/juju/3.6/reference/relation/)
 
 **For a detailed tutorial** about integrating your charm with the PostgreSQL charm, refer to [Juju | Integrate your charm with PostgreSQL](https://juju.is/docs/sdk/integrate-your-charm-with-postgresql). 
 
@@ -19,12 +19,18 @@ Legacy charm details are described [here](/explanation/legacy-charm).
 *  [juju-sdk-tutorial-k8s](https://github.com/canonical/juju-sdk-tutorial-k8s/tree/04_integrate_with_psql) - the branch `04_integrate_with_psql` describes integration with Charmed PostgreSQL K8s 
 * [How to migrate Nextcloud to new PostgreSQL (vm-charms)](https://discourse.charmhub.io/t/nextcloud-postgresql-how-to-migrate-nextcloud-to-new-postgresql-vm-charms/10969) guide
 
+```{seealso}
+[Juju documentation | Integration](https://documentation.ubuntu.com/juju/3.6/reference/relation/)
+```
+
 ## Troubleshooting & testing
+
 * To learn the basics of charm debugging, start with [Juju | How to debug a charm](https://juju.is/docs/sdk/debug-a-charm)
 * To troubleshoot PostgreSQL, check the [Troubleshooting](/reference/troubleshooting/index) reference
 * To test PostgreSQL and other charms, check the [Testing](/reference/software-testing) reference
 
 ## FAQ
+
 **Does the requirer need to set anything in relation data?**
 >It depends on the interface. Check the `postgresql_client` [interface requirements](https://github.com/canonical/charm-relation-interfaces/blob/main/interfaces/postgresql_client/v0/README.md).
 
