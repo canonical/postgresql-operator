@@ -1,12 +1,18 @@
 # Modern PostgreSQL charm
 
-Modern PostgreSQL charms are [Ops charms] released in the Charmhub channels `14/` (PostgreSQL 14) and `16/` (PostgreSQL 16). 
+Modern PostgreSQL charms are [Ops charms](https://documentation.ubuntu.com/juju/3.6/reference/charm/#ops-charm) released in the Charmhub channels `14/` (PostgreSQL 14) and `16/` (PostgreSQL 16). 
 
 They provide the `database` endpoint for the `postgresql_client` interface.
 
 PostgreSQL 14 (track `14/`) additionally provides `db` and `db-admin` endpoints for the legacy `pgsql` interface, and supports migration from the legacy charm.
 
 PostgreSQL 16 (track `16/`) does not provide any legacy interfaces and does not support migration.
+
+```{note}
+You are currently viewing the documentation for **Charmed PostgreSQL 14**.
+
+To switch between versions, use the small rectangular menu at the bottom right corner of the page.
+```
 
 ## PostgreSQL 16
 
@@ -20,7 +26,7 @@ PostgreSQL 16 (track `16/`) does not provide any legacy interfaces and does not 
 
 PostgreSQL 16 includes modern features like Juju Spaces support, enhanced security, extended monitoring capabilities, and improved high availability features.
 
-For detailed information about new features, improvements, and breaking changes, see [PostgreSQL 16 release notes](https://github.com/canonical/postgresql-operator/releases).
+For detailed information about new features, improvements, and breaking changes, see [](/reference/releases).
 
 ## PostgreSQL 14
 
