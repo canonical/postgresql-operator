@@ -203,9 +203,12 @@ class PostgreSQLBackups(Object):
                 return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
 
         for stanza in json.loads(stdout):
-            if stanza.get("name") != self.stanza_name:
+            if (stanza_name := stanza.get("name")) and stanza_name == "[invalid]":
+                logger.error("Invalid stanza name from s3")
+                return False, FAILED_TO_INITIALIZE_STANZA_ERROR_MESSAGE
+            if stanza_name != self.stanza_name:
                 logger.debug(
-                    f"can_use_s3_repository: incompatible stanza name s3={stanza.get('name', '')}, local={self.stanza_name}"
+                    f"can_use_s3_repository: incompatible stanza name s3={stanza_name or ''}, local={self.stanza_name}"
                 )
                 return False, ANOTHER_CLUSTER_REPOSITORY_ERROR_MESSAGE
 
