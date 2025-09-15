@@ -12,11 +12,16 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 
 In addition, Charmed PostgreSQL 16 supports new features like [Juju spaces](/how-to/deploy/juju-spaces), [Juju storage](/how-to/deploy/juju-storage), and [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user). 
 
-For more details about all new PostgreSQL 16 features, see the complete [release notes](https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0)
+For more details about all new PostgreSQL 16 features, see the complete [release notes](https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0).
 
 | Charmhub revision</br>(amd, arm) | Snap revision</br>(amd, arm) | PostgreSQL version | Minimum Juju version |
 |:----------------------------:|:------------------------:|:------------------:|:--------------------:|
 |           [843, 844]         |         218, 219         |        16.9        |         3.6        | 
+
+```{seealso}
+* [Information about all major versions](/explanation/charm-versions/index) 
+* {doc}`Charmed PostgreSQL 14 releases <postgresql-14:reference/releases>`
+```
 
 ## Architecture and base
 
