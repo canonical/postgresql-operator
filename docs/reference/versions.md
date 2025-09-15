@@ -121,5 +121,5 @@ Learn more in the [legacy charm explanation page].
 [TLS integration]: /how-to/enable-tls
 [`arm64` architecture]: /reference/system-requirements
 
-[legacy charm explanation page]: /explanation/legacy-charm
+[legacy charm explanation page]: /explanation/charm-versions/legacy-charm
 
