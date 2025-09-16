@@ -13,7 +13,7 @@ Charmed PostgreSQL is available in multiple versions to support different deploy
 
 There are two [generations](https://documentation.ubuntu.com/juju/3.6/reference/charm/#by-generation) of charms stored under the same charm name `postgresql`. In these docs, we refer to them as "legacy" and "modern". 
 
-Legacy charm
+Legacy charm (deprecated)
 : Also known as a [Reactive charm](https://documentation.ubuntu.com/juju/3.6/reference/charm/#reactive-charm). Found in the Charmhub channel `latest/stable`.
 : Provided `db` and `db-admin` endpoints for the `pgsql` interface.
 
