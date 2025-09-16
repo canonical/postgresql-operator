@@ -1,12 +1,12 @@
 # Modern PostgreSQL charm
 
-Modern PostgreSQL charms are [Ops charms](https://documentation.ubuntu.com/juju/3.6/reference/charm/#ops-charm) released in the Charmhub channels `14/` (PostgreSQL 14) and `16/` (PostgreSQL 16). 
+Modern PostgreSQL charms are [Ops charms](https://documentation.ubuntu.com/juju/3.6/reference/charm/#ops-charm) released in the Charmhub channels `14/` and `16/`. 
 
-They provide the `database` endpoint for the `postgresql_client` interface.
+Both modern charms provide the `database` endpoint for the `postgresql_client` interface.
 
 PostgreSQL 14 (track `14/`) additionally provides `db` and `db-admin` endpoints for the legacy `pgsql` interface, and supports migration from the legacy charm.
 
-PostgreSQL 16 (track `16/`) does not provide any legacy interfaces and does not support migration.
+PostgreSQL 16 (track `16/`) does not provide legacy endpoints.
 
 ```{note}
 You are currently viewing the documentation for **Charmed PostgreSQL 14**.
@@ -24,9 +24,42 @@ To switch between versions, use the small rectangular menu at the bottom right c
 * **Juju version:** Requires Juju 3.6+ LTS
 * **Support status:** ![check] Active development and full support
 
-PostgreSQL 16 includes modern features like Juju Spaces support, enhanced security, extended monitoring capabilities, and improved high availability features.
+### New features
 
-For detailed information about PostgreSQL 14 features, see the {doc}`PostgreSQL 16 releases page <postgresql-16:reference/releases>`
+* [**Juju spaces**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/deploy/juju-spaces) - Enhanced networking capabilities for complex deployment scenarios
+* [**Juju user secrets**](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) - Secure management of the charm's [internal passwords](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/manage-passwords)
+* **Improved** [**security hardening**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/explanation/security) - Enhanced security posture and best practices
+* **TLS v4 library migration**
+  * New endpoints `client-certificates` and `peer-certificates` 
+  * Endpoint `peer-interfaces` uses TLS by default
+  * See all endpoints on [Charmhub](https://charmhub.io/postgresql/integrations?channel=16/stable)
+* [**Timescale Community Edition**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/enable-plugins-extensions/enable-timescaledb) replaces Timescale Apache 2
+* **Improved** [**built-in roles**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/explanation/roles) - Enhanced role-based access control system
+* **New** [**refresh process**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/refresh/index) for in-place upgrades
+
+### Deprecated or removed
+
+Important changes to keep in mind when migrating from 14 to 16:
+
+* **Legacy interface `psql`** - Endpoints `db` and `db-admin` are no longer supported
+  * See [](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/explanation/interfaces-and-endpoints) for current supported interfaces
+* **Support for Juju < `v3.6` removed**
+  * Charmed PostgreSQL 16 requires Juju `3.6+ LTS` due to [Juju secrets](https://documentation.ubuntu.com/juju/3.6/reference/secret/index.html) support
+* **Juju actions `get-password` and `set-password` removed**
+  * Replaced by [Juju secrets](https://documentation.ubuntu.com/juju/3.6/reference/secret/index.html) for enhanced security
+* **[Timescale Apache 2 edition](https://docs.timescale.com/about/latest/timescaledb-editions/) replaced**
+  * Now uses [Timescale Community edition](https://docs.timescale.com/about/latest/timescaledb-editions/)
+* **Charm action `set-tls-private-key` removed**
+  * Will be re-introduced as Juju User Secrets in future releases
+* **Charm actions renamed for consistency:**
+  * `pre-upgrade-check` → `pre-refresh-check`
+  * `resume-upgrade` → `resume-refresh`
+  * Changes align with `juju refresh` terminology
+* **Charm endpoint `certificates` split into separate endpoints:**
+  * `client-certificates` - For client certificate management
+  * `peer-certificates` - For peer-to-peer certificate management
+
+For detailed information about PostgreSQL 16 features, see the {doc}`PostgreSQL 16 releases page <postgresql-16:reference/releases>`
 
 ## PostgreSQL 14
 
@@ -38,51 +71,30 @@ For detailed information about PostgreSQL 14 features, see the {doc}`PostgreSQL 
 * **Juju version:** Partially compatible with older Juju versions down to 2.9
 * **Support status:** 🔧 Bug fixes and security updates only
 
-PostgreSQL 14 provides essential database features including deployment flexibility, backup and restore capabilities, monitoring integration, TLS support, and multi-architecture compatibility.
+### Features
 
-For detailed information about new features, improvements, and breaking changes, see [](/reference/releases).
+* [**Deployment on multiple cloud services**](/how-to/deploy/), including Sunbeam, MAAS, AWS, GCE, and Azure
+* [**Juju storage**](/how-to/deploy/juju-storage) - Flexible storage configuration options
+* [**Back up and restore**](/how-to/back-up-and-restore), including point-in-time recovery
+* [**COS integration**](/how-to/monitoring-cos) - Enable observability tools like Grafana, Loki, Tempo, and Parca
+* [**TLS integration**](/how-to/enable-tls)
+* [**LDAP integration**](/how-to/enable-ldap) - Centralised authentication for PostgreSQL clusters 
+* [**`amd64` and `arm64`architecture** support](/reference/system-requirements)
+
+For detailed information about all PostgreSQL 14 releases, see the [Releases page](/reference/releases).
 
 ## Choosing a version
 
 | Version | Support Status | Base | Juju Version | Key Features |
 |---------|----------------|------|--------------|-------------|
 | **PostgreSQL 16** | ![check] Active development | Ubuntu 24.04 LTS | 3.6+ LTS | Modern features, enhanced security, Juju Spaces |
-| **PostgreSQL 14** | 🔧 Maintenance mode | Ubuntu 22.04 LTS | Compatible with older versions | Core database features, stable platform |
+| **PostgreSQL 14** | 🔧 Maintenance mode | Ubuntu 22.04 LTS | 2.9+ | Core database features, stable platform |
 | **Legacy** | ![cross] Deprecated | Older base | Legacy versions | Not recommended |
 
 
 * **For new deployments**: Use **PostgreSQL 16** for the latest features and long-term support
 * **For existing PostgreSQL 14 deployments**: Continue using PostgreSQL 14 or plan migration to 16
 * **For legacy charm users**: Migrate to PostgreSQL 14 as soon as possible
-
-## Configuration options
-
-The legacy charm config options were not moved to the modern charms. Modern charms apply the best possible configuration automatically. 
-
-Feel free to [contact us](/reference/contacts) about the database tuning and configuration options.
-
-## Extensions supported by modern charm
-
-The legacy charm provided plugins/extensions enabling through the relation (interface `pgsql`).This is NOT supported by modern charms (neither `pgsql` nor `postgresql_client` interfaces). Please enable the necessary extensions using appropriate `plugin_*_enable` [config option](https://charmhub.io/postgresql/configure) of the modern charm. After enabling the modern charm, it will provide plugins support for both `pgsql` (only if it's PostgreSQL 14) and `postgresql_client` interfaces.
-
-See: [](/reference/plugins-extensions)
-
-Feel free to [contact us](/reference/contacts) if there is a particular extension you are interested in.
-
-## Roles supported by modern charm
-
-In the legacy charm, the user could request roles by setting the `roles` field to a comma separated list of desired roles. This is NOT supported by the `14/` modern charm implementation of the legacy `pgsql` interface. 
-
-The same functionality is provided via the modern `postgresql_client` using [extra-user-roles](/explanation/users). 
-
-For more information about migrating the new interface on PostgreSQL 14, see {ref}`integrate-with-your-charm`.
-
-## Workload artifacts
-
-The legacy charm used to deploy PostgreSQL from APT/Debian packages,
-while the modern charm installs and operates PostgreSQL snap [charmed-postgresql](https://snapcraft.io/charmed-postgresql). 
-
-See: [](/explanation/architecture).
 
 <!-- Links -->
 
