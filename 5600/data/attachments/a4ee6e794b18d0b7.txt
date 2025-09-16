@@ -1,0 +1,54 @@
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:72 removing sync_standbys
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:642 Cluster members are: [{'name': 'postgresql-1', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.29.126.220:8008/patroni', 'host': '10.29.126.220', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-2', 'role': 'replica', 'state': 'streaming', 'api_url': 'http://10.29.126.20:8008/patroni', 'host': '10.29.126.20', 'port': 5432, 'timeline': 2, 'lag': 0}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.29.126.223:8008/patroni', 'host': '10.29.126.223', 'port': 5432, 'timeline': 2, 'lag': 0}]
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:82 Stopping unit postgresql/3
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:86 Deleting unit postgresql/3
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/1 [idle] active: 
+  postgresql/2 [executing] active: 
+  postgresql/3 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/1 [executing] active: Primary
+  postgresql/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-1': 234, 'testing.postgresql-2': 234}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-1': 236, 'testing.postgresql-2': 236}
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units_async:test_scaling_three_units_async.py:120 Scaling back up
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+  postgresql/4 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/4 [executing] waiting: agent initialising
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [executing] active: received database credentials of the first database
+  postgresql/1 [executing] active: Primary (degraded)
+  postgresql/2 [executing] active: 
+  postgresql/4 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [executing] maintenance: reconfiguring cluster
+  postgresql/2 [executing] maintenance: reinitialising replica
+  postgresql/4 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [executing] maintenance: reconfiguring cluster
+  postgresql/2 [executing] active: 
+  postgresql/4 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [executing] active: 
+  postgresql/2 [executing] active: 
+  postgresql/4 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/1 [idle] active: Primary
+  postgresql/2 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:642 Cluster members are: [{'name': 'postgresql-1', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.29.126.220:8008/patroni', 'host': '10.29.126.220', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-2', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.29.126.20:8008/patroni', 'host': '10.29.126.20', 'port': 5432, 'timeline': 2, 'lag': 0}, {'name': 'postgresql-4', 'role': 'replica', 'state': 'streaming', 'api_url': 'http://10.29.126.214:8008/patroni', 'host': '10.29.126.214', 'port': 5432, 'timeline': 2, 'lag': 0}]
