@@ -6,8 +6,6 @@ It provided `db` and `db-admin` endpoints for the `pgsql` interface.
 
 **We strongly advise against using the now deprecated `latest/` track**. It will be removed from Charmhub in the near future.
 
-For more information about the modern charms and their differences to the legacy charm, see [](/explanation/charm-versions/modern-charm).
-
 ## The default Charmhub track
 
 The [default track](https://docs.openstack.org/charm-guide/yoga/project/charm-delivery.html) was switched from the `latest/` to `14/` to ensure all new deployments use a modern codebase. See [this Discourse post](https://discourse.charmhub.io/t/request-switch-default-track-from-latest-to-14-for-postgresql-k8s-charms/10314) for more information about the switch.
@@ -47,6 +45,35 @@ Remove the charm store prefix `cs:` from the bundle. Otherwise, the modern charm
 
 A common error message is: `cannot deploy application "postgresql": unknown option "..."`.
 ```
+
+## Configuration options
+
+The legacy charm config options were not moved to the modern charms. Modern charms apply the best possible configuration automatically. 
+
+Feel free to [contact us](/reference/contacts) about the database tuning and configuration options.
+
+## Extensions supported by modern charm
+
+The legacy charm provided plugins/extensions enabling through the relation (interface `pgsql`).This is NOT supported by modern charms (neither `pgsql` nor `postgresql_client` interfaces). Please enable the necessary extensions using appropriate `plugin_*_enable` [config option](https://charmhub.io/postgresql/configure) of the modern charm. After enabling the modern charm, it will provide plugins support for both `pgsql` (only if it's PostgreSQL 14) and `postgresql_client` interfaces.
+
+See: [](/reference/plugins-extensions)
+
+Feel free to [contact us](/reference/contacts) if there is a particular extension you are interested in.
+
+## Roles supported by modern charm
+
+In the legacy charm, the user could request roles by setting the `roles` field to a comma separated list of desired roles. This is NOT supported by the `14/` modern charm implementation of the legacy `pgsql` interface. 
+
+The same functionality is provided via the modern `postgresql_client` using [extra-user-roles](/explanation/users). 
+
+For more information about migrating the new interface on PostgreSQL 14, see {ref}`integrate-with-your-charm`.
+
+## Workload artifacts
+
+The legacy charm used to deploy PostgreSQL from APT/Debian packages,
+while the modern charm installs and operates PostgreSQL snap [charmed-postgresql](https://snapcraft.io/charmed-postgresql). 
+
+See: [](/explanation/architecture).
 
 ## How to report issues and contact authors
 
