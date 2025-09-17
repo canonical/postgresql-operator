@@ -1403,7 +1403,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
-            self.tls.generate_internal_peer_cert()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
