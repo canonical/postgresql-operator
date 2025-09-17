@@ -1,6 +1,6 @@
 # Releases
 
-This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release.
+This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release of Charmed PostgreSQL 14.
 
 To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk).
 
@@ -8,11 +8,7 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 
 ## Dependencies and supported features
 
-For a given release, this table shows:
-* The PostgreSQL 14 version packaged inside.
-* The minimum Juju 3 version required to reliably operate **all** features of the release
-   > This charm still supports older versions of Juju down to 2.9. See the [Juju section of the system requirements](/reference/system-requirements) for more details.
-* Support for specific features
+The table below shows information for all minor releases of Charmed PostgreSQL 14.
 
 | Release | PostgreSQL version | Juju 3 version | [TLS encryption](/how-to/enable-tls)* | [COS monitoring](/how-to/monitoring-cos/enable-monitoring) | [Minor version upgrades](/how-to/upgrade/perform-a-minor-upgrade) | [Cross-regional async replication](/how-to/cross-regional-async-replication/index) | [Point-in-time recovery](/how-to/back-up-and-restore/restore-a-backup) |
 |:---:|:---:|:---:|:---:|:---:|:---:|:---:|:---:|
@@ -25,6 +21,11 @@ For a given release, this table shows:
 | [288] | 14.7 | `2.9.32+` |  |  |  |  |  |
 
 \* **TLS encryption**: Support for **`v2` or higher** of the [`tls-certificates` interface](https://charmhub.io/tls-certificates-interface/libraries/tls_certificates). This means that you can integrate with [modern TLS charms](https://charmhub.io/topics/security-with-x-509-certificates).
+
+```{seealso}
+* [Information about all major versions](/explanation/charm-versions/index) 
+* {doc}`Charmed PostgreSQL 16 releases <postgresql-16:reference/releases>`
+```
 
 ## Architecture and base
 

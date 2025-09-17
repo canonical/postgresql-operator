@@ -4,7 +4,7 @@ Charmed PostgreSQL uses the [Juju storage](https://documentation.ubuntu.com/juju
 
 Charmed PostgreSQL 14 supports a single storage: `pgdata`.
 
-The [legacy PostgreSQL charm](/explanation/legacy-charm) in track [`latest/`](https://charmhub.io/postgresql?channel=latest/stable)" does **not** support the Juju storage abstraction.
+The [legacy PostgreSQL charm](/explanation/charm-versions/legacy-charm) in track [`latest/`](https://charmhub.io/postgresql?channel=latest/stable)" does **not** support the Juju storage abstraction.
 
 ## Check storage details
 

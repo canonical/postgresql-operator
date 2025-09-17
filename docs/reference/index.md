@@ -18,7 +18,6 @@ The following guides contain technical specifications, APIs, release notes, and 
 :glob:
 
 Releases <releases>
-Versions <versions>
 System requirements <system-requirements>
 Software testing <software-testing>
 Performance and resources <performance-and-resources>

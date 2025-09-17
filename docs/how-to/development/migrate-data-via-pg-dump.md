@@ -16,7 +16,7 @@ This guide can be used to copy data between different installations of the same 
 
 ## Summary
 
-The legacy VM charm archived in the `latest/stable` channel, read more [here](/explanation/legacy-charm).
+The legacy VM charm archived in the `latest/stable` channel, read more [here](/explanation/charm-versions/legacy-charm).
 A minor difference in commands might be necessary for different revisions and/or Juju versions, but the general logic remains:
 
 * Deploy the modern charm nearby
@@ -33,7 +33,7 @@ Always test migration in a safe environment before performing it in production!
 
 ## Prerequisites
 
-- **[Your application is compatible](/explanation/legacy-charm) with Charmed PostgreSQL VM**
+- **[Your application is compatible](/explanation/charm-versions/index) with Charmed PostgreSQL VM**
 - A client machine with access to the deployed legacy charm
 - `juju v.2.9` or later  (check [Juju 3.0 Release Notes](https://documentation.ubuntu.com/juju/3.6/reference/juju/juju-roadmap-and-releases/#juju-3-0-0-22-oct-2022) for more information about key differences)
 - Enough storage in the cluster to support backup/restore of the databases.
