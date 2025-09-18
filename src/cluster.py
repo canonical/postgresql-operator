@@ -12,6 +12,7 @@ import re
 import shutil
 import subprocess
 from pathlib import Path
+from time import sleep
 from typing import Any
 
 import psutil
@@ -436,6 +437,37 @@ class Patroni:
 
                 return r.json()
 
+    def is_restart_pending(self) -> bool:
+        """Returns whether the Patroni/PostgreSQL restart pending."""
+        pending_restart = self._get_patroni_restart_pending()
+        if pending_restart:
+            # The current Patroni 3.2.2 has wired behaviour: it temporary flag pending_restart=True
+            # on any changes to REST API, which is gone within a second but long enough to be
+            # cougth by charm. Sleep 2 seconds as a protection here until Patroni 3.3.0 upgrade.
+            # Repeat the request to make sure pending_restart flag is still here
+            logger.debug("Enduring restart is pending (to avoid unnecessary rolling restarts)")
+            sleep(2)
+            pending_restart = self._get_patroni_restart_pending()
+
+        return pending_restart
+
+    def _get_patroni_restart_pending(self) -> bool:
+        """Returns whether the Patroni flag pending_restart on REST API."""
+        r = requests.get(
+            f"{self._patroni_url}/patroni",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
+        )
+        pending_restart = r.json().get("pending_restart", False)
+        logger.debug(
+            f"API _get_patroni_restart_pending ({pending_restart}): %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
+        )
+
+        return pending_restart
+
     @property
     def is_creating_backup(self) -> bool:
         """Returns whether a backup is being created."""
@@ -686,7 +718,7 @@ class Patroni:
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers
             else [],
-            peers_ips=self.peers_ips if not no_peers else set(),
+            peers_ips=sorted(self.peers_ips) if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,

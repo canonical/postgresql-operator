@@ -2352,6 +2352,8 @@ def test_handle_postgresql_restart_need(harness):
         patch("charms.rolling_ops.v0.rollingops.RollingOpsManager._on_acquire_lock") as _restart,
         patch("charm.wait_fixed", return_value=wait_fixed(0)),
         patch("charm.Patroni.reload_patroni_configuration") as _reload_patroni_configuration,
+        patch("charm.Patroni._get_patroni_restart_pending") as _get_patroni_restart_pending,
+        patch("cluster.sleep"),
         patch("charm.PostgresqlOperatorCharm._unit_ip"),
         patch(
             "charm.PostgresqlOperatorCharm.is_tls_enabled", new_callable=PropertyMock
@@ -2374,7 +2376,7 @@ def test_handle_postgresql_restart_need(harness):
 
             _is_tls_enabled.return_value = values[1]
             postgresql_mock.is_tls_enabled = PropertyMock(return_value=values[2])
-            postgresql_mock.is_restart_pending = PropertyMock(return_value=values[3])
+            _get_patroni_restart_pending.return_value = values[3]
 
             harness.charm._handle_postgresql_restart_need(values[0])
             _reload_patroni_configuration.assert_called_once()
