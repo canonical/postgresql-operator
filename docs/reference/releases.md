@@ -14,7 +14,7 @@ See all release notes on [GitHub](https://github.com/canonical/postgresql-operat
 
 ## How to refresh (upgrade)
 
-Charmed PostgreSQL supports **minor in-place upgrades**. See [](/how-to/refresh/index) for more information.
+Charmed PostgreSQL supports **minor in-place upgrades**. See [](/how-to/refresh) for more information.
 
 [Contact us](/reference/contacts) if you are interested in migrating from PostgreSQL 14 to 16.
 

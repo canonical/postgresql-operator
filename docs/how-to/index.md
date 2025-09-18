@@ -45,8 +45,6 @@ Other deployment scenarios and configurations:
 
 ## Refresh (upgrade)
 * [How to refresh]
-    * [Perform a minor upgrade]
-    * [Roll back an in-progress refresh]
 
 ## Cross-regional (cluster-cluster) async replication
 
@@ -101,9 +99,7 @@ This section is for charm developers looking to support PostgreSQL integrations 
 [Enable tracing]: /how-to/monitoring-cos/enable-tracing
 [Enable profiling]: /how-to/monitoring-cos/enable-profiling
 
-[How to upgrade]: /how-to/refresh/index
-[Perform a minor upgrade]: /how-to/refresh/minor-upgrade
-[Roll back an in-progress refresh]: /how-to/refresh/rollback
+[How to refresh]: /how-to/refresh
 
 [Cross-regional async replication]: /how-to/cross-regional-async-replication/index
 [Set up clusters]: /how-to/cross-regional-async-replication/set-up-clusters
@@ -136,7 +132,7 @@ Enable LDAP <enable-ldap>
 Enable plugins/extensions <enable-plugins-extensions/index>
 Back up and restore <back-up-and-restore/index>
 Monitoring (COS) <monitoring-cos/index>
-Refresh (upgrade) <refresh/index>
+Refresh (upgrade) <refresh>
 Cross-regional async replication <cross-regional-async-replication/index>
 Logical replication <logical-replication/index>
 Development <development/index>
