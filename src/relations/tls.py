@@ -253,3 +253,6 @@ class TLS(Object):
         self.charm.set_secret(UNIT_SCOPE, "internal-key", str(private_key))
         self.charm.set_secret(UNIT_SCOPE, "internal-cert", str(cert))
         self.charm.push_tls_files_to_workload()
+        logger.info(
+            "Internal peer certificate generated. Please use a proper TLS operator if possible."
+        )
