@@ -443,10 +443,10 @@ class Patroni:
         if pending_restart:
             # The current Patroni 3.2.2 has wired behaviour: it temporary flag pending_restart=True
             # on any changes to REST API, which is gone within a second but long enough to be
-            # cougth by charm. Sleep 2 seconds as a protection here until Patroni 3.3.0 upgrade.
+            # cougth by charm. Sleep 5 seconds as a protection here until Patroni 3.3.0 upgrade.
             # Repeat the request to make sure pending_restart flag is still here
             logger.debug("Enduring restart is pending (to avoid unnecessary rolling restarts)")
-            sleep(2)
+            sleep(5)
             pending_restart = self._get_patroni_restart_pending()
 
         return pending_restart
