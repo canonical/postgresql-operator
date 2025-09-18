@@ -14,6 +14,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime
+from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
 from typing import Literal, get_args
@@ -236,7 +237,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{POSTGRESQL_SNAP_NAME}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
 
     def _on_databases_change(self, _):
         """Handle databases change event."""
@@ -289,11 +290,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return {}
 
         return relation.data[self.unit]
-
-    @property
-    def tracing_endpoint(self) -> str | None:
-        """Otlp http endpoint for charm instrumentation."""
-        return self._tracing_endpoint_config
 
     def _peer_data(self, scope: Scopes) -> dict:
         """Return corresponding databag for app/unit."""
@@ -389,7 +385,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    @property
+    @cached_property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
@@ -401,7 +397,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             system_users=SYSTEM_USERS,
         )
 
-    @property
+    @cached_property
     def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
         if not self._peers:
@@ -2214,7 +2210,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
-    @property
+    @cached_property
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         user_db_pairs = {}
