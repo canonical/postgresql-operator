@@ -17,16 +17,16 @@ Get the current charm revision of the application with [`juju status`](https://d
 These refreshes are well-tested and should be preferred.
 
 ```{eval-rst}
-+--------------+------------+----------+--------------+------------+----------+---------------+
-| .. centered:: From                   | .. centered:: To                     | Charm release |
-+--------------+------------+----------+--------------+------------+----------+ notes to      |
-| Charm        | PostgreSQL | Snap     | Charm        | PostgreSQL | Snap     | review        |
-| revision     | Version    | revision | revision     | Version    | revision |               |
-+==============+============+==========+==============+============+==========+===============+
-| 843 (amd64)  | 16.9       | 201, 202 | TODO (amd64) | 16.9       | TODO     | `TODO, TODO`_ |
-+--------------+            |          +--------------+            |          | `TODO, TODO`_ |
-| 844 (arm64)  |            |          | TODO (arm64) |            |          |               |
-+--------------+------------+----------+--------------+------------+----------+---------------+
++--------------+------------+----------+--------------+------------+----------+-----------------------------------------------------------------------------------------------+
+| .. centered:: From                   | .. centered:: To                     | Charm release notes to review                                                                 |
++--------------+------------+----------+--------------+------------+----------+                                                                                               |
+| Charm        | PostgreSQL | Snap     | Charm        | PostgreSQL | Snap     |                                                                                               |
+| revision     | Version    | revision | revision     | Version    | revision |                                                                                               |
++==============+============+==========+==============+============+==========+===============================================================================================+
+| 843 (amd64)  | 16.9       | 201, 202 | TODO (amd64) | 16.9       | TODO     | `TODO, TODO <https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.60.0>`__   |
++--------------+            |          +--------------+            |          | `TODO, TODO <https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.61.0>`__   |
+| 844 (arm64)  |            |          | TODO (arm64) |            |          |                                                                                               |
++--------------+------------+----------+--------------+------------+----------+-----------------------------------------------------------------------------------------------+
 ```
 
 ### Supported refreshes
@@ -56,10 +56,6 @@ In some of these cases, it may be possible to perform an out-of-place upgrade or
 * Major in-place upgrade from PostgreSQL 14 to 16
 * Major in-place downgrade from PostgreSQL 16 to 14
 * Any refresh from or to a non-stable version (e.g. 16/edge)
-
-```{eval-rst}
-.. _TODO, TODO: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.60.0
-```
 
 ## Create a backup
 
