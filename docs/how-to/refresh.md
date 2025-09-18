@@ -10,7 +10,7 @@ Charmed PostgreSQL supports minor in-place refresh via the [`juju refresh`](http
 
 ## Determine which version to refresh to
 
-Get the current charm revision of the application with [`juju status`](https://juju.is/docs/juju/juju-status)
+Get the current charm revision of the application with [`juju status`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/status/)
 
 ### Recommended refreshes
 
