@@ -92,7 +92,17 @@ def test_on_relation_changed(harness):
             new_callable=PropertyMock,
         ) as _primary_endpoint,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
+        patch(
+            "charm.PostgresqlOperatorCharm.generate_user_hash",
+            new_callable=PropertyMock,
+            return_value="hash",
+        ),
     ):
+        rel_id = harness.model.get_relation("database-peers").id
+        with harness.hooks_disabled():
+            harness.update_relation_data(rel_id, "postgresql", {"user_hash": "hash"})
+            harness.update_relation_data(rel_id, "postgresql/0", {"user_hash": "hash"})
+            harness.update_relation_data(rel_id, "postgresql/1", {"user_hash": "hash"})
         # Set some side effects to test multiple situations.
         _member_started.side_effect = [True, False, True, True]
         postgresql_mock.list_users.return_value = {"relation-0"}

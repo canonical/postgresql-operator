@@ -140,6 +140,18 @@ class DbProvides(Object):
 
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
+        self.charm.update_config()
+        for key in self.charm._peers.data:
+            # We skip the leader so we don't have to wait on the defer
+            if (
+                key != self.charm.app
+                and key != self.charm.unit
+                and self.charm._peers.data[key].get("user_hash", "")
+                != self.charm.generate_user_hash
+            ):
+                logger.debug("Not all units have synced configuration")
+                event.defer()
+
         self.set_up_relation(event.relation)
 
     def _get_extensions(self, relation: Relation) -> tuple[list, set]:
@@ -228,8 +240,6 @@ class DbProvides(Object):
         self.update_endpoints(relation)
 
         self._update_unit_status(relation)
-
-        self.charm.update_config()
 
         return True
 
