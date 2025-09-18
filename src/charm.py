@@ -32,6 +32,8 @@ from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_co
 from charms.operator_libs_linux.v2 import snap
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+from cryptography.x509 import load_pem_x509_certificate
+from cryptography.x509.oid import NameOID
 from ops import (
     ActionEvent,
     ActiveStatus,
@@ -378,6 +380,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         Called after snap refresh
         """
+        try:
+            if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
+                cert = load_pem_x509_certificate(raw_cert.encode())
+                if (
+                    cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+                    != self._unit_ip
+                ):
+                    self.tls.generate_internal_peer_cert()
+        except Exception:
+            logger.exception("Unable to check or update internal cert")
+
         if not self._patroni.start_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
@@ -1403,7 +1416,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
-            self.tls.generate_internal_peer_cert()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
