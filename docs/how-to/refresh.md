@@ -58,10 +58,6 @@ In some of these cases, it may be possible to perform an out-of-place upgrade or
 * Any refresh from or to a non-stable version (e.g. 16/edge)
 
 ```{eval-rst}
-.. _843:
-.. _844:
-.. _843, 844: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
-
 .. _TODO, TODO: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.60.0
 ```
 
