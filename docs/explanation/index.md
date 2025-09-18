@@ -9,7 +9,7 @@ Additional context about key concepts behind the PostgreSQL charm, including des
 
 Architecture <architecture>
 Interfaces and endpoints <interfaces-and-endpoints>
-Legacy charm <legacy-charm>
+Charm versions <charm-versions/index>
 ```
 
 ## Operational concepts
