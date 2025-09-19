@@ -100,7 +100,7 @@ Tell your users when you will perform the refresh and remain in contact with the
 
 If possible, schedule a maintenance window during a period of low traffic.
 The duration of the refresh may depend on the size of your data and volume of traffic.
-To estimate the duration, we recommend [testing on a staging environment](#test-on-staging-environment).
+To estimate the duration, we recommend [testing on a staging environment](#test-in-a-staging-environment).
 
 ## Consider scaling up
 
