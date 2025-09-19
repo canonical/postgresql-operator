@@ -52,5 +52,4 @@ Troubleshooting <troubleshooting/index>
 Plugins/extensions <plugins-extensions>
 Alert rules <alert-rules>
 Statuses <statuses>
-Glossary <glossary>
 Contacts <contacts>

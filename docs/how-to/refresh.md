@@ -59,12 +59,15 @@ In some of these cases, it may be possible to perform an out-of-place upgrade or
 
 ## Create a backup
 
-Create a [backup](/how-to/back-up-and-restore/create-a-backup).
+See [](/how-to/back-up-and-restore/create-a-backup).
 
 ### Verify the backup
 
 Verify the integrity of the backup by performing a test [restore on another application](/how-to/back-up-and-restore/migrate-a-cluster).
-Check the restored data by ensuring that recent data is present, the data size is correct, and the data matches what you expected in the backup. 
+Check the restored data by ensuring that:
+* recent data is present
+* the data size is correct
+* the data matches what you expected in the backup
 
 ## Read the rollback instructions
 
@@ -80,9 +83,9 @@ For [recommended refreshes](#recommended-refreshes), refer to the rightmost colu
 
 If the PostgreSQL versions that you are refreshing from and to are different, refer to the [upstream PostgreSQL release notes](https://www.postgresql.org/docs/release/) to understand what changed and if any action is required from you.
 
-## Test on staging environment
+## Test in a staging environment
 
-We recommend testing the entire refresh procedure on a staging environment before refreshing your production environment.
+We recommend testing the entire refresh procedure in a staging environment before refreshing your production environment.
 
 In a staging environment, we also encourage you to simulate failure of the refresh and to practice recovery by restoring from [the backup](#create-a-backup).
 
@@ -125,7 +128,7 @@ If the action does not succeed, do not refresh.
 If the action succeeds, copy down the rollback command.
 Keep the command available in case you need to [roll back](#roll-back).
 
-## Configure pause-after-unit-refresh
+## Configure `pause-after-unit-refresh`
 
 After each unit is refreshed, the charm will perform automatic health checks.
 We recommend supplementing the automatic checks with manual checks.
@@ -194,7 +197,7 @@ In most cases, the rollback command is also displayed in the application's statu
 ### Resume the rollback
 
 If more than one unit was refreshed before the rollback was started and `pause-after-unit-refresh` is set to `all` or `first`, your manual confirmation will be needed to complete the rollback.
-The procedure for the rollback is the same as described in [Monitor the refresh](#monitor-the-refresh).
+The procedure for the rollback is the same as described in [](#monitor-the-refresh).
 
 ### Reflect
 
