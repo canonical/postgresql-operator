@@ -86,23 +86,14 @@ def test_on_relation_changed(harness):
         patch("charm.PostgresqlOperatorCharm.update_config"),
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("charm.DbProvides.set_up_relation") as _set_up_relation,
+        patch("charm.DbProvides.update_endpoints"),
         patch.object(EventBase, "defer") as _defer,
         patch(
             "charm.PostgresqlOperatorCharm.primary_endpoint",
             new_callable=PropertyMock,
         ) as _primary_endpoint,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
-        patch(
-            "charm.PostgresqlOperatorCharm.generate_user_hash",
-            new_callable=PropertyMock,
-            return_value="hash",
-        ),
     ):
-        rel_id = harness.model.get_relation("database-peers").id
-        with harness.hooks_disabled():
-            harness.update_relation_data(rel_id, "postgresql", {"user_hash": "hash"})
-            harness.update_relation_data(rel_id, "postgresql/0", {"user_hash": "hash"})
-            harness.update_relation_data(rel_id, "postgresql/1", {"user_hash": "hash"})
         # Set some side effects to test multiple situations.
         _member_started.side_effect = [True, False, True, True]
         postgresql_mock.list_users.return_value = {"relation-0"}
@@ -198,7 +189,6 @@ def test_set_up_relation(harness):
         patch.object(PostgresqlOperatorCharm, "postgresql", Mock()) as postgresql_mock,
         patch("subprocess.check_output", return_value=b"C"),
         patch("relations.db.DbProvides._update_unit_status") as _update_unit_status,
-        patch("relations.db.DbProvides.update_endpoints") as _update_endpoints,
         patch("relations.db.new_password", return_value="test-password") as _new_password,
         patch("relations.db.DbProvides._get_extensions") as _get_extensions,
     ):
@@ -228,7 +218,6 @@ def test_set_up_relation(harness):
         postgresql_mock.create_user.assert_not_called()
         postgresql_mock.create_database.assert_not_called()
         postgresql_mock.get_postgresql_version.assert_not_called()
-        _update_endpoints.assert_not_called()
         _update_unit_status.assert_not_called()
 
         # Assert that the correct calls were made in a successful setup.
@@ -247,7 +236,6 @@ def test_set_up_relation(harness):
         postgresql_mock.create_database.assert_called_once_with(
             DATABASE, user, plugins=["pgaudit"], client_relations=[relation]
         )
-        _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
         assert not isinstance(harness.model.unit.status, BlockedStatus)
 
@@ -256,7 +244,6 @@ def test_set_up_relation(harness):
         postgresql_mock.create_user.reset_mock()
         postgresql_mock.create_database.reset_mock()
         postgresql_mock.get_postgresql_version.reset_mock()
-        _update_endpoints.reset_mock()
         _update_unit_status.reset_mock()
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -276,7 +263,6 @@ def test_set_up_relation(harness):
         postgresql_mock.create_database.assert_called_once_with(
             DATABASE, user, plugins=["pgaudit"], client_relations=[relation]
         )
-        _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
         assert not isinstance(harness.model.unit.status, BlockedStatus)
 
@@ -284,7 +270,6 @@ def test_set_up_relation(harness):
         postgresql_mock.create_user.reset_mock()
         postgresql_mock.create_database.reset_mock()
         postgresql_mock.get_postgresql_version.reset_mock()
-        _update_endpoints.reset_mock()
         _update_unit_status.reset_mock()
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -299,25 +284,21 @@ def test_set_up_relation(harness):
         postgresql_mock.create_database.assert_called_once_with(
             "test_database", user, plugins=["pgaudit"], client_relations=[relation]
         )
-        _update_endpoints.assert_called_once()
         _update_unit_status.assert_called_once()
         assert not isinstance(harness.model.unit.status, BlockedStatus)
 
         # BlockedStatus due to a PostgreSQLCreateUserError.
         postgresql_mock.create_database.reset_mock()
         postgresql_mock.get_postgresql_version.reset_mock()
-        _update_endpoints.reset_mock()
         _update_unit_status.reset_mock()
         assert not harness.charm.legacy_db_relation.set_up_relation(relation)
         postgresql_mock.create_database.assert_not_called()
-        _update_endpoints.assert_not_called()
         _update_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 
         # BlockedStatus due to a PostgreSQLCreateDatabaseError.
         harness.charm.unit.status = ActiveStatus()
         assert not harness.charm.legacy_db_relation.set_up_relation(relation)
-        _update_endpoints.assert_not_called()
         _update_unit_status.assert_not_called()
         assert isinstance(harness.model.unit.status, BlockedStatus)
 

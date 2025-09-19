@@ -2239,7 +2239,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             else:
                 user = f"relation-{relation.id}"
                 if database := self.get_secret(APP_SCOPE, f"{user}-database"):
-                    user = f"relation_id_{relation.id}"
                     user_db_pairs[user] = database
         return user_db_pairs
 
