@@ -907,7 +907,6 @@ def test_on_update_status(harness):
         ) as _set_primary_status_message,
         patch("charm.Patroni.restart_patroni") as _restart_patroni,
         patch("charm.Patroni.is_member_isolated") as _is_member_isolated,
-        patch("charm.Patroni.reinitialize_postgresql") as _reinitialize_postgresql,
         patch(
             "charm.Patroni.member_replication_lag", new_callable=PropertyMock
         ) as _member_replication_lag,
@@ -979,24 +978,9 @@ def test_on_update_status(harness):
         harness.charm.on.update_status.emit()
         _set_primary_status_message.assert_called_once()
 
-        # Test the reinitialisation of the replica when its lag is unknown
-        # after a restart.
-        _set_primary_status_message.reset_mock()
-        _is_primary.return_value = False
-        _is_standby_leader.return_value = False
-        _member_started.return_value = False
-        _is_member_isolated.return_value = False
-        _member_replication_lag.return_value = "unknown"
-        with harness.hooks_disabled():
-            harness.update_relation_data(
-                rel_id, harness.charm.unit.name, {"postgresql_restarted": "True"}
-            )
-        harness.charm.on.update_status.emit()
-        _reinitialize_postgresql.assert_called_once()
-        _restart_patroni.assert_not_called()
-        _set_primary_status_message.assert_not_called()
-
         # Test call to restart when the member is isolated from the cluster.
+        _set_primary_status_message.reset_mock()
+        _member_started.return_value = False
         _is_member_isolated.return_value = True
         with harness.hooks_disabled():
             harness.update_relation_data(
@@ -1013,9 +997,6 @@ def test_on_update_status_after_restore_operation(harness):
         patch(
             "charm.PostgresqlOperatorCharm._set_primary_status_message"
         ) as _set_primary_status_message,
-        patch(
-            "charm.PostgresqlOperatorCharm._handle_workload_failures"
-        ) as _handle_workload_failures,
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,
@@ -1052,7 +1033,6 @@ def test_on_update_status_after_restore_operation(harness):
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
-        _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         assert isinstance(harness.charm.unit.status, BlockedStatus)
 
@@ -1065,7 +1045,6 @@ def test_on_update_status_after_restore_operation(harness):
         _handle_processes_failures.assert_not_called()
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
-        _handle_workload_failures.assert_not_called()
         _set_primary_status_message.assert_not_called()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
@@ -1079,13 +1058,11 @@ def test_on_update_status_after_restore_operation(harness):
         _member_started.return_value = True
         _can_use_s3_repository.return_value = (True, None)
         _handle_processes_failures.return_value = False
-        _handle_workload_failures.return_value = False
         harness.charm.on.update_status.emit()
         _update_config.assert_called_once()
         _handle_processes_failures.assert_called_once()
         _oversee_users.assert_called_once()
         _update_relation_endpoints.assert_called_once()
-        _handle_workload_failures.assert_called_once()
         _set_primary_status_message.assert_called_once()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
