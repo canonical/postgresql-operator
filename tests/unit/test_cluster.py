@@ -366,7 +366,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
             partner_addrs=["2.2.2.2", "3.3.3.3"],
-            peers_ips=peers_ips,
+            peers_ips=sorted(peers_ips),
             scope=scope,
             self_ip=patroni.unit_ip,
             superuser="operator",

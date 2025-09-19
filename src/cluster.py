@@ -11,7 +11,9 @@ import pwd
 import re
 import shutil
 import subprocess
+from functools import cached_property
 from pathlib import Path
+from time import sleep
 from typing import Any
 
 import psutil
@@ -154,11 +156,11 @@ class Patroni:
         # TLS is enabled, otherwise True is set because it's the default value.
         self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
 
-    @property
+    @cached_property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
         return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
-    @property
+    @cached_property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
@@ -202,8 +204,7 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
-    @property
-    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
@@ -435,6 +436,37 @@ class Patroni:
                 )
 
                 return r.json()
+
+    def is_restart_pending(self) -> bool:
+        """Returns whether the Patroni/PostgreSQL restart pending."""
+        pending_restart = self._get_patroni_restart_pending()
+        if pending_restart:
+            # The current Patroni 3.2.2 has wired behaviour: it temporary flag pending_restart=True
+            # on any changes to REST API, which is gone within a second but long enough to be
+            # cougth by charm. Sleep 5 seconds as a protection here until Patroni 3.3.0 upgrade.
+            # Repeat the request to make sure pending_restart flag is still here
+            logger.debug("Enduring restart is pending (to avoid unnecessary rolling restarts)")
+            sleep(5)
+            pending_restart = self._get_patroni_restart_pending()
+
+        return pending_restart
+
+    def _get_patroni_restart_pending(self) -> bool:
+        """Returns whether the Patroni flag pending_restart on REST API."""
+        r = requests.get(
+            f"{self._patroni_url}/patroni",
+            verify=self.verify,
+            timeout=API_REQUEST_TIMEOUT,
+            auth=self._patroni_auth,
+        )
+        pending_restart = r.json().get("pending_restart", False)
+        logger.debug(
+            f"API _get_patroni_restart_pending ({pending_restart}): %s (%s)",
+            r,
+            r.elapsed.total_seconds(),
+        )
+
+        return pending_restart
 
     @property
     def is_creating_backup(self) -> bool:
@@ -686,7 +718,7 @@ class Patroni:
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers
             else [],
-            peers_ips=self.peers_ips if not no_peers else set(),
+            peers_ips=sorted(self.peers_ips) if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
@@ -1034,7 +1066,7 @@ class Patroni:
             timeout=PATRONI_TIMEOUT,
         )
 
-    @property
+    @cached_property
     def _synchronous_node_count(self) -> int:
         planned_units = self.charm.app.planned_units()
         if self.charm.config.synchronous_node_count == "all":
