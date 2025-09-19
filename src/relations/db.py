@@ -208,7 +208,11 @@ class DbProvides(Object):
         # a database name in it (like the relation with Landscape server charm),
         # so create a database with the other application name.
         if not database:
-            database = relation.app.name
+            if relation.app:
+                database = relation.app.name
+            else:
+                logger.debug("Early exit setup relation: no remote application")
+                return False
 
         try:
             unit_relation_databag = relation.data[self.charm.unit]

@@ -135,7 +135,11 @@ async def test_relation_data_is_updated_correctly_when_scaling(ops_test: OpsTest
         )
         await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
         await ops_test.model.wait_for_idle(
-            apps=[DATABASE_APP_NAME], status="active", timeout=600, wait_for_exact_units=2
+            apps=[DATABASE_APP_NAME],
+            status="active",
+            timeout=600,
+            wait_for_exact_units=2,
+            idle_period=30,
         )
 
     logger.info(
