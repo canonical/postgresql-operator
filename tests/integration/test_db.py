@@ -58,6 +58,7 @@ async def test_mailman3_core_db(ops_test: OpsTest, charm: str) -> None:
             apps=[DATABASE_APP_NAME],
             status="active",
             timeout=1500,
+            idle_period=30,
             wait_for_exact_units=DATABASE_UNITS,
         )
 
