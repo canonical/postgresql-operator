@@ -2227,6 +2227,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def _collect_user_relations(self) -> dict[str, str]:
         user_db_pairs = {}
         for relation in self.client_relations:
+            user = f"relation-{relation.id}"
             if relation.name == "database":
                 if (
                     database
@@ -2234,10 +2235,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         relation.id, "database"
                     )
                 ):
-                    user = f"relation_id_{relation.id}"
                     user_db_pairs[user] = database
             else:
-                user = f"relation-{relation.id}"
                 if database := self.get_secret(APP_SCOPE, f"{user}-database"):
                     user_db_pairs[user] = database
         return user_db_pairs
