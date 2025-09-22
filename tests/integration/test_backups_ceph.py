@@ -22,9 +22,6 @@ from .helpers import (
 logger = logging.getLogger(__name__)
 
 S3_INTEGRATOR_APP_NAME = "s3-integrator"
-tls_certificates_app_name = "self-signed-certificates"
-tls_channel = "latest/stable"
-tls_config = {"ca-common-name": "Test CA"}
 
 backup_id, value_before_backup, value_after_backup = "", None, None
 
@@ -190,9 +187,9 @@ async def test_backup_ceph(ops_test: OpsTest, cloud_configs, cloud_credentials, 
     await backup_operations(
         ops_test,
         S3_INTEGRATOR_APP_NAME,
-        tls_certificates_app_name,
-        tls_config,
-        tls_channel,
+        None,
+        None,
+        None,
         cloud_credentials,
         "ceph",
         cloud_configs,

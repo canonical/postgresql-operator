@@ -66,8 +66,11 @@ class TLS(Object):
         peer_addrs -= {None}
         return peer_addrs
 
-    def _get_common_name(self):
+    def _get_common_name(self) -> str:
         return self.charm.unit_peer_data.get("database-address") or self.host
+
+    def _get_peer_common_name(self) -> str:
+        return self.charm.unit_peer_data.get("database-peers-address") or self.host
 
     def __init__(self, charm: "PostgresqlOperatorCharm", peer_relation: str):
         super().__init__(charm, "client-relations")
@@ -76,11 +79,9 @@ class TLS(Object):
         unit_id = self.charm.unit.name.split("/")[1]
         self.host = f"{self.charm.app.name}-{unit_id}"
         if self.charm.unit_peer_data:
-            common_name = self._get_common_name()
             client_addresses = self._get_client_addrs()
             peer_addresses = self._get_peer_addrs()
         else:
-            common_name = self.host
             client_addresses = set()
             peer_addresses = set()
 
@@ -89,7 +90,7 @@ class TLS(Object):
             TLS_CLIENT_RELATION,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=common_name,
+                    common_name=self._get_common_name(),
                     sans_ip=frozenset(client_addresses),
                     sans_dns=frozenset({
                         self.host,
@@ -107,7 +108,7 @@ class TLS(Object):
             TLS_PEER_RELATION,
             certificate_requests=[
                 CertificateRequestAttributes(
-                    common_name=common_name,
+                    common_name=self._get_peer_common_name(),
                     sans_ip=frozenset(self._get_peer_addrs()),
                     sans_dns=frozenset({
                         self.host,
@@ -230,7 +231,7 @@ class TLS(Object):
         private_key = generate_private_key()
         csr = generate_csr(
             private_key,
-            common_name=self._get_common_name(),
+            common_name=self._get_peer_common_name(),
             sans_ip=frozenset(self._get_peer_addrs()),
             sans_dns=frozenset({
                 self.host,
@@ -244,3 +245,6 @@ class TLS(Object):
         self.charm.set_secret(UNIT_SCOPE, "internal-key", str(private_key))
         self.charm.set_secret(UNIT_SCOPE, "internal-cert", str(cert))
         self.charm.push_tls_files_to_workload()
+        logger.info(
+            "Internal peer certificate generated. Please use a proper TLS operator if possible."
+        )

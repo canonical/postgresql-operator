@@ -1215,9 +1215,13 @@ async def backup_operations(
     charm,
 ) -> None:
     """Basic set of operations for backup testing in different cloud providers."""
+    use_tls = all([tls_certificates_app_name, tls_config, tls_channel])
     # Deploy S3 Integrator and TLS Certificates Operator.
     await ops_test.model.deploy(s3_integrator_app_name)
-    await ops_test.model.deploy(tls_certificates_app_name, config=tls_config, channel=tls_channel)
+    if use_tls:
+        await ops_test.model.deploy(
+            tls_certificates_app_name, config=tls_config, channel=tls_channel
+        )
 
     # Deploy and relate PostgreSQL to S3 integrator (one database app for each cloud for now
     # as archive_mode is disabled after restoring the backup) and to TLS Certificates Operator
@@ -1231,12 +1235,13 @@ async def backup_operations(
         config={"profile": "testing"},
     )
 
-    await ops_test.model.relate(
-        f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
-    )
-    await ops_test.model.relate(
-        f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
-    )
+    if use_tls:
+        await ops_test.model.relate(
+            f"{database_app_name}:client-certificates", f"{tls_certificates_app_name}:certificates"
+        )
+        await ops_test.model.relate(
+            f"{database_app_name}:peer-certificates", f"{tls_certificates_app_name}:certificates"
+        )
     async with ops_test.fast_forward(fast_interval="60s"):
         await ops_test.model.wait_for_idle(apps=[database_app_name], status="active", timeout=1000)
 
