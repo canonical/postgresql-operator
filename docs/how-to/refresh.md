@@ -6,7 +6,7 @@ Use `juju config appname pause-after-unit-refresh=all` to halt an in-progress re
 Then, consider [rolling back](#roll-back)
 ```
 
-Charmed PostgreSQL supports minor in-place refresh via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
+Charmed PostgreSQL supports minor version in-place refresh via the [`juju refresh`](https://documentation.ubuntu.com/juju/3.6/reference/juju-cli/list-of-juju-cli-commands/refresh/#details) command.
 
 ## Determine which version to refresh to
 
@@ -162,6 +162,7 @@ These operations are not supported while a refresh is in progress:
 * Scaling up the application
 * Scaling down the application—unless it is necessary for recovery
 * Creating or removing relations
+* Creating or restoring a backup (on the Juju application)
 * Changes to config values (except `pause-after-unit-refresh`)
 
 ## Start the refresh
