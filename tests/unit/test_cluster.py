@@ -10,6 +10,7 @@ from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
+from single_kernel_postgresql.config.literals import REWIND_USER
 from tenacity import (
     RetryError,
     stop_after_delay,
@@ -29,7 +30,6 @@ from constants import (
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    REWIND_USER,
 )
 
 PATRONI_SERVICE = "patroni"
@@ -139,7 +139,7 @@ def test_get_patroni_health(peers_ips, patroni):
 
 
 def test_get_postgresql_version(peers_ips, patroni):
-    assert patroni.get_postgresql_version() == "16.9"
+    assert patroni.get_postgresql_version() == "16.10"
 
 
 def test_dict_to_hba_string(harness, patroni):
