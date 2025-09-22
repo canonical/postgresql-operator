@@ -73,10 +73,10 @@ For detailed information about PostgreSQL 16 features, see the {doc}`PostgreSQL 
 
 ### Features
 
-* [**Deployment on multiple cloud services**](/how-to/deploy/), including Sunbeam, MAAS, AWS, GCE, and Azure
+* [**Deployment on multiple cloud services**](/how-to/deploy/index), including Sunbeam, MAAS, AWS, GCE, and Azure
 * [**Juju storage**](/how-to/deploy/juju-storage) - Flexible storage configuration options
-* [**Back up and restore**](/how-to/back-up-and-restore), including point-in-time recovery
-* [**COS integration**](/how-to/monitoring-cos) - Enable observability tools like Grafana, Loki, Tempo, and Parca
+* [**Back up and restore**](/how-to/back-up-and-restore/index), including point-in-time recovery
+* [**COS integration**](/how-to/monitoring-cos/index) - Enable observability tools like Grafana, Loki, Tempo, and Parca
 * [**TLS integration**](/how-to/enable-tls)
 * [**LDAP integration**](/how-to/enable-ldap) - Centralised authentication for PostgreSQL clusters 
 * [**`amd64` and `arm64`architecture** support](/reference/system-requirements)
