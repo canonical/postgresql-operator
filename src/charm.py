@@ -715,23 +715,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return
 
-        # Restart the workload if it's stuck on the starting state after a timeline divergence
-        # due to a backup that was restored.
-        if (
-            not self.is_primary
-            and not self.is_standby_leader
-            and (
-                self._patroni.member_replication_lag == "unknown"
-                or int(self._patroni.member_replication_lag) > 1000
-            )
-        ):
-            logger.warning("Degraded member detected: reinitialising unit")
-            self.unit.status = MaintenanceStatus("reinitialising replica")
-            self._patroni.reinitialize_postgresql()
-            logger.debug("Deferring on_peer_relation_changed: reinitialising replica")
-            event.defer()
-            return
-
         self._start_stop_pgbackrest_service(event)
 
         # This is intended to be executed only when leader is reinitializing S3 connection due to the leader change.
@@ -1635,7 +1618,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if self.primary_endpoint:
             self._update_relation_endpoints()
 
-        if self._handle_workload_failures():
+        if not self._patroni.member_started and self._patroni.is_member_isolated:
+            self._patroni.restart_patroni()
             return
 
         # Update the sync-standby endpoint in the async replication data.
@@ -1742,40 +1726,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
                 return False
-
-        return False
-
-    def _handle_workload_failures(self) -> bool:
-        """Handle workload (Patroni or PostgreSQL) failures.
-
-        Returns:
-            a bool indicating whether the charm performed any action.
-        """
-        # Restart the workload if it's stuck on the starting state after a restart.
-        try:
-            is_primary = self.is_primary
-            is_standby_leader = self.is_standby_leader
-        except RetryError:
-            return False
-
-        if (
-            not self.has_raft_keys()
-            and not is_primary
-            and not is_standby_leader
-            and not self._patroni.member_started
-            and "postgresql_restarted" in self._peers.data[self.unit]
-            and self._patroni.member_replication_lag == "unknown"
-        ):
-            logger.warning("Workload failure detected. Reinitialising unit.")
-            self.unit.status = MaintenanceStatus("reinitialising replica")
-            self._patroni.reinitialize_postgresql()
-            return True
-
-        # Restart the service if the current cluster member is isolated from the cluster
-        # (stuck with the "awaiting for member to start" message).
-        if not self._patroni.member_started and self._patroni.is_member_isolated:
-            self._patroni.restart_patroni()
-            return True
 
         return False
 
