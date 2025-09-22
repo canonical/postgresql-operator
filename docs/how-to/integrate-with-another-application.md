@@ -36,7 +36,7 @@ juju remove-relation postgresql <charm>
 ### Legacy `pgsql` interface
 
 ```{caution}
-Note that this interface is **deprecated**. See [](/explanation/legacy-charm).
+Note that this interface is **deprecated**. See [](/explanation/charm-versions/legacy-charm).
 ```
 
 To integrate via the legacy interface, run
