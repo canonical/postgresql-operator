@@ -32,7 +32,9 @@ storage:
 Charmed PostgreSQL 16 supports multiple storage types: `archive` , `data` , `logs` and `temp` . See the deployment examples below.
 
 ```{warning}
-The charm supports using tmpfs as a storage provider only for the temp storage. Using tmpfs for archive, data, or logs storage is not supported. These storages must be backed by persistent filesystems.
+The charm only supports using tmpfs as a storage provider for `temp` storage. 
+
+Using tmpfs for `archive`, `data`, or `logs` storage is not supported. These storage types must be backed by persistent filesystems.
 ```
 
 ## Define storage size
