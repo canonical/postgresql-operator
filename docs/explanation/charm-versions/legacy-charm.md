@@ -6,7 +6,7 @@ The PostgreSQL 16 charm does not support the same endpoints as the legacy charm.
 
 To read more about implementing compatible endpoints, see: [](/how-to/development/integrate-with-your-charm)
 
-To read more about the legacy charm see the {doc}`PostgreSQL 14 documentation <postgresql-14:explanation/legacy-charm>`.
+To read more about the legacy charm see the {doc}`PostgreSQL 14 documentation <postgresql-14:explanation/charm-versions/legacy-charm>`.
 
 ## How to report issues and contact authors
 
