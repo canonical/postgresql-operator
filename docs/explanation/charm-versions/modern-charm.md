@@ -35,7 +35,7 @@ To switch between versions, use the small rectangular menu at the bottom right c
   * See all endpoints on [Charmhub](https://charmhub.io/postgresql/integrations?channel=16/stable)
 * [**Timescale Community Edition**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/enable-plugins-extensions/enable-timescaledb) replaces Timescale Apache 2
 * **Improved** [**built-in roles**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/explanation/roles) - Enhanced role-based access control system
-* **New** [**refresh process**](https://canonical-charmed-postgresql.readthedocs-hosted.com/16/how-to/refresh/index) for in-place upgrades
+* **New** **refresh process** for in-place upgrades
 
 ### Deprecated or removed
 
