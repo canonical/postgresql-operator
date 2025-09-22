@@ -4,16 +4,16 @@
 from unittest.mock import Mock, PropertyMock, patch
 
 import pytest
-from charms.postgresql_k8s.v1.postgresql import (
+from ops.framework import EventBase
+from ops.model import ActiveStatus, BlockedStatus
+from ops.testing import Harness
+from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_RELATION,
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLGetPostgreSQLVersionError,
     PostgreSQLListUsersError,
 )
-from ops.framework import EventBase
-from ops.model import ActiveStatus, BlockedStatus
-from ops.testing import Harness
 
 from charm import PostgresqlOperatorCharm
 from constants import PEER
@@ -251,7 +251,12 @@ def test_update_endpoints_with_event(harness: Harness):
             "relations.postgresql_provider.DatabaseProvides.fetch_my_relation_data"
         ) as _fetch_my_relation_data,
     ):
-        _fetch_my_relation_data.return_value.get().get.return_value = "test_password"
+        _fetch_my_relation_data.return_value = {
+            2: {
+                "password": "test_password",
+                "username": "relation-2",
+            }
+        }
 
         # Mock the members_ips list to simulate different scenarios
         # (with and without a replica).
@@ -292,7 +297,7 @@ def test_update_endpoints_with_event(harness: Harness):
             "tls": "False",
         }
         assert harness.get_relation_data(another_rel_id, harness.charm.app.name) == {}
-        _fetch_my_relation_data.assert_called_once_with([2], ["password"])
+        _fetch_my_relation_data.assert_called_once_with([2], ["username", "password"])
 
         # Also test with only a primary instance.
         cluster_status.return_value = CLUSTER_STATUS[:1]
@@ -319,13 +324,22 @@ def test_update_endpoints_without_event(harness):
 
         # Don't set data if no password
         cluster_status.return_value = []
-        _fetch_my_relation_data.return_value.get().get.return_value = None
+        _fetch_my_relation_data.return_value.get.return_value = {}
 
         harness.charm.postgresql_client_relation.update_endpoints()
         assert harness.get_relation_data(rel_id, harness.charm.app.name) == {}
 
         _fetch_my_relation_data.reset_mock()
-        _fetch_my_relation_data.return_value.get().get.return_value = "test_password"
+        _fetch_my_relation_data.return_value = {
+            2: {
+                "password": "test_password",
+                "username": "relation-2",
+            },
+            3: {
+                "password": "test_password",
+                "username": "relation-3",
+            },
+        }
 
         # Add two different relations.
         rel_id = harness.add_relation(RELATION_NAME, "application")
@@ -379,7 +393,7 @@ def test_update_endpoints_without_event(harness):
             "uris": "postgresql://relation-3:test_password@1.1.1.1:5432/test_db2",
             "tls": "False",
         }
-        _fetch_my_relation_data.assert_called_once_with(None, ["password"])
+        _fetch_my_relation_data.assert_called_once_with(None, ["username", "password"])
 
         # Filter out missing replica
         harness.charm.postgresql_client_relation.update_endpoints()

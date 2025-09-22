@@ -5,9 +5,9 @@ from unittest.mock import patch
 import pytest
 from ops.pebble import ConnectionError as PebbleConnectionError
 from ops.testing import Harness
+from single_kernel_postgresql.config.literals import PEER
 
 from charm import PostgresqlOperatorCharm
-from constants import PEER
 from relations.tls_transfer import TLS_TRANSFER_RELATION
 
 SCOPE = "unit"

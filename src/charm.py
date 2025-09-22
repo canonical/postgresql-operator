@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
 from typing import Literal, get_args
@@ -29,21 +30,6 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v1.postgresql import (
-    ACCESS_GROUP_IDENTITY,
-    ACCESS_GROUPS,
-    REQUIRED_PLUGINS,
-    ROLE_BACKUP,
-    ROLE_STATS,
-    PostgreSQL,
-    PostgreSQLCreatePredefinedRolesError,
-    PostgreSQLCreateUserError,
-    PostgreSQLEnableDisableExtensionError,
-    PostgreSQLGetCurrentTimelineError,
-    PostgreSQLGrantDatabasePrivilegesToUserError,
-    PostgreSQLListUsersError,
-    PostgreSQLUpdateUserPasswordError,
-)
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from ops import (
@@ -67,6 +53,30 @@ from ops import (
     WaitingStatus,
     main,
 )
+from single_kernel_postgresql.config.literals import (
+    BACKUP_USER,
+    MONITORING_USER,
+    PEER,
+    REPLICATION_USER,
+    REWIND_USER,
+    SYSTEM_USERS,
+    USER,
+)
+from single_kernel_postgresql.utils.postgresql import (
+    ACCESS_GROUP_IDENTITY,
+    ACCESS_GROUPS,
+    REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_STATS,
+    PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
+    PostgreSQLCreateUserError,
+    PostgreSQLEnableDisableExtensionError,
+    PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
+    PostgreSQLListUsersError,
+    PostgreSQLUpdateUserPasswordError,
+)
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
@@ -84,31 +94,25 @@ from cluster_topology_observer import (
 from config import CharmConfig
 from constants import (
     APP_SCOPE,
-    BACKUP_USER,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
-    MONITORING_USER,
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
-    PEER,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
-    REPLICATION_USER,
     REWIND_PASSWORD_KEY,
-    REWIND_USER,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
-    SYSTEM_USERS,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -116,7 +120,6 @@ from constants import (
     TRACING_PROTOCOL,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
-    USER,
     USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP
@@ -258,7 +261,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     _postgresql: PostgreSQL | None = None
 
     # Override data_models.py TypedCharmBase config
-    @property
+    @cached_property
     def config(self):
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
@@ -368,7 +371,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
@@ -496,12 +499,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # RelationData has dict like API
         return self._peers.data  # type: ignore
 
-    @property
-    def tracing_endpoint(self) -> str | None:
-        """Otlp http endpoint for charm instrumentation."""
-        return self._tracing_endpoint_config
-
-    @property
+    @cached_property
     def cpu_count(self) -> int:
         """Property with numbers of cpus."""
         if cpus := os.cpu_count():
@@ -608,24 +606,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    @property
+    @cached_property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
-        password = str(self.get_secret(APP_SCOPE, f"{USER}-password"))
-        if self._postgresql is None or self._postgresql.primary_host is None:
-            self._postgresql = PostgreSQL(
-                primary_host=self.primary_endpoint,
-                current_host=self._unit_ip,
-                user=USER,
-                password=password,
-                database=DATABASE_DEFAULT_NAME,
-                system_users=SYSTEM_USERS,
-            )
-        else:
-            self._postgresql.password = password
-        return self._postgresql
+        return PostgreSQL(
+            primary_host=self.primary_endpoint,
+            current_host=self._unit_ip,
+            user=USER,
+            password=str(self.get_secret(APP_SCOPE, f"{USER}-password")),
+            database=DATABASE_DEFAULT_NAME,
+            system_users=SYSTEM_USERS,
+        )
 
-    @property
+    @cached_property
     def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
         if not self._peers:
@@ -1129,7 +1122,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 hosts.append(unit.name.replace("/", "-"))
         return set(hosts)
 
-    @property
+    @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
@@ -1346,11 +1339,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
         # Install the charmed PostgreSQL snap.
-        try:
-            self._install_snap_package(revision=None)
-        except snap.SnapError:
-            self.set_unit_status(BlockedStatus("failed to install snap packages"))
-            return
+        self._install_snap_package(revision=None)
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -2511,8 +2500,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns a user->databases map for all relations."""
         user_database_map = {}
         # Copy relations users directly instead of waiting for them to be created
+        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            user = f"relation-{relation.id}"
+            user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
             if user not in user_database_map and (
                 database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                     relation.id, "database"
@@ -2562,15 +2552,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
-    @property
+    @cached_property
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         user_db_pairs = {}
+        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
             if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                 relation.id, "database"
             ):
-                user = f"relation_id_{relation.id}"
+                user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
                 user_db_pairs[user] = database
         return shake_128(str(user_db_pairs).encode()).hexdigest(16)
 
