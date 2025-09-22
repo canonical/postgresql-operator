@@ -27,7 +27,7 @@ To switch between versions, use the small rectangular menu at the bottom right c
 ### New features
 
 * [**Juju spaces**](/how-to/deploy/juju-spaces) - Enhanced networking capabilities for complex deployment scenarios
-* [**Juju user secrets**](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) - Secure management of the charm's [internal passwords](/how-to/manage-passwords)
+* [**Juju user secrets**](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret) - Secure management of the charm's [internal passwords](/how-to/manage-passwords)
 * **Improved** [**security hardening**](/explanation/security/index) - Enhanced security posture and best practices
 * **TLS v4 library migration**
   * New endpoints `client-certificates` and `peer-certificates` 
