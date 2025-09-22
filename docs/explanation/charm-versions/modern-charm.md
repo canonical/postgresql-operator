@@ -28,14 +28,14 @@ To switch between versions, use the small rectangular menu at the bottom right c
 
 * [**Juju spaces**](/how-to/deploy/juju-spaces) - Enhanced networking capabilities for complex deployment scenarios
 * [**Juju user secrets**](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user) - Secure management of the charm's [internal passwords](/how-to/manage-passwords)
-* **Improved** [**security hardening**](/explanation/security) - Enhanced security posture and best practices
+* **Improved** [**security hardening**](/explanation/security/index) - Enhanced security posture and best practices
 * **TLS v4 library migration**
   * New endpoints `client-certificates` and `peer-certificates` 
   * Endpoint `peer-interfaces` uses TLS by default
   * See all endpoints on [Charmhub](https://charmhub.io/postgresql/integrations?channel=16/stable)
 * [**Timescale Community Edition**](/how-to/enable-plugins-extensions/enable-timescaledb) replaces Timescale Apache 2
 * **Improved** [**built-in roles**](/explanation/roles) - Enhanced role-based access control system
-* **New** [**refresh process**](/how-to/refresh/index) for in-place upgrades
+* **New** **refresh process** for in-place upgrades
 
 ### Deprecated or removed
 
@@ -73,10 +73,10 @@ For detailed information about all PostgreSQL 16 releases, see the [Releases pag
 
 ### Features
 
-* [**Deployment on multiple cloud services**](/how-to/deploy/), including Sunbeam, MAAS, AWS, GCE, and Azure
+* [**Deployment on multiple cloud services**](/how-to/deploy/index), including Sunbeam, MAAS, AWS, GCE, and Azure
 * [**Juju storage**](/how-to/deploy/juju-storage) - Flexible storage configuration options
-* [**Back up and restore**](/how-to/back-up-and-restore), including point-in-time recovery
-* [**COS integration**](/how-to/monitoring-cos) - Enable observability tools like Grafana, Loki, Tempo, and Parca
+* [**Back up and restore**](/how-to/back-up-and-restore/index), including point-in-time recovery
+* [**COS integration**](/how-to/monitoring-cos/index) - Enable observability tools like Grafana, Loki, Tempo, and Parca
 * [**TLS integration**](/how-to/enable-tls)
 * [**LDAP integration**](/how-to/enable-ldap) - Centralised authentication for PostgreSQL clusters 
 * [**`amd64` and `arm64`architecture** support](/reference/system-requirements)
@@ -94,7 +94,6 @@ For detailed information about all PostgreSQL 14 releases, see the {doc}`Postgre
 * **For new deployments**: Use **PostgreSQL 16** for the latest features and long-term support
 * **For existing PostgreSQL 14 deployments**: Continue using PostgreSQL 14 or plan migration to 16
 * **For legacy charm users**: Migrate to PostgreSQL 14 as soon as possible
-
 
 <!-- Links -->
 
