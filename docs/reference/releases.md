@@ -10,7 +10,7 @@ To see all releases and commits, check the [Charmed PostgreSQL Releases page on 
 
 **PostgreSQL 16** comes with all features supported by PostgreSQL 14: TLS encryption, COS monitoring, upgrades, cross-regional async replication, LDAP, Point-in-time recovery, and {doc}`more <postgresql-14:reference/releases>`.
 
-In addition, Charmed PostgreSQL 16 supports new features like [Juju spaces](/how-to/deploy/juju-spaces), [Juju storage](/how-to/deploy/juju-storage), and [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user). 
+In addition, Charmed PostgreSQL 16 supports new features like [Juju spaces](/how-to/deploy/juju-spaces), [Juju storage](/how-to/deploy/juju-storage), and [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret). 
 
 For more details about all new PostgreSQL 16 features, see the complete [release notes](https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0).
 
