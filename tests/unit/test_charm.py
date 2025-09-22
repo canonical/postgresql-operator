@@ -890,6 +890,9 @@ def test_on_update_status_after_restore_operation(harness):
         ) as _get_current_timeline,
         patch("charm.PostgresqlOperatorCharm._setup_users") as _setup_users,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
+        patch(
+            "charm.PostgresqlOperatorCharm._fix_directories_permissions"
+        ) as _fix_directories_permissions,
         patch("charm.Patroni.member_started", new_callable=PropertyMock) as _member_started,
         patch("charm.Patroni.get_member_status") as _get_member_status,
         patch(
@@ -931,6 +934,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_not_called()
         _update_relation_endpoints.assert_not_called()
         _set_primary_status_message.assert_not_called()
+        _fix_directories_permissions.assert_not_called()
         _enable_disable_extensions.assert_not_called()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
@@ -951,6 +955,7 @@ def test_on_update_status_after_restore_operation(harness):
         _oversee_users.assert_called_once()
         _update_relation_endpoints.assert_called_once()
         _set_primary_status_message.assert_called_once()
+        _fix_directories_permissions.assert_called_once()
         _enable_disable_extensions.assert_called_once_with()
         assert isinstance(harness.charm.unit.status, ActiveStatus)
 
