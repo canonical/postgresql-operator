@@ -335,5 +335,7 @@ if os.path.exists('./reuse/substitutions.yaml'):
 # Add configuration for intersphinx mapping
 
 intersphinx_mapping = {
-    'starter-pack': ('https://canonical-example-product-documentation.readthedocs-hosted.com/en/latest', None)
+    'postgresql-16': ('https://canonical-charmed-postgresql.readthedocs-hosted.com/16/', None)
 }
+
+myst_url_schemes = ["http", "https", ]

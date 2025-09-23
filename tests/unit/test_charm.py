@@ -1287,7 +1287,7 @@ def test_update_config(harness):
             no_peers=False,
             user_databases_map={"operator": "all", "replication": "all", "rewind": "all"},
         )
-        _handle_postgresql_restart_need.assert_called_once_with(False)
+        _handle_postgresql_restart_need.assert_called_once_with(False, True)
         _restart_ldap_sync_service.assert_called_once()
         _restart_metrics_service.assert_called_once()
         assert "tls" not in harness.get_relation_data(rel_id, harness.charm.unit.name)
@@ -2353,7 +2353,7 @@ def test_handle_postgresql_restart_need(harness):
             postgresql_mock.is_tls_enabled = PropertyMock(return_value=values[2])
             postgresql_mock.is_restart_pending = PropertyMock(return_value=values[3])
 
-            harness.charm._handle_postgresql_restart_need(values[0])
+            harness.charm._handle_postgresql_restart_need(values[0], True)
             _reload_patroni_configuration.assert_called_once()
             if values[0]:
                 assert "tls" in harness.get_relation_data(rel_id, harness.charm.unit)

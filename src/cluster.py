@@ -11,6 +11,7 @@ import pwd
 import re
 import shutil
 import subprocess
+from functools import cached_property
 from pathlib import Path
 from typing import Any
 
@@ -154,11 +155,11 @@ class Patroni:
         # TLS is enabled, otherwise True is set because it's the default value.
         self.verify = f"{PATRONI_CONF_PATH}/{TLS_CA_FILE}" if tls_enabled else True
 
-    @property
+    @cached_property
     def _patroni_auth(self) -> requests.auth.HTTPBasicAuth:
         return requests.auth.HTTPBasicAuth("patroni", self.patroni_password)
 
-    @property
+    @cached_property
     def _patroni_url(self) -> str:
         """Patroni REST API URL."""
         return f"{'https' if self.tls_enabled else 'http'}://{self.unit_ip}:8008"
@@ -202,8 +203,7 @@ class Patroni:
         # Set the correct ownership for the file or directory.
         os.chown(path, uid=user_database.pw_uid, gid=user_database.pw_gid)
 
-    @property
-    @retry(stop=stop_after_attempt(10), wait=wait_exponential(multiplier=1, min=2, max=10))
+    @cached_property
     def cluster_members(self) -> set:
         """Get the current cluster members."""
         # Request info from cluster endpoint (which returns all members of the cluster).
@@ -686,7 +686,7 @@ class Patroni:
             partner_addrs=self.charm.async_replication.get_partner_addresses()
             if not no_peers
             else [],
-            peers_ips=self.peers_ips if not no_peers else set(),
+            peers_ips=sorted(self.peers_ips) if not no_peers else set(),
             pgbackrest_configuration_file=PGBACKREST_CONFIGURATION_FILE,
             scope=self.cluster_name,
             self_ip=self.unit_ip,
@@ -1040,7 +1040,7 @@ class Patroni:
             timeout=PATRONI_TIMEOUT,
         )
 
-    @property
+    @cached_property
     def _synchronous_node_count(self) -> int:
         planned_units = self.charm.app.planned_units()
         if self.charm.config.synchronous_node_count == "all":
