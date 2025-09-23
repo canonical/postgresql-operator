@@ -1,3 +1,4 @@
+(integrate-with-your-charm)=
 # How to integrate PostgreSQL with your charm
 
 Charmed PostgreSQL can be integrated with any charmed application that supports its interfaces. This page provides some guidance and resources for charm developers to develop, integrate, and troubleshoot their charm so that it may connect with PostgreSQL.
@@ -8,7 +9,7 @@ First, we recommend that you check [the supported interfaces](/explanation/inter
 
 Most existing charms currently use [ops-lib-pgsql](https://github.com/canonical/ops-lib-pgsql) interface (legacy). For new charms, **Canonical recommends using [data-platform-libs](https://github.com/canonical/data-platform-libs).**
 
-Legacy charm details are described [here](/explanation/legacy-charm).
+Legacy charm details are described [here](/explanation/charm-versions/legacy-charm).
 
 ## Integrate your charm with PostgreSQL
 

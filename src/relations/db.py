@@ -11,6 +11,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLCreateDatabaseError,
     PostgreSQLCreateUserError,
     PostgreSQLGetPostgreSQLVersionError,
+    PostgreSQLListUsersError,
 )
 from ops.charm import (
     CharmBase,
@@ -111,12 +112,17 @@ class DbProvides(Object):
         """
         # Check for some conditions before trying to access the PostgreSQL instance.
         if not self.charm.unit.is_leader():
-            if (
-                not self.charm._patroni.member_started
-                or f"relation-{event.relation.id}"
-                not in self.charm.postgresql.list_users(current_host=True)
-            ):
-                logger.debug("Deferring on_relation_changed: user was not created yet")
+            try:
+                if (
+                    not self.charm._patroni.member_started
+                    or f"relation-{event.relation.id}"
+                    not in self.charm.postgresql.list_users(current_host=True)
+                ):
+                    logger.debug("Deferring on_relation_changed: user was not created yet")
+                    event.defer()
+                    return
+            except PostgreSQLListUsersError:
+                logger.debug("Deferring on_relation_changed: unable to list users")
                 event.defer()
                 return
 
@@ -141,6 +147,12 @@ class DbProvides(Object):
         logger.warning(f"DEPRECATION WARNING - `{self.relation_name}` is a legacy interface")
 
         self.set_up_relation(event.relation)
+
+        if not self.charm.postgresql.is_user_in_hba(f"relation-{event.relation.id}"):
+            logger.debug("Deferring on_relation_changed: User not in pg_hba yet.")
+            event.defer()
+            return
+        self.update_endpoints(event.relation)
 
     def _get_extensions(self, relation: Relation) -> tuple[list, set]:
         """Returns the list of required and disabled extensions."""
@@ -196,14 +208,19 @@ class DbProvides(Object):
         # a database name in it (like the relation with Landscape server charm),
         # so create a database with the other application name.
         if not database:
-            database = relation.app.name
+            if relation.app:
+                database = relation.app.name
+            else:
+                logger.debug("Early exit setup relation: no remote application")
+                return False
 
         try:
             unit_relation_databag = relation.data[self.charm.unit]
 
             # Creates the user and the database for this specific relation if it was not already
             # created in a previous relation changed event.
-            password = unit_relation_databag.get("password", new_password())
+            if not (password := self.charm.get_secret(APP_SCOPE, user)):
+                password = unit_relation_databag.get("password", new_password())
 
             # Store the user, password and database name in the secret store to be accessible by
             # non-leader units when the cluster topology changes.
@@ -224,8 +241,6 @@ class DbProvides(Object):
                 f"Failed to initialize {self.relation_name} relation"
             )
             return False
-
-        self.update_endpoints(relation)
 
         self._update_unit_status(relation)
 
