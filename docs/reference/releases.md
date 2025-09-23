@@ -1,22 +1,27 @@
----
-relatedlinks: "[Charm&#32risk](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk)"
----
-
 # Releases
 
-Charmed PostgreSQL 16 supports all [features listed in PostgreSQL 14](https://canonical-charmed-postgresql.readthedocs-hosted.com/14/reference/releases/#dependencies-and-supported-features).
+This page provides high-level overviews of the dependencies and features that are supported by each revision in every stable release of Charmed PostgreSQL 16.
 
-| Release | PostgreSQL version | Minimum Juju version | 
-|:---:|:---:|:---:|
-| [843, 844] | 16.9  | 3.6+  |
+To learn more about the different release tracks and channels, see the [Juju documentation about channels](https://documentation.ubuntu.com/juju/3.6/reference/charm/#risk).
 
-See all release notes on [GitHub](https://github.com/canonical/postgresql-operator/releases).
+To see all releases and commits, check the [Charmed PostgreSQL Releases page on GitHub](https://github.com/canonical/postgresql-operator/releases).
 
-## How to refresh (upgrade)
+## Dependencies and supported features
 
-Charmed PostgreSQL supports **minor in-place upgrades**. See [](/how-to/refresh) for more information.
+**PostgreSQL 16** comes with all features supported by PostgreSQL 14: TLS encryption, COS monitoring, upgrades, cross-regional async replication, LDAP, Point-in-time recovery, and {doc}`more <postgresql-14:reference/releases>`.
 
-[Contact us](/reference/contacts) if you are interested in migrating from PostgreSQL 14 to 16.
+In addition, Charmed PostgreSQL 16 supports new features like [Juju spaces](/how-to/deploy/juju-spaces), [Juju storage](/how-to/deploy/juju-storage), and [Juju user secrets](https://documentation.ubuntu.com/juju/latest/reference/secret/index.html#user-secret). 
+
+For more details about all new PostgreSQL 16 features, see the complete [release notes](https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0).
+
+| Charmhub revision</br>(amd, arm) | Snap revision</br>(amd, arm) | PostgreSQL version | Minimum Juju version |
+|:----------------------------:|:------------------------:|:------------------:|:--------------------:|
+|           [843, 844]         |         218, 219         |        16.9        |         3.6        | 
+
+```{seealso}
+* [Information about all major versions](/explanation/charm-versions/index) 
+* {doc}`Charmed PostgreSQL 14 releases <postgresql-14:reference/releases>`
+```
 
 ## Architecture and base
 
@@ -24,12 +29,13 @@ Several [revisions](https://documentation.ubuntu.com/juju/3.6/reference/charm/#c
 
 If you do not specify a revision on deploy time, Juju will automatically choose the revision that matches your base and architecture.
 
-<!--TODO: Move to explanation -->
+```{caution}
+If you deploy with the `--revision` flag, **you must make sure the revision matches your base and architecture**. 
 
+See: [`juju info`](https://juju.is/docs/juju/juju-info).
+```
 
-<!-- LINKS -->
-[843, 844]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
-
-<!--BADGES-->
+<!--Links-->
 [check]: https://img.icons8.com/color/20/checkmark--v1.png
 
+[843, 844]: https://github.com/canonical/postgresql-operator/releases/tag/v16%2F1.59.0
