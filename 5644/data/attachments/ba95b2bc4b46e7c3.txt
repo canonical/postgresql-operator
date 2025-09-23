@@ -1,0 +1,307 @@
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:77 creating a table in the database
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:85 Downscaling the existing cluster
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:94 Upscaling the second cluster with the old data
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] waiting: waiting for primary to be reachable from this unit
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/2 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/2 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/2 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] maintenance: reconfiguring cluster
+  second-cluster/2 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [idle] active: 
+  second-cluster/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/3 [executing] maintenance: installing PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [executing] maintenance: reconfiguring cluster
+  second-cluster/2 [executing] active: 
+  second-cluster/3 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/3 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  second-cluster/1 [idle] active: Primary
+  second-cluster/2 [idle] active: 
+  second-cluster/3 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_restore_cluster:test_restore_cluster.py:105 checking that data was persisted
+[32mINFO    [0m pytest_operator.plugin:plugin.py:951 Model status:
+
+Model    Controller     Cloud/Region         Version  SLA          Timestamp
+testing  concierge-lxd  localhost/localhost  3.6.9    unsupported  01:50:49Z
+
+App             Version  Status  Scale  Charm       Channel  Rev  Exposed  Message
+second-cluster  14.19    active      3  postgresql             1  no       
+
+Unit               Workload  Agent  Machine  Public address  Ports     Message
+second-cluster/1*  active    idle   4        10.16.23.93     5432/tcp  Primary
+second-cluster/2   active    idle   5        10.16.23.103    5432/tcp  
+second-cluster/3   active    idle   6        10.16.23.237    5432/tcp  
+
+Machine  State    Address       Inst id        Base          AZ             Message
+4        started  10.16.23.93   juju-2fa9c4-4  ubuntu@22.04  runnervmf4ws1  Running
+5        started  10.16.23.103  juju-2fa9c4-5  ubuntu@22.04  runnervmf4ws1  Running
+6        started  10.16.23.237  juju-2fa9c4-6  ubuntu@22.04  runnervmf4ws1  Running
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:957 Juju error logs:
+
+machine-2: 01:35:51 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-2: 01:35:51 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-first-cluster-2: 01:35:52 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-first-cluster-2: 01:36:58 ERROR unit.first-cluster/2.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 494, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 325, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7f6525f55e10>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.16.23.35', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f6525f55e10>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/src/cluster.py", line 577, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-first-cluster-2/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.16.23.35', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f6525f55e10>: Failed to establish a new connection: [Errno 111] Connection refused'))
+unit-first-cluster-2: 01:37:17 ERROR unit.first-cluster/2.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-first-cluster-2: 01:37:22 ERROR unit.first-cluster/2.juju-log upgrade:1: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-0: 01:37:27 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-0: 01:37:27 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-first-cluster-0: 01:37:28 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-3: 01:37:38 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-3: 01:37:38 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-0: 01:37:38 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-1: 01:37:55 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-1: 01:37:55 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-first-cluster-1: 01:37:55 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-second-cluster-0: 01:38:39 ERROR unit.second-cluster/0.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 494, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 325, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7ffb4e251e10>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.16.23.176', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ffb4e251e10>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/src/cluster.py", line 577, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-0/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.16.23.176', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7ffb4e251e10>: Failed to establish a new connection: [Errno 111] Connection refused'))
+unit-second-cluster-0: 01:38:58 ERROR unit.second-cluster/0.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-first-cluster-1: 01:39:33 ERROR unit.first-cluster/1.juju-log database-peers:2: Failed to list PostgreSQL database users: connection to server at "10.16.23.177", port 5432 failed: Connection refused
+	Is the server running on that host and accepting TCP/IP connections?
+
+unit-second-cluster-0: 01:40:43 ERROR unit.second-cluster/0.juju-log Failed to list PostgreSQL database users: connection to server at "10.16.23.176", port 5432 failed: FATAL:  password authentication failed for user "operator"
+
+machine-4: 01:43:01 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-4: 01:43:01 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-1: 01:43:01 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+unit-second-cluster-1: 01:43:32 ERROR unit.second-cluster/1.juju-log Unable to get the state of the cluster
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 198, in _new_conn
+    sock = connection.create_connection(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 85, in create_connection
+    raise err
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/util/connection.py", line 73, in create_connection
+    sock.connect(sa)
+ConnectionRefusedError: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 787, in urlopen
+    response = self._make_request(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 493, in _make_request
+    conn.request(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 494, in request
+    self.endheaders()
+  File "/usr/lib/python3.10/http/client.py", line 1278, in endheaders
+    self._send_output(message_body, encode_chunked=encode_chunked)
+  File "/usr/lib/python3.10/http/client.py", line 1038, in _send_output
+    self.send(msg)
+  File "/usr/lib/python3.10/http/client.py", line 976, in send
+    self.connect()
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 325, in connect
+    self.sock = self._new_conn()
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connection.py", line 213, in _new_conn
+    raise NewConnectionError(
+urllib3.exceptions.NewConnectionError: <urllib3.connection.HTTPConnection object at 0x7f2d666adcf0>: Failed to establish a new connection: [Errno 111] Connection refused
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 644, in send
+    resp = conn.urlopen(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/connectionpool.py", line 841, in urlopen
+    retries = retries.increment(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/urllib3/util/retry.py", line 519, in increment
+    raise MaxRetryError(_pool, url, reason) from reason  # type: ignore[arg-type]
+urllib3.exceptions.MaxRetryError: HTTPConnectionPool(host='10.16.23.93', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f2d666adcf0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/src/cluster.py", line 577, in are_replicas_up
+    response = requests.get(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/requests/api.py", line 73, in get
+    return request("get", url, params=params, **kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/requests/api.py", line 59, in request
+    return session.request(method=method, url=url, **kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 589, in request
+    resp = self.send(prep, **send_kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/requests/sessions.py", line 703, in send
+    r = adapter.send(request, **kwargs)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/requests/adapters.py", line 677, in send
+    raise ConnectionError(e, request=request)
+requests.exceptions.ConnectionError: HTTPConnectionPool(host='10.16.23.93', port=8008): Max retries exceeded with url: /cluster (Caused by NewConnectionError('<urllib3.connection.HTTPConnection object at 0x7f2d666adcf0>: Failed to establish a new connection: [Errno 111] Connection refused'))
+unit-second-cluster-1: 01:43:43 ERROR unit.second-cluster/1.juju-log Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+unit-second-cluster-1: 01:44:01 ERROR unit.second-cluster/1.juju-log upgrade:5: failed to change plugins: 
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 438, in enable_disable_extensions
+    with self._connect_to_database() as connection, connection.cursor() as cursor:
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 184, in _connect_to_database
+    connection = psycopg2.connect(
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/venv/lib/python3.10/site-packages/psycopg2/__init__.py", line 122, in connect
+    conn = _connect(dsn, connection_factory=connection_factory, **kwasync)
+psycopg2.OperationalError: could not translate host name "None" to address: Temporary failure in name resolution
+
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/src/charm.py", line 1215, in enable_disable_extensions
+    self.postgresql.enable_disable_extensions(extensions, database)
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/lib/charms/tempo_coordinator_k8s/v0/charm_tracing.py", line 1153, in wrapped_function
+    return callable(*args, **kwargs)  # type: ignore
+  File "/var/lib/juju/agents/unit-second-cluster-1/charm/lib/charms/postgresql_k8s/v0/postgresql.py", line 467, in enable_disable_extensions
+    raise PostgreSQLEnableDisableExtensionError() from e
+charms.postgresql_k8s.v0.postgresql.PostgreSQLEnableDisableExtensionError
+unit-second-cluster-1: 01:44:02 ERROR unit.second-cluster/1.juju-log upgrade:5: Failed to list PostgreSQL database users: could not translate host name "None" to address: Temporary failure in name resolution
+
+machine-5: 01:45:45 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-5: 01:45:45 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-2: 01:45:45 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+machine-6: 01:48:50 ERROR juju.worker.dependency "kvm-container-provisioner" manifold worker returned unexpected error: container types not yet available
+machine-6: 01:48:50 ERROR juju.worker.dependency "lxd-container-provisioner" manifold worker returned unexpected error: container types not yet available
+unit-second-cluster-3: 01:48:50 ERROR juju.worker.meterstatus error running "meter-status-changed": charm missing from disk
+
+[32mINFO    [0m pytest_operator.plugin:plugin.py:1039 Forgetting model main...
