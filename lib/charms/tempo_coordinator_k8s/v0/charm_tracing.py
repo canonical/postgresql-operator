@@ -266,18 +266,20 @@ def _remove_stale_otel_sdk_packages():
         if name.startswith("opentelemetry_"):
             otel_distributions[name].append(distribution)
 
-    otel_logger.debug(f"Found {len(otel_distributions)} opentelemetry distributions")
+    otel_logger.debug("Found %d opentelemetry distributions", len(otel_distributions))
 
     # If we have multiple distributions with the same name, remove any that have 0 associated files
     for name, distributions_ in otel_distributions.items():
         if len(distributions_) <= 1:
             continue
 
-        otel_logger.debug(f"Package {name} has multiple ({len(distributions_)}) distributions.")
+        otel_logger.debug(
+            "Package %s has multiple (%d) distributions.", name, len(distributions_)
+        )
         for distribution in distributions_:
             if not distribution.files:  # Not None or empty list
                 path = distribution._path  # type: ignore
-                otel_logger.info(f"Removing empty distribution of {name} at {path}.")
+                otel_logger.info("Removing empty distribution of %s at %s.", name, path)
                 shutil.rmtree(path)
 
     otel_logger.debug("Successfully applied _remove_stale_otel_sdk_packages patch. ")
@@ -313,8 +315,8 @@ from typing import (
 
 import opentelemetry
 import ops
-from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import ( # type: ignore
-    encode_spans # type: ignore
+from opentelemetry.exporter.otlp.proto.common._internal.trace_encoder import (  # type: ignore
+    encode_spans,  # type: ignore
 )
 from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter  # type: ignore
 from opentelemetry.sdk.resources import Resource
@@ -348,7 +350,7 @@ LIBAPI = 0
 # Increment this PATCH version before using `charmcraft publish-lib` or reset
 # to 0 if you are raising the major API version
 
-LIBPATCH = 9
+LIBPATCH = 11
 
 PYDEPS = ["opentelemetry-exporter-otlp-proto-http==1.21.0"]
 
@@ -394,10 +396,14 @@ class _Buffer:
 
     _SPANSEP = b"__CHARM_TRACING_BUFFER_SPAN_SEP__"
 
-    def __init__(self, db_file: Path, max_event_history_length: int, max_buffer_size_mib: int):
+    def __init__(
+        self, db_file: Path, max_event_history_length: int, max_buffer_size_mib: int
+    ):
         self._db_file = db_file
         self._max_event_history_length = max_event_history_length
-        self._max_buffer_size_mib = max(max_buffer_size_mib, _BUFFER_CACHE_FILE_SIZE_LIMIT_MiB_MIN)
+        self._max_buffer_size_mib = max(
+            max_buffer_size_mib, _BUFFER_CACHE_FILE_SIZE_LIMIT_MiB_MIN
+        )
 
         # set by caller
         self.exporter: Optional[OTLPSpanExporter] = None
@@ -424,7 +430,8 @@ class _Buffer:
         if overflow > 0:
             n_dropped_spans += overflow
             logger.warning(
-                f"charm tracing buffer exceeds max history length ({self._max_event_history_length} events)"
+                "charm tracing buffer exceeds max history length (%d events)",
+                self._max_event_history_length,
             )
 
         new_spans = deque(queue[-self._max_event_history_length :])
@@ -440,19 +447,21 @@ class _Buffer:
             # only do this once
             if not logged_drop:
                 logger.warning(
-                    f"charm tracing buffer exceeds size limit ({self._max_buffer_size_mib}MiB)."
+                    "charm tracing buffer exceeds size limit (%dMiB).",
+                    self._max_buffer_size_mib,
                 )
             logged_drop = True
 
         if n_dropped_spans > 0:
             dev_logger.debug(
-                f"charm tracing buffer overflow: dropped {n_dropped_spans} older spans. "
-                f"Please increase the buffer limits, or ensure the spans can be flushed."
+                "charm tracing buffer overflow: dropped %d older spans. "
+                "Please increase the buffer limits, or ensure the spans can be flushed.",
+                n_dropped_spans,
             )
         return new_spans
 
     def _save(self, spans: Sequence[ReadableSpan], replace: bool = False):
-        dev_logger.debug(f"saving {len(spans)} new spans to buffer")
+        dev_logger.debug("saving %d new spans to buffer", len(spans))
         old = [] if replace else self.load()
         queue = old + [self._serialize(spans)]
         new_buffer = self._prune(queue)
@@ -474,7 +483,7 @@ class _Buffer:
         # ensure the destination folder exists
         db_file_dir = self._db_file.parent
         if not db_file_dir.exists():
-            dev_logger.info(f"creating buffer dir: {db_file_dir}")
+            dev_logger.info("creating buffer dir: %s", db_file_dir)
             db_file_dir.mkdir(parents=True)
 
         self._db_file.write_bytes(self._SPANSEP.join(spans))
@@ -490,7 +499,7 @@ class _Buffer:
         try:
             spans = self._db_file.read_bytes().split(self._SPANSEP)
         except Exception:
-            logger.exception(f"error parsing {self._db_file}")
+            logger.exception("error parsing %s", self._db_file)
             return []
         return spans
 
@@ -498,7 +507,7 @@ class _Buffer:
         """Drop some currently buffered spans from the cache file."""
         current = self.load()
         if n_spans:
-            dev_logger.debug(f"dropping {n_spans} spans from buffer")
+            dev_logger.debug("dropping %d spans from buffer", n_spans)
             new = current[n_spans:]
         else:
             dev_logger.debug("emptying buffer")
@@ -535,7 +544,9 @@ class _Buffer:
                 )
                 errors = True
             except Exception:
-                logger.exception("unexpected error while flushing span batch from buffer")
+                logger.exception(
+                    "unexpected error while flushing span batch from buffer"
+                )
                 errors = True
 
         if not errors:
@@ -684,7 +695,9 @@ def _get_tracing_endpoint(
             f"got {tracing_endpoint} instead."
         )
 
-    dev_logger.debug(f"Setting up span exporter to endpoint: {tracing_endpoint}/v1/traces")
+    dev_logger.debug(
+        "Setting up span exporter to endpoint: %s/v1/traces", tracing_endpoint
+    )
     return f"{tracing_endpoint}/v1/traces"
 
 
@@ -701,13 +714,17 @@ def _get_server_cert(
 
     if server_cert is None:
         logger.warning(
-            f"{charm_type}.{server_cert_attr} is None; sending traces over INSECURE connection."
+            "%s.%s is None; sending traces over INSECURE connection.",
+            charm_type,
+            server_cert_attr,
         )
         return
     if not isinstance(server_cert, (str, Path)):
         logger.warning(
-            f"{charm_type}.{server_cert_attr} has unexpected type {type(server_cert)}; "
-            f"sending traces over INSECURE connection."
+            "%s.%s has unexpected type %s; sending traces over INSECURE connection.",
+            charm_type,
+            server_cert_attr,
+            type(server_cert),
         )
         return
     path = Path(server_cert)
@@ -765,7 +782,9 @@ def _setup_root_span_initializer(
         provider = TracerProvider(resource=resource)
 
         # if anything goes wrong with retrieving the endpoint, we let the exception bubble up.
-        tracing_endpoint = _get_tracing_endpoint(tracing_endpoint_attr, self, charm_type)
+        tracing_endpoint = _get_tracing_endpoint(
+            tracing_endpoint_attr, self, charm_type
+        )
 
         buffer_only = False
         # whether we're only exporting to buffer, or also to the otlp exporter.
@@ -776,10 +795,14 @@ def _setup_root_span_initializer(
             buffer_only = True
 
         server_cert: Optional[Union[str, Path]] = (
-            _get_server_cert(server_cert_attr, self, charm_type) if server_cert_attr else None
+            _get_server_cert(server_cert_attr, self, charm_type)
+            if server_cert_attr
+            else None
         )
 
-        if (tracing_endpoint and tracing_endpoint.startswith("https://")) and not server_cert:
+        if (
+            tracing_endpoint and tracing_endpoint.startswith("https://")
+        ) and not server_cert:
             logger.error(
                 "Tracing endpoint is https, but no server_cert has been passed."
                 "Please point @trace_charm to a `server_cert` attr. "
@@ -810,7 +833,9 @@ def _setup_root_span_initializer(
             # and retry the next time
             otlp_exporter = _OTLPSpanExporter(
                 endpoint=tracing_endpoint,
-                certificate_file=str(Path(server_cert).absolute()) if server_cert else None,
+                certificate_file=str(Path(server_cert).absolute())
+                if server_cert
+                else None,
                 timeout=_OTLP_SPAN_EXPORTER_TIMEOUT,  # give individual requests 1 second to succeed
             )
             exporters.append(otlp_exporter)
@@ -825,10 +850,16 @@ def _setup_root_span_initializer(
         _tracer = get_tracer(_service_name)  # type: ignore
         _tracer_token = tracer.set(_tracer)
 
-        dispatch_path = os.getenv("JUJU_DISPATCH_PATH", "")  # something like hooks/install
-        event_name = dispatch_path.split("/")[1] if "/" in dispatch_path else dispatch_path
+        dispatch_path = os.getenv(
+            "JUJU_DISPATCH_PATH", ""
+        )  # something like hooks/install
+        event_name = (
+            dispatch_path.split("/")[1] if "/" in dispatch_path else dispatch_path
+        )
         root_span_name = f"{unit_name}: {event_name} event"
-        span = _tracer.start_span(root_span_name, attributes={"juju.dispatch_path": dispatch_path})
+        span = _tracer.start_span(
+            root_span_name, attributes={"juju.dispatch_path": dispatch_path}
+        )
 
         # all these shenanigans are to work around the fact that the opentelemetry tracing API is built
         # on the assumption that spans will be used as contextmanagers.
@@ -838,13 +869,13 @@ def _setup_root_span_initializer(
 
         # log a trace id, so we can pick it up from the logs (and jhack) to look it up in tempo.
         root_trace_id = hex(span.get_span_context().trace_id)[2:]  # strip 0x prefix
-        logger.debug(f"Starting root trace with id={root_trace_id!r}.")
+        logger.debug("Starting root trace with id=%r.", root_trace_id)
 
         span_token = opentelemetry.context.attach(ctx)  # type: ignore
 
         @contextmanager
         def wrap_event_context(event_name: str):
-            dev_logger.debug(f"entering event context: {event_name}")
+            dev_logger.debug("entering event context: %s", event_name)
             # when the framework enters an event context, we create a span.
             with _span("event: " + event_name) as event_context_span:
                 if event_context_span:
@@ -863,13 +894,17 @@ def _setup_root_span_initializer(
             opentelemetry.context.detach(span_token)  # type: ignore
             tracer.reset(_tracer_token)
             tp = cast(TracerProvider, get_tracer_provider())
-            flush_successful = tp.force_flush(timeout_millis=1000)  # don't block for too long
+            flush_successful = tp.force_flush(
+                timeout_millis=1000
+            )  # don't block for too long
 
             if buffer_only:
                 # if we're in buffer_only mode, it means we couldn't even set up the exporter for
                 # tempo as we're missing some data.
                 # so attempting to flush the buffer doesn't make sense
-                dev_logger.debug("tracing backend unavailable: all spans pushed to buffer")
+                dev_logger.debug(
+                    "tracing backend unavailable: all spans pushed to buffer"
+                )
 
             else:
                 dev_logger.debug("tracing backend found: attempting to flush buffer...")
@@ -885,7 +920,9 @@ def _setup_root_span_initializer(
                     if not previous_spans_buffered:
                         # if the buffer was empty to begin with, any spans we collected now can be discarded
                         buffer.drop()
-                        dev_logger.debug("buffer dropped: this trace has been sent already")
+                        dev_logger.debug(
+                            "buffer dropped: this trace has been sent already"
+                        )
                     else:
                         # if the buffer was nonempty, we can attempt to flush it
                         dev_logger.debug("attempting buffer flush...")
@@ -1029,7 +1066,7 @@ def _autoinstrument(
         Minimum 10MiB.
     :param buffer_path: path to buffer file to use for saving buffered spans.
     """
-    dev_logger.debug(f"instrumenting {charm_type}")
+    dev_logger.debug("instrumenting %s", charm_type)
     _setup_root_span_initializer(
         charm_type,
         tracing_endpoint_attr,
@@ -1053,12 +1090,12 @@ def trace_type(cls: _T) -> _T:
     It assumes that this class is only instantiated after a charm type decorated with `@trace_charm`
     has been instantiated.
     """
-    dev_logger.debug(f"instrumenting {cls}")
+    dev_logger.debug("instrumenting %s", cls)
     for name, method in inspect.getmembers(cls, predicate=inspect.isfunction):
-        dev_logger.debug(f"discovered {method}")
+        dev_logger.debug("discovered %s", method)
 
         if method.__name__.startswith("__"):
-            dev_logger.debug(f"skipping {method} (dunder)")
+            dev_logger.debug("skipping %s (dunder)", method)
             continue
 
         # the span title in the general case should be:
@@ -1104,7 +1141,7 @@ def trace_function(function: _F, name: Optional[str] = None) -> _F:
 
 
 def _trace_callable(callable: _F, qualifier: str, name: Optional[str] = None) -> _F:
-    dev_logger.debug(f"instrumenting {callable}")
+    dev_logger.debug("instrumenting %s", callable)
 
     # sig = inspect.signature(callable)
     @functools.wraps(callable)

@@ -10,6 +10,7 @@ from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException
+from single_kernel_postgresql.config.literals import REWIND_USER
 from tenacity import (
     RetryError,
     stop_after_delay,
@@ -29,7 +30,6 @@ from constants import (
     PATRONI_LOGS_PATH,
     POSTGRESQL_DATA_PATH,
     POSTGRESQL_LOGS_PATH,
-    REWIND_USER,
 )
 
 PATRONI_SERVICE = "patroni"
@@ -44,6 +44,8 @@ def mocked_requests_get(*args, **kwargs):
 
         def json(self):
             return self.json_data
+
+        elapsed = Mock()
 
     data = {
         "http://server1/cluster": {
@@ -137,7 +139,7 @@ def test_get_patroni_health(peers_ips, patroni):
 
 
 def test_get_postgresql_version(peers_ips, patroni):
-    assert patroni.get_postgresql_version() == "16.9"
+    assert patroni.get_postgresql_version() == "16.10"
 
 
 def test_dict_to_hba_string(harness, patroni):
@@ -196,6 +198,7 @@ def test_is_creating_backup(peers_ips, patroni):
         assert patroni.is_creating_backup
 
         # Test when no member is creating a backup.
+        del patroni.cached_cluster_status
         _cluster_status.return_value = [{"name": "postgresql-0"}, {"name": "postgresql-1"}]
         assert not patroni.is_creating_backup
 
@@ -310,7 +313,11 @@ def test_render_patroni_yml_file(peers_ips, patroni):
 
         # Get the expected content from a file.
         with open("templates/patroni.yml.j2") as file:
-            template = Template(file.read())
+            contents = file.read()
+            template = Template(contents)
+            # Setup a mock for the `open` method, set returned data to patroni.yml template.
+            mock = mock_open(read_data=contents)
+
         expected_content = template.render(
             conf_path=PATRONI_CONF_PATH,
             data_path=POSTGRESQL_DATA_PATH,
@@ -318,7 +325,7 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             postgresql_log_path=POSTGRESQL_LOGS_PATH,
             member_name=member_name,
             partner_addrs=["2.2.2.2", "3.3.3.3"],
-            peers_ips=peers_ips,
+            peers_ips=sorted(peers_ips),
             scope=scope,
             self_ip=patroni.unit_ip,
             listen_ips=["1.1.1.1", "192.168.0.1"],
@@ -331,11 +338,9 @@ def test_render_patroni_yml_file(peers_ips, patroni):
             synchronous_node_count=0,
             raft_password=raft_password,
             patroni_password=patroni_password,
+            instance_password_encryption="scram-sha-256",
+            slots={},
         )
-
-        # Setup a mock for the `open` method, set returned data to patroni.yml template.
-        with open("templates/patroni.yml.j2") as f:
-            mock = mock_open(read_data=f.read())
 
         # Patch the `open` method with our mock.
         with patch("builtins.open", mock, create=True):

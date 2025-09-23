@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from datetime import UTC, datetime
+from functools import cached_property
 from hashlib import shake_128
 from pathlib import Path
 from typing import Literal, get_args
@@ -29,23 +30,10 @@ from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerU
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
 from charms.operator_libs_linux.v2 import snap
-from charms.postgresql_k8s.v1.postgresql import (
-    ACCESS_GROUP_IDENTITY,
-    ACCESS_GROUPS,
-    REQUIRED_PLUGINS,
-    ROLE_BACKUP,
-    ROLE_STATS,
-    PostgreSQL,
-    PostgreSQLCreatePredefinedRolesError,
-    PostgreSQLCreateUserError,
-    PostgreSQLEnableDisableExtensionError,
-    PostgreSQLGetCurrentTimelineError,
-    PostgreSQLGrantDatabasePrivilegesToUserError,
-    PostgreSQLListUsersError,
-    PostgreSQLUpdateUserPasswordError,
-)
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
+from cryptography.x509 import load_pem_x509_certificate
+from cryptography.x509.oid import NameOID
 from ops import (
     ActionEvent,
     ActiveStatus,
@@ -67,6 +55,30 @@ from ops import (
     WaitingStatus,
     main,
 )
+from single_kernel_postgresql.config.literals import (
+    BACKUP_USER,
+    MONITORING_USER,
+    PEER,
+    REPLICATION_USER,
+    REWIND_USER,
+    SYSTEM_USERS,
+    USER,
+)
+from single_kernel_postgresql.utils.postgresql import (
+    ACCESS_GROUP_IDENTITY,
+    ACCESS_GROUPS,
+    REQUIRED_PLUGINS,
+    ROLE_BACKUP,
+    ROLE_STATS,
+    PostgreSQL,
+    PostgreSQLCreatePredefinedRolesError,
+    PostgreSQLCreateUserError,
+    PostgreSQLEnableDisableExtensionError,
+    PostgreSQLGetCurrentTimelineError,
+    PostgreSQLGrantDatabasePrivilegesToUserError,
+    PostgreSQLListUsersError,
+    PostgreSQLUpdateUserPasswordError,
+)
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
 from backups import CANNOT_RESTORE_PITR, S3_BLOCK_MESSAGES, PostgreSQLBackups
@@ -84,31 +96,25 @@ from cluster_topology_observer import (
 from config import CharmConfig
 from constants import (
     APP_SCOPE,
-    BACKUP_USER,
     DATABASE,
     DATABASE_DEFAULT_NAME,
     DATABASE_PORT,
     METRICS_PORT,
     MONITORING_PASSWORD_KEY,
     MONITORING_SNAP_SERVICE,
-    MONITORING_USER,
     PATRONI_CONF_PATH,
     PATRONI_PASSWORD_KEY,
-    PEER,
     PLUGIN_OVERRIDES,
     POSTGRESQL_DATA_PATH,
     RAFT_PASSWORD_KEY,
     REPLICATION_CONSUMER_RELATION,
     REPLICATION_OFFER_RELATION,
     REPLICATION_PASSWORD_KEY,
-    REPLICATION_USER,
     REWIND_PASSWORD_KEY,
-    REWIND_USER,
     SECRET_DELETED_LABEL,
     SECRET_INTERNAL_LABEL,
     SECRET_KEY_OVERRIDES,
     SPI_MODULE,
-    SYSTEM_USERS,
     TLS_CA_BUNDLE_FILE,
     TLS_CA_FILE,
     TLS_CERT_FILE,
@@ -116,7 +122,6 @@ from constants import (
     TRACING_PROTOCOL,
     UNIT_SCOPE,
     UPDATE_CERTS_BIN_PATH,
-    USER,
     USER_PASSWORD_KEY,
 )
 from ldap import PostgreSQLLDAP
@@ -177,7 +182,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         # Lowest unit number is last to refresh
         last_unit_to_refresh = sorted(all_units, key=unit_number)[0].replace("/", "-")
         if self._charm._patroni.get_primary() == last_unit_to_refresh:
-            logging.info(
+            logger.info(
                 f"Unit {last_unit_to_refresh} was already primary during pre-refresh check"
             )
         else:
@@ -187,7 +192,7 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
             else:
-                logging.info(
+                logger.info(
                     f"Switched primary to unit {last_unit_to_refresh} during pre-refresh check"
                 )
 
@@ -258,7 +263,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     _postgresql: PostgreSQL | None = None
 
     # Override data_models.py TypedCharmBase config
-    @property
+    @cached_property
     def config(self):
         """Return a config instance validated and parsed using the provided pydantic class."""
         config = {
@@ -368,13 +373,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             log_slots=[f"{charm_refresh.snap_name()}:logs"],
             tracing_protocols=[TRACING_PROTOCOL],
         )
-        self._tracing_endpoint_config, _ = charm_tracing_config(self._grafana_agent, None)
+        self.tracing_endpoint, _ = charm_tracing_config(self._grafana_agent, None)
 
     def _post_snap_refresh(self, refresh: charm_refresh.Machines):
         """Start PostgreSQL, check if this app and unit are healthy, and allow next unit to refresh.
 
         Called after snap refresh
         """
+        try:
+            if raw_cert := self.get_secret(UNIT_SCOPE, "internal-cert"):
+                cert = load_pem_x509_certificate(raw_cert.encode())
+                if (
+                    cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+                    != self._unit_ip
+                ):
+                    self.tls.generate_internal_peer_cert()
+        except Exception:
+            logger.exception("Unable to check or update internal cert")
+
         if not self._patroni.start_patroni():
             self.set_unit_status(ops.BlockedStatus("Failed to start PostgreSQL"), refresh=refresh)
             return
@@ -478,21 +494,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         ]
 
     @property
-    def app_units(self) -> set[Unit]:
-        """The peer-related units in the application."""
-        if not self._peers:
-            return set()
-
-        return {self.unit, *self._peers.units}
-
-    def scoped_peer_data(self, scope: SCOPES) -> dict | None:
-        """Returns peer data based on scope."""
-        if scope == APP_SCOPE:
-            return self.app_peer_data
-        elif scope == UNIT_SCOPE:
-            return self.unit_peer_data
-
-    @property
     def app_peer_data(self) -> dict:
         """Application peer relation data object."""
         return self.all_peer_data.get(self.app, {})
@@ -511,12 +512,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # RelationData has dict like API
         return self._peers.data  # type: ignore
 
-    @property
-    def tracing_endpoint(self) -> str | None:
-        """Otlp http endpoint for charm instrumentation."""
-        return self._tracing_endpoint_config
-
-    @property
+    @cached_property
     def cpu_count(self) -> int:
         """Property with numbers of cpus."""
         if cpus := os.cpu_count():
@@ -623,25 +619,19 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns whether the unit is stopped."""
         return "stopped" in self.unit_peer_data
 
-    @property
+    @cached_property
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
-        password = str(self.get_secret(APP_SCOPE, f"{USER}-password"))
-        if self._postgresql is None or self._postgresql.primary_host is None:
-            logger.debug("Init class PostgreSQL")
-            self._postgresql = PostgreSQL(
-                primary_host=self.primary_endpoint,
-                current_host=self._unit_ip,
-                user=USER,
-                password=password,
-                database=DATABASE_DEFAULT_NAME,
-                system_users=SYSTEM_USERS,
-            )
-        else:
-            self._postgresql.password = password
-        return self._postgresql
+        return PostgreSQL(
+            primary_host=self.primary_endpoint,
+            current_host=self._unit_ip,
+            user=USER,
+            password=str(self.get_secret(APP_SCOPE, f"{USER}-password")),
+            database=DATABASE_DEFAULT_NAME,
+            system_users=SYSTEM_USERS,
+        )
 
-    @property
+    @cached_property
     def primary_endpoint(self) -> str | None:
         """Returns the endpoint of the primary instance or None when no primary available."""
         if not self._peers:
@@ -655,15 +645,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             # Force a retry if there is no primary or the member that was
             # returned is not in the list of the current cluster members
             # (like when the cluster was not updated yet after a failed switchover).
-            if not primary_endpoint or primary_endpoint not in self._units_ips:
-                # TODO figure out why peer data is not available
-                if primary_endpoint and len(self._units_ips) == 1 and len(self._peers.units) > 1:
-                    logger.warning(
-                        "Possibly incomplete peer data: Will not map primary IP to unit IP"
-                    )
-                    return primary_endpoint
-                logger.debug("primary endpoint early exit: Primary IP not in cached peer list.")
+            if not primary_endpoint:
+                logger.warning(f"Missing primary IP for {primary}")
                 primary_endpoint = None
+            elif primary_endpoint not in self._units_ips:
+                if len(self._peers.units) == 0:
+                    logger.info(f"The unit didn't join {PEER} relation? Using {primary_endpoint}")
+                elif len(self._units_ips) == 1 and len(self._peers.units) > 1:
+                    logger.warning(f"Possibly incomplete peer data, keep using {primary_endpoint}")
+                else:
+                    logger.debug("Early exit primary_endpoint: Primary IP not in cached peer list")
+                    primary_endpoint = None
         except RetryError:
             return None
         else:
@@ -1143,7 +1135,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 hosts.append(unit.name.replace("/", "-"))
         return set(hosts)
 
-    @property
+    @cached_property
     def _patroni(self) -> Patroni:
         """Returns an instance of the Patroni object."""
         return Patroni(
@@ -1348,7 +1340,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         logger.info("Cluster topology changed")
         if self.primary_endpoint:
             self._update_relation_endpoints()
-            self.set_unit_status(ActiveStatus())
+            self._set_primary_status_message()
 
     def _on_install(self, event: InstallEvent) -> None:
         """Install prerequisites for the application."""
@@ -1360,11 +1352,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.set_unit_status(MaintenanceStatus("installing PostgreSQL"))
 
         # Install the charmed PostgreSQL snap.
-        try:
-            self._install_snap_package(revision=None)
-        except snap.SnapError:
-            self.set_unit_status(BlockedStatus("failed to install snap packages"))
-            return
+        self._install_snap_package(revision=None)
 
         cache = snap.SnapCache()
         postgres_snap = cache[charm_refresh.snap_name()]
@@ -1428,7 +1416,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self.get_secret(APP_SCOPE, "internal-ca"):
             self.tls.generate_internal_peer_ca()
-            self.tls.generate_internal_peer_cert()
         self.update_config()
 
         # Don't update connection endpoints in the first time this event run for
@@ -1460,10 +1447,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return
 
         if self.refresh is None:
-            logger.debug("Defer on_config_changed: Refresh could be in progress")
-            event.defer()
-            return
-        if self.refresh.in_progress:
+            logger.warning("Warning _on_config_changed: Refresh could be in progress")
+        elif self.refresh.in_progress:
             logger.debug("Defer on_config_changed: Refresh in progress")
             event.defer()
             return
@@ -1585,10 +1570,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         # Safeguard against starting while refreshing.
         if self.refresh is None:
-            logger.debug("Defer on_start: Refresh could be in progress")
-            event.defer()
-            return False
-        if self.refresh.in_progress:
+            logger.warning("Warning on_start: Refresh could be in progress")
+        elif self.refresh.in_progress:
             # TODO: we should probably start workload if scale up while refresh in progress
             logger.debug("Defer on_start: Refresh in progress")
             event.defer()
@@ -1657,7 +1640,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         try:
             snap_password = postgres_snap.get("exporter.password")
         except snap.SnapError:
-            logger.warning("Early exit: Trying to reset metrics service with no configuration set")
+            logger.warning("Early exit: skipping exporter setup (no configuration set)")
             return None
 
         if snap_password != self.get_secret(APP_SCOPE, MONITORING_PASSWORD_KEY):
@@ -1963,6 +1946,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if not self._patroni.member_started and self._patroni.is_member_isolated:
             self._patroni.restart_patroni()
+            self._observer.start_observer()
             return
 
         # Update the sync-standby endpoint in the async replication data.
@@ -2092,8 +2076,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 logger.info("PostgreSQL data directory was not empty. Moved pg_wal")
                 return True
             try:
-                self._patroni.restart_patroni()
                 logger.info("restarted PostgreSQL because it was not running")
+                self._patroni.restart_patroni()
+                self._observer.start_observer()
                 return True
             except RetryError:
                 logger.error("failed to restart PostgreSQL after checking that it was not running")
@@ -2124,11 +2109,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                     danger_state = " (read-only)"
                 elif len(self._patroni.get_running_cluster_members()) < self.app.planned_units():
                     danger_state = " (degraded)"
-                self.set_unit_status(
-                    ActiveStatus(
-                        f"{'Standby' if self.is_standby_leader else 'Primary'}{danger_state}"
-                    )
-                )
+                unit_status = "Standby" if self.is_standby_leader else "Primary"
+                self.set_unit_status(ActiveStatus(f"{unit_status}{danger_state}"))
             elif self._patroni.member_started:
                 self.set_unit_status(ActiveStatus())
         except (RetryError, ConnectionError) as e:
@@ -2335,12 +2317,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         if not self.postgresql.password or not self.postgresql.current_host:
             return False
         try:
-            for attempt in Retrying(stop=stop_after_delay(30), wait=wait_fixed(3)):
+            for attempt in Retrying(stop=stop_after_delay(10), wait=wait_fixed(3)):
                 with attempt:
                     if not self.postgresql.get_postgresql_timezones():
+                        logger.debug("Cannot connect to database (CannotConnectError)")
                         raise CannotConnectError
         except RetryError:
-            logger.debug("Cannot connect to database")
+            logger.debug("Cannot connect to database (RetryError)")
             return False
         return True
 
@@ -2381,7 +2364,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             parameters=pg_parameters,
             no_peers=no_peers,
             user_databases_map=self.relations_user_databases_map,
-            slots=replication_slots or None,
+            slots=replication_slots,
         )
         if no_peers:
             return True
@@ -2489,18 +2472,13 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self._patroni.reload_patroni_configuration()
         except Exception as e:
             logger.error(f"Reload patroni call failed! error: {e!s}")
-        # Wait for some more time than the Patroni's loop_wait default value (10 seconds),
-        # which tells how much time Patroni will wait before checking the configuration
-        # file again to reload it.
-        try:
-            for attempt in Retrying(stop=stop_after_attempt(5), wait=wait_fixed(3)):
-                with attempt:
-                    restart_postgresql = restart_postgresql or self.postgresql.is_restart_pending()
-                    if not restart_postgresql:
-                        raise Exception
-        except RetryError:
-            # Ignore the error, as it happens only to indicate that the configuration has not changed.
-            pass
+
+        restart_pending = self._patroni.is_restart_pending()
+        logger.debug(
+            f"Checking if restart pending: TLS={restart_postgresql} or API={restart_pending}"
+        )
+        restart_postgresql = restart_postgresql or restart_pending
+
         self.unit_peer_data.update({"tls": "enabled" if self.is_tls_enabled else ""})
         self.postgresql_client_relation.update_endpoints()
 
@@ -2534,8 +2512,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         """Returns a user->databases map for all relations."""
         user_database_map = {}
         # Copy relations users directly instead of waiting for them to be created
+        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
-            user = f"relation-{relation.id}"
+            user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
             if user not in user_database_map and (
                 database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                     relation.id, "database"
@@ -2585,15 +2564,16 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("relations_user_databases_map: Unable to get users")
             return {USER: "all", REPLICATION_USER: "all", REWIND_USER: "all"}
 
-    @property
+    @cached_property
     def generate_user_hash(self) -> str:
         """Generate expected user and database hash."""
         user_db_pairs = {}
+        custom_username_mapping = self.postgresql_client_relation.get_username_mapping()
         for relation in self.model.relations[self.postgresql_client_relation.relation_name]:
             if database := self.postgresql_client_relation.database_provides.fetch_relation_field(
                 relation.id, "database"
             ):
-                user = f"relation_id_{relation.id}"
+                user = custom_username_mapping.get(str(relation.id), f"relation-{relation.id}")
                 user_db_pairs[user] = database
         return shake_128(str(user_db_pairs).encode()).hexdigest(16)
 
