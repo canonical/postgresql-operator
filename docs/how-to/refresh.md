@@ -2,7 +2,7 @@
 
 ```{admonition} Emergency stop button
 :class: attention
-Use `juju config appname pause-after-unit-refresh=all` to halt an in-progress refresh.
+Use `juju config <app name> pause-after-unit-refresh=all` to halt an in-progress refresh.
 Then, consider [rolling back](#roll-back)
 ```
 
