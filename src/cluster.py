@@ -1029,7 +1029,13 @@ class Patroni:
         requests.patch(
             f"{self._patroni_url}/config",
             verify=self.verify,
-            json={"postgresql": {"parameters": parameters}},
+            json={
+                "postgresql": {
+                    "remove_data_directory_on_rewind_failure": False,
+                    "remove_data_directory_on_diverged_timelines": False,
+                    "parameters": parameters,
+                }
+            },
             auth=self._patroni_auth,
             timeout=PATRONI_TIMEOUT,
         )
