@@ -73,7 +73,7 @@ Check the restored data by ensuring that:
 
 In the event that something goes wrong (e.g. the refresh fails, the new version of PostgreSQL is not performant enough, a database client is incompatible with the new version), you may want to quickly roll back.
 
-Prepare for this possibility by reading through the entire refresh documentation—with special attention to the [rollback section](#roll-back)—before starting the refresh.
+Prepare for this possibility by reading through the entire refresh documentation—with special attention to the [](#halt-the-refresh) and [](#roll-back) sections—before starting the refresh.
 
 ## Review release notes
 
@@ -173,9 +173,7 @@ Use `juju refresh` and specify the charm revision that you are refreshing to.
 juju refresh postgresql --revision 0
 ```
 
-## Roll back
-
-### Halt the refresh
+## Halt the refresh
 
 If something goes wrong, halt the refresh by running:
 
@@ -186,13 +184,16 @@ juju config postgresql pause-after-unit-refresh=all
 In the command above, replace `postgresql` with the name of the Juju application.
 
 Next, assess the situation and plan the recovery.
+Often, the safest recovery path is to [roll back](#roll-back).
 Consider [contacting us](/reference/contacts).
 
-### Start the rollback
+## Roll back
 
 If something went wrong, the safest recovery path is often to roll back to the original version.
 
-Use the rollback command [you copied down earlier](#pre-refresh-check).
+First, [halt the refresh](#halt-the-refresh).
+
+Run the rollback command [you copied down earlier](#pre-refresh-check).
 In most cases, the rollback command is also displayed in the application's status message in `juju status`.
 
 ### Resume the rollback
