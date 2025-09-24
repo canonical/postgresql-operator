@@ -57,13 +57,11 @@ from single_kernel_postgresql.config.literals import (
     BACKUP_USER,
     MONITORING_USER,
     PEER,
-    POSTGRESQL_STORAGE_PERMISSIONS,
     REPLICATION_USER,
     REWIND_USER,
     SYSTEM_USERS,
     USER,
 )
-from single_kernel_postgresql.utils.filesystem import change_owner
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
     ACCESS_GROUPS,
@@ -1974,8 +1972,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.debug("Restore check early exit: Patroni has not started yet")
             return False
 
-        self._fix_directories_permissions()
-
         try:
             self._setup_users()
         except Exception as e:
@@ -2021,18 +2017,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             })
 
         return True
-
-    def _fix_directories_permissions(self) -> None:
-        """Fix PostgreSQL data directories permissions."""
-        paths = [
-            "/var/snap/charmed-postgresql/common/data/archive",
-            POSTGRESQL_DATA_PATH,
-            "/var/snap/charmed-postgresql/common/data/logs",
-            "/var/snap/charmed-postgresql/common/data/temp",
-        ]
-        for path in paths:
-            change_owner(path)
-            os.chmod(path, POSTGRESQL_STORAGE_PERMISSIONS)
 
     def _can_run_on_update_status(self) -> bool:
         if not self.is_cluster_initialised:
