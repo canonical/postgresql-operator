@@ -31,6 +31,7 @@ from pysyncobj.utility import TcpUtility, UtilityException
 from requests.auth import HTTPBasicAuth
 from single_kernel_postgresql.config.literals import (
     PEER,
+    POSTGRESQL_STORAGE_PERMISSIONS,
     REWIND_USER,
     USER,
 )
@@ -229,7 +230,7 @@ class Patroni:
 
         # Expected permission
         # Replicas refuse to start with the default permissions
-        os.chmod(POSTGRESQL_DATA_PATH, 0o750)  # noqa: S103
+        os.chmod(POSTGRESQL_DATA_PATH, POSTGRESQL_STORAGE_PERMISSIONS)
 
     def _change_owner(self, path: str) -> None:
         """Change the ownership of a file or a directory to the postgres user.
