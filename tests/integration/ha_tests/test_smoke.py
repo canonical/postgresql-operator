@@ -160,9 +160,8 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             DUP_DATABASE_APP_NAME,
             "--model={ops_test.model.info.name}",
             "--config profile=testing",
+            f"--attach-storage={','.join(garbage_storages)}",
         ]
-        for garbage_storage in garbage_storages:
-            deploy_cmd.append(f"--attach-storage={garbage_storage}")
         return_code, _, _ = await ops_test.juju(*deploy_cmd)
         assert return_code == 0, "Failed to add unit with storage"
 
