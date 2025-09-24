@@ -6,7 +6,6 @@ import asyncio
 import logging
 
 import pytest
-from juju import tag
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
@@ -44,7 +43,7 @@ async def test_app_force_removal(ops_test: OpsTest, charm: str):
             application_name=APPLICATION_NAME,
             num_units=1,
             base=CHARM_BASE,
-            storage={"pgdata": {"pool": "lxd-btrfs", "size": 8045}},
+            storage={"pgdata": {"pool": "lxd-btrfs", "size": 8046}},
             config={"profile": "testing"},
         )
 
@@ -143,14 +142,9 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
                 garbage_storage = await get_any_deatached_storage(ops_test)
 
         logger.info("deploying duplicate application with attached storage")
-        await ops_test.model.deploy(
-            charm,
-            application_name=DUP_APPLICATION_NAME,
-            num_units=1,
-            base=CHARM_BASE,
-            attach_storage=[tag.storage(garbage_storage)],
-            config={"profile": "testing"},
-        )
+        deploy_cmd = f"deploy ./{charm} {DUP_APPLICATION_NAME} --model={ops_test.model.info.name} --attach-storage={garbage_storage} --config profile=testing".split()
+        return_code, _, _ = await ops_test.juju(*deploy_cmd)
+        assert return_code == 0, "Failed to add unit with storage"
 
         # Reducing the update status frequency to speed up the triggering of deferred events.
         await ops_test.model.set_config({"update-status-hook-interval": "10s"})
