@@ -100,7 +100,6 @@ class PostgreSQLUpgrade(DataUpgrade):
             ):
                 if self.charm.get_secret(APP_SCOPE, key) is None:
                     self.charm.set_secret(APP_SCOPE, key, new_password())
-            self._set_up_new_access_roles_for_legacy()
 
         if self.state:
             # If state set, upgrade is supported. Just set the snap information
@@ -196,6 +195,8 @@ class PostgreSQLUpgrade(DataUpgrade):
                         raise Exception()
 
                     self.charm.update_config()
+
+                    self._set_up_new_access_roles_for_legacy()
 
                     self.set_unit_completed()
 

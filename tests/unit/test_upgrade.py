@@ -82,7 +82,6 @@ def test_on_upgrade_charm_check_legacy(harness, unit_states, is_cluster_initiali
         patch(
             "upgrade.PostgreSQLUpgrade._prepare_upgrade_from_legacy"
         ) as _prepare_upgrade_from_legacy,
-        patch("upgrade.PostgreSQLUpgrade._set_up_new_access_roles_for_legacy"),
     ):
         with harness.hooks_disabled():
             harness.set_leader(True)
@@ -110,6 +109,7 @@ def test_on_upgrade_granted(harness):
         patch(
             "charm.PostgresqlOperatorCharm.updated_synchronous_node_count"
         ) as _updated_synchronous_node_count,
+        patch("upgrade.PostgreSQLUpgrade._set_up_new_access_roles_for_legacy"),
     ):
         # Test when the charm fails to start Patroni.
         mock_event = MagicMock()
