@@ -162,6 +162,7 @@ async def test_app_resources_conflicts_v3(ops_test: OpsTest, charm: str):
             "--config profile=testing",
             f"--attach-storage={','.join(garbage_storages)}",
         ]
+        logger.info(deploy_cmd)
         return_code, _, _ = await ops_test.juju(*deploy_cmd)
         assert return_code == 0, "Failed to add unit with storage"
 
