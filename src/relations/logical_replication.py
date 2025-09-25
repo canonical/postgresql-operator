@@ -45,6 +45,10 @@ LOGICAL_REPLICATION_VALIDATION_ERROR_STATUS = "Logical replication setup is inva
 class PostgreSQLLogicalReplication(Object):
     """Defines the logical-replication logic."""
 
+    def _identity(self) -> str:
+        """Return unique identity of this application in the model."""
+        return f"{self.model.uuid}:{self.model.app.name}"
+
     def __init__(self, charm: "PostgresqlOperatorCharm"):
         super().__init__(charm, "postgresql_logical_replication")
         self.charm = charm
@@ -201,6 +205,8 @@ class PostgreSQLLogicalReplication(Object):
         event.relation.data[self.model.app]["subscription-request"] = (
             self.charm.config.logical_replication_subscription_request or ""
         )
+        # Share our identity with the publisher to prevent cyclic replication
+        event.relation.data[self.model.app]["requester-id"] = self._identity()
 
     def _on_relation_changed(self, event: RelationChangedEvent) -> None:
         if not self._relation_changed_checks(event):
@@ -255,6 +261,8 @@ class PostgreSQLLogicalReplication(Object):
         self.charm.app_peer_data["logical-replication-subscriptions"] = json.dumps({
             str(event.relation.id): subscriptions
         })
+        # Rebuild subscribed upstream provenance after any changes
+        self._rebuild_subscribed_upstream()
 
     def _on_relation_departed(self, event: RelationDepartedEvent) -> None:
         if event.departing_unit == self.charm.unit and self.charm._peers is not None:
@@ -282,8 +290,37 @@ class PostgreSQLLogicalReplication(Object):
                 f"Dropped subscription {subscription} from database {database} due to relation break"
             )
         self.charm.app_peer_data["logical-replication-subscriptions"] = ""
+        # Clear provenance as subscriptions are gone
+        self._rebuild_subscribed_upstream()
 
     # endregion
+
+    def _rebuild_subscribed_upstream(self) -> None:
+        """Aggregate upstream provenance for all subscribed tables.
+
+        Stores mapping in app peer data as logical-replication-subscribed-upstream
+        with keys formatted as "<database>:<schema>.<table>" and values equal to
+        the upstream identity "<model_uuid>:<app_name>".
+        """
+        mapping: dict[str, str] = {}
+        for relation in self.model.relations.get(LOGICAL_REPLICATION_RELATION, ()):
+            pubs = json.loads(relation.data[relation.app].get("publications", "{}"))
+            for database, pub in pubs.items():
+                upstream_by_table = pub.get("upstream", {}) if isinstance(pub, dict) else {}
+                publisher_id = pub.get("publisher-id", "") if isinstance(pub, dict) else ""
+                for schematable in pub.get("tables", []):
+                    upstream = upstream_by_table.get(schematable) or publisher_id
+                    if upstream:
+                        mapping[f"{database}:{schematable}"] = upstream
+        self.charm.app_peer_data["logical-replication-subscribed-upstream"] = json.dumps(mapping)
+
+    def _get_subscribed_upstream(self) -> dict[str, str]:
+        try:
+            return json.loads(
+                self.charm.app_peer_data.get("logical-replication-subscribed-upstream", "{}")
+            )
+        except json.JSONDecodeError:
+            return {}
 
     # region Events
 
@@ -497,7 +534,7 @@ class PostgreSQLLogicalReplication(Object):
             return False
         return True
 
-    def _process_offer(self, relation: Relation) -> None:
+    def _process_offer(self, relation: Relation) -> None:  # noqa: C901
         logger.debug(
             f"Started processing offer for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation.id}"
         )
@@ -505,10 +542,12 @@ class PostgreSQLLogicalReplication(Object):
         subscriptions_request = json.loads(
             relation.data[relation.app].get("subscription-request", "{}")
         )
+        requester_id = relation.data[relation.app].get("requester-id", "")
         publications = json.loads(relation.data[self.model.app].get("publications", "{}"))
         secret = self._get_secret(relation.id)
         user = secret.peek_content()["username"]
         errors = []
+        subscribed_upstream = self._get_subscribed_upstream()
 
         for database, publication in publications.copy().items():
             if database in subscriptions_request:
@@ -526,6 +565,27 @@ class PostgreSQLLogicalReplication(Object):
             )
 
         for database, tables in subscriptions_request.items():
+            # Cycle detection: if our local upstream for any requested table equals requester, reject
+            cycle_detected = False
+            upstream_map: dict[str, str] = {}
+            for schematable in tables:
+                key = f"{database}:{schematable}"
+                local_upstream = subscribed_upstream.get(key) or self._identity()
+                upstream_map[schematable] = local_upstream
+                if requester_id and requester_id == local_upstream:
+                    cycle_detected = True
+            if cycle_detected:
+                error = (
+                    f"cyclic logical replication detected for database {database}: "
+                    f"requested tables would replicate back to their upstream ({requester_id})"
+                )
+                errors.append(error)
+                logger.error(
+                    f"Cannot create/alter publication for {LOGICAL_REPLICATION_OFFER_RELATION} #{relation.id}: {error}"
+                )
+                # Skip creating/altering this publication to avoid loop
+                continue
+
             if database not in publications:
                 if validation_error := self._validate_new_publication(database, tables):
                     errors.append(validation_error)
@@ -553,6 +613,8 @@ class PostgreSQLLogicalReplication(Object):
                     "publication-name": publication_name,
                     "replication-slot-name": self._replication_slot_name(relation.id, database),
                     "tables": tables,
+                    "publisher-id": self._identity(),
+                    "upstream": upstream_map,
                 }
             elif sorted(publication_tables := publications[database]["tables"]) != sorted(tables):
                 publication_name = publications[database]["publication-name"]
@@ -583,6 +645,12 @@ class PostgreSQLLogicalReplication(Object):
                 )
                 self.charm.postgresql.alter_publication(database, publication_name, tables)
                 publications[database]["tables"] = tables
+                publications[database]["publisher-id"] = self._identity()
+                publications[database]["upstream"] = upstream_map
+            else:
+                # Tables unchanged; still update provenance and publisher id to propagate upstream
+                publications[database]["publisher-id"] = self._identity()
+                publications[database]["upstream"] = upstream_map
             self._save_published_resources_info(str(relation.id), secret.id, publications)  # type: ignore
             relation.data[self.model.app]["publications"] = json.dumps(publications)
 
