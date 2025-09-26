@@ -584,8 +584,8 @@ class Patroni:
                 member["host"]: member["state"] in ["running", "streaming"]
                 for member in response.json()["members"]
             }
-        except Exception:
-            logger.exception("Unable to get the state of the cluster")
+        except Exception as e:
+            logger.debug(f"Unable to get the state of the cluster: {e}")
             return
 
     def promote_standby_cluster(self) -> None:

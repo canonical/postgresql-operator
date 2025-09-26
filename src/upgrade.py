@@ -196,6 +196,8 @@ class PostgreSQLUpgrade(DataUpgrade):
 
                     self.charm.update_config()
 
+                    self._set_up_new_access_roles_for_legacy()
+
                     self.set_unit_completed()
 
                     # Ensures leader gets its own relation-changed when it upgrades
@@ -258,7 +260,6 @@ class PostgreSQLUpgrade(DataUpgrade):
                 extra_user_roles="pg_monitor",
             )
         self.charm.postgresql.set_up_database()
-        self._set_up_new_access_roles_for_legacy()
 
     def _set_up_new_access_roles_for_legacy(self) -> None:
         """Create missing access groups and their memberships."""
@@ -271,6 +272,7 @@ class PostgreSQLUpgrade(DataUpgrade):
         self.charm.postgresql.create_access_groups()
         self.charm.postgresql.grant_internal_access_group_memberships()
         self.charm.postgresql.grant_relation_access_group_memberships()
+        logger.debug("Access roles created")
 
     @property
     def unit_upgrade_data(self) -> RelationDataContent:
