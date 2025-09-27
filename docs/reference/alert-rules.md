@@ -48,8 +48,17 @@ This page contains a markdown version of the alert rules described in the `postg
 | PatroniPostgresqlDown | ![critical] | Patroni PostgreSQL instance is down.<br>Check for errors in the Loki logs. |
 | PatroniHasNoLeader | ![critical] | Patroni instance has no leader node.<br>A leader node (neither primary nor standby) cannot be found inside a cluster.<br>Check for errors in the Loki logs. |
 
+## `PgbackrestExporterK8s`
+
+| Alert | Severity | Notes |
+| ----- | -------- | ----- |
+| `PgBackRestBackupError` | ![critical] | Backup failed for a stanza.<br>The last pgBackRest backup ended with error status > 0.<br>Check the pgBackRest logs for the stanza. |
+| `PgBackRestBackupTooOld` | ![warning] | No recent backup available.<br>The last pgBackRest backup is older than 7 days.<br>Consider checking your backup schedule, capacity, and logs. |
+| `PgBackRestStanzaError` | ![warning] | A stanza has reported errors.<br>Status > 0 indicates problems such as missing stanza path or no valid backups.<br>Check pgBackRest logs for details. |
+| `PgBackRestRepoError` | ![warning] | A repository has reported errors.<br>Status > 0 indicates the repo may be inaccessible, out of space, or otherwise unhealthy.<br>Check pgBackRest logs and storage system. |
+| `PgBackRestExporterError` | ![critical] | The pgBackRest exporter failed to fetch data.<br>Metric `pgbackrest_exporter_status == 0` indicates exporter-side issues.<br>This may be a misconfiguration or runtime error; check exporter logs. |
+
 <!-- Badges -->
 [info]: https://img.shields.io/badge/info-blue
 [warning]: https://img.shields.io/badge/warning-yellow
 [critical]: https://img.shields.io/badge/critical-red
-
