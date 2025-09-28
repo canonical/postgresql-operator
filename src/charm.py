@@ -752,6 +752,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         if "exporter-started" not in self.unit_peer_data:
             self._setup_exporter()
+        if "pgbackrest-exporter-started" not in self.unit_peer_data:
             self._setup_pgbackrest_exporter()
 
     def _update_new_unit_status(self) -> None:
@@ -1376,6 +1377,8 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             postgres_snap.start(services=[PGBACKREST_MONITORING_SNAP_SERVICE], enable=True)
         else:
             postgres_snap.restart(services=[PGBACKREST_MONITORING_SNAP_SERVICE])
+
+        self.unit_peer_data.update({"pgbackrest-exporter-started": "True"})
 
     def _setup_ldap_sync(self, postgres_snap: snap.Snap | None = None) -> None:
         """Set up postgresql_ldap_sync options."""
