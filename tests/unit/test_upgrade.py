@@ -103,6 +103,9 @@ def test_on_upgrade_granted(harness):
             "charm.PostgreSQLBackups.start_stop_pgbackrest_service"
         ) as _start_stop_pgbackrest_service,
         patch("charm.PostgresqlOperatorCharm._setup_exporter") as _setup_exporter,
+        patch(
+            "charm.PostgresqlOperatorCharm._setup_pgbackrest_exporter"
+        ) as _setup_pgbackrest_exporter,
         patch("charm.Patroni.start_patroni") as _start_patroni,
         patch("charm.PostgresqlOperatorCharm._install_snap_packages") as _install_snap_packages,
         patch("charm.PostgresqlOperatorCharm.update_config") as _update_config,
