@@ -31,7 +31,6 @@ These refreshes are well-tested and should be preferred.
 
 ### Supported refreshes
 
-These refreshes should be supported.
 If possible, use a [recommended refresh](#recommended-refreshes) instead.
 
 ```{eval-rst}
