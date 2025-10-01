@@ -154,8 +154,8 @@ async def test_settings_are_correct(ops_test: OpsTest, unit_id: int):
 
     # Validate each configuration related to Patroni
     assert settings["postgresql"]["use_pg_rewind"] is True
-    assert settings["postgresql"]["remove_data_directory_on_rewind_failure"] is True
-    assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"] is True
+    assert settings["postgresql"]["remove_data_directory_on_rewind_failure"] is False
+    assert settings["postgresql"]["remove_data_directory_on_diverged_timelines"] is False
     assert settings["loop_wait"] == 10
     assert settings["retry_timeout"] == 10
     assert settings["maximum_lag_on_failover"] == 1048576
