@@ -1431,3 +1431,40 @@ async def backup_operations(
             "backup wasn't correctly restored: table 'backup_table_3' exists"
         )
     connection.close()
+
+
+### Ported Mysql jubilant helpers
+
+
+async def execute_queries_on_unit(
+    unit_address: str,
+    username: str,
+    password: str,
+    queries: list[str],
+    database: str,
+    commit: bool = False,
+) -> list:
+    """Execute given MySQL queries on a unit.
+
+    Args:
+        unit_address: The public IP address of the unit to execute the queries on
+        username: The PostgreSQL username
+        password: The PostgreSQL password
+        queries: A list of queries to execute
+        database: Database to execute in
+        commit: A keyword arg indicating whether there are any writes queries
+
+    Returns:
+        A list of rows that were potentially queried
+    """
+    with (
+        psycopg2.connect(
+            f"dbname='{database}' user='{username}' host='{unit_address}' password='{password}' connect_timeout=10"
+        ) as connection,
+        connection.cursor() as cursor,
+    ):
+        for query in queries:
+            cursor.execute(query)
+        output = list(itertools.chain(*cursor.fetchall()))
+
+    return output
