@@ -46,6 +46,7 @@ from ops.charm import (
     InstallEvent,
     LeaderElectedEvent,
     RelationDepartedEvent,
+    SecretRemoveEvent,
     StartEvent,
 )
 from ops.framework import EventBase
@@ -201,6 +202,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.secret_remove, self._on_secret_remove)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
 
@@ -434,6 +436,9 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # For now, as there is no DNS hostnames on VMs, and it would also depend on
         # the underlying provider (LXD, MAAS, etc.), the unit IP is returned.
         return self._unit_ip
+
+    def _on_secret_remove(self, event: SecretRemoveEvent) -> None:
+        event.remove_revision()
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
