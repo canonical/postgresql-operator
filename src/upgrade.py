@@ -23,6 +23,7 @@ from constants import (
     MONITORING_PASSWORD_KEY,
     MONITORING_USER,
     PATRONI_PASSWORD_KEY,
+    PEER,
     RAFT_PASSWORD_KEY,
     SNAP_PACKAGES,
 )
@@ -198,6 +199,8 @@ class PostgreSQLUpgrade(DataUpgrade):
 
                     self._set_up_new_access_roles_for_legacy()
 
+                    self._remove_secrets_old_revisions()
+
                     self.set_unit_completed()
 
                     # Ensures leader gets its own relation-changed when it upgrades
@@ -260,6 +263,16 @@ class PostgreSQLUpgrade(DataUpgrade):
                 extra_user_roles="pg_monitor",
             )
         self.charm.postgresql.set_up_database()
+
+    def _remove_secrets_old_revisions(self) -> None:
+        """Remove secrets' old revisions."""
+        if self.charm.unit.is_leader():
+            secret = self.charm.model.get_secret(label=f"{PEER}.{self.charm.app.name}.app")
+            latest_revision = secret.get_info().revision
+            logger.debug(f"Latest revision of secret is {latest_revision}")
+            for revision in range(1, latest_revision):
+                secret.remove_revision(revision)
+                logger.debug(f"Removed secret revision {revision}")
 
     def _set_up_new_access_roles_for_legacy(self) -> None:
         """Create missing access groups and their memberships."""
