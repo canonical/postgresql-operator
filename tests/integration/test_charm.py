@@ -15,7 +15,7 @@ from tenacity import Retrying, stop_after_attempt, wait_exponential, wait_fixed
 
 from locales import SNAP_LOCALES
 
-from .ha_tests.helpers import get_cluster_roles
+from .ha_tests.helpers import get_cluster_roles, get_patroni_setting
 from .helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
@@ -269,10 +269,16 @@ async def test_scale_down_and_up(ops_test: OpsTest):
             with attempt:
                 assert primary == leader_unit.name
 
+    # Check strict mode is disabled with 1 unit
+    assert not get_patroni_setting(ops_test, "synchronous_mode_strict")
+
     await ops_test.model.applications[DATABASE_APP_NAME].destroy_units(leader_unit.name)
     await ops_test.model.wait_for_idle(
         apps=[DATABASE_APP_NAME], status="active", timeout=1000, wait_for_exact_units=initial_scale
     )
+
+    # Check strict mode is enabled with 2+ units
+    assert get_patroni_setting(ops_test, "synchronous_mode_strict")
 
     # Assert the correct members are part of the cluster.
     await check_cluster_members(ops_test, DATABASE_APP_NAME)
