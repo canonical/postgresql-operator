@@ -87,11 +87,11 @@ async def test_removing_stereo_primary(ops_test: OpsTest, continuous_writes) -> 
 
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
-    await are_writes_increasing(ops_test, primary)
-
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+    await are_writes_increasing(ops_test, primary)
 
     new_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
@@ -121,11 +121,11 @@ async def test_removing_stereo_sync_standby(ops_test: OpsTest, continuous_writes
 
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
-    await are_writes_increasing(ops_test, secondary)
-
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=1)
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+    await are_writes_increasing(ops_test, secondary)
 
     new_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
