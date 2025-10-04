@@ -5,6 +5,8 @@
 
 import json
 import logging
+import os
+import subprocess
 
 from charms.data_platform_libs.v0.upgrade import (
     ClusterNotReadyError,
@@ -49,10 +51,11 @@ def get_postgresql_dependencies_model() -> PostgreSQLDependencyModel:
 class PostgreSQLUpgrade(DataUpgrade):
     """PostgreSQL upgrade class."""
 
-    def __init__(self, charm, model: BaseModel, **kwargs) -> None:
+    def __init__(self, charm, model: BaseModel, run_cmd: str, **kwargs) -> None:
         """Initialize the class."""
         super().__init__(charm, model, **kwargs)
         self.charm = charm
+        self.run_cmd = run_cmd
         self._on_upgrade_charm_check_legacy()
 
     @override
@@ -146,6 +149,8 @@ class PostgreSQLUpgrade(DataUpgrade):
     def _on_upgrade_granted(self, event: UpgradeGrantedEvent) -> None:
         # Refresh the charmed PostgreSQL snap and restart the database.
         # Update the configuration.
+        self._remove_secrets_old_revisions()
+
         self.charm.unit.status = MaintenanceStatus("updating configuration")
         self.charm.update_config()
         self.charm.updated_synchronous_node_count()
@@ -198,8 +203,6 @@ class PostgreSQLUpgrade(DataUpgrade):
                     self.charm.update_config()
 
                     self._set_up_new_access_roles_for_legacy()
-
-                    self._remove_secrets_old_revisions()
 
                     self.set_unit_completed()
 
@@ -268,11 +271,24 @@ class PostgreSQLUpgrade(DataUpgrade):
         """Remove secrets' old revisions."""
         if self.charm.unit.is_leader():
             secret = self.charm.model.get_secret(label=f"{PEER}.{self.charm.app.name}.app")
+            secret_id = secret.get_info().id
             latest_revision = secret.get_info().revision
-            logger.debug(f"Latest revision of secret is {latest_revision}")
+            new_env = os.environ.copy()
+            if "JUJU_CONTEXT_ID" in new_env:
+                new_env.pop("JUJU_CONTEXT_ID")
             for revision in range(1, latest_revision):
-                secret.remove_revision(revision)
-                logger.debug(f"Removed secret revision {revision}")
+                command = [
+                    self.run_cmd,
+                    self.charm.unit.name,
+                    "--",
+                    "secret-remove",
+                    "--revision",
+                    str(revision),
+                    secret_id,
+                ]
+                # Input comes from the charm.
+                subprocess.Popen(command, env=new_env)  # noqa: S603
+                logger.info(f"Removing secret revision {revision}")
 
     def _set_up_new_access_roles_for_legacy(self) -> None:
         """Create missing access groups and their memberships."""

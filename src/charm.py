@@ -214,6 +214,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             model=get_postgresql_dependencies_model(),
             relation_name="upgrade",
             substrate="vm",
+            run_cmd=run_cmd,
         )
         self.postgresql_client_relation = PostgreSQLProvider(self)
         self.legacy_db_relation = DbProvides(self, admin=False)
