@@ -23,7 +23,7 @@ from .helpers import (
 
 
 @pytest.fixture
-async def continuous_writes(ops_test: OpsTest, request) -> None:
+async def continuous_writes(ops_test: OpsTest) -> None:
     """Deploy the charm that makes continuous writes to PostgreSQL."""
     yield
     if environ["test_result"] != "passed":
