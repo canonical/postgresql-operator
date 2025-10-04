@@ -12,8 +12,8 @@ from ..helpers import (
     CHARM_BASE,
     DATABASE_APP_NAME,
 )
-from .conftest import APPLICATION_NAME
 from .helpers import (
+    APPLICATION_NAME,
     app_name,
     are_writes_increasing,
     check_writes,

@@ -10,12 +10,12 @@ from pytest_operator.plugin import OpsTest
 
 from .. import markers
 from ..helpers import (
+    APPLICATION_NAME,
     CHARM_BASE,
     DATABASE_APP_NAME,
     get_machine_from_unit,
     stop_machine,
 )
-from .conftest import APPLICATION_NAME
 from .helpers import (
     app_name,
     are_writes_increasing,
