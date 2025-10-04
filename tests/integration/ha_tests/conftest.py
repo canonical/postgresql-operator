@@ -2,6 +2,7 @@
 # Copyright 2022 Canonical Ltd.
 # See LICENSE file for licensing details.
 from asyncio import gather
+from os import environ
 
 import pytest as pytest
 from pytest_operator.plugin import OpsTest
@@ -25,7 +26,7 @@ from .helpers import (
 async def continuous_writes(ops_test: OpsTest, request) -> None:
     """Deploy the charm that makes continuous writes to PostgreSQL."""
     yield
-    if not request.session.testsfailed:
+    if environ["test_result"] != "passed":
         # Clear the written data at the end.
         for attempt in Retrying(stop=stop_after_delay(60 * 5), wait=wait_fixed(3), reraise=True):
             with attempt:
