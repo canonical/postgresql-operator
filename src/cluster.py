@@ -5,6 +5,7 @@
 """Helper class used to manage cluster lifecycle."""
 
 import glob
+import json
 import logging
 import os
 import pwd
@@ -1057,13 +1058,14 @@ class Patroni:
     def update_synchronous_node_count(self) -> None:
         """Update synchronous_node_count to the minority of the planned cluster."""
         # Try to update synchronous_node_count.
+        member_units = json.loads(self.charm.app_peer_data.get("members_ips", "[]"))
         for attempt in Retrying(stop=stop_after_delay(60), wait=wait_fixed(3)):
             with attempt:
                 r = requests.patch(
                     f"{self._patroni_url}/config",
                     json={
                         "synchronous_node_count": self._synchronous_node_count,
-                        "synchronous_mode_strict": self._synchronous_node_count > 0,
+                        "synchronous_mode_strict": len(member_units) > 1,
                     },
                     verify=self.verify,
                     auth=self._patroni_auth,

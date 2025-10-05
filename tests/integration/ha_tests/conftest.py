@@ -31,7 +31,7 @@ async def continuous_writes(ops_test: OpsTest) -> None:
             action = (
                 await ops_test.model.applications[APPLICATION_NAME]
                 .units[0]
-                .run_action("stop-continuous-writes")
+                .run_action("clear-continuous-writes")
             )
             await action.wait()
             assert action.results["result"] == "True", "Unable to clear up continuous_writes table"
