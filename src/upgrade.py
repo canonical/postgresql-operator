@@ -271,12 +271,19 @@ class PostgreSQLUpgrade(DataUpgrade):
         """Remove secrets' old revisions."""
         if self.charm.unit.is_leader():
             secret = self.charm.model.get_secret(label=f"{PEER}.{self.charm.app.name}.app")
-            secret_id = secret.get_info().id
             latest_revision = secret.get_info().revision
+            # We need to trick Juju into thinking that we are not running in a hook context,
+            # as Juju will disallow use of juju-run / juju-exec.
             new_env = os.environ.copy()
             if "JUJU_CONTEXT_ID" in new_env:
                 new_env.pop("JUJU_CONTEXT_ID")
             for revision in range(1, latest_revision):
+                if str(latest_revision).startswith(str(revision)):
+                    # Skip if the revision is a prefix of the latest revision.
+                    logger.info(
+                        f"Skipping secret revision {revision} because it's the prefix of the latest revision (see https://github.com/juju/juju/issues/20782)"
+                    )
+                    continue
                 command = [
                     self.run_cmd,
                     self.charm.unit.name,
@@ -284,7 +291,7 @@ class PostgreSQLUpgrade(DataUpgrade):
                     "secret-remove",
                     "--revision",
                     str(revision),
-                    secret_id,
+                    secret.get_info().id,
                 ]
                 # Input comes from the charm.
                 subprocess.Popen(command, env=new_env)  # noqa: S603
