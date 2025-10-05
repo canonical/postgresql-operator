@@ -1194,7 +1194,8 @@ class Patroni:
                     f"{self._patroni_url}/config",
                     json={
                         "synchronous_node_count": self._synchronous_node_count,
-                        "synchronous_mode_strict": len(member_units) > 1,
+                        "synchronous_mode_strict": len(member_units) > 1
+                        and self._synchronous_node_count > 0,
                     },
                     verify=self.verify,
                     auth=self._patroni_auth,
