@@ -468,7 +468,7 @@ def test_update_synchronous_node_count(peers_ips, patroni):
 
         _patch.assert_called_once_with(
             "https://1.1.1.1:8008/config",
-            json={"synchronous_node_count": 0},
+            json={"synchronous_node_count": 0, "synchronous_mode_strict": False},
             verify=patroni.verify,
             auth=patroni._patroni_auth,
             timeout=PATRONI_TIMEOUT,
