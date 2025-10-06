@@ -1833,7 +1833,6 @@ def test_stuck_raft_cluster_rejoin(harness):
     rel_id = harness.model.get_relation(PEER).id
 
     with (
-        patch("charm.Patroni.update_synchronous_node_count") as _update_synchronous_node_count,
         patch(
             "charm.PostgresqlOperatorCharm._update_relation_endpoints"
         ) as _update_relation_endpoints,

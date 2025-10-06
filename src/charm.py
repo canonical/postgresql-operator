@@ -671,6 +671,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
     def updated_synchronous_node_count(self) -> bool:
         """Tries to update synchronous_node_count configuration and reports the result."""
+        if self.has_raft_keys():
+            logger.debug("Cannot set synchronouos nodes. Raft is being reinitialised")
+            return False
+
         try:
             self._patroni.update_synchronous_node_count()
             return True
@@ -792,7 +796,6 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         self._add_to_members_ips(ip)
             if self._unit_ip:
                 self._add_to_members_ips(self._unit_ip)
-            self._patroni.update_synchronous_node_count()
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if (
