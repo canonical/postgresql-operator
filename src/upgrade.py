@@ -15,7 +15,7 @@ from charms.data_platform_libs.v0.upgrade import (
     UpgradeGrantedEvent,
 )
 from charms.postgresql_k8s.v0.postgresql import ACCESS_GROUPS
-from ops.model import MaintenanceStatus, RelationDataContent, WaitingStatus
+from ops.model import MaintenanceStatus, RelationDataContent, SecretNotFoundError, WaitingStatus
 from pydantic import BaseModel
 from tenacity import RetryError, Retrying, stop_after_attempt, wait_fixed
 from typing_extensions import override
@@ -29,6 +29,7 @@ from constants import (
     RAFT_PASSWORD_KEY,
     SNAP_PACKAGES,
 )
+from relations.async_replication import SECRET_LABEL as ASYNC_REPLICATION_SECRET_LABEL
 from utils import new_password
 
 logger = logging.getLogger(__name__)
@@ -270,32 +271,55 @@ class PostgreSQLUpgrade(DataUpgrade):
     def _remove_secrets_old_revisions(self) -> None:
         """Remove secrets' old revisions."""
         if self.charm.unit.is_leader():
-            secret = self.charm.model.get_secret(label=f"{PEER}.{self.charm.app.name}.app")
-            latest_revision = secret.get_info().revision
-            # We need to trick Juju into thinking that we are not running in a hook context,
-            # as Juju will disallow use of juju-run / juju-exec.
-            new_env = os.environ.copy()
-            if "JUJU_CONTEXT_ID" in new_env:
-                new_env.pop("JUJU_CONTEXT_ID")
-            for revision in range(1, latest_revision):
-                if str(latest_revision).startswith(str(revision)):
-                    # Skip if the revision is a prefix of the latest revision.
-                    logger.info(
-                        f"Skipping secret revision {revision} because it's the prefix of the latest revision (see https://github.com/juju/juju/issues/20782)"
-                    )
+            # Internal app and async replication secrets.
+            ids_and_labels = [f"{PEER}.{self.charm.app.name}.app", ASYNC_REPLICATION_SECRET_LABEL]
+            # Retrieve the database relation secrets' IDs and add them to the list.
+            for relation in self.charm.model.relations.get("database", []):
+                ids_and_labels.extend([
+                    relation.data[self.charm.app].get(secret_field)
+                    for secret_field in ["secret-tls", "secret-user"]
+                    if secret_field in relation.data[self.charm.app]
+                ])
+            for id_or_label in ids_and_labels:
+                if id_or_label.startswith("secret://"):
+                    secret = self.charm.model.get_secret(id=id_or_label)
+                    label = secret.get_info().label
+                else:
+                    try:
+                        secret = self.charm.model.get_secret(label=id_or_label)
+                        label = id_or_label
+                    except SecretNotFoundError:
+                        logger.debug(f"Skipping secret not found with label {id_or_label}")
+                        continue
+                latest_revision = secret.get_info().revision
+                if latest_revision == 1:
+                    # No old revisions to remove.
                     continue
-                command = [
-                    self.run_cmd,
-                    self.charm.unit.name,
-                    "--",
-                    "secret-remove",
-                    "--revision",
-                    str(revision),
-                    secret.get_info().id,
-                ]
-                # Input comes from the charm.
-                subprocess.Popen(command, env=new_env)  # noqa: S603
-                logger.info(f"Removing secret revision {revision}")
+                logger.info(f"Removing old revisions of secret with label {label}")
+                # We need to trick Juju into thinking that we are not running in a hook context,
+                # as Juju will disallow use of juju-run / juju-exec.
+                new_env = os.environ.copy()
+                if "JUJU_CONTEXT_ID" in new_env:
+                    new_env.pop("JUJU_CONTEXT_ID")
+                for revision in range(1, latest_revision):
+                    if str(latest_revision).startswith(str(revision)):
+                        # Skip if the revision is a prefix of the latest revision.
+                        logger.info(
+                            f"Skipping secret revision {revision} because it's the prefix of the latest revision (see https://github.com/juju/juju/issues/20782)"
+                        )
+                        continue
+                    command = [
+                        self.run_cmd,
+                        self.charm.unit.name,
+                        "--",
+                        "secret-remove",
+                        "--revision",
+                        str(revision),
+                        secret.get_info().id,
+                    ]
+                    # Input comes from the charm.
+                    subprocess.Popen(command, env=new_env)  # noqa: S603
+                    logger.info(f"Removing secret revision {revision} if it exists")
 
     def _set_up_new_access_roles_for_legacy(self) -> None:
         """Create missing access groups and their memberships."""
