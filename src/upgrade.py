@@ -270,7 +270,7 @@ class PostgreSQLUpgrade(DataUpgrade):
 
     def _remove_secrets_old_revisions(self) -> None:
         """Remove secrets' old revisions."""
-        if self.charm.unit.is_leader():
+        if self.charm.unit.is_leader() and self.charm.model.juju_version.has_secrets:
             # Internal app and async replication secrets.
             ids_and_labels = [f"{PEER}.{self.charm.app.name}.app", ASYNC_REPLICATION_SECRET_LABEL]
             # Retrieve the database relation secrets' IDs and add them to the list.
