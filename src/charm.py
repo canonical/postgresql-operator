@@ -792,6 +792,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                         self._add_to_members_ips(ip)
             if self._unit_ip:
                 self._add_to_members_ips(self._unit_ip)
+            self._patroni.update_synchronous_node_count()
             self.app_peer_data["raft_reset_primary"] = "True"
             self._update_relation_endpoints()
         if (
