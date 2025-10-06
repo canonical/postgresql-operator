@@ -834,6 +834,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             self.app_peer_data.pop("raft_reset_primary", None)
             self.app_peer_data.pop("raft_selected_candidate", None)
             self.app_peer_data.pop("raft_followers_stopped", None)
+            self.updated_synchronous_node_count()
 
     def _raft_reinitialisation(self) -> None:
         """Handle raft cluster loss of quorum."""
