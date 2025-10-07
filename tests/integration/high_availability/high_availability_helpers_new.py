@@ -11,11 +11,12 @@ from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from constants import SERVER_CONFIG_USERNAME
+from constants import PEER
 
 from ..helpers import execute_queries_on_unit
 
 MINUTE_SECS = 60
+SERVER_CONFIG_USERNAME = "operator"
 
 JujuModelStatusFn = Callable[[Status], bool]
 JujuAppsStatusFn = Callable[[Status, str], bool]
@@ -201,17 +202,12 @@ async def get_postgresql_max_written_value(juju: Juju, app_name: str, unit_name:
         app_name: The application name.
         unit_name: The unit name.
     """
-    credentials_task = juju.run(
-        unit=unit_name,
-        action="get-password",
-        params={"username": SERVER_CONFIG_USERNAME},
-    )
-    credentials_task.raise_on_failure()
+    password = get_user_password(juju, app_name, SERVER_CONFIG_USERNAME)
 
     output = await execute_queries_on_unit(
         get_unit_ip(juju, app_name, unit_name),
-        credentials_task.results["username"],
-        credentials_task.results["password"],
+        SERVER_CONFIG_USERNAME,
+        password,
         ["SELECT MAX(number) FROM `continuous_writes`.`data`;"],
     )
     return output[0]
@@ -228,17 +224,12 @@ async def get_postgresql_variable_value(
         unit_name: The unit name.
         variable_name: The variable name.
     """
-    credentials_task = juju.run(
-        unit=unit_name,
-        action="get-password",
-        params={"username": SERVER_CONFIG_USERNAME},
-    )
-    credentials_task.raise_on_failure()
+    password = get_user_password(juju, app_name, SERVER_CONFIG_USERNAME)
 
     output = await execute_queries_on_unit(
         get_unit_ip(juju, app_name, unit_name),
-        credentials_task.results["username"],
-        credentials_task.results["password"],
+        SERVER_CONFIG_USERNAME,
+        password,
         [f"SELECT @@{variable_name};"],
     )
     return output[0]
@@ -272,3 +263,14 @@ def wait_for_unit_message(app_name: str, unit_name: str, unit_message: str) -> J
     return lambda status: (
         status.apps[app_name].units[unit_name].workload_status.message == unit_message
     )
+
+
+# PG helpers
+
+
+def get_user_password(juju: Juju, app_name: str, user: str) -> str | None:
+    """Get a system user's password."""
+    for secret in juju.secrets(owner=app_name):
+        if secret.label == f"{PEER}.{app_name}.app":
+            revealed_secret = juju.show_secret(secret.uri, reveal=True)
+            return revealed_secret.content.get(f"{user}-password")
