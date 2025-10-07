@@ -78,6 +78,7 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
+    Substrates,
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
@@ -623,6 +624,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
     def postgresql(self) -> PostgreSQL:
         """Returns an instance of the object used to interact with the database."""
         return PostgreSQL(
+            substrate=Substrates.VM,
             primary_host=self.primary_endpoint,
             current_host=self._unit_ip,
             user=USER,
