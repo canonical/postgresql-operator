@@ -270,7 +270,7 @@ def wait_for_unit_message(app_name: str, unit_name: str, unit_message: str) -> J
 
 def get_user_password(juju: Juju, app_name: str, user: str) -> str | None:
     """Get a system user's password."""
-    for secret in juju.secrets(owner=app_name):
+    for secret in juju.secrets():
         if secret.label == f"{PEER}.{app_name}.app":
             revealed_secret = juju.show_secret(secret.uri, reveal=True)
             return revealed_secret.content.get(f"{user}-password")

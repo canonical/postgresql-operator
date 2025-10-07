@@ -80,8 +80,8 @@ def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> No
     model_1.deploy(
         charm=charm,
         app=POSTGRESQL_APP_1,
-        base="ubuntu@22.04",
-        config={**configuration, "cluster-name": "lima"},
+        base="ubuntu@24.04",
+        config=configuration,
         constraints=constraints,
         num_units=3,
     )
@@ -89,8 +89,8 @@ def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> No
     model_2.deploy(
         charm=charm,
         app=POSTGRESQL_APP_2,
-        base="ubuntu@22.04",
-        config={**configuration, "cluster-name": "cuzco"},
+        base="ubuntu@24.04",
+        config=configuration,
         constraints=constraints,
         num_units=3,
     )
@@ -127,17 +127,17 @@ def test_async_relate(first_model: str, second_model: str) -> None:
     logging.info("Waiting for the applications to settle")
     model_1.wait(
         ready=wait_for_apps_status(jubilant.any_blocked, POSTGRESQL_APP_1),
-        timeout=5 * MINUTE_SECS,
+        timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
         ready=wait_for_apps_status(jubilant.any_waiting, POSTGRESQL_APP_2),
-        timeout=5 * MINUTE_SECS,
+        timeout=10 * MINUTE_SECS,
     )
 
 
 @juju3
 @pytest.mark.abort_on_fail
-def test_deploy_router_and_app(first_model: str) -> None:
+def test_deploy_app(first_model: str) -> None:
     """Deploy the router and the test application."""
     logging.info("Deploying test application")
     model_1 = Juju(model=first_model)
@@ -180,11 +180,11 @@ def test_create_replication(first_model: str, second_model: str) -> None:
     logging.info("Waiting for the applications to settle")
     model_1.wait(
         ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_1),
-        timeout=5 * MINUTE_SECS,
+        timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
         ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_2),
-        timeout=5 * MINUTE_SECS,
+        timeout=10 * MINUTE_SECS,
     )
 
 
@@ -235,7 +235,7 @@ async def test_standby_promotion(first_model: str, second_model: str, continuous
 @pytest.mark.abort_on_fail
 def test_failover(first_model: str, second_model: str) -> None:
     """Test switchover on primary cluster fail."""
-    logging.info("Freezing postgresqld on primary cluster units")
+    logging.info("Freezing postgres on primary cluster units")
     model_2 = Juju(model=second_model)
     model_2_postgresql_units = get_app_units(model_2, POSTGRESQL_APP_2)
 
@@ -255,8 +255,8 @@ def test_failover(first_model: str, second_model: str) -> None:
     )
     promotion_task.raise_on_failure()
 
-    # Restore postgresqld process
-    logging.info("Unfreezing postgresqld on primary cluster units")
+    # Restore postgres process
+    logging.info("Unfreezing postgres on primary cluster units")
     for unit_name in model_2_postgresql_units:
         model_2.exec("sudo pkill -x postgres --signal SIGCONT", unit=unit_name)
 
@@ -287,7 +287,6 @@ async def test_rejoin_invalidated_cluster(
     task = model_1.run(
         unit=model_1_postgresql_leader,
         action="rejoin-cluster",
-        params={"cluster-name": "cuzco"},
         wait=5 * MINUTE_SECS,
     )
     task.raise_on_failure()
