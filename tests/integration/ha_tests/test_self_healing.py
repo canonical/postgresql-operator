@@ -11,6 +11,7 @@ from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from .. import markers
 from ..helpers import (
+    APPLICATION_NAME,
     CHARM_BASE,
     DATABASE_APP_NAME,
     db_connect,
@@ -19,7 +20,6 @@ from ..helpers import (
     get_unit_address,
     run_command_on_unit,
 )
-from .conftest import APPLICATION_NAME
 from .helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,
