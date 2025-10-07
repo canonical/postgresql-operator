@@ -21,7 +21,7 @@ JujuModelStatusFn = Callable[[Status], bool]
 JujuAppsStatusFn = Callable[[Status, str], bool]
 
 
-async def check_mysql_units_writes_increment(
+async def check_postgresql_units_writes_increment(
     juju: Juju, app_name: str, app_units: list[str] | None = None
 ) -> None:
     """Ensure that continuous writes is incrementing on all units.
@@ -32,8 +32,8 @@ async def check_mysql_units_writes_increment(
     if not app_units:
         app_units = get_app_units(juju, app_name)
 
-    app_primary = get_mysql_primary_unit(juju, app_name)
-    app_max_value = await get_mysql_max_written_value(juju, app_name, app_primary)
+    app_primary = get_postgresql_primary_unit(juju, app_name)
+    app_max_value = await get_postgresql_max_written_value(juju, app_name, app_primary)
 
     juju.model_config({"update-status-hook-interval": "15s"})
     for unit_name in app_units:
@@ -43,7 +43,7 @@ async def check_mysql_units_writes_increment(
             wait=wait_fixed(10),
         ):
             with attempt:
-                unit_max_value = await get_mysql_max_written_value(juju, app_name, unit_name)
+                unit_max_value = await get_postgresql_max_written_value(juju, app_name, unit_name)
                 assert unit_max_value > app_max_value, "Writes not incrementing"
                 app_max_value = unit_max_value
 
@@ -153,7 +153,7 @@ def get_relation_data(juju: Juju, app_name: str, rel_name: str) -> list[dict]:
     return relation_data
 
 
-def get_mysql_cluster_status(juju: Juju, unit: str, cluster_set: bool = False) -> dict:
+def get_postgresql_cluster_status(juju: Juju, unit: str, cluster_set: bool = False) -> dict:
     """Get the cluster status by running the get-cluster-status action.
 
     Args:
@@ -175,25 +175,25 @@ def get_mysql_cluster_status(juju: Juju, unit: str, cluster_set: bool = False) -
     return task.results.get("status", {})
 
 
-def get_mysql_unit_name(instance_label: str) -> str:
+def get_postgresql_unit_name(instance_label: str) -> str:
     """Builds a Juju unit name out of a MySQL instance label."""
     return "/".join(instance_label.rsplit("-", 1))
 
 
-def get_mysql_primary_unit(juju: Juju, app_name: str) -> str:
+def get_postgresql_primary_unit(juju: Juju, app_name: str) -> str:
     """Get the current primary node of the cluster."""
-    mysql_primary = get_app_leader(juju, app_name)
-    mysql_cluster_status = get_mysql_cluster_status(juju, mysql_primary)
-    mysql_cluster_topology = mysql_cluster_status["defaultreplicaset"]["topology"]
+    postgresql_primary = get_app_leader(juju, app_name)
+    postgresql_cluster_status = get_postgresql_cluster_status(juju, postgresql_primary)
+    postgresql_cluster_topology = postgresql_cluster_status["defaultreplicaset"]["topology"]
 
-    for label, value in mysql_cluster_topology.items():
+    for label, value in postgresql_cluster_topology.items():
         if value["memberrole"] == "primary":
-            return get_mysql_unit_name(label)
+            return get_postgresql_unit_name(label)
 
     raise Exception("No MySQL primary node found")
 
 
-async def get_mysql_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
+async def get_postgresql_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
     """Retrieve the max written value in the MySQL database.
 
     Args:
@@ -217,7 +217,7 @@ async def get_mysql_max_written_value(juju: Juju, app_name: str, unit_name: str)
     return output[0]
 
 
-async def get_mysql_variable_value(
+async def get_postgresql_variable_value(
     juju: Juju, app_name: str, unit_name: str, variable_name: str
 ) -> str:
     """Retrieve a database variable value as a string.
