@@ -9,8 +9,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
-from ..helpers import CHARM_BASE, DATABASE_APP_NAME, get_password
-from .conftest import APPLICATION_NAME
+from ..helpers import APPLICATION_NAME, CHARM_BASE, DATABASE_APP_NAME, get_password
 from .helpers import (
     METADATA,
     ORIGINAL_RESTART_CONDITION,

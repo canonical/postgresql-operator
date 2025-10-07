@@ -9,12 +9,12 @@ import pytest
 from pytest_operator.plugin import OpsTest
 
 from ..helpers import (
+    APPLICATION_NAME,
     CHARM_BASE,
     DATABASE_APP_NAME,
     get_machine_from_unit,
     stop_machine,
 )
-from .conftest import APPLICATION_NAME
 from .helpers import (
     app_name,
     are_writes_increasing,
@@ -111,11 +111,11 @@ async def test_removing_unit(ops_test: OpsTest, roles: list[str], continuous_wri
 
     await ops_test.model.wait_for_idle(status="active", timeout=600, idle_period=45)
 
-    await are_writes_increasing(ops_test, units)
-
     logger.info("Scaling back up")
     await ops_test.model.applications[DATABASE_APP_NAME].add_unit(count=len(roles))
     await ops_test.model.wait_for_idle(status="active", timeout=1500)
+
+    await are_writes_increasing(ops_test, units)
 
     new_roles = await get_cluster_roles(
         ops_test, ops_test.model.applications[DATABASE_APP_NAME].units[0].name
