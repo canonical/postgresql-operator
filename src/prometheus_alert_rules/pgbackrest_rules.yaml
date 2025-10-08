@@ -1,0 +1,69 @@
+# Reference: https://github.com/woblerr/pgbackrest_exporter/blob/master/README.md
+
+groups:
+
+- name: PgbackrestExporterK8s
+
+  rules:
+
+    - alert: PgBackRestBackupError
+      expr: pgbackrest_backup_last_error_status > 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "Backup failed for stanza {{ $labels.stanza }}"
+        description: |
+          The last pgBackRest backup failed with error status > 0.
+          Check pgBackRest logs for stanza {{ $labels.stanza }}.
+          LABELS = {{ $labels }}
+
+    - alert: PgBackRestBackupTooOld
+      expr: pgbackrest_backup_since_last_completion_seconds > (60 * 60 * 24 * 7)
+      for: 10m
+      labels:
+        severity: warning
+      annotations:
+        summary: "No recent backup for stanza {{ $labels.stanza }}"
+        description: |
+          The last pgBackRest backup is older than 7 days.
+          Consider checking your backup schedule, capacity, and logs.
+          LABELS = {{ $labels }}
+
+    - alert: PgBackRestStanzaError
+      expr: pgbackrest_stanza_status > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "pgBackRest stanza {{ $labels.stanza }} has errors"
+        description: |
+          pgBackRest reports stanza status {{ $value }} > 0.
+          This indicates that stanza {{ $labels.stanza }} has issues (e.g., missing or invalid backups).
+          Check pgBackRest logs for details.
+          LABELS = {{ $labels }}
+
+    - alert: PgBackRestRepoError
+      expr: pgbackrest_repo_status > 0
+      for: 5m
+      labels:
+        severity: warning
+      annotations:
+        summary: "pgBackRest repo {{ $labels.repo }} has errors"
+        description: |
+          pgBackRest reports repo status {{ $value }} > 0.
+          This indicates repository {{ $labels.repo }} is in an error state (e.g., inaccessible, out of space).
+          Check pgBackRest logs and storage.
+          LABELS = {{ $labels }}
+
+    - alert: PgBackRestExporterError
+      expr: pgbackrest_exporter_status == 0
+      for: 5m
+      labels:
+        severity: critical
+      annotations:
+        summary: "pgBackRest exporter failed"
+        description: |
+          pgBackRest exporter failed to fetch data for stanza {{ $labels.stanza }}.
+          This may indicate configuration or runtime errors.
+          LABELS = {{ $labels }}

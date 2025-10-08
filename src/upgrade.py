@@ -167,6 +167,7 @@ class PostgreSQLUpgrade(DataUpgrade):
         )
         self.charm._setup_exporter()
         self.charm.backup.start_stop_pgbackrest_service()
+        self.charm._setup_pgbackrest_exporter()
 
         try:
             self.charm.unit.set_workload_version(
