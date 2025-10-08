@@ -154,28 +154,6 @@ def get_relation_data(juju: Juju, app_name: str, rel_name: str) -> list[dict]:
     return relation_data
 
 
-def get_db_cluster_status(juju: Juju, unit: str, cluster_set: bool = False) -> dict:
-    """Get the cluster status by running the get-cluster-status action.
-
-    Args:
-        juju: The juju instance to use.
-        unit: The unit on which to execute the action on
-        cluster_set: Whether to get the cluster-set instead (optional)
-
-    Returns:
-        A dictionary representing the cluster status
-    """
-    task = juju.run(
-        unit=unit,
-        action="get-cluster-status",
-        params={"cluster-set": cluster_set},
-        wait=5 * MINUTE_SECS,
-    )
-    task.raise_on_failure()
-
-    return task.results.get("status", {})
-
-
 def get_db_unit_name(instance_label: str) -> str:
     """Builds a Juju unit name out of a MySQL instance label."""
     return "/".join(instance_label.rsplit("-", 1))
@@ -184,14 +162,14 @@ def get_db_unit_name(instance_label: str) -> str:
 def get_db_primary_unit(juju: Juju, app_name: str) -> str:
     """Get the current primary node of the cluster."""
     postgresql_primary = get_app_leader(juju, app_name)
-    postgresql_cluster_status = get_db_cluster_status(juju, postgresql_primary)
-    postgresql_cluster_topology = postgresql_cluster_status["defaultreplicaset"]["topology"]
+    task = juju.run(unit=postgresql_primary, action="get-primary", wait=5 * MINUTE_SECS)
+    task.raise_on_failure()
 
-    for label, value in postgresql_cluster_topology.items():
-        if value["memberrole"] == "primary":
-            return get_db_unit_name(label)
+    primary = task.results.get("primary")
+    if primary != "None":
+        return primary
 
-    raise Exception("No MySQL primary node found")
+    raise Exception("No primary node found")
 
 
 async def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
