@@ -6,9 +6,9 @@ import json
 import subprocess
 from collections.abc import Callable
 
-import jubilant
-from jubilant import Juju
-from jubilant.statustypes import Status, UnitStatus
+import jubilant_backports
+from jubilant_backports import Juju
+from jubilant_backports.statustypes import Status, UnitStatus
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
 from constants import PEER
@@ -22,7 +22,7 @@ JujuModelStatusFn = Callable[[Status], bool]
 JujuAppsStatusFn = Callable[[Status, str], bool]
 
 
-async def check_postgresql_units_writes_increment(
+async def check_db_units_writes_increment(
     juju: Juju, app_name: str, app_units: list[str] | None = None
 ) -> None:
     """Ensure that continuous writes is incrementing on all units.
@@ -33,8 +33,8 @@ async def check_postgresql_units_writes_increment(
     if not app_units:
         app_units = get_app_units(juju, app_name)
 
-    app_primary = get_postgresql_primary_unit(juju, app_name)
-    app_max_value = await get_postgresql_max_written_value(juju, app_name, app_primary)
+    app_primary = get_db_primary_unit(juju, app_name)
+    app_max_value = await get_db_max_written_value(juju, app_name, app_primary)
 
     juju.model_config({"update-status-hook-interval": "15s"})
     for unit_name in app_units:
@@ -44,7 +44,7 @@ async def check_postgresql_units_writes_increment(
             wait=wait_fixed(10),
         ):
             with attempt:
-                unit_max_value = await get_postgresql_max_written_value(juju, app_name, unit_name)
+                unit_max_value = await get_db_max_written_value(juju, app_name, unit_name)
                 assert unit_max_value > app_max_value, "Writes not incrementing"
                 app_max_value = unit_max_value
 
@@ -154,7 +154,7 @@ def get_relation_data(juju: Juju, app_name: str, rel_name: str) -> list[dict]:
     return relation_data
 
 
-def get_postgresql_cluster_status(juju: Juju, unit: str, cluster_set: bool = False) -> dict:
+def get_db_cluster_status(juju: Juju, unit: str, cluster_set: bool = False) -> dict:
     """Get the cluster status by running the get-cluster-status action.
 
     Args:
@@ -176,25 +176,25 @@ def get_postgresql_cluster_status(juju: Juju, unit: str, cluster_set: bool = Fal
     return task.results.get("status", {})
 
 
-def get_postgresql_unit_name(instance_label: str) -> str:
+def get_db_unit_name(instance_label: str) -> str:
     """Builds a Juju unit name out of a MySQL instance label."""
     return "/".join(instance_label.rsplit("-", 1))
 
 
-def get_postgresql_primary_unit(juju: Juju, app_name: str) -> str:
+def get_db_primary_unit(juju: Juju, app_name: str) -> str:
     """Get the current primary node of the cluster."""
     postgresql_primary = get_app_leader(juju, app_name)
-    postgresql_cluster_status = get_postgresql_cluster_status(juju, postgresql_primary)
+    postgresql_cluster_status = get_db_cluster_status(juju, postgresql_primary)
     postgresql_cluster_topology = postgresql_cluster_status["defaultreplicaset"]["topology"]
 
     for label, value in postgresql_cluster_topology.items():
         if value["memberrole"] == "primary":
-            return get_postgresql_unit_name(label)
+            return get_db_unit_name(label)
 
     raise Exception("No MySQL primary node found")
 
 
-async def get_postgresql_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
+async def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
     """Retrieve the max written value in the MySQL database.
 
     Args:
@@ -209,30 +209,7 @@ async def get_postgresql_max_written_value(juju: Juju, app_name: str, unit_name:
         SERVER_CONFIG_USERNAME,
         password,
         ["SELECT MAX(number) FROM `continuous_writes`.`data`;"],
-        f"{app_name.replace('-', '_')}_database",
-    )
-    return output[0]
-
-
-async def get_postgresql_variable_value(
-    juju: Juju, app_name: str, unit_name: str, variable_name: str
-) -> str:
-    """Retrieve a database variable value as a string.
-
-    Args:
-        juju: The Juju model.
-        app_name: The application name.
-        unit_name: The unit name.
-        variable_name: The variable name.
-    """
-    password = get_user_password(juju, app_name, SERVER_CONFIG_USERNAME)
-
-    output = await execute_queries_on_unit(
-        get_unit_ip(juju, app_name, unit_name),
-        SERVER_CONFIG_USERNAME,
-        password,
-        [f"SELECT @@{variable_name};"],
-        f"{app_name.replace('-', '_')}_database",
+        "postgresql_test_app_database",
     )
     return output[0]
 
@@ -248,7 +225,7 @@ def wait_for_apps_status(jubilant_status_func: JujuAppsStatusFn, *apps: str) -> 
         Juju model status function.
     """
     return lambda status: all((
-        jubilant.all_agents_idle(status, *apps),
+        jubilant_backports.all_agents_idle(status, *apps),
         jubilant_status_func(status, *apps),
     ))
 

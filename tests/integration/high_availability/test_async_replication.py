@@ -6,17 +6,17 @@ import logging
 import time
 from collections.abc import Generator
 
-import jubilant
+import jubilant_backports
 import pytest
-from jubilant import Juju
+from jubilant_backports import Juju
 
 from .. import architecture
 from ..markers import juju3
 from .high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
-    get_postgresql_cluster_status,
-    get_postgresql_max_written_value,
+    get_db_cluster_status,
+    get_db_max_written_value,
     wait_for_apps_status,
 )
 
@@ -97,11 +97,11 @@ def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> No
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_1),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_1),
         timeout=15 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_2),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_2),
         timeout=15 * MINUTE_SECS,
     )
 
@@ -126,11 +126,11 @@ def test_async_relate(first_model: str, second_model: str) -> None:
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.any_blocked, POSTGRESQL_APP_1),
+        ready=wait_for_apps_status(jubilant_backports.any_blocked, POSTGRESQL_APP_1),
         timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.any_waiting, POSTGRESQL_APP_2),
+        ready=wait_for_apps_status(jubilant_backports.any_waiting, POSTGRESQL_APP_2),
         timeout=10 * MINUTE_SECS,
     )
 
@@ -157,7 +157,7 @@ def test_deploy_app(first_model: str) -> None:
     )
 
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_TEST_APP_NAME),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_TEST_APP_NAME),
         timeout=10 * MINUTE_SECS,
     )
 
@@ -179,11 +179,11 @@ def test_create_replication(first_model: str, second_model: str) -> None:
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_1),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_1),
         timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_2),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_2),
         timeout=10 * MINUTE_SECS,
     )
 
@@ -193,7 +193,7 @@ def test_create_replication(first_model: str, second_model: str) -> None:
 async def test_data_replication(first_model: str, second_model: str, continuous_writes) -> None:
     """Test to write to primary, and read the same data back from replicas."""
     logging.info("Testing data replication")
-    results = await get_postgresql_max_written_values(first_model, second_model)
+    results = await get_db_max_written_values(first_model, second_model)
 
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
@@ -215,12 +215,12 @@ async def test_standby_promotion(first_model: str, second_model: str, continuous
     )
     promotion_task.raise_on_failure()
 
-    results = await get_postgresql_max_written_values(first_model, second_model)
+    results = await get_db_max_written_values(first_model, second_model)
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 
-    cluster_set_status = get_postgresql_cluster_status(
+    cluster_set_status = get_db_cluster_status(
         juju=model_2,
         unit=model_2_postgresql_leader,
         cluster_set=True,
@@ -261,7 +261,7 @@ def test_failover(first_model: str, second_model: str) -> None:
         model_2.exec("sudo pkill -x postgres --signal SIGCONT", unit=unit_name)
 
     logging.info("Checking clusters statuses")
-    cluster_set_status = get_postgresql_cluster_status(
+    cluster_set_status = get_db_cluster_status(
         juju=model_1,
         unit=model_1_postgresql_leader,
         cluster_set=True,
@@ -291,7 +291,7 @@ async def test_rejoin_invalidated_cluster(
     )
     task.raise_on_failure()
 
-    results = await get_postgresql_max_written_values(first_model, second_model)
+    results = await get_db_max_written_values(first_model, second_model)
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
@@ -312,11 +312,11 @@ async def test_unrelate_and_relate(first_model: str, second_model: str, continuo
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_1),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_1),
         timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_blocked, POSTGRESQL_APP_2),
+        ready=wait_for_apps_status(jubilant_backports.all_blocked, POSTGRESQL_APP_2),
         timeout=10 * MINUTE_SECS,
     )
 
@@ -326,7 +326,7 @@ async def test_unrelate_and_relate(first_model: str, second_model: str, continuo
         f"{POSTGRESQL_APP_2}:replication",
     )
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.any_blocked, POSTGRESQL_APP_1),
+        ready=wait_for_apps_status(jubilant_backports.any_blocked, POSTGRESQL_APP_1),
         timeout=5 * MINUTE_SECS,
     )
 
@@ -340,21 +340,21 @@ async def test_unrelate_and_relate(first_model: str, second_model: str, continuo
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_1),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_1),
         timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_2),
+        ready=wait_for_apps_status(jubilant_backports.all_active, POSTGRESQL_APP_2),
         timeout=10 * MINUTE_SECS,
     )
 
-    results = await get_postgresql_max_written_values(first_model, second_model)
+    results = await get_db_max_written_values(first_model, second_model)
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 
 
-async def get_postgresql_max_written_values(first_model: str, second_model: str) -> list[int]:
+async def get_db_max_written_values(first_model: str, second_model: str) -> list[int]:
     """Return list with max written value from all units."""
     model_1 = Juju(model=first_model)
     model_2 = Juju(model=second_model)
@@ -370,16 +370,12 @@ async def get_postgresql_max_written_values(first_model: str, second_model: str)
 
     logging.info(f"Querying max value on all {POSTGRESQL_APP_1} units")
     for unit_name in get_app_units(model_1, POSTGRESQL_APP_1):
-        unit_max_value = await get_postgresql_max_written_value(
-            model_1, POSTGRESQL_APP_1, unit_name
-        )
+        unit_max_value = await get_db_max_written_value(model_1, POSTGRESQL_APP_1, unit_name)
         results.append(unit_max_value)
 
     logging.info(f"Querying max value on all {POSTGRESQL_APP_2} units")
     for unit_name in get_app_units(model_2, POSTGRESQL_APP_2):
-        unit_max_value = await get_postgresql_max_written_value(
-            model_2, POSTGRESQL_APP_2, unit_name
-        )
+        unit_max_value = await get_db_max_written_value(model_2, POSTGRESQL_APP_2, unit_name)
         results.append(unit_max_value)
 
     return results
