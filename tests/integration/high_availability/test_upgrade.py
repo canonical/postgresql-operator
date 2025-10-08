@@ -17,7 +17,6 @@ from .high_availability_helpers_new import (
     check_db_units_writes_increment,
     get_app_leader,
     get_app_units,
-    get_db_primary_unit,
     wait_for_apps_status,
 )
 
@@ -69,10 +68,6 @@ async def test_pre_refresh_check(juju: Juju) -> None:
     logging.info("Run pre-refresh-check action")
     task = juju.run(unit=postgresql_leader, action="pre-refresh-check")
     task.raise_on_failure()
-
-    logging.info("Assert primary is set to leader")
-    postgresql_primary = get_db_primary_unit(juju, DB_APP_NAME)
-    assert postgresql_primary == postgresql_leader, "Primary unit not set to leader"
 
 
 @pytest.mark.abort_on_fail

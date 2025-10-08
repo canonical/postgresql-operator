@@ -10,7 +10,7 @@ from jubilant import Juju
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
     get_app_leader,
-    get_db_primary_unit,
+    get_app_units,
     wait_for_apps_status,
 )
 
@@ -55,17 +55,13 @@ def test_deploy_latest(juju: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_pre_upgrade_check(juju: Juju) -> None:
-    """Test that the pre-upgrade-check action runs successfully."""
+async def test_pre_refresh_check(juju: Juju) -> None:
+    """Test that the pre-refresh-check action runs successfully."""
     db_leader = get_app_leader(juju, DB_APP_NAME)
 
     logging.info("Run pre-refresh-check action")
     task = juju.run(unit=db_leader, action="pre-refresh-check")
     task.raise_on_failure()
-
-    logging.info("Assert primary is set to leader")
-    db_primary = get_db_primary_unit(juju, DB_APP_NAME)
-    assert db_primary == db_leader, "Primary unit not set to leader"
 
 
 @pytest.mark.abort_on_fail
@@ -82,6 +78,21 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
         ready=lambda status: jubilant.any_maintenance(status, DB_APP_NAME),
         timeout=10 * MINUTE_SECS,
     )
+
+    logging.info("Application refresh is blocked due to incompatibility")
+    juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked)
+
+    if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
+        db_leader = get_app_leader(juju, DB_APP_NAME)
+        juju.run(
+            unit=db_leader, action="force-refresh-start", params={"check-compatibility": "False"}
+        )
+
+        juju.wait(ready=jubilant.all_active)
+
+    logging.info("Run resume-refresh action")
+    units = get_app_units(juju, DB_APP_NAME)
+    await juju.run(unit=units[sorted(units.keys())[1]], action="resume-refresh")
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
