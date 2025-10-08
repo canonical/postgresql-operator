@@ -1,0 +1,185 @@
+# Copyright 2023 Canonical Ltd.
+# See LICENSE file for licensing details.
+
+import logging
+import platform
+import shutil
+import zipfile
+from pathlib import Path
+
+import jubilant
+import pytest
+import tomli
+import tomli_w
+from jubilant import Juju
+
+from .high_availability_helpers_new import (
+    check_postgresql_units_writes_increment,
+    get_app_leader,
+    get_app_units,
+    get_postgresql_primary_unit,
+    get_postgresql_variable_value,
+    wait_for_apps_status,
+)
+
+POSTGRESQL_APP_NAME = "postgresql"
+POSTGRESQL_TEST_APP_NAME = "postgresql-test-app"
+
+MINUTE_SECS = 60
+
+logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
+
+
+@pytest.mark.abort_on_fail
+def test_deploy_latest(juju: Juju) -> None:
+    """Simple test to ensure that the PostgreSQL and application charms get deployed."""
+    logging.info("Deploying PostgreSQL cluster")
+    juju.deploy(
+        charm=POSTGRESQL_APP_NAME,
+        app=POSTGRESQL_APP_NAME,
+        base="ubuntu@24.04",
+        channel="16/edge",
+        config={"profile": "testing"},
+        num_units=3,
+    )
+    juju.deploy(
+        charm=POSTGRESQL_TEST_APP_NAME,
+        app=POSTGRESQL_TEST_APP_NAME,
+        base="ubuntu@22.04",
+        channel="latest/edge",
+        num_units=1,
+    )
+
+    juju.integrate(
+        f"{POSTGRESQL_APP_NAME}:database",
+        f"{POSTGRESQL_TEST_APP_NAME}:database",
+    )
+
+    logging.info("Wait for applications to become active")
+    juju.wait(
+        ready=wait_for_apps_status(
+            jubilant.all_active, POSTGRESQL_APP_NAME, POSTGRESQL_TEST_APP_NAME
+        ),
+        timeout=20 * MINUTE_SECS,
+    )
+
+
+@pytest.mark.abort_on_fail
+async def test_pre_refresh_check(juju: Juju) -> None:
+    """Test that the pre-refresh-check action runs successfully."""
+    postgresql_leader = get_app_leader(juju, POSTGRESQL_APP_NAME)
+    postgresql_units = get_app_units(juju, POSTGRESQL_APP_NAME)
+
+    logging.info("Run pre-refresh-check action")
+    task = juju.run(unit=postgresql_leader, action="pre-refresh-check")
+    task.raise_on_failure()
+
+    logging.info("Assert slow shutdown is enabled")
+    for unit_name in postgresql_units:
+        value = await get_postgresql_variable_value(
+            juju, POSTGRESQL_APP_NAME, unit_name, "innodb_fast_shutdown"
+        )
+        assert value == 0
+
+    logging.info("Assert primary is set to leader")
+    postgresql_primary = get_postgresql_primary_unit(juju, POSTGRESQL_APP_NAME)
+    assert postgresql_primary == postgresql_leader, "Primary unit not set to leader"
+
+
+@pytest.mark.abort_on_fail
+async def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
+    """Update the second cluster."""
+    logging.info("Ensure continuous writes are incrementing")
+    await check_postgresql_units_writes_increment(juju, POSTGRESQL_APP_NAME)
+
+    logging.info("Refresh the charm")
+    juju.refresh(app=POSTGRESQL_APP_NAME, path=charm)
+
+    logging.info("Wait for upgrade to start")
+    juju.wait(
+        ready=lambda status: jubilant.any_maintenance(status, POSTGRESQL_APP_NAME),
+        timeout=10 * MINUTE_SECS,
+    )
+
+    logging.info("Wait for upgrade to complete")
+    juju.wait(
+        ready=lambda status: jubilant.all_active(status, POSTGRESQL_APP_NAME),
+        timeout=20 * MINUTE_SECS,
+    )
+
+    logging.info("Ensure continuous writes are incrementing")
+    await check_postgresql_units_writes_increment(juju, POSTGRESQL_APP_NAME)
+
+
+@pytest.mark.abort_on_fail
+async def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> None:
+    """Test an upgrade failure and its rollback."""
+    postgresql_app_leader = get_app_leader(juju, POSTGRESQL_APP_NAME)
+    postgresql_app_units = get_app_units(juju, POSTGRESQL_APP_NAME)
+
+    logging.info("Run pre-refresh-check action")
+    task = juju.run(unit=postgresql_app_leader, action="pre-refresh-check")
+    task.raise_on_failure()
+
+    tmp_folder = Path("tmp")
+    tmp_folder.mkdir(exist_ok=True)
+    tmp_folder_charm = Path(tmp_folder, charm).absolute()
+
+    shutil.copy(charm, tmp_folder_charm)
+
+    logging.info("Inject dependency fault")
+    inject_dependency_fault(juju, POSTGRESQL_APP_NAME, tmp_folder_charm)
+
+    logging.info("Refresh the charm")
+    juju.refresh(app=POSTGRESQL_APP_NAME, path=tmp_folder_charm)
+
+    logging.info("Wait for upgrade to fail on leader")
+    juju.wait(
+        ready=wait_for_apps_status(jubilant.any_blocked, POSTGRESQL_APP_NAME),
+        timeout=10 * MINUTE_SECS,
+    )
+
+    logging.info("Ensure continuous writes on all units")
+    await check_postgresql_units_writes_increment(
+        juju, POSTGRESQL_APP_NAME, list(postgresql_app_units)
+    )
+
+    logging.info("Re-run pre-refresh-check action")
+    task = juju.run(unit=postgresql_app_leader, action="pre-refresh-check")
+    task.raise_on_failure()
+
+    logging.info("Re-refresh the charm")
+    juju.refresh(app=POSTGRESQL_APP_NAME, path=charm)
+
+    logging.info("Wait for upgrade to start")
+    juju.wait(
+        ready=lambda status: jubilant.any_maintenance(status, POSTGRESQL_APP_NAME),
+        timeout=10 * MINUTE_SECS,
+    )
+
+    logging.info("Wait for upgrade to complete")
+    juju.wait(
+        ready=lambda status: jubilant.all_active(status, POSTGRESQL_APP_NAME),
+        timeout=20 * MINUTE_SECS,
+    )
+
+    logging.info("Ensure continuous writes after rollback procedure")
+    await check_postgresql_units_writes_increment(
+        juju, POSTGRESQL_APP_NAME, list(postgresql_app_units)
+    )
+
+    # Remove fault charm file
+    tmp_folder_charm.unlink()
+
+
+def inject_dependency_fault(juju: Juju, app_name: str, charm_file: str | Path) -> None:
+    """Inject a dependency fault into the PostgreSQL charm."""
+    with Path("refresh_versions.toml").open("rb") as file:
+        versions = tomli.load(file)
+
+    versions["charm"] = "16/0.0.0"
+    versions["snap"]["revisions"][platform.machine()] = "1"
+
+    # Overwrite refresh_versions.toml with incompatible version.
+    with zipfile.ZipFile(charm_file, mode="a") as charm_zip:
+        charm_zip.writestr("refresh_versions.toml", tomli_w.dumps(versions))

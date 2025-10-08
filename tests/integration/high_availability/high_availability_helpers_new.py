@@ -209,6 +209,7 @@ async def get_postgresql_max_written_value(juju: Juju, app_name: str, unit_name:
         SERVER_CONFIG_USERNAME,
         password,
         ["SELECT MAX(number) FROM `continuous_writes`.`data`;"],
+        f"{app_name.replace('-', '_')}_database",
     )
     return output[0]
 
@@ -231,6 +232,7 @@ async def get_postgresql_variable_value(
         SERVER_CONFIG_USERNAME,
         password,
         [f"SELECT @@{variable_name};"],
+        f"{app_name.replace('-', '_')}_database",
     )
     return output[0]
 

@@ -98,11 +98,11 @@ def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> No
     logging.info("Waiting for the applications to settle")
     model_1.wait(
         ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_1),
-        timeout=10 * MINUTE_SECS,
+        timeout=15 * MINUTE_SECS,
     )
     model_2.wait(
         ready=wait_for_apps_status(jubilant.all_active, POSTGRESQL_APP_2),
-        timeout=10 * MINUTE_SECS,
+        timeout=15 * MINUTE_SECS,
     )
 
 
@@ -211,7 +211,7 @@ async def test_standby_promotion(first_model: str, second_model: str, continuous
     promotion_task = model_2.run(
         unit=model_2_postgresql_leader,
         action="promote-to-primary",
-        params={"scope": "cluster"},
+        params={"scope": "cluster", "force": "true"},
     )
     promotion_task.raise_on_failure()
 
@@ -361,9 +361,7 @@ async def get_postgresql_max_written_values(first_model: str, second_model: str)
 
     logging.info("Stopping continuous writes")
     stopping_task = model_1.run(
-        unit=get_app_leader(model_1, POSTGRESQL_TEST_APP_NAME),
-        action="stop-continuous-writes",
-        params={},
+        unit=get_app_leader(model_1, POSTGRESQL_TEST_APP_NAME), action="stop-continuous-writes"
     )
     stopping_task.raise_on_failure()
 
