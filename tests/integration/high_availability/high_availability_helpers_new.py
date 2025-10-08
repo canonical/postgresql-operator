@@ -186,7 +186,7 @@ async def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) ->
         get_unit_ip(juju, app_name, unit_name),
         SERVER_CONFIG_USERNAME,
         password,
-        ["SELECT MAX(number) FROM `continuous_writes`.`data`;"],
+        ["SELECT COUNT(number) FROM continuous_writes;"],
         "postgresql_test_app_database",
     )
     return output[0]
