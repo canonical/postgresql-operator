@@ -7,11 +7,11 @@ import shutil
 import zipfile
 from pathlib import Path
 
-import jubilant_backports
+import jubilant
 import pytest
 import tomli
 import tomli_w
-from jubilant_backports import Juju
+from jubilant import Juju
 
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
@@ -56,7 +56,7 @@ def test_deploy_latest(juju: Juju) -> None:
 
     logging.info("Wait for applications to become active")
     juju.wait(
-        ready=wait_for_apps_status(jubilant_backports.all_active, DB_APP_NAME, DB_TEST_APP_NAME),
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME, DB_TEST_APP_NAME),
         timeout=20 * MINUTE_SECS,
     )
 
@@ -86,13 +86,13 @@ async def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> N
 
     logging.info("Wait for upgrade to start")
     juju.wait(
-        ready=lambda status: jubilant_backports.any_maintenance(status, DB_APP_NAME),
+        ready=lambda status: jubilant.any_maintenance(status, DB_APP_NAME),
         timeout=10 * MINUTE_SECS,
     )
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
-        ready=lambda status: jubilant_backports.all_active(status, DB_APP_NAME),
+        ready=lambda status: jubilant.all_active(status, DB_APP_NAME),
         timeout=20 * MINUTE_SECS,
     )
 
@@ -124,7 +124,7 @@ async def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> N
 
     logging.info("Wait for upgrade to fail on leader")
     juju.wait(
-        ready=wait_for_apps_status(jubilant_backports.any_blocked, DB_APP_NAME),
+        ready=wait_for_apps_status(jubilant.any_blocked, DB_APP_NAME),
         timeout=10 * MINUTE_SECS,
     )
 
@@ -140,13 +140,13 @@ async def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> N
 
     logging.info("Wait for upgrade to start")
     juju.wait(
-        ready=lambda status: jubilant_backports.any_maintenance(status, DB_APP_NAME),
+        ready=lambda status: jubilant.any_maintenance(status, DB_APP_NAME),
         timeout=10 * MINUTE_SECS,
     )
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
-        ready=lambda status: jubilant_backports.all_active(status, DB_APP_NAME),
+        ready=lambda status: jubilant.all_active(status, DB_APP_NAME),
         timeout=20 * MINUTE_SECS,
     )
 
