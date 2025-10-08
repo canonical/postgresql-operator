@@ -92,7 +92,7 @@ async def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> N
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
-        ready=lambda status: jubilant.all_active(status, DB_APP_NAME),
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
         timeout=20 * MINUTE_SECS,
     )
 

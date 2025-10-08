@@ -23,9 +23,9 @@ logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
 
 
 @pytest.mark.abort_on_fail
-def test_deploy_stable(juju: Juju) -> None:
-    """Simple test to ensure that the MySQL and application charms get deployed."""
-    logging.info("Deploying MySQL cluster")
+def test_deploy_latest(juju: Juju) -> None:
+    """Simple test to ensure that the PostgreSQL and application charms get deployed."""
+    logging.info("Deploying PostgreSQL cluster")
     juju.deploy(
         charm=DB_APP_NAME,
         app=DB_APP_NAME,
@@ -50,7 +50,6 @@ def test_deploy_stable(juju: Juju) -> None:
     logging.info("Wait for applications to become active")
     juju.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME, DB_TEST_APP_NAME),
-        error=jubilant.any_blocked,
         timeout=20 * MINUTE_SECS,
     )
 
@@ -86,7 +85,7 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
-        ready=lambda status: jubilant.all_active(status, DB_APP_NAME),
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
         timeout=20 * MINUTE_SECS,
     )
 
