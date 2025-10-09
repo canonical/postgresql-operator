@@ -19,12 +19,15 @@ def continuous_writes(juju):
     application_unit = get_app_leader(juju, DB_TEST_APP_NAME)
 
     logger.info("Clearing continuous writes")
-    juju.run(unit=application_unit, action="clear-continuous-writes", wait=120)
+    result = juju.run(unit=application_unit, action="clear-continuous-writes", wait=120)
+    result.raise_on_failure()
 
     logger.info("Starting continuous writes")
-    juju.run(unit=application_unit, action="start-continuous-writes")
+    result = juju.run(unit=application_unit, action="start-continuous-writes")
+    result.raise_on_failure()
 
     yield
 
     logger.info("Clearing continuous writes")
-    juju.run(unit=application_unit, action="clear-continuous-writes", wait=120)
+    result = juju.run(unit=application_unit, action="clear-continuous-writes", wait=120)
+    result.raise_on_failure()

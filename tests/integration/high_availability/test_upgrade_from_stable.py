@@ -76,17 +76,20 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
     logging.info("Application refresh is blocked due to incompatibility")
     juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked)
 
+    units = get_app_units(juju, DB_APP_NAME)
+    unit_names = sorted(units.keys())
+
     if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
-        db_leader = get_app_leader(juju, DB_APP_NAME)
         juju.run(
-            unit=db_leader, action="force-refresh-start", params={"check-compatibility": False}
+            unit=units[unit_names[-1]],
+            action="force-refresh-start",
+            params={"check-compatibility": False},
         )
 
         juju.wait(ready=jubilant.all_active)
 
     logging.info("Run resume-refresh action")
-    units = get_app_units(juju, DB_APP_NAME)
-    await juju.run(unit=units[sorted(units.keys())[1]], action="resume-refresh")
+    juju.run(unit=units[unit_names[1]], action="resume-refresh")
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
