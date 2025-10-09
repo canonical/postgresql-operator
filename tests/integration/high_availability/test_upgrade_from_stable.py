@@ -79,7 +79,7 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
     if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
         db_leader = get_app_leader(juju, DB_APP_NAME)
         juju.run(
-            unit=db_leader, action="force-refresh-start", params={"check-compatibility": "False"}
+            unit=db_leader, action="force-refresh-start", params={"check-compatibility": False}
         )
 
         juju.wait(ready=jubilant.all_active)
