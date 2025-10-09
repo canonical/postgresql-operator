@@ -1027,7 +1027,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
                 return False
             if ip_to_remove in self.members_ips:
                 self._remove_from_members_ips(ip_to_remove)
-        self._add_members(event)
+        try:
+            self._add_members(event)
+        except Exception:
+            logger.debug("Deferring on_peer_relation_changed: Unable to add members")
+            return False
         return True
 
     def _update_member_ip(self) -> bool:

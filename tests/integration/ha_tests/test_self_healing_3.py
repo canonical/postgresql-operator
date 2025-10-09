@@ -7,6 +7,7 @@ import pytest
 from pytest_operator.plugin import OpsTest
 from tenacity import Retrying, stop_after_delay, wait_fixed
 
+from .. import markers
 from ..helpers import (
     APPLICATION_NAME,
     CHARM_BASE,
@@ -162,6 +163,7 @@ async def test_forceful_restart_without_data_and_transaction_logs(
 
 
 @pytest.mark.abort_on_fail
+@markers.amd64_only
 async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_timeout):
     """Completely cut and restore network."""
     # Locate primary unit.
@@ -250,6 +252,7 @@ async def test_network_cut(ops_test: OpsTest, continuous_writes, primary_start_t
 
 
 @pytest.mark.abort_on_fail
+@markers.amd64_only
 async def test_network_cut_without_ip_change(
     ops_test: OpsTest, continuous_writes, primary_start_timeout
 ):
