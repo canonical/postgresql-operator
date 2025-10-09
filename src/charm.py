@@ -50,6 +50,7 @@ from ops import (
     RelationEvent,
     SecretChangedEvent,
     SecretNotFoundError,
+    SecretRemoveEvent,
     StartEvent,
     Unit,
     WaitingStatus,
@@ -316,6 +317,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.start, self._on_start)
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.secret_remove, self._on_secret_remove)
         self.framework.observe(self.on.collect_unit_status, self._reconcile_refresh_status)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
@@ -662,6 +664,17 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return None
         else:
             return primary_endpoint
+
+    def _on_secret_remove(self, event: SecretRemoveEvent) -> None:
+        # A secret removal (entire removal, not just a revision removal) causes
+        # https://github.com/juju/juju/issues/20794. This check is to avoid the
+        # errors that would happen if we tried to remove the revision in that case
+        # (in the revision removal, the label is present).
+        if event.secret.label is None:
+            logger.debug("Secret with no label cannot be removed")
+            return
+        logger.debug(f"Removing secret with label {event.secret.label} revision {event.revision}")
+        event.remove_revision()
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
