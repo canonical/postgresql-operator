@@ -1436,7 +1436,7 @@ async def backup_operations(
 ### Ported Mysql jubilant helpers
 
 
-async def execute_queries_on_unit(
+def execute_queries_on_unit(
     unit_address: str,
     username: str,
     password: str,

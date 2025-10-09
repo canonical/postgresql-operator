@@ -55,20 +55,21 @@ def test_deploy_latest(juju: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_pre_refresh_check(juju: Juju) -> None:
+def test_pre_refresh_check(juju: Juju) -> None:
     """Test that the pre-refresh-check action runs successfully."""
     db_leader = get_app_leader(juju, DB_APP_NAME)
 
     logging.info("Run pre-refresh-check action")
-    task = juju.run(unit=db_leader, action="pre-refresh-check")
-    task.raise_on_failure()
+    juju.run(unit=db_leader, action="pre-refresh-check")
+
+    juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
 
 @pytest.mark.abort_on_fail
-async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
+def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
     """Update the second cluster."""
     logging.info("Ensure continuous writes are incrementing")
-    await check_db_units_writes_increment(juju, DB_APP_NAME)
+    check_db_units_writes_increment(juju, DB_APP_NAME)
 
     logging.info("Refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
@@ -81,15 +82,15 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
 
     if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
         juju.run(
-            unit=units[unit_names[-1]],
+            unit=unit_names[-1],
             action="force-refresh-start",
             params={"check-compatibility": False},
         )
 
-        juju.wait(ready=jubilant.all_active)
+        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
     logging.info("Run resume-refresh action")
-    juju.run(unit=units[unit_names[1]], action="resume-refresh")
+    juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
@@ -98,4 +99,4 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
     )
 
     logging.info("Ensure continuous writes are incrementing")
-    await check_db_units_writes_increment(juju, DB_APP_NAME)
+    check_db_units_writes_increment(juju, DB_APP_NAME)

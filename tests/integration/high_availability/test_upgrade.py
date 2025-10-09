@@ -61,7 +61,7 @@ def test_deploy_latest(juju: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_pre_refresh_check(juju: Juju) -> None:
+def test_pre_refresh_check(juju: Juju) -> None:
     """Test that the pre-refresh-check action runs successfully."""
     postgresql_leader = get_app_leader(juju, DB_APP_NAME)
 
@@ -71,10 +71,10 @@ async def test_pre_refresh_check(juju: Juju) -> None:
 
 
 @pytest.mark.abort_on_fail
-async def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
+def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
     """Update the second cluster."""
     logging.info("Ensure continuous writes are incrementing")
-    await check_db_units_writes_increment(juju, DB_APP_NAME)
+    check_db_units_writes_increment(juju, DB_APP_NAME)
 
     logging.info("Refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
@@ -92,11 +92,11 @@ async def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> N
     )
 
     logging.info("Ensure continuous writes are incrementing")
-    await check_db_units_writes_increment(juju, DB_APP_NAME)
+    check_db_units_writes_increment(juju, DB_APP_NAME)
 
 
 @pytest.mark.abort_on_fail
-async def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> None:
+def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> None:
     """Test an upgrade failure and its rollback."""
     db_app_leader = get_app_leader(juju, DB_APP_NAME)
     db_app_units = get_app_units(juju, DB_APP_NAME)
@@ -124,7 +124,7 @@ async def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> N
     )
 
     logging.info("Ensure continuous writes on all units")
-    await check_db_units_writes_increment(juju, DB_APP_NAME, list(db_app_units))
+    check_db_units_writes_increment(juju, DB_APP_NAME, list(db_app_units))
 
     logging.info("Re-run pre-refresh-check action")
     task = juju.run(unit=db_app_leader, action="pre-refresh-check")
@@ -146,7 +146,7 @@ async def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> N
     )
 
     logging.info("Ensure continuous writes after rollback procedure")
-    await check_db_units_writes_increment(juju, DB_APP_NAME, list(db_app_units))
+    check_db_units_writes_increment(juju, DB_APP_NAME, list(db_app_units))
 
     # Remove fault charm file
     tmp_folder_charm.unlink()

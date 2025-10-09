@@ -22,7 +22,7 @@ JujuModelStatusFn = Callable[[Status], bool]
 JujuAppsStatusFn = Callable[[Status, str], bool]
 
 
-async def check_db_units_writes_increment(
+def check_db_units_writes_increment(
     juju: Juju, app_name: str, app_units: list[str] | None = None
 ) -> None:
     """Ensure that continuous writes is incrementing on all units.
@@ -34,7 +34,7 @@ async def check_db_units_writes_increment(
         app_units = get_app_units(juju, app_name)
 
     app_primary = get_db_primary_unit(juju, app_name)
-    app_max_value = await get_db_max_written_value(juju, app_name, app_primary)
+    app_max_value = get_db_max_written_value(juju, app_name, app_primary)
 
     juju.model_config({"update-status-hook-interval": "15s"})
     for unit_name in app_units:
@@ -44,7 +44,7 @@ async def check_db_units_writes_increment(
             wait=wait_fixed(10),
         ):
             with attempt:
-                unit_max_value = await get_db_max_written_value(juju, app_name, unit_name)
+                unit_max_value = get_db_max_written_value(juju, app_name, unit_name)
                 assert unit_max_value > app_max_value, "Writes not incrementing"
                 app_max_value = unit_max_value
 
@@ -172,7 +172,7 @@ def get_db_primary_unit(juju: Juju, app_name: str) -> str:
     raise Exception("No primary node found")
 
 
-async def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
+def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
     """Retrieve the max written value in the MySQL database.
 
     Args:
@@ -182,7 +182,7 @@ async def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) ->
     """
     password = get_user_password(juju, app_name, SERVER_CONFIG_USERNAME)
 
-    output = await execute_queries_on_unit(
+    output = execute_queries_on_unit(
         get_unit_ip(juju, app_name, unit_name),
         SERVER_CONFIG_USERNAME,
         password,
