@@ -73,12 +73,6 @@ async def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) ->
     logging.info("Refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
 
-    logging.info("Wait for upgrade to start")
-    juju.wait(
-        ready=lambda status: jubilant.any_maintenance(status, DB_APP_NAME),
-        timeout=10 * MINUTE_SECS,
-    )
-
     logging.info("Application refresh is blocked due to incompatibility")
     juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked)
 
