@@ -66,6 +66,7 @@ def test_database(juju: jubilant.Juju, predefined_roles) -> None:
     """Check that an invalid database name makes the database charm block."""
     del predefined_roles[""]
     invalid_database_names = [
+        "databases",
         "postgres",
         "template0",
         "template1",
