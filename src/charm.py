@@ -444,7 +444,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # (in the revision removal, the label is present).
         if self.model.juju_version < JujuVersion("3.6.11"):
             logger.warning(
-                f"Skipping secret revision with label {event.secret.label} revision {event.revision} due to https://github.com/juju/juju/issues/20782"
+                "Skipping secret revision removal due to https://github.com/juju/juju/issues/20782"
             )
             return
 
