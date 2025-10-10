@@ -105,19 +105,11 @@ def juju(request: pytest.FixtureRequest):
 
     This adds command line parameter ``--keep-models`` (see help for details).
     """
-    controller = request.config.getoption("--controller")
     model = request.config.getoption("--model")
-    controller_and_model = None
-    if controller and model:
-        controller_and_model = f"{controller}:{model}"
-    elif controller:
-        controller_and_model = controller
-    elif model:
-        controller_and_model = model
     keep_models = bool(request.config.getoption("--keep-models"))
 
-    if controller_and_model:
-        juju = jubilant.Juju(model=controller_and_model)  # type: ignore
+    if model:
+        juju = jubilant.Juju(model=model)
         yield juju
         log = juju.debug_log(limit=1000)
     else:
