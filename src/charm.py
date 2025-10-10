@@ -438,19 +438,20 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         return self._unit_ip
 
     def _on_secret_remove(self, event: SecretRemoveEvent) -> None:
-        # A secret removal (entire removal, not just a revision removal) causes
-        # https://github.com/juju/juju/issues/20794. This check is to avoid the
-        # errors that would happen if we tried to remove the revision in that case
-        # (in the revision removal, the label is present).
         if self.model.juju_version < JujuVersion("3.6.11"):
             logger.warning(
                 "Skipping secret revision removal due to https://github.com/juju/juju/issues/20782"
             )
             return
 
+        # A secret removal (entire removal, not just a revision removal) causes
+        # https://github.com/juju/juju/issues/20794. This check is to avoid the
+        # errors that would happen if we tried to remove the revision in that case
+        # (in the revision removal, the label is present).
         if event.secret.label is None:
             logger.debug("Secret with no label cannot be removed")
             return
+
         logger.debug(f"Removing secret with label {event.secret.label} revision {event.revision}")
         event.remove_revision()
 
