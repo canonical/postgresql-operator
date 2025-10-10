@@ -4,7 +4,9 @@ A Charmed PostgreSQL backup can be stored on any S3-compatible storage. S3 acces
 
 This guide will teach you how to deploy and configure the s3-integrator charm for [AWS S3](https://aws.amazon.com/s3/), send the configurations to the Charmed PostgreSQL application, and update it. (To configure S3 for RadosGW, see [this guide](/how-to/back-up-and-restore/configure-s3-radosgw))
 
+(configure-s3-integrator-aws)=
 ## Configure s3-integrator
+
 First, deploy and run the charm:
 ```text
 juju deploy s3-integrator
@@ -29,6 +31,7 @@ See [this post](https://repost.aws/knowledge-center/s3-http-307-response) for mo
 ```
 
 ## Integrate with Charmed PostgreSQL
+
 To pass these configurations to Charmed PostgreSQL, integrate the two applications:
 ```text
 juju integrate s3-integrator postgresql

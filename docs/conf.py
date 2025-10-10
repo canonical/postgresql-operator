@@ -166,6 +166,11 @@ html_theme_options = {
 'source_edit_link': 'https://github.com/canonical/postgresql-operator',
 }
 
+# Syntax highlighting settings
+
+highlight_language = "none" # default
+pygments_style = "autumn" # see https://pygments.org/styles for more
+
 # Project slug; see https://meta.discourse.org/t/what-is-category-slug/87897
 #
 # TODO: If your documentation is hosted on https://docs.ubuntu.com/,
