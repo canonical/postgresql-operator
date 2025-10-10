@@ -63,11 +63,12 @@ def test_deploy_latest(juju: Juju) -> None:
 @pytest.mark.abort_on_fail
 def test_pre_refresh_check(juju: Juju) -> None:
     """Test that the pre-refresh-check action runs successfully."""
-    postgresql_leader = get_app_leader(juju, DB_APP_NAME)
+    db_leader = get_app_leader(juju, DB_APP_NAME)
 
     logging.info("Run pre-refresh-check action")
-    task = juju.run(unit=postgresql_leader, action="pre-refresh-check")
-    task.raise_on_failure()
+    juju.run(unit=db_leader, action="pre-refresh-check")
+
+    juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
 
 @pytest.mark.abort_on_fail
@@ -79,11 +80,24 @@ def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
     logging.info("Refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
 
-    logging.info("Wait for upgrade to start")
-    juju.wait(
-        ready=lambda status: jubilant.any_maintenance(status, DB_APP_NAME),
-        timeout=10 * MINUTE_SECS,
-    )
+    logging.info("Application refresh is blocked due to incompatibility")
+    juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked)
+
+    units = get_app_units(juju, DB_APP_NAME)
+    unit_names = sorted(units.keys())
+
+    if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
+        juju.run(
+            unit=unit_names[-1],
+            action="force-refresh-start",
+            params={"check-compatibility": False},
+            wait=5 * MINUTE_SECS,
+        )
+
+        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+
+    logging.info("Run resume-refresh action")
+    juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
 
     logging.info("Wait for upgrade to complete")
     juju.wait(

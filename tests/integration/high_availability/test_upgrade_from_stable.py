@@ -23,7 +23,7 @@ logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
 
 
 @pytest.mark.abort_on_fail
-def test_deploy_latest(juju: Juju) -> None:
+def test_deploy_stable(juju: Juju) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
     logging.info("Deploying PostgreSQL cluster")
     juju.deploy(
@@ -85,6 +85,7 @@ def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
             unit=unit_names[-1],
             action="force-refresh-start",
             params={"check-compatibility": False},
+            wait=5 * MINUTE_SECS,
         )
 
         juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
