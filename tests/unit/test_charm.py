@@ -15,7 +15,7 @@ import psycopg2
 import pytest
 import tomli
 from charms.operator_libs_linux.v2 import snap
-from ops import RelationEvent, Unit
+from ops import JujuVersion, RelationEvent, Unit
 from ops.framework import EventBase
 from ops.model import (
     ActiveStatus,
@@ -2764,12 +2764,24 @@ def test_relations_user_databases_map(harness):
 
 
 def test_on_secret_remove(harness):
-    event = Mock()
-    harness.charm._on_secret_remove(event)
-    event.remove_revision.assert_called_once_with()
-    event.reset_mock()
+    with (
+        patch("ops.model.Model.juju_version", new_callable=PropertyMock) as _juju_version,
+    ):
+        event = Mock()
 
-    # No secret
-    event.secret.label = None
-    harness.charm._on_secret_remove(event)
-    assert not event.remove_revision.called
+        # New juju
+        _juju_version.return_value = JujuVersion("3.6.11")
+        harness.charm._on_secret_remove(event)
+        event.remove_revision.assert_called_once_with()
+        event.reset_mock()
+
+        # Old juju
+        _juju_version.return_value = JujuVersion("3.6.9")
+        harness.charm._on_secret_remove(event)
+        assert not event.remove_revision.called
+        event.reset_mock()
+
+        # No secret
+        event.secret.label = None
+        harness.charm._on_secret_remove(event)
+        assert not event.remove_revision.called
