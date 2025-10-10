@@ -5,6 +5,10 @@
 import logging
 
 import pytest
+from tenacity import (
+    Retrying,
+    stop_after_attempt,
+)
 
 from .high_availability_helpers_new import get_app_leader
 
@@ -23,8 +27,13 @@ def continuous_writes(juju):
     result.raise_on_failure()
 
     logger.info("Starting continuous writes")
-    result = juju.run(unit=application_unit, action="start-continuous-writes")
-    result.raise_on_failure()
+
+    for attempt in Retrying(stop=stop_after_attempt(10), reraise=True):
+        with attempt:
+            result = juju.run(unit=application_unit, action="start-continuous-writes")
+            result.raise_on_failure()
+
+            assert result.results["result"] == "True"
 
     yield
 
