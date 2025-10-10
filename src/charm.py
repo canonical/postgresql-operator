@@ -39,7 +39,7 @@ from charms.postgresql_k8s.v0.postgresql import (
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from ops import main
+from ops import JujuVersion, main
 from ops.charm import (
     ActionEvent,
     HookEvent,
@@ -442,6 +442,12 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # https://github.com/juju/juju/issues/20794. This check is to avoid the
         # errors that would happen if we tried to remove the revision in that case
         # (in the revision removal, the label is present).
+        if self.model.juju_version < JujuVersion("3.6.11"):
+            logger.warning(
+                f"Skipping secret revision with label {event.secret.label} revision {event.revision} due to https://github.com/juju/juju/issues/20782"
+            )
+            return
+
         if event.secret.label is None:
             logger.debug("Secret with no label cannot be removed")
             return
