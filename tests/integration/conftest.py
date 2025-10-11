@@ -111,14 +111,9 @@ def juju(request: pytest.FixtureRequest):
     if model:
         juju = jubilant.Juju(model=model)
         yield juju
-        log = juju.debug_log(limit=1000)
     else:
         with jubilant.temp_model(keep=keep_models) as juju:
             yield juju
-            log = juju.debug_log(limit=1000)
-
-    if request.session.testsfailed:
-        print(log, end="")
 
 
 @pytest.fixture(scope="module")

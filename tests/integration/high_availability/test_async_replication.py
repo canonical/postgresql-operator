@@ -69,7 +69,6 @@ def continuous_writes(first_model: str) -> Generator:
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> None:
     """Simple test to ensure that the MySQL application charms get deployed."""
     configuration = {"profile": "testing"}
@@ -107,7 +106,6 @@ def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> No
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_async_relate(first_model: str, second_model: str) -> None:
     """Relate the two MySQL clusters."""
     logging.info("Creating offers in first model")
@@ -136,7 +134,6 @@ def test_async_relate(first_model: str, second_model: str) -> None:
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_deploy_app(first_model: str) -> None:
     """Deploy the router and the test application."""
     logging.info("Deploying test application")
@@ -163,7 +160,6 @@ def test_deploy_app(first_model: str) -> None:
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_create_replication(first_model: str, second_model: str) -> None:
     """Run the create-replication action and wait for the applications to settle."""
     model_1 = Juju(model=first_model)
@@ -189,7 +185,6 @@ def test_create_replication(first_model: str, second_model: str) -> None:
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_data_replication(first_model: str, second_model: str, continuous_writes) -> None:
     """Test to write to primary, and read the same data back from replicas."""
     logging.info("Testing data replication")
@@ -201,7 +196,6 @@ def test_data_replication(first_model: str, second_model: str, continuous_writes
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_standby_promotion(first_model: str, second_model: str, continuous_writes) -> None:
     """Test graceful promotion of a standby cluster to primary."""
     model_2 = Juju(model=second_model)
@@ -232,7 +226,6 @@ def test_standby_promotion(first_model: str, second_model: str, continuous_write
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_failover(first_model: str, second_model: str) -> None:
     """Test switchover on primary cluster fail."""
     logging.info("Freezing postgres on primary cluster units")
@@ -276,7 +269,6 @@ def test_failover(first_model: str, second_model: str) -> None:
 
 
 @juju3
-@pytest.mark.abort_on_fail
 def test_rejoin_invalidated_cluster(
     first_model: str, second_model: str, continuous_writes
 ) -> None:

@@ -4,11 +4,11 @@
 import logging
 
 import jubilant
-import pytest
 from jubilant import Juju
 
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
+    count_switchovers,
     get_app_leader,
     get_app_units,
     wait_for_apps_status,
@@ -22,7 +22,6 @@ MINUTE_SECS = 60
 logging.getLogger("jubilant.wait").setLevel(logging.WARNING)
 
 
-@pytest.mark.abort_on_fail
 def test_deploy_stable(juju: Juju) -> None:
     """Simple test to ensure that the PostgreSQL and application charms get deployed."""
     logging.info("Deploying PostgreSQL cluster")
@@ -54,7 +53,6 @@ def test_deploy_stable(juju: Juju) -> None:
     )
 
 
-@pytest.mark.abort_on_fail
 def test_pre_refresh_check(juju: Juju) -> None:
     """Test that the pre-refresh-check action runs successfully."""
     db_leader = get_app_leader(juju, DB_APP_NAME)
@@ -65,22 +63,24 @@ def test_pre_refresh_check(juju: Juju) -> None:
     juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
 
-@pytest.mark.abort_on_fail
 def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
     """Update the second cluster."""
     logging.info("Ensure continuous writes are incrementing")
     check_db_units_writes_increment(juju, DB_APP_NAME)
 
+    initial_number_of_switchovers = count_switchovers(juju, DB_APP_NAME)
+
     logging.info("Refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
 
-    logging.info("Application refresh is blocked due to incompatibility")
-    juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked)
+    logging.info("Waiting for refresh to block")
+    juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=5 * MINUTE_SECS)
 
     units = get_app_units(juju, DB_APP_NAME)
     unit_names = sorted(units.keys())
 
     if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
+        logging.info("Application refresh is blocked due to incompatibility")
         juju.run(
             unit=unit_names[-1],
             action="force-refresh-start",
@@ -101,3 +101,9 @@ def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
 
     logging.info("Ensure continuous writes are incrementing")
     check_db_units_writes_increment(juju, DB_APP_NAME)
+
+    logging.info("checking the number of switchovers")
+    final_number_of_switchovers = count_switchovers(juju, DB_APP_NAME)
+    assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
+        "Number of switchovers is greater than 2"
+    )

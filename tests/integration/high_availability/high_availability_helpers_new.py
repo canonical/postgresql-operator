@@ -7,6 +7,7 @@ import subprocess
 from collections.abc import Callable
 
 import jubilant
+import requests
 from jubilant import Juju
 from jubilant.statustypes import Status, UnitStatus
 from tenacity import Retrying, stop_after_delay, wait_fixed
@@ -186,7 +187,7 @@ def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
         get_unit_ip(juju, app_name, unit_name),
         SERVER_CONFIG_USERNAME,
         password,
-        ["SELECT COUNT(number) FROM continuous_writes;"],
+        ["SELECT MAX(number) FROM continuous_writes;"],
         "postgresql_test_app_database",
     )
     return output[0]
@@ -231,3 +232,11 @@ def get_user_password(juju: Juju, app_name: str, user: str) -> str | None:
         if secret.label == f"{PEER}.{app_name}.app":
             revealed_secret = juju.show_secret(secret.uri, reveal=True)
             return revealed_secret.content.get(f"{user}-password")
+
+
+def count_switchovers(juju: Juju, app_name: str) -> int:
+    """Return the number of performed switchovers."""
+    app_primary = get_db_primary_unit(juju, app_name)
+    unit_address = get_unit_ip(juju, app_name, app_primary)
+    switchover_history_info = requests.get(f"https://{unit_address}:8008/history", verify=False)
+    return len(switchover_history_info.json())
