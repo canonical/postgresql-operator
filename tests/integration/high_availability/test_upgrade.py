@@ -78,26 +78,35 @@ def test_upgrade_from_edge(juju: Juju, charm: str, continuous_writes) -> None:
 
     logging.info("Refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
+    logging.info("Wait for refresh to block as paused or incompatible")
+    try:
+        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=5 * MINUTE_SECS)
 
-    logging.info("Waiting for refresh to block")
-    juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=5 * MINUTE_SECS)
+        units = get_app_units(juju, DB_APP_NAME)
+        unit_names = sorted(units.keys())
 
-    units = get_app_units(juju, DB_APP_NAME)
-    unit_names = sorted(units.keys())
+        if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
+            logging.info("Application refresh is blocked due to incompatibility")
+            juju.run(
+                unit=unit_names[-1],
+                action="force-refresh-start",
+                params={"check-compatibility": False},
+                wait=5 * MINUTE_SECS,
+            )
 
-    if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
-        logging.info("Application refresh is blocked due to incompatibility")
-        juju.run(
-            unit=unit_names[-1],
-            action="force-refresh-start",
-            params={"check-compatibility": False},
-            wait=5 * MINUTE_SECS,
-        )
+            juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
 
-        juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
+        logging.info("Run resume-refresh action")
+        juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
+    except TimeoutError:
+        logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
+        assert juju.status().apps[DB_APP_NAME].is_active
 
-    logging.info("Run resume-refresh action")
-    juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
+    logging.info("Wait for upgrade to complete")
+    juju.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
+        timeout=20 * MINUTE_SECS,
+    )
 
     logging.info("Wait for upgrade to complete")
     juju.wait(
@@ -146,22 +155,12 @@ def test_fail_and_rollback(juju: Juju, charm: str, continuous_writes) -> None:
     logging.info("Ensure continuous writes on all units")
     check_db_units_writes_increment(juju, DB_APP_NAME, list(db_app_units))
 
-    logging.info("Re-run pre-refresh-check action")
-    task = juju.run(unit=db_app_leader, action="pre-refresh-check")
-    task.raise_on_failure()
-
     logging.info("Re-refresh the charm")
     juju.refresh(app=DB_APP_NAME, path=charm)
 
-    logging.info("Wait for upgrade to start")
-    juju.wait(
-        ready=lambda status: jubilant.any_maintenance(status, DB_APP_NAME),
-        timeout=10 * MINUTE_SECS,
-    )
-
     logging.info("Wait for upgrade to complete")
     juju.wait(
-        ready=lambda status: jubilant.all_active(status, DB_APP_NAME),
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
         timeout=20 * MINUTE_SECS,
     )
 

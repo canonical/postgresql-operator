@@ -9,9 +9,9 @@ from jubilant import Juju
 from .high_availability_helpers_new import (
     check_db_units_writes_increment,
     count_switchovers,
-    get_app_leader,
     get_app_units,
     wait_for_apps_status,
+    wait_for_unit_status,
 )
 
 DB_APP_NAME = "postgresql"
@@ -53,21 +53,8 @@ def test_deploy_stable(juju: Juju) -> None:
     )
 
 
-def test_pre_refresh_check(juju: Juju) -> None:
-    """Test that the pre-refresh-check action runs successfully."""
-    db_leader = get_app_leader(juju, DB_APP_NAME)
-
-    logging.info("Run pre-refresh-check action")
-    juju.run(unit=db_leader, action="pre-refresh-check")
-
-    juju.wait(jubilant.all_agents_idle, timeout=5 * MINUTE_SECS)
-
-
-def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
-    """Update the second cluster."""
-    logging.info("Ensure continuous writes are incrementing")
-    check_db_units_writes_increment(juju, DB_APP_NAME)
-
+def test_refresh_without_pre_upgrade_check(juju: Juju, charm: str) -> None:
+    """Test updating from stable channel."""
     initial_number_of_switchovers = count_switchovers(juju, DB_APP_NAME)
 
     logging.info("Refresh the charm")
@@ -111,3 +98,22 @@ def test_upgrade_from_stable(juju: Juju, charm: str, continuous_writes) -> None:
     assert (final_number_of_switchovers - initial_number_of_switchovers) <= 2, (
         "Number of switchovers is greater than 2"
     )
+
+
+async def test_rollback_without_pre_upgrade_check(juju: Juju, charm: str) -> None:
+    """Test refresh back to stable channel."""
+    # Early Jubilant 1.X.Y versions do not support the `switch` option
+    logging.info("Refresh the charm to stable channel")
+    juju.cli("refresh", "--channel=16/stable", f"--switch={DB_APP_NAME}", DB_APP_NAME)
+
+    logging.info("Wait for rolling restart")
+    app_units = get_app_units(juju, DB_APP_NAME)
+    app_units_funcs = [wait_for_unit_status(DB_APP_NAME, unit, "error") for unit in app_units]
+
+    juju.wait(
+        ready=lambda status: any(status_func(status) for status_func in app_units_funcs),
+        timeout=10 * MINUTE_SECS,
+        successes=1,
+    )
+
+    check_db_units_writes_increment(juju, DB_APP_NAME)
