@@ -5,10 +5,7 @@
 import logging
 
 import pytest
-from tenacity import (
-    Retrying,
-    stop_after_attempt,
-)
+from tenacity import Retrying, stop_after_attempt
 
 from .high_availability_helpers_new import get_app_leader
 
@@ -23,8 +20,7 @@ def continuous_writes(juju):
     application_unit = get_app_leader(juju, DB_TEST_APP_NAME)
 
     logger.info("Clearing continuous writes")
-    result = juju.run(unit=application_unit, action="clear-continuous-writes", wait=120)
-    result.raise_on_failure()
+    juju.run(unit=application_unit, action="clear-continuous-writes", wait=120).raise_on_failure()
 
     logger.info("Starting continuous writes")
 
@@ -38,5 +34,4 @@ def continuous_writes(juju):
     yield
 
     logger.info("Clearing continuous writes")
-    result = juju.run(unit=application_unit, action="clear-continuous-writes", wait=120)
-    result.raise_on_failure()
+    juju.run(unit=application_unit, action="clear-continuous-writes", wait=120).raise_on_failure()

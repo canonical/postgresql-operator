@@ -37,7 +37,6 @@ def check_db_units_writes_increment(
     app_primary = get_db_primary_unit(juju, app_name)
     app_max_value = get_db_max_written_value(juju, app_name, app_primary)
 
-    juju.model_config({"update-status-hook-interval": "15s"})
     for unit_name in app_units:
         for attempt in Retrying(
             reraise=True,
