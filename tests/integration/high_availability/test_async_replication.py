@@ -16,6 +16,8 @@ from .high_availability_helpers_new import (
     get_app_leader,
     get_app_units,
     get_db_max_written_value,
+    get_db_primary_unit,
+    get_db_standby_leader_unit,
     wait_for_apps_status,
 )
 
@@ -23,6 +25,7 @@ DB_APP_1 = "db1"
 DB_APP_2 = "db2"
 DB_TEST_APP_NAME = "postgresql-test-app"
 DB_TEST_APP_1 = "test-app1"
+DB_TEST_APP_2 = "test-app2"
 
 MINUTE_SECS = 60
 
@@ -79,8 +82,8 @@ def first_model_continuous_writes(first_model: str) -> Generator:
     ).raise_on_failure()
 
 
-def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> None:
-    """Simple test to ensure that the MySQL application charms get deployed."""
+def test_deploy(first_model: str, second_model: str, charm: str) -> None:
+    """Simple test to ensure that the database application charms get deployed."""
     configuration = {"profile": "testing"}
     constraints = {"arch": architecture.architecture}
 
@@ -106,12 +109,10 @@ def test_build_and_deploy(first_model: str, second_model: str, charm: str) -> No
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1),
-        timeout=20 * MINUTE_SECS,
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=20 * MINUTE_SECS
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2),
-        timeout=20 * MINUTE_SECS,
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=20 * MINUTE_SECS
     )
 
 
@@ -139,24 +140,38 @@ def test_async_relate(first_model: str, second_model: str) -> None:
     )
 
 
-def test_deploy_app(first_model: str) -> None:
+def test_deploy_app(first_model: str, second_model: str) -> None:
     """Deploy the router and the test application."""
+    constraints = {"arch": architecture.architecture}
     logging.info("Deploying test application")
     model_1 = Juju(model=first_model)
+    model_2 = Juju(model=second_model)
     model_1.deploy(
         charm=DB_TEST_APP_NAME,
         app=DB_TEST_APP_1,
         base="ubuntu@22.04",
         channel="latest/edge",
         num_units=1,
-        trust=False,
+        constraints=constraints,
+    )
+    model_2.deploy(
+        charm=DB_TEST_APP_NAME,
+        app=DB_TEST_APP_2,
+        base="ubuntu@22.04",
+        channel="latest/edge",
+        num_units=1,
+        constraints=constraints,
     )
 
     logging.info("Relating test application")
     model_1.integrate(f"{DB_TEST_APP_1}:database", f"{DB_APP_1}:database")
+    model_2.integrate(f"{DB_TEST_APP_2}:database", f"{DB_APP_2}:database")
 
     model_1.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_TEST_APP_1), timeout=10 * MINUTE_SECS
+    )
+    model_2.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_TEST_APP_2), timeout=10 * MINUTE_SECS
     )
 
 
@@ -185,16 +200,14 @@ def test_data_replication(
 ) -> None:
     """Test to write to primary, and read the same data back from replicas."""
     logging.info("Testing data replication")
-    results = get_db_max_written_values(first_model, second_model)
+    results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
 
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 
 
-def test_standby_promotion(
-    first_model: str, second_model: str, first_model_continuous_writes
-) -> None:
+def test_standby_promotion(first_model: str, second_model: str) -> None:
     """Test graceful promotion of a standby cluster to primary."""
     model_2 = Juju(model=second_model)
     model_2_postgresql_leader = get_app_leader(model_2, DB_APP_2)
@@ -205,37 +218,58 @@ def test_standby_promotion(
     )
     promotion_task.raise_on_failure()
 
-    results = get_db_max_written_values(first_model, second_model)
+    rerelate_test_app(model_2, DB_APP_2, DB_TEST_APP_2)
+
+    results = get_db_max_written_values(first_model, second_model, second_model, DB_TEST_APP_2)
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 
 
-def test_failover(first_model: str, second_model: str) -> None:
-    """Test switchover on primary cluster fail."""
-    logging.info("Freezing postgres on primary cluster units")
+def test_failover_in_main_cluster(first_model: str, second_model: str) -> None:
+    """Test that async replication fails over correctly."""
     model_2 = Juju(model=second_model)
-    model_2_postgresql_units = get_app_units(model_2, DB_APP_2)
 
-    # Simulating a failure on the primary cluster
-    for unit_name in model_2_postgresql_units:
-        model_2.exec("sudo pkill -x postgres --signal SIGSTOP", unit=unit_name)
+    rerelate_test_app(model_2, DB_APP_2, DB_TEST_APP_2)
 
-    logging.info("Promoting standby cluster to primary with force flag")
+    primary = get_db_primary_unit(model_2, DB_APP_2)
+    model_2.remove_unit(primary, force=True)
+    model_2.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=10 * MINUTE_SECS
+    )
+
+    results = get_db_max_written_values(first_model, second_model, second_model, DB_TEST_APP_2)
+
+    model_2.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=10 * MINUTE_SECS
+    )
+    assert len(results) == 5
+    assert all(results[0] == x for x in results), "Data is not consistent across units"
+    assert results[0] > 1, "No data was written to the database"
+
+    assert primary != get_db_primary_unit(model_2, DB_APP_2)
+
+
+def test_failover_in_standby_cluster(first_model: str, second_model: str) -> None:
+    """Test that async replication fails over correctly."""
     model_1 = Juju(model=first_model)
-    model_1_postgresql_leader = get_app_leader(model_1, DB_APP_1)
+    model_2 = Juju(model=second_model)
 
-    model_1.run(
-        unit=model_1_postgresql_leader,
-        action="promote-to-primary",
-        params={"scope": "cluster", "force": True},
-        wait=5 * MINUTE_SECS,
-    ).raise_on_failure()
+    rerelate_test_app(model_2, DB_APP_2, DB_TEST_APP_2)
 
-    # Restore postgres process
-    logging.info("Unfreezing postgres on primary cluster units")
-    for unit_name in model_2_postgresql_units:
-        model_2.exec("sudo pkill -x postgres --signal SIGCONT", unit=unit_name)
+    standby = get_db_standby_leader_unit(model_1, DB_APP_2)
+    model_1.remove_unit(standby, force=True)
+
+    results = get_db_max_written_values(first_model, second_model, second_model, DB_TEST_APP_2)
+
+    model_1.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=10 * MINUTE_SECS
+    )
+    assert len(results) == 4
+    assert all(results[0] == x for x in results), "Data is not consistent across units"
+    assert results[0] > 1, "No data was written to the database"
+
+    assert standby != get_db_standby_leader_unit(model_1, DB_APP_2)
 
 
 def test_unrelate_and_relate(first_model: str, second_model: str) -> None:
@@ -260,6 +294,8 @@ def test_unrelate_and_relate(first_model: str, second_model: str) -> None:
         ready=wait_for_apps_status(jubilant.any_blocked, DB_APP_1), timeout=5 * MINUTE_SECS
     )
 
+    rerelate_test_app(model_1, DB_APP_1, DB_TEST_APP_1)
+
     logging.info("Running create replication action")
     model_1.run(
         unit=get_app_leader(model_1, DB_APP_1), action="create-replication", wait=5 * MINUTE_SECS
@@ -273,34 +309,65 @@ def test_unrelate_and_relate(first_model: str, second_model: str) -> None:
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=20 * MINUTE_SECS
     )
 
-    results = get_db_max_written_values(first_model, second_model)
+    results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 
 
-def get_db_max_written_values(first_model: str, second_model: str) -> list[int]:
+def get_db_max_written_values(
+    first_model: str, second_model: str, test_model: str, test_app: str
+) -> list[int]:
     """Return list with max written value from all units."""
+    db_name = f"{test_app.replace('-', '_')}_database"
     model_1 = Juju(model=first_model)
     model_2 = Juju(model=second_model)
+    test_app_model = model_1 if test_model == first_model else model_2
 
     logging.info("Stopping continuous writes")
-    stopping_task = model_1.run(
-        unit=get_app_leader(model_1, DB_TEST_APP_1), action="stop-continuous-writes"
-    )
-    stopping_task.raise_on_failure()
+    test_app_model.run(
+        unit=get_app_leader(test_app_model, test_app), action="stop-continuous-writes"
+    ).raise_on_failure()
 
     time.sleep(5)
     results = []
 
     logging.info(f"Querying max value on all {DB_APP_1} units")
     for unit_name in get_app_units(model_1, DB_APP_1):
-        unit_max_value = get_db_max_written_value(model_1, DB_APP_1, unit_name)
+        unit_max_value = get_db_max_written_value(model_1, DB_APP_1, unit_name, db_name)
         results.append(unit_max_value)
 
     logging.info(f"Querying max value on all {DB_APP_2} units")
     for unit_name in get_app_units(model_2, DB_APP_2):
-        unit_max_value = get_db_max_written_value(model_2, DB_APP_2, unit_name)
+        unit_max_value = get_db_max_written_value(model_2, DB_APP_2, unit_name, db_name)
         results.append(unit_max_value)
 
     return results
+
+
+def rerelate_test_app(juju: Juju, db_name: str, test_app_name: str) -> None:
+    logging.info(f"Reintegrating {db_name} and {test_app_name}")
+    juju.remove_relation(db_name, f"{test_app_name}:database")
+    juju.wait(
+        ready=wait_for_apps_status(jubilant.all_blocked, test_app_name)
+        and wait_for_apps_status(jubilant.all_active, db_name),
+        timeout=10 * MINUTE_SECS,
+    )
+
+    juju.integrate(f"{db_name}:database", f"{test_app_name}:database")
+    juju.wait(
+        ready=wait_for_apps_status(jubilant.all_active, test_app_name, db_name),
+        timeout=10 * MINUTE_SECS,
+    )
+
+    logging.info("Clearing continuous writes")
+    application_unit = get_app_leader(juju, test_app_name)
+    juju.run(unit=application_unit, action="clear-continuous-writes", wait=120).raise_on_failure()
+
+    logging.info("Starting continuous writes")
+    for attempt in Retrying(stop=stop_after_attempt(10), reraise=True):
+        with attempt:
+            result = juju.run(unit=application_unit, action="start-continuous-writes")
+            result.raise_on_failure()
+
+            assert result.results["result"] == "True"

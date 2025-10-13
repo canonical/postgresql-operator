@@ -24,7 +24,10 @@ JujuAppsStatusFn = Callable[[Status, str], bool]
 
 
 def check_db_units_writes_increment(
-    juju: Juju, app_name: str, app_units: list[str] | None = None
+    juju: Juju,
+    app_name: str,
+    app_units: list[str] | None = None,
+    db_name: str = "postgresql_test_app_database",
 ) -> None:
     """Ensure that continuous writes is incrementing on all units.
 
@@ -35,7 +38,7 @@ def check_db_units_writes_increment(
         app_units = get_app_units(juju, app_name)
 
     app_primary = get_db_primary_unit(juju, app_name)
-    app_max_value = get_db_max_written_value(juju, app_name, app_primary)
+    app_max_value = get_db_max_written_value(juju, app_name, app_primary, db_name)
 
     for unit_name in app_units:
         for attempt in Retrying(
@@ -44,7 +47,7 @@ def check_db_units_writes_increment(
             wait=wait_fixed(10),
         ):
             with attempt:
-                unit_max_value = get_db_max_written_value(juju, app_name, unit_name)
+                unit_max_value = get_db_max_written_value(juju, app_name, unit_name, db_name)
                 assert unit_max_value > app_max_value, "Writes not incrementing"
                 app_max_value = unit_max_value
 
@@ -172,13 +175,29 @@ def get_db_primary_unit(juju: Juju, app_name: str) -> str:
     raise Exception("No primary node found")
 
 
-def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
+def get_db_standby_leader_unit(juju: Juju, app_name: str) -> str:
+    """Get the current standby node of the cluster."""
+    unit_address = get_unit_ip(juju, app_name, get_app_leader(juju, app_name))
+
+    for member in requests.get(f"https://{unit_address}:8008/history", verify=False).json()[
+        "members"
+    ]:
+        if member["role"] == "standby_leader":
+            return member["name"][::-1].replace("-", "/")[::-1]
+
+    raise Exception("No standby primary node found")
+
+
+def get_db_max_written_value(
+    juju: Juju, app_name: str, unit_name: str, db_name: str = "postgresql_test_app_database"
+) -> int:
     """Retrieve the max written value in the MySQL database.
 
     Args:
         juju: The Juju model.
         app_name: The application name.
         unit_name: The unit name.
+        db_name: The database to connect to.
     """
     password = get_user_password(juju, app_name, SERVER_CONFIG_USERNAME)
 
@@ -187,7 +206,7 @@ def get_db_max_written_value(juju: Juju, app_name: str, unit_name: str) -> int:
         SERVER_CONFIG_USERNAME,
         password,
         ["SELECT MAX(number) FROM continuous_writes;"],
-        "postgresql_test_app_database",
+        db_name,
     )
     return output[0]
 
