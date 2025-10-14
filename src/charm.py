@@ -64,6 +64,7 @@ from single_kernel_postgresql.config.literals import (
     REWIND_USER,
     SYSTEM_USERS,
     USER,
+    Substrates,
 )
 from single_kernel_postgresql.utils.postgresql import (
     ACCESS_GROUP_IDENTITY,
@@ -79,7 +80,6 @@ from single_kernel_postgresql.utils.postgresql import (
     PostgreSQLGrantDatabasePrivilegesToUserError,
     PostgreSQLListUsersError,
     PostgreSQLUpdateUserPasswordError,
-    Substrates,
 )
 from tenacity import RetryError, Retrying, retry, stop_after_attempt, stop_after_delay, wait_fixed
 
