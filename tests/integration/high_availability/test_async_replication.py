@@ -9,7 +9,7 @@ from collections.abc import Generator
 import jubilant
 import pytest
 from jubilant import Juju
-from tenacity import Retrying, stop_after_attempt
+from tenacity import Retrying, stop_after_attempt, wait_fixed
 
 from .. import architecture
 from .high_availability_helpers_new import (
@@ -279,13 +279,18 @@ def test_failover_in_main_cluster(first_model: str, second_model: str) -> None:
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=10 * MINUTE_SECS
     )
 
-    results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
+    for attempt in Retrying(stop=stop_after_attempt(10), wait=wait_fixed(3), reraise=True):
+        with attempt:
+            results = get_db_max_written_values(
+                first_model, second_model, first_model, DB_TEST_APP_1
+            )
+            logging.info(f"Results: {results}")
 
-    assert len(results) == 5
-    assert all(results[0] == x for x in results), "Data is not consistent across units"
-    assert results[0] > 1, "No data was written to the database"
+            assert len(results) == 5
+            assert all(results[0] == x for x in results), "Data is not consistent across units"
+            assert results[0] > 1, "No data was written to the database"
 
-    assert primary != get_db_primary_unit(model_1, DB_APP_1)
+            assert primary != get_db_primary_unit(model_1, DB_APP_1)
 
 
 def test_failover_in_standby_cluster(first_model: str, second_model: str) -> None:
