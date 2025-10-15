@@ -2363,9 +2363,10 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             "max_wal_senders": 25,
             "wal_keep_size": self.config.durability_wal_keep_size,
         }
+        base_patch = {}
         if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
-            cfg_patch["standby_cluster"] = {"host": primary_endpoint}
-        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch)
+            base_patch["standby_cluster"] = {"host": primary_endpoint}
+        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch, base_patch)
 
     def update_config(
         self,

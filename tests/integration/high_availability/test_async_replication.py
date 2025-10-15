@@ -266,6 +266,7 @@ def test_unrelate_and_relate(first_model: str, second_model: str) -> None:
 def test_failover_in_main_cluster(first_model: str, second_model: str) -> None:
     """Test that async replication fails over correctly."""
     model_1 = Juju(model=first_model)
+    model_2 = Juju(model=second_model)
 
     rerelate_test_app(model_1, DB_APP_1, DB_TEST_APP_1)
 
@@ -273,6 +274,9 @@ def test_failover_in_main_cluster(first_model: str, second_model: str) -> None:
     model_1.remove_unit(primary)
     model_1.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=10 * MINUTE_SECS
+    )
+    model_2.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=10 * MINUTE_SECS
     )
 
     results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
