@@ -105,6 +105,20 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
         num_units=3,
     )
 
+    logging.info("Deploying the test application")
+    model_1 = Juju(model=first_model)
+    model_1.deploy(
+        charm=DB_TEST_APP_NAME,
+        app=DB_TEST_APP_NAME,
+        base="ubuntu@22.04",
+        channel="latest/edge",
+        constraints=constraints,
+        num_units=1,
+    )
+
+    logging.info("Relating the test application")
+    model_1.integrate(f"{DB_APP_1}:database", f"{DB_TEST_APP_NAME}:database")
+
     logging.info("Waiting for the applications to settle")
     model_1.wait(
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=20 * MINUTE_SECS
@@ -135,29 +149,6 @@ def test_async_relate(first_model: str, second_model: str) -> None:
     model_2.wait(
         ready=wait_for_apps_status(jubilant.any_active, DB_APP_2),
         timeout=10 * MINUTE_SECS,
-    )
-
-
-def test_deploy_test_app(first_model: str) -> None:
-    """Deploy the test application."""
-    constraints = {"arch": architecture.architecture}
-
-    logging.info("Deploying the test application")
-    model_1 = Juju(model=first_model)
-    model_1.deploy(
-        charm=DB_TEST_APP_NAME,
-        app=DB_TEST_APP_NAME,
-        base="ubuntu@22.04",
-        channel="latest/edge",
-        constraints=constraints,
-        num_units=1,
-    )
-
-    logging.info("Relating the test application")
-    model_1.integrate(f"{DB_APP_1}:database", f"{DB_TEST_APP_NAME}:database")
-
-    model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_TEST_APP_NAME), timeout=10 * MINUTE_SECS
     )
 
 
