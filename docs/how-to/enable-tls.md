@@ -23,7 +23,7 @@ juju deploy self-signed-certificates
 To enable TLS integrate (formerly known as “relate”) the two applications:
 
 ```text
-juju integrate postgresql:certificates self-signed-certificates:certificates
+juju integrate postgresql:client-certificates self-signed-certificates:certificates
 ```
 
 ## Check certificates in use
@@ -75,6 +75,6 @@ juju run postgresql/2 set-tls-private-key
 Disable TLS by removing the integration.
 
 ```text
-juju remove-relation postgresql:certificates self-signed-certificates:certificates
+juju remove-relation postgresql:client-certificates self-signed-certificates:certificates
 ```
 
