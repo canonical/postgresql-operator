@@ -1,52 +1,70 @@
 # Architecture
 
-[PostgreSQL](https://www.postgresql.org/) is one of the most popular open source database. The “[Charmed PostgreSQL](https://charmhub.io/postgresql)” is a Juju-based operator to deploy and support PostgreSQL from [day 0 to day 2](https://codilime.com/blog/day-0-day-1-day-2-the-software-lifecycle-in-the-cloud-age/), it is based on the [PostgreSQL Community Edition](https://www.postgresql.org/community/) using the [Patroni](https://github.com/zalando/patroni) to manage PostgreSQL cluster based on [PostgreSQL synchronous replication](https://patroni.readthedocs.io/en/latest/replication_modes.html#postgresql-synchronous-replication).
+[Charmed PostgreSQL](https://charmhub.io/postgresql) is a Juju-based operator to deploy and operate [PostgreSQL](https://www.postgresql.org/).It is based on [PostgreSQL Community Edition](https://www.postgresql.org/community/), and uses [Patroni](https://github.com/zalando/patroni) to manage PostgreSQL cluster via [synchronous replication](https://patroni.readthedocs.io/en/latest/replication_modes.html#postgresql-synchronous-replication).
 
-![image|690x423, 100%](architecture-diagram.png)
+```{figure} architecture-diagram.png
+:width: 690
+:alt: Diagram of a sample PostgreSQL deployment with 3 units, and integrations with PgBouncer, Prometheus, Grafana, and Ceph.
 
-## HLD (High Level Design)
-
-The charm design leverages on the SNAP “[charmed-postgresql](https://snapcraft.io/charmed-postgresql)” which is deployed by Juju on the specified VM/MAAS/bare-metal machine based on Ubuntu Jammy/22.04. SNAP allows to run PostgreSQL service(s) in a secure and isolated environment ([strict confinement](https://ubuntu.com/blog/demystifying-snap-confinement)). The installed SNAP:
-```text
-> juju ssh postgresql/0 snap list charmed-postgresql
-Name                Version  Rev  Tracking       Publisher        Notes
-charmed-postgresql  14.9     70   latest/stable  dataplatformbot  held
+Example Charmed PostgreSQL deployment with 3 replicas. Integrations include PgBouncer for load balancing, Prometheus and Grafana for observability, and Ceph for backups.
 ```
 
-The SNAP ships the following components:
+## High-level design
 
-* PostgreSQL (based on Ubuntu APT package "[postgresql](https://packages.ubuntu.com/jammy/postgresql)") 
-* PgBouncer  (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/pgbouncer))
-* Patroni (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/patroni))
-* pgBackRest (based on Canonical  [backport](https://launchpad.net/~data-platform/+archive/ubuntu/pgbackrest))
-* Prometheus PostgreSQL Exporter (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/postgres-exporter))
-* Prometheus PgBouncer Exporter (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/pgbouncer-exporter))
-* Prometheus Grafana dashboards and Loki alert rules are part of the charm revision (and missing in SNAP).
+The charm design leverages on the [charmed-postgresql](https://snapcraft.io/charmed-postgresql) snap, which is deployed by Juju on the specified VM/MAAS/bare-metal machine based on Ubuntu Noble/24.04. The snap allows to run PostgreSQL service(s) in a secure and isolated environment. For more information, see this blog post about [strict confinement](https://ubuntu.com/blog/demystifying-snap-confinement). 
+
+```{note}
+The charmed-postgresql snap installs `14/stable` by default.
+
+For `16/edge`, use the `--channel` flag when installing or refreshing the snap.
+```
+
+<!-- TODO: update sample output for 16/edge snap
+```shell
+juju ssh postgresql/0 snap list charmed-postgresql
+Name                Version  Rev  Tracking       Publisher        Notes
+charmed-postgresql  16.10    TODO TODO/edge      dataplatformbot  held
+```
+-->
+
+The snap ships the following components:
+
+* **PostgreSQL** (based on Ubuntu APT package [postgresql](https://packages.ubuntu.com/jammy/postgresql)) 
+* **PgBouncer** (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/pgbouncer))
+* **Patroni** (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/patroni))
+* **pgBackRest** (based on Canonical  [backport](https://launchpad.net/~data-platform/+archive/ubuntu/pgbackrest))
+* **Prometheus PostgreSQL Exporter** (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/postgres-exporter))
+* **Prometheus PgBouncer Exporter** (based on Canonical [backport](https://launchpad.net/~data-platform/+archive/ubuntu/pgbouncer-exporter))
+* Prometheus Grafana dashboards and Loki alert rules are part of the charm revision (and missing in the snap).
 
 Versions of all the components above are carefully chosen to fit functionality of each other.
 
-The Charmed PostgreSQL unit consisting of a several services which are enabled/activated accordingly to the setup: 
+The Charmed PostgreSQL unit consisting of a several services which are enabled/activated according to the setup: 
 
-```text
-> juju ssh postgresql/0 snap services charmed-postgresql
+```shell
+$ juju ssh postgresql/0 snap services charmed-postgresql
+
 Service                                          Startup   Current  Notes
+charmed-postgresql.ldap-sync                     enabled   active   -
 charmed-postgresql.patroni                       enabled   active   -
+charmed-postgresql.pgbackrest-exporter           enabled   active   -
 charmed-postgresql.pgbackrest-service            enabled   active   -
 charmed-postgresql.prometheus-postgres-exporter  enabled   active   -
-
 ```
+
+<!-- TODO: The `ldap-sync` service is... -->
 
 The `patroni` snap service is a main PostgreSQL instance which is normally up and running right after the charm deployment.
 
-The `pgbackrest` snap service is a backup framework for PostgreSQL. It is disabled if [Backup](/how-to/back-up-and-restore/create-a-backup) is not configured.
+The `pgbackrest` snap service is a backup framework for PostgreSQL. It is disabled if [backups](/how-to/back-up-and-restore/create-a-backup) are not configured.
 
 The `prometheus-postgres-exporter` service is activated after the relation with [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) only.
 
 ```{caution}
-It is possible to start/stop/restart snap services manually, but it is **not** recommended in order to avoid a split brain with a charm state machine.
+It is **not recommended** to start, stop, and restart snap services manually in order to avoid a split-brain scenario with a charm state machine.
 ```
 
-The snap "charmed-postgresql" also ships list of tools used by charm:
+The charmed-postgresql snap also ships list of tools used by charm:
 * `charmed-postgresql.psql` (alias `psq`) - is PostgreSQL interactive terminal.
 * `charmed-postgresql.patronictl` - a tool to monitor and manage Patroni.
 * `charmed-postgresql.pgbackrest` - a tool to backup/restore PostgreSQL DB.
@@ -57,41 +75,55 @@ All snap resources must be executed under the special snap user `_daemon_` only!
 
 ## Integrations
 
+The following charms can be integrated with PostgreSQL out of the box.  
+
 ### PgBouncer
 
-[PgBouncer](http://www.pgbouncer.org/) is a lightweight connection pooler for PostgreSQL that provides transparent routing between your application and back-end PostgreSQL Servers. The "[PgBouncer](https://charmhub.io/pgbouncer)" is an independent charm "Charmed PostgreSQL" can be related with.
+[PgBouncer](http://www.pgbouncer.org/) is a lightweight connection pooler for PostgreSQL that provides transparent routing between your application and back-end PostgreSQL Servers. 
 
 ### TLS certificates operator
 
-The [TLS Certificates](https://charmhub.io/tls-certificates-operator) charm is responsible for distributing certificates through relationship. Certificates are provided by the operator through Juju configs. For the playground deployments, the [self-signed operator](https://charmhub.io/self-signed-certificates) is available as well.
+The [TLS Certificates](https://charmhub.io/tls-certificates-operator) charm is responsible for distributing certificates through Juju configs. For test deployments, the [self-signed certificates](https://charmhub.io/self-signed-certificates) charm is available as well.
+
+See also: [](/how-to/enable-tls)
 
 ### S3 integrator
 
-[S3 Integrator](https://charmhub.io/s3-integrator) is an integrator charm for providing S3 credentials to Charmed PostgreSQL which seek to access shared S3 data. Store the credentials centrally in the integrator charm and relate consumer charms as needed.
+[S3 Integrator](https://charmhub.io/s3-integrator) is an integrator charm for providing S3 credentials to Charmed PostgreSQL to access shared S3 data. Store the credentials centrally in the integrator charm and relate consumer charms as needed.
+
+See also: [](configure-s3-integrator-aws)
 
 ### Data integrator
 
-[Data Integrator](https://charmhub.io/data-integrator) charm is a solution to request DB credentials for non-native Juju applications. Not all applications implement a data_interfaces relation but allow setting credentials via config. Also, some of the applications are run outside of juju. This integrator charm allows receiving credentials which can be passed into application config directly without implementing juju-native relation.
+The [data integrator](https://charmhub.io/data-integrator) charm requests credentials for non-native Juju applications. Not all applications implement a `data_interfaces` relation, but do allow setting credentials via config. Additionally, some of applications are run outside of juju. This integrator charm allows receiving credentials which can be passed into application config directly without implementing a Juju-native relation.
+
+See also: [](/how-to/integrate-with-another-application)
 
 ### PostgreSQL test app
 
-The charm "[PostgreSQL Test App](https://charmhub.io/postgresql-test-app)" is a Canonical test application to validate the charm installation / functionality and perform the basic performance tests.
+The [PostgreSQL Test App](https://charmhub.io/postgresql-test-app) charm is a Canonical test application to validate the charm installation / functionality and perform basic performance tests.
 
 ### GLAuth
 
-GLAuth is a secure, easy-to-use and open-sourced LDAP server which provides capabilities to centrally manage accounts across infrastructures. The charm is only available for Kubernetes clouds, under the [GLAuth-K8s operator](https://charmhub.io/glauth-k8s) page, so a cross-controller relation is needed in order to integrate both charms.
+[GLAuth](https://github.com/glauth/glauth) is a secure, easy-to-use and open-sourced LDAP server which provides capabilities to centrally manage accounts across infrastructures. The charm is only available for Kubernetes clouds via the [GLAuth-K8s operator](https://charmhub.io/glauth-k8s), so a cross-controller relation is needed in order to integrate both charms.
 
 ### Grafana
 
-Grafana is an open-source visualisation tools that allows to query, visualise, alert on, and visualise metrics from mixed data sources in configurable dashboards for observability. This charms is shipped with its own Grafana dashboard and supports integration with the [Grafana Operator](https://charmhub.io/grafana-k8s) to simplify observability. Please follow [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) setup.
+[Grafana](https://grafana.com/) is an open-source visualisation tools that allows to query, visualise, alert on, and visualise metrics from mixed data sources in configurable dashboards for observability. This charms is shipped with its own Grafana dashboard and supports integration with the [Grafana Operator](https://charmhub.io/grafana-k8s) to simplify observability.
 
-### Loki
+See also: [](/how-to/monitoring-cos/enable-monitoring) 
 
-Loki is an open-source fully-featured logging system. This charms is shipped with support for the [Loki Operator](https://charmhub.io/loki-k8s) to collect the generated logs. Please follow [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) setup.
+#### Loki
+
+[Loki](https://grafana.com/docs/loki/latest/) is an open-source fully-featured logging system. This charms is shipped with support for the [Loki Operator](https://charmhub.io/loki-k8s) to collect the generated logs. 
+
+See also: [](/how-to/monitoring-cos/enable-monitoring) 
 
 ### Prometheus
 
-Prometheus is an open-source systems monitoring and alerting toolkit with a dimensional data model, flexible query language, efficient time series database and modern alerting approach. This charm is shipped with a Prometheus exporters, alerts and support for integrating with the [Prometheus Operator](https://charmhub.io/prometheus-k8s) to automatically scrape the targets. Please follow [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) setup.
+[Prometheus](https://prometheus.io/docs/introduction/overview/) is an open-source systems monitoring and alerting toolkit with a dimensional data model, flexible query language, efficient time series database and modern alerting approach. Charmed PostgreSQL is shipped with a Prometheus exporters, alerts and support for integrating with the [Prometheus charm](https://charmhub.io/prometheus-k8s) to automatically scrape the targets. 
+
+See also: [](/how-to/monitoring-cos/enable-monitoring) 
 
 ## LLD (Low Level Design)
 
@@ -125,8 +157,9 @@ The `__init__` method guarantees that the charm observes all events relevant to 
 
 The VM and K8s charm flavours shares the codebase via charm libraries in [`lib/charms/postgresql_k8s/v0/`](https://github.com/canonical/postgresql-k8s-operator/blob/main/lib/charms/postgresql_k8s/v0/postgresql.py) (of K8s flavour of the charm!):
 
-```text
-> charmcraft list-lib postgresql-k8s                                                                                                                                                                                                               
+```shell
+$ charmcraft list-lib postgresql-k8s                                                                                                                                                                                                               
+
 Library name    API    Patch                                                                                                                                                                                                                          
 postgresql      0      12                                                                                                                                                                                                                             
 postgresql_tls  0      7                                  
