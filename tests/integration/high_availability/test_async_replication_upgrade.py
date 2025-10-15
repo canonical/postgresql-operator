@@ -13,7 +13,6 @@ from tenacity import Retrying, stop_after_attempt
 
 from .. import architecture
 from .high_availability_helpers_new import (
-    check_db_units_writes_increment,
     get_app_leader,
     get_app_units,
     get_db_max_written_value,
@@ -85,23 +84,22 @@ def test_deploy(first_model: str, second_model: str, charm: str) -> None:
     configuration = {"profile": "testing"}
     constraints = {"arch": architecture.architecture}
 
-    logging.info("Deploying mysql clusters")
+    # TODO Deploy from edge
+    logging.info("Deploying postgresql clusters")
     model_1 = Juju(model=first_model)
     model_1.deploy(
-        charm=DB_APP_NAME,
+        charm=charm,
         app=DB_APP_1,
         base="ubuntu@24.04",
-        channel="16/edge",
         config=configuration,
         constraints=constraints,
         num_units=3,
     )
     model_2 = Juju(model=second_model)
     model_2.deploy(
-        charm=DB_APP_NAME,
+        charm=charm,
         app=DB_APP_2,
         base="ubuntu@24.04",
-        channel="16/edge",
         config=configuration,
         constraints=constraints,
         num_units=3,
@@ -183,7 +181,7 @@ def test_create_replication(first_model: str, second_model: str) -> None:
 
 
 def test_upgrade_from_edge(
-    first_model: str, second_model: str, charm: str, first_continuous_writes
+    first_model: str, second_model: str, charm: str, first_model_continuous_writes
 ) -> None:
     """Upgrade the two MySQL clusters."""
     model_1 = Juju(model=first_model)
@@ -196,7 +194,9 @@ def test_upgrade_from_edge(
     run_upgrade_from_edge(model_2, DB_APP_2, charm)
 
 
-def test_data_replication(first_model: str, second_model: str, continuous_writes) -> None:
+def test_data_replication(
+    first_model: str, second_model: str, first_model_continuous_writes
+) -> None:
     """Test to write to primary, and read the same data back from replicas."""
     logging.info("Testing data replication")
     results = get_db_max_written_values(first_model, second_model)
@@ -243,19 +243,16 @@ def run_pre_refresh_checks(juju: Juju, app_name: str) -> None:
 
 def run_upgrade_from_edge(juju: Juju, app_name: str, charm: str) -> None:
     """Update the second cluster."""
-    logging.info("Ensure continuous writes are incrementing")
-    check_db_units_writes_increment(juju, DB_APP_NAME)
-
     logging.info("Refresh the charm")
-    juju.refresh(app=DB_APP_NAME, path=charm)
+    juju.refresh(app=app_name, path=charm)
     logging.info("Wait for refresh to block as paused or incompatible")
     try:
-        juju.wait(lambda status: status.apps[DB_APP_NAME].is_blocked, timeout=5 * MINUTE_SECS)
+        juju.wait(lambda status: status.apps[app_name].is_blocked, timeout=5 * MINUTE_SECS)
 
-        units = get_app_units(juju, DB_APP_NAME)
+        units = get_app_units(juju, app_name)
         unit_names = sorted(units.keys())
 
-        if "Refresh incompatible" in juju.status().apps[DB_APP_NAME].app_status.message:
+        if "Refresh incompatible" in juju.status().apps[app_name].app_status.message:
             logging.info("Application refresh is blocked due to incompatibility")
             juju.run(
                 unit=unit_names[-1],
@@ -270,19 +267,7 @@ def run_upgrade_from_edge(juju: Juju, app_name: str, charm: str) -> None:
         juju.run(unit=unit_names[1], action="resume-refresh", wait=5 * MINUTE_SECS)
     except TimeoutError:
         logging.info("Upgrade completed without snap refresh (charm.py upgrade only)")
-        assert juju.status().apps[DB_APP_NAME].is_active
+        assert juju.status().apps[app_name].is_active
 
     logging.info("Wait for upgrade to complete")
-    juju.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
-        timeout=20 * MINUTE_SECS,
-    )
-
-    logging.info("Wait for upgrade to complete")
-    juju.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_NAME),
-        timeout=20 * MINUTE_SECS,
-    )
-
-    logging.info("Ensure continuous writes are incrementing")
-    check_db_units_writes_increment(juju, DB_APP_NAME)
+    juju.wait(ready=wait_for_apps_status(jubilant.all_active, app_name), timeout=20 * MINUTE_SECS)

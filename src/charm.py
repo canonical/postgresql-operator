@@ -164,8 +164,10 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
         pass
 
     def run_pre_refresh_checks_before_any_units_refreshed(self) -> None:
-        if not self._charm._patroni.are_all_members_ready():
-            raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
+        for attempt in Retrying(stop=stop_after_attempt(2), wait=wait_fixed(1), reraise=True):
+            with attempt:
+                if not self._charm._patroni.are_all_members_ready():
+                    raise charm_refresh.PrecheckFailed("PostgreSQL is not running on 1+ units")
         if self._charm._patroni.is_creating_backup:
             raise charm_refresh.PrecheckFailed("Backup in progress")
 
@@ -189,7 +191,12 @@ class _PostgreSQLRefresh(charm_refresh.CharmSpecificMachines):
             )
         else:
             try:
-                self._charm._patroni.switchover(candidate=last_unit_to_refresh)
+                self._charm._patroni.switchover(
+                    candidate=last_unit_to_refresh,
+                    async_cluster=bool(
+                        self._charm.async_replication.get_primary_cluster_endpoint()
+                    ),
+                )
             except SwitchoverFailedError as e:
                 logger.warning(f"switchover failed with reason: {e}")
                 raise charm_refresh.PrecheckFailed("Unable to switch primary")
