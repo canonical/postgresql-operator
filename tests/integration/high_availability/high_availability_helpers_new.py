@@ -179,7 +179,7 @@ def get_db_standby_leader_unit(juju: Juju, app_name: str) -> str:
     """Get the current standby node of the cluster."""
     unit_address = get_unit_ip(juju, app_name, get_app_leader(juju, app_name))
 
-    for member in requests.get(f"https://{unit_address}:8008/history", verify=False).json()[
+    for member in requests.get(f"https://{unit_address}:8008/cluster", verify=False).json()[
         "members"
     ]:
         if member["role"] == "standby_leader":

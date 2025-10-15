@@ -265,7 +265,7 @@ def test_unrelate_and_relate(first_model: str, second_model: str) -> None:
 
 def test_failover_in_main_cluster(first_model: str, second_model: str) -> None:
     """Test that async replication fails over correctly."""
-    model_1 = Juju(model=second_model)
+    model_1 = Juju(model=first_model)
 
     rerelate_test_app(model_1, DB_APP_1, DB_TEST_APP_1)
 
@@ -275,7 +275,7 @@ def test_failover_in_main_cluster(first_model: str, second_model: str) -> None:
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=10 * MINUTE_SECS
     )
 
-    results = get_db_max_written_values(first_model, second_model, second_model, DB_TEST_APP_1)
+    results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
 
     assert len(results) == 5
     assert all(results[0] == x for x in results), "Data is not consistent across units"
@@ -298,7 +298,7 @@ def test_failover_in_standby_cluster(first_model: str, second_model: str) -> Non
         ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=10 * MINUTE_SECS
     )
 
-    results = get_db_max_written_values(first_model, second_model, second_model, DB_TEST_APP_1)
+    results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
 
     assert len(results) == 4
     assert all(results[0] == x for x in results), "Data is not consistent across units"

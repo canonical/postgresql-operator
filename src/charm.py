@@ -2342,6 +2342,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             return False
         return True
 
+    def _api_update_config(self) -> None:
+        # Use config value if set, calculate otherwise
+        max_connections = (
+            self.config.experimental_max_connections
+            if self.config.experimental_max_connections
+            else max(4 * self.cpu_count, 100)
+        )
+        cfg_patch = {
+            "max_connections": max_connections,
+            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
+            "max_replication_slots": 25,
+            "max_wal_senders": 25,
+            "wal_keep_size": self.config.durability_wal_keep_size,
+        }
+        if primary_endpoint := self.async_replication.get_primary_cluster_endpoint():
+            cfg_patch["standby_cluster"] = {"host": primary_endpoint}
+        self._patroni.bulk_update_parameters_controller_by_patroni(cfg_patch)
+
     def update_config(
         self,
         is_creating_backup: bool = False,
@@ -2411,20 +2429,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             logger.warning("Early exit update_config: Cannot connect to Postgresql")
             return False
 
-        # Use config value if set, calculate otherwise
-        max_connections = (
-            self.config.experimental_max_connections
-            if self.config.experimental_max_connections
-            else max(4 * self.cpu_count, 100)
-        )
-
-        self._patroni.bulk_update_parameters_controller_by_patroni({
-            "max_connections": max_connections,
-            "max_prepared_transactions": self.config.memory_max_prepared_transactions,
-            "max_replication_slots": 25,
-            "max_wal_senders": 25,
-            "wal_keep_size": self.config.durability_wal_keep_size,
-        })
+        self._api_update_config()
 
         self._patroni.ensure_slots_controller_by_patroni(replication_slots)
 
