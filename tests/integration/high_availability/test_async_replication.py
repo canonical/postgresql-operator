@@ -311,7 +311,7 @@ def test_failover_in_standby_cluster(first_model: str, second_model: str) -> Non
     assert standby != get_db_standby_leader_unit(model_2, DB_APP_2)
 
 
-def scale_up(first_model: str, second_model: str) -> None:
+def test_scale_up(first_model: str, second_model: str) -> None:
     model_1 = Juju(model=first_model)
     model_2 = Juju(model=second_model)
 
