@@ -307,6 +307,29 @@ def test_failover_in_standby_cluster(first_model: str, second_model: str) -> Non
     assert standby != get_db_standby_leader_unit(model_2, DB_APP_2)
 
 
+def scale_up(first_model: str, second_model: str) -> None:
+    model_1 = Juju(model=first_model)
+    model_2 = Juju(model=second_model)
+
+    rerelate_test_app(model_1, DB_APP_1, DB_TEST_APP_1)
+    model_1.add_unit(DB_APP_1)
+    model_2.add_unit(DB_APP_2)
+
+    logging.info("Waiting for the applications to settle")
+    model_1.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=20 * MINUTE_SECS
+    )
+    model_2.wait(
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=20 * MINUTE_SECS
+    )
+
+    results = get_db_max_written_values(first_model, second_model, first_model, DB_TEST_APP_1)
+
+    assert len(results) == 6
+    assert all(results[0] == x for x in results), "Data is not consistent across units"
+    assert results[0] > 1, "No data was written to the database"
+
+
 def get_db_max_written_values(
     first_model: str, second_model: str, test_model: str, test_app: str
 ) -> list[int]:

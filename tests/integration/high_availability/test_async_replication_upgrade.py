@@ -9,6 +9,7 @@ from collections.abc import Generator
 import jubilant
 import pytest
 from jubilant import Juju
+from tenacity import Retrying, stop_after_attempt
 
 from .. import architecture
 from .high_availability_helpers_new import (
@@ -52,20 +53,31 @@ def second_model(juju: Juju, request: pytest.FixtureRequest) -> Generator:
 
 
 @pytest.fixture()
-def continuous_writes(first_model: str) -> Generator:
-    """Starts continuous writes to the MySQL cluster for a test and clear the writes at the end."""
+def first_model_continuous_writes(first_model: str) -> Generator:
+    """Starts continuous writes to the cluster for a test and clear the writes at the end."""
     model_1 = Juju(model=first_model)
-    model_1_test_app_leader = get_app_leader(model_1, DB_TEST_APP_NAME)
+    application_unit = get_app_leader(model_1, DB_TEST_APP_NAME)
 
     logging.info("Clearing continuous writes")
-    model_1.run(model_1_test_app_leader, "clear-continuous-writes")
+    model_1.run(
+        unit=application_unit, action="clear-continuous-writes", wait=120
+    ).raise_on_failure()
+
     logging.info("Starting continuous writes")
-    model_1.run(model_1_test_app_leader, "start-continuous-writes")
+
+    for attempt in Retrying(stop=stop_after_attempt(10), reraise=True):
+        with attempt:
+            result = model_1.run(unit=application_unit, action="start-continuous-writes")
+            result.raise_on_failure()
+
+            assert result.results["result"] == "True"
 
     yield
 
     logging.info("Clearing continuous writes")
-    model_1.run(model_1_test_app_leader, "clear-continuous-writes")
+    model_1.run(
+        unit=application_unit, action="clear-continuous-writes", wait=120
+    ).raise_on_failure()
 
 
 def test_deploy(first_model: str, second_model: str, charm: str) -> None:
@@ -108,21 +120,23 @@ def test_async_relate(first_model: str, second_model: str) -> None:
     """Relate the two MySQL clusters."""
     logging.info("Creating offers in first model")
     model_1 = Juju(model=first_model)
-    model_1.offer(DB_APP_1, endpoint="replication-offer")
+    model_1.offer(f"{first_model}.{DB_APP_1}", endpoint="replication-offer")
 
     logging.info("Consuming offer in second model")
     model_2 = Juju(model=second_model)
     model_2.consume(f"{first_model}.{DB_APP_1}")
 
-    logging.info("Relating the two mysql clusters")
+    logging.info("Relating the two postgresql clusters")
     model_2.integrate(f"{DB_APP_1}", f"{DB_APP_2}:replication")
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.any_blocked, DB_APP_1), timeout=5 * MINUTE_SECS
+        ready=wait_for_apps_status(jubilant.any_active, DB_APP_1),
+        timeout=10 * MINUTE_SECS,
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.any_waiting, DB_APP_2), timeout=5 * MINUTE_SECS
+        ready=wait_for_apps_status(jubilant.any_active, DB_APP_2),
+        timeout=10 * MINUTE_SECS,
     )
 
 
@@ -155,24 +169,21 @@ def test_create_replication(first_model: str, second_model: str) -> None:
     model_2 = Juju(model=second_model)
 
     logging.info("Running create replication action")
-    task = model_1.run(
-        unit=get_app_leader(model_1, DB_APP_1),
-        action="create-replication",
-        wait=5 * MINUTE_SECS,
-    )
-    task.raise_on_failure()
+    model_1.run(
+        unit=get_app_leader(model_1, DB_APP_1), action="create-replication", wait=5 * MINUTE_SECS
+    ).raise_on_failure()
 
     logging.info("Waiting for the applications to settle")
     model_1.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=5 * MINUTE_SECS
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_1), timeout=20 * MINUTE_SECS
     )
     model_2.wait(
-        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=5 * MINUTE_SECS
+        ready=wait_for_apps_status(jubilant.all_active, DB_APP_2), timeout=20 * MINUTE_SECS
     )
 
 
 def test_upgrade_from_edge(
-    first_model: str, second_model: str, charm: str, continuous_writes
+    first_model: str, second_model: str, charm: str, first_continuous_writes
 ) -> None:
     """Upgrade the two MySQL clusters."""
     model_1 = Juju(model=first_model)
@@ -188,14 +199,14 @@ def test_upgrade_from_edge(
 def test_data_replication(first_model: str, second_model: str, continuous_writes) -> None:
     """Test to write to primary, and read the same data back from replicas."""
     logging.info("Testing data replication")
-    results = await get_mysql_max_written_values(first_model, second_model)
+    results = get_db_max_written_values(first_model, second_model)
 
     assert len(results) == 6
     assert all(results[0] == x for x in results), "Data is not consistent across units"
     assert results[0] > 1, "No data was written to the database"
 
 
-def get_mysql_max_written_values(first_model: str, second_model: str) -> list[int]:
+def get_db_max_written_values(first_model: str, second_model: str) -> list[int]:
     """Return list with max written value from all units."""
     model_1 = Juju(model=first_model)
     model_2 = Juju(model=second_model)
@@ -211,12 +222,12 @@ def get_mysql_max_written_values(first_model: str, second_model: str) -> list[in
 
     logging.info(f"Querying max value on all {DB_APP_1} units")
     for unit_name in get_app_units(model_1, DB_APP_1):
-        unit_max_value = await get_db_max_written_value(model_1, DB_APP_1, unit_name)
+        unit_max_value = get_db_max_written_value(model_1, DB_APP_1, unit_name)
         results.append(unit_max_value)
 
     logging.info(f"Querying max value on all {DB_APP_2} units")
     for unit_name in get_app_units(model_2, DB_APP_2):
-        unit_max_value = await get_db_max_written_value(model_2, DB_APP_2, unit_name)
+        unit_max_value = get_db_max_written_value(model_2, DB_APP_2, unit_name)
         results.append(unit_max_value)
 
     return results
