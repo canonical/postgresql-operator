@@ -1,0 +1,46 @@
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:71 removing primaries
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:642 Cluster members are: [{'name': 'postgresql-0', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.125.211.220:8008/patroni', 'host': '10.125.211.220', 'port': 5432, 'timeline': 1, 'lag': 0}, {'name': 'postgresql-1', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.125.211.113:8008/patroni', 'host': '10.125.211.113', 'port': 5432, 'timeline': 1, 'lag': 0}, {'name': 'postgresql-2', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.125.211.29:8008/patroni', 'host': '10.125.211.29', 'port': 5432, 'timeline': 1}]
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:81 Stopping unit postgresql/2
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:85 Deleting unit postgresql/2
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: 
+  postgresql/1 [idle] active: 
+  postgresql/2 [idle] active: Primary
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: Primary
+  postgresql/1 [idle] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: 
+[32mINFO    [0m integration.ha_tests.test_scaling_three_units:test_scaling_three_units.py:117 Scaling back up
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [idle] active: 
+  postgresql/1 [idle] active: 
+  postgresql/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [allocating] waiting: waiting for machine
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/3 [allocating] waiting: agent initialising
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [executing] active: received database credentials of the first database
+  postgresql/0 [executing] active: 
+  postgresql/1 [executing] active: 
+  postgresql/3 [executing] waiting: waiting to start PostgreSQL
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: Primary (degraded)
+  postgresql/1 [idle] active: 
+  postgresql/3 [executing] waiting: awaiting for member to start
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql-test-app/0 [idle] active: received database credentials of the first database
+  postgresql/0 [executing] active: Primary
+  postgresql/1 [executing] active: 
+  postgresql/3 [executing] active: 
+[32mINFO    [0m juju.model:__init__.py:3254 Waiting for model:
+  postgresql/0 [idle] active: 
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:103 Initial writes {'testing.postgresql-0': 474, 'testing.postgresql-1': 474, 'testing.postgresql-3': 475}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:113 Retry writes {'testing.postgresql-0': 477, 'testing.postgresql-1': 477, 'testing.postgresql-3': 477}
+[32mINFO    [0m integration.ha_tests.helpers:helpers.py:642 Cluster members are: [{'name': 'postgresql-0', 'role': 'leader', 'state': 'running', 'api_url': 'http://10.125.211.220:8008/patroni', 'host': '10.125.211.220', 'port': 5432, 'timeline': 2}, {'name': 'postgresql-1', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.125.211.113:8008/patroni', 'host': '10.125.211.113', 'port': 5432, 'timeline': 2, 'lag': 0}, {'name': 'postgresql-3', 'role': 'sync_standby', 'state': 'streaming', 'api_url': 'http://10.125.211.90:8008/patroni', 'host': '10.125.211.90', 'port': 5432, 'timeline': 2, 'lag': 0}]
