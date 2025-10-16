@@ -33,12 +33,13 @@ Service                                          Startup   Current  Notes
 charmed-postgresql.patroni                       enabled   active   -
 charmed-postgresql.pgbackrest-service            enabled   active   -
 charmed-postgresql.prometheus-postgres-exporter  enabled   active   -
+charmed-postgresql.pgbackrest-exporter           enabled   active   -
 
 ```
 
 The `patroni` snap service is a main PostgreSQL instance which is normally up and running right after the charm deployment.
 
-The `pgbackrest` snap service is a backup framework for PostgreSQL. It is disabled if [Backup](/how-to/back-up-and-restore/create-a-backup) is not configured.
+The `pgbackrest` snap service is a backup framework for PostgreSQL. It is disabled if [Backup](/how-to/back-up-and-restore/create-a-backup) is not configured along with the `pgbackrest-exporter` service.
 
 The `prometheus-postgres-exporter` service is activated after the relation with [COS Monitoring](/how-to/monitoring-cos/enable-monitoring) only.
 
