@@ -651,6 +651,11 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
             event.defer()
             return False
 
+        if not self.upgrade.idle:
+            logger.debug("Defer on_peer_relation_changed: upgrade in progress")
+            event.defer()
+            return False
+
         # Check whether raft is stuck.
         if self.has_raft_keys():
             self._raft_reinitialisation()
