@@ -39,13 +39,14 @@ from charms.postgresql_k8s.v0.postgresql import (
 from charms.postgresql_k8s.v0.postgresql_tls import PostgreSQLTLS
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
-from ops import main
+from ops import JujuVersion, main
 from ops.charm import (
     ActionEvent,
     HookEvent,
     InstallEvent,
     LeaderElectedEvent,
     RelationDepartedEvent,
+    SecretRemoveEvent,
     StartEvent,
 )
 from ops.framework import EventBase
@@ -203,6 +204,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         self.framework.observe(self.on.set_password_action, self._on_set_password)
         self.framework.observe(self.on.promote_to_primary_action, self._on_promote_to_primary)
         self.framework.observe(self.on.update_status, self._on_update_status)
+        self.framework.observe(self.on.secret_remove, self._on_secret_remove)
         self.cluster_name = self.app.name
         self._member_name = self.unit.name.replace("/", "-")
 
@@ -439,6 +441,24 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
         # For now, as there is no DNS hostnames on VMs, and it would also depend on
         # the underlying provider (LXD, MAAS, etc.), the unit IP is returned.
         return self._unit_ip
+
+    def _on_secret_remove(self, event: SecretRemoveEvent) -> None:
+        if self.model.juju_version < JujuVersion("3.6.11"):
+            logger.warning(
+                "Skipping secret revision removal due to https://github.com/juju/juju/issues/20782"
+            )
+            return
+
+        # A secret removal (entire removal, not just a revision removal) causes
+        # https://github.com/juju/juju/issues/20794. This check is to avoid the
+        # errors that would happen if we tried to remove the revision in that case
+        # (in the revision removal, the label is present).
+        if event.secret.label is None:
+            logger.debug("Secret with no label cannot be removed")
+            return
+
+        logger.debug(f"Removing secret with label {event.secret.label} revision {event.revision}")
+        event.remove_revision()
 
     def _on_get_primary(self, event: ActionEvent) -> None:
         """Get primary instance."""
