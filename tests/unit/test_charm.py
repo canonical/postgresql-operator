@@ -15,7 +15,7 @@ from charms.postgresql_k8s.v0.postgresql import (
     PostgreSQLEnableDisableExtensionError,
     PostgreSQLUpdateUserPasswordError,
 )
-from ops import Unit
+from ops import JujuVersion, Unit
 from ops.framework import EventBase
 from ops.model import (
     ActiveStatus,
@@ -2933,3 +2933,27 @@ def test_relations_user_databases_map(harness):
             "replication": "all",
             "rewind": "all",
         }
+
+
+def test_on_secret_remove(harness, only_with_juju_secrets):
+    with (
+        patch("ops.model.Model.juju_version", new_callable=PropertyMock) as _juju_version,
+    ):
+        event = Mock()
+
+        # New juju
+        _juju_version.return_value = JujuVersion("3.6.11")
+        harness.charm._on_secret_remove(event)
+        event.remove_revision.assert_called_once_with()
+        event.reset_mock()
+
+        # Old juju
+        _juju_version.return_value = JujuVersion("3.6.9")
+        harness.charm._on_secret_remove(event)
+        assert not event.remove_revision.called
+        event.reset_mock()
+
+        # No secret
+        event.secret.label = None
+        harness.charm._on_secret_remove(event)
+        assert not event.remove_revision.called
