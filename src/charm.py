@@ -26,10 +26,10 @@ import charm_refresh
 import ops.log
 import psycopg2
 import tomli
+from charmlibs import snap
 from charms.data_platform_libs.v0.data_interfaces import DataPeerData, DataPeerUnitData
 from charms.data_platform_libs.v1.data_models import TypedCharmBase
 from charms.grafana_agent.v0.cos_agent import COSAgentProvider, charm_tracing_config
-from charms.operator_libs_linux.v2 import snap
 from charms.rolling_ops.v0.rollingops import RollingOpsManager, RunWithLock
 from charms.tempo_coordinator_k8s.v0.charm_tracing import trace_charm
 from cryptography.x509 import load_pem_x509_certificate
@@ -405,7 +405,7 @@ class PostgresqlOperatorCharm(TypedCharmBase[CharmConfig]):
 
         self._setup_exporter()
         self.backup.start_stop_pgbackrest_service()
-        self.charm._setup_pgbackrest_exporter()
+        self._setup_pgbackrest_exporter()
 
         # Wait until the database initialise.
         self.set_unit_status(WaitingStatus("waiting for database initialisation"), refresh=refresh)
