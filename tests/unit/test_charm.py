@@ -14,7 +14,7 @@ import charm_refresh
 import psycopg2
 import pytest
 import tomli
-from charms.operator_libs_linux.v2 import snap
+from charmlibs import snap
 from ops import RelationEvent, Unit
 from ops.framework import EventBase
 from ops.model import (

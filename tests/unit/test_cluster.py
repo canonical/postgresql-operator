@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, Mock, PropertyMock, mock_open, patch, senti
 
 import pytest
 import requests
-from charms.operator_libs_linux.v2 import snap
+from charmlibs import snap
 from jinja2 import Template
 from ops.testing import Harness
 from pysyncobj.utility import UtilityException

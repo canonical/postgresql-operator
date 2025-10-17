@@ -21,8 +21,8 @@ from botocore.client import Config
 from botocore.exceptions import ClientError, ConnectTimeoutError, ParamValidationError, SSLError
 from botocore.loaders import create_loader
 from botocore.regions import EndpointResolver
+from charmlibs import snap
 from charms.data_platform_libs.v0.s3 import CredentialsChangedEvent, S3Requirer
-from charms.operator_libs_linux.v2 import snap
 from jinja2 import Template
 from ops.charm import ActionEvent, HookEvent
 from ops.framework import Object

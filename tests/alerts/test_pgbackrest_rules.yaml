@@ -1,0 +1,157 @@
+rule_files:
+  - ../../src/prometheus_alert_rules/pgbackrest_rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  - name: PgBackRestBackupError fires when last_error_status >0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_backup_last_error_status{stanza="demo"}'
+        values: '0 1 1 1 1 1 1'
+    alert_rule_test:
+      - alertname: PgBackRestBackupError
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgBackRestBackupError
+              severity: critical
+              stanza: demo
+            exp_annotations:
+              summary: Backup failed for stanza demo
+              description: |
+                The last pgBackRest backup failed with error status > 0.
+                Check pgBackRest logs for stanza demo.
+                LABELS = map[__name__:pgbackrest_backup_last_error_status stanza:demo]
+
+  - name: PgBackRestBackupError does not fire when last_error_status==0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_backup_last_error_status{stanza="demo"}'
+        values: '0 0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PgBackRestBackupError
+        eval_time: 5m
+        exp_alerts: []
+
+  - name: PgBackRestBackupTooOld fires when last backup >7d
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_backup_since_last_completion_seconds{stanza="demo"}'
+        values: '0 604801 604801 604801 604801 604801 604801 604801 604801 604801 604801 604801'
+    alert_rule_test:
+      - alertname: PgBackRestBackupTooOld
+        eval_time: 11m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgBackRestBackupTooOld
+              severity: warning
+              stanza: demo
+            exp_annotations:
+              summary: No recent backup for stanza demo
+              description: |
+                The last pgBackRest backup is older than 7 days.
+                Consider checking your backup schedule, capacity, and logs.
+                LABELS = map[__name__:pgbackrest_backup_since_last_completion_seconds stanza:demo]
+
+  - name: PgBackRestBackupTooOld does not fire when last backup <7d
+    interval: 1h
+    input_series:
+      - series: 'pgbackrest_backup_since_last_completion_seconds{stanza="demo"}'
+        values: '0 1000 1000 1000 1000'
+    alert_rule_test:
+      - alertname: PgBackRestBackupTooOld
+        eval_time: 10h
+        exp_alerts: []
+
+  - name: PgBackRestStanzaError fires when stanza_status >0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_stanza_status{stanza="demo"}'
+        values: '0 1 1 1 1 1 1'
+    alert_rule_test:
+      - alertname: PgBackRestStanzaError
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgBackRestStanzaError
+              severity: warning
+              stanza: demo
+            exp_annotations:
+              summary: pgBackRest stanza demo has errors
+              description: |
+                pgBackRest reports stanza status 1 > 0.
+                This indicates that stanza demo has issues (e.g., missing or invalid backups).
+                Check pgBackRest logs for details.
+                LABELS = map[__name__:pgbackrest_stanza_status stanza:demo]
+
+  - name: PgBackRestStanzaError does not fire when stanza_status==0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_stanza_status{stanza="demo"}'
+        values: '0 0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PgBackRestStanzaError
+        eval_time: 5m
+        exp_alerts: []
+
+  - name: PgBackRestRepoError fires when repo_status >0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_repo_status{repo="repo1"}'
+        values: '0 1 1 1 1 1 1'
+    alert_rule_test:
+      - alertname: PgBackRestRepoError
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgBackRestRepoError
+              severity: warning
+              repo: repo1
+            exp_annotations:
+              summary: pgBackRest repo repo1 has errors
+              description: |
+                pgBackRest reports repo status 1 > 0.
+                This indicates repository repo1 is in an error state (e.g., inaccessible, out of space).
+                Check pgBackRest logs and storage.
+                LABELS = map[__name__:pgbackrest_repo_status repo:repo1]
+
+  - name: PgBackRestRepoError does not fire when repo_status==0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_repo_status{repo="repo1"}'
+        values: '0 0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PgBackRestRepoError
+        eval_time: 5m
+        exp_alerts: []
+
+  - name: PgBackRestExporterError fires when exporter_status==0
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_exporter_status{stanza="demo"}'
+        values: '1 0 0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PgBackRestExporterError
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              alertname: PgBackRestExporterError
+              severity: critical
+              stanza: demo
+            exp_annotations:
+              summary: pgBackRest exporter failed
+              description: |
+                pgBackRest exporter failed to fetch data for stanza demo.
+                This may indicate configuration or runtime errors.
+                LABELS = map[__name__:pgbackrest_exporter_status stanza:demo]
+
+  - name: PgBackRestExporterError does not fire when exporter_status==1
+    interval: 1m
+    input_series:
+      - series: 'pgbackrest_exporter_status{stanza="demo"}'
+        values: '1 1 1 1 1 1'
+    alert_rule_test:
+      - alertname: PgBackRestExporterError
+        eval_time: 5m
+        exp_alerts: []

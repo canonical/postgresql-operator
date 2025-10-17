@@ -86,6 +86,7 @@ Service                                          Startup   Current   Notes
 charmed-postgresql.patroni                       enabled   active    -
 charmed-postgresql.pgbackrest-service            enabled   active    -
 charmed-postgresql.prometheus-postgres-exporter  enabled   active    -
+charmed-postgresql.pgbackrest-exporter           enabled   active    -
 
 ubuntu@juju-fd7874-0:~$ systemctl --failed
 ...

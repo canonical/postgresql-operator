@@ -1,0 +1,693 @@
+rule_files:
+  - ../../src/prometheus_alert_rules/postgresql_rules.yaml
+
+evaluation_interval: 1m
+
+tests:
+  # 2.2.1
+  - name: PostgresqlDown fires immediately when pg_up=0
+    interval: 1m
+    input_series:
+      - series: 'pg_up{instance="pg1"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PostgresqlDown
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlDown
+              severity: critical
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 is down.
+              description: |
+                If you are not upgrading or configuring cross-region async replication clusters, check for errors in the Loki logs.
+                LABELS = map[__name__:pg_up instance:pg1]
+
+  - name: PostgresqlDown does not fire when pg_up=1
+    interval: 1m
+    input_series:
+      - series: 'pg_up{instance="pg2"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PostgresqlDown
+        eval_time: 0m
+        exp_alerts: []
+
+  # 2.2.2
+  - name: PostgresqlRestarted fires if uptime <60s
+    interval: 1m
+    input_series:
+      - series: 'pg_postmaster_start_time_seconds{instance="pg1"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PostgresqlRestarted
+        eval_time: 30s
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlRestarted
+              severity: info
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has restarted.
+              description: |
+                If you are not enabling/disabling TLS or upgrading or configuring cross-region async replication clusters, check for errors in the Loki logs.
+                LABELS = map[instance:pg1]
+
+  - name: PostgresqlRestarted does not fire if uptime >60s
+    interval: 1m
+    input_series:
+      - series: 'pg_postmaster_start_time_seconds{instance="pg2"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PostgresqlRestarted
+        eval_time: 2m
+        exp_alerts: []
+
+  # 2.2.3
+  - name: PostgresqlExporterError fires if scrape error >0
+    interval: 1m
+    input_series:
+      - series: 'pg_exporter_last_scrape_error{instance="pg1"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PostgresqlExporterError
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlExporterError
+              severity: critical
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 is showing an exporter error.
+              description: |
+                There may be a buggy query in query.yaml
+                LABELS = map[__name__:pg_exporter_last_scrape_error instance:pg1]
+
+  - name: PostgresqlExporterError does not fire when =0
+    interval: 1m
+    input_series:
+      - series: 'pg_exporter_last_scrape_error{instance="pg2"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PostgresqlExporterError
+        eval_time: 0m
+        exp_alerts: []
+
+  # 2.2.4
+  - name: PostgresqlTableNotAutoVacuumed fires if >7d
+    interval: 1d
+    input_series:
+      - series: 'pg_stat_user_tables_last_autovacuum{instance="pg1",relname="orders"}'
+        values: '1 2 3 4 5 6 7 8 9'
+    alert_rule_test:
+      - alertname: PostgresqlTableNotAutoVacuumed
+        eval_time: 8d
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlTableNotAutoVacuumed
+              severity: warning
+              instance: pg1
+              relname: orders
+            exp_annotations:
+              summary: A PostgreSQL table in instance pg1 is not auto vacuumed.
+              description: |
+                Table orders has not been auto vacuumed for 7 days.
+                Double-check your VACUUM settings.
+                LABELS = map[__name__:pg_stat_user_tables_last_autovacuum instance:pg1 relname:orders]
+
+  - name: PostgresqlTableNotAutoVacuumed does not fire if <7d
+    interval: 1d
+    input_series:
+      - series: 'pg_stat_user_tables_last_autovacuum{instance="pg2",relname="customers"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PostgresqlTableNotAutoVacuumed
+        eval_time: 5d
+        exp_alerts: []
+
+  # 2.2.5
+  - name: PostgresqlTableNotAutoAnalyzed fires if >7d
+    interval: 1d
+    input_series:
+      - series: 'pg_stat_user_tables_last_autoanalyze{instance="pg1",relname="orders"}'
+        values: '1 2 3 4 5 6 7 8 9'
+    alert_rule_test:
+      - alertname: PostgresqlTableNotAutoAnalyzed
+        eval_time: 8d
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlTableNotAutoAnalyzed
+              severity: warning
+              instance: pg1
+              relname: orders
+            exp_annotations:
+              summary: A PostgreSQL table in instance pg1 is not auto analyzed.
+              description: |
+                Table orders has not been auto analyzed for 7 days.
+                Double-check your AUTOVACUUM ANALYZE settings.
+                LABELS = map[__name__:pg_stat_user_tables_last_autoanalyze instance:pg1 relname:orders]
+
+  - name: PostgresqlTableNotAutoAnalyzed does not fire if <7d
+    interval: 1d
+    input_series:
+      - series: 'pg_stat_user_tables_last_autoanalyze{instance="pg2",relname="customers"}'
+        values: '0 0 0 0 0'
+    alert_rule_test:
+      - alertname: PostgresqlTableNotAutoAnalyzed
+        eval_time: 5d
+        exp_alerts: []
+
+  # 2.2.6
+  - name: PostgresqlTooManyConnections fires after 2m
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_activity_count{instance="pg1",job="db",server="s1"}'
+        values: '90 90 90'
+      - series: 'pg_settings_max_connections{instance="pg1",job="db",server="s1"}'
+        values: '100 100 100'
+    alert_rule_test:
+      - alertname: PostgresqlTooManyConnections
+        eval_time: 2m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlTooManyConnections
+              severity: warning
+              instance: pg1
+              job: db
+              server: s1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 is using > 80% of the maximum connections.
+              description: |
+                Consider checking how many connections the client application is opening, or using PgBouncer in front of the database.
+                LABELS = map[instance:pg1 job:db server:s1]
+
+  - name: PostgresqlTooManyConnections does not fire if <80%
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_activity_count{instance="pg2",job="db",server="s2"}'
+        values: '40 40 40'
+      - series: 'pg_settings_max_connections{instance="pg2",job="db",server="s2"}'
+        values: '100 100 100'
+    alert_rule_test:
+      - alertname: PostgresqlTooManyConnections
+        eval_time: 2m
+        exp_alerts: []
+
+  # 2.2.7
+  - name: PostgresqlNotEnoughConnections fires if <5 (non-template, non-postgres)
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_activity_count{instance="pg1",datname="appdb"}'
+        values: '2 2 2'
+    alert_rule_test:
+      - alertname: PostgresqlNotEnoughConnections
+        eval_time: 2m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlNotEnoughConnections
+              severity: info
+              instance: pg1
+              datname: appdb
+            exp_annotations:
+              summary: PostgreSQL instance pg1 does not have enough connections.
+              description: |
+                PostgreSQL instance pg1 should have more connections (> 5).
+                Consider double-checking how many connections the client application is opening and/or using PgBouncer in front of the database.
+                LABELS = map[datname:appdb instance:pg1]
+
+  - name: PostgresqlNotEnoughConnections does not fire if >=5
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_activity_count{instance="pg2",datname="appdb"}'
+        values: '6 6 6'
+    alert_rule_test:
+      - alertname: PostgresqlNotEnoughConnections
+        eval_time: 2m
+        exp_alerts: []
+
+  # 2.2.8
+  - name: PostgresqlDeadLocks fires if increase>5 in 1m
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_database_deadlocks{instance="pg1",datname="appdb"}'
+        values: '0 6'
+    alert_rule_test:
+      - alertname: PostgresqlDeadLocks
+        eval_time: 1m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlDeadLocks
+              severity: warning
+              instance: pg1
+              datname: appdb
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has dead locks.
+              description: |
+                See more details with the pg_locks view.
+                LABELS = map[datname:appdb instance:pg1]
+
+  - name: PostgresqlDeadLocks does not fire when increase <=5
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_database_deadlocks{instance="pg2",datname="appdb"}'
+        values: '0 2'
+    alert_rule_test:
+      - alertname: PostgresqlDeadLocks
+        eval_time: 1m
+        exp_alerts: []
+
+  # 2.2.9
+  - name: PostgresqlHighRollbackRate fires if >2%
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_database_xact_rollback{instance="pg1",datname="appdb",datid="1"}'
+        values: '10 20 30'
+      - series: 'pg_stat_database_xact_commit{instance="pg1",datname="appdb",datid="1"}'
+        values: '10 10 10'
+    alert_rule_test:
+      - alertname: PostgresqlHighRollbackRate
+        eval_time: 3m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlHighRollbackRate
+              severity: warning
+              instance: pg1
+              datname: appdb
+              datid: "1"
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has a high rollback rate instance.
+              description: |
+                The ratio of transactions being aborted compared to committed is > 2 %.
+                This is probably happening due to unoptimized configurations related to commit delay, connections, memory, and WAL files.
+                LABELS = map[datid:1 datname:appdb instance:pg1]
+
+  - name: PostgresqlHighRollbackRate does not fire if <=2%
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_database_xact_rollback{instance="pg2",datname="appdb",datid="2"}'
+        values: '1 1 1'
+      - series: 'pg_stat_database_xact_commit{instance="pg2",datname="appdb",datid="2"}'
+        values: '100 100 100'
+    alert_rule_test:
+      - alertname: PostgresqlHighRollbackRate
+        eval_time: 3m
+        exp_alerts: []
+
+  # 2.2.10
+  - name: PostgresqlCommitRateLow fires when commit rate <10
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_database_xact_commit{instance="pg1",datname="appdb"}'
+        values: '1 2 2 3 3 4 4 5 5 6 6 7 7 8 8'
+    alert_rule_test:
+      - alertname: PostgresqlCommitRateLow
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlCommitRateLow
+              severity: info
+              instance: pg1
+              datname: appdb
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has a low commit rate. 
+              description: |
+                PostgreSQL seems to be processing very few transactions.
+                Please check for long-running queries and configuration issues, like insufficient cache size.
+                LABELS = map[datname:appdb instance:pg1]
+
+  - name: PostgresqlCommitRateLow does not fire when commit rate >=10
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_database_xact_commit{instance="pg2",datname="appdb"}'
+        values: '20 20 20'
+    alert_rule_test:
+      - alertname: PostgresqlCommitRateLow
+        eval_time: 2m
+        exp_alerts: []
+
+  # 2.2.11
+  - name: PostgresqlLowXidConsumption fires if <5
+    interval: 1m
+    input_series:
+      - series: 'pg_txid_current{instance="pg1"}'
+        values: '0 1 2 2 2 3 3 4 4'
+    alert_rule_test:
+      - alertname: PostgresqlLowXidConsumption
+        eval_time: 6m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlLowXidConsumption
+              severity: info
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 shows low XID consumption.
+              description: |
+                PostgreSQL seems to be consuming transaction IDs very slowly.
+                Run ANALYZE to update the optimizer statistics, ensure that query plans are correct, and double-check your VACUUM settings.
+                LABELS = map[instance:pg1]
+
+  - name: PostgresqlLowXidConsumption does not fire if >=5
+    interval: 1m
+    input_series:
+      - series: 'pg_txid_current{instance="pg2"}'
+        values: '0 10 20 30'
+    alert_rule_test:
+      - alertname: PostgresqlLowXidConsumption
+        eval_time: 2m
+        exp_alerts: []
+
+  # 2.2.12
+  - name: PostgresqlHighRateStatementTimeout fires when rate >3
+    interval: 1m
+    input_series:
+      - series: 'postgresql_errors_total{instance="pg1",type="statement_timeout"}'
+        values: '0 500 1000 1500 2000 2600'
+    alert_rule_test:
+      - alertname: PostgresqlHighRateStatementTimeout
+        eval_time: 5m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlHighRateStatementTimeout
+              severity: critical
+              instance: pg1
+              type: statement_timeout
+            exp_annotations:
+              summary: PostgreSQL instance pg1 shows a high rate of statement timeout.
+              description: |
+                Either tune `statement_timeout` when sending queries or use EXPLAIN ANALYZE to understand how the queries can be improved.
+                VALUE = 10
+                LABELS = map[instance:pg1 type:statement_timeout]
+
+  - name: PostgresqlHighRateStatementTimeout does not fire when rate <=3
+    interval: 1m
+    input_series:
+      - series: 'postgresql_errors_total{instance="pg2",type="statement_timeout"}'
+        values: '0 1 2 2'
+    alert_rule_test:
+      - alertname: PostgresqlHighRateStatementTimeout
+        eval_time: 3m
+        exp_alerts: []
+
+  # 2.2.13
+  - name: PostgresqlHighRateDeadlock fires when increase >1
+    interval: 1m
+    input_series:
+      - series: 'postgresql_errors_total{instance="pg1",type="deadlock_detected"}'
+        values: '0 2'
+    alert_rule_test:
+      - alertname: PostgresqlHighRateDeadlock
+        eval_time: 1m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlHighRateDeadlock
+              severity: warning
+              instance: pg1
+              type: deadlock_detected
+            exp_annotations:
+              summary: PostgreSQL instance pg1 shows a high deadlock rate.
+              description: |
+                More details can be obtained through the pg_locks view.
+                LABELS = map[instance:pg1 type:deadlock_detected]
+
+  - name: PostgresqlHighRateDeadlock does not fire if increase <=1
+    interval: 1m
+    input_series:
+      - series: 'postgresql_errors_total{instance="pg2",type="deadlock_detected"}'
+        values: '0 1'
+    alert_rule_test:
+      - alertname: PostgresqlHighRateDeadlock
+        eval_time: 1m
+        exp_alerts: []
+
+  # 2.2.14
+  - name: PostgresqlUnusedReplicationSlot fires if active==0 for 1m
+    interval: 1m
+    input_series:
+      - series: 'pg_replication_slots_active{instance="pg1"}'
+        values: '0 0'
+    alert_rule_test:
+      - alertname: PostgresqlUnusedReplicationSlot
+        eval_time: 1m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlUnusedReplicationSlot
+              severity: info
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has unused replication slots.
+              description: |
+                Check if a replica is not using any of them before deleting it.
+                LABELS = map[__name__:pg_replication_slots_active instance:pg1]
+
+  - name: PostgresqlUnusedReplicationSlot does not fire if active==1
+    interval: 1m
+    input_series:
+      - series: 'pg_replication_slots_active{instance="pg2"}'
+        values: '1 1'
+    alert_rule_test:
+      - alertname: PostgresqlUnusedReplicationSlot
+        eval_time: 1m
+        exp_alerts: []
+
+  # 2.2.15
+  - name: PostgresqlTooManyDeadTuples fires when dead/live >=0.1
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_user_tables_n_dead_tup{instance="pg1",relname="orders"}'
+        values: '20000 20000'
+      - series: 'pg_stat_user_tables_n_live_tup{instance="pg1",relname="orders"}'
+        values: '100000 100000'
+    alert_rule_test:
+      - alertname: PostgresqlTooManyDeadTuples
+        eval_time: 2m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlTooManyDeadTuples
+              severity: warning
+              instance: pg1
+              relname: orders
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has too many dead tuples.
+              description: |
+                Double-check your VACUUM settings.
+                LABELS = map[instance:pg1 relname:orders]
+
+  - name: PostgresqlTooManyDeadTuples does not fire when dead/live <0.1
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_user_tables_n_dead_tup{instance="pg2",relname="customers"}'
+        values: '100 100'
+      - series: 'pg_stat_user_tables_n_live_tup{instance="pg2",relname="customers"}'
+        values: '10000 10000'
+    alert_rule_test:
+      - alertname: PostgresqlTooManyDeadTuples
+        eval_time: 2m
+        exp_alerts: []
+
+  # 2.2.16
+  - name: PostgresqlConfigurationChanged fires when settings metric differs
+    interval: 1m
+    input_series:
+      - series: 'pg_settings_max_connections{instance="pg1"}'
+        values: '100 100 100 100 100 100'
+      - series: 'pg_settings_work_mem{instance="pg1"}'
+        values: '4096 4096 8192 8192 8192 8192'
+    alert_rule_test:
+      - alertname: PostgresqlConfigurationChanged
+        eval_time: 5m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlConfigurationChanged
+              severity: info
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 configuration has changed.
+              description: |
+                PostgreSQL database configuration has changed.
+                LABELS = map[__name__:pg_settings_work_mem instance:pg1]
+
+  - name: PostgresqlConfigurationChanged does not fire if no diff
+    interval: 1m
+    input_series:
+      - series: 'pg_settings_max_connections{instance="pg2"}'
+        values: '100'
+    alert_rule_test:
+      - alertname: PostgresqlConfigurationChanged
+        eval_time: 5m
+        exp_alerts: []
+
+  # 2.2.17
+  - name: PostgresqlSslCompressionActive fires if sum>0
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_ssl_compression{instance="pg1"}'
+        values: '1'
+    alert_rule_test:
+      - alertname: PostgresqlSslCompressionActive
+        eval_time: 0m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlSslCompressionActive
+              severity: warning
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 SSL compression is active.
+              description: |
+                Database connections with SSL compression are enabled. This may add significant jitter in replication delay.
+                Replicas should turn off SSL compression via `sslcompression=0` in `recovery.conf`.
+                LABELS = map[instance:pg1]
+
+  - name: PostgresqlSslCompressionActive does not fire if sum==0
+    interval: 1m
+    input_series:
+      - series: 'pg_stat_ssl_compression{instance="pg2"}'
+        values: '0'
+    alert_rule_test:
+      - alertname: PostgresqlSslCompressionActive
+        eval_time: 0m
+        exp_alerts: []
+
+  # 2.2.18
+  - name: PostgresqlTooManyLocksAcquired fires if ratio >0.2
+    interval: 1m
+    input_series:
+      - series: 'pg_locks_count{instance="pg1"}'
+        values: '100 150 200 250 300 350'
+      - series: 'pg_settings_max_locks_per_transaction{instance="pg1"}'
+        values: '30 30 30 30 30 30'
+      - series: 'pg_settings_max_connections{instance="pg1"}'
+        values: '30 30 30 30 30 30'
+    alert_rule_test:
+      - alertname: PostgresqlTooManyLocksAcquired
+        eval_time: 4m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlTooManyLocksAcquired
+              severity: warning
+              instance: pg1
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has acquired too many locks.
+              description: |
+                If this alert happens frequently, you may need to increase the PostgreSQL setting max_locks_per_transaction.
+                LABELS = map[instance:pg1]
+
+  - name: PostgresqlTooManyLocksAcquired does not fire if ratio <=0.2
+    interval: 1m
+    input_series:
+      - series: 'pg_locks_count{instance="pg2"}'
+        values: '100'
+      - series: 'pg_settings_max_locks_per_transaction{instance="pg2"}'
+        values: '50'
+      - series: 'pg_settings_max_connections{instance="pg2"}'
+        values: '100'
+    alert_rule_test:
+      - alertname: PostgresqlTooManyLocksAcquired
+        eval_time: 2m
+        exp_alerts: []
+
+
+  # 2.2.19
+  - name: PostgresqlBloatIndexHigh fires if bloat_pct >80 and size>100MB
+    interval: 5m
+    input_series:
+      - series: 'pg_bloat_btree_bloat_pct{idxname="idx_orders",instance="pg1"}'
+        values: '85 85 85 85 85 85 85 85 85 85 85 85 85 85 85 85 85 85 85 85'
+      - series: 'pg_bloat_btree_real_size{idxname="idx_orders",instance="pg1"}'
+        values: '200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000 200000000'
+    alert_rule_test:
+      - alertname: PostgresqlBloatIndexHigh(>80%)
+        eval_time: 1h10m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlBloatIndexHigh(>80%)
+              severity: warning
+              instance: pg1
+              idxname: idx_orders
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has a high bloat index (> 80%).
+              description: |
+                The index idx_orders is bloated.
+                Consider running `REINDEX INDEX CONCURRENTLY idx_orders;`
+                LABELS = map[__name__:pg_bloat_btree_bloat_pct idxname:idx_orders instance:pg1]
+
+  - name: PostgresqlBloatIndexHigh does not fire if bloat_pct <=80
+    interval: 1h
+    input_series:
+      - series: 'pg_bloat_btree_bloat_pct{instance="pg2",idxname="idx_customers"}'
+        values: '70 70'
+      - series: 'pg_bloat_btree_real_size{instance="pg2",idxname="idx_customers"}'
+        values: '200000000 200000000'
+    alert_rule_test:
+      - alertname: PostgresqlBloatIndexHigh(>80%)
+        eval_time: 1h
+        exp_alerts: []
+
+  # 2.2.20
+  - name: PostgresqlBloatTableHigh fires if bloat_pct >80 and size>200MB
+    interval: 5m
+    input_series:
+      - series: 'pg_bloat_table_bloat_pct{instance="pg1",relname="orders"}'
+        values: '90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90 90'
+      - series: 'pg_bloat_table_real_size{instance="pg1",relname="orders"}'
+        values: '500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000 500000000'
+    alert_rule_test:
+      - alertname: PostgresqlBloatTableHigh(>80%)
+        eval_time: 1h10m
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlBloatTableHigh(>80%)
+              severity: warning
+              instance: pg1
+              relname: orders
+            exp_annotations:
+              summary: PostgreSQL instance pg1 has a high bloat table (> 80%).
+              description: |
+                The table orders is bloated.
+                Consider running `VACUUM orders;`
+                LABELS = map[__name__:pg_bloat_table_bloat_pct instance:pg1 relname:orders]
+
+  - name: PostgresqlBloatTableHigh does not fire if bloat_pct <=80
+    interval: 1h
+    input_series:
+      - series: 'pg_bloat_table_bloat_pct{instance="pg2",relname="customers"}'
+        values: '60 60'
+      - series: 'pg_bloat_table_real_size{instance="pg2",relname="customers"}'
+        values: '500000000 500000000'
+    alert_rule_test:
+      - alertname: PostgresqlBloatTableHigh(>80%)
+        eval_time: 1h
+        exp_alerts: []
+
+  # 2.2.21
+  - name: PostgresqlInvalidIndex fires after 6h if index present
+    interval: 5m
+    input_series:
+      - series: 'pg_general_index_info_pg_relation_size{indexrelname="orders_ccnew_idx",instance="pg1",relname="orders"}'
+        values: '1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1'
+    alert_rule_test:
+      - alertname: PostgresqlInvalidIndex
+        eval_time: 7h
+        exp_alerts:
+          - exp_labels:
+              alertname: PostgresqlInvalidIndex
+              severity: critical
+              instance: pg1
+              relname: orders
+              indexrelname: orders_ccnew_idx
+            exp_annotations:
+              summary: PostgreSQL instance pg1)= has an invalid index. 
+              description: |
+                The table orders has an invalid index: orders_ccnew_idx.
+                Consider running `DROP INDEX orders_ccnew_idx;`
+                LABELS = map[__name__:pg_general_index_info_pg_relation_size indexrelname:orders_ccnew_idx instance:pg1 relname:orders]
+
+  - name: PostgresqlInvalidIndex does not fire if no ccnew index
+    interval: 1h
+    input_series:
+      - series: 'pg_general_index_info_pg_relation_size{instance="pg2",relname="orders",indexrelname="orders_valid_idx"}'
+        values: '1 1 1 1 1 1 1'
+    alert_rule_test:
+      - alertname: PostgresqlInvalidIndex
+        eval_time: 6h
+        exp_alerts: []
